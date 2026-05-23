@@ -1,0 +1,682 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>在线教学与实训平台</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="style.css"> <!-- 引用独立的style.css文件 -->
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap');
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            border: none;
+            outline: none;
+            font-family: "Inter", sans-serif;
+        }
+
+        body {
+            /* 完全使用你上传的背景图路径 */
+            background-image: url(img/back.jpg);
+            background-size: cover;
+            background-position: top;
+            background-repeat: no-repeat;
+            /* 修复原模板overflow:hidden导致无法滚动的问题 */
+            overflow-x: hidden;
+            overflow-y: auto;
+            min-height: 100vh;
+            position: relative;
+        }
+
+        /* 保留你上传的底部渐变遮罩 */
+        body::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            right: 0;
+            left: 0;
+            background: linear-gradient(transparent 70%, rgba(0, 0, 0, 0.3));
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        /* 毛玻璃核心样式复用 */
+        .glass-effect {
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.1);
+            border-radius: 12px;
+        }
+
+        /* ==================== 完全对齐你上传的导航栏样式 ==================== */
+        .navbar-container {
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            /* 保留你上传的导航栏入场动画 */
+            animation: topIn 1.2s ease-out forwards;
+        }
+
+        .navbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 2rem;
+            padding: 10px 25px;
+            background-color: rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-bottom-left-radius: 20px;
+            border-bottom-right-radius: 20px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+            /* 导航栏最大宽度，确保只占中上方一部分 */
+            max-width: 950px;
+            width: 90%;
+        }
+
+        .navbar-logo h2 {
+            color: rgb(53, 53, 53);
+            font-weight: 600;
+            font-size: 1.2rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            white-space: nowrap;
+        }
+
+        .navbar-menu {
+            display: flex;
+            gap: 10px;
+        }
+
+        .navbar-menu a {
+            font-size: 18px;
+            font-weight: 500;
+            letter-spacing: 2px;
+            color: rgb(53, 53, 53);
+            width: 110px;
+            text-align: center;
+            padding: 8px 0;
+            border-bottom-left-radius: 20px;
+            border-bottom-right-radius: 20px;
+            text-decoration: none;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        /* 激活态和hover态：背景填充（完全和你上传的一致） */
+        .navbar-menu a.active,
+        .navbar-menu a:hover {
+            background-color: #16423c;
+            color: white;
+        }
+
+        /* 你上传的导航栏特有交互：鼠标离开时所有菜单项恢复透明 */
+        .navbar:hover > .navbar-menu > a:not(:hover) {
+            background-color: transparent;
+            color: rgb(53, 53, 53);
+        }
+
+        .navbar-user {
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+            white-space: nowrap;
+        }
+
+        .navbar-user a {
+            color: rgb(53, 53, 53);
+            font-size: 1.2rem;
+            text-decoration: none;
+        }
+
+        .avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 2px solid rgba(255, 255, 255, 0.5);
+        }
+
+        /* 导航栏入场动画（完全和你上传的一致） */
+        @keyframes topIn {
+            from {
+                transform: translateY(-100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        /* ==================== 主体内容样式 ==================== */
+        .container {
+            display: flex;
+            gap: 2rem;
+            padding: 2rem;
+            max-width: 1400px;
+            margin: 2rem auto 0;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* 左侧侧边栏 */
+        .sidebar {
+            width: 280px;
+            padding: 1.5rem;
+            height: calc(100vh - 130px);
+            position: sticky;
+            top: 90px;
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.1);
+            border-radius: 12px;
+        }
+
+        .sidebar-title h3 {
+            color: #2c3e50;
+            font-size: 1.2rem;
+            margin-bottom: 1.5rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .sidebar-menu {
+            list-style: none;
+            margin-bottom: 2rem;
+        }
+
+        .sidebar-menu li {
+            margin: 1rem 0;
+        }
+
+        .sidebar-menu a {
+            color: #2c3e50;
+            text-decoration: none;
+            font-size: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.8rem;
+            padding: 0.8rem 1rem;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+
+        .sidebar-menu a:hover {
+            background: rgba(22, 66, 60, 0.15);
+            color: #16423c;
+        }
+
+        /* 侧边栏统计卡片 */
+        .sidebar-card {
+            padding: 1.2rem;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            margin-top: 1rem;
+        }
+
+        .sidebar-card h4 {
+            color: #2c3e50;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .progress-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin: 0.8rem 0;
+        }
+
+        .progress-bar {
+            width: 60%;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: #16423c;
+            border-radius: 4px;
+            transition: width 0.5s ease;
+        }
+
+        .progress-num {
+            font-size: 0.85rem;
+            color: #2c3e50;
+            font-weight: 500;
+        }
+
+        /* 右侧主内容区 */
+        .main-content {
+            flex: 1;
+        }
+
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+        }
+
+        .page-header h2 {
+            color: white;
+            font-size: 1.5rem;
+            text-shadow: 0 1px 5px rgba(0, 0, 0, 0.3);
+        }
+
+        .btn {
+            padding: 0.6rem 1.2rem;
+            border: none;
+            border-radius: 8px;
+            background: #16423c;
+            color: white;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn:hover {
+            background: #0f2d29;
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        /* 纯文字毛玻璃课程卡片（无任何图片） */
+        .card-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        .course-card {
+            overflow: hidden;
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.1);
+            border-radius: 12px;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .course-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 12px 40px 0 rgba(31, 38, 135, 0.15);
+        }
+
+        .card-content {
+            padding: 1.8rem;
+        }
+
+        .card-tag {
+            display: inline-block;
+            padding: 0.3rem 0.8rem;
+            background: rgba(22, 66, 60, 0.15);
+            color: #16423c;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            margin-bottom: 1rem;
+        }
+
+        .card-content h3 {
+            color: #2c3e50;
+            font-size: 1.25rem;
+            margin-bottom: 0.8rem;
+            line-height: 1.4;
+        }
+
+        .card-desc {
+            color: #555;
+            font-size: 0.9rem;
+            line-height: 1.6;
+            margin-bottom: 1.2rem;
+        }
+
+        .card-meta {
+            display: flex;
+            gap: 1.2rem;
+            margin-bottom: 1.5rem;
+            font-size: 0.85rem;
+            color: #666;
+            flex-wrap: wrap;
+        }
+
+        .card-meta i {
+            color: #16423c;
+            margin-right: 0.3rem;
+        }
+
+        .card-btn {
+            width: 100%;
+            padding: 0.8rem;
+            border: none;
+            border-radius: 8px;
+            background: rgba(22, 66, 60, 0.15);
+            color: #2c3e50;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 500;
+        }
+
+        .card-btn:hover {
+            background: #16423c;
+            color: white;
+        }
+
+        /* 实训公告卡片 */
+        .notice-card {
+            padding: 1.5rem;
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.1);
+            border-radius: 12px;
+        }
+
+        .notice-card h3 {
+            color: #2c3e50;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .notice-list {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .notice-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 1rem;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+        }
+
+        .notice-tag {
+            padding: 0.3rem 0.8rem;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        .notice-tag.urgent {
+            background: rgba(231, 76, 60, 0.2);
+            color: #e74c3c;
+        }
+
+        .notice-tag.info {
+            background: rgba(22, 66, 60, 0.15);
+            color: #16423c;
+        }
+
+        .notice-tag.warn {
+            background: rgba(241, 196, 15, 0.2);
+            color: #f1c40f;
+        }
+
+        .notice-item p {
+            flex: 1;
+            margin: 0 1rem;
+            color: #2c3e50;
+            text-align: left;
+            width: auto;
+            text-shadow: none;
+        }
+
+        .notice-time {
+            font-size: 0.8rem;
+            color: #666;
+            white-space: nowrap;
+        }
+
+        /* 底部版权栏 */
+        .footer {
+            text-align: center;
+            padding: 1.5rem;
+            color: rgba(255, 255, 255, 0.7);
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 12px;
+            margin: 2rem auto;
+            max-width: 1400px;
+            width: 90%;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* 响应式适配 */
+        @media (max-width: 1200px) {
+            .container {
+                flex-direction: column;
+            }
+            .sidebar {
+                width: 100%;
+                height: auto;
+                position: static;
+                margin-bottom: 2rem;
+            }
+            .card-grid {
+                grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            }
+        }
+
+        @media (max-width: 768px) {
+            .navbar {
+                flex-direction: column;
+                gap: 1rem;
+                padding: 15px 20px;
+            }
+            .navbar-menu {
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+            .page-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 1rem;
+            }
+            .notice-item {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 0.5rem;
+            }
+            .notice-time {
+                align-self: flex-end;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- 顶部导航栏（完全对齐你上传的样式） -->
+    <header class="navbar-container">
+        <nav class="navbar">
+            <div class="navbar-logo">
+                <h2><i class="bi bi-book-half"></i> 学知实训平台</h2>
+            </div>
+            <div class="navbar-menu">
+                <a href="#" class="active">首页</a>
+                <a href="#">课程中心</a>
+                <a href="#">实训模块</a>
+                <a href="#">学习数据</a>
+                <a href="#">个人中心</a>
+            </div>
+            <div class="navbar-user">
+                <a href="#"><i class="bi bi-bell"></i></a>
+                <a href="#"><img src="https://picsum.photos/40/40" alt="用户头像" class="avatar"></a>
+            </div>
+        </nav>
+    </header>
+
+    <!-- 主体内容 -->
+    <div class="container">
+        <!-- 左侧侧边栏 -->
+        <aside class="sidebar">
+            <div class="sidebar-title">
+                <h3>课程分类</h3>
+            </div>
+            <ul class="sidebar-menu">
+                <li><a href="#"><i class="bi bi-code-slash"></i> 编程开发</a></li>
+                <li><a href="#"><i class="bi bi-database"></i> 数据库实训</a></li>
+                <li><a href="#"><i class="bi bi-cloud"></i> 云计算实训</a></li>
+                <li><a href="#"><i class="bi bi-robot"></i> 人工智能实训</a></li>
+                <li><a href="#"><i class="bi bi-network-wired"></i> 网络安全实训</a></li>
+                <li><a href="#"><i class="bi bi-puzzle"></i> 综合项目实训</a></li>
+            </ul>
+
+            <div class="sidebar-card">
+                <h4><i class="bi bi-graph-up"></i> 学习进度</h4>
+                <div class="progress-item">
+                    <span>本周完成实训</span>
+                    <div class="progress-bar">
+                        <div class="progress-fill" style="width: 75%;"></div>
+                    </div>
+                    <span class="progress-num">75%</span>
+                </div>
+                <div class="progress-item">
+                    <span>已学课程</span>
+                    <div class="progress-bar">
+                        <div class="progress-fill" style="width: 60%;"></div>
+                    </div>
+                    <span class="progress-num">60%</span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- 右侧主内容区 -->
+        <main class="main-content">
+            <div class="page-header">
+                <h2>推荐实训课程</h2>
+                <div class="header-actions">
+                    <button class="btn">全部课程</button>
+                    <button class="btn btn-secondary">筛选</button>
+                </div>
+            </div>
+
+            <!-- 纯文字毛玻璃课程卡片 -->
+            <div class="card-grid">
+                <div class="course-card">
+                    <div class="card-content">
+                        <div class="card-tag">编程开发</div>
+                        <h3>Python全栈开发实训</h3>
+                        <p class="card-desc">基于Django框架的Web项目开发，完成电商平台实战，掌握前后端分离开发流程</p>
+                        <div class="card-meta">
+                            <span><i class="bi bi-clock"></i> 48课时</span>
+                            <span><i class="bi bi-star-fill"></i> 4.9分</span>
+                            <span><i class="bi bi-people"></i> 1280人学习</span>
+                        </div>
+                        <button class="card-btn">开始学习</button>
+                    </div>
+                </div>
+
+                <div class="course-card">
+                    <div class="card-content">
+                        <div class="card-tag">数据库</div>
+                        <h3>MySQL数据库优化实训</h3>
+                        <p class="card-desc">深入学习索引优化、事务机制，完成百万级数据查询优化与分库分表实践</p>
+                        <div class="card-meta">
+                            <span><i class="bi bi-clock"></i> 32课时</span>
+                            <span><i class="bi bi-star-fill"></i> 4.8分</span>
+                            <span><i class="bi bi-people"></i> 960人学习</span>
+                        </div>
+                        <button class="card-btn">开始学习</button>
+                    </div>
+                </div>
+
+                <div class="course-card">
+                    <div class="card-content">
+                        <div class="card-tag">云计算</div>
+                        <h3>云原生容器化实训</h3>
+                        <p class="card-desc">基于Docker+K8s实现微服务部署与运维，掌握容器编排与集群管理</p>
+                        <div class="card-meta">
+                            <span><i class="bi bi-clock"></i> 40课时</span>
+                            <span><i class="bi bi-star-fill"></i> 4.7分</span>
+                            <span><i class="bi bi-people"></i> 850人学习</span>
+                        </div>
+                        <button class="card-btn">开始学习</button>
+                    </div>
+                </div>
+
+                <div class="course-card">
+                    <div class="card-content">
+                        <div class="card-tag">网络安全</div>
+                        <h3>Web安全渗透测试实训</h3>
+                        <p class="card-desc">学习XSS、CSRF、SQL注入等漏洞挖掘与防护，完成实战渗透演练</p>
+                        <div class="card-meta">
+                            <span><i class="bi bi-clock"></i> 45课时</span>
+                            <span><i class="bi bi-star-fill"></i> 4.9分</span>
+                            <span><i class="bi bi-people"></i> 1120人学习</span>
+                        </div>
+                        <button class="card-btn">开始学习</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 实训公告 -->
+            <div class="notice-card">
+                <h3><i class="bi bi-bullhorn"></i> 实训公告</h3>
+                <div class="notice-list">
+                    <div class="notice-item">
+                        <span class="notice-tag urgent">紧急</span>
+                        <p>2026年春季实训项目提交截止日期延长至5月24日</p>
+                        <span class="notice-time">2026-05-20</span>
+                    </div>
+                    <div class="notice-item">
+                        <span class="notice-tag info">通知</span>
+                        <p>新增人工智能实训课程《大模型应用开发》已上线</p>
+                        <span class="notice-time">2026-05-18</span>
+                    </div>
+                    <div class="notice-item">
+                        <span class="notice-tag warn">提醒</span>
+                        <p>未完成基础实训的同学请尽快完成，否则影响综合评分</p>
+                        <span class="notice-time">2026-05-15</span>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- 底部版权栏 -->
+    <footer class="footer">
+        <p>© 2026 学知实训平台 - 在线教学与实训系统 版权所有</p>
+    </footer>
+</body>
+</html>
