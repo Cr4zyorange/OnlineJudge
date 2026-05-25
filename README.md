@@ -4,6 +4,8 @@
 
 本目录结构基于 `docs/最终提交/软件详细设计说明书.md` 中的系统设计建立：系统采用前后端分离架构，前端为 Vue3 + TypeScript，后端为 Spring Boot，数据库为 MySQL；实现边界按 AUTH、CRS、LRN、LAB、HWK、GRD 六个子系统拆分，跨模块复用能力集中放在 `common` 和 `integration` 下。
 
+正式开发前先阅读 `docs/开发/00-基础设施开发约定.md`。该文档说明了当前仓库已提供的统一登录态、课程权限客户端、评测/通知/来源成绩/文件存储契约，以及前端统一请求层；各模块不要重复定义这些基础对象。
+
 ```text
 .
 ├── backend/                                      # Spring Boot 后端工程

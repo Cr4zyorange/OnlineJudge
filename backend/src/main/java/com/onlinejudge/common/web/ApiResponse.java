@@ -1,15 +1,11 @@
 package com.onlinejudge.common.web;
 
-public record ApiResponse<T>(int code, String message, T data) {
+public record ApiResponse<T>(String code, String message, T data) {
     public static <T> ApiResponse<T> ok(T data) {
-        return new ApiResponse<>(200, "success", data);
+        return new ApiResponse<>("0", "success", data);
     }
 
-    public static ApiResponse<Void> ok() {
-        return new ApiResponse<>(200, "success", null);
-    }
-
-    public static ApiResponse<Void> error(int code, String message) {
+    public static <T> ApiResponse<T> error(String code, String message) {
         return new ApiResponse<>(code, message, null);
     }
 }
