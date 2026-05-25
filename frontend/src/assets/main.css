@@ -98,6 +98,11 @@ button:disabled {
   color: #fff;
 }
 
+.navbar-menu a.disabled {
+  opacity: 0.55;
+  pointer-events: none;
+}
+
 .navbar-user {
   display: flex;
   align-items: center;

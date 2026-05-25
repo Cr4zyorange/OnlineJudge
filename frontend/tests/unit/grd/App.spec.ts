@@ -1,12 +1,21 @@
 import { mount } from '@vue/test-utils';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import App from '../../../src/app/App.vue';
+import * as courseApi from '../../../src/api/crs/courses';
 import * as gradeItemApi from '../../../src/api/grd/gradeItems';
 
 vi.mock('../../../src/api/grd/gradeItems');
+vi.mock('../../../src/api/crs/courses');
 
 describe('App', () => {
   const originalLocation = window.location;
+
+  beforeEach(() => {
+    window.localStorage.clear();
+    window.localStorage.setItem('onlinejudge.userId', '101');
+    window.localStorage.setItem('onlinejudge.userRole', 'TEACHER');
+    window.localStorage.setItem('onlinejudge.username', 'Teacher101');
+  });
 
   afterEach(() => {
     vi.resetAllMocks();
@@ -14,6 +23,23 @@ describe('App', () => {
       configurable: true,
       value: originalLocation
     });
+  });
+
+  it('renders the merged course management page on the course route', async () => {
+    vi.mocked(courseApi.listCourses).mockResolvedValueOnce({ list: [], total: 0, page: 1, size: 20 });
+    vi.mocked(courseApi.listCourses).mockResolvedValueOnce({ list: [], total: 0, page: 1, size: 20 });
+    vi.mocked(courseApi.listCourses).mockResolvedValueOnce({ list: [], total: 0, page: 1, size: 20 });
+    vi.mocked(courseApi.listCourses).mockResolvedValueOnce({ list: [], total: 0, page: 1, size: 20 });
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: new URL('http://localhost/courses')
+    });
+
+    const wrapper = mount(App);
+    await flushPromises();
+
+    expect(courseApi.listCourses).toHaveBeenCalledWith('', 'all');
+    expect(wrapper.text()).toContain('全部课程');
   });
 
   it('passes course id from route query into the grade item configuration page', async () => {

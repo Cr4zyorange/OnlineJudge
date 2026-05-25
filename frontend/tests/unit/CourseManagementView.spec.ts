@@ -1,11 +1,13 @@
 import { flushPromises, mount } from '@vue/test-utils';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import CourseManagementView from '../../src/views/crs/CourseManagementView.vue';
+
+const longDescription = '课程创建与管理主流程，覆盖教师建课、信息维护、学生加入、教学资源组织与后续课程运维需求，保证课程展示卡片不会因为简介过长而影响排版，同时为后续加入课程、成员管理、公告发布、成绩联动等操作预留足够清晰的展示空间。';
 
 const course = {
   id: 1,
   name: '软件工程基础',
-  description: '课程创建与管理主流程，覆盖教师建课、信息维护、学生加入、教学资源组织与后续课程运维需求，保证课程展示卡片不会因为简介过长而影响排版，同时为后续加入课程、成员管理、公告发布、成绩联动等操作预留足够清晰的展示空间。',
+  description: longDescription,
   teacherId: 101,
   teacherName: '教师101',
   semester: '2026春',
@@ -24,9 +26,17 @@ const course = {
 };
 
 describe('CourseManagementView', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    window.localStorage.clear();
+    window.localStorage.setItem('onlinejudge.userId', '101');
+    window.localStorage.setItem('onlinejudge.userRole', 'TEACHER');
+    window.localStorage.setItem('onlinejudge.username', 'Teacher101');
+  });
+
   it('truncates long descriptions and opens a detail modal from the all courses view', async () => {
     const page = (list = [course], total = list.length) => ({
-      code: 200,
+      code: '0',
       message: 'success',
       data: { list, total, page: 1, size: 20 }
     });
@@ -40,35 +50,36 @@ describe('CourseManagementView', () => {
     const wrapper = mount(CourseManagementView);
     await flushPromises();
 
-    expect(wrapper.get('.card-desc').text().length).toBeLessThan(course.description.length);
+    expect(wrapper.get('.card-desc').text().length).toBeLessThan(longDescription.length);
+    const gradeLink = wrapper.findAll('.navbar-menu a').find((link) => link.text().includes('成绩分析'));
+    expect(gradeLink?.attributes('href')).toBe('/courses/1/grd/grade-items');
+
     await wrapper.get('.course-card').trigger('click');
     await flushPromises();
 
     expect(wrapper.text()).toContain('课程详情');
-    expect(wrapper.text()).toContain(course.description);
+    expect(wrapper.text()).toContain(longDescription);
     expect(wrapper.text()).toContain('预留操作区');
   });
 
   it('uses different layouts for all courses and managed courses, then creates a course', async () => {
     const page = (list = [course], total = list.length) => ({
-      code: 200,
+      code: '0',
       message: 'success',
       data: { list, total, page: 1, size: 20 }
     });
+    const newCourse = { ...course, id: 2, name: '数据结构', category: '计算机基础' };
     const fetchMock = vi.fn()
       .mockResolvedValueOnce({ ok: true, json: async () => page([course], 1) })
       .mockResolvedValueOnce({ ok: true, json: async () => page([course], 1) })
       .mockResolvedValueOnce({ ok: true, json: async () => page([course], 1) })
       .mockResolvedValueOnce({ ok: true, json: async () => page([], 0) })
       .mockResolvedValueOnce({ ok: true, json: async () => page([course], 1) })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ code: 200, message: 'success', data: { ...course, id: 2, name: '数据结构' } })
-      })
-      .mockResolvedValueOnce({ ok: true, json: async () => page([{ ...course, id: 2, name: '数据结构' }], 1) })
-      .mockResolvedValueOnce({ ok: true, json: async () => page([{ ...course, id: 2, name: '数据结构' }], 1) })
-      .mockResolvedValueOnce({ ok: true, json: async () => page([{ ...course, id: 2, name: '数据结构' }], 1) })
-      .mockResolvedValueOnce({ ok: true, json: async () => page([], 0) });
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ code: '0', message: 'success', data: newCourse }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => page([newCourse], 1) })
+      .mockResolvedValueOnce({ ok: true, json: async () => page([newCourse], 1) })
+      .mockResolvedValueOnce({ ok: true, json: async () => page([], 0) })
+      .mockResolvedValueOnce({ ok: true, json: async () => page([newCourse], 1) });
     vi.stubGlobal('fetch', fetchMock);
 
     const wrapper = mount(CourseManagementView);

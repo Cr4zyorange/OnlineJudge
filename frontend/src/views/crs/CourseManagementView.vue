@@ -6,10 +6,16 @@
           <h2><i class="bi bi-book-half"></i> 学知实训平台</h2>
         </div>
         <div class="navbar-menu">
-          <a class="active">课程中心</a>
+          <a class="active" href="/courses">课程中心</a>
           <a>实训模块</a>
           <a>作业评测</a>
-          <a>成绩分析</a>
+          <a
+            :class="{ disabled: !gradeAnalysisHref }"
+            :href="gradeAnalysisHref || undefined"
+            :aria-disabled="!gradeAnalysisHref"
+          >
+            成绩分析
+          </a>
         </div>
         <div class="navbar-user">
           <i class="bi bi-bell"></i>
@@ -164,10 +170,10 @@
                     <span><i class="bi bi-person-badge"></i> {{ course.teacherName }}</span>
                   </div>
                   <div v-if="activeTab === 'managed'" class="card-actions">
-                    <button class="card-btn" type="button" :disabled="!course.manageable" @click="editCourse(course)">
+                    <button class="card-btn" type="button" :disabled="!course.manageable" @click.stop="editCourse(course)">
                       <i class="bi bi-pencil-square"></i> 编辑
                     </button>
-                    <button class="card-btn danger" type="button" :disabled="!course.manageable" @click="archive(course)">
+                    <button class="card-btn danger" type="button" :disabled="!course.manageable" @click.stop="archive(course)">
                       <i class="bi bi-archive"></i> 归档
                     </button>
                   </div>
@@ -320,6 +326,19 @@ const visibleCourses = computed(() => {
 });
 
 const canOpenCourseDetail = computed(() => activeTab.value === 'all' || activeTab.value === 'archived');
+const gradeAnalysisCourse = computed(() => {
+  if (editingCourse.value?.id) {
+    return editingCourse.value;
+  }
+  if (selectedCourse.value?.id) {
+    return selectedCourse.value;
+  }
+  return visibleCourses.value.find((course) => course.manageable) ?? visibleCourses.value[0] ?? null;
+});
+const gradeAnalysisHref = computed(() => {
+  const course = gradeAnalysisCourse.value;
+  return course ? `/courses/${course.id}/grd/grade-items` : '';
+});
 
 async function loadCourses() {
   loading.value = true;
@@ -401,7 +420,7 @@ function editCourse(course: Course) {
 }
 
 async function archive(course: Course) {
-  if (!window.confirm(`确认归档课程「${course.name}」？`)) {
+  if (!window.confirm(`确认归档课程《${course.name}》？`)) {
     return;
   }
   await archiveCourse(course.id);

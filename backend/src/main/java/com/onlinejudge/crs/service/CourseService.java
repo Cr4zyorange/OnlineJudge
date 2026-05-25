@@ -3,7 +3,12 @@ package com.onlinejudge.crs.service;
 import com.onlinejudge.common.exception.BusinessException;
 import com.onlinejudge.common.security.CurrentUser;
 import com.onlinejudge.common.web.PageResponse;
-import com.onlinejudge.crs.domain.*;
+import com.onlinejudge.crs.domain.Course;
+import com.onlinejudge.crs.domain.CourseMember;
+import com.onlinejudge.crs.domain.CourseMemberRole;
+import com.onlinejudge.crs.domain.CourseMemberStatus;
+import com.onlinejudge.crs.domain.CourseStatus;
+import com.onlinejudge.crs.domain.EnrollmentMode;
 import com.onlinejudge.crs.domain.dto.CourseCreateRequest;
 import com.onlinejudge.crs.domain.dto.CoursePermissionResponse;
 import com.onlinejudge.crs.domain.dto.CourseResponse;
@@ -33,11 +38,12 @@ public class CourseService {
         int normalizedPage = Math.max(page, 1);
         int normalizedSize = Math.min(Math.max(size, 1), 50);
         String normalizedScope = scope == null || scope.isBlank() ? "all" : scope;
+        boolean admin = isAdmin(user);
         return new PageResponse<>(
-                courseRepository.list(keyword, normalizedPage, normalizedSize, normalizedScope, user.id(), user.isAdmin()).stream()
+                courseRepository.list(keyword, normalizedPage, normalizedSize, normalizedScope, user.id(), admin).stream()
                         .map(course -> toResponse(course, user))
                         .toList(),
-                courseRepository.count(keyword, normalizedScope, user.id(), user.isAdmin()),
+                courseRepository.count(keyword, normalizedScope, user.id(), admin),
                 normalizedPage,
                 normalizedSize
         );
@@ -45,7 +51,7 @@ public class CourseService {
 
     public CourseResponse detail(Long courseId, CurrentUser user) {
         Course course = getCourse(courseId);
-        if (!user.isAdmin() && !isActiveMember(courseId, user.id())) {
+        if (!isAdmin(user) && !isActiveMember(courseId, user.id())) {
             throw new BusinessException(HttpStatus.FORBIDDEN, "无权限访问");
         }
         return toResponse(course, user);
@@ -88,14 +94,14 @@ public class CourseService {
     }
 
     private void requireTeacher(CurrentUser user) {
-        if (!user.isTeacher()) {
+        if (!isTeacher(user)) {
             throw new BusinessException(HttpStatus.FORBIDDEN, "无权限访问");
         }
     }
 
     private void requireManagePermission(Long courseId, CurrentUser user) {
         getCourse(courseId);
-        if (user.isAdmin()) {
+        if (isAdmin(user)) {
             return;
         }
         CourseMember member = courseRepository.findMember(courseId, user.id())
@@ -128,7 +134,7 @@ public class CourseService {
                 course.endDate(),
                 course.status(),
                 courseRepository.memberCount(course.id()),
-                viewer.isAdmin() || courseRepository.findMember(course.id(), viewer.id())
+                isAdmin(viewer) || courseRepository.findMember(course.id(), viewer.id())
                         .filter(member -> member.status() == CourseMemberStatus.ACTIVE && member.role() == CourseMemberRole.TEACHER)
                         .isPresent(),
                 course.createdAt(),
@@ -141,5 +147,13 @@ public class CourseService {
         boolean teacher = active && member.role() == CourseMemberRole.TEACHER;
         return new CoursePermissionResponse(courseId, userId, active, teacher,
                 member == null ? null : member.role(), member == null ? null : member.status());
+    }
+
+    private boolean isAdmin(CurrentUser user) {
+        return user.hasRole("ADMIN");
+    }
+
+    private boolean isTeacher(CurrentUser user) {
+        return user.hasRole("TEACHER") || isAdmin(user);
     }
 }

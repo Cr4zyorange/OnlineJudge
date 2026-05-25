@@ -1,26 +1,5 @@
-import type { ApiResponse, Course, CoursePayload, PageResponse } from '../../types/crs';
-
-const headers = {
-  'Content-Type': 'application/json',
-  'X-User-Id': '101',
-  'X-User-Name': 'Teacher101',
-  'X-User-Role': 'TEACHER'
-};
-
-async function request<T>(url: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(url, {
-    ...init,
-    headers: {
-      ...headers,
-      ...(init?.headers ?? {})
-    }
-  });
-  const body = (await response.json()) as ApiResponse<T>;
-  if (!response.ok || body.code !== 200) {
-    throw new Error(body.message || '请求失败');
-  }
-  return body.data;
-}
+import { request } from '../http';
+import type { Course, CoursePayload, PageResponse } from '../../types/crs';
 
 export type CourseScope = 'all' | 'managed' | 'archived';
 
@@ -35,14 +14,14 @@ export function listCourses(keyword = '', scope: CourseScope = 'all') {
 export function createCourse(payload: CoursePayload) {
   return request<Course>('/api/v1/courses', {
     method: 'POST',
-    body: JSON.stringify(payload)
+    body: payload
   });
 }
 
 export function updateCourse(courseId: number, payload: CoursePayload) {
   return request<Course>(`/api/v1/courses/${courseId}`, {
     method: 'PUT',
-    body: JSON.stringify(payload)
+    body: payload
   });
 }
 

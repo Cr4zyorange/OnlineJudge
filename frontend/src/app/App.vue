@@ -1,5 +1,6 @@
 <template>
-  <GradeItemConfigView v-if="courseId !== null" :course-id="courseId" />
+  <CourseManagementView v-if="viewMode === 'courses'" />
+  <GradeItemConfigView v-else-if="courseId !== null" :course-id="courseId" />
   <main v-else class="app-empty-state">
     <p>缺少课程上下文</p>
   </main>
@@ -7,7 +8,20 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
+import CourseManagementView from '../views/crs/CourseManagementView.vue';
 import GradeItemConfigView from '../views/grd/GradeItemConfigView.vue';
+
+const pathname = computed(() => window.location.pathname);
+
+const viewMode = computed(() => {
+  if (pathname.value.includes('/grd/grade-items')) {
+    return 'grade-items';
+  }
+  if (pathname.value === '/' || pathname.value.startsWith('/courses')) {
+    return 'courses';
+  }
+  return 'grade-items';
+});
 
 const courseId = computed(() => {
   const queryCourseId = parseCourseId(new URLSearchParams(window.location.search).get('courseId'));
