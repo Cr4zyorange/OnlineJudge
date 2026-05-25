@@ -1,9 +1,10 @@
 package com.onlinejudge.grd.controller;
 
+import com.onlinejudge.common.security.AccessDeniedException;
+import com.onlinejudge.common.security.CurrentUser;
 import com.onlinejudge.common.web.ApiResponse;
 import com.onlinejudge.grd.domain.GradeItem;
 import com.onlinejudge.grd.domain.GradeRuleValidationResult;
-import com.onlinejudge.grd.service.GradeItemPermissionException;
 import com.onlinejudge.grd.service.GradeItemService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -14,7 +15,6 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -32,63 +32,58 @@ public class GradeItemController {
     @PostMapping("/courses/{courseId}/grade-items")
     public ResponseEntity<ApiResponse<GradeItem>> createGradeItem(
             @PathVariable long courseId,
-            @RequestHeader("X-User-Id") long userId,
-            @RequestHeader("X-User-Role") String userRole,
+            CurrentUser currentUser,
             @Valid @RequestBody CreateGradeItemRequest request
     ) {
-        requireTeacher(userRole);
-        GradeItem item = gradeItemService.createGradeItem(courseId, userId, request.toCommand());
+        requireTeacher(currentUser);
+        GradeItem item = gradeItemService.createGradeItem(courseId, currentUser.id(), request.toCommand());
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.ok(item));
     }
 
     @GetMapping("/courses/{courseId}/grade-items")
     public ApiResponse<List<GradeItem>> listGradeItems(
             @PathVariable long courseId,
-            @RequestHeader("X-User-Id") long userId,
-            @RequestHeader("X-User-Role") String userRole
+            CurrentUser currentUser
     ) {
-        requireTeacher(userRole);
-        return ApiResponse.ok(gradeItemService.listGradeItems(courseId, userId));
+        requireTeacher(currentUser);
+        return ApiResponse.ok(gradeItemService.listGradeItems(courseId, currentUser.id()));
     }
 
     @PutMapping("/grade-items/{gradeItemId}")
     public ApiResponse<GradeItem> updateGradeItem(
             @PathVariable long gradeItemId,
-            @RequestHeader("X-User-Id") long userId,
-            @RequestHeader("X-User-Role") String userRole,
+            CurrentUser currentUser,
             @Valid @RequestBody UpdateGradeItemRequest request
     ) {
-        requireTeacher(userRole);
-        return ApiResponse.ok(gradeItemService.updateGradeItem(gradeItemId, userId, request.toCommand()));
+        requireTeacher(currentUser);
+        return ApiResponse.ok(gradeItemService.updateGradeItem(gradeItemId, currentUser.id(), request.toCommand()));
     }
 
     @DeleteMapping("/grade-items/{gradeItemId}")
     public ApiResponse<GradeItem> deleteGradeItem(
             @PathVariable long gradeItemId,
-            @RequestHeader("X-User-Id") long userId,
-            @RequestHeader("X-User-Role") String userRole
+            CurrentUser currentUser
     ) {
-        requireTeacher(userRole);
-        return ApiResponse.ok(gradeItemService.deleteGradeItem(gradeItemId, userId));
+        requireTeacher(currentUser);
+        return ApiResponse.ok(gradeItemService.deleteGradeItem(gradeItemId, currentUser.id()));
     }
 
     @PostMapping("/courses/{courseId}/grade-rules/validate")
     public ApiResponse<GradeRuleValidationResult> validateGradeRules(
             @PathVariable long courseId,
-            @RequestHeader("X-User-Id") long userId,
-            @RequestHeader("X-User-Role") String userRole,
+            CurrentUser currentUser,
             @Valid @RequestBody(required = false) GradeRuleValidationRequest request
     ) {
-        requireTeacher(userRole);
+        requireTeacher(currentUser);
         if (request == null) {
-            return ApiResponse.ok(gradeItemService.validateGradeRules(courseId, userId));
+            return ApiResponse.ok(gradeItemService.validateGradeRules(courseId, currentUser.id()));
         }
-        return ApiResponse.ok(gradeItemService.validateGradeRules(courseId, userId, request.toCommands()));
+        return ApiResponse.ok(gradeItemService.validateGradeRules(courseId, currentUser.id(), request.toCommands()));
     }
 
-    private void requireTeacher(String userRole) {
-        if (!"TEACHER".equals(userRole) && !"ADMIN".equals(userRole)) {
-            throw new GradeItemPermissionException("教师无课程成绩管理权限");
+    private void requireTeacher(CurrentUser currentUser) {
+        if (!currentUser.hasRole("TEACHER") && !currentUser.hasRole("ADMIN")) {
+            throw new AccessDeniedException("教师无课程成绩管理权限");
         }
     }
 }

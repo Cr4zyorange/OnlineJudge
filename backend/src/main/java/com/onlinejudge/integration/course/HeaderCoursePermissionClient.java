@@ -10,25 +10,53 @@ import java.util.Arrays;
 @Component
 public class HeaderCoursePermissionClient implements CoursePermissionClient {
     @Override
-    public boolean canManageCourseGrade(long courseId, long userId) {
+    public boolean canManageCourse(long courseId, long userId) {
         if (userId <= 0 || courseId <= 0) {
             return false;
         }
-        ServletRequestAttributes attributes = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
-        if (attributes == null) {
-            return false;
-        }
-        HttpServletRequest request = attributes.getRequest();
-        String userRole = request.getHeader("X-User-Role");
-        if ("ADMIN".equals(userRole)) {
+        if (isAdmin()) {
             return true;
         }
-        String manageableCourseIds = request.getHeader("X-Manageable-Course-Ids");
-        if (manageableCourseIds == null || manageableCourseIds.isBlank()) {
+        return hasCourseHeader("X-Manageable-Course-Ids", courseId);
+    }
+
+    @Override
+    public boolean canViewCourse(long courseId, long userId) {
+        if (userId <= 0 || courseId <= 0) {
             return false;
         }
-        return Arrays.stream(manageableCourseIds.split(","))
+        return canManageCourse(courseId, userId) || hasCourseHeader("X-Course-Ids", courseId);
+    }
+
+    @Override
+    public boolean isCourseMember(long courseId, long userId) {
+        return canViewCourse(courseId, userId);
+    }
+
+    private boolean isAdmin() {
+        HttpServletRequest request = currentRequest();
+        return request != null && "ADMIN".equals(request.getHeader("X-User-Role"));
+    }
+
+    private boolean hasCourseHeader(String headerName, long courseId) {
+        HttpServletRequest request = currentRequest();
+        if (request == null) {
+            return false;
+        }
+        String courseIds = request.getHeader(headerName);
+        if (courseIds == null || courseIds.isBlank()) {
+            return false;
+        }
+        return Arrays.stream(courseIds.split(","))
                 .map(String::trim)
                 .anyMatch(value -> "*".equals(value) || Long.toString(courseId).equals(value));
+    }
+
+    private HttpServletRequest currentRequest() {
+        ServletRequestAttributes attributes = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
+        if (attributes == null) {
+            return null;
+        }
+        return attributes.getRequest();
     }
 }

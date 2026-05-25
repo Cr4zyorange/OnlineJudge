@@ -12,6 +12,12 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 @RestControllerAdvice
 public class ApiExceptionHandler {
+    @ExceptionHandler(ApiException.class)
+    public ResponseEntity<ApiResponse<Void>> handleApiException(ApiException exception) {
+        return ResponseEntity.status(exception.status())
+                .body(ApiResponse.error(exception.code(), exception.getMessage()));
+    }
+
     @ExceptionHandler(GradeItemPermissionException.class)
     public ResponseEntity<ApiResponse<Void>> handlePermission(GradeItemPermissionException exception) {
         return ResponseEntity.status(HttpStatus.FORBIDDEN)
