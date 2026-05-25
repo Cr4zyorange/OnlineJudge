@@ -1,5 +1,6 @@
 <template>
-  <GradeItemConfigView v-if="courseId !== null" :course-id="courseId" />
+  <LabTeacherView v-if="viewName === 'lab' && courseId !== null" :course-id="courseId" />
+  <GradeItemConfigView v-else-if="courseId !== null" :course-id="courseId" />
   <main v-else class="app-empty-state">
     <p>缺少课程上下文</p>
   </main>
@@ -8,6 +9,14 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import GradeItemConfigView from '../views/grd/GradeItemConfigView.vue';
+import LabTeacherView from '../views/lab/LabTeacherView.vue';
+
+const viewName = computed(() => {
+  if (window.location.pathname.includes('/labs')) {
+    return 'lab';
+  }
+  return 'grd';
+});
 
 const courseId = computed(() => {
   const queryCourseId = parseCourseId(new URLSearchParams(window.location.search).get('courseId'));
