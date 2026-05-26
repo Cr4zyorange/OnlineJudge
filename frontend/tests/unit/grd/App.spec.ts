@@ -5,6 +5,7 @@ import * as courseApi from '../../../src/api/crs/courses';
 import * as gradeItemApi from '../../../src/api/grd/gradeItems';
 
 vi.mock('../../../src/api/grd/gradeItems');
+vi.mock('../../../src/api/grd/gradeRecords');
 vi.mock('../../../src/api/crs/courses');
 
 describe('App', () => {

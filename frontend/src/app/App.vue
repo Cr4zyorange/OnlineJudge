@@ -1,5 +1,6 @@
 <template>
   <CourseManagementView v-if="viewMode === 'courses'" />
+  <TeacherGradeTableView v-else-if="courseId !== null && page === 'grades'" :course-id="courseId" />
   <GradeItemConfigView v-else-if="courseId !== null" :course-id="courseId" />
   <main v-else class="app-empty-state">
     <p>缺少课程上下文</p>
@@ -7,24 +8,53 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, defineAsyncComponent, defineComponent, h } from 'vue';
 import CourseManagementView from '../views/crs/CourseManagementView.vue';
 import GradeItemConfigView from '../views/grd/GradeItemConfigView.vue';
 
-const pathname = computed(() => window.location.pathname);
-
-const viewMode = computed(() => {
-  if (pathname.value.includes('/grd/grade-items')) {
-    return 'grade-items';
+const gradeTableModules = import.meta.glob('../views/grd/TeacherGradeTableView.vue');
+const TeacherGradeTableViewFallback = defineComponent({
+  props: {
+    courseId: {
+      type: Number,
+      required: true
+    }
+  },
+  setup() {
+    return () => h('main', { class: 'app-empty-state' }, '成绩列表模块未加载');
   }
-  if (pathname.value === '/' || pathname.value.startsWith('/courses')) {
-    return 'courses';
+});
+const TeacherGradeTableView = defineAsyncComponent(() => {
+  const loader = gradeTableModules['../views/grd/TeacherGradeTableView.vue'];
+  return loader ? loader() as Promise<typeof TeacherGradeTableViewFallback> : Promise.resolve(TeacherGradeTableViewFallback);
+});
+
+const pathname = computed(() => window.location.pathname);
+const searchParams = computed(() => new URLSearchParams(window.location.search));
+
+const page = computed(() => {
+  const queryPage = searchParams.value.get('page');
+  if (queryPage) {
+    return queryPage;
+  }
+  if (pathname.value.includes('/grd/grades')) {
+    return 'grades';
   }
   return 'grade-items';
 });
 
+const viewMode = computed(() => {
+  if (pathname.value.includes('/grd/grade-items') || pathname.value.includes('/grd/grades')) {
+    return 'grade';
+  }
+  if (pathname.value === '/' || pathname.value === '/courses' || pathname.value === '/courses/') {
+    return 'courses';
+  }
+  return 'grade';
+});
+
 const courseId = computed(() => {
-  const queryCourseId = parseCourseId(new URLSearchParams(window.location.search).get('courseId'));
+  const queryCourseId = parseCourseId(searchParams.value.get('courseId'));
   if (queryCourseId !== null) {
     return queryCourseId;
   }
