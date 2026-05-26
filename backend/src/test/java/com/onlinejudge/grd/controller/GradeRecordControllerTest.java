@@ -15,6 +15,7 @@ import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -25,6 +26,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Sql(
         statements = {
                 "DELETE FROM t_course_grade_summary",
+                "DELETE FROM t_grade_change_log",
                 "DELETE FROM t_grade_record",
                 "DELETE FROM t_grade_item",
                 "DELETE FROM t_grade_calculation_batch"
@@ -85,6 +87,131 @@ class GradeRecordControllerTest {
                         .header("X-Course-Ids", "101"))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("ERR-AUTH-03"));
+    }
+
+    @Test
+    void teacherAdjustsGradeRecordWithReasonAndQueriesChangeLogsThroughApi() throws Exception {
+        createGradeItem("实验一", "LAB", 301, "0.40");
+        createGradeItem("作业一", "HWK", 401, "0.60");
+        mockMvc.perform(post("/api/v1/courses/101/grades/sync")
+                        .headers(teacherHeaders("101")))
+                .andExpect(status().isOk());
+
+        String tableJson = mockMvc.perform(get("/api/v1/courses/101/grades?studentKeyword=601")
+                        .headers(teacherHeaders("101")))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        long recordId = objectMapper.readTree(tableJson)
+                .at("/data/records/0/records/0/id")
+                .asLong();
+
+        mockMvc.perform(put("/api/v1/grade-records/{recordId}/adjust", recordId)
+                        .headers(teacherHeaders("101"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "newScore", "95.00",
+                                "reason", "复核测试用例后修正"
+                        ))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"))
+                .andExpect(jsonPath("$.data.recordId").value(recordId))
+                .andExpect(jsonPath("$.data.oldScore").value(90.00))
+                .andExpect(jsonPath("$.data.newScore").value(95.00))
+                .andExpect(jsonPath("$.data.reason").value("复核测试用例后修正"));
+
+        mockMvc.perform(get("/api/v1/courses/101/grades/students/601")
+                        .headers(teacherHeaders("101")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.records[0].rawScore").value(95.00))
+                .andExpect(jsonPath("$.data.records[0].gradeStatus").value("ADJUSTED"));
+
+        mockMvc.perform(get("/api/v1/courses/101/grade-change-logs?studentId=601")
+                        .headers(teacherHeaders("101")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.total").value(1))
+                .andExpect(jsonPath("$.data.records[0].gradeItemId").value(1))
+                .andExpect(jsonPath("$.data.records[0].changeType").value("RECORD_ADJUST"))
+                .andExpect(jsonPath("$.data.records[0].oldValue").value(90.00))
+                .andExpect(jsonPath("$.data.records[0].newValue").value(95.00))
+                .andExpect(jsonPath("$.data.records[0].reason").value("复核测试用例后修正"))
+                .andExpect(jsonPath("$.data.records[0].operatorId").value(501));
+    }
+
+    @Test
+    void teacherCannotAdjustGradeRecordWithoutReason() throws Exception {
+        createGradeItem("实验一", "LAB", 301, "0.40");
+        mockMvc.perform(post("/api/v1/courses/101/grades/sync")
+                        .headers(teacherHeaders("101")))
+                .andExpect(status().isOk());
+        String tableJson = mockMvc.perform(get("/api/v1/courses/101/grades?studentKeyword=601")
+                        .headers(teacherHeaders("101")))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        long recordId = objectMapper.readTree(tableJson)
+                .at("/data/records/0/records/0/id")
+                .asLong();
+
+        mockMvc.perform(put("/api/v1/grade-records/{recordId}/adjust", recordId)
+                        .headers(teacherHeaders("101"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "newScore", "95.00",
+                                "reason", " "
+                        ))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("ERR-GRD-06"));
+    }
+
+    @Test
+    void teacherAdjustsCourseFinalScoreWithReasonAndKeepsChangeLog() throws Exception {
+        createGradeItem("实验一", "LAB", 301, "0.40");
+        createGradeItem("作业一", "HWK", 401, "0.60");
+        mockMvc.perform(post("/api/v1/courses/101/grades/sync")
+                        .headers(teacherHeaders("101")))
+                .andExpect(status().isOk());
+        String tableJson = mockMvc.perform(get("/api/v1/courses/101/grades?studentKeyword=601")
+                        .headers(teacherHeaders("101")))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        long summaryId = objectMapper.readTree(tableJson)
+                .at("/data/records/0/summary/id")
+                .asLong();
+
+        mockMvc.perform(put("/api/v1/course-grade-summaries/{summaryId}/adjust", summaryId)
+                        .headers(teacherHeaders("101"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "newScore", "88.00",
+                                "reason", "课程总评复核修正"
+                        ))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"))
+                .andExpect(jsonPath("$.data.summaryId").value(summaryId))
+                .andExpect(jsonPath("$.data.oldScore").value(84.00))
+                .andExpect(jsonPath("$.data.newScore").value(88.00))
+                .andExpect(jsonPath("$.data.reason").value("课程总评复核修正"));
+
+        mockMvc.perform(get("/api/v1/courses/101/grades?studentKeyword=601")
+                        .headers(teacherHeaders("101")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.records[0].summary.finalScore").value(88.00))
+                .andExpect(jsonPath("$.data.records[0].summary.finalStatus").value("ADJUSTED"));
+
+        mockMvc.perform(get("/api/v1/courses/101/grade-change-logs?studentId=601")
+                        .headers(teacherHeaders("101")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.total").value(1))
+                .andExpect(jsonPath("$.data.records[0].gradeItemId", nullValue()))
+                .andExpect(jsonPath("$.data.records[0].changeType").value("FINAL_ADJUST"))
+                .andExpect(jsonPath("$.data.records[0].oldValue").value(84.00))
+                .andExpect(jsonPath("$.data.records[0].newValue").value(88.00))
+                .andExpect(jsonPath("$.data.records[0].reason").value("课程总评复核修正"));
     }
 
     private void createGradeItem(String name, String sourceType, long sourceId, String weight) throws Exception {

@@ -29,4 +29,19 @@ public record CourseGradeSummary(
                 updatedAt
         );
     }
+
+    public CourseGradeSummary adjusted(BigDecimal finalScore, LocalDateTime adjustedAt) {
+        return new CourseGradeSummary(
+                id,
+                courseId,
+                studentId,
+                finalScore,
+                FinalStatus.ADJUSTED,
+                publishStatus,
+                calculationBatchId,
+                publishedAt,
+                createdAt,
+                adjustedAt
+        );
+    }
 }

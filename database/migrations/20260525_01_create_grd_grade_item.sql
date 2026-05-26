@@ -84,3 +84,20 @@ CREATE TABLE IF NOT EXISTS t_grade_calculation_batch (
 
 CREATE INDEX IF NOT EXISTS idx_grade_calculation_batch_course
     ON t_grade_calculation_batch (course_id, calculated_at);
+
+CREATE TABLE IF NOT EXISTS t_grade_change_log (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    course_id BIGINT NOT NULL,
+    student_id BIGINT NOT NULL,
+    grade_item_id BIGINT NULL,
+    change_type VARCHAR(30) NOT NULL,
+    old_value DECIMAL(6,2) NULL,
+    new_value DECIMAL(6,2) NULL,
+    reason VARCHAR(500) NOT NULL,
+    operator_id BIGINT NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_grade_change_log_course
+    ON t_grade_change_log (course_id, student_id, grade_item_id, created_at);

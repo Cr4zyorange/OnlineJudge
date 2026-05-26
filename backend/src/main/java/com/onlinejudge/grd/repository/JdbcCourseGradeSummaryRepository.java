@@ -87,6 +87,29 @@ public class JdbcCourseGradeSummaryRepository implements CourseGradeSummaryRepos
     }
 
     @Override
+    public CourseGradeSummary update(CourseGradeSummary summary) {
+        jdbcTemplate.update("""
+                        UPDATE t_course_grade_summary
+                        SET final_score = ?,
+                            final_status = ?,
+                            publish_status = ?,
+                            calculation_batch_id = ?,
+                            published_at = ?,
+                            updated_at = ?
+                        WHERE id = ?
+                        """,
+                summary.finalScore(),
+                summary.finalStatus().name(),
+                summary.publishStatus().name(),
+                summary.calculationBatchId(),
+                nullableTimestamp(summary.publishedAt()),
+                Timestamp.valueOf(summary.updatedAt()),
+                summary.id()
+        );
+        return findById(summary.id()).orElseThrow();
+    }
+
+    @Override
     public List<CourseGradeSummary> findByCourseId(long courseId) {
         return jdbcTemplate.query("""
                         SELECT id, course_id, student_id, final_score, final_status, publish_status,
@@ -100,7 +123,8 @@ public class JdbcCourseGradeSummaryRepository implements CourseGradeSummaryRepos
         );
     }
 
-    private Optional<CourseGradeSummary> findById(long id) {
+    @Override
+    public Optional<CourseGradeSummary> findById(long id) {
         return jdbcTemplate.query("""
                         SELECT id, course_id, student_id, final_score, final_status, publish_status,
                                calculation_batch_id, published_at, created_at, updated_at

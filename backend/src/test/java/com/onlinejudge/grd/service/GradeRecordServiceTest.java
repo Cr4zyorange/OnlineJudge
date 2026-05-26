@@ -1,7 +1,11 @@
 package com.onlinejudge.grd.service;
 
+import com.onlinejudge.common.event.NotificationEvent;
+import com.onlinejudge.common.event.NotificationEventPublisher;
 import com.onlinejudge.grd.domain.CourseGradeSummary;
 import com.onlinejudge.grd.domain.CourseGradeSummaryRepository;
+import com.onlinejudge.grd.domain.GradeChangeLog;
+import com.onlinejudge.grd.domain.GradeChangeLogRepository;
 import com.onlinejudge.grd.domain.GradeCalculationBatch;
 import com.onlinejudge.grd.domain.GradeCalculationBatchRepository;
 import com.onlinejudge.grd.domain.GradeItem;
@@ -37,10 +41,12 @@ class GradeRecordServiceTest {
         GradeRecordService service = new GradeRecordService(
                 itemRepository,
                 recordRepository,
+                new InMemoryGradeChangeLogRepository(),
                 summaryRepository,
                 batchRepository,
                 sourceGradesForCourse101(),
-                permissionClient(601L, 602L, 603L)
+                permissionClient(601L, 602L, 603L),
+                new RecordingNotificationEventPublisher()
         );
         itemRepository.add(item(1L, 101L, "实验一", SourceType.LAB, 301L, "100.00", "0.40"));
         itemRepository.add(item(2L, 101L, "作业一", SourceType.HWK, 401L, "100.00", "0.60"));
@@ -87,15 +93,87 @@ class GradeRecordServiceTest {
         GradeRecordService service = new GradeRecordService(
                 new InMemoryGradeItemRepository(),
                 new InMemoryGradeRecordRepository(),
+                new InMemoryGradeChangeLogRepository(),
                 new InMemoryCourseGradeSummaryRepository(),
                 new InMemoryGradeCalculationBatchRepository(),
                 (courseId, sourceType, sourceId) -> List.of(),
-                (courseId, userId) -> false
+                (courseId, userId) -> false,
+                new RecordingNotificationEventPublisher()
         );
 
         assertThatThrownBy(() -> service.syncSourceGrades(101L, 501L))
                 .isInstanceOf(GradeItemPermissionException.class)
                 .hasMessageContaining("教师无课程成绩管理权限");
+    }
+
+    @Test
+    void teacherAdjustsPublishedGradeRecordAndNotifiesStudentWithoutUnpublishingSummary() {
+        InMemoryGradeItemRepository itemRepository = new InMemoryGradeItemRepository();
+        InMemoryGradeRecordRepository recordRepository = new InMemoryGradeRecordRepository();
+        InMemoryCourseGradeSummaryRepository summaryRepository = new InMemoryCourseGradeSummaryRepository();
+        RecordingNotificationEventPublisher eventPublisher = new RecordingNotificationEventPublisher();
+        GradeRecordService service = new GradeRecordService(
+                itemRepository,
+                recordRepository,
+                new InMemoryGradeChangeLogRepository(),
+                summaryRepository,
+                new InMemoryGradeCalculationBatchRepository(),
+                (courseId, sourceType, sourceId) -> List.of(),
+                permissionClient(601L),
+                eventPublisher
+        );
+        itemRepository.add(item(11L, 101L, "实验一", SourceType.LAB, 301L, "100.00", "1.00"));
+        LocalDateTime publishedAt = LocalDateTime.now().minusDays(1);
+        GradeRecord record = recordRepository.upsert(record(101L, 601L, 11L, "80.00", "80.00", PublishStatus.PUBLISHED, publishedAt));
+        CourseGradeSummary summary = summaryRepository.upsert(summary(101L, 601L, "80.00", PublishStatus.PUBLISHED, publishedAt));
+
+        GradeAdjustmentResult result = service.adjustGradeRecord(
+                record.id(),
+                501L,
+                new AdjustGradeRecordCommand(new BigDecimal("95.00"), "已发布成绩复核")
+        );
+
+        assertThat(result.newScore()).isEqualByComparingTo("95.00");
+        CourseGradeSummary recalculatedSummary = summaryRepository.findById(summary.id()).orElseThrow();
+        assertThat(recalculatedSummary.finalScore()).isEqualByComparingTo("95.00");
+        assertThat(recalculatedSummary.publishStatus()).isEqualTo(PublishStatus.PUBLISHED);
+        assertThat(recalculatedSummary.publishedAt()).isEqualTo(publishedAt);
+        assertThat(eventPublisher.events()).singleElement().satisfies(event -> {
+            assertThat(event.type()).isEqualTo("GRADE_CHANGED");
+            assertThat(event.courseId()).isEqualTo(101L);
+            assertThat(event.recipientUserIds()).containsExactly(601L);
+            assertThat(event.targetType()).isEqualTo("GRADE_ITEM");
+            assertThat(event.targetId()).isEqualTo(11L);
+            assertThat(event.occurredAt()).isNotNull();
+        });
+    }
+
+    @Test
+    void teacherAdjustsUnpublishedGradeRecordWithoutNotifyingStudent() {
+        InMemoryGradeItemRepository itemRepository = new InMemoryGradeItemRepository();
+        InMemoryGradeRecordRepository recordRepository = new InMemoryGradeRecordRepository();
+        InMemoryCourseGradeSummaryRepository summaryRepository = new InMemoryCourseGradeSummaryRepository();
+        RecordingNotificationEventPublisher eventPublisher = new RecordingNotificationEventPublisher();
+        GradeRecordService service = new GradeRecordService(
+                itemRepository,
+                recordRepository,
+                new InMemoryGradeChangeLogRepository(),
+                summaryRepository,
+                new InMemoryGradeCalculationBatchRepository(),
+                (courseId, sourceType, sourceId) -> List.of(),
+                permissionClient(601L),
+                eventPublisher
+        );
+        itemRepository.add(item(1L, 101L, "实验一", SourceType.LAB, 301L, "100.00", "1.00"));
+        GradeRecord record = recordRepository.upsert(record(101L, 601L, 1L, "80.00", "80.00", PublishStatus.UNPUBLISHED, null));
+
+        service.adjustGradeRecord(
+                record.id(),
+                501L,
+                new AdjustGradeRecordCommand(new BigDecimal("95.00"), "未发布成绩复核")
+        );
+
+        assertThat(eventPublisher.events()).isEmpty();
     }
 
     private CoursePermissionClient permissionClient(Long... studentIds) {
@@ -182,6 +260,71 @@ class GradeRecordServiceTest {
         );
     }
 
+    private GradeRecord record(
+            long courseId,
+            long studentId,
+            long gradeItemId,
+            String rawScore,
+            String weightedScore,
+            PublishStatus publishStatus,
+            LocalDateTime publishedAt
+    ) {
+        LocalDateTime now = LocalDateTime.now();
+        return new GradeRecord(
+                0L,
+                courseId,
+                studentId,
+                gradeItemId,
+                SourceType.LAB,
+                301L,
+                new BigDecimal(rawScore),
+                new BigDecimal(weightedScore),
+                GradeStatus.SCORED,
+                publishStatus,
+                null,
+                now,
+                now,
+                publishedAt,
+                now,
+                now
+        );
+    }
+
+    private CourseGradeSummary summary(
+            long courseId,
+            long studentId,
+            String finalScore,
+            PublishStatus publishStatus,
+            LocalDateTime publishedAt
+    ) {
+        LocalDateTime now = LocalDateTime.now();
+        return new CourseGradeSummary(
+                0L,
+                courseId,
+                studentId,
+                new BigDecimal(finalScore),
+                FinalStatus.CALCULATED,
+                publishStatus,
+                1L,
+                publishedAt,
+                now,
+                now
+        );
+    }
+
+    private static final class RecordingNotificationEventPublisher implements NotificationEventPublisher {
+        private final List<NotificationEvent> events = new ArrayList<>();
+
+        @Override
+        public void publish(NotificationEvent event) {
+            events.add(event);
+        }
+
+        List<NotificationEvent> events() {
+            return events;
+        }
+    }
+
     private static final class InMemoryGradeItemRepository implements GradeItemRepository {
         private final List<GradeItem> items = new ArrayList<>();
 
@@ -233,6 +376,22 @@ class GradeRecordServiceTest {
         }
 
         @Override
+        public GradeRecord update(GradeRecord record) {
+            for (int index = 0; index < records.size(); index++) {
+                if (records.get(index).id() == record.id()) {
+                    records.set(index, record);
+                    return record;
+                }
+            }
+            throw new IllegalArgumentException("record not found");
+        }
+
+        @Override
+        public Optional<GradeRecord> findById(long id) {
+            return records.stream().filter(record -> record.id() == id).findFirst();
+        }
+
+        @Override
         public List<GradeRecord> findByCourseId(long courseId) {
             return records.stream().filter(record -> record.courseId() == courseId).toList();
         }
@@ -243,6 +402,32 @@ class GradeRecordServiceTest {
                     .filter(record -> record.studentId() == studentId)
                     .filter(record -> record.gradeItemId() == gradeItemId)
                     .findFirst();
+        }
+    }
+
+    private static final class InMemoryGradeChangeLogRepository implements GradeChangeLogRepository {
+        private long nextId = 1L;
+        private final List<GradeChangeLog> logs = new ArrayList<>();
+
+        @Override
+        public GradeChangeLog save(GradeChangeLog log) {
+            GradeChangeLog saved = log.withId(nextId++);
+            logs.add(saved);
+            return saved;
+        }
+
+        @Override
+        public List<GradeChangeLog> findByCourseId(long courseId, Long studentId, Long gradeItemId, int page, int size) {
+            return logs.stream()
+                    .filter(log -> log.courseId() == courseId)
+                    .filter(log -> studentId == null || log.studentId() == studentId)
+                    .filter(log -> gradeItemId == null || gradeItemId.equals(log.gradeItemId()))
+                    .toList();
+        }
+
+        @Override
+        public int countByCourseId(long courseId, Long studentId, Long gradeItemId) {
+            return findByCourseId(courseId, studentId, gradeItemId, 1, Integer.MAX_VALUE).size();
         }
     }
 
@@ -263,6 +448,22 @@ class GradeRecordServiceTest {
             CourseGradeSummary saved = summary.withId(nextId++);
             summaries.add(saved);
             return saved;
+        }
+
+        @Override
+        public CourseGradeSummary update(CourseGradeSummary summary) {
+            for (int index = 0; index < summaries.size(); index++) {
+                if (summaries.get(index).id() == summary.id()) {
+                    summaries.set(index, summary);
+                    return summary;
+                }
+            }
+            throw new IllegalArgumentException("summary not found");
+        }
+
+        @Override
+        public Optional<CourseGradeSummary> findById(long id) {
+            return summaries.stream().filter(summary -> summary.id() == id).findFirst();
         }
 
         @Override
