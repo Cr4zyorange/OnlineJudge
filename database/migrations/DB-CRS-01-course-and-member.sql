@@ -1,0 +1,43 @@
+CREATE TABLE IF NOT EXISTS crs_course (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    course_name VARCHAR(100) NOT NULL,
+    description TEXT NULL,
+    teacher_id BIGINT NOT NULL,
+    semester VARCHAR(64) NULL,
+    category VARCHAR(64) NULL,
+    cover_url VARCHAR(500) NULL,
+    enrollment_mode VARCHAR(32) NOT NULL DEFAULT 'PUBLIC',
+    invite_code VARCHAR(64) NULL,
+    max_students INT NULL,
+    start_date DATE NULL,
+    end_date DATE NULL,
+    status VARCHAR(32) NOT NULL DEFAULT 'DRAFT',
+    is_deleted TINYINT(1) NOT NULL DEFAULT 0,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_crs_course_teacher (teacher_id),
+    INDEX idx_crs_course_status (status),
+    INDEX idx_crs_course_name (course_name)
+);
+
+CREATE TABLE IF NOT EXISTS crs_course_member (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    course_id BIGINT NOT NULL,
+    user_id BIGINT NOT NULL,
+    role VARCHAR(32) NOT NULL,
+    join_method VARCHAR(32) NOT NULL DEFAULT 'CREATED',
+    join_status VARCHAR(32) NOT NULL DEFAULT 'ACTIVE',
+    apply_reason VARCHAR(500) NULL,
+    approved_by BIGINT NULL,
+    joined_at DATETIME NULL,
+    left_at DATETIME NULL,
+    last_access_at DATETIME NULL,
+    is_deleted TINYINT(1) NOT NULL DEFAULT 0,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_crs_course_member (course_id, user_id),
+    INDEX idx_crs_member_course (course_id),
+    INDEX idx_crs_member_user (user_id),
+    INDEX idx_crs_member_role_status (role, join_status),
+    CONSTRAINT fk_crs_member_course FOREIGN KEY (course_id) REFERENCES crs_course (id)
+);

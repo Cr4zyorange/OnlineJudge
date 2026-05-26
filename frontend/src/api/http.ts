@@ -14,7 +14,7 @@ export interface RequestOptions {
 }
 
 interface ApiResponse<T> {
-  code: string;
+  code: string | number;
   message: string;
   data: T;
 }
@@ -106,9 +106,13 @@ function splitCsv(value: string | null) {
   return value.split(',').map((item) => item.trim()).filter(Boolean);
 }
 
+function isSuccessCode(code: string | number | undefined) {
+  return code === '0' || code === 0 || code === '200' || code === 200;
+}
+
 async function unwrap<T>(response: Response): Promise<T> {
   const body = (await response.json()) as ApiResponse<T>;
-  if (!response.ok || body.code !== '0') {
+  if (!response.ok || !isSuccessCode(body.code)) {
     throw new Error(body.message || '接口请求失败');
   }
   return body.data;
