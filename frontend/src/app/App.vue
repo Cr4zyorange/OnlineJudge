@@ -1,5 +1,6 @@
 <template>
-  <GradeItemConfigView v-if="courseId !== null" :course-id="courseId" />
+  <TeacherGradeTableView v-if="courseId !== null && page === 'grades'" :course-id="courseId" />
+  <GradeItemConfigView v-else-if="courseId !== null" :course-id="courseId" />
   <main v-else class="app-empty-state">
     <p>缺少课程上下文</p>
   </main>
@@ -8,6 +9,9 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import GradeItemConfigView from '../views/grd/GradeItemConfigView.vue';
+import TeacherGradeTableView from '../views/grd/TeacherGradeTableView.vue';
+
+const page = computed(() => (window.location.pathname.includes('/grades') ? 'grades' : 'grade-items'));
 
 const courseId = computed(() => {
   const queryCourseId = parseCourseId(new URLSearchParams(window.location.search).get('courseId'));

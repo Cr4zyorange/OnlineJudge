@@ -2,8 +2,10 @@ import { mount } from '@vue/test-utils';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import App from '../../../src/app/App.vue';
 import * as gradeItemApi from '../../../src/api/grd/gradeItems';
+import * as gradeRecordsApi from '../../../src/api/grd/gradeRecords';
 
 vi.mock('../../../src/api/grd/gradeItems');
+vi.mock('../../../src/api/grd/gradeRecords');
 
 describe('App', () => {
   const originalLocation = window.location;
@@ -40,6 +42,25 @@ describe('App', () => {
     await flushPromises();
 
     expect(gradeItemApi.listGradeItems).toHaveBeenCalledWith(404);
+  });
+
+  it('routes course grade table paths to the teacher grade table page', async () => {
+    vi.mocked(gradeRecordsApi.listCourseGrades).mockResolvedValueOnce({
+      records: [],
+      total: 0,
+      page: 1,
+      size: 20
+    });
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: new URL('http://localhost/courses/505/grd/grades')
+    });
+
+    mount(App);
+    await flushPromises();
+
+    expect(gradeRecordsApi.listCourseGrades).toHaveBeenCalledWith(505, { page: 1, size: 20 });
+    expect(gradeItemApi.listGradeItems).not.toHaveBeenCalled();
   });
 
   it('does not load grade items without an active course context', async () => {
