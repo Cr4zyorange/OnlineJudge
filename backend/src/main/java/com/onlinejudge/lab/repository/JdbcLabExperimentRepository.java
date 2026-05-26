@@ -203,25 +203,29 @@ public class JdbcLabExperimentRepository implements LabExperimentRepository {
     private void replaceTestcases(long labId, List<LabTestcase> testcases, LocalDateTime now) {
         jdbcTemplate.update("DELETE FROM lab_testcase WHERE lab_id = ?", labId);
         for (LabTestcase testcase : testcases) {
-            jdbcTemplate.update("""
-                            INSERT INTO lab_testcase
-                            (lab_id, input, expected_output, score_weight, is_public, time_limit_ms,
-                             memory_limit_kb, order_num, deleted, created_at, updated_at)
-                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                            """,
-                    labId,
-                    testcase.input(),
-                    testcase.expectedOutput(),
-                    testcase.scoreWeight(),
-                    testcase.isPublic(),
-                    testcase.timeLimitMs(),
-                    testcase.memoryLimitKb(),
-                    testcase.orderNum(),
-                    testcase.deleted(),
-                    Timestamp.valueOf(now),
-                    Timestamp.valueOf(now)
-            );
+            insertTestcase(labId, testcase, now);
         }
+    }
+
+    protected void insertTestcase(long labId, LabTestcase testcase, LocalDateTime now) {
+        jdbcTemplate.update("""
+                        INSERT INTO lab_testcase
+                        (lab_id, input, expected_output, score_weight, is_public, time_limit_ms,
+                         memory_limit_kb, order_num, deleted, created_at, updated_at)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                labId,
+                testcase.input(),
+                testcase.expectedOutput(),
+                testcase.scoreWeight(),
+                testcase.isPublic(),
+                testcase.timeLimitMs(),
+                testcase.memoryLimitKb(),
+                testcase.orderNum(),
+                testcase.deleted(),
+                Timestamp.valueOf(now),
+                Timestamp.valueOf(now)
+        );
     }
 
     private void bindExperiment(PreparedStatement statement, LabExperiment experiment) throws java.sql.SQLException {

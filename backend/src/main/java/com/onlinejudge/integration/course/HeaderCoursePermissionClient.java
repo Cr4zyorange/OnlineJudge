@@ -6,6 +6,7 @@ import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.util.Arrays;
+import java.util.List;
 
 @Component
 public class HeaderCoursePermissionClient implements CoursePermissionClient {
@@ -31,6 +32,27 @@ public class HeaderCoursePermissionClient implements CoursePermissionClient {
     @Override
     public boolean isCourseMember(long courseId, long userId) {
         return canViewCourse(courseId, userId);
+    }
+
+    @Override
+    public List<Long> listCourseStudentIds(long courseId) {
+        if (courseId <= 0) {
+            return List.of();
+        }
+        HttpServletRequest request = currentRequest();
+        if (request == null) {
+            return List.of();
+        }
+        String studentIds = request.getHeader("X-Course-Student-Ids");
+        if (studentIds == null || studentIds.isBlank()) {
+            return List.of();
+        }
+        return Arrays.stream(studentIds.split(","))
+                .map(String::trim)
+                .filter(value -> !value.isEmpty())
+                .map(Long::parseLong)
+                .distinct()
+                .toList();
     }
 
     private boolean isAdmin() {

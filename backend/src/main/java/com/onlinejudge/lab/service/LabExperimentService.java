@@ -11,6 +11,7 @@ import com.onlinejudge.lab.domain.LabTestcase;
 import com.onlinejudge.lab.domain.LabTestcaseDraft;
 import com.onlinejudge.lab.domain.UpdateLabExperimentCommand;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -33,6 +34,7 @@ public class LabExperimentService {
         this.notificationEventPublisher = notificationEventPublisher;
     }
 
+    @Transactional
     public LabExperiment createLab(long courseId, long teacherId, CreateLabExperimentCommand command) {
         requireManagePermission(courseId, teacherId);
         validate(command);
@@ -63,20 +65,39 @@ public class LabExperimentService {
 
     public List<LabExperiment> listLabs(long courseId, long userId, LabExperimentStatus status) {
         requireViewPermission(courseId, userId);
-        return repository.findByCourseId(courseId, status);
+        boolean canManage = coursePermissionClient.canManageCourse(courseId, userId);
+        List<LabExperiment> experiments = repository.findByCourseId(courseId, status);
+        if (canManage) {
+            return experiments;
+        }
+        return experiments.stream()
+                .filter(experiment -> experiment.status() == LabExperimentStatus.PUBLISHED
+                        || experiment.status() == LabExperimentStatus.CLOSED
+                        || experiment.status() == LabExperimentStatus.SCORE_PUBLISHED
+                        || experiment.status() == LabExperimentStatus.ARCHIVED)
+                .toList();
     }
 
     public LabExperiment getLab(long labId, long userId) {
         LabExperiment experiment = findExisting(labId);
         requireViewPermission(experiment.courseId(), userId);
+        if (!coursePermissionClient.canManageCourse(experiment.courseId(), userId)
+                && experiment.status() != LabExperimentStatus.PUBLISHED
+                && experiment.status() != LabExperimentStatus.CLOSED
+                && experiment.status() != LabExperimentStatus.SCORE_PUBLISHED
+                && experiment.status() != LabExperimentStatus.ARCHIVED) {
+            throw new LabPermissionException("当前实验未对学生开放");
+        }
         return experiment;
     }
 
+    @Transactional
     public LabExperiment updateLab(long labId, long teacherId, UpdateLabExperimentCommand command) {
         LabExperiment existing = findExisting(labId);
         requireManagePermission(existing.courseId(), teacherId);
         requireEditable(existing);
         validate(command);
+        LocalDateTime now = LocalDateTime.now();
         return repository.update(existing.update(
                 command.chapterId(),
                 command.title().trim(),
@@ -90,11 +111,12 @@ public class LabExperimentService {
                 command.reportRequired(),
                 command.timeLimitMs(),
                 command.memoryLimitKb(),
-                LocalDateTime.now(),
-                toTestcases(command.testcases(), LocalDateTime.now())
+                now,
+                toTestcases(command.testcases(), now)
         ));
     }
 
+    @Transactional
     public LabExperiment deleteLab(long labId, long teacherId) {
         LabExperiment existing = findExisting(labId);
         requireManagePermission(existing.courseId(), teacherId);
@@ -104,6 +126,7 @@ public class LabExperimentService {
         return repository.update(existing.delete(LocalDateTime.now()));
     }
 
+    @Transactional
     public LabExperiment publishLab(long labId, long teacherId) {
         LabExperiment existing = findExisting(labId);
         requireManagePermission(existing.courseId(), teacherId);
@@ -111,11 +134,12 @@ public class LabExperimentService {
             throw new LabStateException("当前实验状态不允许发布");
         }
         LabExperiment published = repository.update(existing.publish(LocalDateTime.now()));
+        List<Long> recipientUserIds = coursePermissionClient.listCourseStudentIds(published.courseId());
         notificationEventPublisher.publish(new NotificationEvent(
                 "lab-published-" + published.id() + "-" + published.updatedAt(),
                 "LAB_EXPERIMENT_PUBLISHED",
                 published.courseId(),
-                List.of(),
+                recipientUserIds,
                 "实验已发布",
                 "课程发布了新实验：" + published.title(),
                 "LAB",
@@ -126,6 +150,7 @@ public class LabExperimentService {
         return published;
     }
 
+    @Transactional
     public LabExperiment closeLab(long labId, long teacherId) {
         LabExperiment existing = findExisting(labId);
         requireManagePermission(existing.courseId(), teacherId);
