@@ -9,6 +9,61 @@
           重新计算
         </button>
       </div>
+      <form
+        class="grade-table__filters"
+        data-testid="grade-filter-form"
+        @submit.prevent="applyFilters"
+      >
+        <label>
+          学生
+          <input
+            v-model.trim="studentKeyword"
+            data-testid="student-keyword"
+            type="search"
+            placeholder="学号"
+          />
+        </label>
+        <label>
+          成绩项
+          <input
+            v-model.trim="gradeItemIdInput"
+            data-testid="grade-item-id"
+            inputmode="numeric"
+            min="1"
+            type="number"
+            placeholder="ID"
+          />
+        </label>
+        <label>
+          成绩状态
+          <select v-model="gradeStatus" data-testid="grade-status">
+            <option value="">全部</option>
+            <option value="SCORED">已评分</option>
+            <option value="UNSUBMITTED">未提交</option>
+            <option value="UNGRADED">待评分</option>
+            <option value="MISSING">缺失</option>
+            <option value="ADJUSTED">已调整</option>
+          </select>
+        </label>
+        <label>
+          发布状态
+          <select v-model="publishStatus" data-testid="publish-status">
+            <option value="">全部</option>
+            <option value="UNPUBLISHED">未发布</option>
+            <option value="PUBLISHED">已发布</option>
+          </select>
+        </label>
+        <label>
+          每页
+          <select v-model.number="size" data-testid="page-size">
+            <option :value="10">10</option>
+            <option :value="20">20</option>
+            <option :value="50">50</option>
+          </select>
+        </label>
+        <button type="submit" :disabled="loading">筛选</button>
+        <button type="button" :disabled="loading" @click="resetFilters">重置</button>
+      </form>
       <p v-if="feedback" class="grade-table__feedback">{{ feedback }}</p>
       <p v-if="errorMessage" class="grade-table__error">{{ errorMessage }}</p>
     </section>
@@ -38,19 +93,39 @@
             </tr>
           </tbody>
         </table>
+        <div class="grade-table__pagination">
+          <button
+            type="button"
+            data-testid="prev-page"
+            :disabled="loading || page <= 1"
+            @click="goToPage(page - 1)"
+          >
+            上一页
+          </button>
+          <span>第 {{ page }} / {{ totalPages }} 页</span>
+          <button
+            type="button"
+            data-testid="next-page"
+            :disabled="loading || page >= totalPages"
+            @click="goToPage(page + 1)"
+          >
+            下一页
+          </button>
+        </div>
       </template>
     </section>
   </main>
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import {
+  type GradeTableQuery,
   listCourseGrades,
   recalculateCourseGrades,
   syncSourceGrades
 } from '../../api/grd/gradeRecords';
-import type { CourseGradeRow } from '../../types/grd';
+import type { CourseGradeRow, GradeStatus, PublishStatus } from '../../types/grd';
 
 const props = defineProps<{
   courseId: number;
@@ -62,6 +137,13 @@ const busy = ref(false);
 const feedback = ref('');
 const errorMessage = ref('');
 const total = ref(0);
+const page = ref(1);
+const size = ref(20);
+const studentKeyword = ref('');
+const gradeItemIdInput = ref('');
+const gradeStatus = ref<GradeStatus | ''>('');
+const publishStatus = ref<PublishStatus | ''>('');
+const totalPages = computed(() => Math.max(1, Math.ceil(total.value / size.value)));
 
 onMounted(loadRows);
 
@@ -69,9 +151,11 @@ async function loadRows() {
   loading.value = true;
   errorMessage.value = '';
   try {
-    const result = await listCourseGrades(props.courseId, { page: 1, size: 20 });
+    const result = await listCourseGrades(props.courseId, currentQuery());
     rows.value = result.records;
     total.value = result.total;
+    page.value = result.page;
+    size.value = result.size;
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '成绩总表加载失败';
   } finally {
@@ -86,6 +170,7 @@ async function syncGrades() {
   try {
     const result = await syncSourceGrades(props.courseId);
     feedback.value = `同步完成：${result.syncedCount} 条有效成绩，${result.ungradedCount} 条未评分，${result.missingCount} 条缺失`;
+    page.value = 1;
     await loadRows();
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '来源成绩同步失败';
@@ -101,12 +186,54 @@ async function recalculate() {
   try {
     const result = await recalculateCourseGrades(props.courseId);
     feedback.value = `重新计算完成：${result.affectedCount} 名学生`;
+    page.value = 1;
     await loadRows();
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '课程总评计算失败';
   } finally {
     busy.value = false;
   }
+}
+
+async function applyFilters() {
+  page.value = 1;
+  await loadRows();
+}
+
+async function resetFilters() {
+  studentKeyword.value = '';
+  gradeItemIdInput.value = '';
+  gradeStatus.value = '';
+  publishStatus.value = '';
+  page.value = 1;
+  size.value = 20;
+  await loadRows();
+}
+
+async function goToPage(nextPage: number) {
+  page.value = Math.min(Math.max(nextPage, 1), totalPages.value);
+  await loadRows();
+}
+
+function currentQuery() {
+  const gradeItemId = Number(gradeItemIdInput.value);
+  const query: GradeTableQuery = {
+    page: page.value,
+    size: size.value
+  };
+  if (studentKeyword.value) {
+    query.studentKeyword = studentKeyword.value;
+  }
+  if (Number.isInteger(gradeItemId) && gradeItemId > 0) {
+    query.gradeItemId = gradeItemId;
+  }
+  if (gradeStatus.value) {
+    query.gradeStatus = gradeStatus.value;
+  }
+  if (publishStatus.value) {
+    query.publishStatus = publishStatus.value;
+  }
+  return query;
 }
 </script>
 
@@ -132,6 +259,31 @@ async function recalculate() {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+
+.grade-table__filters {
+  align-items: end;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  margin-top: 16px;
+}
+
+label {
+  color: #334155;
+  display: grid;
+  font-size: 13px;
+  gap: 6px;
+}
+
+input,
+select {
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  color: #1f2937;
+  min-height: 36px;
+  padding: 7px 10px;
 }
 
 button {
@@ -172,5 +324,18 @@ td {
   color: #475569;
   font-size: 14px;
   margin: 0 0 12px;
+}
+
+.grade-table__pagination {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  margin-top: 14px;
+}
+
+.grade-table__pagination span {
+  color: #475569;
+  font-size: 14px;
 }
 </style>

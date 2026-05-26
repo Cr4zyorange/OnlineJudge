@@ -77,6 +77,86 @@ describe('TeacherGradeTableView', () => {
     expect(wrapper.text()).toContain('603');
     expect(wrapper.text()).toContain('INCOMPLETE');
   });
+
+  it('queries the grade table with filters and page navigation', async () => {
+    vi.mocked(gradeRecordsApi.listCourseGrades)
+      .mockResolvedValueOnce({
+        records: [
+          {
+            studentId: 601,
+            summary: null,
+            records: []
+          }
+        ],
+        total: 30,
+        page: 1,
+        size: 20
+      })
+      .mockResolvedValueOnce({
+        records: [
+          {
+            studentId: 603,
+            summary: null,
+            records: []
+          }
+        ],
+        total: 12,
+        page: 1,
+        size: 10
+      })
+      .mockResolvedValueOnce({
+        records: [
+          {
+            studentId: 613,
+            summary: null,
+            records: []
+          }
+        ],
+        total: 12,
+        page: 2,
+        size: 10
+      });
+
+    const wrapper = mount(TeacherGradeTableView, {
+      props: {
+        courseId: 101
+      }
+    });
+    await flushPromises();
+
+    await wrapper.get('[data-testid="student-keyword"]').setValue('603');
+    await wrapper.get('[data-testid="grade-item-id"]').setValue('7');
+    await wrapper.get('[data-testid="grade-status"]').setValue('MISSING');
+    await wrapper.get('[data-testid="publish-status"]').setValue('UNPUBLISHED');
+    await wrapper.get('[data-testid="page-size"]').setValue('10');
+    await wrapper.get('[data-testid="grade-filter-form"]').trigger('submit');
+    await flushPromises();
+
+    expect(gradeRecordsApi.listCourseGrades).toHaveBeenNthCalledWith(2, 101, {
+      studentKeyword: '603',
+      gradeItemId: 7,
+      gradeStatus: 'MISSING',
+      publishStatus: 'UNPUBLISHED',
+      page: 1,
+      size: 10
+    });
+    expect(wrapper.text()).toContain('603');
+    expect(wrapper.text()).toContain('第 1 / 2 页');
+
+    await wrapper.get('[data-testid="next-page"]').trigger('click');
+    await flushPromises();
+
+    expect(gradeRecordsApi.listCourseGrades).toHaveBeenNthCalledWith(3, 101, {
+      studentKeyword: '603',
+      gradeItemId: 7,
+      gradeStatus: 'MISSING',
+      publishStatus: 'UNPUBLISHED',
+      page: 2,
+      size: 10
+    });
+    expect(wrapper.text()).toContain('613');
+    expect(wrapper.text()).toContain('第 2 / 2 页');
+  });
 });
 
 async function flushPromises() {
