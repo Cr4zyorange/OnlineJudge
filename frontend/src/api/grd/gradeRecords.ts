@@ -1,4 +1,10 @@
-import type { CourseGradeRow, GradeRecalculationResult, GradeSyncResult } from '../../types/grd';
+import type {
+  CourseGradeTablePage,
+  GradeRecalculationResult,
+  GradeStatus,
+  GradeSyncResult,
+  PublishStatus
+} from '../../types/grd';
 import { configureAuthContext, request } from '../http';
 
 export interface GradeRecordAuthContext {
@@ -8,6 +14,15 @@ export interface GradeRecordAuthContext {
 }
 
 type GradeRecordAuthContextProvider = () => GradeRecordAuthContext | null;
+
+export interface GradeTableQuery {
+  studentKeyword?: string;
+  gradeItemId?: number;
+  gradeStatus?: GradeStatus;
+  publishStatus?: PublishStatus;
+  page?: number;
+  size?: number;
+}
 
 let authContextProvider: GradeRecordAuthContextProvider | null = null;
 
@@ -39,6 +54,27 @@ export async function recalculateCourseGrades(courseId: number): Promise<GradeRe
   });
 }
 
-export async function listCourseGrades(courseId: number): Promise<CourseGradeRow[]> {
-  return request<CourseGradeRow[]>(`/api/v1/courses/${courseId}/grades`);
+export async function listCourseGrades(
+  courseId: number,
+  query: GradeTableQuery = {}
+): Promise<CourseGradeTablePage> {
+  const params = new URLSearchParams();
+  appendParam(params, 'studentKeyword', query.studentKeyword);
+  appendParam(params, 'gradeItemId', query.gradeItemId);
+  appendParam(params, 'gradeStatus', query.gradeStatus);
+  appendParam(params, 'publishStatus', query.publishStatus);
+  appendParam(params, 'page', query.page);
+  appendParam(params, 'size', query.size);
+  const queryString = params.toString();
+  const url = queryString
+    ? `/api/v1/courses/${courseId}/grades?${queryString}`
+    : `/api/v1/courses/${courseId}/grades`;
+  return request<CourseGradeTablePage>(url);
+}
+
+function appendParam(params: URLSearchParams, name: string, value: string | number | undefined) {
+  if (value === undefined || value === '') {
+    return;
+  }
+  params.append(name, String(value));
 }

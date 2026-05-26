@@ -47,21 +47,34 @@ class GradeRecordControllerTest {
                         .headers(teacherHeaders("101")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("0"))
+                .andExpect(jsonPath("$.data.calculationBatchId").isNumber())
                 .andExpect(jsonPath("$.data.syncedCount").value(3))
                 .andExpect(jsonPath("$.data.ungradedCount").value(1))
-                .andExpect(jsonPath("$.data.affectedStudentCount").value(2));
+                .andExpect(jsonPath("$.data.missingCount").value(2))
+                .andExpect(jsonPath("$.data.affectedStudentCount").value(3));
 
-        mockMvc.perform(get("/api/v1/courses/101/grades")
+        mockMvc.perform(get("/api/v1/courses/101/grades?page=1&size=2")
                         .headers(teacherHeaders("101")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("0"))
-                .andExpect(jsonPath("$.data", hasSize(2)))
-                .andExpect(jsonPath("$.data[0].studentId").value(601))
-                .andExpect(jsonPath("$.data[0].summary.finalScore").value(84.00))
-                .andExpect(jsonPath("$.data[0].summary.finalStatus").value("CALCULATED"))
-                .andExpect(jsonPath("$.data[1].studentId").value(602))
-                .andExpect(jsonPath("$.data[1].summary.finalScore", nullValue()))
-                .andExpect(jsonPath("$.data[1].summary.finalStatus").value("INCOMPLETE"));
+                .andExpect(jsonPath("$.data.total").value(3))
+                .andExpect(jsonPath("$.data.page").value(1))
+                .andExpect(jsonPath("$.data.size").value(2))
+                .andExpect(jsonPath("$.data.records", hasSize(2)))
+                .andExpect(jsonPath("$.data.records[0].studentId").value(601))
+                .andExpect(jsonPath("$.data.records[0].summary.finalScore").value(84.00))
+                .andExpect(jsonPath("$.data.records[0].summary.finalStatus").value("CALCULATED"))
+                .andExpect(jsonPath("$.data.records[1].studentId").value(602))
+                .andExpect(jsonPath("$.data.records[1].summary.finalScore", nullValue()))
+                .andExpect(jsonPath("$.data.records[1].summary.finalStatus").value("INCOMPLETE"));
+
+        mockMvc.perform(get("/api/v1/courses/101/grades?gradeStatus=MISSING&studentKeyword=603&page=1&size=10")
+                        .headers(teacherHeaders("101")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.total").value(1))
+                .andExpect(jsonPath("$.data.records", hasSize(1)))
+                .andExpect(jsonPath("$.data.records[0].studentId").value(603))
+                .andExpect(jsonPath("$.data.records[0].records", hasSize(2)));
     }
 
     @Test
@@ -97,6 +110,7 @@ class GradeRecordControllerTest {
         headers.add("X-User-Id", "501");
         headers.add("X-User-Role", "TEACHER");
         headers.add("X-Manageable-Course-Ids", manageableCourseIds);
+        headers.add("X-Course-Student-Ids", "101:601,602,603");
         return headers;
     }
 }

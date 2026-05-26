@@ -16,26 +16,29 @@
     <section class="grade-table__list" aria-label="课程成绩总表">
       <p v-if="loading">加载中</p>
       <p v-else-if="rows.length === 0">暂无成绩记录</p>
-      <table v-else>
-        <thead>
-          <tr>
-            <th>学生</th>
-            <th>总评</th>
-            <th>状态</th>
-            <th>发布</th>
-            <th>明细数</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="row in rows" :key="row.studentId">
-            <td>{{ row.studentId }}</td>
-            <td>{{ row.summary?.finalScore ?? '-' }}</td>
-            <td>{{ row.summary?.finalStatus ?? 'INCOMPLETE' }}</td>
-            <td>{{ row.summary?.publishStatus ?? 'UNPUBLISHED' }}</td>
-            <td>{{ row.records.length }}</td>
-          </tr>
-        </tbody>
-      </table>
+      <template v-else>
+        <p class="grade-table__total">共 {{ total }} 名学生</p>
+        <table>
+          <thead>
+            <tr>
+              <th>学生</th>
+              <th>总评</th>
+              <th>状态</th>
+              <th>发布</th>
+              <th>明细数</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="row in rows" :key="row.studentId">
+              <td>{{ row.studentId }}</td>
+              <td>{{ row.summary?.finalScore ?? '-' }}</td>
+              <td>{{ row.summary?.finalStatus ?? 'INCOMPLETE' }}</td>
+              <td>{{ row.summary?.publishStatus ?? 'UNPUBLISHED' }}</td>
+              <td>{{ row.records.length }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </template>
     </section>
   </main>
 </template>
@@ -58,6 +61,7 @@ const loading = ref(false);
 const busy = ref(false);
 const feedback = ref('');
 const errorMessage = ref('');
+const total = ref(0);
 
 onMounted(loadRows);
 
@@ -65,7 +69,9 @@ async function loadRows() {
   loading.value = true;
   errorMessage.value = '';
   try {
-    rows.value = await listCourseGrades(props.courseId);
+    const result = await listCourseGrades(props.courseId, { page: 1, size: 20 });
+    rows.value = result.records;
+    total.value = result.total;
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '成绩总表加载失败';
   } finally {
@@ -79,7 +85,7 @@ async function syncGrades() {
   errorMessage.value = '';
   try {
     const result = await syncSourceGrades(props.courseId);
-    feedback.value = `同步完成：${result.syncedCount} 条有效成绩，${result.ungradedCount} 条未评分`;
+    feedback.value = `同步完成：${result.syncedCount} 条有效成绩，${result.ungradedCount} 条未评分，${result.missingCount} 条缺失`;
     await loadRows();
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '来源成绩同步失败';
@@ -160,5 +166,11 @@ td {
 
 .grade-table__error {
   color: #b91c1c;
+}
+
+.grade-table__total {
+  color: #475569;
+  font-size: 14px;
+  margin: 0 0 12px;
 }
 </style>

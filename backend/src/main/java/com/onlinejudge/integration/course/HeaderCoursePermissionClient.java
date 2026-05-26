@@ -5,7 +5,9 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 
 @Component
 public class HeaderCoursePermissionClient implements CoursePermissionClient {
@@ -33,6 +35,28 @@ public class HeaderCoursePermissionClient implements CoursePermissionClient {
         return canViewCourse(courseId, userId);
     }
 
+    @Override
+    public List<Long> listCourseStudentIds(long courseId) {
+        if (courseId <= 0) {
+            return List.of();
+        }
+        HttpServletRequest request = currentRequest();
+        if (request == null) {
+            return List.of();
+        }
+        String roster = request.getHeader("X-Course-Student-Ids");
+        if (roster == null || roster.isBlank()) {
+            return List.of();
+        }
+        return Arrays.stream(roster.split(";"))
+                .map(String::trim)
+                .filter(value -> !value.isBlank())
+                .filter(value -> value.startsWith(courseId + ":"))
+                .findFirst()
+                .map(value -> parseStudentIds(value.substring(value.indexOf(':') + 1)))
+                .orElseGet(() -> roster.contains(":") ? List.of() : parseStudentIds(roster));
+    }
+
     private boolean isAdmin() {
         HttpServletRequest request = currentRequest();
         return request != null && "ADMIN".equals(request.getHeader("X-User-Role"));
@@ -50,6 +74,22 @@ public class HeaderCoursePermissionClient implements CoursePermissionClient {
         return Arrays.stream(courseIds.split(","))
                 .map(String::trim)
                 .anyMatch(value -> "*".equals(value) || Long.toString(courseId).equals(value));
+    }
+
+    private List<Long> parseStudentIds(String value) {
+        List<Long> studentIds = new ArrayList<>();
+        for (String item : value.split(",")) {
+            String trimmed = item.trim();
+            if (trimmed.isEmpty()) {
+                continue;
+            }
+            try {
+                studentIds.add(Long.parseLong(trimmed));
+            } catch (NumberFormatException ignored) {
+                return List.of();
+            }
+        }
+        return List.copyOf(studentIds);
     }
 
     private HttpServletRequest currentRequest() {

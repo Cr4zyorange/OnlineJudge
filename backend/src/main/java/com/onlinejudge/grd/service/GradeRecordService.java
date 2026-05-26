@@ -3,6 +3,8 @@ package com.onlinejudge.grd.service;
 import com.onlinejudge.grd.domain.CourseGradeSummary;
 import com.onlinejudge.grd.domain.CourseGradeSummaryRepository;
 import com.onlinejudge.grd.domain.FinalStatus;
+import com.onlinejudge.grd.domain.GradeCalculationBatch;
+import com.onlinejudge.grd.domain.GradeCalculationBatchRepository;
 import com.onlinejudge.grd.domain.GradeItem;
 import com.onlinejudge.grd.domain.GradeItemRepository;
 import com.onlinejudge.grd.domain.GradeRecord;
@@ -20,6 +22,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -31,6 +34,7 @@ public class GradeRecordService {
     private final GradeItemRepository gradeItemRepository;
     private final GradeRecordRepository gradeRecordRepository;
     private final CourseGradeSummaryRepository courseGradeSummaryRepository;
+    private final GradeCalculationBatchRepository gradeCalculationBatchRepository;
     private final SourceGradeClient sourceGradeClient;
     private final CoursePermissionClient coursePermissionClient;
 
@@ -38,12 +42,14 @@ public class GradeRecordService {
             GradeItemRepository gradeItemRepository,
             GradeRecordRepository gradeRecordRepository,
             CourseGradeSummaryRepository courseGradeSummaryRepository,
+            GradeCalculationBatchRepository gradeCalculationBatchRepository,
             SourceGradeClient sourceGradeClient,
             CoursePermissionClient coursePermissionClient
     ) {
         this.gradeItemRepository = gradeItemRepository;
         this.gradeRecordRepository = gradeRecordRepository;
         this.courseGradeSummaryRepository = courseGradeSummaryRepository;
+        this.gradeCalculationBatchRepository = gradeCalculationBatchRepository;
         this.sourceGradeClient = sourceGradeClient;
         this.coursePermissionClient = coursePermissionClient;
     }
@@ -55,6 +61,8 @@ public class GradeRecordService {
         int syncedCount = 0;
         int missingCount = 0;
         int ungradedCount = 0;
+        Set<Long> studentIds = courseStudentIds(courseId);
+        Map<GradeItem, Map<Long, SourceGradeDTO>> sourceGradesByItem = new LinkedHashMap<>();
 
         for (GradeItem item : sourceItems) {
             List<SourceGradeDTO> sourceGrades = sourceGradeClient.findSourceGrades(
@@ -62,11 +70,19 @@ public class GradeRecordService {
                     SourceGradeType.valueOf(item.sourceType().name()),
                     item.sourceId()
             );
-            if (sourceGrades.isEmpty()) {
-                missingCount++;
-            }
-            for (SourceGradeDTO sourceGrade : sourceGrades) {
-                GradeRecord record = toGradeRecord(item, sourceGrade, now);
+            Map<Long, SourceGradeDTO> sourceGradesByStudent = sourceGrades.stream()
+                    .collect(Collectors.toMap(SourceGradeDTO::studentId, sourceGrade -> sourceGrade, (left, right) -> right, LinkedHashMap::new));
+            studentIds.addAll(sourceGradesByStudent.keySet());
+            sourceGradesByItem.put(item, sourceGradesByStudent);
+        }
+
+        for (Map.Entry<GradeItem, Map<Long, SourceGradeDTO>> entry : sourceGradesByItem.entrySet()) {
+            GradeItem item = entry.getKey();
+            Map<Long, SourceGradeDTO> sourceGradesByStudent = entry.getValue();
+            for (long studentId : studentIds) {
+                GradeRecord record = sourceGradesByStudent.containsKey(studentId)
+                        ? toGradeRecord(item, sourceGradesByStudent.get(studentId), now)
+                        : missingGradeRecord(item, studentId, now);
                 gradeRecordRepository.upsert(record);
                 if (record.gradeStatus() == GradeStatus.SCORED) {
                     syncedCount++;
@@ -78,21 +94,47 @@ public class GradeRecordService {
             }
         }
 
-        int affectedCount = recalculateCourseGrades(courseId, teacherId).affectedCount();
-        return new GradeSyncResult(0L, sourceItems.size(), affectedCount, syncedCount, missingCount, ungradedCount);
+        GradeCalculationBatch batch = saveCalculationBatch(
+                courseId,
+                "SYNC",
+                sourceItems.size(),
+                studentIds.size(),
+                teacherId,
+                now
+        );
+        int affectedCount = recalculateCourseGradesWithBatch(courseId, batch.id()).affectedCount();
+        return new GradeSyncResult(batch.id(), sourceItems.size(), affectedCount, syncedCount, missingCount, ungradedCount);
     }
 
     public GradeRecalculationResult recalculateCourseGrades(long courseId, long teacherId) {
         requireCoursePermission(courseId, teacherId);
+        Set<Long> studentIds = studentIdsForCalculation(courseId);
+        GradeCalculationBatch batch = saveCalculationBatch(
+                courseId,
+                "RECALCULATE",
+                includedGradeItems(courseId).size(),
+                studentIds.size(),
+                teacherId,
+                LocalDateTime.now()
+        );
+        return recalculateCourseGradesWithBatch(courseId, batch.id());
+    }
+
+    private GradeRecalculationResult recalculateCourseGradesWithBatch(long courseId, long calculationBatchId) {
         Map<Long, GradeItem> itemsById = gradeItemRepository.findByCourseId(courseId).stream()
                 .filter(GradeItem::enabled)
                 .collect(Collectors.toMap(GradeItem::id, item -> item));
         Map<Long, List<GradeRecord>> recordsByStudent = gradeRecordRepository.findByCourseId(courseId).stream()
                 .collect(Collectors.groupingBy(GradeRecord::studentId));
+        Set<Long> studentIds = new LinkedHashSet<>();
+        studentIds.addAll(courseStudentIds(courseId));
+        studentIds.addAll(recordsByStudent.keySet());
+        studentIds.addAll(courseGradeSummaryRepository.findByCourseId(courseId).stream()
+                .map(CourseGradeSummary::studentId)
+                .toList());
         LocalDateTime now = LocalDateTime.now();
-        for (Map.Entry<Long, List<GradeRecord>> entry : recordsByStudent.entrySet()) {
-            long studentId = entry.getKey();
-            List<GradeRecord> includedRecords = entry.getValue().stream()
+        for (long studentId : studentIds) {
+            List<GradeRecord> includedRecords = recordsByStudent.getOrDefault(studentId, List.of()).stream()
                     .filter(record -> {
                         GradeItem item = itemsById.get(record.gradeItemId());
                         return item != null && item.includedInFinal();
@@ -113,22 +155,40 @@ public class GradeRecordService {
                     finalScore,
                     complete ? FinalStatus.CALCULATED : FinalStatus.INCOMPLETE,
                     PublishStatus.UNPUBLISHED,
-                    0L,
+                    calculationBatchId,
                     null,
                     now,
                     now
             ));
         }
-        return new GradeRecalculationResult(0L, recordsByStudent.size());
+        return new GradeRecalculationResult(calculationBatchId, studentIds.size());
+    }
+
+    public CourseGradeTablePage listCourseGrades(long courseId, long teacherId, GradeTableQuery query) {
+        requireCoursePermission(courseId, teacherId);
+        List<CourseGradeRow> filteredRows = buildCourseGradeRows(courseId).stream()
+                .filter(row -> matchesStudentKeyword(row, query.studentKeyword()))
+                .filter(row -> matchesGradeItem(row, query.gradeItemId()))
+                .filter(row -> matchesGradeStatus(row, query.gradeStatus()))
+                .filter(row -> matchesPublishStatus(row, query.publishStatus()))
+                .toList();
+        int total = filteredRows.size();
+        int fromIndex = Math.min((query.page() - 1) * query.size(), total);
+        int toIndex = Math.min(fromIndex + query.size(), total);
+        return new CourseGradeTablePage(filteredRows.subList(fromIndex, toIndex), total, query.page(), query.size());
     }
 
     public List<CourseGradeRow> listCourseGrades(long courseId, long teacherId) {
-        requireCoursePermission(courseId, teacherId);
+        return listCourseGrades(courseId, teacherId, GradeTableQuery.firstPage()).records();
+    }
+
+    private List<CourseGradeRow> buildCourseGradeRows(long courseId) {
         Map<Long, List<GradeRecord>> recordsByStudent = gradeRecordRepository.findByCourseId(courseId).stream()
                 .collect(Collectors.groupingBy(GradeRecord::studentId));
         Map<Long, CourseGradeSummary> summariesByStudent = courseGradeSummaryRepository.findByCourseId(courseId).stream()
                 .collect(Collectors.toMap(CourseGradeSummary::studentId, summary -> summary));
         Set<Long> studentIds = new LinkedHashSet<>();
+        studentIds.addAll(courseStudentIds(courseId));
         studentIds.addAll(recordsByStudent.keySet());
         studentIds.addAll(summariesByStudent.keySet());
         return studentIds.stream()
@@ -187,6 +247,27 @@ public class GradeRecordService {
         );
     }
 
+    private GradeRecord missingGradeRecord(GradeItem item, long studentId, LocalDateTime now) {
+        return new GradeRecord(
+                0L,
+                item.courseId(),
+                studentId,
+                item.id(),
+                item.sourceType(),
+                item.sourceId(),
+                null,
+                null,
+                GradeStatus.MISSING,
+                PublishStatus.UNPUBLISHED,
+                null,
+                null,
+                now,
+                null,
+                now,
+                now
+        );
+    }
+
     private BigDecimal normalizeRawScore(GradeItem item, SourceGradeDTO sourceGrade) {
         if (sourceGrade.score() == null || sourceGrade.fullScore() == null || sourceGrade.fullScore().compareTo(BigDecimal.ZERO) <= 0) {
             return BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
@@ -210,5 +291,73 @@ public class GradeRecordService {
         if (!coursePermissionClient.canManageCourseGrade(courseId, teacherId)) {
             throw new GradeItemPermissionException("教师无课程成绩管理权限");
         }
+    }
+
+    private Set<Long> courseStudentIds(long courseId) {
+        return coursePermissionClient.listCourseStudentIds(courseId).stream()
+                .filter(studentId -> studentId != null && studentId > 0)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+    }
+
+    private Set<Long> studentIdsForCalculation(long courseId) {
+        Set<Long> studentIds = courseStudentIds(courseId);
+        studentIds.addAll(gradeRecordRepository.findByCourseId(courseId).stream()
+                .map(GradeRecord::studentId)
+                .toList());
+        studentIds.addAll(courseGradeSummaryRepository.findByCourseId(courseId).stream()
+                .map(CourseGradeSummary::studentId)
+                .toList());
+        return studentIds;
+    }
+
+    private List<GradeItem> includedGradeItems(long courseId) {
+        return gradeItemRepository.findByCourseId(courseId).stream()
+                .filter(GradeItem::enabled)
+                .filter(GradeItem::includedInFinal)
+                .toList();
+    }
+
+    private GradeCalculationBatch saveCalculationBatch(
+            long courseId,
+            String triggerType,
+            int affectedItemCount,
+            int affectedStudentCount,
+            long calculatedBy,
+            LocalDateTime calculatedAt
+    ) {
+        return gradeCalculationBatchRepository.save(new GradeCalculationBatch(
+                0L,
+                courseId,
+                triggerType,
+                affectedItemCount,
+                affectedStudentCount,
+                "SUCCESS",
+                "course grades calculated",
+                calculatedBy,
+                calculatedAt
+        ));
+    }
+
+    private boolean matchesStudentKeyword(CourseGradeRow row, String studentKeyword) {
+        return studentKeyword == null || Long.toString(row.studentId()).contains(studentKeyword.trim());
+    }
+
+    private boolean matchesGradeItem(CourseGradeRow row, Long gradeItemId) {
+        return gradeItemId == null || row.records().stream()
+                .anyMatch(record -> record.gradeItemId() == gradeItemId);
+    }
+
+    private boolean matchesGradeStatus(CourseGradeRow row, GradeStatus gradeStatus) {
+        return gradeStatus == null || row.records().stream()
+                .anyMatch(record -> record.gradeStatus() == gradeStatus);
+    }
+
+    private boolean matchesPublishStatus(CourseGradeRow row, PublishStatus publishStatus) {
+        if (publishStatus == null) {
+            return true;
+        }
+        boolean summaryMatches = row.summary() != null && row.summary().publishStatus() == publishStatus;
+        return summaryMatches || row.records().stream()
+                .anyMatch(record -> record.publishStatus() == publishStatus);
     }
 }

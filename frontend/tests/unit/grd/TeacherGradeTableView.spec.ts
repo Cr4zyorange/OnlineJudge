@@ -11,41 +11,51 @@ describe('TeacherGradeTableView', () => {
   });
 
   it('syncs source grades and renders calculated final score and incomplete status', async () => {
-    vi.mocked(gradeRecordsApi.listCourseGrades).mockResolvedValueOnce([]);
+    vi.mocked(gradeRecordsApi.listCourseGrades).mockResolvedValueOnce({
+      records: [],
+      total: 0,
+      page: 1,
+      size: 20
+    });
     vi.mocked(gradeRecordsApi.syncSourceGrades).mockResolvedValueOnce({
-      calculationBatchId: 0,
+      calculationBatchId: 12,
       affectedItemCount: 2,
-      affectedStudentCount: 2,
+      affectedStudentCount: 3,
       syncedCount: 3,
-      missingCount: 0,
+      missingCount: 2,
       ungradedCount: 1
     });
-    vi.mocked(gradeRecordsApi.listCourseGrades).mockResolvedValueOnce([
-      {
-        studentId: 601,
-        summary: {
-          id: 1,
-          courseId: 101,
+    vi.mocked(gradeRecordsApi.listCourseGrades).mockResolvedValueOnce({
+      records: [
+        {
           studentId: 601,
-          finalScore: '84.00',
-          finalStatus: 'CALCULATED',
-          publishStatus: 'UNPUBLISHED'
+          summary: {
+            id: 1,
+            courseId: 101,
+            studentId: 601,
+            finalScore: '84.00',
+            finalStatus: 'CALCULATED',
+            publishStatus: 'UNPUBLISHED'
+          },
+          records: []
         },
-        records: []
-      },
-      {
-        studentId: 602,
-        summary: {
-          id: 2,
-          courseId: 101,
-          studentId: 602,
-          finalScore: null,
-          finalStatus: 'INCOMPLETE',
-          publishStatus: 'UNPUBLISHED'
+        {
+          studentId: 603,
+          summary: {
+            id: 3,
+            courseId: 101,
+            studentId: 603,
+            finalScore: null,
+            finalStatus: 'INCOMPLETE',
+            publishStatus: 'UNPUBLISHED'
+          },
+          records: []
         },
-        records: []
-      }
-    ]);
+      ],
+      total: 3,
+      page: 1,
+      size: 20
+    });
 
     const wrapper = mount(TeacherGradeTableView, {
       props: {
@@ -60,9 +70,11 @@ describe('TeacherGradeTableView', () => {
     await flushPromises();
 
     expect(gradeRecordsApi.syncSourceGrades).toHaveBeenCalledWith(101);
-    expect(wrapper.text()).toContain('同步完成：3 条有效成绩，1 条未评分');
+    expect(wrapper.text()).toContain('同步完成：3 条有效成绩，1 条未评分，2 条缺失');
+    expect(wrapper.text()).toContain('共 3 名学生');
     expect(wrapper.text()).toContain('601');
     expect(wrapper.text()).toContain('84.00');
+    expect(wrapper.text()).toContain('603');
     expect(wrapper.text()).toContain('INCOMPLETE');
   });
 });

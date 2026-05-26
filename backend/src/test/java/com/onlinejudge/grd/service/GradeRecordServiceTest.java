@@ -2,6 +2,8 @@ package com.onlinejudge.grd.service;
 
 import com.onlinejudge.grd.domain.CourseGradeSummary;
 import com.onlinejudge.grd.domain.CourseGradeSummaryRepository;
+import com.onlinejudge.grd.domain.GradeCalculationBatch;
+import com.onlinejudge.grd.domain.GradeCalculationBatchRepository;
 import com.onlinejudge.grd.domain.GradeItem;
 import com.onlinejudge.grd.domain.GradeItemRepository;
 import com.onlinejudge.grd.domain.GradeRecord;
@@ -31,22 +33,26 @@ class GradeRecordServiceTest {
         InMemoryGradeItemRepository itemRepository = new InMemoryGradeItemRepository();
         InMemoryGradeRecordRepository recordRepository = new InMemoryGradeRecordRepository();
         InMemoryCourseGradeSummaryRepository summaryRepository = new InMemoryCourseGradeSummaryRepository();
+        InMemoryGradeCalculationBatchRepository batchRepository = new InMemoryGradeCalculationBatchRepository();
         GradeRecordService service = new GradeRecordService(
                 itemRepository,
                 recordRepository,
                 summaryRepository,
+                batchRepository,
                 sourceGradesForCourse101(),
-                (courseId, userId) -> true
+                permissionClient(601L, 602L, 603L)
         );
         itemRepository.add(item(1L, 101L, "实验一", SourceType.LAB, 301L, "100.00", "0.40"));
         itemRepository.add(item(2L, 101L, "作业一", SourceType.HWK, 401L, "100.00", "0.60"));
 
         GradeSyncResult result = service.syncSourceGrades(101L, 501L);
 
+        assertThat(result.calculationBatchId()).isPositive();
         assertThat(result.syncedCount()).isEqualTo(3);
         assertThat(result.ungradedCount()).isEqualTo(1);
-        assertThat(result.missingCount()).isZero();
-        assertThat(result.affectedStudentCount()).isEqualTo(2);
+        assertThat(result.missingCount()).isEqualTo(2);
+        assertThat(result.affectedStudentCount()).isEqualTo(3);
+        assertThat(batchRepository.findById(result.calculationBatchId()).orElseThrow().triggerType()).isEqualTo("SYNC");
 
         GradeRecord labScore = recordRepository.findByStudentAndItem(101L, 601L, 1L).orElseThrow();
         assertThat(labScore.rawScore()).isEqualByComparingTo("90.00");
@@ -66,6 +72,14 @@ class GradeRecordServiceTest {
         CourseGradeSummary incomplete = summaryRepository.findByStudent(101L, 602L).orElseThrow();
         assertThat(incomplete.finalScore()).isNull();
         assertThat(incomplete.finalStatus()).isEqualTo(FinalStatus.INCOMPLETE);
+
+        GradeRecord missingLab = recordRepository.findByStudentAndItem(101L, 603L, 1L).orElseThrow();
+        GradeRecord missingHomework = recordRepository.findByStudentAndItem(101L, 603L, 2L).orElseThrow();
+        assertThat(missingLab.gradeStatus()).isEqualTo(GradeStatus.MISSING);
+        assertThat(missingHomework.gradeStatus()).isEqualTo(GradeStatus.MISSING);
+        CourseGradeSummary missingSummary = summaryRepository.findByStudent(101L, 603L).orElseThrow();
+        assertThat(missingSummary.finalScore()).isNull();
+        assertThat(missingSummary.finalStatus()).isEqualTo(FinalStatus.INCOMPLETE);
     }
 
     @Test
@@ -74,6 +88,7 @@ class GradeRecordServiceTest {
                 new InMemoryGradeItemRepository(),
                 new InMemoryGradeRecordRepository(),
                 new InMemoryCourseGradeSummaryRepository(),
+                new InMemoryGradeCalculationBatchRepository(),
                 (courseId, sourceType, sourceId) -> List.of(),
                 (courseId, userId) -> false
         );
@@ -81,6 +96,20 @@ class GradeRecordServiceTest {
         assertThatThrownBy(() -> service.syncSourceGrades(101L, 501L))
                 .isInstanceOf(GradeItemPermissionException.class)
                 .hasMessageContaining("教师无课程成绩管理权限");
+    }
+
+    private CoursePermissionClient permissionClient(Long... studentIds) {
+        return new CoursePermissionClient() {
+            @Override
+            public boolean canManageCourse(long courseId, long userId) {
+                return true;
+            }
+
+            @Override
+            public List<Long> listCourseStudentIds(long courseId) {
+                return List.of(studentIds);
+            }
+        };
     }
 
     private SourceGradeClient sourceGradesForCourse101() {
@@ -245,6 +274,24 @@ class GradeRecordServiceTest {
             return summaries.stream()
                     .filter(summary -> summary.courseId() == courseId)
                     .filter(summary -> summary.studentId() == studentId)
+                    .findFirst();
+        }
+    }
+
+    private static final class InMemoryGradeCalculationBatchRepository implements GradeCalculationBatchRepository {
+        private long nextId = 1L;
+        private final List<GradeCalculationBatch> batches = new ArrayList<>();
+
+        @Override
+        public GradeCalculationBatch save(GradeCalculationBatch batch) {
+            GradeCalculationBatch saved = batch.withId(nextId++);
+            batches.add(saved);
+            return saved;
+        }
+
+        Optional<GradeCalculationBatch> findById(long id) {
+            return batches.stream()
+                    .filter(batch -> batch.id() == id)
                     .findFirst();
         }
     }

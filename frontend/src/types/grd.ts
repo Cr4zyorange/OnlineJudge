@@ -65,6 +65,13 @@ export interface CourseGradeRow {
   records: GradeRecord[];
 }
 
+export interface CourseGradeTablePage {
+  records: CourseGradeRow[];
+  total: number;
+  page: number;
+  size: number;
+}
+
 export interface GradeSyncResult {
   calculationBatchId: number;
   affectedItemCount: number;

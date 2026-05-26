@@ -45,7 +45,12 @@ describe('App', () => {
   });
 
   it('routes course grade table paths to the teacher grade table page', async () => {
-    vi.mocked(gradeRecordsApi.listCourseGrades).mockResolvedValueOnce([]);
+    vi.mocked(gradeRecordsApi.listCourseGrades).mockResolvedValueOnce({
+      records: [],
+      total: 0,
+      page: 1,
+      size: 20
+    });
     Object.defineProperty(window, 'location', {
       configurable: true,
       value: new URL('http://localhost/courses/505/grd/grades')
@@ -54,7 +59,7 @@ describe('App', () => {
     mount(App);
     await flushPromises();
 
-    expect(gradeRecordsApi.listCourseGrades).toHaveBeenCalledWith(505);
+    expect(gradeRecordsApi.listCourseGrades).toHaveBeenCalledWith(505, { page: 1, size: 20 });
     expect(gradeItemApi.listGradeItems).not.toHaveBeenCalled();
   });
 
