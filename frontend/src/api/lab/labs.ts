@@ -1,0 +1,75 @@
+import type {
+  LabExperimentDetail,
+  LabExperimentPayload,
+  LabExperimentStatus,
+  LabExperimentSummary
+} from '../../types/lab';
+import { configureAuthContext, request } from '../http';
+
+export interface LabAuthContext {
+  userId: number | string;
+  userRole: 'TEACHER' | 'ADMIN';
+  courseIds?: Array<number | string> | '*';
+  manageableCourseIds: Array<number | string> | '*';
+}
+
+type LabAuthContextProvider = () => LabAuthContext | null;
+
+let authContextProvider: LabAuthContextProvider | null = null;
+
+export function configureLabAuthContext(provider: LabAuthContextProvider | null) {
+  authContextProvider = provider;
+  configureAuthContext(() => {
+    const context = authContextProvider?.();
+    if (!context) {
+      return null;
+    }
+    return {
+      userId: context.userId,
+      role: context.userRole,
+      courseIds: context.courseIds ?? context.manageableCourseIds,
+      manageableCourseIds: context.manageableCourseIds
+    };
+  });
+}
+
+export async function listLabs(courseId: number, status?: LabExperimentStatus): Promise<LabExperimentSummary[]> {
+  const query = status ? `?status=${status}` : '';
+  return request<LabExperimentSummary[]>(`/api/v1/courses/${courseId}/labs${query}`);
+}
+
+export async function createLab(courseId: number, payload: LabExperimentPayload): Promise<LabExperimentDetail> {
+  return request<LabExperimentDetail>(`/api/v1/courses/${courseId}/labs`, {
+    method: 'POST',
+    body: payload
+  });
+}
+
+export async function getLabDetail(labId: number): Promise<LabExperimentDetail> {
+  return request<LabExperimentDetail>(`/api/v1/labs/${labId}`);
+}
+
+export async function updateLab(labId: number, payload: LabExperimentPayload): Promise<LabExperimentDetail> {
+  return request<LabExperimentDetail>(`/api/v1/labs/${labId}`, {
+    method: 'PUT',
+    body: payload
+  });
+}
+
+export async function deleteLab(labId: number): Promise<LabExperimentSummary> {
+  return request<LabExperimentSummary>(`/api/v1/labs/${labId}`, {
+    method: 'DELETE'
+  });
+}
+
+export async function publishLab(labId: number): Promise<LabExperimentSummary> {
+  return request<LabExperimentSummary>(`/api/v1/labs/${labId}/publish`, {
+    method: 'POST'
+  });
+}
+
+export async function closeLab(labId: number): Promise<LabExperimentSummary> {
+  return request<LabExperimentSummary>(`/api/v1/labs/${labId}/close`, {
+    method: 'POST'
+  });
+}

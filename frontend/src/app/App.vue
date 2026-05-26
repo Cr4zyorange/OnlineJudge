@@ -1,5 +1,6 @@
 <template>
   <CourseManagementView v-if="viewMode === 'courses'" />
+  <LabTeacherView v-else-if="viewMode === 'lab' && courseId !== null" :course-id="courseId" />
   <TeacherGradeTableView v-else-if="courseId !== null && page === 'grades'" :course-id="courseId" />
   <GradeItemConfigView v-else-if="courseId !== null" :course-id="courseId" />
   <main v-else class="app-empty-state">
@@ -11,6 +12,7 @@
 import { computed } from 'vue';
 import CourseManagementView from '../views/crs/CourseManagementView.vue';
 import GradeItemConfigView from '../views/grd/GradeItemConfigView.vue';
+import LabTeacherView from '../views/lab/LabTeacherView.vue';
 import TeacherGradeTableView from '../views/grd/TeacherGradeTableView.vue';
 
 const pathname = computed(() => window.location.pathname);
@@ -27,6 +29,9 @@ const page = computed(() => {
 const viewMode = computed(() => {
   if (pathname.value === '/' || pathname.value === '/courses' || pathname.value === '/courses/') {
     return 'courses';
+  }
+  if (pathname.value.includes('/labs')) {
+    return 'lab';
   }
   return 'grade';
 });
