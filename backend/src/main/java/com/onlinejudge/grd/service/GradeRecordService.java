@@ -1,5 +1,7 @@
 package com.onlinejudge.grd.service;
 
+import com.onlinejudge.common.event.NotificationEvent;
+import com.onlinejudge.common.event.NotificationEventPublisher;
 import com.onlinejudge.grd.domain.CourseGradeSummary;
 import com.onlinejudge.grd.domain.CourseGradeSummaryRepository;
 import com.onlinejudge.grd.domain.FinalStatus;
@@ -41,6 +43,7 @@ public class GradeRecordService {
     private final GradeCalculationBatchRepository gradeCalculationBatchRepository;
     private final SourceGradeClient sourceGradeClient;
     private final CoursePermissionClient coursePermissionClient;
+    private final NotificationEventPublisher notificationEventPublisher;
 
     public GradeRecordService(
             GradeItemRepository gradeItemRepository,
@@ -49,7 +52,8 @@ public class GradeRecordService {
             CourseGradeSummaryRepository courseGradeSummaryRepository,
             GradeCalculationBatchRepository gradeCalculationBatchRepository,
             SourceGradeClient sourceGradeClient,
-            CoursePermissionClient coursePermissionClient
+            CoursePermissionClient coursePermissionClient,
+            NotificationEventPublisher notificationEventPublisher
     ) {
         this.gradeItemRepository = gradeItemRepository;
         this.gradeRecordRepository = gradeRecordRepository;
@@ -58,6 +62,7 @@ public class GradeRecordService {
         this.gradeCalculationBatchRepository = gradeCalculationBatchRepository;
         this.sourceGradeClient = sourceGradeClient;
         this.coursePermissionClient = coursePermissionClient;
+        this.notificationEventPublisher = notificationEventPublisher;
     }
 
     public GradeSyncResult syncSourceGrades(long courseId, long teacherId) {
@@ -132,14 +137,15 @@ public class GradeRecordService {
                 .collect(Collectors.toMap(GradeItem::id, item -> item));
         Map<Long, List<GradeRecord>> recordsByStudent = gradeRecordRepository.findByCourseId(courseId).stream()
                 .collect(Collectors.groupingBy(GradeRecord::studentId));
+        Map<Long, CourseGradeSummary> summariesByStudent = courseGradeSummaryRepository.findByCourseId(courseId).stream()
+                .collect(Collectors.toMap(CourseGradeSummary::studentId, summary -> summary));
         Set<Long> studentIds = new LinkedHashSet<>();
         studentIds.addAll(courseStudentIds(courseId));
         studentIds.addAll(recordsByStudent.keySet());
-        studentIds.addAll(courseGradeSummaryRepository.findByCourseId(courseId).stream()
-                .map(CourseGradeSummary::studentId)
-                .toList());
+        studentIds.addAll(summariesByStudent.keySet());
         LocalDateTime now = LocalDateTime.now();
         for (long studentId : studentIds) {
+            CourseGradeSummary existingSummary = summariesByStudent.get(studentId);
             List<GradeRecord> includedRecords = recordsByStudent.getOrDefault(studentId, List.of()).stream()
                     .filter(record -> {
                         GradeItem item = itemsById.get(record.gradeItemId());
@@ -160,10 +166,10 @@ public class GradeRecordService {
                     studentId,
                     finalScore,
                     complete ? FinalStatus.CALCULATED : FinalStatus.INCOMPLETE,
-                    PublishStatus.UNPUBLISHED,
+                    existingSummary == null ? PublishStatus.UNPUBLISHED : existingSummary.publishStatus(),
                     calculationBatchId,
-                    null,
-                    now,
+                    existingSummary == null ? null : existingSummary.publishedAt(),
+                    existingSummary == null ? now : existingSummary.createdAt(),
                     now
             ));
         }
@@ -229,7 +235,7 @@ public class GradeRecordService {
         BigDecimal oldScore = record.rawScore();
         BigDecimal weightedScore = newScore.multiply(gradeItem.weight()).setScale(2, RoundingMode.HALF_UP);
         GradeRecord adjustedRecord = gradeRecordRepository.update(record.adjusted(newScore, weightedScore, now));
-        gradeChangeLogRepository.save(new GradeChangeLog(
+        GradeChangeLog changeLog = gradeChangeLogRepository.save(new GradeChangeLog(
                 0L,
                 adjustedRecord.courseId(),
                 adjustedRecord.studentId(),
@@ -241,6 +247,9 @@ public class GradeRecordService {
                 teacherId,
                 now
         ));
+        if (record.publishStatus() == PublishStatus.PUBLISHED) {
+            publishGradeChangedEvent(changeLog, "GRADE_ITEM", adjustedRecord.gradeItemId(), now);
+        }
         GradeCalculationBatch batch = saveCalculationBatch(
                 adjustedRecord.courseId(),
                 "ADJUST_RECORD",
@@ -271,7 +280,7 @@ public class GradeRecordService {
         LocalDateTime now = LocalDateTime.now();
         BigDecimal oldScore = summary.finalScore();
         CourseGradeSummary adjustedSummary = courseGradeSummaryRepository.update(summary.adjusted(newScore, now));
-        gradeChangeLogRepository.save(new GradeChangeLog(
+        GradeChangeLog changeLog = gradeChangeLogRepository.save(new GradeChangeLog(
                 0L,
                 adjustedSummary.courseId(),
                 adjustedSummary.studentId(),
@@ -283,6 +292,9 @@ public class GradeRecordService {
                 teacherId,
                 now
         ));
+        if (summary.publishStatus() == PublishStatus.PUBLISHED) {
+            publishGradeChangedEvent(changeLog, "COURSE_GRADE_SUMMARY", adjustedSummary.id(), now);
+        }
         return new FinalScoreAdjustmentResult(
                 adjustedSummary.id(),
                 adjustedSummary.studentId(),
@@ -291,6 +303,26 @@ public class GradeRecordService {
                 reason,
                 adjustedSummary.updatedAt()
         );
+    }
+
+    private void publishGradeChangedEvent(
+            GradeChangeLog changeLog,
+            String targetType,
+            long targetId,
+            LocalDateTime changedAt
+    ) {
+        notificationEventPublisher.publish(new NotificationEvent(
+                "GRD:GRADE_CHANGED:LOG:" + changeLog.id(),
+                "GRADE_CHANGED",
+                changeLog.courseId(),
+                List.of(changeLog.studentId()),
+                "成绩已变更",
+                "课程成绩已调整，请查看最新成绩。",
+                targetType,
+                targetId,
+                "/courses/" + changeLog.courseId() + "?page=grades",
+                changedAt
+        ));
     }
 
     public GradeChangeLogPage listGradeChangeLogs(
