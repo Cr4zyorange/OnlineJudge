@@ -8,26 +8,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed, defineAsyncComponent, defineComponent, h } from 'vue';
+import { computed } from 'vue';
 import CourseManagementView from '../views/crs/CourseManagementView.vue';
 import GradeItemConfigView from '../views/grd/GradeItemConfigView.vue';
-
-const gradeTableModules = import.meta.glob('../views/grd/TeacherGradeTableView.vue');
-const TeacherGradeTableViewFallback = defineComponent({
-  props: {
-    courseId: {
-      type: Number,
-      required: true
-    }
-  },
-  setup() {
-    return () => h('main', { class: 'app-empty-state' }, '成绩列表模块未加载');
-  }
-});
-const TeacherGradeTableView = defineAsyncComponent(() => {
-  const loader = gradeTableModules['../views/grd/TeacherGradeTableView.vue'];
-  return loader ? loader() as Promise<typeof TeacherGradeTableViewFallback> : Promise.resolve(TeacherGradeTableViewFallback);
-});
+import TeacherGradeTableView from '../views/grd/TeacherGradeTableView.vue';
 
 const pathname = computed(() => window.location.pathname);
 const searchParams = computed(() => new URLSearchParams(window.location.search));
@@ -37,16 +21,10 @@ const page = computed(() => {
   if (queryPage) {
     return queryPage;
   }
-  if (pathname.value.includes('/grd/grades')) {
-    return 'grades';
-  }
-  return 'grade-items';
+  return pathname.value.includes('/grades') ? 'grades' : 'grade-items';
 });
 
 const viewMode = computed(() => {
-  if (pathname.value.includes('/grd/grade-items') || pathname.value.includes('/grd/grades')) {
-    return 'grade';
-  }
   if (pathname.value === '/' || pathname.value === '/courses' || pathname.value === '/courses/') {
     return 'courses';
   }
