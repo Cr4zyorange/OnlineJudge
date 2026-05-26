@@ -68,3 +68,28 @@ export interface LabExperimentPayload {
   memoryLimitKb: number;
   testcases: LabTestcasePayload[];
 }
+
+export interface LabSubmissionPayload {
+  language: string;
+  code?: string;
+  file?: File;
+}
+
+export interface LabSubmissionSummary {
+  submissionId: number;
+  labId: number;
+  studentId: number;
+  submitStatus: 'SUBMITTED' | 'LATE' | 'WITHDRAWN';
+  evaluationStatus:
+    | 'NONE'
+    | 'PENDING'
+    | 'RUNNING'
+    | 'ACCEPTED'
+    | 'WRONG_ANSWER'
+    | 'COMPILE_ERROR'
+    | 'RUNTIME_ERROR'
+    | 'TIME_LIMIT_EXCEEDED'
+    | 'SYSTEM_ERROR';
+  version: number;
+  submittedAt: string;
+}

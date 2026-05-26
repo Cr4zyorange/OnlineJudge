@@ -31,7 +31,7 @@ export async function request<T>(url: string, options: RequestOptions = {}): Pro
   const response = await fetch(url, {
     method: options.method ?? 'GET',
     headers: {
-      ...jsonHeaders(),
+      ...requestHeaders(options.body),
       ...options.headers
     },
     body: formatBody(options.body)
@@ -39,10 +39,9 @@ export async function request<T>(url: string, options: RequestOptions = {}): Pro
   return unwrap<T>(response);
 }
 
-function jsonHeaders() {
+function requestHeaders(body: unknown) {
   const authContext = resolveAuthContext();
-  return {
-    'Content-Type': 'application/json',
+  const headers: Record<string, string> = {
     'X-User-Id': String(authContext.userId),
     'X-Username': authContext.username ?? '',
     'X-User-Role': authContext.role,
@@ -50,6 +49,10 @@ function jsonHeaders() {
     'X-Course-Ids': formatCourseIds(authContext.courseIds ?? authContext.manageableCourseIds ?? []),
     'X-Manageable-Course-Ids': formatCourseIds(authContext.manageableCourseIds ?? [])
   };
+  if (!(body instanceof FormData)) {
+    headers['Content-Type'] = 'application/json';
+  }
+  return headers;
 }
 
 function resolveAuthContext(): AuthContext {
@@ -81,6 +84,9 @@ function resolveAuthContext(): AuthContext {
 function formatBody(body: unknown) {
   if (body === undefined) {
     return undefined;
+  }
+  if (body instanceof FormData) {
+    return body;
   }
   return typeof body === 'string' ? body : JSON.stringify(body);
 }

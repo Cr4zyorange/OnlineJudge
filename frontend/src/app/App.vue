@@ -1,6 +1,14 @@
 <template>
   <CourseManagementView v-if="viewMode === 'courses'" />
-  <LabTeacherView v-else-if="viewMode === 'lab' && courseId !== null" :course-id="courseId" />
+  <LabTeacherView
+    v-else-if="viewMode === 'lab' && labRole === 'teacher' && courseId !== null"
+    :course-id="courseId"
+  />
+  <LabStudentView
+    v-else-if="viewMode === 'lab' && labRole === 'student' && courseId !== null && labId !== null"
+    :course-id="courseId"
+    :lab-id="labId"
+  />
   <TeacherGradeTableView v-else-if="courseId !== null && page === 'grades'" :course-id="courseId" />
   <GradeItemConfigView v-else-if="courseId !== null" :course-id="courseId" />
   <main v-else class="app-empty-state">
@@ -12,6 +20,7 @@
 import { computed } from 'vue';
 import CourseManagementView from '../views/crs/CourseManagementView.vue';
 import GradeItemConfigView from '../views/grd/GradeItemConfigView.vue';
+import LabStudentView from '../views/lab/LabStudentView.vue';
 import LabTeacherView from '../views/lab/LabTeacherView.vue';
 import TeacherGradeTableView from '../views/grd/TeacherGradeTableView.vue';
 
@@ -36,6 +45,8 @@ const viewMode = computed(() => {
   return 'grade';
 });
 
+const labRole = computed(() => searchParams.value.get('role') === 'student' ? 'student' : 'teacher');
+
 const courseId = computed(() => {
   const queryCourseId = parseCourseId(searchParams.value.get('courseId'));
   if (queryCourseId !== null) {
@@ -43,6 +54,15 @@ const courseId = computed(() => {
   }
   const pathCourseId = window.location.pathname.match(/\/courses\/(\d+)(?:\/|$)/)?.[1] ?? null;
   return parseCourseId(pathCourseId);
+});
+
+const labId = computed(() => {
+  const queryLabId = parseCourseId(searchParams.value.get('labId'));
+  if (queryLabId !== null) {
+    return queryLabId;
+  }
+  const pathLabId = window.location.pathname.match(/\/labs\/(\d+)(?:\/|$)/)?.[1] ?? null;
+  return parseCourseId(pathLabId);
 });
 
 function parseCourseId(value: string | null) {

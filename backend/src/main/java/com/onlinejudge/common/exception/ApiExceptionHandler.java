@@ -7,6 +7,7 @@ import com.onlinejudge.grd.service.InvalidGradeRuleException;
 import com.onlinejudge.lab.service.LabNotFoundException;
 import com.onlinejudge.lab.service.LabPermissionException;
 import com.onlinejudge.lab.service.LabStateException;
+import com.onlinejudge.lab.service.LabSubmissionValidationException;
 import com.onlinejudge.lab.service.LabValidationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -50,6 +51,12 @@ public class ApiExceptionHandler {
     public ResponseEntity<ApiResponse<Void>> handleLabValidation(LabValidationException exception) {
         return ResponseEntity.badRequest()
                 .body(ApiResponse.error("LAB-400-01", exception.getMessage()));
+    }
+
+    @ExceptionHandler(LabSubmissionValidationException.class)
+    public ResponseEntity<ApiResponse<Void>> handleLabSubmissionValidation(LabSubmissionValidationException exception) {
+        return ResponseEntity.badRequest()
+                .body(ApiResponse.error(exception.code(), exception.getMessage()));
     }
 
     @ExceptionHandler(LabNotFoundException.class)

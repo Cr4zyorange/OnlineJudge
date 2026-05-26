@@ -2,7 +2,9 @@ import type {
   LabExperimentDetail,
   LabExperimentPayload,
   LabExperimentStatus,
-  LabExperimentSummary
+  LabExperimentSummary,
+  LabSubmissionPayload,
+  LabSubmissionSummary
 } from '../../types/lab';
 import { configureAuthContext, request } from '../http';
 
@@ -71,5 +73,20 @@ export async function publishLab(labId: number): Promise<LabExperimentSummary> {
 export async function closeLab(labId: number): Promise<LabExperimentSummary> {
   return request<LabExperimentSummary>(`/api/v1/labs/${labId}/close`, {
     method: 'POST'
+  });
+}
+
+export async function submitLab(labId: number, payload: LabSubmissionPayload): Promise<LabSubmissionSummary> {
+  const formData = new FormData();
+  formData.append('language', payload.language);
+  if (payload.code) {
+    formData.append('code', payload.code);
+  }
+  if (payload.file) {
+    formData.append('file', payload.file);
+  }
+  return request<LabSubmissionSummary>(`/api/v1/labs/${labId}/submissions`, {
+    method: 'POST',
+    body: formData
   });
 }
