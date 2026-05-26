@@ -1,24 +1,25 @@
 ---
 name: onlinejudge-pr-approval-reviewer
-description: Use when reviewing or approving OnlineJudgeForSE pull requests that target the development branch and must be judged against issue linkage, repository workflow rules, CI/tests, scope control, and the documented requirements/design behavior.
+description: Use when reviewing OnlineJudge issues or approving OnlineJudge pull requests that target the development branch and must be judged against issue linkage, repository workflow rules, CI/tests, scope control, and the documented requirements/design behavior.
 ---
 
-# OnlineJudgeForSE PR Approval Reviewer
+# OnlineJudge PR Approval Reviewer
 
 ## When To Use
 
-Use this skill when the user asks Codex to inspect, patrol, approve, or reject pull requests for `OnlineJudgeForSE`, especially when:
+Use this skill when the user asks Codex to inspect, patrol, approve, or reject issues or pull requests for `OnlineJudge`, especially when:
 
 - an open PR targets `dev`;
+- a specific issue must be reviewed together with its implementation PR;
 - the task is "审批 PR"、"自动审批"、"不符合条件直接打回";
 - approval must depend on document conformance, not only generic code quality;
 - the PR should be checked against repository workflow rules before any functional review.
 
-This skill is for PR review and approval. It does not replace merge decisions, release branching, or issue planning.
+This skill is for issue-bound PR review and approval. It does not replace merge decisions, release branching, or issue planning.
 
 ## Core Principle
 
-Approval has three gates:
+Approval follows this gate order:
 
 ```text
 hard gate
@@ -49,7 +50,7 @@ git remote -v
 gh repo view --json nameWithOwner,defaultBranchRef
 ```
 
-Treat repository identity as live data. The local remote may be `Lucio-ball/OnlineJudgeForSE`, while GitHub CLI may resolve another canonical name. Use the live `gh repo view` result for GitHub operations, but keep file-path checks in the local repository.
+Treat repository identity as live data. Do not rely on folder names, stale memory, or previous repo names. Use the live `gh repo view` result for GitHub operations, but keep file-path checks in the local repository.
 
 List reviewable PRs:
 
@@ -59,6 +60,52 @@ gh pr list --base dev --state open --json number,title,headRefName,baseRefName,i
 
 If there are no open PRs targeting `dev`, report that there is nothing to review.
 
+## Issue-First PR Association
+
+When the user asks to review a specific issue, do not wait for the user to supply a PR number. Resolve and, when safe, repair the issue-PR association before the hard gate.
+
+1. Inspect the issue:
+
+   ```bash
+   gh issue view <issue-id> --json number,title,body,state,labels,assignees,milestone,projectItems,comments,url
+   ```
+
+2. Look for an open PR that already closes the issue:
+
+   ```bash
+   gh pr list --base dev --state open --json number,title,headRefName,baseRefName,body,closingIssuesReferences,url
+   ```
+
+3. If no closing PR is found, look for exactly one plausible implementation PR using branch, title, and body evidence:
+
+   ```bash
+   gh pr list --base dev --state open --json number,title,headRefName,baseRefName,body,author,files,url
+   ```
+
+   Treat these as strong evidence:
+
+   - branch name starts with `feature/<issue-id>-`, `fix/<issue-id>-`, or `docs/<issue-id>-`;
+   - PR title or body references `#<issue-id>`;
+   - PR body describes the same module, requirement IDs, pages, APIs, or tables as the issue;
+   - there is only one open `dev` PR by the issue assignee whose changed files match the issue module.
+
+4. If exactly one PR matches the issue but its body does not contain a recognized closing keyword, append a `Closes #<issue-id>` line to the PR body before review:
+
+   ```bash
+   gh pr view <pr-number> --json body --jq '.body // ""' > /tmp/pr-body.md
+   printf '\n\nCloses #<issue-id>\n' >> /tmp/pr-body.md
+   gh pr edit <pr-number> --body-file /tmp/pr-body.md
+   gh pr view <pr-number> --json closingIssuesReferences,url
+   ```
+
+   This is a repair step, not an approval. Continue the review only after GitHub reports the issue under `closingIssuesReferences`.
+
+5. If multiple plausible PRs exist, or the match depends on guessing intent, do not edit any PR. Report the ambiguity with the candidate PR numbers and stop before approval.
+
+6. If no plausible PR exists, report that the issue has no reviewable implementation PR targeting `dev`.
+
+For PR-first reviews, perform the same association repair in reverse: inspect `closingIssuesReferences`; if it is empty but the branch name or PR body identifies exactly one issue, append `Closes #<issue-id>` and re-check before applying the hard gate.
+
 ## Hard Gate
 
 Reject immediately with `request changes` if any item fails:
@@ -67,7 +114,7 @@ Reject immediately with `request changes` if any item fails:
 | --- | --- |
 | Base branch | PR targets `dev` |
 | Draft status | PR is ready for review, not draft |
-| Issue linkage | PR body contains `Close #id` or `Closes #id` |
+| Issue linkage | PR body contains `Close #id` or `Closes #id`; if the issue-PR match is unambiguous, repair this automatically before judging the gate |
 | Branch naming | branch follows `feature/<issue-id>-<name>`, `fix/<issue-id>-<name>`, `docs/<issue-id>-<name>`, `test/<name>`, `release/<version>`, or `hotfix/<issue-id>-<name>` |
 | Scope | PR changes belong to one issue and one reviewable delivery unit |
 | Issue completion claim | PR explains how the linked issue's documented scope is completed |
@@ -202,7 +249,7 @@ Required before approval:
 Inspect metadata:
 
 ```bash
-gh pr view <number> --json number,title,body,headRefName,baseRefName,isDraft,author,commits,files,reviewDecision,statusCheckRollup,url
+gh pr view <number> --json number,title,body,headRefName,baseRefName,isDraft,author,commits,files,reviewDecision,statusCheckRollup,closingIssuesReferences,url
 ```
 
 Inspect diff:
@@ -216,6 +263,7 @@ Check issue close directive:
 
 ```bash
 gh pr view <number> --json body --jq '.body'
+gh pr view <number> --json closingIssuesReferences
 ```
 
 Inspect the linked issue:
