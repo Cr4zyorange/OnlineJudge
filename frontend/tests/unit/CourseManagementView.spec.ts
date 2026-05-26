@@ -28,7 +28,7 @@ const course = {
 describe('CourseManagementView', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
-    window.localStorage.clear();
+    installLocalStorageMock();
     window.localStorage.setItem('onlinejudge.userId', '101');
     window.localStorage.setItem('onlinejudge.userRole', 'TEACHER');
     window.localStorage.setItem('onlinejudge.username', 'Teacher101');
@@ -110,3 +110,16 @@ describe('CourseManagementView', () => {
     expect(wrapper.text()).toContain('已归档');
   });
 });
+
+function installLocalStorageMock() {
+  const values = new Map<string, string>();
+  Object.defineProperty(window, 'localStorage', {
+    configurable: true,
+    value: {
+      getItem: vi.fn((key: string) => values.get(key) ?? null),
+      setItem: vi.fn((key: string, value: string) => values.set(key, value)),
+      removeItem: vi.fn((key: string) => values.delete(key)),
+      clear: vi.fn(() => values.clear())
+    }
+  });
+}

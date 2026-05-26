@@ -89,18 +89,22 @@ class CourseControllerTest {
 
     @Test
     void archivedCourseAppearsInArchivedList() throws Exception {
+        String suffix = "401-" + System.nanoTime();
+        String currentName = "current-" + suffix;
+        String historyName = "history-" + suffix;
+
         mockMvc.perform(post("/api/v1/courses")
                         .header("X-User-Id", "401")
                         .header("X-User-Role", "TEACHER")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"name\":\"current-401\",\"status\":\"ACTIVE\"}"))
+                        .content("{\"name\":\"" + currentName + "\",\"status\":\"ACTIVE\"}"))
                 .andExpect(status().isOk());
 
         String response = mockMvc.perform(post("/api/v1/courses")
                         .header("X-User-Id", "401")
                         .header("X-User-Role", "TEACHER")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"name\":\"history-401\",\"status\":\"ACTIVE\"}"))
+                        .content("{\"name\":\"" + historyName + "\",\"status\":\"ACTIVE\"}"))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
         String courseId = response.replaceAll("(?s).*\"id\":(\\d+).*", "$1");
@@ -110,20 +114,20 @@ class CourseControllerTest {
                         .header("X-User-Role", "TEACHER"))
                 .andExpect(status().isOk());
 
-        mockMvc.perform(get("/api/v1/courses?scope=archived&keyword=401")
+        mockMvc.perform(get("/api/v1/courses?scope=archived&keyword=" + suffix)
                         .header("X-User-Id", "401")
                         .header("X-User-Role", "TEACHER"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.total", is(1)))
-                .andExpect(jsonPath("$.data.list[0].name", is("history-401")))
+                .andExpect(jsonPath("$.data.list[0].name", is(historyName)))
                 .andExpect(jsonPath("$.data.list[0].status", is("ARCHIVED")));
 
-        mockMvc.perform(get("/api/v1/courses?scope=all&keyword=401")
+        mockMvc.perform(get("/api/v1/courses?scope=all&keyword=" + suffix)
                         .header("X-User-Id", "401")
                         .header("X-User-Role", "TEACHER"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.total", is(1)))
-                .andExpect(jsonPath("$.data.list[0].name", is("current-401")))
+                .andExpect(jsonPath("$.data.list[0].name", is(currentName)))
                 .andExpect(jsonPath("$.data.list[0].status", is("ACTIVE")));
     }
 }
