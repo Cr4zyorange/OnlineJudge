@@ -39,6 +39,26 @@ describe('shared API request client', () => {
     }));
   });
 
+  it('accepts the legacy success response code used by older backend processes', async () => {
+    configureAuthContext(() => ({
+      userId: 501,
+      role: 'TEACHER',
+      permissions: [],
+      courseIds: '*',
+      manageableCourseIds: '*'
+    }));
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        code: 200,
+        message: 'success',
+        data: { list: [] }
+      })
+    } as Response);
+
+    await expect(request<{ list: unknown[] }>('/api/v1/courses')).resolves.toEqual({ list: [] });
+  });
+
   it('throws the backend message when the standard response is not successful', async () => {
     configureAuthContext(() => ({
       userId: 601,

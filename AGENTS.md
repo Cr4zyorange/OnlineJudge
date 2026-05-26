@@ -129,7 +129,7 @@ REFACTOR：在测试保持通过的前提下清理结构、命名和重复代码
 - 开始开发前确认 issue 内容、所属模块和当前 Projects 状态。
 - 开始做时将 issue 移动到进行中。
 - PR 目标分支统一为远程 `dev`，本仓库的 `dev` 等价于常见 Git Flow 中的 `develop`。
-- PR 描述必须包含 `close #issue_id` 或 `Closes #issue_id`。
+- PR 描述必须包含 `close #issue_id` 或 `closes #issue_id`。
 - 没有关联 issue 的开发改动不应混入功能 PR。
 
 如果某个 issue 做不完、卡住，或发现范围明显大于预期，必须尽早在 issue/PR 中写明当前进展、阻塞点和需要协同的模块。

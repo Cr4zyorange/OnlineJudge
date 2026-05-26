@@ -64,6 +64,19 @@ class HeaderCoursePermissionClientTest {
         assertThat(client.canManageCourse(101L, 0L)).isFalse();
     }
 
+    @Test
+    void readsCourseStudentRosterFromHeader() {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.addHeader("X-Course-Student-Ids", "101:601,602,603;202:701");
+        bind(request);
+
+        HeaderCoursePermissionClient client = new HeaderCoursePermissionClient();
+
+        assertThat(client.listCourseStudentIds(101L)).containsExactly(601L, 602L, 603L);
+        assertThat(client.listCourseStudentIds(202L)).containsExactly(701L);
+        assertThat(client.listCourseStudentIds(303L)).isEmpty();
+    }
+
     private void bind(HttpServletRequest request) {
         RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request));
     }
