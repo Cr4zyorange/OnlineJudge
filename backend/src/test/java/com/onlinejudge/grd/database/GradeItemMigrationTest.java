@@ -2,12 +2,14 @@ package com.onlinejudge.grd.database;
 
 import com.onlinejudge.grd.domain.CourseGradeSummary;
 import com.onlinejudge.grd.domain.FinalStatus;
+import com.onlinejudge.grd.domain.GradeChangeLog;
 import com.onlinejudge.grd.domain.GradeItem;
 import com.onlinejudge.grd.domain.GradeRecord;
 import com.onlinejudge.grd.domain.GradeStatus;
 import com.onlinejudge.grd.domain.PublishStatus;
 import com.onlinejudge.grd.domain.SourceType;
 import com.onlinejudge.grd.repository.JdbcCourseGradeSummaryRepository;
+import com.onlinejudge.grd.repository.JdbcGradeChangeLogRepository;
 import com.onlinejudge.grd.repository.JdbcGradeItemRepository;
 import com.onlinejudge.grd.repository.JdbcGradeRecordRepository;
 import org.junit.jupiter.api.Test;
@@ -29,23 +31,27 @@ import static org.assertj.core.api.Assertions.assertThat;
 @Import({
         JdbcGradeItemRepository.class,
         JdbcGradeRecordRepository.class,
-        JdbcCourseGradeSummaryRepository.class
+        JdbcCourseGradeSummaryRepository.class,
+        JdbcGradeChangeLogRepository.class
 })
 @Sql(scripts = "file:../database/migrations/20260525_01_create_grd_grade_item.sql")
 class GradeItemMigrationTest {
     private final JdbcGradeItemRepository repository;
     private final JdbcGradeRecordRepository gradeRecordRepository;
     private final JdbcCourseGradeSummaryRepository courseGradeSummaryRepository;
+    private final JdbcGradeChangeLogRepository gradeChangeLogRepository;
 
     @Autowired
     GradeItemMigrationTest(
             JdbcGradeItemRepository repository,
             JdbcGradeRecordRepository gradeRecordRepository,
-            JdbcCourseGradeSummaryRepository courseGradeSummaryRepository
+            JdbcCourseGradeSummaryRepository courseGradeSummaryRepository,
+            JdbcGradeChangeLogRepository gradeChangeLogRepository
     ) {
         this.repository = repository;
         this.gradeRecordRepository = gradeRecordRepository;
         this.courseGradeSummaryRepository = courseGradeSummaryRepository;
+        this.gradeChangeLogRepository = gradeChangeLogRepository;
     }
 
     @Test
@@ -155,5 +161,26 @@ class GradeItemMigrationTest {
         assertThat(gradeRecordRepository.findByCourseId(303L)).containsExactly(record);
         assertThat(summary.id()).isPositive();
         assertThat(courseGradeSummaryRepository.findByCourseId(303L)).containsExactly(summary);
+    }
+
+    @Test
+    void gradeChangeLogMigrationSupportsAdjustmentTracePersistence() {
+        LocalDateTime now = LocalDateTime.now();
+        GradeChangeLog saved = gradeChangeLogRepository.save(new GradeChangeLog(
+                0L,
+                404L,
+                601L,
+                1L,
+                "RECORD_ADJUST",
+                new BigDecimal("90.00"),
+                new BigDecimal("95.00"),
+                "复核测试用例后修正",
+                501L,
+                now
+        ));
+
+        assertThat(saved.id()).isPositive();
+        assertThat(gradeChangeLogRepository.findByCourseId(404L, 601L, null, 1, 20)).containsExactly(saved);
+        assertThat(gradeChangeLogRepository.countByCourseId(404L, 601L, null)).isEqualTo(1);
     }
 }

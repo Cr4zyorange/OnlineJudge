@@ -50,6 +50,50 @@ export interface GradeRecord {
   publishStatus: PublishStatus;
 }
 
+export interface GradeAdjustmentPayload {
+  newScore: string;
+  reason: string;
+}
+
+export interface GradeAdjustmentResult {
+  recordId: number;
+  studentId: number;
+  gradeItemId: number | null;
+  oldScore: string | null;
+  newScore: string;
+  reason: string;
+  updatedAt: string;
+}
+
+export interface FinalScoreAdjustmentResult {
+  summaryId: number;
+  studentId: number;
+  oldScore: string | null;
+  newScore: string;
+  reason: string;
+  updatedAt: string;
+}
+
+export interface GradeChangeLog {
+  id: number;
+  courseId: number;
+  studentId: number;
+  gradeItemId: number | null;
+  changeType: 'RECORD_ADJUST' | 'FINAL_ADJUST';
+  oldValue: string | null;
+  newValue: string | null;
+  reason: string;
+  operatorId: number;
+  createdAt: string;
+}
+
+export interface GradeChangeLogPage {
+  records: GradeChangeLog[];
+  total: number;
+  page: number;
+  size: number;
+}
+
 export interface CourseGradeSummary {
   id: number;
   courseId: number;

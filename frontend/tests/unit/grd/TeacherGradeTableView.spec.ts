@@ -157,6 +157,210 @@ describe('TeacherGradeTableView', () => {
     expect(wrapper.text()).toContain('613');
     expect(wrapper.text()).toContain('第 2 / 2 页');
   });
+
+  it('shows student details, submits a reasoned grade adjustment, and renders change logs', async () => {
+    vi.mocked(gradeRecordsApi.listCourseGrades)
+      .mockResolvedValueOnce({
+        records: [
+          {
+            studentId: 601,
+            summary: {
+              id: 1,
+              courseId: 101,
+              studentId: 601,
+              finalScore: '84.00',
+              finalStatus: 'CALCULATED',
+              publishStatus: 'UNPUBLISHED'
+            },
+            records: [
+              {
+                id: 9,
+                courseId: 101,
+                studentId: 601,
+                gradeItemId: 1,
+                sourceType: 'LAB',
+                sourceId: 301,
+                rawScore: '90.00',
+                weightedScore: '36.00',
+                gradeStatus: 'SCORED',
+                publishStatus: 'UNPUBLISHED'
+              }
+            ]
+          }
+        ],
+        total: 1,
+        page: 1,
+        size: 20
+      })
+      .mockResolvedValueOnce({
+        records: [
+          {
+            studentId: 601,
+            summary: {
+              id: 1,
+              courseId: 101,
+              studentId: 601,
+              finalScore: '86.00',
+              finalStatus: 'CALCULATED',
+              publishStatus: 'UNPUBLISHED'
+            },
+            records: [
+              {
+                id: 9,
+                courseId: 101,
+                studentId: 601,
+                gradeItemId: 1,
+                sourceType: 'LAB',
+                sourceId: 301,
+                rawScore: '95.00',
+                weightedScore: '38.00',
+                gradeStatus: 'ADJUSTED',
+                publishStatus: 'UNPUBLISHED'
+              }
+            ]
+          }
+        ],
+        total: 1,
+        page: 1,
+        size: 20
+      });
+    vi.mocked(gradeRecordsApi.listGradeChangeLogs).mockResolvedValue({
+      records: [
+        {
+          id: 3,
+          courseId: 101,
+          studentId: 601,
+          gradeItemId: 1,
+          changeType: 'RECORD_ADJUST',
+          oldValue: '90.00',
+          newValue: '95.00',
+          reason: '复核测试用例后修正',
+          operatorId: 501,
+          createdAt: '2026-05-26T18:30:00'
+        }
+      ],
+      total: 1,
+      page: 1,
+      size: 20
+    });
+    vi.mocked(gradeRecordsApi.adjustGradeRecord).mockResolvedValue({
+      recordId: 9,
+      studentId: 601,
+      gradeItemId: 1,
+      oldScore: '90.00',
+      newScore: '95.00',
+      reason: '复核测试用例后修正',
+      updatedAt: '2026-05-26T18:30:00'
+    });
+
+    const wrapper = mount(TeacherGradeTableView, {
+      props: {
+        courseId: 101
+      }
+    });
+    await flushPromises();
+
+    await wrapper.get('[data-testid="detail-student-601"]').trigger('click');
+    await flushPromises();
+
+    expect(wrapper.text()).toContain('成绩明细');
+    expect(wrapper.text()).toContain('90.00');
+
+    await wrapper.get('[data-testid="adjustment-score"]').setValue('95.00');
+    await wrapper.get('[data-testid="adjustment-reason"]').setValue('复核测试用例后修正');
+    await wrapper.get('[data-testid="submit-adjustment"]').trigger('submit');
+    await flushPromises();
+
+    expect(gradeRecordsApi.adjustGradeRecord).toHaveBeenCalledWith(9, {
+      newScore: '95.00',
+      reason: '复核测试用例后修正'
+    });
+    expect(gradeRecordsApi.listGradeChangeLogs).toHaveBeenCalledWith(101, {
+      studentId: 601,
+      page: 1,
+      size: 20
+    });
+    expect(wrapper.text()).toContain('调整完成：90.00 -> 95.00');
+    expect(wrapper.text()).toContain('复核测试用例后修正');
+    expect(wrapper.text()).toContain('ADJUSTED');
+  });
+
+  it('submits a reasoned final-score adjustment from the student detail panel', async () => {
+    vi.mocked(gradeRecordsApi.listCourseGrades)
+      .mockResolvedValueOnce({
+        records: [
+          {
+            studentId: 601,
+            summary: {
+              id: 5,
+              courseId: 101,
+              studentId: 601,
+              finalScore: '84.00',
+              finalStatus: 'CALCULATED',
+              publishStatus: 'UNPUBLISHED'
+            },
+            records: []
+          }
+        ],
+        total: 1,
+        page: 1,
+        size: 20
+      })
+      .mockResolvedValueOnce({
+        records: [
+          {
+            studentId: 601,
+            summary: {
+              id: 5,
+              courseId: 101,
+              studentId: 601,
+              finalScore: '88.00',
+              finalStatus: 'ADJUSTED',
+              publishStatus: 'UNPUBLISHED'
+            },
+            records: []
+          }
+        ],
+        total: 1,
+        page: 1,
+        size: 20
+      });
+    vi.mocked(gradeRecordsApi.listGradeChangeLogs).mockResolvedValue({
+      records: [],
+      total: 0,
+      page: 1,
+      size: 20
+    });
+    vi.mocked(gradeRecordsApi.adjustCourseFinalScore).mockResolvedValue({
+      summaryId: 5,
+      studentId: 601,
+      oldScore: '84.00',
+      newScore: '88.00',
+      reason: '课程总评复核修正',
+      updatedAt: '2026-05-26T18:30:00'
+    });
+
+    const wrapper = mount(TeacherGradeTableView, {
+      props: {
+        courseId: 101
+      }
+    });
+    await flushPromises();
+
+    await wrapper.get('[data-testid="detail-student-601"]').trigger('click');
+    await flushPromises();
+    await wrapper.get('[data-testid="final-score"]').setValue('88.00');
+    await wrapper.get('[data-testid="final-reason"]').setValue('课程总评复核修正');
+    await wrapper.get('[data-testid="submit-final-adjustment"]').trigger('submit');
+    await flushPromises();
+
+    expect(gradeRecordsApi.adjustCourseFinalScore).toHaveBeenCalledWith(5, {
+      newScore: '88.00',
+      reason: '课程总评复核修正'
+    });
+    expect(wrapper.text()).toContain('总评调整完成：84.00 -> 88.00');
+    expect(wrapper.text()).toContain('ADJUSTED');
+  });
 });
 
 async function flushPromises() {

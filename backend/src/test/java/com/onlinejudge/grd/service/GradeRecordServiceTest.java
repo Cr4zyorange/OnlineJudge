@@ -2,6 +2,8 @@ package com.onlinejudge.grd.service;
 
 import com.onlinejudge.grd.domain.CourseGradeSummary;
 import com.onlinejudge.grd.domain.CourseGradeSummaryRepository;
+import com.onlinejudge.grd.domain.GradeChangeLog;
+import com.onlinejudge.grd.domain.GradeChangeLogRepository;
 import com.onlinejudge.grd.domain.GradeCalculationBatch;
 import com.onlinejudge.grd.domain.GradeCalculationBatchRepository;
 import com.onlinejudge.grd.domain.GradeItem;
@@ -37,6 +39,7 @@ class GradeRecordServiceTest {
         GradeRecordService service = new GradeRecordService(
                 itemRepository,
                 recordRepository,
+                new InMemoryGradeChangeLogRepository(),
                 summaryRepository,
                 batchRepository,
                 sourceGradesForCourse101(),
@@ -87,6 +90,7 @@ class GradeRecordServiceTest {
         GradeRecordService service = new GradeRecordService(
                 new InMemoryGradeItemRepository(),
                 new InMemoryGradeRecordRepository(),
+                new InMemoryGradeChangeLogRepository(),
                 new InMemoryCourseGradeSummaryRepository(),
                 new InMemoryGradeCalculationBatchRepository(),
                 (courseId, sourceType, sourceId) -> List.of(),
@@ -233,6 +237,22 @@ class GradeRecordServiceTest {
         }
 
         @Override
+        public GradeRecord update(GradeRecord record) {
+            for (int index = 0; index < records.size(); index++) {
+                if (records.get(index).id() == record.id()) {
+                    records.set(index, record);
+                    return record;
+                }
+            }
+            throw new IllegalArgumentException("record not found");
+        }
+
+        @Override
+        public Optional<GradeRecord> findById(long id) {
+            return records.stream().filter(record -> record.id() == id).findFirst();
+        }
+
+        @Override
         public List<GradeRecord> findByCourseId(long courseId) {
             return records.stream().filter(record -> record.courseId() == courseId).toList();
         }
@@ -243,6 +263,32 @@ class GradeRecordServiceTest {
                     .filter(record -> record.studentId() == studentId)
                     .filter(record -> record.gradeItemId() == gradeItemId)
                     .findFirst();
+        }
+    }
+
+    private static final class InMemoryGradeChangeLogRepository implements GradeChangeLogRepository {
+        private long nextId = 1L;
+        private final List<GradeChangeLog> logs = new ArrayList<>();
+
+        @Override
+        public GradeChangeLog save(GradeChangeLog log) {
+            GradeChangeLog saved = log.withId(nextId++);
+            logs.add(saved);
+            return saved;
+        }
+
+        @Override
+        public List<GradeChangeLog> findByCourseId(long courseId, Long studentId, Long gradeItemId, int page, int size) {
+            return logs.stream()
+                    .filter(log -> log.courseId() == courseId)
+                    .filter(log -> studentId == null || log.studentId() == studentId)
+                    .filter(log -> gradeItemId == null || gradeItemId.equals(log.gradeItemId()))
+                    .toList();
+        }
+
+        @Override
+        public int countByCourseId(long courseId, Long studentId, Long gradeItemId) {
+            return findByCourseId(courseId, studentId, gradeItemId, 1, Integer.MAX_VALUE).size();
         }
     }
 
@@ -263,6 +309,22 @@ class GradeRecordServiceTest {
             CourseGradeSummary saved = summary.withId(nextId++);
             summaries.add(saved);
             return saved;
+        }
+
+        @Override
+        public CourseGradeSummary update(CourseGradeSummary summary) {
+            for (int index = 0; index < summaries.size(); index++) {
+                if (summaries.get(index).id() == summary.id()) {
+                    summaries.set(index, summary);
+                    return summary;
+                }
+            }
+            throw new IllegalArgumentException("summary not found");
+        }
+
+        @Override
+        public Optional<CourseGradeSummary> findById(long id) {
+            return summaries.stream().filter(summary -> summary.id() == id).findFirst();
         }
 
         @Override
