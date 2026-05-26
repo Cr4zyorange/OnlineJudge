@@ -84,6 +84,8 @@ temp/
 # Application runtime data
 uploads/
 storage/
+!backend/src/main/java/com/onlinejudge/common/storage/
+!backend/src/main/java/com/onlinejudge/common/storage/*.java
 data/
 *.db
 *.sqlite
