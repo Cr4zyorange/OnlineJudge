@@ -44,7 +44,8 @@ describe('CourseManagementView', () => {
       .mockResolvedValueOnce({ ok: true, json: async () => page([course], 1) })
       .mockResolvedValueOnce({ ok: true, json: async () => page([course], 1) })
       .mockResolvedValueOnce({ ok: true, json: async () => page([course], 1) })
-      .mockResolvedValueOnce({ ok: true, json: async () => page([], 0) });
+      .mockResolvedValueOnce({ ok: true, json: async () => page([], 0) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ code: '0', message: 'success', data: [] }) });
     vi.stubGlobal('fetch', fetchMock);
 
     const wrapper = mount(CourseManagementView);
@@ -60,6 +61,7 @@ describe('CourseManagementView', () => {
     expect(wrapper.text()).toContain('课程详情');
     expect(wrapper.text()).toContain(longDescription);
     expect(wrapper.text()).toContain('预留操作区');
+    expect(wrapper.text()).toContain('暂无章节目录');
   });
 
   it('uses different layouts for all courses and managed courses, then creates a course', async () => {
@@ -89,9 +91,8 @@ describe('CourseManagementView', () => {
     expect(wrapper.text()).toContain('师生共用课程列表');
     expect(wrapper.find('input[placeholder="例如：软件工程基础"]').exists()).toBe(false);
 
-    const managedButton = wrapper.findAll('button').find((button) => button.text().includes('我管理的'));
-    expect(managedButton).toBeTruthy();
-    await managedButton!.trigger('click');
+    const managedButton = wrapper.findAll('.menu-button')[1];
+    await managedButton.trigger('click');
     await flushPromises();
 
     await wrapper.find('input[placeholder="例如：软件工程基础"]').setValue('数据结构');
@@ -108,6 +109,61 @@ describe('CourseManagementView', () => {
     expect(wrapper.text()).toContain('课程创建成功');
     expect(wrapper.text()).toContain('数据结构');
     expect(wrapper.text()).toContain('已归档');
+  });
+
+  it('opens chapter management from a manageable course and saves a nested chapter', async () => {
+    const page = (list = [course], total = list.length) => ({
+      code: '0',
+      message: 'success',
+      data: { list, total, page: 1, size: 20 }
+    });
+    const chapters = [
+      {
+        id: 11,
+        courseId: 1,
+        parentId: null,
+        title: '课程导论',
+        content: '目标与安排',
+        orderNum: 1,
+        children: [],
+        createdAt: '2026-05-25T00:00:00',
+        updatedAt: '2026-05-25T00:00:00'
+      }
+    ];
+    const nested = { ...chapters[0], id: 12, parentId: 11, title: '开发环境', content: '安装 JDK 与 IDE' };
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => page([course], 1) })
+      .mockResolvedValueOnce({ ok: true, json: async () => page([course], 1) })
+      .mockResolvedValueOnce({ ok: true, json: async () => page([course], 1) })
+      .mockResolvedValueOnce({ ok: true, json: async () => page([], 0) })
+      .mockResolvedValueOnce({ ok: true, json: async () => page([course], 1) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ code: '0', message: 'success', data: chapters }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ code: '0', message: 'success', data: nested }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ code: '0', message: 'success', data: [{ ...chapters[0], children: [nested] }] }) });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const wrapper = mount(CourseManagementView);
+    await flushPromises();
+
+    await wrapper.findAll('.menu-button')[1].trigger('click');
+    await flushPromises();
+
+    const chapterButton = wrapper.findAll('button').find((button) => button.text().includes('章节'));
+    expect(chapterButton).toBeTruthy();
+    await chapterButton!.trigger('click');
+    await flushPromises();
+
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/courses/1/chapters', expect.objectContaining({ method: 'GET' }));
+    expect(wrapper.text()).toContain('课程导论');
+
+    await wrapper.find('[data-testid="chapter-title"]').setValue('开发环境');
+    await wrapper.find('[data-testid="chapter-parent"]').setValue('11');
+    await wrapper.find('[data-testid="chapter-content"]').setValue('安装 JDK 与 IDE');
+    await wrapper.find('[data-testid="chapter-form"]').trigger('submit.prevent');
+    await flushPromises();
+
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/courses/1/chapters', expect.objectContaining({ method: 'POST' }));
+    expect(wrapper.text()).toContain('开发环境');
   });
 });
 

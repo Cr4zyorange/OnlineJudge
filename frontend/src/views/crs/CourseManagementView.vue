@@ -9,11 +9,7 @@
           <a class="active" href="/courses">课程中心</a>
           <a>实训模块</a>
           <a>作业评测</a>
-          <a
-            :class="{ disabled: !gradeAnalysisHref }"
-            :href="gradeAnalysisHref || undefined"
-            :aria-disabled="!gradeAnalysisHref"
-          >
+          <a :class="{ disabled: !gradeAnalysisHref }" :href="gradeAnalysisHref || undefined" :aria-disabled="!gradeAnalysisHref">
             成绩分析
           </a>
         </div>
@@ -31,17 +27,17 @@
         </div>
         <ul class="sidebar-menu">
           <li>
-            <button class="menu-button" :class="{ active: activeTab === 'all' }" type="button" @click="switchTab('all')">
+            <button class="menu-button" :class="{ active: activeTab === 'all' && !chapterCourse }" type="button" @click="switchTab('all')">
               <i class="bi bi-grid"></i> 全部课程
             </button>
           </li>
           <li>
-            <button class="menu-button" :class="{ active: activeTab === 'managed' }" type="button" @click="switchTab('managed')">
+            <button class="menu-button" :class="{ active: activeTab === 'managed' && !chapterCourse }" type="button" @click="switchTab('managed')">
               <i class="bi bi-person-check"></i> 我管理的
             </button>
           </li>
           <li>
-            <button class="menu-button" :class="{ active: activeTab === 'archived' }" type="button" @click="switchTab('archived')">
+            <button class="menu-button" :class="{ active: activeTab === 'archived' && !chapterCourse }" type="button" @click="switchTab('archived')">
               <i class="bi bi-archive"></i> 归档记录
             </button>
           </li>
@@ -70,7 +66,7 @@
             <h2>{{ pageTitle }}</h2>
             <p>{{ pageSubtitle }}</p>
           </div>
-          <div class="header-actions">
+          <div v-if="!chapterCourse" class="header-actions">
             <label class="search-box">
               <i class="bi bi-search"></i>
               <input v-model="keyword" type="search" placeholder="搜索课程、学期或分类" @keyup.enter="loadCourses" />
@@ -79,9 +75,71 @@
               <i class="bi bi-arrow-clockwise"></i>
             </button>
           </div>
+          <div v-else class="header-actions">
+            <button class="btn btn-secondary" type="button" @click="closeChapterManagement">
+              <i class="bi bi-arrow-left"></i> 返回课程
+            </button>
+            <button class="btn btn-secondary icon-btn" type="button" title="刷新章节" @click="loadChapters">
+              <i class="bi bi-arrow-clockwise"></i>
+            </button>
+          </div>
         </div>
 
-        <section class="workspace" :class="{ single: activeTab !== 'managed' }">
+        <section v-if="chapterCourse" class="workspace">
+          <form class="course-form" data-testid="chapter-form" @submit.prevent="submitChapter">
+            <div class="form-title">
+              <h3>{{ editingChapter ? '编辑章节' : '创建章节' }}</h3>
+              <button v-if="editingChapter" class="text-button" type="button" @click="resetChapterForm">取消编辑</button>
+            </div>
+            <label>
+              <span>章节标题</span>
+              <input data-testid="chapter-title" v-model.trim="chapterForm.title" type="text" maxlength="200" placeholder="例如：课程导论" />
+            </label>
+            <label>
+              <span>父章节</span>
+              <select data-testid="chapter-parent" v-model="chapterParentValue">
+                <option value="">作为一级章节</option>
+                <option v-for="item in flatChapters" :key="item.chapter.id" :value="String(item.chapter.id)" :disabled="editingChapter?.id === item.chapter.id">
+                  {{ item.prefix }}{{ item.chapter.title }}
+                </option>
+              </select>
+            </label>
+            <label>
+              <span>排序号</span>
+              <input v-model.number="chapterForm.orderNum" type="number" min="0" step="1" placeholder="默认追加到末尾" />
+            </label>
+            <label>
+              <span>章节说明</span>
+              <textarea data-testid="chapter-content" v-model.trim="chapterForm.content" rows="5" placeholder="填写教学目标、知识点或学习建议"></textarea>
+            </label>
+            <p v-if="chapterError" class="message error">{{ chapterError }}</p>
+            <p v-if="chapterSuccess" class="message success">{{ chapterSuccess }}</p>
+            <button class="btn submit-btn" type="submit" :disabled="chapterSubmitting">
+              <i class="bi bi-check2-circle"></i>
+              {{ chapterSubmitting ? '提交中' : editingChapter ? '保存章节' : '创建章节' }}
+            </button>
+          </form>
+
+          <section class="course-panel">
+            <div v-if="chapterLoading" class="state-card">章节加载中...</div>
+            <div v-else-if="chapterLoadError" class="state-card error">{{ chapterLoadError }}</div>
+            <div v-else-if="chapters.length === 0" class="state-card">暂无章节，创建第一个章节后会展示为目录树。</div>
+            <div v-else class="chapter-tree">
+              <ChapterNode
+                v-for="chapter in chapters"
+                :key="chapter.id"
+                :chapter="chapter"
+                :course-id="chapterCourse.id"
+                :depth="0"
+                @edit="editChapter"
+                @delete="removeChapter"
+                @move="moveChapter"
+              />
+            </div>
+          </section>
+        </section>
+
+        <section v-else class="workspace" :class="{ single: activeTab !== 'managed' }">
           <form v-if="activeTab === 'managed'" class="course-form" @submit.prevent="submitCourse">
             <div class="form-title">
               <h3>{{ editingCourse ? '编辑课程' : '创建课程' }}</h3>
@@ -173,6 +231,9 @@
                     <button class="card-btn" type="button" :disabled="!course.manageable" @click.stop="editCourse(course)">
                       <i class="bi bi-pencil-square"></i> 编辑
                     </button>
+                    <button class="card-btn" type="button" :disabled="!course.manageable" @click.stop="openChapterManagement(course)">
+                      <i class="bi bi-list-nested"></i> 章节
+                    </button>
                     <button class="card-btn danger" type="button" :disabled="!course.manageable" @click.stop="archive(course)">
                       <i class="bi bi-archive"></i> 归档
                     </button>
@@ -220,19 +281,21 @@
             <span>结课日期</span>
             <strong>{{ selectedCourse.endDate || '未设置' }}</strong>
           </div>
-          <div class="detail-item">
-            <span>加入方式</span>
-            <strong>{{ enrollmentModeText(selectedCourse.enrollmentMode) }}</strong>
-          </div>
-          <div class="detail-item">
-            <span>课程状态</span>
-            <strong>{{ statusText(selectedCourse.status) }}</strong>
-          </div>
         </div>
 
         <div class="detail-block">
           <span>完整简介</span>
           <p>{{ selectedCourse.description || '暂无课程简介' }}</p>
+        </div>
+
+        <div class="detail-block">
+          <span>章节目录</span>
+          <p v-if="detailChapterLoading">章节加载中...</p>
+          <p v-else-if="detailChapterError">{{ detailChapterError }}</p>
+          <p v-else-if="detailChapters.length === 0">暂无章节目录</p>
+          <div v-else class="compact-tree">
+            <CompactChapterNode v-for="chapter in detailChapters" :key="chapter.id" :chapter="chapter" :depth="0" />
+          </div>
         </div>
 
         <div class="modal-actions-placeholder">
@@ -241,8 +304,8 @@
             <button class="card-btn" type="button" disabled>
               <i class="bi bi-box-arrow-in-right"></i> 加入课程
             </button>
-            <button class="card-btn" type="button" disabled>
-              <i class="bi bi-people"></i> 管理人员
+            <button v-if="selectedCourse.manageable" class="card-btn" type="button" @click="manageSelectedCourseChapters">
+              <i class="bi bi-list-nested"></i> 管理章节
             </button>
           </div>
         </div>
@@ -252,10 +315,71 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue';
-import { archiveCourse, createCourse, listCourses, updateCourse } from '../../api/crs/courses';
+import { computed, defineComponent, h, onMounted, reactive, ref } from 'vue';
+import type { Component, VNode } from 'vue';
+import {
+  archiveCourse,
+  createChapter,
+  createCourse,
+  deleteChapter,
+  listChapters,
+  listCourses,
+  updateChapter,
+  updateCourse
+} from '../../api/crs/courses';
 import type { CourseScope } from '../../api/crs/courses';
-import type { Course, CoursePayload } from '../../types/crs';
+import type { Chapter, ChapterPayload, Course, CoursePayload } from '../../types/crs';
+
+const ChapterNode: Component = defineComponent({
+  name: 'ChapterNode',
+  props: {
+    chapter: { type: Object as () => Chapter, required: true },
+    courseId: { type: Number, required: true },
+    depth: { type: Number, required: true }
+  },
+  emits: ['edit', 'delete', 'move'],
+  setup(props, { emit }) {
+    return (): VNode => h('div', { class: 'chapter-node', style: { marginLeft: `${props.depth * 22}px` } }, [
+      h('div', { class: 'chapter-row' }, [
+        h('div', { class: 'chapter-main' }, [
+          h('span', { class: 'chapter-order' }, String(props.chapter.orderNum)),
+          h('div', [
+            h('strong', props.chapter.title),
+            props.chapter.content ? h('p', props.chapter.content) : null
+          ])
+        ]),
+        h('div', { class: 'chapter-actions' }, [
+          h('button', { class: 'card-btn', type: 'button', title: '上移', onClick: () => emit('move', props.chapter, -1) }, '↑'),
+          h('button', { class: 'card-btn', type: 'button', title: '下移', onClick: () => emit('move', props.chapter, 1) }, '↓'),
+          h('button', { class: 'card-btn', type: 'button', onClick: () => emit('edit', props.chapter) }, '编辑'),
+          h('button', { class: 'card-btn danger', type: 'button', onClick: () => emit('delete', props.chapter) }, '删除')
+        ])
+      ]),
+      ...props.chapter.children.map((child) => h(ChapterNode, {
+        chapter: child,
+        courseId: props.courseId,
+        depth: props.depth + 1,
+        onEdit: (chapter: Chapter) => emit('edit', chapter),
+        onDelete: (chapter: Chapter) => emit('delete', chapter),
+        onMove: (chapter: Chapter, delta: number) => emit('move', chapter, delta)
+      }))
+    ]);
+  }
+});
+
+const CompactChapterNode: Component = defineComponent({
+  name: 'CompactChapterNode',
+  props: {
+    chapter: { type: Object as () => Chapter, required: true },
+    depth: { type: Number, required: true }
+  },
+  setup(props) {
+    return (): VNode => h('div', { class: 'compact-node', style: { marginLeft: `${props.depth * 18}px` } }, [
+      h('span', `${props.chapter.orderNum}. ${props.chapter.title}`),
+      ...props.chapter.children.map((child) => h(CompactChapterNode, { chapter: child, depth: props.depth + 1 }))
+    ]);
+  }
+});
 
 const blankForm = (): CoursePayload => ({
   name: '',
@@ -271,16 +395,36 @@ const blankForm = (): CoursePayload => ({
   status: 'DRAFT'
 });
 
+const blankChapterForm = (): ChapterPayload => ({
+  parentId: null,
+  title: '',
+  content: '',
+  orderNum: undefined
+});
+
 const form = reactive<CoursePayload>(blankForm());
+const chapterForm = reactive<ChapterPayload>(blankChapterForm());
+const chapterParentValue = ref('');
 const courses = ref<Course[]>([]);
+const chapters = ref<Chapter[]>([]);
+const detailChapters = ref<Chapter[]>([]);
 const keyword = ref('');
 const loading = ref(false);
 const submitting = ref(false);
+const chapterLoading = ref(false);
+const chapterSubmitting = ref(false);
+const detailChapterLoading = ref(false);
 const loadError = ref('');
 const formError = ref('');
 const successMessage = ref('');
+const chapterLoadError = ref('');
+const chapterError = ref('');
+const chapterSuccess = ref('');
+const detailChapterError = ref('');
 const editingCourse = ref<Course | null>(null);
 const selectedCourse = ref<Course | null>(null);
+const chapterCourse = ref<Course | null>(null);
+const editingChapter = ref<Chapter | null>(null);
 const activeTab = ref<CourseScope>('all');
 const stats = reactive<Record<CourseScope, number>>({
   all: 0,
@@ -289,6 +433,9 @@ const stats = reactive<Record<CourseScope, number>>({
 });
 
 const pageTitle = computed(() => {
+  if (chapterCourse.value) {
+    return `章节目录：${chapterCourse.value.name}`;
+  }
   if (activeTab.value === 'managed') {
     return '课程创建与管理';
   }
@@ -299,8 +446,11 @@ const pageTitle = computed(() => {
 });
 
 const pageSubtitle = computed(() => {
+  if (chapterCourse.value) {
+    return '维护课程章节树，支持一级章节、子章节、编辑、排序和删除。';
+  }
   if (activeTab.value === 'managed') {
-    return '创建课程、维护基础信息，并自动绑定创建教师。';
+    return '创建课程、维护基础信息，并从课程卡片进入章节目录管理。';
   }
   if (activeTab.value === 'archived') {
     return '查看已经归档的课程，保留历史课程信息。';
@@ -325,16 +475,9 @@ const visibleCourses = computed(() => {
   return courses.value.filter((course) => course.status !== 'ARCHIVED');
 });
 
+const flatChapters = computed(() => flattenChapters(chapters.value));
 const canOpenCourseDetail = computed(() => activeTab.value === 'all' || activeTab.value === 'archived');
-const gradeAnalysisCourse = computed(() => {
-  if (editingCourse.value?.id) {
-    return editingCourse.value;
-  }
-  if (selectedCourse.value?.id) {
-    return selectedCourse.value;
-  }
-  return visibleCourses.value.find((course) => course.manageable) ?? visibleCourses.value[0] ?? null;
-});
+const gradeAnalysisCourse = computed(() => editingCourse.value ?? selectedCourse.value ?? chapterCourse.value ?? visibleCourses.value.find((course) => course.manageable) ?? visibleCourses.value[0] ?? null);
 const gradeAnalysisHref = computed(() => {
   const course = gradeAnalysisCourse.value;
   return course ? `/courses/${course.id}/grd/grade-items` : '';
@@ -369,6 +512,7 @@ async function switchTab(tab: CourseScope) {
   activeTab.value = tab;
   keyword.value = '';
   closeCourseDetail();
+  closeChapterManagement();
   resetForm();
   await loadCourses();
 }
@@ -434,15 +578,135 @@ function resetForm() {
   Object.assign(form, blankForm());
 }
 
-function openCourseDetail(course: Course) {
+async function openCourseDetail(course: Course) {
   if (!canOpenCourseDetail.value) {
     return;
   }
   selectedCourse.value = course;
+  detailChapters.value = [];
+  detailChapterError.value = '';
+  detailChapterLoading.value = true;
+  try {
+    detailChapters.value = await listChapters(course.id);
+  } catch (error) {
+    detailChapterError.value = error instanceof Error ? error.message : '章节目录加载失败';
+  } finally {
+    detailChapterLoading.value = false;
+  }
 }
 
 function closeCourseDetail() {
   selectedCourse.value = null;
+}
+
+async function openChapterManagement(course: Course) {
+  chapterCourse.value = course;
+  closeCourseDetail();
+  resetChapterForm();
+  await loadChapters();
+}
+
+function closeChapterManagement() {
+  chapterCourse.value = null;
+  chapters.value = [];
+  resetChapterForm();
+}
+
+async function loadChapters() {
+  if (!chapterCourse.value) {
+    return;
+  }
+  chapterLoading.value = true;
+  chapterLoadError.value = '';
+  try {
+    chapters.value = await listChapters(chapterCourse.value.id);
+  } catch (error) {
+    chapterLoadError.value = error instanceof Error ? error.message : '章节目录加载失败';
+  } finally {
+    chapterLoading.value = false;
+  }
+}
+
+async function submitChapter() {
+  if (!chapterCourse.value) {
+    return;
+  }
+  chapterError.value = '';
+  chapterSuccess.value = '';
+  if (!chapterForm.title?.trim()) {
+    chapterError.value = '请填写章节标题';
+    return;
+  }
+  chapterSubmitting.value = true;
+  const payload = normalizeChapterPayload();
+  try {
+    if (editingChapter.value) {
+      await updateChapter(chapterCourse.value.id, editingChapter.value.id, payload);
+      chapterSuccess.value = '章节已保存';
+    } else {
+      await createChapter(chapterCourse.value.id, payload);
+      chapterSuccess.value = '章节创建成功';
+    }
+    resetChapterForm();
+    await loadChapters();
+  } catch (error) {
+    chapterError.value = error instanceof Error ? error.message : '章节提交失败';
+  } finally {
+    chapterSubmitting.value = false;
+  }
+}
+
+function editChapter(chapter: Chapter) {
+  editingChapter.value = chapter;
+  Object.assign(chapterForm, {
+    title: chapter.title,
+    content: chapter.content ?? '',
+    orderNum: chapter.orderNum,
+    parentId: chapter.parentId ?? null
+  });
+  chapterParentValue.value = chapter.parentId == null ? '' : String(chapter.parentId);
+}
+
+async function removeChapter(chapter: Chapter) {
+  if (!chapterCourse.value || !window.confirm(`确认删除章节《${chapter.title}》？子章节也会一并删除。`)) {
+    return;
+  }
+  await deleteChapter(chapterCourse.value.id, chapter.id);
+  await loadChapters();
+}
+
+async function moveChapter(chapter: Chapter, delta: number) {
+  if (!chapterCourse.value) {
+    return;
+  }
+  await updateChapter(chapterCourse.value.id, chapter.id, {
+    parentId: chapter.parentId ?? null,
+    title: chapter.title,
+    content: chapter.content ?? '',
+    orderNum: Math.max(0, chapter.orderNum + delta)
+  });
+  await loadChapters();
+}
+
+function resetChapterForm() {
+  editingChapter.value = null;
+  Object.assign(chapterForm, blankChapterForm());
+  chapterParentValue.value = '';
+}
+
+function normalizeChapterPayload(): ChapterPayload {
+  return {
+    title: chapterForm.title.trim(),
+    content: chapterForm.content?.trim() || '',
+    parentId: chapterParentValue.value ? Number(chapterParentValue.value) : null,
+    orderNum: Number.isFinite(chapterForm.orderNum) ? Number(chapterForm.orderNum) : undefined
+  };
+}
+
+async function manageSelectedCourseChapters() {
+  if (selectedCourse.value) {
+    await openChapterManagement(selectedCourse.value);
+  }
 }
 
 function requiredMissingFields() {
@@ -495,6 +759,13 @@ function statusText(status: Course['status']) {
     ARCHIVED: '已归档'
   };
   return map[status];
+}
+
+function flattenChapters(items: Chapter[], depth = 0): Array<{ chapter: Chapter; prefix: string }> {
+  return items.flatMap((chapter) => [
+    { chapter, prefix: `${'　'.repeat(depth)}${depth > 0 ? '└ ' : ''}` },
+    ...flattenChapters(chapter.children, depth + 1)
+  ]);
 }
 
 onMounted(async () => {
