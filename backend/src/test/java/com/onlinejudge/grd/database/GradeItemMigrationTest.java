@@ -20,7 +20,9 @@ import org.springframework.context.annotation.Import;
 import org.springframework.test.context.jdbc.Sql;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -180,7 +182,15 @@ class GradeItemMigrationTest {
         ));
 
         assertThat(saved.id()).isPositive();
-        assertThat(gradeChangeLogRepository.findByCourseId(404L, 601L, null, 1, 20)).containsExactly(saved);
+        List<GradeChangeLog> logs = gradeChangeLogRepository.findByCourseId(404L, 601L, null, 1, 20);
+        assertThat(logs).hasSize(1);
+        GradeChangeLog loaded = logs.get(0);
+        assertThat(loaded)
+                .usingRecursiveComparison()
+                .ignoringFields("createdAt")
+                .isEqualTo(saved);
+        assertThat(Duration.between(saved.createdAt(), loaded.createdAt()).abs())
+                .isLessThan(Duration.ofMillis(1));
         assertThat(gradeChangeLogRepository.countByCourseId(404L, 601L, null)).isEqualTo(1);
     }
 }

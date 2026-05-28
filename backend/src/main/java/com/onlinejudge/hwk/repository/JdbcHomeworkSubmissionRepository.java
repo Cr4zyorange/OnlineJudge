@@ -1,0 +1,196 @@
+package com.onlinejudge.hwk.repository;
+
+import com.onlinejudge.hwk.domain.HomeworkEvaluationStatus;
+import com.onlinejudge.hwk.domain.HomeworkReviewStatus;
+import com.onlinejudge.hwk.domain.HomeworkSubmission;
+import com.onlinejudge.hwk.domain.HomeworkSubmissionRepository;
+import com.onlinejudge.hwk.domain.HomeworkSubmitStatus;
+import com.onlinejudge.hwk.domain.HomeworkSubmitType;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.RowMapper;
+import org.springframework.jdbc.support.GeneratedKeyHolder;
+import org.springframework.jdbc.support.KeyHolder;
+import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.sql.PreparedStatement;
+import java.sql.Timestamp;
+import java.math.BigDecimal;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+
+@Repository
+public class JdbcHomeworkSubmissionRepository implements HomeworkSubmissionRepository {
+    private static final RowMapper<HomeworkSubmission> ROW_MAPPER = (resultSet, rowNum) -> new HomeworkSubmission(
+            resultSet.getLong("id"),
+            resultSet.getLong("homework_id"),
+            resultSet.getLong("student_id"),
+            HomeworkSubmitType.valueOf(resultSet.getString("submit_type")),
+            resultSet.getString("answer_text"),
+            resultSet.getString("answer_json"),
+            resultSet.getString("file_url"),
+            resultSet.getString("language"),
+            HomeworkSubmitStatus.valueOf(resultSet.getString("submit_status")),
+            HomeworkEvaluationStatus.valueOf(resultSet.getString("evaluation_status")),
+            HomeworkReviewStatus.valueOf(resultSet.getString("review_status")),
+            resultSet.getBigDecimal("auto_score"),
+            resultSet.getBigDecimal("manual_score"),
+            resultSet.getBigDecimal("final_score"),
+            resultSet.getString("comment"),
+            resultSet.getBoolean("is_latest"),
+            resultSet.getBoolean("is_final"),
+            resultSet.getTimestamp("submitted_at").toLocalDateTime(),
+            resultSet.getObject("reviewed_by", Long.class),
+            resultSet.getTimestamp("reviewed_at") == null ? null : resultSet.getTimestamp("reviewed_at").toLocalDateTime(),
+            resultSet.getTimestamp("created_at").toLocalDateTime(),
+            resultSet.getTimestamp("updated_at").toLocalDateTime()
+    );
+
+    private final JdbcTemplate jdbcTemplate;
+
+    public JdbcHomeworkSubmissionRepository(JdbcTemplate jdbcTemplate) {
+        this.jdbcTemplate = jdbcTemplate;
+    }
+
+    @Override
+    @Transactional
+    public HomeworkSubmission save(HomeworkSubmission submission) {
+        jdbcTemplate.update("""
+                UPDATE t_hwk_submission
+                SET is_latest = FALSE,
+                    is_final = FALSE,
+                    updated_at = ?
+                WHERE homework_id = ? AND student_id = ? AND is_latest = TRUE
+                """,
+                Timestamp.valueOf(submission.updatedAt()),
+                submission.homeworkId(),
+                submission.studentId()
+        );
+
+        KeyHolder keyHolder = new GeneratedKeyHolder();
+        jdbcTemplate.update(connection -> {
+            PreparedStatement statement = connection.prepareStatement("""
+                    INSERT INTO t_hwk_submission
+                    (homework_id, student_id, submit_type, answer_text, answer_json, file_url, language,
+                     submit_status, evaluation_status, review_status, auto_score, manual_score, final_score,
+                     comment, is_latest, is_final, submitted_at, reviewed_by, reviewed_at, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """, new String[]{"id"});
+            statement.setLong(1, submission.homeworkId());
+            statement.setLong(2, submission.studentId());
+            statement.setString(3, submission.submitType().name());
+            statement.setString(4, submission.answerText());
+            statement.setString(5, submission.answerJson());
+            statement.setString(6, submission.fileUrl());
+            statement.setString(7, submission.language());
+            statement.setString(8, submission.submitStatus().name());
+            statement.setString(9, submission.evaluationStatus().name());
+            statement.setString(10, submission.reviewStatus().name());
+            statement.setBigDecimal(11, submission.autoScore());
+            statement.setBigDecimal(12, submission.manualScore());
+            statement.setBigDecimal(13, submission.finalScore());
+            statement.setString(14, submission.comment());
+            statement.setBoolean(15, submission.latestSubmission());
+            statement.setBoolean(16, submission.finalSubmission());
+            statement.setTimestamp(17, Timestamp.valueOf(submission.submittedAt()));
+            if (submission.reviewedBy() == null) {
+                statement.setObject(18, null);
+            } else {
+                statement.setLong(18, submission.reviewedBy());
+            }
+            statement.setTimestamp(19, submission.reviewedAt() == null ? null : Timestamp.valueOf(submission.reviewedAt()));
+            statement.setTimestamp(20, Timestamp.valueOf(submission.createdAt()));
+            statement.setTimestamp(21, Timestamp.valueOf(submission.updatedAt()));
+            return statement;
+        }, keyHolder);
+
+        long id = Objects.requireNonNull(keyHolder.getKey()).longValue();
+        return findById(id).orElseThrow(() -> new IllegalStateException("保存作业提交后无法读取记录"));
+    }
+
+    @Override
+    public Optional<HomeworkSubmission> findLatestByHomeworkIdAndStudentId(long homeworkId, long studentId) {
+        return jdbcTemplate.query("""
+                        SELECT id, homework_id, student_id, submit_type, answer_text, answer_json, file_url, language,
+                               submit_status, evaluation_status, review_status, auto_score, manual_score, final_score,
+                               comment, is_latest, is_final, submitted_at, reviewed_by, reviewed_at, created_at, updated_at
+                        FROM t_hwk_submission
+                        WHERE homework_id = ? AND student_id = ? AND is_latest = TRUE
+                        ORDER BY submitted_at DESC, id DESC
+                        """,
+                ROW_MAPPER,
+                homeworkId,
+                studentId
+        ).stream().findFirst();
+    }
+
+    @Override
+    public List<HomeworkSubmission> findByHomeworkIdAndStudentId(long homeworkId, long studentId) {
+        return jdbcTemplate.query("""
+                        SELECT id, homework_id, student_id, submit_type, answer_text, answer_json, file_url, language,
+                               submit_status, evaluation_status, review_status, auto_score, manual_score, final_score,
+                               comment, is_latest, is_final, submitted_at, reviewed_by, reviewed_at, created_at, updated_at
+                        FROM t_hwk_submission
+                        WHERE homework_id = ? AND student_id = ?
+                        ORDER BY submitted_at DESC, id DESC
+                        """,
+                ROW_MAPPER,
+                homeworkId,
+                studentId
+        );
+    }
+
+    @Override
+    public List<HomeworkSubmission> findByHomeworkId(long homeworkId) {
+        return jdbcTemplate.query("""
+                        SELECT id, homework_id, student_id, submit_type, answer_text, answer_json, file_url, language,
+                               submit_status, evaluation_status, review_status, auto_score, manual_score, final_score,
+                               comment, is_latest, is_final, submitted_at, reviewed_by, reviewed_at, created_at, updated_at
+                        FROM t_hwk_submission
+                        WHERE homework_id = ?
+                        ORDER BY submitted_at DESC, id DESC
+                        """,
+                ROW_MAPPER,
+                homeworkId
+        );
+    }
+
+    @Override
+    public Optional<HomeworkSubmission> findById(long id) {
+        return jdbcTemplate.query("""
+                        SELECT id, homework_id, student_id, submit_type, answer_text, answer_json, file_url, language,
+                               submit_status, evaluation_status, review_status, auto_score, manual_score, final_score,
+                               comment, is_latest, is_final, submitted_at, reviewed_by, reviewed_at, created_at, updated_at
+                        FROM t_hwk_submission
+                        WHERE id = ?
+                        """,
+                ROW_MAPPER,
+                id
+        ).stream().findFirst();
+    }
+
+    @Override
+    public HomeworkSubmission updateEvaluation(
+            long submissionId,
+            HomeworkEvaluationStatus evaluationStatus,
+            BigDecimal autoScore,
+            BigDecimal finalScore
+    ) {
+        jdbcTemplate.update("""
+                UPDATE t_hwk_submission
+                SET evaluation_status = ?,
+                    auto_score = ?,
+                    final_score = ?,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+                """,
+                evaluationStatus.name(),
+                autoScore,
+                finalScore,
+                submissionId
+        );
+        return findById(submissionId)
+                .orElseThrow(() -> new IllegalStateException("更新评测状态后无法读取提交记录"));
+    }
+}
