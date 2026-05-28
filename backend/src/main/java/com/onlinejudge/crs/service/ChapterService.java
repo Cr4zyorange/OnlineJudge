@@ -20,6 +20,7 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 @Service
 public class ChapterService {
@@ -43,7 +44,7 @@ public class ChapterService {
 
     public List<ChapterResponse> tree(Long courseId, CurrentUser user) {
         requireViewPermission(courseId, user);
-        return buildTree(chapterRepository.listByCourse(courseId));
+        return buildTree(chapterRepository.listByCourse(courseId), canManageCourse(courseId, user));
     }
 
     @Transactional
@@ -136,11 +137,21 @@ public class ChapterService {
                 .isPresent();
     }
 
+    private boolean canManageCourse(Long courseId, CurrentUser user) {
+        if (isAdmin(user)) {
+            return true;
+        }
+        return courseRepository.findMember(courseId, user.id())
+                .filter(member -> member.status() == CourseMemberStatus.ACTIVE)
+                .filter(member -> member.role() == CourseMemberRole.TEACHER)
+                .isPresent();
+    }
+
     private boolean isAdmin(CurrentUser user) {
         return user.hasRole("ADMIN");
     }
 
-    private List<ChapterResponse> buildTree(List<Chapter> chapters) {
+    private List<ChapterResponse> buildTree(List<Chapter> chapters, boolean includeHidden) {
         Map<Long, MutableChapter> nodes = new LinkedHashMap<>();
         for (Chapter chapter : chapters) {
             nodes.put(chapter.id(), new MutableChapter(chapter));
@@ -155,15 +166,18 @@ public class ChapterService {
         }
         return roots.stream()
                 .sorted(chapterComparator())
-                .map(this::toResponse)
+                .flatMap(node -> toResponse(node, includeHidden).stream())
                 .toList();
     }
 
-    private ChapterResponse toResponse(MutableChapter node) {
-        return toResponse(node.chapter, node.children.stream()
+    private Optional<ChapterResponse> toResponse(MutableChapter node, boolean includeHidden) {
+        if (!includeHidden && node.chapter.visibleStatus() != 1) {
+            return Optional.empty();
+        }
+        return Optional.of(toResponse(node.chapter, node.children.stream()
                 .sorted(chapterComparator())
-                .map(this::toResponse)
-                .toList());
+                .flatMap(child -> toResponse(child, includeHidden).stream())
+                .toList()));
     }
 
     private ChapterResponse toResponse(Chapter chapter, List<ChapterResponse> children) {

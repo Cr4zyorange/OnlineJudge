@@ -206,13 +206,20 @@ class CourseControllerTest {
                 .andExpect(jsonPath("$.data.chapterType", is(2)));
 
         mockMvc.perform(get("/api/v1/courses/" + courseId + "/chapters")
+                        .header("X-User-Id", "701")
+                        .header("X-User-Role", "TEACHER"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()", is(2)))
+                .andExpect(jsonPath("$.data[1].chapterName", is("实践准备")))
+                .andExpect(jsonPath("$.data[1].visibleStatus", is(0)));
+
+        mockMvc.perform(get("/api/v1/courses/" + courseId + "/chapters")
                         .header("X-User-Id", "702")
                         .header("X-User-Role", "STUDENT"))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()", is(1)))
                 .andExpect(jsonPath("$.data[0].chapterName", is("课程导论")))
-                .andExpect(jsonPath("$.data[0].sortOrder", is(1)))
-                .andExpect(jsonPath("$.data[1].chapterName", is("实践准备")))
-                .andExpect(jsonPath("$.data[1].sortOrder", is(2)));
+                .andExpect(jsonPath("$.data[0].sortOrder", is(1)));
 
         mockMvc.perform(delete("/api/v1/chapters/" + chapterId)
                         .header("X-User-Id", "701")
@@ -223,8 +230,6 @@ class CourseControllerTest {
                         .header("X-User-Id", "702")
                         .header("X-User-Role", "STUDENT"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.length()", is(1)))
-                .andExpect(jsonPath("$.data[0].chapterName", is("实践准备")))
-                .andExpect(jsonPath("$.data[0].sortOrder", is(1)));
+                .andExpect(jsonPath("$.data.length()", is(0)));
     }
 }
