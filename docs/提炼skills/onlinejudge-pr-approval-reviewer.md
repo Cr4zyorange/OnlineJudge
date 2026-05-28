@@ -43,6 +43,8 @@ If the issue scope is complete but the code does not implement the documented re
 
 Approve only when the PR is workflow-clean, source-bounded, issue-complete, tested, and consistent with the documented requirement/function description.
 
+Approval is not the same as merge. After confirming a PR is approvable, ask the user whether to merge it. Only after the user clearly confirms, complete the merge, delete the feature branch, and adjust the linked issue state.
+
 ## Comprehensive Review Discipline
 
 Each review should be as complete as the live state allows. Do not produce a minimal rejection that names only the first failing gate if the same pass can also verify issue scope, document conformance, changed-file behavior, tests, and obvious regressions.
@@ -280,6 +282,26 @@ Use this decision table:
 | document conformance passes, serious correctness/security/test issue remains | `gh pr review <number> --request-changes` |
 | all gates pass | `gh pr review <number> --approve` |
 | cannot review due to auth/network/tooling | report exact blocker and do not approve |
+
+After approval, if the user confirms merge, complete the handoff instead of leaving it as aftercare:
+
+1. Re-check the PR is still mergeable, approved, open, and targeting `dev`.
+2. Merge with GitHub CLI using the repo's normal strategy, and delete the head branch when safe:
+
+   ```bash
+   gh pr merge <number> --squash --delete-branch
+   ```
+
+3. Verify the PR is merged and the remote feature branch is gone:
+
+   ```bash
+   gh pr view <number> --json state,mergedAt,mergeCommit,headRefName,url
+   git ls-remote --heads origin <head-branch>
+   ```
+
+4. Adjust the linked issue. If the project has a pre-merge status such as `Ready to merge`, use it before merge when available. After a successful merge, move the `Team planning` item to `Done` when that option exists, and close the issue if GitHub did not close it automatically because the PR targeted `dev` instead of the default branch.
+
+5. Report the merge commit, branch deletion result, issue state, and project state.
 
 Approval body should be brief and evidence-based:
 
