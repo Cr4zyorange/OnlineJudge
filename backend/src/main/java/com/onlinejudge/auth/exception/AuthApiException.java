@@ -27,4 +27,8 @@ public class AuthApiException extends ApiException {
     public static AuthApiException conflict(String message) {
         return new AuthApiException("AUTH_409", message, HttpStatus.CONFLICT);
     }
+
+    public static AuthApiException notFound(String message) {
+        return new AuthApiException("AUTH_404", message, HttpStatus.NOT_FOUND);
+    }
 }
