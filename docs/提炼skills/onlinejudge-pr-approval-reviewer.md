@@ -22,20 +22,43 @@ This skill is for issue-bound PR review and approval. It does not replace merge 
 Approval follows this gate order:
 
 ```text
-hard gate
+live state check
+-> issue/PR association and project-state maintenance
+-> hard gate
 -> issue completion gate
 -> document conformance gate
 -> general correctness check
 -> approve
 ```
 
-If a hard gate fails, request changes immediately. Do not continue into style-only review.
+Before judging implementation quality, first make the issue and PR association explicit and keep the issue's Project state aligned with the review state. A review is not clean if the PR is detached from its issue or the linked issue still looks unstarted in `Team planning`.
+
+If a hard gate fails after safe automatic repair attempts, request changes immediately. Do not continue into style-only review.
+
+Requesting changes is not permission to stop at the first visible problem. Even when one blocker is enough to reject, continue the review far enough to collect every concrete, source-backed blocker that can be found without unsafe guesses or excessive churn. The goal is one comprehensive review cycle that gives the author a complete repair list and avoids repeated "fix one, get another blocker" rounds.
 
 If the hard gate passes but the PR does not finish the issue's documented scope, request changes.
 
 If the issue scope is complete but the code does not implement the documented requirement/design behavior, request changes.
 
 Approve only when the PR is workflow-clean, source-bounded, issue-complete, tested, and consistent with the documented requirement/function description.
+
+## Comprehensive Review Discipline
+
+Each review should be as complete as the live state allows. Do not produce a minimal rejection that names only the first failing gate if the same pass can also verify issue scope, document conformance, changed-file behavior, tests, and obvious regressions.
+
+When a PR is going to be rejected, still inspect and report all confirmed blockers in these buckets:
+
+- workflow blockers: base branch, draft state, issue linkage, `Team planning` state, branch name, scope split, CI/test status, secrets or local files;
+- issue-completion blockers: every explicit checklist item, acceptance criterion, referenced page/API/table/test, and documented state that is missing or only partly implemented;
+- document-conformance blockers: mismatches against `docs/开发/`, final SRS/overview/detailed-design documents, and matching process documents;
+- correctness blockers: behavior bugs, permission/data-ownership gaps, transaction or consistency risks, frontend state regressions, brittle tests, and silent public-contract drift.
+
+Stop early only when continuing would be misleading or unsafe: the PR/issue pair is ambiguous, live GitHub state cannot be read, the branch cannot be checked out or diffed, auth prevents required inspection, or the first failure invalidates the remaining evidence. In those cases, say exactly what prevented a fuller review.
+
+Review comments must distinguish confirmed blockers from lower-confidence risks. Do not pad the review with speculative style advice. A comprehensive rejection should be longer than an approval, but every listed item must include enough file, behavior, requirement, command, or document evidence for the author to fix it without asking for clarification.
+
+Before submitting `request changes`, do a second pass over the changed-file list and the linked issue checklist to confirm the review body did not miss another blocker in the same module.
 
 ## Start-Up Checks
 
@@ -55,12 +78,18 @@ Treat repository identity as live data. Do not rely on folder names, stale memor
 List reviewable PRs:
 
 ```bash
-gh pr list --base dev --state open --json number,title,headRefName,baseRefName,isDraft,author,reviewDecision,statusCheckRollup,url
+gh pr list --base dev --state open --json number,title,headRefName,baseRefName,isDraft,author,reviewDecision,statusCheckRollup,body,closingIssuesReferences,url
 ```
 
 If there are no open PRs targeting `dev`, report that there is nothing to review.
 
-## Issue-First PR Association
+## Issue/PR Association And Project State Maintenance
+
+Every review must leave the issue/PR relationship and issue Project state better than it found them, when doing so is unambiguous and safe. This step happens before the hard gate.
+
+Do not mutate ambiguous state. If there are multiple possible PRs, multiple possible issues, a missing `Team planning` item that cannot be safely resolved, or a Project status option cannot be identified from live data, stop and report the ambiguity instead of guessing.
+
+### Resolve The Pair
 
 When the user asks to review a specific issue, do not wait for the user to supply a PR number. Resolve and, when safe, repair the issue-PR association before the hard gate.
 
@@ -93,18 +122,46 @@ When the user asks to review a specific issue, do not wait for the user to suppl
 
    ```bash
    gh pr view <pr-number> --json body --jq '.body // ""' > /tmp/pr-body.md
-   printf '\n\nCloses #<issue-id>\n' >> /tmp/pr-body.md
+   perl -0pi -e 's/^\xEF\xBB\xBF//; s/\r\n/\n/g; s/\s*\z/\n\nCloses #<issue-id>\n/' /tmp/pr-body.md
    gh pr edit <pr-number> --body-file /tmp/pr-body.md
    gh pr view <pr-number> --json closingIssuesReferences,url
    ```
 
-   This is a repair step, not an approval. Continue the review only after GitHub reports the issue under `closingIssuesReferences`.
+   This is a repair step, not an approval. Continue the review only after GitHub reports the issue under `closingIssuesReferences` or the issue reports the PR under `closedByPullRequestsReferences`.
 
 5. If multiple plausible PRs exist, or the match depends on guessing intent, do not edit any PR. Report the ambiguity with the candidate PR numbers and stop before approval.
 
 6. If no plausible PR exists, report that the issue has no reviewable implementation PR targeting `dev`.
 
 For PR-first reviews, perform the same association repair in reverse: inspect `closingIssuesReferences`; if it is empty but the branch name or PR body identifies exactly one issue, append `Closes #<issue-id>` and re-check before applying the hard gate.
+
+### Maintain Issue Project State
+
+After resolving exactly one linked issue and exactly one implementation PR, inspect the linked issue's Project state:
+
+```bash
+gh issue view <issue-id> --json number,title,state,projectItems,closedByPullRequestsReferences,url
+```
+
+Use `Team planning` as the authoritative project item when present. If the issue is missing from `Team planning`, add or normalize it only when the repository workflow and live GitHub output make the target project unambiguous; otherwise report the missing project item as a hard-gate blocker.
+
+Required state maintenance:
+
+- If an open, ready-for-review PR targets `dev` and is unambiguously linked to the issue, the issue must not remain `Todo`. Move `Team planning` status from `Todo` to `In progress` before reviewing.
+- If the PR fails review, keep the issue `In progress`; do not move it backward to `Todo`.
+- If all gates pass and the PR is approved, move `Team planning` status from `In progress` to `Ready to merge` when that option exists.
+- If the PR is already merged or the issue is already closed, inspect and report the state, but do not reopen or rewrite it unless the user explicitly asked for cleanup.
+
+Resolve Project IDs and option IDs from live data before editing. Do not hard-code IDs from memory:
+
+```bash
+gh project list --owner <owner> --format json
+gh project field-list <project-number> --owner <owner> --format json
+gh project item-list <project-number> --owner <owner> --format json
+gh project item-edit --project-id <project-id> --id <item-id> --field-id <status-field-id> --single-select-option-id <option-id>
+```
+
+If project mutation fails because auth lacks `project` scope, network access fails, or the CLI cannot see the project item, do not approve while the visible state remains wrong. Report the exact project-state blocker and the command or UI action needed to repair it.
 
 ## Hard Gate
 
@@ -115,6 +172,7 @@ Reject immediately with `request changes` if any item fails:
 | Base branch | PR targets `dev` |
 | Draft status | PR is ready for review, not draft |
 | Issue linkage | PR body contains `Close #id` or `Closes #id`; if the issue-PR match is unambiguous, repair this automatically before judging the gate |
+| Project issue state | linked issue is in `Team planning` and reflects the review state: `In progress` for active review, `Ready to merge` after approval when available |
 | Branch naming | branch follows `feature/<issue-id>-<name>`, `fix/<issue-id>-<name>`, `docs/<issue-id>-<name>`, `test/<name>`, `release/<version>`, or `hotfix/<issue-id>-<name>` |
 | Scope | PR changes belong to one issue and one reviewable delivery unit |
 | Issue completion claim | PR explains how the linked issue's documented scope is completed |
@@ -130,6 +188,8 @@ gh pr review <number> --request-changes --body-file /tmp/pr-review.md
 ```
 
 Do not approve a PR that fails a hard gate even if the code looks good.
+
+If a hard gate fails, the review conclusion is fixed, but the review body should still include other confirmed hard-gate, issue-completion, document-conformance, and correctness blockers discovered during the same pass. Do not continue into subjective style-only review after a hard-gate failure.
 
 ## Issue Completion Gate
 
@@ -236,12 +296,18 @@ Rejection body should lead with blocking issues:
 ```text
 Requesting changes.
 
-1. [hard gate / doc conformance / correctness] <specific blocker>.
-2. <specific blocker>.
+Blocking issues found in this pass:
+
+1. [hard gate / issue completion / doc conformance / correctness] <specific blocker with evidence>.
+2. <specific blocker with evidence>.
 
 Required before approval:
 - <repair action>
 - <verification action>
+
+Review coverage:
+- checked <issue / docs / changed files / tests / CI / local commands>;
+- could not fully check <area> because <exact blocker>, if applicable.
 ```
 
 ## Useful Commands
