@@ -69,6 +69,12 @@ public class AuthRepository {
         return queryUser("phone", phone);
     }
 
+    public Optional<AuthUser> findUserByLoginIdentifier(String account) {
+        return findUserByUsername(account)
+                .or(() -> findUserByEmail(account))
+                .or(() -> findUserByPhone(account));
+    }
+
     public long createUser(
             String username,
             String userType,
@@ -143,25 +149,25 @@ public class AuthRepository {
                 userId);
     }
 
-    public void createSession(long userId, String token, LocalDateTime issuedAt, LocalDateTime expiresAt) {
+    public void createSession(long userId, String tokenId, LocalDateTime issuedAt, LocalDateTime expiresAt) {
         jdbcTemplate.update("""
                         INSERT INTO t_auth_session (user_id, token_id, issued_at, expires_at, status)
                         VALUES (?, ?, ?, ?, ?)
                         """,
                 userId,
-                token,
+                tokenId,
                 Timestamp.valueOf(issuedAt),
                 Timestamp.valueOf(expiresAt),
                 SessionStatus.VALID.name());
     }
 
-    public Optional<AuthUserView> findValidSessionUser(String token, LocalDateTime now) {
+    public Optional<AuthUserView> findValidSessionUser(String tokenId, LocalDateTime now) {
         List<Long> userIds = jdbcTemplate.query("""
                         SELECT user_id FROM t_auth_session
                         WHERE token_id = ? AND status = ? AND expires_at > ?
                         """,
                 (rs, rowNum) -> rs.getLong("user_id"),
-                token,
+                tokenId,
                 SessionStatus.VALID.name(),
                 Timestamp.valueOf(now));
         if (userIds.isEmpty()) {
@@ -174,7 +180,7 @@ public class AuthRepository {
         return Optional.of(user);
     }
 
-    public void revokeSession(String token, LocalDateTime revokedAt) {
+    public void revokeSession(String tokenId, LocalDateTime revokedAt) {
         jdbcTemplate.update("""
                         UPDATE t_auth_session
                         SET status = ?, revoked_at = ?
@@ -182,8 +188,29 @@ public class AuthRepository {
                         """,
                 SessionStatus.REVOKED.name(),
                 Timestamp.valueOf(revokedAt),
-                token,
+                tokenId,
                 SessionStatus.VALID.name());
+    }
+
+    public void recordAudit(
+            Long operatorId,
+            String operationType,
+            String targetType,
+            String targetId,
+            String resultStatus,
+            String failureReason
+    ) {
+        jdbcTemplate.update("""
+                        INSERT INTO t_auth_audit_log (
+                            operator_id, operation_type, target_type, target_id, result_status, failure_reason
+                        ) VALUES (?, ?, ?, ?, ?, ?)
+                        """,
+                operatorId,
+                operationType,
+                targetType,
+                targetId,
+                resultStatus,
+                failureReason);
     }
 
     public AuthUserView toUserView(long userId) {

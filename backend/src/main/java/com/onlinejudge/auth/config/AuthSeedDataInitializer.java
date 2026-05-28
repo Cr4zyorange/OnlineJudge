@@ -30,7 +30,7 @@ public class AuthSeedDataInitializer {
         if (authRepository.findUserByUsername(username).isPresent()) {
             return;
         }
-        authService.register(new RegisterRequest(
+        authService.registerTrusted(new RegisterRequest(
                 username,
                 password,
                 userType,
@@ -38,6 +38,6 @@ public class AuthSeedDataInitializer {
                 null,
                 username + "@example.com",
                 null
-        ));
+        ), userType);
     }
 }

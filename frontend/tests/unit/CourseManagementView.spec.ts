@@ -29,6 +29,7 @@ describe('CourseManagementView', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     installLocalStorageMock();
+    window.localStorage.setItem('onlinejudge.authToken', 'teacher-token');
     window.localStorage.setItem('onlinejudge.userId', '101');
     window.localStorage.setItem('onlinejudge.userRole', 'TEACHER');
     window.localStorage.setItem('onlinejudge.username', 'Teacher101');

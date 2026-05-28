@@ -1,8 +1,12 @@
 import { flushPromises, mount } from '@vue/test-utils';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import AuthView from '../../../src/views/auth/AuthView.vue';
 
 describe('AuthView', () => {
+  beforeEach(() => {
+    installLocalStorageMock();
+  });
+
   afterEach(() => {
     vi.restoreAllMocks();
     window.localStorage.clear();
@@ -49,6 +53,8 @@ describe('AuthView', () => {
 
     expect(wrapper.text()).toContain('账号已存在');
     expect(wrapper.text()).toContain('创建平台账号');
+    expect(wrapper.find('option[value="ADMIN"]').exists()).toBe(false);
+    expect(wrapper.find('option[value="TEACHER"]').exists()).toBe(false);
   });
 });
 
@@ -61,4 +67,17 @@ function jsonResponse<T>(data: T) {
       data
     })
   } as Response;
+}
+
+function installLocalStorageMock() {
+  const values = new Map<string, string>();
+  Object.defineProperty(window, 'localStorage', {
+    configurable: true,
+    value: {
+      getItem: vi.fn((key: string) => values.get(key) ?? null),
+      setItem: vi.fn((key: string, value: string) => values.set(key, value)),
+      removeItem: vi.fn((key: string) => values.delete(key)),
+      clear: vi.fn(() => values.clear())
+    }
+  });
 }

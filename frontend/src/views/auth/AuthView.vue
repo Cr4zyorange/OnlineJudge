@@ -35,14 +35,7 @@
           显示名称
           <input v-model.trim="registerForm.displayName" name="displayName" placeholder="姓名或昵称" />
         </label>
-        <label>
-          用户类型
-          <select v-model="registerForm.userType" name="userType">
-            <option value="STUDENT">学生</option>
-            <option value="TEACHER">教师</option>
-            <option value="ADMIN">管理员</option>
-          </select>
-        </label>
+        <input type="hidden" name="userType" value="STUDENT" />
         <label>
           密码
           <input v-model="registerForm.password" name="registerPassword" type="password" autocomplete="new-password" placeholder="至少 8 位，包含字母和数字" />

@@ -40,7 +40,7 @@ public class AuthController {
         if (token == null) {
             throw new AuthenticationRequiredException("未登录或登录状态已失效");
         }
-        authService.logout(token);
+        authService.logout(currentUser.id(), token);
         return ApiResponse.ok(null);
     }
 

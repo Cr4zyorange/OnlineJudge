@@ -8,11 +8,13 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.jdbc.Sql;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.Map;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.not;
@@ -22,11 +24,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest(properties = {
-        "spring.datasource.url=jdbc:h2:mem:auth_controller;MODE=MySQL;DATABASE_TO_LOWER=TRUE;CASE_INSENSITIVE_IDENTIFIERS=TRUE;DB_CLOSE_DELAY=-1"
+        "spring.datasource.url=jdbc:h2:mem:auth_controller;MODE=MySQL;DATABASE_TO_LOWER=TRUE;CASE_INSENSITIVE_IDENTIFIERS=TRUE;DB_CLOSE_DELAY=-1",
+        "onlinejudge.auth.allow-header-auth=false"
 })
 @AutoConfigureMockMvc
 @Sql(
         statements = {
+                "DELETE FROM t_auth_audit_log",
                 "DELETE FROM t_auth_session",
                 "DELETE FROM t_auth_user_role",
                 "DELETE FROM t_auth_role_permission",
@@ -42,6 +46,9 @@ class AuthControllerTest {
 
     @Autowired
     private ObjectMapper objectMapper;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
 
     @Test
     void userRegistersLogsInReadsCurrentUserAndLogoutRevokesToken() throws Exception {
@@ -92,6 +99,8 @@ class AuthControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("0"));
 
+        assertThat(auditCount("LOGOUT", "SUCCESS")).isEqualTo(1);
+
         mockMvc.perform(get("/api/v1/auth/me")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
                 .andExpect(status().isUnauthorized())
@@ -100,16 +109,19 @@ class AuthControllerTest {
 
     @Test
     void loginFailureUsesSafeMessageAndDoesNotCreateSession() throws Exception {
+        registerStudent("student46", "Student46@pass", "student46@example.com", "13900000046");
+
         mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(Map.of(
-                                "account", "missing-user",
+                                "account", "student46",
                                 "password", "wrong-password"
                         ))))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("AUTH_401"))
                 .andExpect(jsonPath("$.message").value("账号或密码错误"))
                 .andExpect(jsonPath("$.message").value(not(containsString("不存在"))));
+        assertThat(auditCount("LOGIN_FAILURE", "FAILURE")).isEqualTo(1);
     }
 
     @Test
@@ -127,5 +139,115 @@ class AuthControllerTest {
                         .header("X-User-Role", "STUDENT"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("ERR-AUTH-01"));
+    }
+
+    @Test
+    void publicRegistrationRejectsTeacherAndAdminRoles() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "username", "admin45",
+                                "password", "Admin45@pass",
+                                "userType", "ADMIN",
+                                "displayName", "管理员45"
+                        ))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("AUTH_400"));
+
+        mockMvc.perform(post("/api/v1/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "username", "teacher45",
+                                "password", "Teacher45@pass",
+                                "userType", "TEACHER",
+                                "displayName", "教师45"
+                        ))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("AUTH_400"));
+    }
+
+    @Test
+    void registrationRejectsDuplicateEmailAndPhoneUsedForLogin() throws Exception {
+        registerStudent("student47", "Student47@pass", "student47@example.com", "13900000047");
+
+        mockMvc.perform(post("/api/v1/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "username", "student48",
+                                "password", "Student48@pass",
+                                "userType", "STUDENT",
+                                "displayName", "学生48",
+                                "email", "student47@example.com"
+                        ))))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("AUTH_409"));
+
+        mockMvc.perform(post("/api/v1/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "username", "student49",
+                                "password", "Student49@pass",
+                                "userType", "STUDENT",
+                                "displayName", "学生49",
+                                "phone", "13900000047"
+                        ))))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("AUTH_409"));
+    }
+
+    @Test
+    void sessionStoresTokenDigestInsteadOfBearerTokenPlaintextAndAuditsLogin() throws Exception {
+        registerStudent("student50", "Student50@pass", "student50@example.com", "13900000050");
+
+        String loginBody = mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "account", "student50@example.com",
+                                "password", "Student50@pass"
+                        ))))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        String bearerToken = objectMapper.readTree(loginBody).path("data").path("token").asText();
+        String storedTokenId = jdbcTemplate.queryForObject("SELECT token_id FROM t_auth_session", String.class);
+
+        assertThat(storedTokenId).isNotEqualTo(bearerToken);
+        assertThat(storedTokenId).matches("[0-9a-f]{64}");
+        assertThat(auditCount("LOGIN_SUCCESS", "SUCCESS")).isEqualTo(1);
+    }
+
+    @Test
+    void businessApiRejectsHeaderOnlyIdentityWhenSessionTokenIsMissing() throws Exception {
+        mockMvc.perform(get("/api/v1/courses")
+                        .header("X-User-Id", "501")
+                        .header("X-User-Role", "TEACHER"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("ERR-AUTH-01"));
+    }
+
+    private void registerStudent(String username, String password, String email, String phone) throws Exception {
+        mockMvc.perform(post("/api/v1/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "username", username,
+                                "password", password,
+                                "userType", "STUDENT",
+                                "displayName", username,
+                                "email", email,
+                                "phone", phone
+                        ))))
+                .andExpect(status().isOk());
+    }
+
+    private int auditCount(String operationType, String resultStatus) {
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM t_auth_audit_log WHERE operation_type = ? AND result_status = ?",
+                Integer.class,
+                operationType,
+                resultStatus
+        );
+        return count == null ? 0 : count;
     }
 }

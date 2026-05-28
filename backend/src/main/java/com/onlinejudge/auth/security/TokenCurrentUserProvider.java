@@ -6,6 +6,7 @@ import com.onlinejudge.common.security.CurrentUser;
 import com.onlinejudge.common.security.CurrentUserProvider;
 import com.onlinejudge.common.security.HeaderCurrentUserProvider;
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Component;
 import org.springframework.web.context.request.RequestContextHolder;
@@ -19,13 +20,16 @@ import java.util.TreeSet;
 public class TokenCurrentUserProvider implements CurrentUserProvider {
     private final SessionTokenService sessionTokenService;
     private final HeaderCurrentUserProvider headerCurrentUserProvider;
+    private final boolean allowHeaderAuth;
 
     public TokenCurrentUserProvider(
             SessionTokenService sessionTokenService,
-            HeaderCurrentUserProvider headerCurrentUserProvider
+            HeaderCurrentUserProvider headerCurrentUserProvider,
+            @Value("${onlinejudge.auth.allow-header-auth:false}") boolean allowHeaderAuth
     ) {
         this.sessionTokenService = sessionTokenService;
         this.headerCurrentUserProvider = headerCurrentUserProvider;
+        this.allowHeaderAuth = allowHeaderAuth;
     }
 
     @Override
@@ -36,6 +40,9 @@ public class TokenCurrentUserProvider implements CurrentUserProvider {
                     .map(this::toCurrentUser);
         }
         if (isAuthSessionEndpoint()) {
+            return Optional.empty();
+        }
+        if (!allowHeaderAuth) {
             return Optional.empty();
         }
         return headerCurrentUserProvider.getCurrentUser();

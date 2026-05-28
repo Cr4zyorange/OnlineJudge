@@ -1,3 +1,5 @@
+import { readAuthStorage } from './auth/storage';
+
 export interface AuthContext {
   userId: number | string;
   username?: string;
@@ -57,23 +59,11 @@ function jsonHeaders(requireAuth: boolean): Record<string, string> {
       Authorization: `Bearer ${token}`
     };
   }
-  const authContext = resolveAuthContext();
-  return {
-    'Content-Type': 'application/json',
-    'X-User-Id': String(authContext.userId),
-    'X-Username': authContext.username ?? '',
-    'X-User-Role': authContext.role,
-    'X-Permissions': (authContext.permissions ?? []).join(','),
-    'X-Course-Ids': formatCourseIds(authContext.courseIds ?? authContext.manageableCourseIds ?? []),
-    'X-Manageable-Course-Ids': formatCourseIds(authContext.manageableCourseIds ?? [])
-  };
+  throw new Error('当前登录态缺失，无法访问接口');
 }
 
 function storedToken() {
-  if (typeof window === 'undefined' || typeof window.localStorage?.getItem !== 'function') {
-    return null;
-  }
-  return window.localStorage.getItem('onlinejudge.authToken');
+  return readAuthStorage('onlinejudge.authToken');
 }
 
 function resolveAuthContext(): AuthContext {

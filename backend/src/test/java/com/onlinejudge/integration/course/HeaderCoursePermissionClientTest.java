@@ -23,7 +23,7 @@ class HeaderCoursePermissionClientTest {
         request.addHeader("X-Manageable-Course-Ids", "202");
         bind(request);
 
-        HeaderCoursePermissionClient client = new HeaderCoursePermissionClient();
+        HeaderCoursePermissionClient client = new HeaderCoursePermissionClient(true);
 
         assertThat(client.isCourseMember(101L, 501L)).isTrue();
         assertThat(client.canViewCourse(101L, 501L)).isTrue();
@@ -41,7 +41,7 @@ class HeaderCoursePermissionClientTest {
         request.addHeader("X-Manageable-Course-Ids", "*");
         bind(request);
 
-        HeaderCoursePermissionClient client = new HeaderCoursePermissionClient();
+        HeaderCoursePermissionClient client = new HeaderCoursePermissionClient(true);
 
         assertThat(client.isCourseMember(999L, 1L)).isTrue();
         assertThat(client.canManageCourse(999L, 1L)).isTrue();
@@ -56,7 +56,7 @@ class HeaderCoursePermissionClientTest {
         request.addHeader("X-Manageable-Course-Ids", "*");
         bind(request);
 
-        HeaderCoursePermissionClient client = new HeaderCoursePermissionClient();
+        HeaderCoursePermissionClient client = new HeaderCoursePermissionClient(true);
 
         assertThat(client.canViewCourse(0L, 501L)).isFalse();
         assertThat(client.canManageCourse(101L, 0L)).isFalse();
@@ -68,11 +68,27 @@ class HeaderCoursePermissionClientTest {
         request.addHeader("X-Course-Student-Ids", "101:601,602,603;202:701");
         bind(request);
 
-        HeaderCoursePermissionClient client = new HeaderCoursePermissionClient();
+        HeaderCoursePermissionClient client = new HeaderCoursePermissionClient(true);
 
         assertThat(client.listCourseStudentIds(101L)).containsExactly(601L, 602L, 603L);
         assertThat(client.listCourseStudentIds(202L)).containsExactly(701L);
         assertThat(client.listCourseStudentIds(303L)).isEmpty();
+    }
+
+    @Test
+    void ignoresHeaderCoursePermissionsWhenHeaderAuthIsDisabled() {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.addHeader("X-User-Role", "ADMIN");
+        request.addHeader("X-Course-Ids", "*");
+        request.addHeader("X-Manageable-Course-Ids", "*");
+        request.addHeader("X-Course-Student-Ids", "101:601");
+        bind(request);
+
+        HeaderCoursePermissionClient client = new HeaderCoursePermissionClient(false);
+
+        assertThat(client.canViewCourse(101L, 501L)).isFalse();
+        assertThat(client.canManageCourse(101L, 501L)).isFalse();
+        assertThat(client.listCourseStudentIds(101L)).isEmpty();
     }
 
     private void bind(HttpServletRequest request) {

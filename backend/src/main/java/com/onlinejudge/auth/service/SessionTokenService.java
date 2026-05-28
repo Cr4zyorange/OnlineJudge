@@ -5,10 +5,14 @@ import com.onlinejudge.auth.repository.AuthRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.Base64;
+import java.util.HexFormat;
 import java.util.Optional;
 
 @Service
@@ -36,7 +40,7 @@ public class SessionTokenService {
         String token = Base64.getUrlEncoder().withoutPadding().encodeToString(tokenBytes);
         LocalDateTime issuedAt = LocalDateTime.now(clock);
         LocalDateTime expiresAt = issuedAt.plusHours(SESSION_HOURS);
-        authRepository.createSession(userId, token, issuedAt, expiresAt);
+        authRepository.createSession(userId, digest(token), issuedAt, expiresAt);
         return new SessionToken(token, expiresAt);
     }
 
@@ -44,12 +48,22 @@ public class SessionTokenService {
         if (token == null || token.isBlank()) {
             return Optional.empty();
         }
-        return authRepository.findValidSessionUser(token.trim(), LocalDateTime.now(clock));
+        return authRepository.findValidSessionUser(digest(token.trim()), LocalDateTime.now(clock));
     }
 
     public void revoke(String token) {
         if (token != null && !token.isBlank()) {
-            authRepository.revokeSession(token.trim(), LocalDateTime.now(clock));
+            authRepository.revokeSession(digest(token.trim()), LocalDateTime.now(clock));
+        }
+    }
+
+    private String digest(String token) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hashedToken = digest.digest(token.getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(hashedToken);
+        } catch (NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("SHA-256 digest is unavailable", exception);
         }
     }
 

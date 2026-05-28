@@ -21,24 +21,45 @@ public class AuthService {
     private final AuthRepository authRepository;
     private final PasswordSecurityService passwordSecurityService;
     private final SessionTokenService sessionTokenService;
+    private final AuthAuditService authAuditService;
 
     public AuthService(
             AuthRepository authRepository,
             PasswordSecurityService passwordSecurityService,
-            SessionTokenService sessionTokenService
+            SessionTokenService sessionTokenService,
+            AuthAuditService authAuditService
     ) {
         this.authRepository = authRepository;
         this.passwordSecurityService = passwordSecurityService;
         this.sessionTokenService = sessionTokenService;
+        this.authAuditService = authAuditService;
     }
 
     @Transactional
     public AuthUserView register(RegisterRequest request) {
         String username = requireText(request.username(), "账号不能为空");
         String userType = normalizeRole(request.userType());
+        if (!"STUDENT".equals(userType)) {
+            throw AuthApiException.badRequest("公开注册仅支持学生账号");
+        }
+        return registerTrusted(request, userType);
+    }
+
+    @Transactional
+    public AuthUserView registerTrusted(RegisterRequest request, String trustedUserType) {
+        String username = requireText(request.username(), "账号不能为空");
+        String userType = normalizeRole(trustedUserType);
         String displayName = requireText(request.displayName(), "显示名称不能为空");
         if (authRepository.findUserByUsername(username).isPresent()) {
             throw AuthApiException.conflict("账号已存在");
+        }
+        String phone = blankToNull(request.phone());
+        String email = blankToNull(request.email());
+        if (authRepository.findUserByEmail(email).isPresent()) {
+            throw AuthApiException.conflict("邮箱已存在");
+        }
+        if (authRepository.findUserByPhone(phone).isPresent()) {
+            throw AuthApiException.conflict("手机号已存在");
         }
         authRepository.ensureBaseRolesAndPermissions();
         PasswordSecurityService.PasswordCredential credential = passwordSecurityService.hash(request.password());
@@ -46,8 +67,8 @@ public class AuthService {
                 username,
                 userType,
                 displayName,
-                blankToNull(request.phone()),
-                blankToNull(request.email()),
+                phone,
+                email,
                 blankToNull(request.avatarUrl()),
                 credential.passwordHash(),
                 credential.passwordSalt()
@@ -60,21 +81,25 @@ public class AuthService {
     public AuthLoginResult login(LoginRequest request) {
         String account = requireText(request.account(), "账号不能为空");
         String password = requireText(request.password(), "密码不能为空");
-        AuthUser user = authRepository.findUserByUsername(account)
-                .or(() -> authRepository.findUserByEmail(account))
-                .or(() -> authRepository.findUserByPhone(account))
-                .orElseThrow(AuthApiException::loginFailed);
+        AuthUser user = authRepository.findUserByLoginIdentifier(account)
+                .orElseThrow(() -> {
+                    authAuditService.record(null, "LOGIN_FAILURE", "AUTH_USER", account, "FAILURE", "账号或密码错误");
+                    return AuthApiException.loginFailed();
+                });
         ensureLoginAllowed(user);
         if (!passwordSecurityService.matches(password, user.passwordHash(), user.passwordSalt())) {
             int failedCount = user.failedLoginCount() + 1;
             authRepository.updateFailedLogin(user.id(), failedCount);
             if (failedCount >= MAX_FAILED_LOGIN_COUNT) {
                 authRepository.updateAccountStatus(user.id(), AccountStatus.FROZEN);
+                authAuditService.record(user.id(), "ACCOUNT_LOCKED", "AUTH_USER", String.valueOf(user.id()), "SUCCESS", "登录失败次数过多");
             }
+            authAuditService.record(user.id(), "LOGIN_FAILURE", "AUTH_USER", String.valueOf(user.id()), "FAILURE", "账号或密码错误");
             throw AuthApiException.loginFailed();
         }
         authRepository.resetLoginFailure(user.id(), LocalDateTime.now());
         SessionTokenService.SessionToken token = sessionTokenService.createSession(user.id());
+        authAuditService.record(user.id(), "LOGIN_SUCCESS", "AUTH_USER", String.valueOf(user.id()), "SUCCESS", null);
         return new AuthLoginResult(token.token(), token.expiresAt(), authRepository.toUserView(user.id()));
     }
 
@@ -82,8 +107,9 @@ public class AuthService {
         return authRepository.toUserView(userId);
     }
 
-    public void logout(String token) {
+    public void logout(long userId, String token) {
         sessionTokenService.revoke(token);
+        authAuditService.record(userId, "LOGOUT", "AUTH_SESSION", null, "SUCCESS", null);
     }
 
     private void ensureLoginAllowed(AuthUser user) {

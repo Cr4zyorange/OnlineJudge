@@ -1,4 +1,5 @@
 import { publicRequest, request } from '../http';
+import { removeAuthStorage, writeAuthStorage } from './storage';
 
 export interface AuthUser {
   id: number;
@@ -63,9 +64,6 @@ export async function logout() {
 }
 
 export function clearAuthSession() {
-  if (typeof window === 'undefined') {
-    return;
-  }
   [
     'onlinejudge.authToken',
     'onlinejudge.authExpiresAt',
@@ -74,16 +72,16 @@ export function clearAuthSession() {
     'onlinejudge.userRole',
     'onlinejudge.role',
     'onlinejudge.permissions'
-  ].forEach((key) => window.localStorage.removeItem(key));
+  ].forEach((key) => removeAuthStorage(key));
 }
 
 function persistAuthSession(result: LoginResult) {
-  window.localStorage.setItem('onlinejudge.authToken', result.token);
-  window.localStorage.setItem('onlinejudge.authExpiresAt', result.expiresAt);
-  window.localStorage.setItem('onlinejudge.userId', String(result.user.id));
-  window.localStorage.setItem('onlinejudge.username', result.user.username);
+  writeAuthStorage('onlinejudge.authToken', result.token);
+  writeAuthStorage('onlinejudge.authExpiresAt', result.expiresAt);
+  writeAuthStorage('onlinejudge.userId', String(result.user.id));
+  writeAuthStorage('onlinejudge.username', result.user.username);
   const primaryRole = result.user.roles[0] ?? result.user.userType;
-  window.localStorage.setItem('onlinejudge.userRole', primaryRole);
-  window.localStorage.setItem('onlinejudge.role', primaryRole);
-  window.localStorage.setItem('onlinejudge.permissions', result.user.permissions.join(','));
+  writeAuthStorage('onlinejudge.userRole', primaryRole);
+  writeAuthStorage('onlinejudge.role', primaryRole);
+  writeAuthStorage('onlinejudge.permissions', result.user.permissions.join(','));
 }

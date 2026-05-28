@@ -9,9 +9,11 @@ describe('gradeItems API client', () => {
   afterEach(() => {
     configureGradeItemAuthContext(null);
     vi.restoreAllMocks();
+    window.localStorage.clear();
   });
 
   it('calls documented grade item endpoints with auth context supplied by the integration layer', async () => {
+    window.localStorage.setItem('onlinejudge.authToken', 'teacher-token');
     configureGradeItemAuthContext(() => ({
       userId: 501,
       userRole: 'TEACHER',
@@ -45,17 +47,13 @@ describe('gradeItems API client', () => {
     expect(fetchMock).toHaveBeenNthCalledWith(1, '/api/v1/grade-items/7', expect.objectContaining({
       method: 'PUT',
       headers: expect.objectContaining({
-        'X-User-Id': '501',
-        'X-User-Role': 'TEACHER',
-        'X-Manageable-Course-Ids': '101'
+        Authorization: 'Bearer teacher-token'
       })
     }));
     expect(fetchMock).toHaveBeenNthCalledWith(2, '/api/v1/courses/101/grade-rules/validate', expect.objectContaining({
       method: 'POST',
       headers: expect.objectContaining({
-        'X-User-Id': '501',
-        'X-User-Role': 'TEACHER',
-        'X-Manageable-Course-Ids': '101'
+        Authorization: 'Bearer teacher-token'
       }),
       body: JSON.stringify({
         gradeItems: [

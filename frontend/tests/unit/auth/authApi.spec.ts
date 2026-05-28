@@ -1,11 +1,17 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { clearAuthSession, getCurrentUser, login, logout, register } from '../../../src/api/auth/auth';
 
 describe('AUTH API client', () => {
+  beforeEach(() => {
+    installLocalStorageMock();
+  });
+
   afterEach(() => {
     clearAuthSession();
     vi.restoreAllMocks();
-    window.localStorage.clear();
+    if (typeof window.localStorage.clear === 'function') {
+      window.localStorage.clear();
+    }
   });
 
   it('registers users through the documented AUTH endpoint without requiring existing login state', async () => {
@@ -80,6 +86,29 @@ describe('AUTH API client', () => {
     }));
     expect(window.localStorage.getItem('onlinejudge.authToken')).toBeNull();
   });
+
+  it('keeps auth calls stable when browser storage methods are unavailable in tests', async () => {
+    Object.defineProperty(window, 'localStorage', {
+      configurable: true,
+      value: {}
+    });
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(jsonResponse({
+      token: 'fallback-token',
+      expiresAt: '2026-05-28T18:00:00',
+      user: {
+        id: 46,
+        username: 'student46',
+        userType: 'STUDENT',
+        displayName: '学生46',
+        roles: ['STUDENT'],
+        permissions: ['course:view']
+      }
+    }));
+
+    await expect(login({ account: 'student46', password: 'Student46@pass' })).resolves.toMatchObject({
+      token: 'fallback-token'
+    });
+  });
 });
 
 function jsonResponse<T>(data: T) {
@@ -91,4 +120,17 @@ function jsonResponse<T>(data: T) {
       data
     })
   } as Response;
+}
+
+function installLocalStorageMock() {
+  const values = new Map<string, string>();
+  Object.defineProperty(window, 'localStorage', {
+    configurable: true,
+    value: {
+      getItem: vi.fn((key: string) => values.get(key) ?? null),
+      setItem: vi.fn((key: string, value: string) => values.set(key, value)),
+      removeItem: vi.fn((key: string) => values.delete(key)),
+      clear: vi.fn(() => values.clear())
+    }
+  });
 }

@@ -18,8 +18,8 @@ CREATE TABLE IF NOT EXISTS t_auth_user (
 );
 
 CREATE INDEX IF NOT EXISTS idx_auth_user_type ON t_auth_user (user_type);
-CREATE INDEX IF NOT EXISTS idx_auth_user_phone ON t_auth_user (phone);
-CREATE INDEX IF NOT EXISTS idx_auth_user_email ON t_auth_user (email);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_auth_user_phone ON t_auth_user (phone);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_auth_user_email ON t_auth_user (email);
 CREATE INDEX IF NOT EXISTS idx_auth_user_status ON t_auth_user (account_status);
 
 CREATE TABLE IF NOT EXISTS t_auth_role (
