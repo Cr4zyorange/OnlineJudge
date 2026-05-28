@@ -122,15 +122,17 @@ describe('CourseManagementView', () => {
         id: 11,
         courseId: 1,
         parentId: null,
-        title: '课程导论',
-        content: '目标与安排',
-        orderNum: 1,
+        chapterName: '课程导论',
+        objective: '目标与安排',
+        sortOrder: 1,
+        visibleStatus: 1,
+        chapterType: 1,
         children: [],
         createdAt: '2026-05-25T00:00:00',
         updatedAt: '2026-05-25T00:00:00'
       }
     ];
-    const nested = { ...chapters[0], id: 12, parentId: 11, title: '开发环境', content: '安装 JDK 与 IDE' };
+    const nested = { ...chapters[0], id: 12, parentId: 11, chapterName: '开发环境', objective: '安装 JDK 与 IDE' };
     const fetchMock = vi.fn()
       .mockResolvedValueOnce({ ok: true, json: async () => page([course], 1) })
       .mockResolvedValueOnce({ ok: true, json: async () => page([course], 1) })
@@ -164,6 +166,69 @@ describe('CourseManagementView', () => {
 
     expect(fetchMock).toHaveBeenCalledWith('/api/v1/courses/1/chapters', expect.objectContaining({ method: 'POST' }));
     expect(wrapper.text()).toContain('开发环境');
+  });
+
+  it('reorders same-level chapters by drag and drop', async () => {
+    const page = (list = [course], total = list.length) => ({
+      code: '0',
+      message: 'success',
+      data: { list, total, page: 1, size: 20 }
+    });
+    const firstChapter = {
+      id: 11,
+      courseId: 1,
+      parentId: null,
+      chapterName: '课程导论',
+      objective: '目标与安排',
+      sortOrder: 1,
+      visibleStatus: 1,
+      chapterType: 1,
+      children: [],
+      createdAt: '2026-05-25T00:00:00',
+      updatedAt: '2026-05-25T00:00:00'
+    };
+    const secondChapter = { ...firstChapter, id: 12, chapterName: '实践准备', sortOrder: 2 };
+    const reordered = [
+      { ...secondChapter, sortOrder: 1 },
+      { ...firstChapter, sortOrder: 2 }
+    ];
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => page([course], 1) })
+      .mockResolvedValueOnce({ ok: true, json: async () => page([course], 1) })
+      .mockResolvedValueOnce({ ok: true, json: async () => page([course], 1) })
+      .mockResolvedValueOnce({ ok: true, json: async () => page([], 0) })
+      .mockResolvedValueOnce({ ok: true, json: async () => page([course], 1) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ code: '0', message: 'success', data: [firstChapter, secondChapter] }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ code: '0', message: 'success', data: { ...secondChapter, sortOrder: 1 } }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ code: '0', message: 'success', data: reordered }) });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const wrapper = mount(CourseManagementView);
+    await flushPromises();
+
+    await wrapper.findAll('.menu-button')[1].trigger('click');
+    await flushPromises();
+
+    const chapterButton = wrapper.findAll('button').find((button) => button.text().includes('章节'));
+    await chapterButton!.trigger('click');
+    await flushPromises();
+
+    const rows = wrapper.findAll('.chapter-row');
+    const dataTransfer = {
+      effectAllowed: '',
+      dropEffect: '',
+      setData: vi.fn(),
+      getData: vi.fn()
+    };
+    await rows[1].trigger('dragstart', { dataTransfer });
+    await rows[0].trigger('dragover', { dataTransfer });
+    await rows[0].trigger('drop', { dataTransfer });
+    await flushPromises();
+
+    const updateCall = fetchMock.mock.calls.find(([url, options]) => url === '/api/v1/chapters/12' && options.method === 'PUT');
+    expect(updateCall).toBeTruthy();
+    expect(JSON.parse(updateCall![1].body)).toEqual(expect.objectContaining({ sortOrder: 1, chapterName: '实践准备' }));
+    expect(wrapper.text()).toContain('实践准备');
   });
 });
 

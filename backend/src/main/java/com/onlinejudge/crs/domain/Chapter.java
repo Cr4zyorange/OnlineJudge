@@ -6,9 +6,11 @@ public record Chapter(
         Long id,
         Long courseId,
         Long parentId,
-        String title,
-        String content,
-        Integer orderNum,
+        String chapterName,
+        Integer sortOrder,
+        String objective,
+        Integer visibleStatus,
+        Integer chapterType,
         LocalDateTime createdAt,
         LocalDateTime updatedAt
 ) {

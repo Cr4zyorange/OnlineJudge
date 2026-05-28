@@ -93,24 +93,41 @@
             </div>
             <label>
               <span>章节标题</span>
-              <input data-testid="chapter-title" v-model.trim="chapterForm.title" type="text" maxlength="200" placeholder="例如：课程导论" />
+              <input data-testid="chapter-title" v-model.trim="chapterForm.chapterName" type="text" maxlength="255" placeholder="例如：课程导论" />
             </label>
             <label>
               <span>父章节</span>
               <select data-testid="chapter-parent" v-model="chapterParentValue">
                 <option value="">作为一级章节</option>
                 <option v-for="item in flatChapters" :key="item.chapter.id" :value="String(item.chapter.id)" :disabled="editingChapter?.id === item.chapter.id">
-                  {{ item.prefix }}{{ item.chapter.title }}
+                  {{ item.prefix }}{{ item.chapter.chapterName }}
                 </option>
               </select>
             </label>
+            <div class="form-grid">
+              <label>
+                <span>排序号</span>
+                <input v-model.number="chapterForm.sortOrder" type="number" min="1" step="1" placeholder="默认追加到末尾" />
+              </label>
+              <label>
+                <span>可见状态</span>
+                <select v-model.number="chapterForm.visibleStatus">
+                  <option :value="1">显示</option>
+                  <option :value="0">隐藏</option>
+                </select>
+              </label>
+              <label>
+                <span>章节类型</span>
+                <select v-model.number="chapterForm.chapterType">
+                  <option :value="1">普通章节</option>
+                  <option :value="2">实验章节</option>
+                  <option :value="3">作业章节</option>
+                </select>
+              </label>
+            </div>
             <label>
-              <span>排序号</span>
-              <input v-model.number="chapterForm.orderNum" type="number" min="0" step="1" placeholder="默认追加到末尾" />
-            </label>
-            <label>
-              <span>章节说明</span>
-              <textarea data-testid="chapter-content" v-model.trim="chapterForm.content" rows="5" placeholder="填写教学目标、知识点或学习建议"></textarea>
+              <span>教学目标</span>
+              <textarea data-testid="chapter-content" v-model.trim="chapterForm.objective" rows="5" placeholder="填写教学目标、知识点或学习建议"></textarea>
             </label>
             <p v-if="chapterError" class="message error">{{ chapterError }}</p>
             <p v-if="chapterSuccess" class="message success">{{ chapterSuccess }}</p>
@@ -134,6 +151,7 @@
                 @edit="editChapter"
                 @delete="removeChapter"
                 @move="moveChapter"
+                @drag-sort="dragSortChapter"
               />
             </div>
           </section>
@@ -337,15 +355,45 @@ const ChapterNode: Component = defineComponent({
     courseId: { type: Number, required: true },
     depth: { type: Number, required: true }
   },
-  emits: ['edit', 'delete', 'move'],
+  emits: ['edit', 'delete', 'move', 'drag-sort'],
   setup(props, { emit }) {
     return (): VNode => h('div', { class: 'chapter-node', style: { marginLeft: `${props.depth * 22}px` } }, [
-      h('div', { class: 'chapter-row' }, [
+      h('div', {
+        class: ['chapter-row', { dragging: draggedChapterId.value === props.chapter.id }],
+        draggable: true,
+        onDragstart: (event: DragEvent) => {
+          draggedChapterId.value = props.chapter.id;
+          event.dataTransfer?.setData('text/plain', String(props.chapter.id));
+          event.dataTransfer?.setData('application/x-parent-id', props.chapter.parentId == null ? '' : String(props.chapter.parentId));
+          if (event.dataTransfer) {
+            event.dataTransfer.effectAllowed = 'move';
+          }
+        },
+        onDragend: () => {
+          draggedChapterId.value = null;
+        },
+        onDragover: (event: DragEvent) => {
+          if (canDropOnChapter(props.chapter)) {
+            event.preventDefault();
+            if (event.dataTransfer) {
+              event.dataTransfer.dropEffect = 'move';
+            }
+          }
+        },
+        onDrop: (event: DragEvent) => {
+          event.preventDefault();
+          emit('drag-sort', props.chapter);
+        }
+      }, [
         h('div', { class: 'chapter-main' }, [
-          h('span', { class: 'chapter-order' }, String(props.chapter.orderNum)),
+          h('span', { class: 'chapter-order' }, String(props.chapter.sortOrder)),
           h('div', [
-            h('strong', props.chapter.title),
-            props.chapter.content ? h('p', props.chapter.content) : null
+            h('strong', props.chapter.chapterName),
+            h('div', { class: 'chapter-badges' }, [
+              h('span', props.chapter.visibleStatus === 1 ? '显示' : '隐藏'),
+              h('span', chapterTypeText(props.chapter.chapterType))
+            ]),
+            props.chapter.objective ? h('p', props.chapter.objective) : null
           ])
         ]),
         h('div', { class: 'chapter-actions' }, [
@@ -361,7 +409,8 @@ const ChapterNode: Component = defineComponent({
         depth: props.depth + 1,
         onEdit: (chapter: Chapter) => emit('edit', chapter),
         onDelete: (chapter: Chapter) => emit('delete', chapter),
-        onMove: (chapter: Chapter, delta: number) => emit('move', chapter, delta)
+        onMove: (chapter: Chapter, delta: number) => emit('move', chapter, delta),
+        onDragSort: (chapter: Chapter) => emit('drag-sort', chapter)
       }))
     ]);
   }
@@ -375,7 +424,7 @@ const CompactChapterNode: Component = defineComponent({
   },
   setup(props) {
     return (): VNode => h('div', { class: 'compact-node', style: { marginLeft: `${props.depth * 18}px` } }, [
-      h('span', `${props.chapter.orderNum}. ${props.chapter.title}`),
+      h('span', `${props.chapter.sortOrder}. ${props.chapter.chapterName}`),
       ...props.chapter.children.map((child) => h(CompactChapterNode, { chapter: child, depth: props.depth + 1 }))
     ]);
   }
@@ -397,9 +446,11 @@ const blankForm = (): CoursePayload => ({
 
 const blankChapterForm = (): ChapterPayload => ({
   parentId: null,
-  title: '',
-  content: '',
-  orderNum: undefined
+  chapterName: '',
+  objective: '',
+  sortOrder: undefined,
+  visibleStatus: 1,
+  chapterType: 1
 });
 
 const form = reactive<CoursePayload>(blankForm());
@@ -425,6 +476,7 @@ const editingCourse = ref<Course | null>(null);
 const selectedCourse = ref<Course | null>(null);
 const chapterCourse = ref<Course | null>(null);
 const editingChapter = ref<Chapter | null>(null);
+const draggedChapterId = ref<number | null>(null);
 const activeTab = ref<CourseScope>('all');
 const stats = reactive<Record<CourseScope, number>>({
   all: 0,
@@ -633,7 +685,7 @@ async function submitChapter() {
   }
   chapterError.value = '';
   chapterSuccess.value = '';
-  if (!chapterForm.title?.trim()) {
+  if (!chapterForm.chapterName?.trim()) {
     chapterError.value = '请填写章节标题';
     return;
   }
@@ -641,7 +693,7 @@ async function submitChapter() {
   const payload = normalizeChapterPayload();
   try {
     if (editingChapter.value) {
-      await updateChapter(chapterCourse.value.id, editingChapter.value.id, payload);
+      await updateChapter(editingChapter.value.id, payload);
       chapterSuccess.value = '章节已保存';
     } else {
       await createChapter(chapterCourse.value.id, payload);
@@ -659,19 +711,21 @@ async function submitChapter() {
 function editChapter(chapter: Chapter) {
   editingChapter.value = chapter;
   Object.assign(chapterForm, {
-    title: chapter.title,
-    content: chapter.content ?? '',
-    orderNum: chapter.orderNum,
+    chapterName: chapter.chapterName,
+    objective: chapter.objective ?? '',
+    sortOrder: chapter.sortOrder,
+    visibleStatus: chapter.visibleStatus,
+    chapterType: chapter.chapterType,
     parentId: chapter.parentId ?? null
   });
   chapterParentValue.value = chapter.parentId == null ? '' : String(chapter.parentId);
 }
 
 async function removeChapter(chapter: Chapter) {
-  if (!chapterCourse.value || !window.confirm(`确认删除章节《${chapter.title}》？子章节也会一并删除。`)) {
+  if (!chapterCourse.value || !window.confirm(`确认删除章节《${chapter.chapterName}》？子章节也会一并删除。`)) {
     return;
   }
-  await deleteChapter(chapterCourse.value.id, chapter.id);
+  await deleteChapter(chapter.id);
   await loadChapters();
 }
 
@@ -679,11 +733,38 @@ async function moveChapter(chapter: Chapter, delta: number) {
   if (!chapterCourse.value) {
     return;
   }
-  await updateChapter(chapterCourse.value.id, chapter.id, {
+  await updateChapter(chapter.id, {
     parentId: chapter.parentId ?? null,
-    title: chapter.title,
-    content: chapter.content ?? '',
-    orderNum: Math.max(0, chapter.orderNum + delta)
+    chapterName: chapter.chapterName,
+    objective: chapter.objective ?? '',
+    visibleStatus: chapter.visibleStatus,
+    chapterType: chapter.chapterType,
+    sortOrder: Math.max(1, chapter.sortOrder + delta)
+  });
+  await loadChapters();
+}
+
+async function dragSortChapter(target: Chapter) {
+  if (!chapterCourse.value || draggedChapterId.value == null || draggedChapterId.value === target.id) {
+    return;
+  }
+  const dragged = findChapterById(chapters.value, draggedChapterId.value);
+  draggedChapterId.value = null;
+  if (!dragged) {
+    return;
+  }
+  if ((dragged.parentId ?? null) !== (target.parentId ?? null)) {
+    chapterError.value = '只能在同一层级内拖拽排序';
+    return;
+  }
+  chapterError.value = '';
+  await updateChapter(dragged.id, {
+    parentId: dragged.parentId ?? null,
+    chapterName: dragged.chapterName,
+    objective: dragged.objective ?? '',
+    visibleStatus: dragged.visibleStatus,
+    chapterType: dragged.chapterType,
+    sortOrder: target.sortOrder
   });
   await loadChapters();
 }
@@ -696,10 +777,12 @@ function resetChapterForm() {
 
 function normalizeChapterPayload(): ChapterPayload {
   return {
-    title: chapterForm.title.trim(),
-    content: chapterForm.content?.trim() || '',
+    chapterName: chapterForm.chapterName.trim(),
+    objective: chapterForm.objective?.trim() || '',
     parentId: chapterParentValue.value ? Number(chapterParentValue.value) : null,
-    orderNum: Number.isFinite(chapterForm.orderNum) ? Number(chapterForm.orderNum) : undefined
+    sortOrder: Number.isFinite(chapterForm.sortOrder) ? Number(chapterForm.sortOrder) : undefined,
+    visibleStatus: chapterForm.visibleStatus ?? 1,
+    chapterType: chapterForm.chapterType ?? 1
   };
 }
 
@@ -759,6 +842,36 @@ function statusText(status: Course['status']) {
     ARCHIVED: '已归档'
   };
   return map[status];
+}
+
+function chapterTypeText(type: Chapter['chapterType']) {
+  const map: Record<Chapter['chapterType'], string> = {
+    1: '普通',
+    2: '实验',
+    3: '作业'
+  };
+  return map[type];
+}
+
+function canDropOnChapter(target: Chapter) {
+  if (draggedChapterId.value == null || draggedChapterId.value === target.id) {
+    return false;
+  }
+  const dragged = findChapterById(chapters.value, draggedChapterId.value);
+  return !!dragged && (dragged.parentId ?? null) === (target.parentId ?? null);
+}
+
+function findChapterById(items: Chapter[], id: number): Chapter | null {
+  for (const chapter of items) {
+    if (chapter.id === id) {
+      return chapter;
+    }
+    const child = findChapterById(chapter.children, id);
+    if (child) {
+      return child;
+    }
+  }
+  return null;
 }
 
 function flattenChapters(items: Chapter[], depth = 0): Array<{ chapter: Chapter; prefix: string }> {

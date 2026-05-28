@@ -607,6 +607,18 @@ button:disabled {
   border: 1px solid rgba(22, 66, 60, 0.12);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.38);
+  cursor: grab;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+}
+
+.chapter-row:active {
+  cursor: grabbing;
+}
+
+.chapter-row.dragging {
+  border-color: rgba(44, 95, 89, 0.38);
+  box-shadow: 0 10px 24px rgba(22, 66, 60, 0.12);
+  transform: scale(0.995);
 }
 
 .chapter-main {
@@ -633,6 +645,22 @@ button:disabled {
   display: block;
   margin-bottom: 0.25rem;
   color: #263d39;
+}
+
+.chapter-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-bottom: 0.35rem;
+}
+
+.chapter-badges span {
+  padding: 0.12rem 0.4rem;
+  border-radius: 4px;
+  background: rgba(44, 95, 89, 0.1);
+  color: #2c5f59;
+  font-size: 0.72rem;
+  font-weight: 700;
 }
 
 .chapter-main p {

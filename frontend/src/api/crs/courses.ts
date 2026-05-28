@@ -42,15 +42,15 @@ export function createChapter(courseId: number, payload: ChapterPayload) {
   });
 }
 
-export function updateChapter(courseId: number, chapterId: number, payload: ChapterPayload) {
-  return request<Chapter>(`/api/v1/courses/${courseId}/chapters/${chapterId}`, {
+export function updateChapter(chapterId: number, payload: ChapterPayload) {
+  return request<Chapter>(`/api/v1/chapters/${chapterId}`, {
     method: 'PUT',
     body: payload
   });
 }
 
-export function deleteChapter(courseId: number, chapterId: number) {
-  return request<void>(`/api/v1/courses/${courseId}/chapters/${chapterId}`, {
+export function deleteChapter(chapterId: number) {
+  return request<void>(`/api/v1/chapters/${chapterId}`, {
     method: 'DELETE'
   });
 }

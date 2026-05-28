@@ -5,7 +5,6 @@ import com.onlinejudge.common.web.ApiResponse;
 import com.onlinejudge.common.web.PageResponse;
 import com.onlinejudge.crs.domain.dto.ChapterCreateRequest;
 import com.onlinejudge.crs.domain.dto.ChapterResponse;
-import com.onlinejudge.crs.domain.dto.ChapterUpdateRequest;
 import com.onlinejudge.crs.domain.dto.CourseCreateRequest;
 import com.onlinejudge.crs.domain.dto.CoursePermissionResponse;
 import com.onlinejudge.crs.domain.dto.CourseResponse;
@@ -88,19 +87,4 @@ public class CourseController {
         return ApiResponse.ok(chapterService.tree(courseId, currentUser));
     }
 
-    @PutMapping("/{courseId}/chapters/{chapterId}")
-    public ApiResponse<ChapterResponse> updateChapter(@PathVariable Long courseId,
-                                                      @PathVariable Long chapterId,
-                                                      @Valid @RequestBody ChapterUpdateRequest request,
-                                                      CurrentUser currentUser) {
-        return ApiResponse.ok(chapterService.update(courseId, chapterId, request, currentUser));
-    }
-
-    @DeleteMapping("/{courseId}/chapters/{chapterId}")
-    public ApiResponse<Void> deleteChapter(@PathVariable Long courseId,
-                                           @PathVariable Long chapterId,
-                                           CurrentUser currentUser) {
-        chapterService.delete(courseId, chapterId, currentUser);
-        return ApiResponse.ok(null);
-    }
 }

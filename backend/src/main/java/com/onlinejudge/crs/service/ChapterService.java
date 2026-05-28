@@ -35,8 +35,10 @@ public class ChapterService {
     public ChapterResponse create(Long courseId, ChapterCreateRequest request, CurrentUser user) {
         requireManagePermission(courseId, user);
         validateParent(courseId, request.parentId());
-        int orderNum = request.orderNum() == null ? chapterRepository.nextOrder(courseId, request.parentId()) : request.orderNum();
-        return toResponse(chapterRepository.insert(courseId, request, orderNum), List.of());
+        int sortOrder = request.sortOrder() == null ? chapterRepository.nextOrder(courseId, request.parentId()) : request.sortOrder();
+        Chapter chapter = chapterRepository.insert(courseId, request, sortOrder);
+        reorderSiblings(courseId, request.parentId(), chapter.id(), sortOrder);
+        return toResponse(getChapter(courseId, chapter.id()), List.of());
     }
 
     public List<ChapterResponse> tree(Long courseId, CurrentUser user) {
@@ -45,23 +47,35 @@ public class ChapterService {
     }
 
     @Transactional
-    public ChapterResponse update(Long courseId, Long chapterId, ChapterUpdateRequest request, CurrentUser user) {
+    public ChapterResponse update(Long chapterId, ChapterUpdateRequest request, CurrentUser user) {
+        Chapter chapter = getChapter(chapterId);
+        Long courseId = chapter.courseId();
         requireManagePermission(courseId, user);
-        Chapter chapter = getChapter(courseId, chapterId);
         if (chapterId.equals(request.parentId())) {
             throw new BusinessException(HttpStatus.BAD_REQUEST, "章节不能作为自己的父章节");
         }
         validateParent(courseId, request.parentId());
         ensureNoCycle(courseId, chapterId, request.parentId());
-        int orderNum = request.orderNum() == null ? chapter.orderNum() : request.orderNum();
-        return toResponse(chapterRepository.update(courseId, chapterId, request, orderNum), List.of());
+        Long previousParentId = chapter.parentId();
+        boolean parentChanged = !sameParent(previousParentId, request.parentId());
+        int sortOrder = request.sortOrder() == null
+                ? (parentChanged ? chapterRepository.nextOrder(courseId, request.parentId()) : chapter.sortOrder())
+                : request.sortOrder();
+        chapterRepository.update(courseId, chapterId, request, sortOrder);
+        if (parentChanged) {
+            normalizeSiblings(courseId, previousParentId);
+        }
+        reorderSiblings(courseId, request.parentId(), chapterId, sortOrder);
+        return toResponse(getChapter(courseId, chapterId), List.of());
     }
 
     @Transactional
-    public void delete(Long courseId, Long chapterId, CurrentUser user) {
+    public void delete(Long chapterId, CurrentUser user) {
+        Chapter chapter = getChapter(chapterId);
+        Long courseId = chapter.courseId();
         requireManagePermission(courseId, user);
-        getChapter(courseId, chapterId);
         chapterRepository.deleteWithDescendants(courseId, chapterId);
+        normalizeSiblings(courseId, chapter.parentId());
     }
 
     private void requireViewPermission(Long courseId, CurrentUser user) {
@@ -91,6 +105,11 @@ public class ChapterService {
 
     private Chapter getChapter(Long courseId, Long chapterId) {
         return chapterRepository.findById(courseId, chapterId)
+                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "章节不存在"));
+    }
+
+    private Chapter getChapter(Long chapterId) {
+        return chapterRepository.findById(chapterId)
                 .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "章节不存在"));
     }
 
@@ -152,9 +171,11 @@ public class ChapterService {
                 chapter.id(),
                 chapter.courseId(),
                 chapter.parentId(),
-                chapter.title(),
-                chapter.content(),
-                chapter.orderNum(),
+                chapter.chapterName(),
+                chapter.sortOrder(),
+                chapter.objective(),
+                chapter.visibleStatus(),
+                chapter.chapterType(),
                 children,
                 chapter.createdAt(),
                 chapter.updatedAt()
@@ -162,8 +183,37 @@ public class ChapterService {
     }
 
     private Comparator<MutableChapter> chapterComparator() {
-        return Comparator.comparing((MutableChapter node) -> node.chapter.orderNum())
+        return Comparator.comparing((MutableChapter node) -> node.chapter.sortOrder())
                 .thenComparing(node -> node.chapter.id());
+    }
+
+    private void reorderSiblings(Long courseId, Long parentId, Long targetChapterId, int targetSortOrder) {
+        List<Chapter> siblings = new ArrayList<>(chapterRepository.listSiblings(courseId, parentId));
+        Chapter target = siblings.stream()
+                .filter(chapter -> chapter.id().equals(targetChapterId))
+                .findFirst()
+                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "章节不存在"));
+        siblings.removeIf(chapter -> chapter.id().equals(targetChapterId));
+        int index = Math.max(0, Math.min(targetSortOrder - 1, siblings.size()));
+        siblings.add(index, target);
+        persistSiblingOrder(courseId, siblings);
+    }
+
+    private void normalizeSiblings(Long courseId, Long parentId) {
+        persistSiblingOrder(courseId, chapterRepository.listSiblings(courseId, parentId));
+    }
+
+    private void persistSiblingOrder(Long courseId, List<Chapter> siblings) {
+        for (int index = 0; index < siblings.size(); index++) {
+            int nextOrder = index + 1;
+            if (!Integer.valueOf(nextOrder).equals(siblings.get(index).sortOrder())) {
+                chapterRepository.updateSortOrder(courseId, siblings.get(index).id(), nextOrder);
+            }
+        }
+    }
+
+    private boolean sameParent(Long left, Long right) {
+        return left == null ? right == null : left.equals(right);
     }
 
     private static class MutableChapter {
