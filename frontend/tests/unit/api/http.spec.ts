@@ -1,15 +1,16 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { removeAuthStorage, writeAuthStorage } from '../../../src/api/auth/storage';
 import { configureAuthContext, request } from '../../../src/api/http';
 
 describe('shared API request client', () => {
   afterEach(() => {
     configureAuthContext(null);
     vi.restoreAllMocks();
-    window.localStorage.clear();
+    removeAuthStorage('onlinejudge.authToken');
   });
 
   it('unwraps standard ApiResponse data and injects the bearer token instead of user-controlled headers', async () => {
-    window.localStorage.setItem('onlinejudge.authToken', 'session-token');
+    writeAuthStorage('onlinejudge.authToken', 'session-token');
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(jsonResponse({ ok: true }));
 
     const result = await request<{ ok: boolean }>('/api/v1/example', {
@@ -32,7 +33,7 @@ describe('shared API request client', () => {
   });
 
   it('accepts the legacy success response code used by older backend processes', async () => {
-    window.localStorage.setItem('onlinejudge.authToken', 'session-token');
+    writeAuthStorage('onlinejudge.authToken', 'session-token');
     vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
       ok: true,
       json: async () => ({
@@ -46,7 +47,7 @@ describe('shared API request client', () => {
   });
 
   it('throws the backend message when the standard response is not successful', async () => {
-    window.localStorage.setItem('onlinejudge.authToken', 'session-token');
+    writeAuthStorage('onlinejudge.authToken', 'session-token');
     vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
       ok: false,
       json: async () => ({

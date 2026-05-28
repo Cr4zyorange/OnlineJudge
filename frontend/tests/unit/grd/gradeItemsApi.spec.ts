@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { removeAuthStorage, writeAuthStorage } from '../../../src/api/auth/storage';
 import {
   configureGradeItemAuthContext,
   updateGradeItem,
@@ -9,11 +10,11 @@ describe('gradeItems API client', () => {
   afterEach(() => {
     configureGradeItemAuthContext(null);
     vi.restoreAllMocks();
-    window.localStorage.clear();
+    removeAuthStorage('onlinejudge.authToken');
   });
 
   it('calls documented grade item endpoints with auth context supplied by the integration layer', async () => {
-    window.localStorage.setItem('onlinejudge.authToken', 'teacher-token');
+    writeAuthStorage('onlinejudge.authToken', 'teacher-token');
     configureGradeItemAuthContext(() => ({
       userId: 501,
       userRole: 'TEACHER',
