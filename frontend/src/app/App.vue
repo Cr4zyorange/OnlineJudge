@@ -1,5 +1,6 @@
 <template>
-  <CourseManagementView v-if="viewMode === 'courses'" />
+  <AuthView v-if="viewMode === 'auth'" :initial-mode="authMode" />
+  <CourseManagementView v-else-if="viewMode === 'courses'" />
   <TeacherGradeTableView v-else-if="courseId !== null && page === 'grades'" :course-id="courseId" />
   <GradeItemConfigView v-else-if="courseId !== null" :course-id="courseId" />
   <main v-else class="app-empty-state">
@@ -9,6 +10,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
+import AuthView from '../views/auth/AuthView.vue';
 import CourseManagementView from '../views/crs/CourseManagementView.vue';
 import GradeItemConfigView from '../views/grd/GradeItemConfigView.vue';
 import TeacherGradeTableView from '../views/grd/TeacherGradeTableView.vue';
@@ -25,11 +27,16 @@ const page = computed(() => {
 });
 
 const viewMode = computed(() => {
+  if (pathname.value === '/login' || pathname.value === '/register') {
+    return 'auth';
+  }
   if (pathname.value === '/' || pathname.value === '/courses' || pathname.value === '/courses/') {
     return 'courses';
   }
   return 'grade';
 });
+
+const authMode = computed(() => pathname.value === '/register' ? 'register' : 'login');
 
 const courseId = computed(() => {
   const queryCourseId = parseCourseId(searchParams.value.get('courseId'));
