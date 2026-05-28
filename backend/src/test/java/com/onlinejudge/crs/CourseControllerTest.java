@@ -130,4 +130,106 @@ class CourseControllerTest {
                 .andExpect(jsonPath("$.data.list[0].name", is(currentName)))
                 .andExpect(jsonPath("$.data.list[0].status", is("ACTIVE")));
     }
+
+    @Test
+    void teacherManagesNestedChapterTreeAndStudentCanOnlyReadIt() throws Exception {
+        String response = mockMvc.perform(post("/api/v1/courses")
+                        .header("X-User-Id", "701")
+                        .header("X-User-Role", "TEACHER")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"chapter-course-" + System.nanoTime() + "\",\"enrollmentMode\":\"PUBLIC\",\"status\":\"ACTIVE\"}"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        String courseId = response.replaceAll("(?s).*\"id\":(\\d+).*", "$1");
+
+        String firstChapter = mockMvc.perform(post("/api/v1/courses/" + courseId + "/chapters")
+                        .header("X-User-Id", "701")
+                        .header("X-User-Role", "TEACHER")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"chapterName\":\"课程导论\",\"objective\":\"学习目标\",\"sortOrder\":2,\"visibleStatus\":1,\"chapterType\":1}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.chapterName", is("课程导论")))
+                .andExpect(jsonPath("$.data.sortOrder", is(1)))
+                .andExpect(jsonPath("$.data.objective", is("学习目标")))
+                .andExpect(jsonPath("$.data.visibleStatus", is(1)))
+                .andExpect(jsonPath("$.data.chapterType", is(1)))
+                .andReturn().getResponse().getContentAsString();
+        String chapterId = firstChapter.replaceAll("(?s).*\"id\":(\\d+).*", "$1");
+
+        String secondChapter = mockMvc.perform(post("/api/v1/courses/" + courseId + "/chapters")
+                        .header("X-User-Id", "701")
+                        .header("X-User-Role", "TEACHER")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"chapterName\":\"实践准备\",\"sortOrder\":1,\"visibleStatus\":1,\"chapterType\":1}"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        String secondChapterId = secondChapter.replaceAll("(?s).*\"id\":(\\d+).*", "$1");
+
+        mockMvc.perform(post("/api/v1/courses/" + courseId + "/chapters")
+                        .header("X-User-Id", "701")
+                        .header("X-User-Role", "TEACHER")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"chapterName\":\"环境安装\",\"parentId\":" + chapterId + ",\"sortOrder\":1,\"visibleStatus\":1,\"chapterType\":1}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.parentId", is(Integer.parseInt(chapterId))));
+
+        mockMvc.perform(post("/api/v1/courses/" + courseId + "/join")
+                        .header("X-User-Id", "702")
+                        .header("X-User-Role", "STUDENT"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/v1/courses/" + courseId + "/chapters")
+                        .header("X-User-Id", "702")
+                        .header("X-User-Role", "STUDENT"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].chapterName", is("实践准备")))
+                .andExpect(jsonPath("$.data[0].sortOrder", is(1)))
+                .andExpect(jsonPath("$.data[1].chapterName", is("课程导论")))
+                .andExpect(jsonPath("$.data[1].sortOrder", is(2)))
+                .andExpect(jsonPath("$.data[1].children[0].chapterName", is("环境安装")));
+
+        mockMvc.perform(put("/api/v1/chapters/" + secondChapterId)
+                        .header("X-User-Id", "702")
+                        .header("X-User-Role", "STUDENT")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"chapterName\":\"越权修改\",\"sortOrder\":1,\"visibleStatus\":1,\"chapterType\":1}"))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(put("/api/v1/chapters/" + secondChapterId)
+                        .header("X-User-Id", "701")
+                        .header("X-User-Role", "TEACHER")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"chapterName\":\"实践准备\",\"sortOrder\":2,\"visibleStatus\":0,\"chapterType\":2}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.sortOrder", is(2)))
+                .andExpect(jsonPath("$.data.visibleStatus", is(0)))
+                .andExpect(jsonPath("$.data.chapterType", is(2)));
+
+        mockMvc.perform(get("/api/v1/courses/" + courseId + "/chapters")
+                        .header("X-User-Id", "701")
+                        .header("X-User-Role", "TEACHER"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()", is(2)))
+                .andExpect(jsonPath("$.data[1].chapterName", is("实践准备")))
+                .andExpect(jsonPath("$.data[1].visibleStatus", is(0)));
+
+        mockMvc.perform(get("/api/v1/courses/" + courseId + "/chapters")
+                        .header("X-User-Id", "702")
+                        .header("X-User-Role", "STUDENT"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()", is(1)))
+                .andExpect(jsonPath("$.data[0].chapterName", is("课程导论")))
+                .andExpect(jsonPath("$.data[0].sortOrder", is(1)));
+
+        mockMvc.perform(delete("/api/v1/chapters/" + chapterId)
+                        .header("X-User-Id", "701")
+                        .header("X-User-Role", "TEACHER"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/v1/courses/" + courseId + "/chapters")
+                        .header("X-User-Id", "702")
+                        .header("X-User-Role", "STUDENT"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()", is(0)));
+    }
 }

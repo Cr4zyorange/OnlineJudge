@@ -588,6 +588,106 @@ button:disabled {
   margin-top: 0.85rem;
 }
 
+.chapter-tree {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.chapter-node {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.chapter-row {
+  display: flex;
+  align-items: stretch;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem;
+  border: 1px solid rgba(22, 66, 60, 0.12);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.38);
+  cursor: grab;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+}
+
+.chapter-row:active {
+  cursor: grabbing;
+}
+
+.chapter-row.dragging {
+  border-color: rgba(44, 95, 89, 0.38);
+  box-shadow: 0 10px 24px rgba(22, 66, 60, 0.12);
+  transform: scale(0.995);
+}
+
+.chapter-main {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.85rem;
+  min-width: 0;
+}
+
+.chapter-order {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
+  height: 28px;
+  border-radius: 4px;
+  background: rgba(22, 66, 60, 0.15);
+  color: #16423c;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.chapter-main strong {
+  display: block;
+  margin-bottom: 0.25rem;
+  color: #263d39;
+}
+
+.chapter-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-bottom: 0.35rem;
+}
+
+.chapter-badges span {
+  padding: 0.12rem 0.4rem;
+  border-radius: 4px;
+  background: rgba(44, 95, 89, 0.1);
+  color: #2c5f59;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.chapter-main p {
+  margin: 0;
+  color: #5d716d;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.chapter-actions {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(52px, auto));
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.compact-tree {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.compact-node {
+  display: grid;
+  gap: 0.35rem;
+  color: #344e49;
+}
+
 @media (max-width: 1180px) {
   .container,
   .workspace {
@@ -634,8 +734,15 @@ button:disabled {
   }
 
   .placeholder-actions,
-  .modal-header {
+  .modal-header,
+  .chapter-row,
+  .chapter-actions {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .chapter-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

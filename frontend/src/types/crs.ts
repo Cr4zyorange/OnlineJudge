@@ -36,6 +36,29 @@ export interface CoursePayload {
   status: CourseStatus;
 }
 
+export interface Chapter {
+  id: number;
+  courseId: number;
+  parentId?: number | null;
+  chapterName: string;
+  sortOrder: number;
+  objective?: string;
+  visibleStatus: 0 | 1;
+  chapterType: 1 | 2 | 3;
+  children: Chapter[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ChapterPayload {
+  parentId?: number | null;
+  chapterName: string;
+  sortOrder?: number;
+  objective?: string;
+  visibleStatus?: 0 | 1;
+  chapterType?: 1 | 2 | 3;
+}
+
 export interface ApiResponse<T> {
   code: string;
   message: string;
