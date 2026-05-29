@@ -5,6 +5,7 @@ import java.time.LocalDateTime;
 public record GradePublishRecord(
         long id,
         long courseId,
+        String idempotencyKey,
         String publishScope,
         int publishedCount,
         long publishedBy,
@@ -16,6 +17,7 @@ public record GradePublishRecord(
         return new GradePublishRecord(
                 id,
                 courseId,
+                idempotencyKey,
                 publishScope,
                 publishedCount,
                 publishedBy,

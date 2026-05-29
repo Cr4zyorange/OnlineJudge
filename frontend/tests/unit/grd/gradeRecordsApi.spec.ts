@@ -115,7 +115,7 @@ describe('gradeRecords API client', () => {
       .mockResolvedValueOnce(jsonResponse({ records: [], total: 0, page: 1, size: 20 }));
 
     await publishCourseGrades(101, {
-      publishScope: 'SELECTED_STUDENTS',
+      publishScope: 'PARTIAL_STUDENTS',
       studentIds: [601],
       gradeItemIds: []
     });
@@ -124,7 +124,7 @@ describe('gradeRecords API client', () => {
     expect(fetchMock).toHaveBeenNthCalledWith(1, '/api/v1/courses/101/grades/publish', expect.objectContaining({
       method: 'POST',
       body: JSON.stringify({
-        publishScope: 'SELECTED_STUDENTS',
+        publishScope: 'PARTIAL_STUDENTS',
         studentIds: [601],
         gradeItemIds: []
       })

@@ -227,7 +227,7 @@ class GradeRecordControllerTest {
                         .headers(teacherHeaders("101"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(Map.of(
-                                "publishScope", "SELECTED_STUDENTS",
+                                "publishScope", "PARTIAL_STUDENTS",
                                 "studentIds", java.util.List.of(601),
                                 "gradeItemIds", java.util.List.of()
                         ))))
@@ -253,9 +253,30 @@ class GradeRecordControllerTest {
                         .headers(teacherHeaders("101")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.total").value(1))
-                .andExpect(jsonPath("$.data.records[0].publishScope").value("SELECTED_STUDENTS"))
+                .andExpect(jsonPath("$.data.records[0].publishScope").value("PARTIAL_STUDENTS"))
                 .andExpect(jsonPath("$.data.records[0].publishedBy").value(501))
                 .andExpect(jsonPath("$.data.records[0].notificationStatus").value("SENT"));
+    }
+
+    @Test
+    void teacherCannotPublishPartialItemsUntilItemScopeVisibilityIsImplemented() throws Exception {
+        createGradeItem("实验一", "LAB", 301, "0.40");
+        createGradeItem("作业一", "HWK", 401, "0.60");
+        mockMvc.perform(post("/api/v1/courses/101/grades/sync")
+                        .headers(teacherHeaders("101")))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/v1/courses/101/grades/publish")
+                        .headers(teacherHeaders("101"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "publishScope", "PARTIAL_ITEMS",
+                                "studentIds", java.util.List.of(),
+                                "gradeItemIds", java.util.List.of(1)
+                        ))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("ERR-GRD-04"))
+                .andExpect(jsonPath("$.message").value("部分成绩项发布暂未实现，不能提前公开课程总评"));
     }
 
     private void createGradeItem(String name, String sourceType, long sourceId, String weight) throws Exception {

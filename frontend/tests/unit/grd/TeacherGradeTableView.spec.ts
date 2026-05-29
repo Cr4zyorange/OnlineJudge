@@ -414,7 +414,7 @@ describe('TeacherGradeTableView', () => {
         {
           id: 7,
           courseId: 101,
-          publishScope: 'SELECTED_STUDENTS',
+          publishScope: 'PARTIAL_STUDENTS',
           publishedCount: 1,
           publishedBy: 501,
           publishedAt: '2026-05-29T10:00:00',
@@ -440,7 +440,7 @@ describe('TeacherGradeTableView', () => {
     await flushPromises();
 
     expect(gradeRecordsApi.publishCourseGrades).toHaveBeenCalledWith(101, {
-      publishScope: 'SELECTED_STUDENTS',
+      publishScope: 'PARTIAL_STUDENTS',
       studentIds: [601],
       gradeItemIds: []
     });
@@ -449,8 +449,48 @@ describe('TeacherGradeTableView', () => {
       size: 20
     });
     expect(wrapper.text()).toContain('发布完成：1 名学生可查看成绩，通知状态 SENT');
-    expect(wrapper.text()).toContain('SELECTED_STUDENTS');
+    expect(wrapper.text()).toContain('PARTIAL_STUDENTS');
     expect(wrapper.text()).toContain('PUBLISHED');
+  });
+
+  it('loads publish records when the grade table first renders', async () => {
+    vi.mocked(gradeRecordsApi.listCourseGrades).mockResolvedValueOnce({
+      records: [],
+      total: 0,
+      page: 1,
+      size: 20
+    });
+    vi.mocked(gradeRecordsApi.listGradePublishRecords).mockResolvedValue({
+      records: [
+        {
+          id: 7,
+          courseId: 101,
+          publishScope: 'PARTIAL_STUDENTS',
+          publishedCount: 1,
+          publishedBy: 501,
+          publishedAt: '2026-05-29T10:00:00',
+          notificationStatus: 'SENT',
+          remark: 'students=1;gradeItems=2'
+        }
+      ],
+      total: 1,
+      page: 1,
+      size: 20
+    });
+
+    const wrapper = mount(TeacherGradeTableView, {
+      props: {
+        courseId: 101
+      }
+    });
+    await flushPromises();
+
+    expect(gradeRecordsApi.listGradePublishRecords).toHaveBeenCalledWith(101, {
+      page: 1,
+      size: 20
+    });
+    expect(wrapper.text()).toContain('PARTIAL_STUDENTS');
+    expect(wrapper.text()).toContain('通知 SENT');
   });
 });
 

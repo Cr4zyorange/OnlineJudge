@@ -208,7 +208,7 @@ class GradeRecordServiceTest {
         GradePublishResult result = service.publishCourseGrades(
                 101L,
                 501L,
-                new PublishCourseGradesCommand("SELECTED_STUDENTS", List.of(601L), List.of())
+                new PublishCourseGradesCommand("PARTIAL_STUDENTS", List.of(601L), List.of())
         );
 
         assertThat(result.publishedCount()).isEqualTo(1);
@@ -227,6 +227,88 @@ class GradeRecordServiceTest {
             assertThat(event.targetType()).isEqualTo("GRADE_PUBLISH_RECORD");
             assertThat(event.targetId()).isEqualTo(result.publishId());
         });
+    }
+
+    @Test
+    void repeatedPublishUsesRangeIdempotencyKeyAndDoesNotNotifyAgain() {
+        InMemoryGradeItemRepository itemRepository = new InMemoryGradeItemRepository();
+        InMemoryGradeRecordRepository recordRepository = new InMemoryGradeRecordRepository();
+        InMemoryCourseGradeSummaryRepository summaryRepository = new InMemoryCourseGradeSummaryRepository();
+        InMemoryGradePublishRecordRepository publishRecordRepository = new InMemoryGradePublishRecordRepository();
+        RecordingNotificationEventPublisher eventPublisher = new RecordingNotificationEventPublisher();
+        GradeRecordService service = new GradeRecordService(
+                itemRepository,
+                recordRepository,
+                new InMemoryGradeChangeLogRepository(),
+                publishRecordRepository,
+                summaryRepository,
+                new InMemoryGradeCalculationBatchRepository(),
+                (courseId, sourceType, sourceId) -> List.of(),
+                permissionClient(601L, 602L),
+                eventPublisher
+        );
+        itemRepository.add(item(1L, 101L, "实验一", SourceType.LAB, 301L, "100.00", "1.00"));
+        recordRepository.upsert(record(101L, 601L, 1L, "90.00", "90.00", PublishStatus.UNPUBLISHED, null));
+        recordRepository.upsert(record(101L, 602L, 1L, "88.00", "88.00", PublishStatus.UNPUBLISHED, null));
+        summaryRepository.upsert(summary(101L, 601L, "90.00", PublishStatus.UNPUBLISHED, null));
+        summaryRepository.upsert(summary(101L, 602L, "88.00", PublishStatus.UNPUBLISHED, null));
+
+        GradePublishResult first = service.publishCourseGrades(
+                101L,
+                501L,
+                new PublishCourseGradesCommand("PARTIAL_STUDENTS", List.of(601L), List.of())
+        );
+        GradePublishResult second = service.publishCourseGrades(
+                101L,
+                501L,
+                new PublishCourseGradesCommand("PARTIAL_STUDENTS", List.of(601L), List.of())
+        );
+        GradePublishResult third = service.publishCourseGrades(
+                101L,
+                501L,
+                new PublishCourseGradesCommand("PARTIAL_STUDENTS", List.of(602L), List.of())
+        );
+
+        assertThat(second.publishId()).isEqualTo(first.publishId());
+        assertThat(third.publishId()).isNotEqualTo(first.publishId());
+        assertThat(publishRecordRepository.countByCourseId(101L)).isEqualTo(2);
+        assertThat(eventPublisher.events()).hasSize(2);
+        assertThat(eventPublisher.events().get(0).recipientUserIds()).containsExactly(601L);
+        assertThat(eventPublisher.events().get(1).recipientUserIds()).containsExactly(602L);
+    }
+
+    @Test
+    void coursePublishStoresBoundedScopeRemarkForLargeClasses() {
+        InMemoryGradeItemRepository itemRepository = new InMemoryGradeItemRepository();
+        InMemoryGradeRecordRepository recordRepository = new InMemoryGradeRecordRepository();
+        InMemoryCourseGradeSummaryRepository summaryRepository = new InMemoryCourseGradeSummaryRepository();
+        InMemoryGradePublishRecordRepository publishRecordRepository = new InMemoryGradePublishRecordRepository();
+        List<Long> studentIds = java.util.stream.LongStream.rangeClosed(1, 150)
+                .boxed()
+                .toList();
+        GradeRecordService service = new GradeRecordService(
+                itemRepository,
+                recordRepository,
+                new InMemoryGradeChangeLogRepository(),
+                publishRecordRepository,
+                summaryRepository,
+                new InMemoryGradeCalculationBatchRepository(),
+                (courseId, sourceType, sourceId) -> List.of(),
+                permissionClient(studentIds.toArray(Long[]::new)),
+                new RecordingNotificationEventPublisher()
+        );
+        itemRepository.add(item(1L, 101L, "实验一", SourceType.LAB, 301L, "100.00", "1.00"));
+        for (long studentId : studentIds) {
+            recordRepository.upsert(record(101L, studentId, 1L, "90.00", "90.00", PublishStatus.UNPUBLISHED, null));
+            summaryRepository.upsert(summary(101L, studentId, "90.00", PublishStatus.UNPUBLISHED, null));
+        }
+
+        service.publishCourseGrades(101L, 501L, new PublishCourseGradesCommand("COURSE", List.of(), List.of()));
+
+        GradePublishRecord record = publishRecordRepository.findLatestByCourseId(101L).orElseThrow();
+        assertThat(record.remark()).contains("students=150");
+        assertThat(record.remark()).contains("gradeItems=1");
+        assertThat(record.remark()).hasSizeLessThanOrEqualTo(500);
     }
 
     private CoursePermissionClient permissionClient(Long... studentIds) {
@@ -493,6 +575,14 @@ class GradeRecordServiceTest {
             GradePublishRecord saved = record.withId(nextId++);
             records.add(saved);
             return saved;
+        }
+
+        @Override
+        public Optional<GradePublishRecord> findByIdempotencyKey(long courseId, String idempotencyKey) {
+            return records.stream()
+                    .filter(record -> record.courseId() == courseId)
+                    .filter(record -> idempotencyKey.equals(record.idempotencyKey()))
+                    .findFirst();
         }
 
         @Override

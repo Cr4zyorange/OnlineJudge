@@ -72,6 +72,7 @@ CREATE INDEX IF NOT EXISTS idx_course_grade_publish
 CREATE TABLE IF NOT EXISTS t_grade_publish_record (
     id BIGINT NOT NULL AUTO_INCREMENT,
     course_id BIGINT NOT NULL,
+    idempotency_key VARCHAR(128) NOT NULL,
     publish_scope VARCHAR(30) NOT NULL,
     published_count INT NOT NULL DEFAULT 0,
     published_by BIGINT NOT NULL,
@@ -83,6 +84,9 @@ CREATE TABLE IF NOT EXISTS t_grade_publish_record (
 
 CREATE INDEX IF NOT EXISTS idx_grade_publish_record_course
     ON t_grade_publish_record (course_id, published_at);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uk_grade_publish_record_idempotency
+    ON t_grade_publish_record (course_id, idempotency_key);
 
 CREATE TABLE IF NOT EXISTS t_grade_calculation_batch (
     id BIGINT NOT NULL AUTO_INCREMENT,

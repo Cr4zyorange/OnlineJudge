@@ -25,10 +25,14 @@ import com.onlinejudge.integration.grade.SourceGradeType;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.Comparator;
+import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -206,8 +210,12 @@ public class GradeRecordService {
         if (includedItems.isEmpty()) {
             throw new InvalidGradeRuleException("成绩规则缺失，不能发布课程成绩");
         }
+        String publishScope = normalizePublishScope(command);
         Set<Long> targetStudentIds = normalizePublishStudentIds(courseId, command);
-        Set<Long> targetGradeItemIds = normalizePublishGradeItemIds(command, includedItems);
+        Set<Long> targetGradeItemIds = normalizePublishGradeItemIds(command, includedItems, publishScope);
+        String idempotencyKey = publishIdempotencyKey(courseId, publishScope, targetStudentIds, targetGradeItemIds);
+        java.util.Optional<GradePublishRecord> existingPublishRecord =
+                gradePublishRecordRepository.findByIdempotencyKey(courseId, idempotencyKey);
         Map<Long, List<GradeRecord>> recordsByStudent = gradeRecordRepository.findByCourseId(courseId).stream()
                 .filter(record -> targetStudentIds.contains(record.studentId()))
                 .collect(Collectors.groupingBy(GradeRecord::studentId));
@@ -228,29 +236,20 @@ public class GradeRecordService {
             }
         }
 
-        boolean alreadyPublished = targetStudentIds.stream()
-                .allMatch(studentId -> {
-                    CourseGradeSummary summary = summariesByStudent.get(studentId);
-                    List<GradeRecord> records = recordsByStudent.getOrDefault(studentId, List.of()).stream()
-                            .filter(record -> targetGradeItemIds.contains(record.gradeItemId()))
-                            .toList();
-                    return summary != null
-                            && summary.publishStatus() == PublishStatus.PUBLISHED
-                            && !records.isEmpty()
-                            && records.stream().allMatch(record -> record.publishStatus() == PublishStatus.PUBLISHED);
-                });
-        if (alreadyPublished) {
-            return gradePublishRecordRepository.findLatestByCourseId(courseId)
-                    .map(record -> new GradePublishResult(
-                            record.id(),
-                            record.publishedCount(),
-                            record.publishedAt(),
-                            record.notificationStatus()
-                    ))
-                    .orElseThrow(() -> new GradePublishException("成绩已发布，但缺少发布记录"));
+        if (existingPublishRecord.isPresent() && allTargetRowsPublished(targetStudentIds, targetGradeItemIds, recordsByStudent, summariesByStudent)) {
+            GradePublishRecord record = existingPublishRecord.get();
+            return new GradePublishResult(
+                    record.id(),
+                    record.publishedCount(),
+                    record.publishedAt(),
+                    record.notificationStatus()
+            );
         }
 
         LocalDateTime now = LocalDateTime.now();
+        Set<Long> recipientStudentIds = targetStudentIds.stream()
+                .filter(studentId -> !isStudentFullyPublished(studentId, targetGradeItemIds, recordsByStudent, summariesByStudent))
+                .collect(Collectors.toCollection(LinkedHashSet::new));
         for (long studentId : targetStudentIds) {
             List<GradeRecord> records = recordsByStudent.getOrDefault(studentId, List.of()).stream()
                     .filter(record -> targetGradeItemIds.contains(record.gradeItemId()))
@@ -264,25 +263,28 @@ public class GradeRecordService {
         GradePublishRecord publishRecord = gradePublishRecordRepository.save(new GradePublishRecord(
                 0L,
                 courseId,
-                normalizePublishScope(command),
-                targetStudentIds.size(),
+                idempotencyKey,
+                publishScope,
+                recipientStudentIds.size(),
                 teacherId,
                 now,
                 "SENT",
                 publishRemark(targetStudentIds, targetGradeItemIds)
         ));
-        notificationEventPublisher.publish(new NotificationEvent(
-                "GRD:GRADE_PUBLISHED:PUBLISH:" + publishRecord.id(),
-                "GRADE_PUBLISHED",
-                courseId,
-                List.copyOf(targetStudentIds),
-                "成绩已发布",
-                "课程成绩已发布，请查看成绩明细。",
-                "GRADE_PUBLISH_RECORD",
-                publishRecord.id(),
-                "/courses/" + courseId + "?page=grades",
-                now
-        ));
+        if (!recipientStudentIds.isEmpty()) {
+            notificationEventPublisher.publish(new NotificationEvent(
+                    "GRD:GRADE_PUBLISHED:PUBLISH:" + publishRecord.id(),
+                    "GRADE_PUBLISHED",
+                    courseId,
+                    List.copyOf(recipientStudentIds),
+                    "成绩已发布",
+                    "课程成绩已发布，请查看成绩明细。",
+                    "GRADE_PUBLISH_RECORD",
+                    publishRecord.id(),
+                    "/courses/" + courseId + "?page=grades",
+                    now
+            ));
+        }
         return new GradePublishResult(
                 publishRecord.id(),
                 publishRecord.publishedCount(),
@@ -352,6 +354,32 @@ public class GradeRecordService {
         return record.gradeStatus() != GradeStatus.SCORED && record.gradeStatus() != GradeStatus.ADJUSTED;
     }
 
+    private boolean allTargetRowsPublished(
+            Set<Long> targetStudentIds,
+            Set<Long> targetGradeItemIds,
+            Map<Long, List<GradeRecord>> recordsByStudent,
+            Map<Long, CourseGradeSummary> summariesByStudent
+    ) {
+        return targetStudentIds.stream()
+                .allMatch(studentId -> isStudentFullyPublished(studentId, targetGradeItemIds, recordsByStudent, summariesByStudent));
+    }
+
+    private boolean isStudentFullyPublished(
+            long studentId,
+            Set<Long> targetGradeItemIds,
+            Map<Long, List<GradeRecord>> recordsByStudent,
+            Map<Long, CourseGradeSummary> summariesByStudent
+    ) {
+        CourseGradeSummary summary = summariesByStudent.get(studentId);
+        List<GradeRecord> records = recordsByStudent.getOrDefault(studentId, List.of()).stream()
+                .filter(record -> targetGradeItemIds.contains(record.gradeItemId()))
+                .toList();
+        return summary != null
+                && summary.publishStatus() == PublishStatus.PUBLISHED
+                && !records.isEmpty()
+                && records.stream().allMatch(record -> record.publishStatus() == PublishStatus.PUBLISHED);
+    }
+
     private Set<Long> normalizePublishStudentIds(long courseId, PublishCourseGradesCommand command) {
         String scope = normalizePublishScope(command);
         Set<Long> requestedStudentIds = command.studentIds() == null
@@ -360,7 +388,7 @@ public class GradeRecordService {
                 .filter(studentId -> studentId != null && studentId > 0)
                 .collect(Collectors.toCollection(LinkedHashSet::new));
         Set<Long> targetStudentIds;
-        if ("SELECTED_STUDENTS".equals(scope)) {
+        if ("PARTIAL_STUDENTS".equals(scope)) {
             targetStudentIds = new LinkedHashSet<>(requestedStudentIds);
         } else {
             targetStudentIds = studentIdsForCalculation(courseId);
@@ -375,20 +403,21 @@ public class GradeRecordService {
         return targetStudentIds;
     }
 
-    private Set<Long> normalizePublishGradeItemIds(PublishCourseGradesCommand command, List<GradeItem> includedItems) {
+    private Set<Long> normalizePublishGradeItemIds(
+            PublishCourseGradesCommand command,
+            List<GradeItem> includedItems,
+            String publishScope
+    ) {
         Set<Long> includedItemIds = includedItems.stream()
                 .map(GradeItem::id)
                 .collect(Collectors.toCollection(LinkedHashSet::new));
+        if ("PARTIAL_ITEMS".equals(publishScope)) {
+            throw new GradePublishException("部分成绩项发布暂未实现，不能提前公开课程总评");
+        }
         if (command.gradeItemIds() == null || command.gradeItemIds().isEmpty()) {
             return includedItemIds;
         }
-        Set<Long> requestedItemIds = command.gradeItemIds().stream()
-                .filter(itemId -> itemId != null && itemId > 0)
-                .collect(Collectors.toCollection(LinkedHashSet::new));
-        if (requestedItemIds.isEmpty() || !includedItemIds.containsAll(requestedItemIds)) {
-            throw new InvalidGradeRuleException("成绩项不属于当前课程或未计入总评");
-        }
-        return requestedItemIds;
+        throw new GradePublishException("部分成绩项发布暂未实现，不能提前公开课程总评");
     }
 
     private String normalizePublishScope(PublishCourseGradesCommand command) {
@@ -396,20 +425,32 @@ public class GradeRecordService {
         if (scope.isEmpty()) {
             return "COURSE";
         }
-        if (!"COURSE".equals(scope) && !"ALL".equals(scope) && !"SELECTED_STUDENTS".equals(scope)) {
+        if (!"COURSE".equals(scope) && !"PARTIAL_STUDENTS".equals(scope) && !"PARTIAL_ITEMS".equals(scope)) {
             throw new GradePublishException("成绩发布范围不合法");
         }
         return scope;
     }
 
     private String publishRemark(Set<Long> studentIds, Set<Long> gradeItemIds) {
-        String students = studentIds.stream()
-                .map(String::valueOf)
-                .collect(Collectors.joining(","));
-        String items = gradeItemIds.stream()
-                .map(String::valueOf)
-                .collect(Collectors.joining(","));
-        return "students=" + students + ";gradeItems=" + items;
+        return "students=" + studentIds.size() + ";gradeItems=" + gradeItemIds.size();
+    }
+
+    private String publishIdempotencyKey(
+            long courseId,
+            String publishScope,
+            Set<Long> studentIds,
+            Set<Long> gradeItemIds
+    ) {
+        String rawKey = courseId + "|" + publishScope + "|students="
+                + studentIds.stream().sorted().map(String::valueOf).collect(Collectors.joining(","))
+                + "|gradeItems="
+                + gradeItemIds.stream().sorted().map(String::valueOf).collect(Collectors.joining(","));
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            return HexFormat.of().formatHex(digest.digest(rawKey.getBytes(StandardCharsets.UTF_8)));
+        } catch (NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("SHA-256 digest is unavailable", exception);
+        }
     }
 
     @Transactional

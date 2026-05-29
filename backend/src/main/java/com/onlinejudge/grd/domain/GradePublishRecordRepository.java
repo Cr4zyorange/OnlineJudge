@@ -11,4 +11,6 @@ public interface GradePublishRecordRepository {
     int countByCourseId(long courseId);
 
     Optional<GradePublishRecord> findLatestByCourseId(long courseId);
+
+    Optional<GradePublishRecord> findByIdempotencyKey(long courseId, String idempotencyKey);
 }

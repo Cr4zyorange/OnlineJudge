@@ -132,7 +132,7 @@ export interface GradeRecalculationResult {
   affectedCount: number;
 }
 
-export type GradePublishScope = 'COURSE' | 'ALL' | 'SELECTED_STUDENTS';
+export type GradePublishScope = 'COURSE' | 'PARTIAL_STUDENTS' | 'PARTIAL_ITEMS';
 
 export interface GradePublishPayload {
   publishScope: GradePublishScope;

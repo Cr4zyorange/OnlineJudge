@@ -240,17 +240,17 @@
           </li>
         </ul>
       </div>
+    </section>
 
-      <div class="grade-table__logs" data-testid="publish-record-list">
-        <h2>发布记录</h2>
-        <p v-if="publishRecordsLoading">加载中</p>
-        <p v-else-if="publishRecords.length === 0">暂无发布记录</p>
-        <ul v-else>
-          <li v-for="record in publishRecords" :key="record.id">
-            {{ record.publishScope }}：{{ record.publishedCount }} 名学生，通知 {{ record.notificationStatus }}
-          </li>
-        </ul>
-      </div>
+    <section class="grade-table__list" data-testid="publish-record-list" aria-label="成绩发布记录">
+      <h2>发布记录</h2>
+      <p v-if="publishRecordsLoading">加载中</p>
+      <p v-else-if="publishRecords.length === 0">暂无发布记录</p>
+      <ul v-else class="grade-table__publish-records">
+        <li v-for="record in publishRecords" :key="record.id">
+          {{ record.publishScope }}：{{ record.publishedCount }} 名学生，通知 {{ record.notificationStatus }}
+        </li>
+      </ul>
     </section>
   </main>
 </template>
@@ -299,7 +299,9 @@ const publishRecordsLoading = ref(false);
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / size.value)));
 const selectedRecord = computed(() => selectedRow.value?.records.find((record) => record.id === selectedRecordId.value) ?? null);
 
-onMounted(loadRows);
+onMounted(async () => {
+  await Promise.all([loadRows(), refreshPublishRecords()]);
+});
 
 async function loadRows() {
   loading.value = true;
@@ -438,7 +440,7 @@ async function publishSelectedStudent() {
   errorMessage.value = '';
   try {
     const result = await publishCourseGrades(props.courseId, {
-      publishScope: 'SELECTED_STUDENTS',
+      publishScope: 'PARTIAL_STUDENTS',
       studentIds: [selectedRow.value.studentId],
       gradeItemIds: []
     });
@@ -658,7 +660,8 @@ td {
 }
 
 .grade-table__detail-heading h2,
-.grade-table__logs h2 {
+.grade-table__logs h2,
+.grade-table__list h2 {
   font-size: 16px;
   margin: 0;
 }
@@ -671,6 +674,13 @@ td {
 }
 
 .grade-table__logs ul {
+  display: grid;
+  gap: 8px;
+  margin: 8px 0 0;
+  padding-left: 18px;
+}
+
+.grade-table__publish-records {
   display: grid;
   gap: 8px;
   margin: 8px 0 0;
