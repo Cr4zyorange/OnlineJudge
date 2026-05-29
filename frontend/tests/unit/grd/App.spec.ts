@@ -4,10 +4,12 @@ import App from '../../../src/app/App.vue';
 import * as courseApi from '../../../src/api/crs/courses';
 import * as gradeItemApi from '../../../src/api/grd/gradeItems';
 import * as gradeRecordsApi from '../../../src/api/grd/gradeRecords';
+import * as labApi from '../../../src/api/lab/labs';
 
 vi.mock('../../../src/api/grd/gradeItems');
 vi.mock('../../../src/api/grd/gradeRecords');
 vi.mock('../../../src/api/crs/courses');
+vi.mock('../../../src/api/lab/labs');
 
 describe('App', () => {
   const originalLocation = window.location;
@@ -88,6 +90,41 @@ describe('App', () => {
 
     expect(gradeRecordsApi.listCourseGrades).toHaveBeenCalledWith(505, { page: 1, size: 20 });
     expect(gradeItemApi.listGradeItems).not.toHaveBeenCalled();
+  });
+
+  it('routes logged-in students from the lab detail path to the student lab page', async () => {
+    window.localStorage.setItem('onlinejudge.userRole', 'STUDENT');
+    vi.mocked(labApi.listLabs).mockResolvedValueOnce([]);
+    vi.mocked(labApi.getLabDetail).mockResolvedValueOnce({
+      id: 7,
+      courseId: 101,
+      chapterId: null,
+      title: '学生实验详情',
+      description: '从登录角色进入学生提交页',
+      status: 'PUBLISHED',
+      deadline: '2026-06-30T23:59:59',
+      maxScore: 100,
+      attachmentIds: [],
+      allowedLanguages: 'java,python',
+      evaluationMode: 'DOCKER_IO',
+      autoEvaluate: true,
+      reportRequired: false,
+      timeLimitMs: 60000,
+      memoryLimitKb: 262144,
+      deleted: false,
+      testcases: []
+    });
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: new URL('http://localhost/courses/101/labs/7')
+    });
+
+    const wrapper = mount(App);
+    await flushPromises();
+
+    expect(labApi.getLabDetail).toHaveBeenCalledWith(7);
+    expect(labApi.listLabs).not.toHaveBeenCalled();
+    expect(wrapper.text()).toContain('学生实验详情');
   });
 
   it('does not load grade items without an active course context', async () => {

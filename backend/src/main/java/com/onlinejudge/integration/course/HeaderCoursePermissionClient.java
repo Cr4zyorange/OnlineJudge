@@ -8,6 +8,7 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedHashSet;
 import java.util.List;
 
 @Component
@@ -105,7 +106,7 @@ public class HeaderCoursePermissionClient implements CoursePermissionClient {
                 return List.of();
             }
         }
-        return List.copyOf(studentIds);
+        return List.copyOf(new LinkedHashSet<>(studentIds));
     }
 
     private HttpServletRequest currentRequest() {

@@ -1,6 +1,7 @@
 package com.onlinejudge.common.evaluation;
 
 public enum EvaluationStatus {
+    NONE,
     PENDING,
     RUNNING,
     ACCEPTED,

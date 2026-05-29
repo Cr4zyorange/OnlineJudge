@@ -11,6 +11,14 @@ describe('shared API request client', () => {
 
   it('unwraps standard ApiResponse data and injects the bearer token instead of user-controlled headers', async () => {
     writeAuthStorage('onlinejudge.authToken', 'session-token');
+    configureAuthContext(() => ({
+      userId: 501,
+      username: 'teacher01',
+      role: 'TEACHER',
+      permissions: ['grade:manage'],
+      courseIds: [101],
+      manageableCourseIds: [101]
+    }));
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(jsonResponse({ ok: true }));
 
     const result = await request<{ ok: boolean }>('/api/v1/example', {
@@ -32,8 +40,37 @@ describe('shared API request client', () => {
     }));
   });
 
+  it('keeps bearer auth for multipart submissions without forcing a json content type', async () => {
+    writeAuthStorage('onlinejudge.authToken', 'student-token');
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(jsonResponse({ submissionId: 99 }));
+    const formData = new FormData();
+    formData.append('language', 'python');
+    formData.append('file', new File(['print(1)'], 'main.py', { type: 'text/x-python' }));
+
+    const result = await request<{ submissionId: number }>('/api/v1/labs/7/submissions', {
+      method: 'POST',
+      body: formData
+    });
+
+    expect(result).toEqual({ submissionId: 99 });
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/labs/7/submissions', expect.objectContaining({
+      method: 'POST',
+      headers: {
+        Authorization: 'Bearer student-token'
+      },
+      body: formData
+    }));
+  });
+
   it('accepts the legacy success response code used by older backend processes', async () => {
     writeAuthStorage('onlinejudge.authToken', 'session-token');
+    configureAuthContext(() => ({
+      userId: 501,
+      role: 'TEACHER',
+      permissions: [],
+      courseIds: '*',
+      manageableCourseIds: '*'
+    }));
     vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
       ok: true,
       json: async () => ({
@@ -48,6 +85,13 @@ describe('shared API request client', () => {
 
   it('throws the backend message when the standard response is not successful', async () => {
     writeAuthStorage('onlinejudge.authToken', 'session-token');
+    configureAuthContext(() => ({
+      userId: 601,
+      role: 'STUDENT',
+      permissions: [],
+      courseIds: [101],
+      manageableCourseIds: []
+    }));
     vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
       ok: false,
       json: async () => ({

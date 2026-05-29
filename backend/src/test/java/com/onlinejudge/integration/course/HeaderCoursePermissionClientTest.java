@@ -21,6 +21,7 @@ class HeaderCoursePermissionClientTest {
         request.addHeader("X-User-Role", "TEACHER");
         request.addHeader("X-Course-Ids", "101, 202");
         request.addHeader("X-Manageable-Course-Ids", "202");
+        request.addHeader("X-Course-Student-Ids", "7001, 7002, 7002");
         bind(request);
 
         HeaderCoursePermissionClient client = new HeaderCoursePermissionClient(true);
@@ -31,6 +32,7 @@ class HeaderCoursePermissionClientTest {
         assertThat(client.canManageCourse(202L, 501L)).isTrue();
         assertThat(client.canManageCourseGrade(202L, 501L)).isTrue();
         assertThat(client.canViewCourse(303L, 501L)).isFalse();
+        assertThat(client.listCourseStudentIds(101L)).containsExactly(7001L, 7002L);
     }
 
     @Test

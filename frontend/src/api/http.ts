@@ -34,7 +34,7 @@ export async function request<T>(url: string, options: RequestOptions = {}): Pro
   const response = await fetch(url, {
     method: options.method ?? 'GET',
     headers: {
-      ...jsonHeaders(options.auth !== false),
+      ...requestHeaders(options.auth !== false, options.body),
       ...options.headers
     },
     body: formatBody(options.body)
@@ -42,24 +42,26 @@ export async function request<T>(url: string, options: RequestOptions = {}): Pro
   return unwrap<T>(response);
 }
 
-export async function publicRequest<T>(url: string, options: Omit<RequestOptions, 'auth'> = {}): Promise<T> {
-  return request<T>(url, { ...options, auth: false });
+export function publicRequest<T>(url: string, options: Omit<RequestOptions, 'auth'> = {}): Promise<T> {
+  return request<T>(url, {
+    ...options,
+    auth: false
+  });
 }
 
-function jsonHeaders(requireAuth: boolean): Record<string, string> {
-  if (!requireAuth) {
-    return {
-      'Content-Type': 'application/json'
-    };
+function requestHeaders(requireAuth: boolean, body: unknown) {
+  const headers: Record<string, string> = {};
+  if (!(body instanceof FormData)) {
+    headers['Content-Type'] = 'application/json';
   }
-  const token = storedToken();
-  if (token) {
-    return {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`
-    };
+  if (requireAuth) {
+    const token = storedToken();
+    if (!token) {
+      throw new Error('当前登录态缺失，无法访问接口');
+    }
+    headers.Authorization = `Bearer ${token}`;
   }
-  throw new Error('当前登录态缺失，无法访问接口');
+  return headers;
 }
 
 function storedToken() {
@@ -95,6 +97,9 @@ function resolveAuthContext(): AuthContext {
 function formatBody(body: unknown) {
   if (body === undefined) {
     return undefined;
+  }
+  if (body instanceof FormData) {
+    return body;
   }
   return typeof body === 'string' ? body : JSON.stringify(body);
 }

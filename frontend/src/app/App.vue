@@ -1,6 +1,15 @@
 <template>
   <AuthView v-if="viewMode === 'auth'" :initial-mode="authMode" />
   <CourseManagementView v-else-if="viewMode === 'courses'" />
+  <LabTeacherView
+    v-else-if="viewMode === 'lab' && labRole === 'teacher' && courseId !== null"
+    :course-id="courseId"
+  />
+  <LabStudentView
+    v-else-if="viewMode === 'lab' && labRole === 'student' && courseId !== null && labId !== null"
+    :course-id="courseId"
+    :lab-id="labId"
+  />
   <TeacherGradeTableView v-else-if="courseId !== null && page === 'grades'" :course-id="courseId" />
   <GradeItemConfigView v-else-if="courseId !== null" :course-id="courseId" />
   <main v-else class="app-empty-state">
@@ -13,6 +22,8 @@ import { computed } from 'vue';
 import AuthView from '../views/auth/AuthView.vue';
 import CourseManagementView from '../views/crs/CourseManagementView.vue';
 import GradeItemConfigView from '../views/grd/GradeItemConfigView.vue';
+import LabStudentView from '../views/lab/LabStudentView.vue';
+import LabTeacherView from '../views/lab/LabTeacherView.vue';
 import TeacherGradeTableView from '../views/grd/TeacherGradeTableView.vue';
 
 const pathname = computed(() => window.location.pathname);
@@ -33,10 +44,23 @@ const viewMode = computed(() => {
   if (pathname.value === '/' || pathname.value === '/courses' || pathname.value === '/courses/') {
     return 'courses';
   }
+  if (pathname.value.includes('/labs')) {
+    return 'lab';
+  }
   return 'grade';
 });
 
 const authMode = computed(() => pathname.value === '/register' ? 'register' : 'login');
+
+const labRole = computed(() => {
+  const queryRole = searchParams.value.get('role')?.toLowerCase();
+  if (queryRole === 'student' || queryRole === 'teacher') {
+    return queryRole;
+  }
+  const storedRole = window.localStorage.getItem('onlinejudge.userRole')
+    ?? window.localStorage.getItem('onlinejudge.role');
+  return storedRole === 'STUDENT' ? 'student' : 'teacher';
+});
 
 const courseId = computed(() => {
   const queryCourseId = parseCourseId(searchParams.value.get('courseId'));
@@ -45,6 +69,15 @@ const courseId = computed(() => {
   }
   const pathCourseId = window.location.pathname.match(/\/courses\/(\d+)(?:\/|$)/)?.[1] ?? null;
   return parseCourseId(pathCourseId);
+});
+
+const labId = computed(() => {
+  const queryLabId = parseCourseId(searchParams.value.get('labId'));
+  if (queryLabId !== null) {
+    return queryLabId;
+  }
+  const pathLabId = window.location.pathname.match(/\/labs\/(\d+)(?:\/|$)/)?.[1] ?? null;
+  return parseCourseId(pathLabId);
 });
 
 function parseCourseId(value: string | null) {

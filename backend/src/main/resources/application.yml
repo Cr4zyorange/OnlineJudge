@@ -7,6 +7,10 @@ spring:
   sql:
     init:
       mode: always
+      schema-locations:
+        - file:../database/migrations/20260525_01_create_grd_grade_item.sql
+        - file:../database/migrations/20260525_02_create_lab_experiment.sql
+        - file:../database/migrations/20260526_01_create_lab_submission.sql
 
 server:
   port: 8080
