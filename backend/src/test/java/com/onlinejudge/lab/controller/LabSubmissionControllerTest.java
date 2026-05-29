@@ -169,6 +169,39 @@ class LabSubmissionControllerTest {
                 .andExpect(jsonPath("$.message", containsString("无课程访问权限")));
     }
 
+    @Test
+    void teacherCannotSubmitStudentLabEndpoint() throws Exception {
+        long labId = createPublishedLab(506L, true, LocalDateTime.now().plusDays(3));
+
+        mockMvc.perform(multipart("/api/v1/labs/{labId}/submissions", labId)
+                        .headers(teacherHeaders("506", "506", "601"))
+                        .param("code", "print('teacher submit')")
+                        .param("language", "python"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("LAB-403-01"))
+                .andExpect(jsonPath("$.message", containsString("学生")));
+    }
+
+    @Test
+    void submissionRejectsUnsupportedSourceFileType() throws Exception {
+        long labId = createPublishedLab(507L, false, LocalDateTime.now().plusDays(3));
+
+        MockMultipartFile invalidFile = new MockMultipartFile(
+                "file",
+                "notes.txt",
+                "text/plain",
+                "not source code".getBytes()
+        );
+
+        mockMvc.perform(multipart("/api/v1/labs/{labId}/submissions", labId)
+                        .file(invalidFile)
+                        .headers(studentHeaders("507"))
+                        .param("language", "python"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("LAB-400-06"))
+                .andExpect(jsonPath("$.message", containsString("文件")));
+    }
+
     private long createPublishedLab(long courseId, boolean autoEvaluate, LocalDateTime deadline) throws Exception {
         Map<String, Object> payload = Map.ofEntries(
                 entry("title", "学生提交实验"),

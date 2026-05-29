@@ -18,11 +18,30 @@ import java.io.ByteArrayInputStream;
 import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.TreeSet;
 
 @Service
 public class LabSubmissionService {
     private static final long MAX_UPLOAD_SIZE_BYTES = 5L * 1024L * 1024L;
+    private static final Set<String> GENERIC_SOURCE_CONTENT_TYPES = Set.of(
+            "application/octet-stream",
+            "text/plain"
+    );
+    private static final Map<String, Set<String>> SOURCE_FILE_EXTENSIONS = Map.of(
+            "java", Set.of("java"),
+            "python", Set.of("py"),
+            "cpp", Set.of("cpp", "cc", "cxx"),
+            "c", Set.of("c")
+    );
+    private static final Map<String, Set<String>> SOURCE_FILE_CONTENT_TYPES = Map.of(
+            "java", Set.of("text/x-java-source", "text/java", "application/java", "application/x-java"),
+            "python", Set.of("text/x-python", "application/x-python-code"),
+            "cpp", Set.of("text/x-c++src", "text/x-c++source", "application/x-c++src"),
+            "c", Set.of("text/x-csrc", "text/x-c")
+    );
 
     private final LabExperimentRepository labExperimentRepository;
     private final LabSubmissionRepository labSubmissionRepository;
@@ -92,9 +111,6 @@ public class LabSubmissionService {
         if (!coursePermissionClient.canViewCourse(experiment.courseId(), studentId)) {
             throw new LabPermissionException("无课程访问权限");
         }
-        if (coursePermissionClient.canManageCourse(experiment.courseId(), studentId)) {
-            return;
-        }
         if (experiment.status() != LabExperimentStatus.PUBLISHED) {
             throw new LabStateException("当前实验状态不允许提交");
         }
@@ -121,8 +137,11 @@ public class LabSubmissionService {
                 throw new LabSubmissionValidationException("LAB-400-04", "编程语言不在实验允许范围内");
             }
         }
-        if (hasFile(command) && command.fileBytes().length > MAX_UPLOAD_SIZE_BYTES) {
-            throw new LabSubmissionValidationException("LAB-400-06", "提交文件大小超过系统限制");
+        if (hasFile(command)) {
+            validateSourceFile(command, normalizedLanguage);
+            if (command.fileBytes().length > MAX_UPLOAD_SIZE_BYTES) {
+                throw new LabSubmissionValidationException("LAB-400-06", "提交文件大小超过系统限制");
+            }
         }
     }
 
@@ -147,5 +166,58 @@ public class LabSubmissionService {
             throw new LabSubmissionValidationException("LAB-400-04", "编程语言不在实验允许范围内");
         }
         return language.trim().toLowerCase(Locale.ROOT);
+    }
+
+    private void validateSourceFile(CreateLabSubmissionCommand command, String normalizedLanguage) {
+        String fileName = command.fileName() == null ? "" : command.fileName().trim();
+        String extension = extractExtension(fileName);
+        Set<String> allowedExtensions = SOURCE_FILE_EXTENSIONS.get(normalizedLanguage);
+        if (allowedExtensions == null || !allowedExtensions.contains(extension)) {
+            throw new LabSubmissionValidationException(
+                    "LAB-400-06",
+                    "提交文件格式不合法，仅支持 " + formatExtensions(allowedExtensions) + " 源码文件"
+            );
+        }
+
+        String contentType = normalizeContentType(command.fileContentType());
+        if (contentType != null && !isSupportedContentType(normalizedLanguage, contentType)) {
+            throw new LabSubmissionValidationException(
+                    "LAB-400-06",
+                    "提交文件类型不合法，仅支持 " + formatExtensions(allowedExtensions) + " 源码文件"
+            );
+        }
+    }
+
+    private String extractExtension(String fileName) {
+        int separatorIndex = fileName.lastIndexOf('.');
+        if (separatorIndex < 0 || separatorIndex == fileName.length() - 1) {
+            return "";
+        }
+        return fileName.substring(separatorIndex + 1).toLowerCase(Locale.ROOT);
+    }
+
+    private String normalizeContentType(String contentType) {
+        if (contentType == null || contentType.isBlank()) {
+            return null;
+        }
+        return contentType.split(";", 2)[0].trim().toLowerCase(Locale.ROOT);
+    }
+
+    private boolean isSupportedContentType(String normalizedLanguage, String contentType) {
+        if (GENERIC_SOURCE_CONTENT_TYPES.contains(contentType)) {
+            return true;
+        }
+        return SOURCE_FILE_CONTENT_TYPES.getOrDefault(normalizedLanguage, Set.of()).contains(contentType);
+    }
+
+    private String formatExtensions(Set<String> extensions) {
+        if (extensions == null || extensions.isEmpty()) {
+            return "受支持";
+        }
+        TreeSet<String> sortedExtensions = new TreeSet<>(extensions);
+        return sortedExtensions.stream()
+                .map(extension -> "." + extension)
+                .reduce((left, right) -> left + "、" + right)
+                .orElse("受支持");
     }
 }

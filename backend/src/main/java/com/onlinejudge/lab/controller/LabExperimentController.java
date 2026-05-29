@@ -7,6 +7,7 @@ import com.onlinejudge.integration.course.CoursePermissionClient;
 import com.onlinejudge.lab.domain.LabExperiment;
 import com.onlinejudge.lab.domain.LabExperimentStatus;
 import com.onlinejudge.lab.service.LabExperimentService;
+import com.onlinejudge.lab.service.LabPermissionException;
 import com.onlinejudge.lab.service.LabSubmissionService;
 import jakarta.validation.Valid;
 import org.springframework.http.MediaType;
@@ -124,6 +125,7 @@ public class LabExperimentController {
             @RequestParam(required = false) String language,
             @RequestParam(required = false) MultipartFile file
     ) throws IOException {
+        requireStudent(currentUser);
         LabSubmissionResponse submission = LabSubmissionResponse.from(labSubmissionService.submit(
                 labId,
                 currentUser.id(),
@@ -148,6 +150,12 @@ public class LabExperimentController {
     private void requireTeacher(CurrentUser currentUser) {
         if (!currentUser.hasRole("TEACHER") && !currentUser.hasRole("ADMIN")) {
             throw new AccessDeniedException("教师无实验管理权限");
+        }
+    }
+
+    private void requireStudent(CurrentUser currentUser) {
+        if (!currentUser.hasRole("STUDENT")) {
+            throw new LabPermissionException("仅学生可以提交实验");
         }
     }
 }

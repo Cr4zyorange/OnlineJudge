@@ -116,6 +116,51 @@ describe('LabStudentView', () => {
     expect(wrapper.text()).toContain('请填写代码或上传文件');
   });
 
+  it('blocks unsupported upload files before calling the submit api', async () => {
+    vi.mocked(labApi.getLabDetail).mockResolvedValueOnce({
+      id: 10,
+      courseId: 101,
+      chapterId: null,
+      title: '实验十',
+      description: '文件格式校验',
+      status: 'PUBLISHED',
+      deadline: '2026-06-30T23:59:59',
+      maxScore: 100,
+      attachmentIds: [],
+      allowedLanguages: 'java,python',
+      evaluationMode: 'DOCKER_IO',
+      autoEvaluate: true,
+      reportRequired: false,
+      timeLimitMs: 60000,
+      memoryLimitKb: 262144,
+      deleted: false,
+      testcases: []
+    });
+
+    const wrapper = mount(LabStudentView, {
+      props: {
+        courseId: 101,
+        labId: 10
+      }
+    });
+    await flushPromises();
+
+    const invalidFile = new File(['plain text'], 'notes.txt', { type: 'text/plain' });
+    const fileInput = wrapper.get('[name="file"]');
+    Object.defineProperty(fileInput.element, 'files', {
+      value: [invalidFile],
+      configurable: true
+    });
+
+    await fileInput.trigger('change');
+    await wrapper.get('[name="language"]').setValue('python');
+    await wrapper.get('form').trigger('submit');
+    await flushPromises();
+
+    expect(labApi.submitLab).not.toHaveBeenCalled();
+    expect(wrapper.text()).toContain('仅支持');
+  });
+
   it('surfaces backend submission errors on the page', async () => {
     vi.mocked(labApi.getLabDetail).mockResolvedValueOnce({
       id: 9,

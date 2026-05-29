@@ -85,6 +85,14 @@ import { computed, onMounted, ref } from 'vue';
 import { getLabDetail, submitLab } from '../../api/lab/labs';
 import type { LabExperimentDetail, LabSubmissionSummary } from '../../types/lab';
 
+const MAX_UPLOAD_SIZE_BYTES = 5 * 1024 * 1024;
+const ALLOWED_FILE_EXTENSIONS: Record<string, string[]> = {
+  java: ['java'],
+  python: ['py'],
+  cpp: ['cpp', 'cc', 'cxx'],
+  c: ['c']
+};
+
 const props = defineProps<{
   courseId: number;
   labId: number;
@@ -159,6 +167,19 @@ function validateForm() {
   if (!code.value.trim() && !selectedFile.value) {
     errors.push('请填写代码或上传文件');
   }
+  if (selectedFile.value) {
+    const extension = getFileExtension(selectedFile.value.name);
+    const allowedExtensions = ALLOWED_FILE_EXTENSIONS[language.value] ?? [];
+    if (!allowedExtensions.includes(extension)) {
+      const readableExtensions = allowedExtensions.length > 0
+        ? allowedExtensions.map((item) => `.${item}`).join('、')
+        : '当前语言对应的源码文件';
+      errors.push(`仅支持 ${readableExtensions} 文件`);
+    }
+    if (selectedFile.value.size > MAX_UPLOAD_SIZE_BYTES) {
+      errors.push('上传文件大小不能超过 5MB');
+    }
+  }
   return errors.join('；');
 }
 
@@ -177,6 +198,14 @@ function resetForm() {
 
 function formatDateTime(value: string) {
   return value.replace('T', ' ').slice(0, 16);
+}
+
+function getFileExtension(fileName: string) {
+  const separatorIndex = fileName.lastIndexOf('.');
+  if (separatorIndex < 0 || separatorIndex === fileName.length - 1) {
+    return '';
+  }
+  return fileName.slice(separatorIndex + 1).toLowerCase();
 }
 </script>
 
