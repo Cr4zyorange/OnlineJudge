@@ -4,6 +4,9 @@ import type {
   GradeAdjustmentResult,
   FinalScoreAdjustmentResult,
   GradeChangeLogPage,
+  GradePublishPayload,
+  GradePublishRecordPage,
+  GradePublishResult,
   GradeRecalculationResult,
   GradeStatus,
   GradeSyncResult,
@@ -35,6 +38,11 @@ export interface GradeChangeLogQuery {
   size?: number;
 }
 
+export interface GradePublishRecordQuery {
+  page?: number;
+  size?: number;
+}
+
 let authContextProvider: GradeRecordAuthContextProvider | null = null;
 
 export function configureGradeRecordAuthContext(provider: GradeRecordAuthContextProvider | null) {
@@ -62,6 +70,16 @@ export async function syncSourceGrades(courseId: number): Promise<GradeSyncResul
 export async function recalculateCourseGrades(courseId: number): Promise<GradeRecalculationResult> {
   return request<GradeRecalculationResult>(`/api/v1/courses/${courseId}/grades/recalculate`, {
     method: 'POST'
+  });
+}
+
+export async function publishCourseGrades(
+  courseId: number,
+  payload: GradePublishPayload
+): Promise<GradePublishResult> {
+  return request<GradePublishResult>(`/api/v1/courses/${courseId}/grades/publish`, {
+    method: 'POST',
+    body: JSON.stringify(payload)
   });
 }
 
@@ -117,6 +135,20 @@ export async function listGradeChangeLogs(
     ? `/api/v1/courses/${courseId}/grade-change-logs?${queryString}`
     : `/api/v1/courses/${courseId}/grade-change-logs`;
   return request<GradeChangeLogPage>(url);
+}
+
+export async function listGradePublishRecords(
+  courseId: number,
+  query: GradePublishRecordQuery = {}
+): Promise<GradePublishRecordPage> {
+  const params = new URLSearchParams();
+  appendParam(params, 'page', query.page);
+  appendParam(params, 'size', query.size);
+  const queryString = params.toString();
+  const url = queryString
+    ? `/api/v1/courses/${courseId}/grade-publish-records?${queryString}`
+    : `/api/v1/courses/${courseId}/grade-publish-records`;
+  return request<GradePublishRecordPage>(url);
 }
 
 function appendParam(params: URLSearchParams, name: string, value: string | number | undefined) {

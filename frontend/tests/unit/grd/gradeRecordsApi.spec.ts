@@ -6,6 +6,8 @@ import {
   adjustCourseFinalScore,
   listGradeChangeLogs,
   listCourseGrades,
+  listGradePublishRecords,
+  publishCourseGrades,
   type GradeTableQuery,
   recalculateCourseGrades,
   syncSourceGrades
@@ -97,6 +99,37 @@ describe('gradeRecords API client', () => {
       })
     }));
     expect(fetchMock).toHaveBeenNthCalledWith(3, '/api/v1/courses/101/grade-change-logs?studentId=601&gradeItemId=1&page=1&size=20', expect.objectContaining({
+      method: 'GET'
+    }));
+  });
+
+  it('calls documented grade publish and publish record endpoints', async () => {
+    writeAuthStorage('onlinejudge.authToken', 'teacher-token');
+    configureGradeRecordAuthContext(() => ({
+      userId: 501,
+      userRole: 'TEACHER',
+      manageableCourseIds: [101]
+    }));
+    const fetchMock = vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(jsonResponse({ publishId: 7, publishedCount: 1, notificationStatus: 'SENT' }))
+      .mockResolvedValueOnce(jsonResponse({ records: [], total: 0, page: 1, size: 20 }));
+
+    await publishCourseGrades(101, {
+      publishScope: 'SELECTED_STUDENTS',
+      studentIds: [601],
+      gradeItemIds: []
+    });
+    await listGradePublishRecords(101, { page: 1, size: 20 });
+
+    expect(fetchMock).toHaveBeenNthCalledWith(1, '/api/v1/courses/101/grades/publish', expect.objectContaining({
+      method: 'POST',
+      body: JSON.stringify({
+        publishScope: 'SELECTED_STUDENTS',
+        studentIds: [601],
+        gradeItemIds: []
+      })
+    }));
+    expect(fetchMock).toHaveBeenNthCalledWith(2, '/api/v1/courses/101/grade-publish-records?page=1&size=20', expect.objectContaining({
       method: 'GET'
     }));
   });

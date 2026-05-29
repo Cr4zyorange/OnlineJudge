@@ -361,6 +361,97 @@ describe('TeacherGradeTableView', () => {
     expect(wrapper.text()).toContain('总评调整完成：84.00 -> 88.00');
     expect(wrapper.text()).toContain('ADJUSTED');
   });
+
+  it('publishes selected student grades and renders the publish record', async () => {
+    vi.mocked(gradeRecordsApi.listCourseGrades)
+      .mockResolvedValueOnce({
+        records: [
+          {
+            studentId: 601,
+            summary: {
+              id: 5,
+              courseId: 101,
+              studentId: 601,
+              finalScore: '84.00',
+              finalStatus: 'CALCULATED',
+              publishStatus: 'UNPUBLISHED'
+            },
+            records: []
+          }
+        ],
+        total: 1,
+        page: 1,
+        size: 20
+      })
+      .mockResolvedValueOnce({
+        records: [
+          {
+            studentId: 601,
+            summary: {
+              id: 5,
+              courseId: 101,
+              studentId: 601,
+              finalScore: '84.00',
+              finalStatus: 'CALCULATED',
+              publishStatus: 'PUBLISHED',
+              publishedAt: '2026-05-29T10:00:00'
+            },
+            records: []
+          }
+        ],
+        total: 1,
+        page: 1,
+        size: 20
+      });
+    vi.mocked(gradeRecordsApi.publishCourseGrades).mockResolvedValue({
+      publishId: 7,
+      publishedCount: 1,
+      publishedAt: '2026-05-29T10:00:00',
+      notificationStatus: 'SENT'
+    });
+    vi.mocked(gradeRecordsApi.listGradePublishRecords).mockResolvedValue({
+      records: [
+        {
+          id: 7,
+          courseId: 101,
+          publishScope: 'SELECTED_STUDENTS',
+          publishedCount: 1,
+          publishedBy: 501,
+          publishedAt: '2026-05-29T10:00:00',
+          notificationStatus: 'SENT',
+          remark: 'students=601'
+        }
+      ],
+      total: 1,
+      page: 1,
+      size: 20
+    });
+
+    const wrapper = mount(TeacherGradeTableView, {
+      props: {
+        courseId: 101
+      }
+    });
+    await flushPromises();
+
+    await wrapper.get('[data-testid="detail-student-601"]').trigger('click');
+    await flushPromises();
+    await wrapper.get('[data-testid="publish-selected-student"]').trigger('click');
+    await flushPromises();
+
+    expect(gradeRecordsApi.publishCourseGrades).toHaveBeenCalledWith(101, {
+      publishScope: 'SELECTED_STUDENTS',
+      studentIds: [601],
+      gradeItemIds: []
+    });
+    expect(gradeRecordsApi.listGradePublishRecords).toHaveBeenCalledWith(101, {
+      page: 1,
+      size: 20
+    });
+    expect(wrapper.text()).toContain('发布完成：1 名学生可查看成绩，通知状态 SENT');
+    expect(wrapper.text()).toContain('SELECTED_STUDENTS');
+    expect(wrapper.text()).toContain('PUBLISHED');
+  });
 });
 
 async function flushPromises() {

@@ -69,6 +69,21 @@ CREATE TABLE IF NOT EXISTS t_course_grade_summary (
 CREATE INDEX IF NOT EXISTS idx_course_grade_publish
     ON t_course_grade_summary (course_id, publish_status);
 
+CREATE TABLE IF NOT EXISTS t_grade_publish_record (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    course_id BIGINT NOT NULL,
+    publish_scope VARCHAR(30) NOT NULL,
+    published_count INT NOT NULL DEFAULT 0,
+    published_by BIGINT NOT NULL,
+    published_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    notification_status VARCHAR(30) NOT NULL,
+    remark VARCHAR(500) NULL,
+    PRIMARY KEY (id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_grade_publish_record_course
+    ON t_grade_publish_record (course_id, published_at);
+
 CREATE TABLE IF NOT EXISTS t_grade_calculation_batch (
     id BIGINT NOT NULL AUTO_INCREMENT,
     course_id BIGINT NOT NULL,

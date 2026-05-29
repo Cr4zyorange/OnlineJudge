@@ -62,4 +62,25 @@ public record GradeRecord(
                 adjustedAt
         );
     }
+
+    public GradeRecord published(LocalDateTime publishedAt) {
+        return new GradeRecord(
+                id,
+                courseId,
+                studentId,
+                gradeItemId,
+                sourceType,
+                sourceId,
+                rawScore,
+                weightedScore,
+                gradeStatus,
+                PublishStatus.PUBLISHED,
+                comment,
+                sourceUpdatedAt,
+                calculatedAt,
+                publishedAt,
+                createdAt,
+                publishedAt
+        );
+    }
 }
