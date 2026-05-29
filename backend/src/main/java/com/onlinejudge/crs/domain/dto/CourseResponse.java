@@ -22,6 +22,7 @@ public record CourseResponse(
         LocalDate endDate,
         CourseStatus status,
         long memberCount,
+        boolean member,
         boolean manageable,
         LocalDateTime createdAt,
         LocalDateTime updatedAt

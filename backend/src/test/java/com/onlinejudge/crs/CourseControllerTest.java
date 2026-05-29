@@ -5,10 +5,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.hamcrest.Matchers.is;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -233,5 +235,162 @@ class CourseControllerTest {
                         .header("X-User-Role", "STUDENT"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.length()", is(0)));
+    }
+
+    @Test
+    void teacherManagesResourcesAndOnlyCourseMembersCanListOrDownload() throws Exception {
+        String response = mockMvc.perform(post("/api/v1/courses")
+                        .header("X-User-Id", "801")
+                        .header("X-User-Role", "TEACHER")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"resource-course-" + System.nanoTime() + "\",\"enrollmentMode\":\"PUBLIC\",\"status\":\"ACTIVE\"}"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        String courseId = response.replaceAll("(?s).*\"id\":(\\d+).*", "$1");
+
+        String chapterResponse = mockMvc.perform(post("/api/v1/courses/" + courseId + "/chapters")
+                        .header("X-User-Id", "801")
+                        .header("X-User-Role", "TEACHER")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"chapterName\":\"Resource Chapter\",\"sortOrder\":1,\"visibleStatus\":1,\"chapterType\":1}"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        String chapterId = chapterResponse.replaceAll("(?s).*\"id\":(\\d+).*", "$1");
+
+        MockMultipartFile file = new MockMultipartFile(
+                "file",
+                "lesson.pdf",
+                "application/pdf",
+                "course material".getBytes(java.nio.charset.StandardCharsets.UTF_8)
+        );
+
+        String uploadResponse = mockMvc.perform(multipart("/api/v1/courses/" + courseId + "/resources")
+                        .file(file)
+                        .param("name", "Lesson PDF")
+                        .param("chapterId", chapterId)
+                        .param("resourceType", "DOCUMENT")
+                        .param("visibility", "STUDENT")
+                        .header("X-User-Id", "801")
+                        .header("X-User-Role", "TEACHER"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.name", is("Lesson PDF")))
+                .andExpect(jsonPath("$.data.chapterId", is(Integer.parseInt(chapterId))))
+                .andExpect(jsonPath("$.data.resourceType", is("DOCUMENT")))
+                .andReturn().getResponse().getContentAsString();
+        String resourceId = uploadResponse.replaceAll("(?s).*\"id\":(\\d+).*", "$1");
+
+        MockMultipartFile teacherOnlyFile = new MockMultipartFile(
+                "file",
+                "teacher-note.pdf",
+                "application/pdf",
+                "teacher material".getBytes(java.nio.charset.StandardCharsets.UTF_8)
+        );
+        String teacherOnlyUploadResponse = mockMvc.perform(multipart("/api/v1/courses/" + courseId + "/resources")
+                        .file(teacherOnlyFile)
+                        .param("name", "Teacher Note")
+                        .param("chapterId", chapterId)
+                        .param("resourceType", "DOCUMENT")
+                        .param("visibility", "TEACHER")
+                        .header("X-User-Id", "801")
+                        .header("X-User-Role", "TEACHER"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        String teacherOnlyResourceId = teacherOnlyUploadResponse.replaceAll("(?s).*\"id\":(\\d+).*", "$1");
+
+        mockMvc.perform(get("/api/v1/courses/" + courseId + "/resources")
+                        .header("X-User-Id", "802")
+                        .header("X-User-Role", "STUDENT"))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(post("/api/v1/courses/" + courseId + "/join")
+                        .header("X-User-Id", "802")
+                        .header("X-User-Role", "STUDENT"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/v1/courses/" + courseId + "/resources")
+                        .header("X-User-Id", "802")
+                        .header("X-User-Role", "STUDENT"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()", is(1)))
+                .andExpect(jsonPath("$.data[0].name", is("Lesson PDF")))
+                .andExpect(jsonPath("$.data[0].downloadUrl", is("/api/v1/courses/" + courseId + "/resources/" + resourceId + "/download")));
+
+        mockMvc.perform(get("/api/v1/courses/" + courseId + "/resources/" + resourceId + "/download")
+                        .header("X-User-Id", "802")
+                        .header("X-User-Role", "STUDENT"))
+                .andExpect(status().isOk())
+                .andExpect(content().bytes("course material".getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+
+        mockMvc.perform(get("/api/v1/courses/" + courseId + "/resources/" + teacherOnlyResourceId + "/download")
+                        .header("X-User-Id", "802")
+                        .header("X-User-Role", "STUDENT"))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(put("/api/v1/courses/" + courseId + "/resources/" + resourceId)
+                        .header("X-User-Id", "802")
+                        .header("X-User-Role", "STUDENT")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"student edit\",\"resourceType\":\"DOCUMENT\",\"visibility\":\"STUDENT\"}"))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(put("/api/v1/courses/" + courseId + "/resources/" + resourceId)
+                        .header("X-User-Id", "801")
+                        .header("X-User-Role", "TEACHER")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"Updated PDF\",\"chapterId\":" + chapterId + ",\"resourceType\":\"COURSEWARE\",\"visibility\":\"STUDENT\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.name", is("Updated PDF")))
+                .andExpect(jsonPath("$.data.resourceType", is("COURSEWARE")));
+
+        mockMvc.perform(delete("/api/v1/courses/" + courseId + "/resources/" + resourceId)
+                        .header("X-User-Id", "801")
+                        .header("X-User-Role", "TEACHER"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/v1/courses/" + courseId + "/resources")
+                        .header("X-User-Id", "802")
+                        .header("X-User-Role", "STUDENT"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()", is(0)));
+    }
+
+    @Test
+    void resourceUploadRejectsUnsupportedTypeAndOversizedFile() throws Exception {
+        String response = mockMvc.perform(post("/api/v1/courses")
+                        .header("X-User-Id", "811")
+                        .header("X-User-Role", "TEACHER")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"resource-validation-" + System.nanoTime() + "\",\"status\":\"ACTIVE\"}"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        String courseId = response.replaceAll("(?s).*\"id\":(\\d+).*", "$1");
+
+        MockMultipartFile script = new MockMultipartFile(
+                "file",
+                "run.exe",
+                "application/octet-stream",
+                "bad".getBytes(java.nio.charset.StandardCharsets.UTF_8)
+        );
+        mockMvc.perform(multipart("/api/v1/courses/" + courseId + "/resources")
+                        .file(script)
+                        .param("resourceType", "DOCUMENT")
+                        .param("visibility", "STUDENT")
+                        .header("X-User-Id", "811")
+                        .header("X-User-Role", "TEACHER"))
+                .andExpect(status().isBadRequest());
+
+        MockMultipartFile huge = new MockMultipartFile(
+                "file",
+                "huge.pdf",
+                "application/pdf",
+                new byte[51 * 1024 * 1024]
+        );
+        mockMvc.perform(multipart("/api/v1/courses/" + courseId + "/resources")
+                        .file(huge)
+                        .param("resourceType", "DOCUMENT")
+                        .param("visibility", "STUDENT")
+                        .header("X-User-Id", "811")
+                        .header("X-User-Role", "TEACHER"))
+                .andExpect(status().isBadRequest());
     }
 }

@@ -2,6 +2,7 @@ package com.onlinejudge.common.storage;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Primary;
+import org.springframework.core.io.FileSystemResource;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -40,6 +41,26 @@ public class LocalDiskFileStorageService implements FileStorageService {
             );
         } catch (IOException exception) {
             throw new IllegalStateException("文件存储失败", exception);
+        }
+    }
+
+    @Override
+    public StoredFile load(String storageKey) {
+        Path targetPath = rootDirectory.resolve(storageKey).normalize();
+        if (!targetPath.startsWith(rootDirectory) || !Files.exists(targetPath)) {
+            throw new IllegalStateException("文件不存在");
+        }
+        try {
+            return new StoredFile(
+                    storageKey,
+                    targetPath.getFileName().toString(),
+                    "application/octet-stream",
+                    Files.size(targetPath),
+                    targetPath.toUri().toString(),
+                    new FileSystemResource(targetPath)
+            );
+        } catch (IOException exception) {
+            throw new IllegalStateException("文件读取失败", exception);
         }
     }
 

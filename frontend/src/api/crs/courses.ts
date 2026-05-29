@@ -1,5 +1,5 @@
 import { request } from '../http';
-import type { Chapter, ChapterPayload, Course, CoursePayload, PageResponse } from '../../types/crs';
+import type { Chapter, ChapterPayload, Course, CoursePayload, CourseResource, PageResponse, ResourcePayload } from '../../types/crs';
 
 export type CourseScope = 'all' | 'managed' | 'archived';
 
@@ -31,6 +31,16 @@ export function archiveCourse(courseId: number) {
   });
 }
 
+export function getCourse(courseId: number) {
+  return request<Course>(`/api/v1/courses/${courseId}`);
+}
+
+export function joinCourse(courseId: number) {
+  return request<void>(`/api/v1/courses/${courseId}/join`, {
+    method: 'POST'
+  });
+}
+
 export function listChapters(courseId: number) {
   return request<Chapter[]>(`/api/v1/courses/${courseId}/chapters`);
 }
@@ -51,6 +61,41 @@ export function updateChapter(chapterId: number, payload: ChapterPayload) {
 
 export function deleteChapter(chapterId: number) {
   return request<void>(`/api/v1/chapters/${chapterId}`, {
+    method: 'DELETE'
+  });
+}
+
+export function listResources(courseId: number) {
+  return request<CourseResource[]>(`/api/v1/courses/${courseId}/resources`);
+}
+
+export function uploadResource(courseId: number, payload: ResourcePayload, file: File) {
+  const formData = new FormData();
+  formData.set('file', file);
+  formData.set('name', payload.name);
+  formData.set('resourceType', payload.resourceType);
+  formData.set('visibility', payload.visibility);
+  if (payload.chapterId != null) {
+    formData.set('chapterId', String(payload.chapterId));
+  }
+  if (payload.publishAt) {
+    formData.set('publishAt', payload.publishAt);
+  }
+  return request<CourseResource>(`/api/v1/courses/${courseId}/resources`, {
+    method: 'POST',
+    body: formData
+  });
+}
+
+export function updateResource(courseId: number, resourceId: number, payload: ResourcePayload) {
+  return request<CourseResource>(`/api/v1/courses/${courseId}/resources/${resourceId}`, {
+    method: 'PUT',
+    body: payload
+  });
+}
+
+export function deleteResource(courseId: number, resourceId: number) {
+  return request<void>(`/api/v1/courses/${courseId}/resources/${resourceId}`, {
     method: 'DELETE'
   });
 }

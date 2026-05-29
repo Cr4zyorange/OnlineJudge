@@ -56,10 +56,25 @@ function requestHeaders(requireAuth: boolean, body: unknown) {
   }
   if (requireAuth) {
     const token = storedToken();
-    if (!token) {
-      throw new Error('当前登录态缺失，无法访问接口');
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
+      return headers;
     }
-    headers.Authorization = `Bearer ${token}`;
+    const context = resolveAuthContext();
+    headers['X-User-Id'] = String(context.userId);
+    headers['X-User-Role'] = context.role;
+    if (context.username) {
+      headers['X-Username'] = context.username;
+    }
+    if (context.permissions?.length) {
+      headers['X-Permissions'] = context.permissions.join(',');
+    }
+    if (context.courseIds) {
+      headers['X-Course-Ids'] = formatCourseIds(context.courseIds);
+    }
+    if (context.manageableCourseIds) {
+      headers['X-Manageable-Course-Ids'] = formatCourseIds(context.manageableCourseIds);
+    }
   }
   return headers;
 }

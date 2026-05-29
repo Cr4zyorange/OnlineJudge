@@ -62,6 +62,31 @@ describe('shared API request client', () => {
     }));
   });
 
+  it('uses the configured role context as header auth when no bearer token exists', async () => {
+    configureAuthContext(() => ({
+      userId: 701,
+      username: 'teacher701',
+      role: 'TEACHER',
+      permissions: ['course:manage'],
+      courseIds: '*',
+      manageableCourseIds: '*'
+    }));
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(jsonResponse({ list: [] }));
+
+    await expect(request<{ list: unknown[] }>('/api/v1/courses')).resolves.toEqual({ list: [] });
+
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/courses', expect.objectContaining({
+      headers: expect.objectContaining({
+        'X-User-Id': '701',
+        'X-User-Role': 'TEACHER',
+        'X-Username': 'teacher701',
+        'X-Permissions': 'course:manage',
+        'X-Course-Ids': '*',
+        'X-Manageable-Course-Ids': '*'
+      })
+    }));
+  });
+
   it('accepts the legacy success response code used by older backend processes', async () => {
     writeAuthStorage('onlinejudge.authToken', 'session-token');
     configureAuthContext(() => ({
