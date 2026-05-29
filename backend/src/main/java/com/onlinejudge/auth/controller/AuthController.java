@@ -2,6 +2,8 @@ package com.onlinejudge.auth.controller;
 
 import com.onlinejudge.auth.domain.AuthLoginResult;
 import com.onlinejudge.auth.domain.AuthUserView;
+import com.onlinejudge.auth.domain.PermissionCheckResult;
+import com.onlinejudge.auth.service.AccessControlService;
 import com.onlinejudge.auth.service.AuthService;
 import com.onlinejudge.common.security.AuthenticationRequiredException;
 import com.onlinejudge.common.security.CurrentUser;
@@ -18,9 +20,11 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/auth")
 public class AuthController {
     private final AuthService authService;
+    private final AccessControlService accessControlService;
 
-    public AuthController(AuthService authService) {
+    public AuthController(AuthService authService, AccessControlService accessControlService) {
         this.authService = authService;
+        this.accessControlService = accessControlService;
     }
 
     @PostMapping("/register")
@@ -47,6 +51,14 @@ public class AuthController {
     @GetMapping("/me")
     public ApiResponse<AuthUserView> me(CurrentUser currentUser) {
         return ApiResponse.ok(authService.currentUser(currentUser.id()));
+    }
+
+    @PostMapping("/check-permission")
+    public ApiResponse<PermissionCheckResult> checkPermission(
+            CurrentUser currentUser,
+            @RequestBody CheckPermissionRequest request
+    ) {
+        return ApiResponse.ok(accessControlService.checkPermission(currentUser, request));
     }
 
     private String extractToken(HttpServletRequest request) {
