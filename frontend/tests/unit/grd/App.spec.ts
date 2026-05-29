@@ -189,6 +189,33 @@ describe('App', () => {
     expect(wrapper.text()).toContain('无权限访问');
     expect(wrapper.text()).not.toContain('用户权限管理');
   });
+
+  it('renders the forbidden access page for unauthorized routes', async () => {
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: new URL('http://localhost/403')
+    });
+
+    const wrapper = mount(App);
+    await flushPromises();
+
+    expect(wrapper.text()).toContain('无权限访问');
+    expect(wrapper.text()).toContain('返回课程首页');
+  });
+
+  it('renders the expired session page and clears local auth state', async () => {
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: new URL('http://localhost/session-expired')
+    });
+
+    const wrapper = mount(App);
+    await flushPromises();
+
+    expect(wrapper.text()).toContain('登录状态已失效');
+    expect(wrapper.text()).toContain('重新登录');
+    expect(window.localStorage.getItem('onlinejudge.authToken')).toBeNull();
+  });
 });
 
 async function flushPromises() {

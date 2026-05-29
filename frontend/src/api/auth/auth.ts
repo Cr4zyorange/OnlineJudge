@@ -79,6 +79,20 @@ export interface LoginResult {
   user: AuthUser;
 }
 
+export interface PermissionCheckPayload {
+  permissionCode: string;
+  resourceType?: string;
+  resourceId?: string;
+}
+
+export interface PermissionCheckResult {
+  allowed: boolean;
+  permissionCode: string;
+  resourceType?: string;
+  resourceId?: string;
+  reason?: string | null;
+}
+
 export async function login(payload: LoginPayload) {
   const result = await publicRequest<LoginResult>('/api/v1/auth/login', {
     method: 'POST',
@@ -97,6 +111,13 @@ export function register(payload: RegisterPayload) {
 
 export function getCurrentUser() {
   return request<AuthUser>('/api/v1/auth/me');
+}
+
+export function checkPermission(payload: PermissionCheckPayload) {
+  return request<PermissionCheckResult>('/api/v1/auth/check-permission', {
+    method: 'POST',
+    body: payload
+  });
 }
 
 export async function logout() {
