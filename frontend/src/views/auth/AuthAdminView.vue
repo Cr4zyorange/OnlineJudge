@@ -24,9 +24,54 @@
 
         <div v-if="loading" class="state-block">正在加载用户和角色</div>
         <div v-else-if="error" class="state-block error">{{ error }}</div>
-        <div v-else-if="users.length === 0" class="state-block">暂无用户</div>
 
-        <div v-else class="user-list">
+        <form class="user-form" data-create-user-form @submit.prevent="createNewUser">
+          <label>
+            用户名
+            <input v-model.trim="newUserForm.username" name="username" required />
+          </label>
+          <label>
+            初始密码
+            <input v-model.trim="newUserForm.password" name="password" type="password" required />
+          </label>
+          <label>
+            显示名称
+            <input v-model.trim="newUserForm.displayName" name="displayName" required />
+          </label>
+          <label>
+            用户类型
+            <select v-model="newUserForm.userType" name="userType">
+              <option value="STUDENT">学生</option>
+              <option value="TEACHER">教师</option>
+              <option value="ADMIN">管理员</option>
+            </select>
+          </label>
+          <label>
+            手机
+            <input v-model.trim="newUserForm.phone" name="phone" />
+          </label>
+          <label>
+            邮箱
+            <input v-model.trim="newUserForm.email" name="email" />
+          </label>
+          <div class="assignment-block create-user-roles">
+            <p>初始角色</p>
+            <label v-for="role in roles" :key="role.roleId">
+              <input
+                type="checkbox"
+                :data-create-user-role="role.roleId"
+                :checked="createUserRoleSelected(role.roleId)"
+                @change="toggleCreateUserRole(role.roleId)"
+              />
+              {{ role.roleName }}
+            </label>
+          </div>
+          <button type="submit" class="primary-action" data-create-user>新增用户</button>
+        </form>
+
+        <div v-if="!loading && !error && users.length === 0" class="state-block">暂无用户</div>
+
+        <div v-if="!loading && !error && users.length > 0" class="user-list">
           <section v-for="user in users" :key="user.id" class="user-row">
             <div class="user-main">
               <strong>{{ user.username }}</strong>
@@ -52,6 +97,14 @@
               @click="saveUserRoles(user.id)"
             >
               保存角色
+            </button>
+            <button
+              type="button"
+              class="ghost-action"
+              :data-toggle-user-status="user.id"
+              @click="toggleUserStatus(user)"
+            >
+              {{ nextAccountStatus(user) === 'DISABLED' ? '禁用账号' : '启用账号' }}
             </button>
           </section>
         </div>
@@ -137,13 +190,16 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue';
 import {
+  createAdminUser,
   createRole,
   listPermissions,
   listRoles,
   listUsers,
   updateRole,
   updateRolePermissions,
+  updateUserStatus,
   updateUserRoles,
+  type AdminUserPayload,
   type AuthUser,
   type RolePermission,
   type RolePayload,
@@ -162,6 +218,16 @@ const newRoleForm = reactive<RolePayload>({
   description: '',
   enabled: true
 });
+const newUserForm = reactive<AdminUserPayload>({
+  username: '',
+  password: '',
+  userType: 'TEACHER',
+  displayName: '',
+  phone: '',
+  email: '',
+  roleIds: []
+});
+const newUserRoleIds = ref<number[]>([]);
 const loading = ref(false);
 const error = ref('');
 const feedback = ref('');
@@ -198,6 +264,14 @@ async function saveUserRoles(userId: number) {
   });
 }
 
+async function toggleUserStatus(user: AuthUser) {
+  await runAction('账号状态已更新', async () => {
+    const updatedUser = await updateUserStatus(user.id, nextAccountStatus(user));
+    users.value = users.value.map((current) => current.id === user.id ? updatedUser : current);
+    userRoleSelection[user.id] = roleIdsForUser(updatedUser);
+  });
+}
+
 async function saveRolePermissions(roleId: number) {
   await runAction('角色权限已更新', async () => {
     const updatedRole = await updateRolePermissions(roleId, rolePermissionSelection[roleId] ?? []);
@@ -219,6 +293,27 @@ async function createNewRole() {
       description: '',
       enabled: true
     });
+  });
+}
+
+async function createNewUser() {
+  await runAction('用户已创建', async () => {
+    const createdUser = await createAdminUser({
+      ...newUserForm,
+      roleIds: initialRoleIds()
+    });
+    users.value = [...users.value, createdUser];
+    userRoleSelection[createdUser.id] = roleIdsForUser(createdUser);
+    Object.assign(newUserForm, {
+      username: '',
+      password: '',
+      userType: 'TEACHER',
+      displayName: '',
+      phone: '',
+      email: '',
+      roleIds: []
+    });
+    newUserRoleIds.value = [];
   });
 }
 
@@ -257,12 +352,20 @@ function rolePermissionSelected(roleId: number, permissionId: number) {
   return (rolePermissionSelection[roleId] ?? []).includes(permissionId);
 }
 
+function createUserRoleSelected(roleId: number) {
+  return newUserRoleIds.value.includes(roleId);
+}
+
 function toggleUserRole(userId: number, roleId: number) {
   userRoleSelection[userId] = toggleId(userRoleSelection[userId] ?? [], roleId);
 }
 
 function toggleRolePermission(roleId: number, permissionId: number) {
   rolePermissionSelection[roleId] = toggleId(rolePermissionSelection[roleId] ?? [], permissionId);
+}
+
+function toggleCreateUserRole(roleId: number) {
+  newUserRoleIds.value = toggleId(newUserRoleIds.value, roleId);
 }
 
 function roleIdsForUser(user: AuthUser) {
@@ -275,6 +378,19 @@ function toggleId(ids: number[], id: number) {
   return ids.includes(id)
     ? ids.filter((current) => current !== id)
     : [...ids, id].sort((left, right) => left - right);
+}
+
+function initialRoleIds() {
+  if (newUserRoleIds.value.length > 0) {
+    return newUserRoleIds.value;
+  }
+  return roles.value
+    .filter((role) => role.roleCode === newUserForm.userType)
+    .map((role) => role.roleId);
+}
+
+function nextAccountStatus(user: AuthUser) {
+  return (user.accountStatus ?? 'ACTIVE') === 'DISABLED' ? 'ACTIVE' : 'DISABLED';
 }
 
 async function runAction(successMessage: string, action: () => Promise<void>) {
@@ -378,6 +494,7 @@ h2 {
   border-bottom: 1px solid rgba(23, 43, 39, 0.08);
 }
 
+.user-form,
 .role-form,
 .role-edit-form {
   display: grid;
@@ -385,6 +502,11 @@ h2 {
   align-items: end;
   gap: 10px;
   padding: 14px 18px;
+}
+
+.user-form {
+  grid-template-columns: repeat(3, minmax(130px, 1fr));
+  border-bottom: 1px solid rgba(23, 43, 39, 0.08);
 }
 
 .role-edit-form {
@@ -439,17 +561,32 @@ label {
   font-size: 0.88rem;
 }
 
-label input[type='text'],
-label input:not([type]) {
+label input,
+label select {
   width: 100%;
   min-width: 0;
 }
 
+.user-form label,
 .role-form label,
 .role-edit-form label {
   display: grid;
   gap: 5px;
   padding: 8px 10px;
+}
+
+.create-user-roles {
+  align-self: stretch;
+  padding: 8px 10px;
+  border: 1px solid rgba(23, 43, 39, 0.12);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+select {
+  border: 1px solid rgba(23, 43, 39, 0.18);
+  border-radius: 6px;
+  background: #fff;
 }
 
 .toggle-label {
@@ -519,6 +656,7 @@ code {
 
   .admin-grid,
   .user-row,
+  .user-form,
   .role-form,
   .role-edit-form {
     grid-template-columns: 1fr;

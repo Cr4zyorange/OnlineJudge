@@ -72,13 +72,9 @@ public class AuthAdminController {
         return ApiResponse.ok(roleService.createRole(currentUser, request));
     }
 
-    @PutMapping("/roles/{roleId}")
-    public ApiResponse<RoleView> updateRole(
-            CurrentUser currentUser,
-            @PathVariable long roleId,
-            @RequestBody RoleUpsertRequest request
-    ) {
-        return ApiResponse.ok(roleService.updateRole(currentUser, roleId, request));
+    @PutMapping("/roles")
+    public ApiResponse<RoleView> updateRole(CurrentUser currentUser, @RequestBody RoleUpsertRequest request) {
+        return ApiResponse.ok(roleService.updateRole(currentUser, request));
     }
 
     @PutMapping("/roles/{roleId}/permissions")

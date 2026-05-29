@@ -145,6 +145,27 @@ class AuthAdminControllerTest {
         assertThat(userCount("bad-role46")).isZero();
     }
 
+    @Test
+    void adminUpdatesRoleThroughDocumentedCollectionEndpoint() throws Exception {
+        seedUser("admin-role-path46", "Admin46@pass", "ADMIN");
+        String adminToken = loginToken("admin-role-path46", "Admin46@pass");
+        long teacherRoleId = roleId("TEACHER");
+
+        mockMvc.perform(put("/api/v1/admin/roles")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "roleId", teacherRoleId,
+                                "roleCode", "TEACHER",
+                                "roleName", "授课教师",
+                                "description", "负责课程教学",
+                                "enabled", true
+                        ))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.roleId").value(teacherRoleId))
+                .andExpect(jsonPath("$.data.roleName").value("授课教师"));
+    }
+
     private long seedUser(String username, String password, String userType) {
         return authService.registerTrusted(new RegisterRequest(
                 username,

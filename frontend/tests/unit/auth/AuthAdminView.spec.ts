@@ -61,11 +61,29 @@ describe('AuthAdminView', () => {
         permissions: []
       }))
       .mockResolvedValueOnce(jsonResponse({
-        roleId: 2,
-        roleCode: 'TEACHER',
-        roleName: '教师',
-        enabled: true,
-        permissions: [{ permissionId: 11, permissionCode: 'auth:manage', permissionName: '用户权限管理' }]
+          roleId: 2,
+          roleCode: 'TEACHER',
+          roleName: '教师',
+          enabled: true,
+          permissions: [{ permissionId: 11, permissionCode: 'auth:manage', permissionName: '用户权限管理' }]
+      }))
+      .mockResolvedValueOnce(jsonResponse({
+        id: 47,
+        username: 'newteacher46',
+        userType: 'TEACHER',
+        displayName: '新教师46',
+        accountStatus: 'ACTIVE',
+        roles: ['TEACHER'],
+        permissions: ['course:manage']
+      }))
+      .mockResolvedValueOnce(jsonResponse({
+        id: 46,
+        username: 'teacher46',
+        userType: 'TEACHER',
+        displayName: '教师46',
+        accountStatus: 'DISABLED',
+        roles: ['STUDENT', 'TEACHER'],
+        permissions: ['course:manage']
       }));
 
     const wrapper = mount(AuthAdminView);
@@ -100,6 +118,20 @@ describe('AuthAdminView', () => {
     await flushPromises();
     expect(wrapper.text()).toContain('角色权限已更新');
 
+    await wrapper.find('input[name="username"]').setValue('newteacher46');
+    await wrapper.find('input[name="password"]').setValue('Teacher46@pass');
+    await wrapper.find('input[name="displayName"]').setValue('新教师46');
+    await wrapper.find('select[name="userType"]').setValue('TEACHER');
+    await wrapper.find('[data-create-user-form]').trigger('submit');
+    await flushPromises();
+    expect(wrapper.text()).toContain('用户已创建');
+    expect(wrapper.text()).toContain('newteacher46');
+
+    await wrapper.find('[data-toggle-user-status="46"]').trigger('click');
+    await flushPromises();
+    expect(wrapper.text()).toContain('账号状态已更新');
+    expect(wrapper.text()).toContain('DISABLED');
+
     expect(fetchMock).toHaveBeenNthCalledWith(4, '/api/v1/admin/users/46/roles', expect.objectContaining({
       method: 'PUT',
       body: JSON.stringify({ roleIds: [1, 2] })
@@ -108,13 +140,29 @@ describe('AuthAdminView', () => {
       method: 'POST',
       body: JSON.stringify({ roleCode: 'ASSISTANT', roleName: '助教', description: '课程助教', enabled: true })
     }));
-    expect(fetchMock).toHaveBeenNthCalledWith(6, '/api/v1/admin/roles/4', expect.objectContaining({
+    expect(fetchMock).toHaveBeenNthCalledWith(6, '/api/v1/admin/roles', expect.objectContaining({
       method: 'PUT',
-      body: JSON.stringify({ roleCode: 'ASSISTANT', roleName: '助教', description: '课程助教', enabled: false })
+      body: JSON.stringify({ roleId: 4, roleCode: 'ASSISTANT', roleName: '助教', description: '课程助教', enabled: false })
     }));
     expect(fetchMock).toHaveBeenNthCalledWith(7, '/api/v1/admin/roles/2/permissions', expect.objectContaining({
       method: 'PUT',
       body: JSON.stringify({ permissionIds: [11, 12] })
+    }));
+    expect(fetchMock).toHaveBeenNthCalledWith(8, '/api/v1/admin/users', expect.objectContaining({
+      method: 'POST',
+      body: JSON.stringify({
+        username: 'newteacher46',
+        password: 'Teacher46@pass',
+        userType: 'TEACHER',
+        displayName: '新教师46',
+        phone: '',
+        email: '',
+        roleIds: [2]
+      })
+    }));
+    expect(fetchMock).toHaveBeenNthCalledWith(9, '/api/v1/admin/users/46/status', expect.objectContaining({
+      method: 'PUT',
+      body: JSON.stringify({ accountStatus: 'DISABLED' })
     }));
   });
 });

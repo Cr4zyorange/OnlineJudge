@@ -81,8 +81,9 @@ public class RoleService {
     }
 
     @Transactional
-    public RoleView updateRole(CurrentUser currentUser, long roleId, RoleUpsertRequest request) {
+    public RoleView updateRole(CurrentUser currentUser, RoleUpsertRequest request) {
         requireAdmin(currentUser);
+        long roleId = requireRoleId(request.roleId());
         if (!authRepository.roleExists(roleId)) {
             throw AuthApiException.notFound("角色不存在");
         }
@@ -94,6 +95,13 @@ public class RoleService {
                 request.enabled() == null || request.enabled()
         );
         return authRepository.roleView(roleId);
+    }
+
+    private long requireRoleId(Long roleId) {
+        if (roleId == null || roleId <= 0) {
+            throw AuthApiException.badRequest("角色ID不能为空");
+        }
+        return roleId;
     }
 
     @Transactional

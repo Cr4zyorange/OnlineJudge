@@ -39,6 +39,7 @@ export interface RoleView {
 }
 
 export interface RolePayload {
+  roleId?: number;
   roleCode: string;
   roleName: string;
   description?: string;
@@ -131,6 +132,13 @@ export function updateUserRoles(userId: number, roleIds: number[]) {
   });
 }
 
+export function updateUserStatus(userId: number, accountStatus: string) {
+  return request<AuthUser>(`/api/v1/admin/users/${userId}/status`, {
+    method: 'PUT',
+    body: { accountStatus }
+  });
+}
+
 export function listRoles() {
   return request<RoleView[]>('/api/v1/admin/roles');
 }
@@ -143,9 +151,9 @@ export function createRole(payload: RolePayload) {
 }
 
 export function updateRole(roleId: number, payload: RolePayload) {
-  return request<RoleView>(`/api/v1/admin/roles/${roleId}`, {
+  return request<RoleView>('/api/v1/admin/roles', {
     method: 'PUT',
-    body: payload
+    body: { roleId, ...payload }
   });
 }
 
