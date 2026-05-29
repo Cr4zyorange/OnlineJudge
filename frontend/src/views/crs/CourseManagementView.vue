@@ -243,9 +243,9 @@
                       <strong>{{ resource.name }}</strong>
                       <p>{{ resourceTypeText(resource.resourceType) }} · {{ formatFileSize(resource.fileSize) }} · {{ chapterName(resource.chapterId) }}</p>
                     </div>
-                    <a class="card-btn" :href="resource.downloadUrl" target="_blank" rel="noopener">
+                    <button class="card-btn" type="button" @click="downloadCourseResource(resource)">
                       <i class="bi bi-download"></i> 下载
-                    </a>
+                    </button>
                     <button class="card-btn" type="button" @click="editResource(resource)">编辑</button>
                     <button class="card-btn danger" type="button" @click="removeResource(resource)">删除</button>
                   </article>
@@ -448,9 +448,9 @@
                 <strong>{{ resource.name }}</strong>
                 <p>{{ resourceTypeText(resource.resourceType) }} · {{ formatFileSize(resource.fileSize) }} · {{ chapterName(resource.chapterId) }}</p>
               </div>
-              <a class="card-btn" :href="resource.downloadUrl" target="_blank" rel="noopener">
+              <button class="card-btn" type="button" @click="downloadCourseResource(resource)">
                 <i class="bi bi-download"></i> 下载
-              </a>
+              </button>
             </article>
           </div>
         </div>
@@ -483,6 +483,7 @@ import {
   createCourse,
   deleteResource,
   deleteChapter,
+  downloadResource,
   getCourse,
   joinCourse,
   listChapters,
@@ -1118,6 +1119,29 @@ async function removeResource(resource: CourseResource) {
   }
   await deleteResource(resourceCourse.value.id, resource.id);
   detailResources.value = await listResources(resourceCourse.value.id);
+}
+
+async function downloadCourseResource(resource: CourseResource) {
+  resourceError.value = '';
+  detailResourceError.value = '';
+  try {
+    const { blob, filename } = await downloadResource(resource.courseId, resource.id);
+    const objectUrl = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = objectUrl;
+    link.download = filename || resource.originalFilename || resource.name;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(objectUrl);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : '资源下载失败';
+    if (resourceCourse.value) {
+      resourceError.value = message;
+    } else {
+      detailResourceError.value = message;
+    }
+  }
 }
 
 function resetResourceForm() {

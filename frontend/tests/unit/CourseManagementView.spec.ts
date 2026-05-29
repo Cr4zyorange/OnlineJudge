@@ -20,6 +20,7 @@ const course = {
   endDate: '2026-07-01',
   status: 'ACTIVE',
   memberCount: 1,
+  member: true,
   manageable: true,
   createdAt: '2026-05-25T00:00:00',
   updatedAt: '2026-05-25T00:00:00'
@@ -230,6 +231,74 @@ describe('CourseManagementView', () => {
     expect(updateCall).toBeTruthy();
     expect(JSON.parse(updateCall![1].body)).toEqual(expect.objectContaining({ sortOrder: 1, chapterName: '实践准备' }));
     expect(wrapper.text()).toContain('实践准备');
+  });
+
+  it('downloads resources from the rendered action through bearer-authenticated fetch', async () => {
+    const page = (list = [course], total = list.length) => ({
+      code: '0',
+      message: 'success',
+      data: { list, total, page: 1, size: 20 }
+    });
+    const resources = [{
+      id: 21,
+      courseId: 1,
+      chapterId: null,
+      name: 'Lesson PDF',
+      resourceType: 'DOCUMENT',
+      visibility: 'STUDENT',
+      publishAt: null,
+      originalFilename: 'lesson.pdf',
+      contentType: 'application/pdf',
+      fileSize: 15,
+      uploadUserId: 101,
+      downloadUrl: '/api/v1/courses/1/resources/21/download',
+      createdAt: '2026-05-25T00:00:00',
+      updatedAt: '2026-05-25T00:00:00'
+    }];
+    const fileBlob = new Blob(['course material'], { type: 'application/pdf' });
+    vi.stubGlobal('URL', {
+      createObjectURL: vi.fn(() => 'blob:lesson'),
+      revokeObjectURL: vi.fn()
+    });
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => page([course], 1) })
+      .mockResolvedValueOnce({ ok: true, json: async () => page([course], 1) })
+      .mockResolvedValueOnce({ ok: true, json: async () => page([course], 1) })
+      .mockResolvedValueOnce({ ok: true, json: async () => page([], 0) })
+      .mockResolvedValueOnce({ ok: true, json: async () => page([course], 1) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ code: '0', message: 'success', data: [] }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ code: '0', message: 'success', data: resources }) })
+      .mockResolvedValueOnce({
+        ok: true,
+        headers: new Headers({ 'Content-Disposition': "attachment; filename*=UTF-8''lesson.pdf" }),
+        blob: async () => fileBlob
+      });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const wrapper = mount(CourseManagementView);
+    await flushPromises();
+
+    await wrapper.findAll('.menu-button')[1].trigger('click');
+    await flushPromises();
+
+    const resourceButton = wrapper.findAll('button').find((button) => button.text().includes('资源'));
+    expect(resourceButton).toBeTruthy();
+    await resourceButton!.trigger('click');
+    await flushPromises();
+
+    const downloadButton = wrapper.findAll('button').find((button) => button.text().includes('下载'));
+    expect(downloadButton).toBeTruthy();
+    await downloadButton!.trigger('click');
+    await flushPromises();
+
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/courses/1/resources/21/download', expect.objectContaining({
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: 'Bearer teacher-token'
+      }
+    }));
   });
 });
 

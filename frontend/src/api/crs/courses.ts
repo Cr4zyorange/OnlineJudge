@@ -1,4 +1,4 @@
-import { request } from '../http';
+import { request, requestBlob } from '../http';
 import type { Chapter, ChapterPayload, Course, CoursePayload, CourseResource, PageResponse, ResourcePayload } from '../../types/crs';
 
 export type CourseScope = 'all' | 'managed' | 'archived';
@@ -98,4 +98,8 @@ export function deleteResource(courseId: number, resourceId: number) {
   return request<void>(`/api/v1/courses/${courseId}/resources/${resourceId}`, {
     method: 'DELETE'
   });
+}
+
+export function downloadResource(courseId: number, resourceId: number) {
+  return requestBlob(`/api/v1/courses/${courseId}/resources/${resourceId}/download`);
 }

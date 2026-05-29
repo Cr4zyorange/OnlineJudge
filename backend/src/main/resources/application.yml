@@ -18,4 +18,4 @@ server:
 
 onlinejudge:
   auth:
-    allow-header-auth: true
+    allow-header-auth: false

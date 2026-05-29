@@ -16,6 +16,11 @@ export interface RequestOptions {
   auth?: boolean;
 }
 
+export interface BlobResponse {
+  blob: Blob;
+  filename?: string;
+}
+
 interface ApiResponse<T> {
   code: string | number;
   message: string;
@@ -24,10 +29,8 @@ interface ApiResponse<T> {
 
 type AuthContextProvider = () => AuthContext | null;
 
-let authContextProvider: AuthContextProvider | null = null;
-
-export function configureAuthContext(provider: AuthContextProvider | null) {
-  authContextProvider = provider;
+export function configureAuthContext(_provider: AuthContextProvider | null) {
+  // Bearer/session auth is the only runtime identity source.
 }
 
 export async function request<T>(url: string, options: RequestOptions = {}): Promise<T> {
@@ -40,6 +43,24 @@ export async function request<T>(url: string, options: RequestOptions = {}): Pro
     body: formatBody(options.body)
   });
   return unwrap<T>(response);
+}
+
+export async function requestBlob(url: string, options: RequestOptions = {}): Promise<BlobResponse> {
+  const response = await fetch(url, {
+    method: options.method ?? 'GET',
+    headers: {
+      ...requestHeaders(options.auth !== false, options.body),
+      ...options.headers
+    },
+    body: formatBody(options.body)
+  });
+  if (!response.ok) {
+    throw new Error(await errorMessage(response));
+  }
+  return {
+    blob: await response.blob(),
+    filename: filenameFromDisposition(response.headers.get('Content-Disposition'))
+  };
 }
 
 export function publicRequest<T>(url: string, options: Omit<RequestOptions, 'auth'> = {}): Promise<T> {
@@ -56,57 +77,16 @@ function requestHeaders(requireAuth: boolean, body: unknown) {
   }
   if (requireAuth) {
     const token = storedToken();
-    if (token) {
-      headers.Authorization = `Bearer ${token}`;
-      return headers;
+    if (!token) {
+      throw new Error('当前登录态缺失，无法访问接口');
     }
-    const context = resolveAuthContext();
-    headers['X-User-Id'] = String(context.userId);
-    headers['X-User-Role'] = context.role;
-    if (context.username) {
-      headers['X-Username'] = context.username;
-    }
-    if (context.permissions?.length) {
-      headers['X-Permissions'] = context.permissions.join(',');
-    }
-    if (context.courseIds) {
-      headers['X-Course-Ids'] = formatCourseIds(context.courseIds);
-    }
-    if (context.manageableCourseIds) {
-      headers['X-Manageable-Course-Ids'] = formatCourseIds(context.manageableCourseIds);
-    }
+    headers.Authorization = `Bearer ${token}`;
   }
   return headers;
 }
 
 function storedToken() {
   return readAuthStorage('onlinejudge.authToken');
-}
-
-function resolveAuthContext(): AuthContext {
-  const configuredContext = authContextProvider?.();
-  if (configuredContext) {
-    return configuredContext;
-  }
-  if (typeof window !== 'undefined' && typeof window.localStorage?.getItem === 'function') {
-    const userId = window.localStorage.getItem('onlinejudge.userId');
-    const role = window.localStorage.getItem('onlinejudge.userRole') ?? window.localStorage.getItem('onlinejudge.role');
-    const username = window.localStorage.getItem('onlinejudge.username') ?? undefined;
-    const permissions = window.localStorage.getItem('onlinejudge.permissions');
-    const courseIds = window.localStorage.getItem('onlinejudge.courseIds');
-    const manageableCourseIds = window.localStorage.getItem('onlinejudge.manageableCourseIds');
-    if (userId && role) {
-      return {
-        userId,
-        username,
-        role,
-        permissions: splitCsv(permissions),
-        courseIds: parseCourseIds(courseIds ?? manageableCourseIds),
-        manageableCourseIds: parseCourseIds(manageableCourseIds)
-      };
-    }
-  }
-  throw new Error('当前登录态缺失，无法访问接口');
 }
 
 function formatBody(body: unknown) {
@@ -119,27 +99,6 @@ function formatBody(body: unknown) {
   return typeof body === 'string' ? body : JSON.stringify(body);
 }
 
-function formatCourseIds(courseIds: Array<number | string> | '*') {
-  if (courseIds === '*') {
-    return '*';
-  }
-  return courseIds.map(String).join(',');
-}
-
-function parseCourseIds(value: string | null): Array<string> | '*' {
-  if (!value) {
-    return [];
-  }
-  return value === '*' ? '*' : splitCsv(value);
-}
-
-function splitCsv(value: string | null) {
-  if (!value) {
-    return [];
-  }
-  return value.split(',').map((item) => item.trim()).filter(Boolean);
-}
-
 function isSuccessCode(code: string | number | undefined) {
   return code === '0' || code === 0 || code === '200' || code === 200;
 }
@@ -150,4 +109,29 @@ async function unwrap<T>(response: Response): Promise<T> {
     throw new Error(body.message || '接口请求失败');
   }
   return body.data;
+}
+
+async function errorMessage(response: Response) {
+  try {
+    const body = (await response.json()) as Partial<ApiResponse<unknown>>;
+    return body.message || '接口请求失败';
+  } catch {
+    return response.statusText || '接口请求失败';
+  }
+}
+
+function filenameFromDisposition(disposition: string | null) {
+  if (!disposition) {
+    return undefined;
+  }
+  const utf8Match = disposition.match(/filename\*=UTF-8''([^;]+)/i);
+  if (utf8Match) {
+    return decodeURIComponent(utf8Match[1]);
+  }
+  const quotedMatch = disposition.match(/filename="([^"]+)"/i);
+  if (quotedMatch) {
+    return quotedMatch[1];
+  }
+  const plainMatch = disposition.match(/filename=([^;]+)/i);
+  return plainMatch?.[1]?.trim();
 }
