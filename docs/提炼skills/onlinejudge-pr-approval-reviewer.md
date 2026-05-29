@@ -87,7 +87,9 @@ If there are no open PRs targeting `dev`, report that there is nothing to review
 
 ## Issue/PR Association And Project State Maintenance
 
-Every review must leave the issue/PR relationship and issue Project state better than it found them, when doing so is unambiguous and safe. This step happens before the hard gate.
+Every review must leave the issue/PR relationship and issue Project state better than it found them, when doing so is unambiguous and safe. This step happens before the hard gate. A text-only reference is not enough: the relationship is complete only when GitHub exposes a recognized link through `closingIssuesReferences`, `closedByPullRequestsReferences`, or the `Team planning` item's `Linked pull requests` field.
+
+If the issue/PR pair is unambiguous, the reviewer must repair the association directly. Do not request changes merely telling the author to link the issue. Exhaust safe automatic repairs first; only stop when the pair is ambiguous, GitHub auth/API permissions block the repair, or every available automatic repair has failed and the live metadata still proves the relation is missing.
 
 Do not mutate ambiguous state. If there are multiple possible PRs, multiple possible issues, a missing `Team planning` item that cannot be safely resolved, or a Project status option cannot be identified from live data, stop and report the ambiguity instead of guessing.
 
@@ -120,22 +122,29 @@ When the user asks to review a specific issue, do not wait for the user to suppl
    - PR body describes the same module, requirement IDs, pages, APIs, or tables as the issue;
    - there is only one open `dev` PR by the issue assignee whose changed files match the issue module.
 
-4. If exactly one PR matches the issue but its body does not contain a recognized closing keyword, append a `Closes #<issue-id>` line to the PR body before review:
+4. If exactly one PR matches the issue but GitHub does not expose a recognized PR/issue relationship, repair it yourself before review. This applies even when the body already contains text that looks like `Closes #<issue-id>` but `closingIssuesReferences` is still empty. Use this repair ladder in order:
+
+   - normalize the PR body to a canonical full-repo closing directive;
+   - add the issue and PR to the same `Team planning` project when either item is missing;
+   - if the issue has no linked development branch and the head branch can be safely linked or recreated for that issue, use GitHub's linked-branch flow;
+   - re-check PR, issue, and Project metadata after each repair attempt.
 
    ```bash
    gh pr view <pr-number> --json body --jq '.body // ""' > /tmp/pr-body.md
-   perl -0pi -e 's/^\xEF\xBB\xBF//; s/\r\n/\n/g; s/\s*\z/\n\nCloses #<issue-id>\n/' /tmp/pr-body.md
+   perl -0pi -e 's/^\xEF\xBB\xBF//; s/\r\n/\n/g; s/\s*\z/\n\nCloses <owner>/<repo>#<issue-id>\n/' /tmp/pr-body.md
    gh pr edit <pr-number> --body-file /tmp/pr-body.md
    gh pr view <pr-number> --json closingIssuesReferences,url
+   gh issue view <issue-id> --json closedByPullRequestsReferences,projectItems,url
+   gh issue develop --list <issue-id>
    ```
 
-   This is a repair step, not an approval. Continue the review only after GitHub reports the issue under `closingIssuesReferences` or the issue reports the PR under `closedByPullRequestsReferences`.
+   This is a repair step, not an approval. Continue the review only after GitHub reports the issue under `closingIssuesReferences`, the issue reports the PR under `closedByPullRequestsReferences`, or the `Team planning` item visibly lists the PR under `Linked pull requests`. If the metadata stays empty after all safe automatic repairs, report the exact repair commands attempted and the blocker that prevented automatic association; do not hand the author a generic "please link the issue" task.
 
 5. If multiple plausible PRs exist, or the match depends on guessing intent, do not edit any PR. Report the ambiguity with the candidate PR numbers and stop before approval.
 
 6. If no plausible PR exists, report that the issue has no reviewable implementation PR targeting `dev`.
 
-For PR-first reviews, perform the same association repair in reverse: inspect `closingIssuesReferences`; if it is empty but the branch name or PR body identifies exactly one issue, append `Closes #<issue-id>` and re-check before applying the hard gate.
+For PR-first reviews, perform the same association repair in reverse: inspect `closingIssuesReferences`; if it is empty but the branch name or PR body identifies exactly one issue, run the repair ladder yourself and re-check before applying the hard gate. Treat `closingIssuesReferences: []` as unresolved linkage unless the issue or Project item independently exposes the PR link.
 
 ### Maintain Issue Project State
 
@@ -173,7 +182,7 @@ Reject immediately with `request changes` if any item fails:
 | --- | --- |
 | Base branch | PR targets `dev` |
 | Draft status | PR is ready for review, not draft |
-| Issue linkage | PR body contains `Close #id` or `Closes #id`; if the issue-PR match is unambiguous, repair this automatically before judging the gate |
+| Issue linkage | GitHub metadata recognizes the PR/issue relationship through `closingIssuesReferences`, `closedByPullRequestsReferences`, or the `Team planning` `Linked pull requests` field; if the issue-PR match is unambiguous, the reviewer must repair this automatically before judging the gate and must not request human action for linkage alone |
 | Project issue state | linked issue is in `Team planning` and reflects the review state: `In progress` for active review, `Ready to merge` after approval when available |
 | Branch naming | branch follows `feature/<issue-id>-<name>`, `fix/<issue-id>-<name>`, `docs/<issue-id>-<name>`, `test/<name>`, `release/<version>`, or `hotfix/<issue-id>-<name>` |
 | Scope | PR changes belong to one issue and one reviewable delivery unit |
@@ -292,14 +301,16 @@ After approval, if the user confirms merge, complete the handoff instead of leav
    gh pr merge <number> --squash --delete-branch
    ```
 
-3. Verify the PR is merged and the remote feature branch is gone:
+3. Verify the PR is merged, the remote feature branch is gone, and the merged PR is still visibly associated with the linked issue:
 
    ```bash
    gh pr view <number> --json state,mergedAt,mergeCommit,headRefName,url
    git ls-remote --heads origin <head-branch>
+   gh issue view <issue-id> --json state,closedByPullRequestsReferences,projectItems,url
+   gh project item-list <project-number> --owner <owner> --format json
    ```
 
-4. Adjust the linked issue. If the project has a pre-merge status such as `Ready to merge`, use it before merge when available. After a successful merge, move the `Team planning` item to `Done` when that option exists, and close the issue if GitHub did not close it automatically because the PR targeted `dev` instead of the default branch.
+4. Adjust the linked issue. If the project has a pre-merge status such as `Ready to merge`, use it before merge when available. After a successful merge, move the `Team planning` item to `Done` when that option exists, and close the issue if GitHub did not close it automatically because the PR targeted `dev` instead of the default branch. If the PR did not remain linked in GitHub metadata or the Project `Linked pull requests` field, repair/report that relationship before calling the merge handoff complete.
 
 5. Report the merge commit, branch deletion result, issue state, and project state.
 
