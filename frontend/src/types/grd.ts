@@ -48,6 +48,7 @@ export interface GradeRecord {
   weightedScore: string | null;
   gradeStatus: GradeStatus;
   publishStatus: PublishStatus;
+  publishedAt?: string | null;
 }
 
 export interface GradeAdjustmentPayload {
@@ -101,6 +102,7 @@ export interface CourseGradeSummary {
   finalScore: string | null;
   finalStatus: FinalStatus;
   publishStatus: PublishStatus;
+  publishedAt?: string | null;
 }
 
 export interface CourseGradeRow {
@@ -128,4 +130,37 @@ export interface GradeSyncResult {
 export interface GradeRecalculationResult {
   calculationBatchId: number;
   affectedCount: number;
+}
+
+export type GradePublishScope = 'COURSE' | 'PARTIAL_STUDENTS' | 'PARTIAL_ITEMS';
+
+export interface GradePublishPayload {
+  publishScope: GradePublishScope;
+  studentIds: number[];
+  gradeItemIds: number[];
+}
+
+export interface GradePublishResult {
+  publishId: number;
+  publishedCount: number;
+  publishedAt: string;
+  notificationStatus: 'SENT' | 'FAILED';
+}
+
+export interface GradePublishRecord {
+  id: number;
+  courseId: number;
+  publishScope: GradePublishScope;
+  publishedCount: number;
+  publishedBy: number;
+  publishedAt: string;
+  notificationStatus: 'SENT' | 'FAILED';
+  remark: string | null;
+}
+
+export interface GradePublishRecordPage {
+  records: GradePublishRecord[];
+  total: number;
+  page: number;
+  size: number;
 }

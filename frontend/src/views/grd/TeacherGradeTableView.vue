@@ -133,6 +133,14 @@
       <div class="grade-table__detail-heading">
         <h2>成绩明细</h2>
         <p>学生 {{ selectedRow.studentId }}</p>
+        <button
+          type="button"
+          data-testid="publish-selected-student"
+          :disabled="busy || !selectedRow.summary"
+          @click="publishSelectedStudent"
+        >
+          发布该学生成绩
+        </button>
       </div>
       <form
         v-if="selectedRow.summary"
@@ -233,6 +241,17 @@
         </ul>
       </div>
     </section>
+
+    <section class="grade-table__list" data-testid="publish-record-list" aria-label="成绩发布记录">
+      <h2>发布记录</h2>
+      <p v-if="publishRecordsLoading">加载中</p>
+      <p v-else-if="publishRecords.length === 0">暂无发布记录</p>
+      <ul v-else class="grade-table__publish-records">
+        <li v-for="record in publishRecords" :key="record.id">
+          {{ record.publishScope }}：{{ record.publishedCount }} 名学生，通知 {{ record.notificationStatus }}
+        </li>
+      </ul>
+    </section>
   </main>
 </template>
 
@@ -242,12 +261,14 @@ import {
   adjustGradeRecord,
   adjustCourseFinalScore,
   type GradeTableQuery,
+  listGradePublishRecords,
   listGradeChangeLogs,
   listCourseGrades,
+  publishCourseGrades,
   recalculateCourseGrades,
   syncSourceGrades
 } from '../../api/grd/gradeRecords';
-import type { CourseGradeRow, GradeChangeLog, GradeRecord, GradeStatus, PublishStatus } from '../../types/grd';
+import type { CourseGradeRow, GradeChangeLog, GradePublishRecord, GradeRecord, GradeStatus, PublishStatus } from '../../types/grd';
 
 const props = defineProps<{
   courseId: number;
@@ -273,10 +294,14 @@ const finalScore = ref('');
 const finalReason = ref('');
 const changeLogs = ref<GradeChangeLog[]>([]);
 const logsLoading = ref(false);
+const publishRecords = ref<GradePublishRecord[]>([]);
+const publishRecordsLoading = ref(false);
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / size.value)));
 const selectedRecord = computed(() => selectedRow.value?.records.find((record) => record.id === selectedRecordId.value) ?? null);
 
-onMounted(loadRows);
+onMounted(async () => {
+  await Promise.all([loadRows(), refreshPublishRecords()]);
+});
 
 async function loadRows() {
   loading.value = true;
@@ -406,6 +431,29 @@ async function submitFinalScoreAdjustment() {
   }
 }
 
+async function publishSelectedStudent() {
+  if (!selectedRow.value?.summary) {
+    return;
+  }
+  busy.value = true;
+  feedback.value = '';
+  errorMessage.value = '';
+  try {
+    const result = await publishCourseGrades(props.courseId, {
+      publishScope: 'PARTIAL_STUDENTS',
+      studentIds: [selectedRow.value.studentId],
+      gradeItemIds: []
+    });
+    feedback.value = `发布完成：${result.publishedCount} 名学生可查看成绩，通知状态 ${result.notificationStatus}`;
+    await loadRows();
+    await refreshPublishRecords();
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : '成绩发布失败';
+  } finally {
+    busy.value = false;
+  }
+}
+
 async function refreshChangeLogs() {
   if (!selectedRow.value) {
     changeLogs.value = [];
@@ -423,6 +471,21 @@ async function refreshChangeLogs() {
     errorMessage.value = error instanceof Error ? error.message : '变更记录加载失败';
   } finally {
     logsLoading.value = false;
+  }
+}
+
+async function refreshPublishRecords() {
+  publishRecordsLoading.value = true;
+  try {
+    const result = await listGradePublishRecords(props.courseId, {
+      page: 1,
+      size: 20
+    });
+    publishRecords.value = result.records;
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : '发布记录加载失败';
+  } finally {
+    publishRecordsLoading.value = false;
   }
 }
 
@@ -597,7 +660,8 @@ td {
 }
 
 .grade-table__detail-heading h2,
-.grade-table__logs h2 {
+.grade-table__logs h2,
+.grade-table__list h2 {
   font-size: 16px;
   margin: 0;
 }
@@ -610,6 +674,13 @@ td {
 }
 
 .grade-table__logs ul {
+  display: grid;
+  gap: 8px;
+  margin: 8px 0 0;
+  padding-left: 18px;
+}
+
+.grade-table__publish-records {
   display: grid;
   gap: 8px;
   margin: 8px 0 0;

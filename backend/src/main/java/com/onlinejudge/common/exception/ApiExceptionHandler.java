@@ -4,6 +4,7 @@ import com.onlinejudge.common.web.ApiResponse;
 import com.onlinejudge.grd.service.GradeAdjustmentException;
 import com.onlinejudge.grd.service.GradeItemPermissionException;
 import com.onlinejudge.grd.service.GradeItemNotFoundException;
+import com.onlinejudge.grd.service.GradePublishException;
 import com.onlinejudge.grd.service.InvalidGradeRuleException;
 import com.onlinejudge.lab.service.LabNotFoundException;
 import com.onlinejudge.lab.service.LabPermissionException;
@@ -40,6 +41,12 @@ public class ApiExceptionHandler {
     public ResponseEntity<ApiResponse<Void>> handleGradeAdjustment(GradeAdjustmentException exception) {
         return ResponseEntity.badRequest()
                 .body(ApiResponse.error("ERR-GRD-06", exception.getMessage()));
+    }
+
+    @ExceptionHandler(GradePublishException.class)
+    public ResponseEntity<ApiResponse<Void>> handleGradePublish(GradePublishException exception) {
+        return ResponseEntity.badRequest()
+                .body(ApiResponse.error("ERR-GRD-04", exception.getMessage()));
     }
 
     @ExceptionHandler(GradeItemNotFoundException.class)

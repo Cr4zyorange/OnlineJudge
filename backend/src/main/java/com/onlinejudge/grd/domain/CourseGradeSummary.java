@@ -44,4 +44,19 @@ public record CourseGradeSummary(
                 adjustedAt
         );
     }
+
+    public CourseGradeSummary published(LocalDateTime publishedAt) {
+        return new CourseGradeSummary(
+                id,
+                courseId,
+                studentId,
+                finalScore,
+                finalStatus,
+                PublishStatus.PUBLISHED,
+                calculationBatchId,
+                publishedAt,
+                createdAt,
+                publishedAt
+        );
+    }
 }

@@ -7,12 +7,15 @@ import com.onlinejudge.grd.service.CourseGradeRow;
 import com.onlinejudge.grd.service.AdjustGradeRecordCommand;
 import com.onlinejudge.grd.service.GradeAdjustmentResult;
 import com.onlinejudge.grd.service.GradeChangeLogPage;
+import com.onlinejudge.grd.service.GradePublishRecordPage;
+import com.onlinejudge.grd.service.GradePublishResult;
 import com.onlinejudge.grd.service.FinalScoreAdjustmentResult;
 import com.onlinejudge.grd.service.CourseGradeTablePage;
 import com.onlinejudge.grd.service.GradeRecalculationResult;
 import com.onlinejudge.grd.service.GradeRecordService;
 import com.onlinejudge.grd.service.GradeSyncResult;
 import com.onlinejudge.grd.service.GradeTableQuery;
+import com.onlinejudge.grd.service.PublishCourseGradesCommand;
 import com.onlinejudge.grd.domain.GradeStatus;
 import com.onlinejudge.grd.domain.PublishStatus;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -78,6 +81,39 @@ public class GradeRecordController {
     ) {
         requireTeacher(currentUser);
         return ApiResponse.ok(gradeRecordService.getStudentGradeDetail(courseId, studentId, currentUser.id()));
+    }
+
+    @PostMapping("/courses/{courseId}/grades/publish")
+    public ApiResponse<GradePublishResult> publishCourseGrades(
+            @PathVariable long courseId,
+            @RequestBody PublishCourseGradesRequest request,
+            CurrentUser currentUser
+    ) {
+        requireTeacher(currentUser);
+        return ApiResponse.ok(gradeRecordService.publishCourseGrades(
+                courseId,
+                currentUser.id(),
+                new PublishCourseGradesCommand(request.publishScope(), request.studentIds(), request.gradeItemIds())
+        ));
+    }
+
+    @GetMapping("/courses/{courseId}/grade-publish-records")
+    public ApiResponse<GradePublishRecordPage> listGradePublishRecords(
+            @PathVariable long courseId,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "20") int size,
+            CurrentUser currentUser
+    ) {
+        requireTeacher(currentUser);
+        return ApiResponse.ok(gradeRecordService.listGradePublishRecords(courseId, currentUser.id(), page, size));
+    }
+
+    @GetMapping("/courses/{courseId}/my-grades")
+    public ApiResponse<CourseGradeRow> getMyPublishedGrades(
+            @PathVariable long courseId,
+            CurrentUser currentUser
+    ) {
+        return ApiResponse.ok(gradeRecordService.getMyPublishedGrades(courseId, currentUser.id()));
     }
 
     @PutMapping("/grade-records/{recordId}/adjust")
