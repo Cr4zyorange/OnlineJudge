@@ -1,3 +1,5 @@
+import { readAuthStorage } from './auth/storage';
+
 export interface AuthContext {
   userId: number | string;
   username?: string;
@@ -32,7 +34,7 @@ export async function request<T>(url: string, options: RequestOptions = {}): Pro
   const response = await fetch(url, {
     method: options.method ?? 'GET',
     headers: {
-      ...requestHeaders(options.body, options.auth !== false),
+      ...requestHeaders(options.auth !== false, options.body),
       ...options.headers
     },
     body: formatBody(options.body)
@@ -47,21 +49,23 @@ export function publicRequest<T>(url: string, options: Omit<RequestOptions, 'aut
   });
 }
 
-function requestHeaders(body: unknown, requireAuth: boolean) {
+function requestHeaders(requireAuth: boolean, body: unknown) {
   const headers: Record<string, string> = {};
-  if (requireAuth) {
-    const authContext = resolveAuthContext();
-    headers['X-User-Id'] = String(authContext.userId);
-    headers['X-Username'] = authContext.username ?? '';
-    headers['X-User-Role'] = authContext.role;
-    headers['X-Permissions'] = (authContext.permissions ?? []).join(',');
-    headers['X-Course-Ids'] = formatCourseIds(authContext.courseIds ?? authContext.manageableCourseIds ?? []);
-    headers['X-Manageable-Course-Ids'] = formatCourseIds(authContext.manageableCourseIds ?? []);
-  }
   if (!(body instanceof FormData)) {
     headers['Content-Type'] = 'application/json';
   }
+  if (requireAuth) {
+    const token = storedToken();
+    if (!token) {
+      throw new Error('当前登录态缺失，无法访问接口');
+    }
+    headers.Authorization = `Bearer ${token}`;
+  }
   return headers;
+}
+
+function storedToken() {
+  return readAuthStorage('onlinejudge.authToken');
 }
 
 function resolveAuthContext(): AuthContext {

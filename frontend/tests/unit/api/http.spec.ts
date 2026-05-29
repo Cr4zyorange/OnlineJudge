@@ -1,13 +1,16 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { removeAuthStorage, writeAuthStorage } from '../../../src/api/auth/storage';
 import { configureAuthContext, request } from '../../../src/api/http';
 
 describe('shared API request client', () => {
   afterEach(() => {
     configureAuthContext(null);
     vi.restoreAllMocks();
+    removeAuthStorage('onlinejudge.authToken');
   });
 
-  it('unwraps standard ApiResponse data and injects the shared auth headers', async () => {
+  it('unwraps standard ApiResponse data and injects the bearer token instead of user-controlled headers', async () => {
+    writeAuthStorage('onlinejudge.authToken', 'session-token');
     configureAuthContext(() => ({
       userId: 501,
       username: 'teacher01',
@@ -28,18 +31,39 @@ describe('shared API request client', () => {
       method: 'POST',
       headers: expect.objectContaining({
         'Content-Type': 'application/json',
-        'X-User-Id': '501',
-        'X-Username': 'teacher01',
-        'X-User-Role': 'TEACHER',
-        'X-Permissions': 'grade:manage',
-        'X-Course-Ids': '101',
-        'X-Manageable-Course-Ids': '101'
+        Authorization: 'Bearer session-token'
       }),
       body: JSON.stringify({ name: 'demo' })
+    }));
+    expect(fetchMock).not.toHaveBeenCalledWith('/api/v1/example', expect.objectContaining({
+      headers: expect.objectContaining({ 'X-User-Role': expect.any(String) })
+    }));
+  });
+
+  it('keeps bearer auth for multipart submissions without forcing a json content type', async () => {
+    writeAuthStorage('onlinejudge.authToken', 'student-token');
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(jsonResponse({ submissionId: 99 }));
+    const formData = new FormData();
+    formData.append('language', 'python');
+    formData.append('file', new File(['print(1)'], 'main.py', { type: 'text/x-python' }));
+
+    const result = await request<{ submissionId: number }>('/api/v1/labs/7/submissions', {
+      method: 'POST',
+      body: formData
+    });
+
+    expect(result).toEqual({ submissionId: 99 });
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/labs/7/submissions', expect.objectContaining({
+      method: 'POST',
+      headers: {
+        Authorization: 'Bearer student-token'
+      },
+      body: formData
     }));
   });
 
   it('accepts the legacy success response code used by older backend processes', async () => {
+    writeAuthStorage('onlinejudge.authToken', 'session-token');
     configureAuthContext(() => ({
       userId: 501,
       role: 'TEACHER',
@@ -60,6 +84,7 @@ describe('shared API request client', () => {
   });
 
   it('throws the backend message when the standard response is not successful', async () => {
+    writeAuthStorage('onlinejudge.authToken', 'session-token');
     configureAuthContext(() => ({
       userId: 601,
       role: 'STUDENT',
