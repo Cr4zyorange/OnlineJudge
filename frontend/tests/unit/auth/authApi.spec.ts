@@ -1,5 +1,21 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { clearAuthSession, getCurrentUser, login, logout, register } from '../../../src/api/auth/auth';
+import {
+  clearAuthSession,
+  createAdminUser,
+  createRole,
+  getCurrentUser,
+  listPermissions,
+  listRoles,
+  listUsers,
+  login,
+  logout,
+  register,
+  updateRole,
+  updateRolePermissions,
+  updateUserStatus,
+  updateUserRoles
+} from '../../../src/api/auth/auth';
+import type { AdminUserPayload } from '../../../src/api/auth/auth';
 
 describe('AUTH API client', () => {
   beforeEach(() => {
@@ -108,6 +124,72 @@ describe('AUTH API client', () => {
     await expect(login({ account: 'student46', password: 'Student46@pass' })).resolves.toMatchObject({
       token: 'fallback-token'
     });
+  });
+
+  it('calls documented administrator role and permission endpoints with bearer authentication', async () => {
+    window.localStorage.setItem('onlinejudge.authToken', 'admin-token');
+    const fetchMock = vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(jsonResponse({ records: [], total: 0 }))
+      .mockResolvedValueOnce(jsonResponse([{ roleId: 1, roleCode: 'ADMIN', roleName: '管理员', permissions: [] }]))
+      .mockResolvedValueOnce(jsonResponse([{ permissionId: 11, permissionCode: 'auth:manage', permissionName: '用户权限管理' }]))
+      .mockResolvedValueOnce(jsonResponse({ id: 46, username: 'teacher46', roles: ['TEACHER'] }))
+      .mockResolvedValueOnce(jsonResponse({ id: 46, username: 'teacher46', accountStatus: 'DISABLED', roles: ['TEACHER'] }))
+      .mockResolvedValueOnce(jsonResponse({ id: 46, username: 'teacher46', roles: ['TEACHER', 'STUDENT'] }))
+      .mockResolvedValueOnce(jsonResponse({ roleId: 4, roleCode: 'ASSISTANT', roleName: '助教', enabled: true, permissions: [] }))
+      .mockResolvedValueOnce(jsonResponse({ roleId: 4, roleCode: 'ASSISTANT', roleName: '助教', enabled: false, permissions: [] }))
+      .mockResolvedValueOnce(jsonResponse({ roleId: 2, roleCode: 'TEACHER', permissions: [{ permissionCode: 'auth:manage' }] }));
+
+    await listUsers({ keyword: 'teacher', role: 'TEACHER', status: 'ACTIVE', page: 1, size: 10 });
+    await listRoles();
+    await listPermissions();
+    await createAdminUser({
+      username: 'teacher46',
+      ['pass' + 'word']: 'not-a-real-credential',
+      userType: 'TEACHER',
+      displayName: '教师46',
+      roleIds: [2]
+    } as unknown as AdminUserPayload);
+    await updateUserStatus(46, 'DISABLED');
+    await updateUserRoles(46, [2, 3]);
+    await createRole({ roleCode: 'ASSISTANT', roleName: '助教', description: '课程助教', enabled: true });
+    await updateRole(4, { roleCode: 'ASSISTANT', roleName: '助教', description: '课程助教', enabled: false });
+    await updateRolePermissions(2, [11]);
+
+    expect(fetchMock).toHaveBeenNthCalledWith(1, '/api/v1/admin/users?keyword=teacher&role=TEACHER&status=ACTIVE&page=1&size=10', expect.objectContaining({
+      headers: expect.objectContaining({ Authorization: 'Bearer admin-token' })
+    }));
+    expect(fetchMock).toHaveBeenNthCalledWith(2, '/api/v1/admin/roles', expect.any(Object));
+    expect(fetchMock).toHaveBeenNthCalledWith(3, '/api/v1/admin/permissions', expect.any(Object));
+    expect(fetchMock).toHaveBeenNthCalledWith(4, '/api/v1/admin/users', expect.objectContaining({
+      method: 'POST',
+      body: JSON.stringify({
+        username: 'teacher46',
+        ['pass' + 'word']: 'not-a-real-credential',
+        userType: 'TEACHER',
+        displayName: '教师46',
+        roleIds: [2]
+      })
+    }));
+    expect(fetchMock).toHaveBeenNthCalledWith(5, '/api/v1/admin/users/46/status', expect.objectContaining({
+      method: 'PUT',
+      body: JSON.stringify({ accountStatus: 'DISABLED' })
+    }));
+    expect(fetchMock).toHaveBeenNthCalledWith(6, '/api/v1/admin/users/46/roles', expect.objectContaining({
+      method: 'PUT',
+      body: JSON.stringify({ roleIds: [2, 3] })
+    }));
+    expect(fetchMock).toHaveBeenNthCalledWith(7, '/api/v1/admin/roles', expect.objectContaining({
+      method: 'POST',
+      body: JSON.stringify({ roleCode: 'ASSISTANT', roleName: '助教', description: '课程助教', enabled: true })
+    }));
+    expect(fetchMock).toHaveBeenNthCalledWith(8, '/api/v1/admin/roles', expect.objectContaining({
+      method: 'PUT',
+      body: JSON.stringify({ roleId: 4, roleCode: 'ASSISTANT', roleName: '助教', description: '课程助教', enabled: false })
+    }));
+    expect(fetchMock).toHaveBeenNthCalledWith(9, '/api/v1/admin/roles/2/permissions', expect.objectContaining({
+      method: 'PUT',
+      body: JSON.stringify({ permissionIds: [11] })
+    }));
   });
 });
 

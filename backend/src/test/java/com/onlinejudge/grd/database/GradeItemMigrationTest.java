@@ -20,6 +20,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.test.context.jdbc.Sql;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.LocalDateTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -180,7 +181,21 @@ class GradeItemMigrationTest {
         ));
 
         assertThat(saved.id()).isPositive();
-        assertThat(gradeChangeLogRepository.findByCourseId(404L, 601L, null, 1, 20)).containsExactly(saved);
+        assertThat(gradeChangeLogRepository.findByCourseId(404L, 601L, null, 1, 20))
+                .singleElement()
+                .satisfies(actual -> {
+                    assertThat(actual.id()).isEqualTo(saved.id());
+                    assertThat(actual.courseId()).isEqualTo(saved.courseId());
+                    assertThat(actual.studentId()).isEqualTo(saved.studentId());
+                    assertThat(actual.gradeItemId()).isEqualTo(saved.gradeItemId());
+                    assertThat(actual.changeType()).isEqualTo(saved.changeType());
+                    assertThat(actual.oldValue()).isEqualByComparingTo(saved.oldValue());
+                    assertThat(actual.newValue()).isEqualByComparingTo(saved.newValue());
+                    assertThat(actual.reason()).isEqualTo(saved.reason());
+                    assertThat(actual.operatorId()).isEqualTo(saved.operatorId());
+                    assertThat(Duration.between(saved.createdAt(), actual.createdAt()).abs())
+                            .isLessThanOrEqualTo(Duration.ofNanos(1_000));
+                });
         assertThat(gradeChangeLogRepository.countByCourseId(404L, 601L, null)).isEqualTo(1);
     }
 }

@@ -139,11 +139,62 @@ describe('App', () => {
     expect(gradeItemApi.listGradeItems).not.toHaveBeenCalled();
     expect(wrapper.text()).toContain('缺少课程上下文');
   });
+
+  it('checks the current user before rendering the administrator AUTH page', async () => {
+    window.localStorage.setItem('onlinejudge.authToken', 'admin-token');
+    const fetchMock = vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(jsonResponse({
+        id: 1,
+        username: 'admin',
+        userType: 'ADMIN',
+        displayName: '管理员',
+        roles: ['ADMIN'],
+        permissions: ['auth:manage']
+      }))
+      .mockResolvedValueOnce(jsonResponse({ records: [], total: 0 }))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse([]));
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: new URL('http://localhost/admin/auth')
+    });
+
+    const wrapper = mount(App);
+    await flushPromises();
+
+    expect(fetchMock).toHaveBeenNthCalledWith(1, '/api/v1/auth/me', expect.objectContaining({
+      headers: expect.objectContaining({ Authorization: 'Bearer admin-token' })
+    }));
+    expect(wrapper.text()).toContain('用户权限管理');
+  });
+
+  it('shows a 403 state instead of the administrator AUTH page for non-admin users', async () => {
+    window.localStorage.setItem('onlinejudge.authToken', 'teacher-token');
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(jsonResponse({
+      id: 2,
+      username: 'teacher',
+      userType: 'TEACHER',
+      displayName: '教师',
+      roles: ['TEACHER'],
+      permissions: ['course:manage']
+    }));
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: new URL('http://localhost/admin/auth')
+    });
+
+    const wrapper = mount(App);
+    await flushPromises();
+
+    expect(wrapper.text()).toContain('无权限访问');
+    expect(wrapper.text()).not.toContain('用户权限管理');
+  });
 });
 
 async function flushPromises() {
-  await Promise.resolve();
-  await Promise.resolve();
+  for (let tick = 0; tick < 6; tick += 1) {
+    await Promise.resolve();
+  }
 }
 
 function installLocalStorageMock() {
@@ -157,4 +208,15 @@ function installLocalStorageMock() {
       clear: vi.fn(() => values.clear())
     }
   });
+}
+
+function jsonResponse<T>(data: T) {
+  return {
+    ok: true,
+    json: async () => ({
+      code: '0',
+      message: 'success',
+      data
+    })
+  } as Response;
 }

@@ -3,6 +3,8 @@ package com.onlinejudge.auth.repository;
 import com.onlinejudge.auth.domain.AccountStatus;
 import com.onlinejudge.auth.domain.AuthUser;
 import com.onlinejudge.auth.domain.AuthUserView;
+import com.onlinejudge.auth.domain.PermissionView;
+import com.onlinejudge.auth.domain.RoleView;
 import com.onlinejudge.auth.domain.SessionStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
@@ -32,6 +34,16 @@ public class AuthRepository {
             rs.getInt("failed_login_count"),
             toLocalDateTime(rs.getTimestamp("locked_until")),
             toLocalDateTime(rs.getTimestamp("last_login_at"))
+    );
+
+    private final RowMapper<PermissionView> permissionMapper = (rs, rowNum) -> new PermissionView(
+            rs.getLong("permission_id"),
+            rs.getString("permission_code"),
+            rs.getString("permission_name"),
+            rs.getString("permission_type"),
+            rs.getString("module_code"),
+            rs.getString("resource_pattern"),
+            rs.getBoolean("enabled")
     );
 
     public AuthRepository(JdbcTemplate jdbcTemplate) {
@@ -236,12 +248,211 @@ public class AuthRepository {
         );
     }
 
+    public List<AuthUserView> listUsers(String keyword, String role, String status, int page, int size) {
+        UserFilter filter = normalizeUserFilter(keyword, role, status);
+        List<Long> userIds = jdbcTemplate.query("""
+                        SELECT DISTINCT u.user_id
+                        FROM t_auth_user u
+                        LEFT JOIN t_auth_user_role ur ON ur.user_id = u.user_id
+                        LEFT JOIN t_auth_role r ON r.role_id = ur.role_id
+                        WHERE u.deleted = FALSE
+                          AND (? IS NULL OR u.username LIKE ? OR u.display_name LIKE ? OR u.email LIKE ?)
+                          AND (? IS NULL OR r.role_code = ?)
+                          AND (? IS NULL OR u.account_status = ?)
+                        ORDER BY u.user_id
+                        LIMIT ? OFFSET ?
+                        """,
+                (rs, rowNum) -> rs.getLong("user_id"),
+                filter.keywordLike(),
+                filter.keywordLike(),
+                filter.keywordLike(),
+                filter.keywordLike(),
+                filter.role(),
+                filter.role(),
+                filter.status(),
+                filter.status(),
+                size,
+                (page - 1) * size);
+        return userIds.stream().map(this::toUserView).toList();
+    }
+
+    public long countUsers(String keyword, String role, String status) {
+        UserFilter filter = normalizeUserFilter(keyword, role, status);
+        Long count = jdbcTemplate.queryForObject("""
+                        SELECT COUNT(DISTINCT u.user_id)
+                        FROM t_auth_user u
+                        LEFT JOIN t_auth_user_role ur ON ur.user_id = u.user_id
+                        LEFT JOIN t_auth_role r ON r.role_id = ur.role_id
+                        WHERE u.deleted = FALSE
+                          AND (? IS NULL OR u.username LIKE ? OR u.display_name LIKE ? OR u.email LIKE ?)
+                          AND (? IS NULL OR r.role_code = ?)
+                          AND (? IS NULL OR u.account_status = ?)
+                        """,
+                Long.class,
+                filter.keywordLike(),
+                filter.keywordLike(),
+                filter.keywordLike(),
+                filter.keywordLike(),
+                filter.role(),
+                filter.role(),
+                filter.status(),
+                filter.status());
+        return count == null ? 0 : count;
+    }
+
+    public boolean userExists(long userId) {
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM t_auth_user WHERE user_id = ? AND deleted = FALSE",
+                Integer.class,
+                userId
+        );
+        return count != null && count > 0;
+    }
+
+    public List<RoleView> listRoles() {
+        List<Long> roleIds = jdbcTemplate.query("""
+                        SELECT role_id FROM t_auth_role
+                        WHERE deleted = FALSE
+                        ORDER BY role_code
+                        """,
+                (rs, rowNum) -> rs.getLong("role_id"));
+        return roleIds.stream().map(this::roleView).toList();
+    }
+
+    public RoleView roleView(long roleId) {
+        return jdbcTemplate.queryForObject("""
+                        SELECT role_id, role_code, role_name, description, enabled
+                        FROM t_auth_role
+                        WHERE role_id = ? AND deleted = FALSE
+                        """,
+                (rs, rowNum) -> new RoleView(
+                        rs.getLong("role_id"),
+                        rs.getString("role_code"),
+                        rs.getString("role_name"),
+                        rs.getString("description"),
+                        rs.getBoolean("enabled"),
+                        permissionsByRoleId(rs.getLong("role_id"))
+                ),
+                roleId);
+    }
+
+    public List<PermissionView> listPermissions() {
+        return jdbcTemplate.query("""
+                        SELECT permission_id, permission_code, permission_name, permission_type,
+                               module_code, resource_pattern, enabled
+                        FROM t_auth_permission
+                        WHERE deleted = FALSE
+                        ORDER BY module_code, permission_code
+                        """,
+                permissionMapper);
+    }
+
+    public long createRole(String roleCode, String roleName, String description, boolean enabled) {
+        jdbcTemplate.update("""
+                        INSERT INTO t_auth_role (role_code, role_name, description, enabled)
+                        VALUES (?, ?, ?, ?)
+                        """,
+                roleCode,
+                roleName,
+                description,
+                enabled);
+        Long roleId = jdbcTemplate.queryForObject(
+                "SELECT role_id FROM t_auth_role WHERE role_code = ?",
+                Long.class,
+                roleCode);
+        return Objects.requireNonNull(roleId);
+    }
+
+    public void updateRole(long roleId, String roleCode, String roleName, String description, boolean enabled) {
+        jdbcTemplate.update("""
+                        UPDATE t_auth_role
+                        SET role_code = ?, role_name = ?, description = ?, enabled = ?, updated_at = CURRENT_TIMESTAMP
+                        WHERE role_id = ? AND deleted = FALSE
+                        """,
+                roleCode,
+                roleName,
+                description,
+                enabled,
+                roleId);
+    }
+
+    public boolean enabledRolesExist(List<Long> roleIds) {
+        if (roleIds == null || roleIds.isEmpty()) {
+            return false;
+        }
+        return roleIds.stream().distinct().allMatch(this::enabledRoleExists);
+    }
+
+    public boolean enabledPermissionsExist(List<Long> permissionIds) {
+        if (permissionIds == null || permissionIds.isEmpty()) {
+            return true;
+        }
+        return permissionIds.stream().distinct().allMatch(this::enabledPermissionExists);
+    }
+
+    public void replaceUserRoles(long userId, List<Long> roleIds, long assignedBy) {
+        jdbcTemplate.update("DELETE FROM t_auth_user_role WHERE user_id = ?", userId);
+        for (Long roleId : roleIds.stream().distinct().toList()) {
+            jdbcTemplate.update(
+                    "INSERT INTO t_auth_user_role (user_id, role_id, assigned_by) VALUES (?, ?, ?)",
+                    userId,
+                    roleId,
+                    assignedBy
+            );
+        }
+    }
+
+    public void replaceRolePermissions(long roleId, List<Long> permissionIds, long assignedBy) {
+        jdbcTemplate.update("DELETE FROM t_auth_role_permission WHERE role_id = ?", roleId);
+        for (Long permissionId : permissionIds.stream().distinct().toList()) {
+            jdbcTemplate.update(
+                    "INSERT INTO t_auth_role_permission (role_id, permission_id, assigned_by) VALUES (?, ?, ?)",
+                    roleId,
+                    permissionId,
+                    assignedBy
+            );
+        }
+    }
+
+    public boolean roleExists(long roleId) {
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM t_auth_role WHERE role_id = ? AND deleted = FALSE",
+                Integer.class,
+                roleId
+        );
+        return count != null && count > 0;
+    }
+
+    private boolean enabledRoleExists(long roleId) {
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM t_auth_role WHERE role_id = ? AND enabled = TRUE AND deleted = FALSE",
+                Integer.class,
+                roleId
+        );
+        return count != null && count > 0;
+    }
+
+    private boolean enabledPermissionExists(long permissionId) {
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM t_auth_permission WHERE permission_id = ? AND enabled = TRUE AND deleted = FALSE",
+                Integer.class,
+                permissionId
+        );
+        return count != null && count > 0;
+    }
+
     private Optional<AuthUser> queryUser(String field, String value) {
         if (value == null || value.isBlank()) {
             return Optional.empty();
         }
+        String sql = switch (field) {
+            case "username" -> "SELECT * FROM t_auth_user WHERE username = ? AND deleted = FALSE";
+            case "email" -> "SELECT * FROM t_auth_user WHERE email = ? AND deleted = FALSE";
+            case "phone" -> "SELECT * FROM t_auth_user WHERE phone = ? AND deleted = FALSE";
+            default -> throw new IllegalArgumentException("unsupported user lookup field");
+        };
         List<AuthUser> users = jdbcTemplate.query(
-                "SELECT * FROM t_auth_user WHERE " + field + " = ? AND deleted = FALSE",
+                sql,
                 userMapper,
                 value.trim()
         );
@@ -271,6 +482,26 @@ public class AuthRepository {
                         """,
                 (rs, rowNum) -> rs.getString("permission_code"),
                 userId);
+    }
+
+    private List<PermissionView> permissionsByRoleId(long roleId) {
+        return jdbcTemplate.query("""
+                        SELECT p.permission_id, p.permission_code, p.permission_name, p.permission_type,
+                               p.module_code, p.resource_pattern, p.enabled
+                        FROM t_auth_role_permission rp
+                        JOIN t_auth_permission p ON p.permission_id = rp.permission_id
+                        WHERE rp.role_id = ? AND p.deleted = FALSE
+                        ORDER BY p.module_code, p.permission_code
+                        """,
+                permissionMapper,
+                roleId);
+    }
+
+    private UserFilter normalizeUserFilter(String keyword, String role, String status) {
+        String keywordLike = keyword == null || keyword.isBlank() ? null : "%" + keyword.trim() + "%";
+        String normalizedRole = role == null || role.isBlank() ? null : role.trim();
+        String normalizedStatus = status == null || status.isBlank() ? null : status.trim();
+        return new UserFilter(keywordLike, normalizedRole, normalizedStatus);
     }
 
     private void upsertRole(String code, String name, String description) {
@@ -344,5 +575,8 @@ public class AuthRepository {
 
     private LocalDateTime toLocalDateTime(Timestamp timestamp) {
         return timestamp == null ? null : timestamp.toLocalDateTime();
+    }
+
+    private record UserFilter(String keywordLike, String role, String status) {
     }
 }
