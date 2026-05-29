@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { removeAuthStorage, writeAuthStorage } from '../../../src/api/auth/storage';
 import {
   configureGradeItemAuthContext,
   updateGradeItem,
@@ -9,9 +10,11 @@ describe('gradeItems API client', () => {
   afterEach(() => {
     configureGradeItemAuthContext(null);
     vi.restoreAllMocks();
+    removeAuthStorage('onlinejudge.authToken');
   });
 
   it('calls documented grade item endpoints with auth context supplied by the integration layer', async () => {
+    writeAuthStorage('onlinejudge.authToken', 'teacher-token');
     configureGradeItemAuthContext(() => ({
       userId: 501,
       userRole: 'TEACHER',
@@ -45,17 +48,13 @@ describe('gradeItems API client', () => {
     expect(fetchMock).toHaveBeenNthCalledWith(1, '/api/v1/grade-items/7', expect.objectContaining({
       method: 'PUT',
       headers: expect.objectContaining({
-        'X-User-Id': '501',
-        'X-User-Role': 'TEACHER',
-        'X-Manageable-Course-Ids': '101'
+        Authorization: 'Bearer teacher-token'
       })
     }));
     expect(fetchMock).toHaveBeenNthCalledWith(2, '/api/v1/courses/101/grade-rules/validate', expect.objectContaining({
       method: 'POST',
       headers: expect.objectContaining({
-        'X-User-Id': '501',
-        'X-User-Role': 'TEACHER',
-        'X-Manageable-Course-Ids': '101'
+        Authorization: 'Bearer teacher-token'
       }),
       body: JSON.stringify({
         gradeItems: [

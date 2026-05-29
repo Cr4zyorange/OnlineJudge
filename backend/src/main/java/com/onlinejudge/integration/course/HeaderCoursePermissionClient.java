@@ -1,6 +1,7 @@
 package com.onlinejudge.integration.course;
 
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
@@ -12,8 +13,17 @@ import java.util.List;
 
 @Component
 public class HeaderCoursePermissionClient implements CoursePermissionClient {
+    private final boolean allowHeaderAuth;
+
+    public HeaderCoursePermissionClient(@Value("${onlinejudge.auth.allow-header-auth:false}") boolean allowHeaderAuth) {
+        this.allowHeaderAuth = allowHeaderAuth;
+    }
+
     @Override
     public boolean canManageCourse(long courseId, long userId) {
+        if (!allowHeaderAuth) {
+            return false;
+        }
         if (userId <= 0 || courseId <= 0) {
             return false;
         }
@@ -25,6 +35,9 @@ public class HeaderCoursePermissionClient implements CoursePermissionClient {
 
     @Override
     public boolean canViewCourse(long courseId, long userId) {
+        if (!allowHeaderAuth) {
+            return false;
+        }
         if (userId <= 0 || courseId <= 0) {
             return false;
         }
@@ -38,6 +51,9 @@ public class HeaderCoursePermissionClient implements CoursePermissionClient {
 
     @Override
     public List<Long> listCourseStudentIds(long courseId) {
+        if (!allowHeaderAuth) {
+            return List.of();
+        }
         if (courseId <= 0) {
             return List.of();
         }

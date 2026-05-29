@@ -41,4 +41,25 @@ public record GradeRecord(
                 updatedAt
         );
     }
+
+    public GradeRecord adjusted(BigDecimal rawScore, BigDecimal weightedScore, LocalDateTime adjustedAt) {
+        return new GradeRecord(
+                id,
+                courseId,
+                studentId,
+                gradeItemId,
+                sourceType,
+                sourceId,
+                rawScore,
+                weightedScore,
+                GradeStatus.ADJUSTED,
+                publishStatus,
+                comment,
+                sourceUpdatedAt,
+                adjustedAt,
+                publishedAt,
+                createdAt,
+                adjustedAt
+        );
+    }
 }

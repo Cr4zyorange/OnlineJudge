@@ -1,6 +1,7 @@
 package com.onlinejudge.common.exception;
 
 import com.onlinejudge.common.web.ApiResponse;
+import com.onlinejudge.grd.service.GradeAdjustmentException;
 import com.onlinejudge.grd.service.GradeItemPermissionException;
 import com.onlinejudge.grd.service.GradeItemNotFoundException;
 import com.onlinejudge.grd.service.InvalidGradeRuleException;
@@ -33,6 +34,12 @@ public class ApiExceptionHandler {
     public ResponseEntity<ApiResponse<Void>> handleInvalidRule(InvalidGradeRuleException exception) {
         return ResponseEntity.badRequest()
                 .body(ApiResponse.error("ERR-GRD-03", exception.getMessage()));
+    }
+
+    @ExceptionHandler(GradeAdjustmentException.class)
+    public ResponseEntity<ApiResponse<Void>> handleGradeAdjustment(GradeAdjustmentException exception) {
+        return ResponseEntity.badRequest()
+                .body(ApiResponse.error("ERR-GRD-06", exception.getMessage()));
     }
 
     @ExceptionHandler(GradeItemNotFoundException.class)

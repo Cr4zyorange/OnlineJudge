@@ -1,5 +1,9 @@
 import type {
   CourseGradeTablePage,
+  GradeAdjustmentPayload,
+  GradeAdjustmentResult,
+  FinalScoreAdjustmentResult,
+  GradeChangeLogPage,
   GradeRecalculationResult,
   GradeStatus,
   GradeSyncResult,
@@ -20,6 +24,13 @@ export interface GradeTableQuery {
   gradeItemId?: number;
   gradeStatus?: GradeStatus;
   publishStatus?: PublishStatus;
+  page?: number;
+  size?: number;
+}
+
+export interface GradeChangeLogQuery {
+  studentId?: number;
+  gradeItemId?: number;
   page?: number;
   size?: number;
 }
@@ -70,6 +81,42 @@ export async function listCourseGrades(
     ? `/api/v1/courses/${courseId}/grades?${queryString}`
     : `/api/v1/courses/${courseId}/grades`;
   return request<CourseGradeTablePage>(url);
+}
+
+export async function adjustGradeRecord(
+  recordId: number,
+  payload: GradeAdjustmentPayload
+): Promise<GradeAdjustmentResult> {
+  return request<GradeAdjustmentResult>(`/api/v1/grade-records/${recordId}/adjust`, {
+    method: 'PUT',
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function adjustCourseFinalScore(
+  summaryId: number,
+  payload: GradeAdjustmentPayload
+): Promise<FinalScoreAdjustmentResult> {
+  return request<FinalScoreAdjustmentResult>(`/api/v1/course-grade-summaries/${summaryId}/adjust`, {
+    method: 'PUT',
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function listGradeChangeLogs(
+  courseId: number,
+  query: GradeChangeLogQuery = {}
+): Promise<GradeChangeLogPage> {
+  const params = new URLSearchParams();
+  appendParam(params, 'studentId', query.studentId);
+  appendParam(params, 'gradeItemId', query.gradeItemId);
+  appendParam(params, 'page', query.page);
+  appendParam(params, 'size', query.size);
+  const queryString = params.toString();
+  const url = queryString
+    ? `/api/v1/courses/${courseId}/grade-change-logs?${queryString}`
+    : `/api/v1/courses/${courseId}/grade-change-logs`;
+  return request<GradeChangeLogPage>(url);
 }
 
 function appendParam(params: URLSearchParams, name: string, value: string | number | undefined) {

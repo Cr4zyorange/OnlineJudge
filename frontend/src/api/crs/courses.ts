@@ -1,5 +1,5 @@
 import { request } from '../http';
-import type { Course, CoursePayload, PageResponse } from '../../types/crs';
+import type { Chapter, ChapterPayload, Course, CoursePayload, PageResponse } from '../../types/crs';
 
 export type CourseScope = 'all' | 'managed' | 'archived';
 
@@ -27,6 +27,30 @@ export function updateCourse(courseId: number, payload: CoursePayload) {
 
 export function archiveCourse(courseId: number) {
   return request<void>(`/api/v1/courses/${courseId}`, {
+    method: 'DELETE'
+  });
+}
+
+export function listChapters(courseId: number) {
+  return request<Chapter[]>(`/api/v1/courses/${courseId}/chapters`);
+}
+
+export function createChapter(courseId: number, payload: ChapterPayload) {
+  return request<Chapter>(`/api/v1/courses/${courseId}/chapters`, {
+    method: 'POST',
+    body: payload
+  });
+}
+
+export function updateChapter(chapterId: number, payload: ChapterPayload) {
+  return request<Chapter>(`/api/v1/chapters/${chapterId}`, {
+    method: 'PUT',
+    body: payload
+  });
+}
+
+export function deleteChapter(chapterId: number) {
+  return request<void>(`/api/v1/chapters/${chapterId}`, {
     method: 'DELETE'
   });
 }

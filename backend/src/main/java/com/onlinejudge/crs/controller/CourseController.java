@@ -3,10 +3,13 @@ package com.onlinejudge.crs.controller;
 import com.onlinejudge.common.security.CurrentUser;
 import com.onlinejudge.common.web.ApiResponse;
 import com.onlinejudge.common.web.PageResponse;
+import com.onlinejudge.crs.domain.dto.ChapterCreateRequest;
+import com.onlinejudge.crs.domain.dto.ChapterResponse;
 import com.onlinejudge.crs.domain.dto.CourseCreateRequest;
 import com.onlinejudge.crs.domain.dto.CoursePermissionResponse;
 import com.onlinejudge.crs.domain.dto.CourseResponse;
 import com.onlinejudge.crs.domain.dto.CourseUpdateRequest;
+import com.onlinejudge.crs.service.ChapterService;
 import com.onlinejudge.crs.service.CourseService;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -23,9 +26,11 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/courses")
 public class CourseController {
     private final CourseService courseService;
+    private final ChapterService chapterService;
 
-    public CourseController(CourseService courseService) {
+    public CourseController(CourseService courseService, ChapterService chapterService) {
         this.courseService = courseService;
+        this.chapterService = chapterService;
     }
 
     @PostMapping
@@ -69,4 +74,17 @@ public class CourseController {
     public ApiResponse<CoursePermissionResponse> permission(@PathVariable Long courseId, @PathVariable Long userId) {
         return ApiResponse.ok(courseService.permission(courseId, userId));
     }
+
+    @PostMapping("/{courseId}/chapters")
+    public ApiResponse<ChapterResponse> createChapter(@PathVariable Long courseId,
+                                                      @Valid @RequestBody ChapterCreateRequest request,
+                                                      CurrentUser currentUser) {
+        return ApiResponse.ok(chapterService.create(courseId, request, currentUser));
+    }
+
+    @GetMapping("/{courseId}/chapters")
+    public ApiResponse<java.util.List<ChapterResponse>> chapterTree(@PathVariable Long courseId, CurrentUser currentUser) {
+        return ApiResponse.ok(chapterService.tree(courseId, currentUser));
+    }
+
 }

@@ -11,6 +11,7 @@ export interface RequestOptions {
   method?: string;
   headers?: Record<string, string>;
   body?: unknown;
+  auth?: boolean;
 }
 
 interface ApiResponse<T> {
@@ -31,7 +32,7 @@ export async function request<T>(url: string, options: RequestOptions = {}): Pro
   const response = await fetch(url, {
     method: options.method ?? 'GET',
     headers: {
-      ...requestHeaders(options.body),
+      ...requestHeaders(options.body, options.auth !== false),
       ...options.headers
     },
     body: formatBody(options.body)
@@ -39,16 +40,24 @@ export async function request<T>(url: string, options: RequestOptions = {}): Pro
   return unwrap<T>(response);
 }
 
-function requestHeaders(body: unknown) {
-  const authContext = resolveAuthContext();
-  const headers: Record<string, string> = {
-    'X-User-Id': String(authContext.userId),
-    'X-Username': authContext.username ?? '',
-    'X-User-Role': authContext.role,
-    'X-Permissions': (authContext.permissions ?? []).join(','),
-    'X-Course-Ids': formatCourseIds(authContext.courseIds ?? authContext.manageableCourseIds ?? []),
-    'X-Manageable-Course-Ids': formatCourseIds(authContext.manageableCourseIds ?? [])
-  };
+export function publicRequest<T>(url: string, options: Omit<RequestOptions, 'auth'> = {}): Promise<T> {
+  return request<T>(url, {
+    ...options,
+    auth: false
+  });
+}
+
+function requestHeaders(body: unknown, requireAuth: boolean) {
+  const headers: Record<string, string> = {};
+  if (requireAuth) {
+    const authContext = resolveAuthContext();
+    headers['X-User-Id'] = String(authContext.userId);
+    headers['X-Username'] = authContext.username ?? '';
+    headers['X-User-Role'] = authContext.role;
+    headers['X-Permissions'] = (authContext.permissions ?? []).join(',');
+    headers['X-Course-Ids'] = formatCourseIds(authContext.courseIds ?? authContext.manageableCourseIds ?? []);
+    headers['X-Manageable-Course-Ids'] = formatCourseIds(authContext.manageableCourseIds ?? []);
+  }
   if (!(body instanceof FormData)) {
     headers['Content-Type'] = 'application/json';
   }

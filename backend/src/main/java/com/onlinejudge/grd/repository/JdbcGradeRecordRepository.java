@@ -107,6 +107,35 @@ public class JdbcGradeRecordRepository implements GradeRecordRepository {
     }
 
     @Override
+    public GradeRecord update(GradeRecord record) {
+        jdbcTemplate.update("""
+                        UPDATE t_grade_record
+                        SET raw_score = ?,
+                            weighted_score = ?,
+                            grade_status = ?,
+                            publish_status = ?,
+                            comment = ?,
+                            source_updated_at = ?,
+                            calculated_at = ?,
+                            published_at = ?,
+                            updated_at = ?
+                        WHERE id = ?
+                        """,
+                record.rawScore(),
+                record.weightedScore(),
+                record.gradeStatus().name(),
+                record.publishStatus().name(),
+                record.comment(),
+                nullableTimestamp(record.sourceUpdatedAt()),
+                nullableTimestamp(record.calculatedAt()),
+                nullableTimestamp(record.publishedAt()),
+                Timestamp.valueOf(record.updatedAt()),
+                record.id()
+        );
+        return findById(record.id()).orElseThrow();
+    }
+
+    @Override
     public List<GradeRecord> findByCourseId(long courseId) {
         return jdbcTemplate.query("""
                         SELECT id, course_id, student_id, grade_item_id, source_type, source_id,
@@ -121,7 +150,8 @@ public class JdbcGradeRecordRepository implements GradeRecordRepository {
         );
     }
 
-    private Optional<GradeRecord> findById(long id) {
+    @Override
+    public Optional<GradeRecord> findById(long id) {
         return jdbcTemplate.query("""
                         SELECT id, course_id, student_id, grade_item_id, source_type, source_id,
                                raw_score, weighted_score, grade_status, publish_status, comment,
