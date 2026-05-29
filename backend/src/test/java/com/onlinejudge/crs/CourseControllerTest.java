@@ -40,7 +40,9 @@ class CourseControllerTest {
                 .andReturn().getResponse().getContentAsString();
 
         String courseId = response.replaceAll("(?s).*\"id\":(\\d+).*", "$1");
-        mockMvc.perform(get("/api/v1/courses/" + courseId + "/permissions/101"))
+        mockMvc.perform(get("/api/v1/courses/" + courseId + "/permissions/101")
+                        .header("X-User-Id", "101")
+                        .header("X-User-Role", "TEACHER"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.member", is(true)))
                 .andExpect(jsonPath("$.data.teacher", is(true)))

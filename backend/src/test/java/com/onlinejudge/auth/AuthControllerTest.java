@@ -227,6 +227,68 @@ class AuthControllerTest {
                 .andExpect(jsonPath("$.code").value("ERR-AUTH-01"));
     }
 
+    @Test
+    void checkPermissionAllowsCurrentUserPermission() throws Exception {
+        registerStudent("student51", "Student51@pass", "student51@example.com", "13900000051");
+        String token = loginToken("student51", "Student51@pass");
+
+        mockMvc.perform(post("/api/v1/auth/check-permission")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "permissionCode", "course:view",
+                                "resourceType", "COURSE",
+                                "resourceId", "101"
+                        ))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"))
+                .andExpect(jsonPath("$.data.allowed").value(true))
+                .andExpect(jsonPath("$.data.permissionCode").value("course:view"));
+    }
+
+    @Test
+    void checkPermissionRejectsMissingPermissionAndAuditsDeniedAccess() throws Exception {
+        registerStudent("student52", "Student52@pass", "student52@example.com", "13900000052");
+        String token = loginToken("student52", "Student52@pass");
+
+        mockMvc.perform(post("/api/v1/auth/check-permission")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "permissionCode", "auth:manage",
+                                "resourceType", "AUTH_ADMIN",
+                                "resourceId", "roles"
+                        ))))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ERR-AUTH-03"))
+                .andExpect(jsonPath("$.message").value("无权限访问"));
+
+        assertThat(auditCount("ACCESS_DENIED", "DENIED")).isEqualTo(1);
+    }
+
+    @Test
+    void checkPermissionRejectsBlankPermissionCode() throws Exception {
+        registerStudent("student53", "Student53@pass", "student53@example.com", "13900000053");
+        String token = loginToken("student53", "Student53@pass");
+
+        mockMvc.perform(post("/api/v1/auth/check-permission")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "permissionCode", " "
+                        ))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("AUTH_400"))
+                .andExpect(jsonPath("$.message").value("权限编码不能为空"));
+    }
+
+    @Test
+    void authInterceptorProtectsBusinessEndpointWithoutCurrentUserArgument() throws Exception {
+        mockMvc.perform(get("/api/v1/courses/1/permissions/1"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("ERR-AUTH-01"));
+    }
+
     private void registerStudent(String username, String password, String email, String phone) throws Exception {
         mockMvc.perform(post("/api/v1/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -249,5 +311,19 @@ class AuthControllerTest {
                 resultStatus
         );
         return count == null ? 0 : count;
+    }
+
+    private String loginToken(String account, String password) throws Exception {
+        String body = mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "account", account,
+                                "password", password
+                        ))))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        return objectMapper.readTree(body).path("data").path("token").asText();
     }
 }

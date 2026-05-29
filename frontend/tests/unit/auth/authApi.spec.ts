@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  checkPermission,
   clearAuthSession,
   createAdminUser,
   createRole,
@@ -189,6 +190,34 @@ describe('AUTH API client', () => {
     expect(fetchMock).toHaveBeenNthCalledWith(9, '/api/v1/admin/roles/2/permissions', expect.objectContaining({
       method: 'PUT',
       body: JSON.stringify({ permissionIds: [11] })
+    }));
+  });
+
+  it('checks platform permissions through API-AUTH-16 with bearer authentication', async () => {
+    window.localStorage.setItem('onlinejudge.authToken', 'teacher-token');
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(jsonResponse({
+      allowed: true,
+      permissionCode: 'grade:manage',
+      resourceType: 'COURSE',
+      resourceId: '101',
+      reason: null
+    }));
+
+    const result = await checkPermission({
+      permissionCode: 'grade:manage',
+      resourceType: 'COURSE',
+      resourceId: '101'
+    });
+
+    expect(result.allowed).toBe(true);
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/auth/check-permission', expect.objectContaining({
+      method: 'POST',
+      headers: expect.objectContaining({ Authorization: 'Bearer teacher-token' }),
+      body: JSON.stringify({
+        permissionCode: 'grade:manage',
+        resourceType: 'COURSE',
+        resourceId: '101'
+      })
     }));
   });
 });
