@@ -23,10 +23,6 @@
     v-else-if="viewMode === 'homework' && courseId !== null"
     :course-id="courseId"
   />
-  <StudentGradeView
-    v-else-if="courseId !== null && page === 'grades' && gradeRole === 'student'"
-    :course-id="courseId"
-  />
   <TeacherGradeTableView v-else-if="courseId !== null && page === 'grades'" :course-id="courseId" />
   <GradeItemConfigView v-else-if="courseId !== null" :course-id="courseId" />
   <main v-else class="app-empty-state">
@@ -46,7 +42,6 @@ import GradeItemConfigView from '../views/grd/GradeItemConfigView.vue';
 import HomeworkTeacherView from '../views/hwk/HomeworkTeacherView.vue';
 import LabStudentView from '../views/lab/LabStudentView.vue';
 import LabTeacherView from '../views/lab/LabTeacherView.vue';
-import StudentGradeView from '../views/grd/StudentGradeView.vue';
 import TeacherGradeTableView from '../views/grd/TeacherGradeTableView.vue';
 
 const pathname = computed(() => window.location.pathname);
@@ -94,16 +89,6 @@ const viewMode = computed(() => {
 const authMode = computed(() => pathname.value === '/register' ? 'register' : 'login');
 
 const labRole = computed(() => {
-  const queryRole = searchParams.value.get('role')?.toLowerCase();
-  if (queryRole === 'student' || queryRole === 'teacher') {
-    return queryRole;
-  }
-  const storedRole = window.localStorage.getItem('onlinejudge.userRole')
-    ?? window.localStorage.getItem('onlinejudge.role');
-  return storedRole === 'STUDENT' ? 'student' : 'teacher';
-});
-
-const gradeRole = computed(() => {
   const queryRole = searchParams.value.get('role')?.toLowerCase();
   if (queryRole === 'student' || queryRole === 'teacher') {
     return queryRole;
