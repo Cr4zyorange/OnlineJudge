@@ -323,6 +323,67 @@ class AuthControllerTest {
     }
 
     @Test
+    void profileUpdateRejectsInvalidContactAndDisplayNameBeforeSaving() throws Exception {
+        registerStudent("student57", "Student57@pass", "student57@example.com", "13900000057");
+        String token = loginToken("student57", "Student57@pass");
+
+        mockMvc.perform(put("/api/v1/users/me")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "displayName", "student57",
+                                "phone", "not-a-phone",
+                                "email", "student57-new@example.com"
+                        ))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("AUTH_400"))
+                .andExpect(jsonPath("$.message").value("手机号格式不正确"));
+
+        mockMvc.perform(put("/api/v1/users/me")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "displayName", "student57",
+                                "phone", "13900000957",
+                                "email", "not-an-email"
+                        ))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("AUTH_400"))
+                .andExpect(jsonPath("$.message").value("邮箱格式不正确"));
+
+        mockMvc.perform(put("/api/v1/users/me")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "displayName", "a".repeat(65),
+                                "phone", "13900000957",
+                                "email", "student57-new@example.com"
+                        ))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("AUTH_400"))
+                .andExpect(jsonPath("$.message").value("显示名称长度不能超过64个字符"));
+
+        mockMvc.perform(put("/api/v1/users/me")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "displayName", "student57",
+                                "phone", "13900000957",
+                                "email", "student57-new@example.com",
+                                "avatarUrl", "https://example.com/" + "a".repeat(256)
+                        ))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("AUTH_400"))
+                .andExpect(jsonPath("$.message").value("头像地址长度不能超过255个字符"));
+
+        String storedEmail = jdbcTemplate.queryForObject(
+                "SELECT email FROM t_auth_user WHERE username = 'student57'",
+                String.class
+        );
+        assertThat(storedEmail).isEqualTo("student57@example.com");
+    }
+
+    @Test
     void passwordChangeRequiresOldPasswordRehashesAndRevokesExistingSessions() throws Exception {
         registerStudent("student55", "Student55@pass", "student55@example.com", "13900000055");
         String token = loginToken("student55", "Student55@pass");
@@ -339,7 +400,8 @@ class AuthControllerTest {
                                 "newPassword", "Student55@new"
                         ))))
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.code").value("AUTH_401"));
+                .andExpect(jsonPath("$.code").value("AUTH_401"))
+                .andExpect(jsonPath("$.message").value("原密码错误"));
 
         mockMvc.perform(put("/api/v1/users/me/password")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
