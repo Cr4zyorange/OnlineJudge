@@ -12,6 +12,7 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.jdbc.Sql;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -24,6 +25,7 @@ import static java.util.Map.entry;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.hasSize;
+import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -39,6 +41,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
                 "DELETE FROM t_hwk_test_case",
                 "DELETE FROM t_hwk_question",
                 "DELETE FROM t_hwk_judge_config",
+                "DELETE FROM t_hwk_submission",
                 "DELETE FROM t_hwk_homework"
         },
         executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD
@@ -61,6 +64,9 @@ class HomeworkControllerTest {
 
     @Autowired
     private RecordingNotificationEventPublisher notificationEventPublisher;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
 
     @BeforeEach
     void clearNotificationEvents() {
@@ -250,6 +256,138 @@ class HomeworkControllerTest {
     }
 
     @Test
+    void studentSubmitsPublishedTextHomeworkAndDuplicateSubmitIsRejectedWhenResubmitDisabled() throws Exception {
+        long homeworkId = createHomeworkAndReturnId(Map.ofEntries(
+                entry("courseId", 101),
+                entry("chapterId", 11),
+                entry("title", "HWK02 text published"),
+                entry("description", "Write your reflection."),
+                entry("type", "TEXT"),
+                entry("deadline", "2026-06-30T23:59:59"),
+                entry("totalScore", 100),
+                entry("allowResubmit", false),
+                entry("allowLateSubmit", false),
+                entry("showEvaluationBeforePublish", true)
+        ));
+        mockMvc.perform(put("/api/v1/homeworks/{homeworkId}/publish", homeworkId)
+                        .headers(teacherHeaders("101", "101", "101:601")))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/v1/homeworks/{homeworkId}/submissions", homeworkId)
+                        .headers(studentHeaders("101"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of("answerText", "My first answer"))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.homeworkId").value(homeworkId))
+                .andExpect(jsonPath("$.data.studentId").value(601))
+                .andExpect(jsonPath("$.data.submitType").value("TEXT"))
+                .andExpect(jsonPath("$.data.submitStatus").value("SUBMITTED"))
+                .andExpect(jsonPath("$.data.reviewStatus").value("UNREVIEWED"))
+                .andExpect(jsonPath("$.data.final").value(true))
+                .andExpect(jsonPath("$.data.submittedAt").exists());
+
+        mockMvc.perform(post("/api/v1/homeworks/{homeworkId}/submissions", homeworkId)
+                        .headers(studentHeaders("101"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of("answerText", "Second answer"))))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("HWK_4095"));
+
+        jdbcTemplate.update("""
+                UPDATE t_hwk_submission
+                SET auto_score = 80, manual_score = 90, final_score = 90, comment = 'teacher-only feedback'
+                WHERE homework_id = ? AND student_id = ?
+                """, homeworkId, 601L);
+
+        mockMvc.perform(get("/api/v1/homeworks/{homeworkId}/my-submissions", homeworkId)
+                        .headers(studentHeaders("101")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data", hasSize(1)))
+                .andExpect(jsonPath("$.data[0].answerText").value("My first answer"))
+                .andExpect(jsonPath("$.data[0].autoScore").value(nullValue()))
+                .andExpect(jsonPath("$.data[0].manualScore").value(nullValue()))
+                .andExpect(jsonPath("$.data[0].finalScore").value(nullValue()))
+                .andExpect(jsonPath("$.data[0].comment").value(nullValue()));
+    }
+
+    @Test
+    void studentSubmitAfterDeadlineIsRejectedWhenLateSubmitDisabled() throws Exception {
+        long homeworkId = createExpiredPublishedHomework(false);
+
+        mockMvc.perform(post("/api/v1/homeworks/{homeworkId}/submissions", homeworkId)
+                        .headers(studentHeaders("101"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of("answerText", "late answer"))))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("HWK_4094"));
+    }
+
+    @Test
+    void studentSubmissionContentMustMatchHomeworkType() throws Exception {
+        long homeworkId = createHomeworkAndReturnId(Map.ofEntries(
+                entry("courseId", 101),
+                entry("chapterId", 11),
+                entry("title", "HWK02 text content validation"),
+                entry("description", "Text content is required."),
+                entry("type", "TEXT"),
+                entry("deadline", "2026-06-30T23:59:59"),
+                entry("totalScore", 100),
+                entry("allowResubmit", true),
+                entry("allowLateSubmit", false),
+                entry("showEvaluationBeforePublish", true)
+        ));
+        mockMvc.perform(put("/api/v1/homeworks/{homeworkId}/publish", homeworkId)
+                        .headers(teacherHeaders("101", "101", "101:601")))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/v1/homeworks/{homeworkId}/submissions", homeworkId)
+                        .headers(studentHeaders("101"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("HWK_4008"));
+    }
+
+    @Test
+    void nonCourseMemberCannotSubmitPublishedHomework() throws Exception {
+        long homeworkId = createHomeworkAndReturnId(Map.ofEntries(
+                entry("courseId", 101),
+                entry("chapterId", 11),
+                entry("title", "HWK02 member boundary"),
+                entry("description", "Only course members can submit."),
+                entry("type", "TEXT"),
+                entry("deadline", "2026-06-30T23:59:59"),
+                entry("totalScore", 100),
+                entry("allowResubmit", true),
+                entry("allowLateSubmit", false),
+                entry("showEvaluationBeforePublish", true)
+        ));
+        mockMvc.perform(put("/api/v1/homeworks/{homeworkId}/publish", homeworkId)
+                        .headers(teacherHeaders("101", "101", "101:601")))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/v1/homeworks/{homeworkId}/submissions", homeworkId)
+                        .headers(studentHeaders("202"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of("answerText", "I should not submit"))))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("HWK_4031"));
+    }
+
+    @Test
+    void studentLateSubmissionIsMarkedLateWhenHomeworkAllowsLateSubmit() throws Exception {
+        long homeworkId = createExpiredPublishedHomework(true);
+
+        mockMvc.perform(post("/api/v1/homeworks/{homeworkId}/submissions", homeworkId)
+                        .headers(studentHeaders("101"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of("answerText", "accepted late answer"))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.submitStatus").value("LATE"))
+                .andExpect(jsonPath("$.data.final").value(true));
+    }
+
+    @Test
     void teacherSavesCodeHomeworkTestCasesBeforePublish() throws Exception {
         long homeworkId = createHomeworkAndReturnId(Map.ofEntries(
                 entry("courseId", 101),
@@ -343,6 +481,28 @@ class HomeworkControllerTest {
                         )
                 ))
         );
+    }
+
+    private long createExpiredPublishedHomework(boolean allowLateSubmit) throws Exception {
+        long homeworkId = createHomeworkAndReturnId(Map.ofEntries(
+                entry("courseId", 101),
+                entry("chapterId", 11),
+                entry("title", "HWK02 expired text"),
+                entry("description", "Expired text homework."),
+                entry("type", "TEXT"),
+                entry("deadline", "2026-06-30T23:59:59"),
+                entry("totalScore", 100),
+                entry("allowResubmit", true),
+                entry("allowLateSubmit", allowLateSubmit),
+                entry("showEvaluationBeforePublish", true)
+        ));
+        mockMvc.perform(put("/api/v1/homeworks/{homeworkId}/publish", homeworkId)
+                        .headers(teacherHeaders("101", "101", "101:601")))
+                .andExpect(status().isOk());
+        jdbcTemplate.update("UPDATE t_hwk_homework SET deadline = ? WHERE id = ?",
+                java.sql.Timestamp.valueOf("2026-05-01 23:59:59"),
+                homeworkId);
+        return homeworkId;
     }
 
     private org.springframework.http.HttpHeaders teacherHeaders(String courseIds, String manageableCourseIds) {

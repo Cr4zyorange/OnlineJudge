@@ -93,6 +93,44 @@ export interface HomeworkPayload {
   outputCompareMode: string;
 }
 
+export type HomeworkSubmitType = 'OBJECTIVE' | 'FILE' | 'CODE' | 'TEXT';
+
+export type HomeworkSubmitStatus = 'SUBMITTED' | 'LATE';
+
+export type HomeworkEvaluationStatus = 'PENDING' | 'NOT_EVALUATED' | 'NOT_REQUIRED';
+
+export type HomeworkReviewStatus = 'UNREVIEWED' | 'REVIEWED';
+
+export interface HomeworkSubmissionPayload {
+  answerText: string | null;
+  answerJson: string | null;
+  fileUrl: string | null;
+  codeText: string | null;
+  language: string | null;
+}
+
+export interface HomeworkSubmission {
+  id: number;
+  homeworkId: number;
+  studentId: number;
+  submitType: HomeworkSubmitType;
+  answerText: string | null;
+  answerJson: string | null;
+  fileUrl: string | null;
+  language: string | null;
+  submitStatus: HomeworkSubmitStatus;
+  evaluationStatus: HomeworkEvaluationStatus;
+  reviewStatus: HomeworkReviewStatus;
+  autoScore: number | null;
+  manualScore: number | null;
+  finalScore: number | null;
+  comment: string | null;
+  final: boolean;
+  submittedAt: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface PageResponse<T> {
   list: T[];
   total: number;

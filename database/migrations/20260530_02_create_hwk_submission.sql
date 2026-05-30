@@ -1,0 +1,28 @@
+CREATE TABLE IF NOT EXISTS t_hwk_submission (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    homework_id BIGINT NOT NULL,
+    student_id BIGINT NOT NULL,
+    submit_type VARCHAR(32) NOT NULL,
+    answer_text TEXT NULL,
+    answer_json TEXT NULL,
+    file_url VARCHAR(500) NULL,
+    language VARCHAR(32) NULL,
+    submit_status VARCHAR(32) NOT NULL,
+    evaluation_status VARCHAR(32) NOT NULL,
+    review_status VARCHAR(32) NOT NULL,
+    auto_score DECIMAL(6,2) NULL,
+    manual_score DECIMAL(6,2) NULL,
+    final_score DECIMAL(6,2) NULL,
+    comment VARCHAR(1000) NULL,
+    is_final TINYINT(1) NOT NULL DEFAULT 1,
+    submitted_at DATETIME NOT NULL,
+    reviewed_by BIGINT NULL,
+    reviewed_at DATETIME NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    KEY idx_hwk_submission_homework_student (homework_id, student_id),
+    KEY idx_hwk_submission_homework_status (homework_id, submit_status, evaluation_status, review_status),
+    KEY idx_hwk_submission_is_final (homework_id, student_id, is_final),
+    CONSTRAINT fk_hwk_submission_homework
+        FOREIGN KEY (homework_id) REFERENCES t_hwk_homework(id)
+);

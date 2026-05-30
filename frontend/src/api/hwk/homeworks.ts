@@ -4,6 +4,8 @@ import type {
   HomeworkPayload,
   HomeworkQuestionPayload,
   HomeworkStatus,
+  HomeworkSubmission,
+  HomeworkSubmissionPayload,
   HomeworkSummary,
   HomeworkTestCasePayload,
   PageResponse
@@ -48,6 +50,17 @@ export function updateHomework(homeworkId: number, payload: HomeworkPayload): Pr
 
 export function getHomeworkDetail(homeworkId: number): Promise<HomeworkDetail> {
   return request<HomeworkDetail>(`/api/v1/homeworks/${homeworkId}`);
+}
+
+export function submitHomework(homeworkId: number, payload: HomeworkSubmissionPayload): Promise<HomeworkSubmission> {
+  return request<HomeworkSubmission>(`/api/v1/homeworks/${homeworkId}/submissions`, {
+    method: 'POST',
+    body: payload
+  });
+}
+
+export function listMyHomeworkSubmissions(homeworkId: number): Promise<HomeworkSubmission[]> {
+  return request<HomeworkSubmission[]>(`/api/v1/homeworks/${homeworkId}/my-submissions`);
 }
 
 export function saveHomeworkQuestions(

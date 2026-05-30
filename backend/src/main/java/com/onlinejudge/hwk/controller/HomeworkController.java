@@ -6,6 +6,7 @@ import com.onlinejudge.common.web.ApiResponse;
 import com.onlinejudge.common.web.PageResponse;
 import com.onlinejudge.hwk.domain.HomeworkStatus;
 import com.onlinejudge.hwk.service.HomeworkService;
+import com.onlinejudge.hwk.service.HomeworkSubmissionService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -24,9 +25,11 @@ import java.util.List;
 @RequestMapping("/api/v1/homeworks")
 public class HomeworkController {
     private final HomeworkService homeworkService;
+    private final HomeworkSubmissionService homeworkSubmissionService;
 
-    public HomeworkController(HomeworkService homeworkService) {
+    public HomeworkController(HomeworkService homeworkService, HomeworkSubmissionService homeworkSubmissionService) {
         this.homeworkService = homeworkService;
+        this.homeworkSubmissionService = homeworkSubmissionService;
     }
 
     @PostMapping
@@ -111,6 +114,30 @@ public class HomeworkController {
         return ApiResponse.ok(HomeworkResponse.fromTeacherView(homeworkService.close(homeworkId, currentUser.id())));
     }
 
+    @PostMapping("/{homeworkId}/submissions")
+    public ResponseEntity<ApiResponse<HomeworkSubmissionResponse>> submit(
+            @PathVariable long homeworkId,
+            CurrentUser currentUser,
+            @RequestBody HomeworkSubmissionRequest request
+    ) {
+        requireStudent(currentUser);
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.ok(HomeworkSubmissionResponse.fromStudentView(
+                homeworkSubmissionService.submit(homeworkId, currentUser.id(), request)
+        )));
+    }
+
+    @GetMapping("/{homeworkId}/my-submissions")
+    public ApiResponse<List<HomeworkSubmissionResponse>> mySubmissions(
+            @PathVariable long homeworkId,
+            CurrentUser currentUser
+    ) {
+        requireStudent(currentUser);
+        return ApiResponse.ok(homeworkSubmissionService.listMine(homeworkId, currentUser.id())
+                .stream()
+                .map(HomeworkSubmissionResponse::fromStudentView)
+                .toList());
+    }
+
     private PageResponse<HomeworkResponse> mapPage(PageResponse<com.onlinejudge.hwk.domain.Homework> page) {
         return new PageResponse<>(page.list().stream().map(HomeworkResponse::summary).toList(), page.total(), page.page(), page.size());
     }
@@ -118,6 +145,12 @@ public class HomeworkController {
     private void requireTeacher(CurrentUser currentUser) {
         if (!currentUser.hasRole("TEACHER") && !currentUser.hasRole("ADMIN")) {
             throw new AccessDeniedException("teacher role is required");
+        }
+    }
+
+    private void requireStudent(CurrentUser currentUser) {
+        if (!currentUser.hasRole("STUDENT")) {
+            throw new AccessDeniedException("student role is required");
         }
     }
 }

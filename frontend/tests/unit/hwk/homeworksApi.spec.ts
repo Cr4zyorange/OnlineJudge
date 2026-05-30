@@ -3,10 +3,12 @@ import {
   closeHomework,
   createHomework,
   getHomeworkDetail,
+  listMyHomeworkSubmissions,
   listHomeworks,
   publishHomework,
   saveHomeworkQuestions,
   saveHomeworkTestCases,
+  submitHomework,
   updateHomework
 } from '../../../src/api/hwk/homeworks';
 
@@ -29,6 +31,8 @@ describe('homeworks api', () => {
       .mockResolvedValueOnce(jsonResponse(homeworkDetail({ id: 11, questions: [{ ...questionPayload(), id: 7, homeworkId: 11 }] })))
       .mockResolvedValueOnce(jsonResponse(homeworkDetail({ id: 11, testCases: [{ ...testCasePayload(), id: 9, homeworkId: 11 }] })))
       .mockResolvedValueOnce(jsonResponse(homeworkDetail({ id: 11 })))
+      .mockResolvedValueOnce(jsonResponse(submission({ id: 31 })))
+      .mockResolvedValueOnce(jsonResponse([submission({ id: 31 })]))
       .mockResolvedValueOnce(jsonResponse(homeworkDetail({ id: 11, status: 'PUBLISHED' })))
       .mockResolvedValueOnce(jsonResponse(homeworkDetail({ id: 11, status: 'CLOSED' })));
 
@@ -39,6 +43,8 @@ describe('homeworks api', () => {
     await saveHomeworkQuestions(11, [questionPayload()]);
     await saveHomeworkTestCases(11, [testCasePayload()]);
     await getHomeworkDetail(11);
+    await submitHomework(11, { answerText: 'text answer', answerJson: null, fileUrl: null, codeText: null, language: null });
+    await listMyHomeworkSubmissions(11);
     await publishHomework(11);
     await closeHomework(11);
 
@@ -49,6 +55,8 @@ describe('homeworks api', () => {
       ['/api/v1/homeworks/11/questions', 'PUT'],
       ['/api/v1/homeworks/11/test-cases', 'PUT'],
       ['/api/v1/homeworks/11', 'GET'],
+      ['/api/v1/homeworks/11/submissions', 'POST'],
+      ['/api/v1/homeworks/11/my-submissions', 'GET'],
       ['/api/v1/homeworks/11/publish', 'PUT'],
       ['/api/v1/homeworks/11/close', 'PUT']
     ]);
@@ -121,6 +129,31 @@ function homeworkDetail(overrides: Record<string, unknown> = {}) {
     updatedAt: '2026-05-30T12:00:00',
     questions: [],
     testCases: [],
+    ...overrides
+  };
+}
+
+function submission(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 31,
+    homeworkId: 11,
+    studentId: 601,
+    submitType: 'TEXT',
+    answerText: 'text answer',
+    answerJson: null,
+    fileUrl: null,
+    language: null,
+    submitStatus: 'SUBMITTED',
+    evaluationStatus: 'NOT_REQUIRED',
+    reviewStatus: 'UNREVIEWED',
+    autoScore: null,
+    manualScore: null,
+    finalScore: null,
+    comment: null,
+    final: true,
+    submittedAt: '2026-05-30T13:00:00',
+    createdAt: '2026-05-30T13:00:00',
+    updatedAt: '2026-05-30T13:00:00',
     ...overrides
   };
 }
