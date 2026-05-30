@@ -15,11 +15,18 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.Locale;
+import java.util.regex.Pattern;
 
 @Service
 public class AuthService {
     private static final int MAX_FAILED_LOGIN_COUNT = 5;
     private static final int LOCK_MINUTES = 15;
+    private static final int DISPLAY_NAME_MAX_LENGTH = 64;
+    private static final int PHONE_MAX_LENGTH = 32;
+    private static final int EMAIL_MAX_LENGTH = 128;
+    private static final int AVATAR_URL_MAX_LENGTH = 255;
+    private static final Pattern PHONE_PATTERN = Pattern.compile("1[3-9]\\d{9}");
+    private static final Pattern EMAIL_PATTERN = Pattern.compile("^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$");
 
     private final AuthRepository authRepository;
     private final PasswordSecurityService passwordSecurityService;
@@ -122,6 +129,7 @@ public class AuthService {
         String phone = blankToNull(request.phone());
         String email = blankToNull(request.email());
         String avatarUrl = blankToNull(request.avatarUrl());
+        validateProfileFields(displayName, phone, email, avatarUrl);
         authRepository.findUserByPhone(phone)
                 .filter(user -> !user.id().equals(current.id()))
                 .ifPresent(user -> {
@@ -144,7 +152,7 @@ public class AuthService {
         String newPassword = requireText(request.newPassword(), "新密码不能为空");
         if (!passwordSecurityService.matches(oldPassword, current.passwordHash(), current.passwordSalt())) {
             authAuditService.record(current.id(), "PASSWORD_CHANGE_FAILED", "AUTH_USER", String.valueOf(current.id()), "FAILURE", "原密码错误");
-            throw AuthApiException.loginFailed();
+            throw AuthApiException.oldPasswordWrong();
         }
         if (oldPassword.equals(newPassword)) {
             throw AuthApiException.conflict("新旧密码不能相同");
@@ -178,6 +186,21 @@ public class AuthService {
             throw AuthApiException.badRequest("用户类型必须是 STUDENT、TEACHER 或 ADMIN");
         }
         return normalized;
+    }
+
+    private void validateProfileFields(String displayName, String phone, String email, String avatarUrl) {
+        if (displayName.length() > DISPLAY_NAME_MAX_LENGTH) {
+            throw AuthApiException.badRequest("显示名称长度不能超过64个字符");
+        }
+        if (phone != null && (phone.length() > PHONE_MAX_LENGTH || !PHONE_PATTERN.matcher(phone).matches())) {
+            throw AuthApiException.badRequest("手机号格式不正确");
+        }
+        if (email != null && (email.length() > EMAIL_MAX_LENGTH || !EMAIL_PATTERN.matcher(email).matches())) {
+            throw AuthApiException.badRequest("邮箱格式不正确");
+        }
+        if (avatarUrl != null && avatarUrl.length() > AVATAR_URL_MAX_LENGTH) {
+            throw AuthApiException.badRequest("头像地址长度不能超过255个字符");
+        }
     }
 
     private String requireText(String value, String message) {

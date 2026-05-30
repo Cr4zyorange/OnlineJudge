@@ -16,6 +16,10 @@ public class AuthApiException extends ApiException {
         return new AuthApiException("AUTH_401", "账号或密码错误", HttpStatus.UNAUTHORIZED);
     }
 
+    public static AuthApiException oldPasswordWrong() {
+        return new AuthApiException("AUTH_401", "原密码错误", HttpStatus.UNAUTHORIZED);
+    }
+
     public static AuthApiException disabled() {
         return new AuthApiException("AUTH_403", "账号状态异常，请联系管理员", HttpStatus.FORBIDDEN);
     }
