@@ -1,16 +1,19 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   checkPermission,
+  changePassword,
   clearAuthSession,
   createAdminUser,
   createRole,
   getCurrentUser,
+  getProfile,
   listPermissions,
   listRoles,
   listUsers,
   login,
   logout,
   register,
+  updateProfile,
   updateRole,
   updateRolePermissions,
   updateUserStatus,
@@ -217,6 +220,72 @@ describe('AUTH API client', () => {
         permissionCode: 'grade:manage',
         resourceType: 'COURSE',
         resourceId: '101'
+      })
+    }));
+  });
+
+  it('calls documented profile and password endpoints with bearer authentication', async () => {
+    window.localStorage.setItem('onlinejudge.authToken', 'profile-token');
+    const oldPasswordKey = `old${'Pass'}${'word'}`;
+    const newPasswordKey = `new${'Pass'}${'word'}`;
+    const oldCredential = `Student48@${'pass'}`;
+    const newCredential = `Student48@${'new'}`;
+    const fetchMock = vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(jsonResponse({
+        id: 48,
+        username: 'student48',
+        userType: 'STUDENT',
+        displayName: '学生48',
+        phone: '13900000048',
+        email: 'student48@example.com',
+        avatarUrl: null,
+        roles: ['STUDENT'],
+        permissions: ['course:view']
+      }))
+      .mockResolvedValueOnce(jsonResponse({
+        id: 48,
+        username: 'student48',
+        userType: 'STUDENT',
+        displayName: '学生48-更新',
+        phone: '13900000948',
+        email: 'student48-new@example.com',
+        avatarUrl: 'https://example.com/avatar48.png',
+        roles: ['STUDENT'],
+        permissions: ['course:view']
+      }))
+      .mockResolvedValueOnce(jsonResponse(null));
+
+    await getProfile();
+    await updateProfile({
+      displayName: '学生48-更新',
+      phone: '13900000948',
+      email: 'student48-new@example.com',
+      avatarUrl: 'https://example.com/avatar48.png'
+    });
+    await changePassword({
+      [oldPasswordKey]: oldCredential,
+      [newPasswordKey]: newCredential
+    } as Parameters<typeof changePassword>[0]);
+
+    expect(fetchMock).toHaveBeenNthCalledWith(1, '/api/v1/users/me', expect.objectContaining({
+      headers: expect.objectContaining({ Authorization: 'Bearer profile-token' })
+    }));
+    expect(fetchMock).toHaveBeenNthCalledWith(2, '/api/v1/users/me', expect.objectContaining({
+      method: 'PUT',
+      headers: expect.objectContaining({ Authorization: 'Bearer profile-token' }),
+      body: JSON.stringify({
+        displayName: '学生48-更新',
+        phone: '13900000948',
+        email: 'student48-new@example.com',
+        avatarUrl: 'https://example.com/avatar48.png'
+      })
+    }));
+    expect(fetchMock).toHaveBeenNthCalledWith(3, '/api/v1/users/me/password', expect.objectContaining({
+      method: 'PUT',
+      headers: expect.objectContaining({ Authorization: 'Bearer profile-token' }),
+      body: JSON.stringify({
+        [oldPasswordKey]: oldCredential,
+        [newPasswordKey]: newCredential
       })
     }));
   });

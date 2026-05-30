@@ -51,6 +51,18 @@ export interface LoginPayload {
   password: string;
 }
 
+export interface ProfileUpdatePayload {
+  displayName: string;
+  phone?: string;
+  email?: string;
+  avatarUrl?: string;
+}
+
+export interface PasswordChangePayload {
+  oldPassword: string;
+  newPassword: string;
+}
+
 export interface RegisterPayload {
   username: string;
   password: string;
@@ -111,6 +123,24 @@ export function register(payload: RegisterPayload) {
 
 export function getCurrentUser() {
   return request<AuthUser>('/api/v1/auth/me');
+}
+
+export function getProfile() {
+  return request<AuthUser>('/api/v1/users/me');
+}
+
+export function updateProfile(payload: ProfileUpdatePayload) {
+  return request<AuthUser>('/api/v1/users/me', {
+    method: 'PUT',
+    body: payload
+  });
+}
+
+export function changePassword(payload: PasswordChangePayload) {
+  return request<void>('/api/v1/users/me/password', {
+    method: 'PUT',
+    body: payload
+  });
 }
 
 export function checkPermission(payload: PermissionCheckPayload) {
