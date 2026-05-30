@@ -2,6 +2,7 @@
   <AuthView v-if="viewMode === 'auth'" :initial-mode="authMode" />
   <AuthStatusView v-else-if="viewMode === 'forbidden'" kind="forbidden" />
   <AuthStatusView v-else-if="viewMode === 'session-expired'" kind="expired" />
+  <AuthProfileView v-else-if="viewMode === 'profile'" />
   <AuthAdminView v-else-if="viewMode === 'auth-admin' && adminGate === 'allowed'" />
   <main v-else-if="viewMode === 'auth-admin'" class="app-empty-state">
     <p v-if="adminGate === 'checking'">正在校验登录状态</p>
@@ -32,6 +33,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { getCurrentUser } from '../api/auth/auth';
+import AuthProfileView from '../views/auth/AuthProfileView.vue';
 import AuthStatusView from '../views/auth/AuthStatusView.vue';
 import AuthView from '../views/auth/AuthView.vue';
 import AuthAdminView from '../views/auth/AuthAdminView.vue';
@@ -65,6 +67,9 @@ const viewMode = computed(() => {
   }
   if (pathname.value === '/session-expired') {
     return 'session-expired';
+  }
+  if (pathname.value === '/profile' || pathname.value === '/profile/password') {
+    return 'profile';
   }
   if (pathname.value === '/admin/auth') {
     return 'auth-admin';
