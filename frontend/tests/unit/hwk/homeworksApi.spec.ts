@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   closeHomework,
   createHomework,
+  getHomeworkDetail,
   listHomeworks,
   publishHomework,
   saveHomeworkQuestions,
@@ -27,6 +28,7 @@ describe('homeworks api', () => {
       .mockResolvedValueOnce(jsonResponse(homeworkDetail({ id: 11, title: 'updated' })))
       .mockResolvedValueOnce(jsonResponse(homeworkDetail({ id: 11, questions: [{ ...questionPayload(), id: 7, homeworkId: 11 }] })))
       .mockResolvedValueOnce(jsonResponse(homeworkDetail({ id: 11, testCases: [{ ...testCasePayload(), id: 9, homeworkId: 11 }] })))
+      .mockResolvedValueOnce(jsonResponse(homeworkDetail({ id: 11 })))
       .mockResolvedValueOnce(jsonResponse(homeworkDetail({ id: 11, status: 'PUBLISHED' })))
       .mockResolvedValueOnce(jsonResponse(homeworkDetail({ id: 11, status: 'CLOSED' })));
 
@@ -36,6 +38,7 @@ describe('homeworks api', () => {
     await updateHomework(11, { ...homeworkPayload(), title: 'updated' });
     await saveHomeworkQuestions(11, [questionPayload()]);
     await saveHomeworkTestCases(11, [testCasePayload()]);
+    await getHomeworkDetail(11);
     await publishHomework(11);
     await closeHomework(11);
 
@@ -45,6 +48,7 @@ describe('homeworks api', () => {
       ['/api/v1/homeworks/11', 'PUT'],
       ['/api/v1/homeworks/11/questions', 'PUT'],
       ['/api/v1/homeworks/11/test-cases', 'PUT'],
+      ['/api/v1/homeworks/11', 'GET'],
       ['/api/v1/homeworks/11/publish', 'PUT'],
       ['/api/v1/homeworks/11/close', 'PUT']
     ]);

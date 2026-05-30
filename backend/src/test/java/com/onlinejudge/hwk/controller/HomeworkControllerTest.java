@@ -138,6 +138,91 @@ class HomeworkControllerTest {
     }
 
     @Test
+    void studentPublishedHomeworkListAndDetailDoNotExposeAnswersOrHiddenTestCaseOutput() throws Exception {
+        long objectiveHomeworkId = createHomeworkAndReturnId(objectivePayload());
+        mockMvc.perform(put("/api/v1/homeworks/{homeworkId}/publish", objectiveHomeworkId)
+                        .headers(teacherHeaders("101", "101", "101:601")))
+                .andExpect(status().isOk());
+
+        long codeHomeworkId = createHomeworkAndReturnId(Map.ofEntries(
+                entry("courseId", 101),
+                entry("chapterId", 11),
+                entry("title", "HWK01 code with hidden case"),
+                entry("description", "Implement addition."),
+                entry("type", "CODE"),
+                entry("deadline", "2026-06-30T23:59:59"),
+                entry("totalScore", 100),
+                entry("allowResubmit", true),
+                entry("allowLateSubmit", false),
+                entry("showEvaluationBeforePublish", true),
+                entry("languageLimitJson", "[\"java\"]"),
+                entry("timeLimitMs", 1000),
+                entry("memoryLimitKb", 65536),
+                entry("outputCompareMode", "EXACT"),
+                entry("testCases", List.of(
+                        Map.of(
+                                "inputData", "1 2",
+                                "expectedOutput", "3",
+                                "scoreWeight", 50,
+                                "hidden", false,
+                                "timeLimitMs", 1000,
+                                "memoryLimitKb", 65536,
+                                "sortOrder", 1
+                        ),
+                        Map.of(
+                                "inputData", "40 2",
+                                "expectedOutput", "42",
+                                "scoreWeight", 50,
+                                "hidden", true,
+                                "timeLimitMs", 1000,
+                                "memoryLimitKb", 65536,
+                                "sortOrder", 2
+                        )
+                ))
+        ));
+        mockMvc.perform(put("/api/v1/homeworks/{homeworkId}/publish", codeHomeworkId)
+                        .headers(teacherHeaders("101", "101", "101:601")))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/v1/homeworks")
+                        .headers(studentHeaders("101"))
+                        .param("courseId", "101"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.list", hasSize(2)))
+                .andExpect(jsonPath("$.data.list[0].questions").isEmpty())
+                .andExpect(jsonPath("$.data.list[0].testCases").isEmpty());
+
+        mockMvc.perform(get("/api/v1/homeworks/{homeworkId}", objectiveHomeworkId)
+                        .headers(studentHeaders("101")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.questions", hasSize(2)))
+                .andExpect(jsonPath("$.data.questions[0].answerJson").doesNotExist());
+
+        mockMvc.perform(get("/api/v1/homeworks/{homeworkId}", codeHomeworkId)
+                        .headers(studentHeaders("101")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.testCases", hasSize(1)))
+                .andExpect(jsonPath("$.data.testCases[0].hidden").value(false))
+                .andExpect(jsonPath("$.data.testCases[0].expectedOutput").value("3"));
+    }
+
+    @Test
+    void publishKeepsHomeworkPublishedWhenNotificationDeliveryFails() throws Exception {
+        notificationEventPublisher.failNextPublish();
+        long homeworkId = createHomeworkAndReturnId(objectivePayload());
+
+        mockMvc.perform(put("/api/v1/homeworks/{homeworkId}/publish", homeworkId)
+                        .headers(teacherHeaders("101", "101", "101:7001")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("PUBLISHED"));
+
+        mockMvc.perform(get("/api/v1/homeworks/{homeworkId}", homeworkId)
+                        .headers(teacherHeaders("101", "101")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("PUBLISHED"));
+    }
+
+    @Test
     void codeHomeworkWithoutTestCasesIsRejectedWhenPublishing() throws Exception {
         long homeworkId = createHomeworkAndReturnId(Map.ofEntries(
                 entry("courseId", 101),
@@ -177,12 +262,20 @@ class HomeworkControllerTest {
                 entry("allowResubmit", true),
                 entry("allowLateSubmit", false),
                 entry("showEvaluationBeforePublish", true),
-                entry("languageLimitJson", "[\"java\"]"),
-                entry("timeLimitMs", 1000),
-                entry("memoryLimitKb", 65536),
-                entry("outputCompareMode", "EXACT"),
+                entry("languageLimitJson", "[\"python\"]"),
+                entry("timeLimitMs", 2000),
+                entry("memoryLimitKb", 131072),
+                entry("outputCompareMode", "TRIM"),
                 entry("testCases", List.of())
         ));
+
+        mockMvc.perform(get("/api/v1/homeworks/{homeworkId}", homeworkId)
+                        .headers(teacherHeaders("101", "101")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.languageLimitJson").value("[\"python\"]"))
+                .andExpect(jsonPath("$.data.timeLimitMs").value(2000))
+                .andExpect(jsonPath("$.data.memoryLimitKb").value(131072))
+                .andExpect(jsonPath("$.data.outputCompareMode").value("TRIM"));
 
         mockMvc.perform(put("/api/v1/homeworks/{homeworkId}/test-cases", homeworkId)
                         .headers(teacherHeaders("101", "101"))
@@ -272,11 +365,24 @@ class HomeworkControllerTest {
         return headers;
     }
 
+    private org.springframework.http.HttpHeaders studentHeaders(String courseIds) {
+        org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
+        headers.add("X-User-Id", "601");
+        headers.add("X-User-Role", "STUDENT");
+        headers.add("X-Course-Ids", courseIds);
+        return headers;
+    }
+
     static final class RecordingNotificationEventPublisher implements NotificationEventPublisher {
         private final List<NotificationEvent> events = new CopyOnWriteArrayList<>();
+        private volatile boolean failNextPublish;
 
         @Override
         public void publish(NotificationEvent event) {
+            if (failNextPublish) {
+                failNextPublish = false;
+                throw new IllegalStateException("notification broker unavailable");
+            }
             events.add(event);
         }
 
@@ -286,6 +392,11 @@ class HomeworkControllerTest {
 
         void clear() {
             events.clear();
+            failNextPublish = false;
+        }
+
+        void failNextPublish() {
+            failNextPublish = true;
         }
     }
 }

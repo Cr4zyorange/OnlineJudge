@@ -82,6 +82,21 @@
             <span>语言限制 JSON</span>
             <input v-model="form.languageLimitJson" name="languageLimitJson" type="text" />
           </label>
+          <label>
+            <span>时间限制(ms)</span>
+            <input v-model="form.timeLimitMs" name="timeLimitMs" type="number" min="1" />
+          </label>
+          <label>
+            <span>内存限制(KB)</span>
+            <input v-model="form.memoryLimitKb" name="memoryLimitKb" type="number" min="1" />
+          </label>
+          <label>
+            <span>输出比较</span>
+            <select v-model="form.outputCompareMode" name="outputCompareMode">
+              <option value="EXACT">EXACT</option>
+              <option value="TRIM">TRIM</option>
+            </select>
+          </label>
           <div v-for="(testCase, index) in form.testCases" :key="`test-case-${index}`" class="homeworks__config-card">
             <label>
               <span>输入</span>
@@ -112,7 +127,7 @@
         </section>
 
         <div class="homeworks__actions">
-          <button type="submit" :disabled="saving">保存草稿</button>
+          <button type="submit" :disabled="saving">{{ editingId ? '保存修改' : '保存草稿' }}</button>
           <button type="button" :disabled="saving" @click="resetForm">清空</button>
         </div>
       </form>
@@ -158,6 +173,12 @@
             <td>{{ formatDeadline(homework.deadline) }}</td>
             <td>{{ homework.totalScore }}</td>
             <td class="homeworks__row-actions">
+              <button
+                v-if="homework.status === 'DRAFT'"
+                :data-testid="`edit-homework-${homework.id}`"
+                type="button"
+                @click="edit(homework.id)"
+              >编辑</button>
               <button v-if="homework.status === 'DRAFT'" type="button" @click="publish(homework.id)">发布</button>
               <button v-if="homework.status === 'PUBLISHED'" type="button" @click="close(homework.id)">关闭</button>
             </td>
@@ -170,8 +191,9 @@
 
 <script setup lang="ts">
 import { onMounted, reactive, ref, watch } from 'vue';
-import { closeHomework, createHomework, listHomeworks, publishHomework } from '../../api/hwk/homeworks';
+import { closeHomework, createHomework, getHomeworkDetail, listHomeworks, publishHomework, updateHomework } from '../../api/hwk/homeworks';
 import type {
+  HomeworkDetail,
   HomeworkPayload,
   HomeworkQuestionPayload,
   HomeworkStatus,
@@ -191,6 +213,7 @@ const feedback = ref('');
 const errorMessage = ref('');
 const selectedStatus = ref('');
 const keyword = ref('');
+const editingId = ref<number | null>(null);
 
 const form = reactive({
   title: '',
@@ -202,6 +225,9 @@ const form = reactive({
   allowLateSubmit: false,
   showEvaluationBeforePublish: true,
   languageLimitJson: '["java"]',
+  timeLimitMs: '1000',
+  memoryLimitKb: '65536',
+  outputCompareMode: 'EXACT',
   questions: [createEmptyQuestion()],
   testCases: [createEmptyTestCase()]
 });
@@ -237,12 +263,31 @@ async function submit() {
   }
   saving.value = true;
   try {
-    await createHomework(buildPayload());
+    if (editingId.value) {
+      await updateHomework(editingId.value, buildPayload());
+    } else {
+      await createHomework(buildPayload());
+    }
     feedback.value = '保存成功';
     resetForm();
     await loadHomeworks();
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '作业保存失败';
+  } finally {
+    saving.value = false;
+  }
+}
+
+async function edit(homeworkId: number) {
+  feedback.value = '';
+  errorMessage.value = '';
+  saving.value = true;
+  try {
+    const detail = await getHomeworkDetail(homeworkId);
+    fillForm(detail);
+    editingId.value = homeworkId;
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : '作业详情加载失败';
   } finally {
     saving.value = false;
   }
@@ -312,9 +357,9 @@ function buildPayload(): HomeworkPayload {
     questions: form.type === 'OBJECTIVE' ? collectQuestions() : [],
     testCases: form.type === 'CODE' ? collectTestCases() : [],
     languageLimitJson: form.type === 'CODE' ? form.languageLimitJson.trim() || null : null,
-    timeLimitMs: 1000,
-    memoryLimitKb: 65536,
-    outputCompareMode: 'EXACT'
+    timeLimitMs: form.type === 'CODE' ? Number(form.timeLimitMs) : 1000,
+    memoryLimitKb: form.type === 'CODE' ? Number(form.memoryLimitKb) : 65536,
+    outputCompareMode: form.type === 'CODE' ? form.outputCompareMode : 'EXACT'
   };
 }
 
@@ -370,6 +415,7 @@ function removeTestCase(index: number) {
 }
 
 function resetForm() {
+  editingId.value = null;
   form.title = '';
   form.description = '';
   form.type = 'OBJECTIVE';
@@ -379,8 +425,45 @@ function resetForm() {
   form.allowLateSubmit = false;
   form.showEvaluationBeforePublish = true;
   form.languageLimitJson = '["java"]';
+  form.timeLimitMs = '1000';
+  form.memoryLimitKb = '65536';
+  form.outputCompareMode = 'EXACT';
   form.questions = [createEmptyQuestion()];
   form.testCases = [createEmptyTestCase()];
+}
+
+function fillForm(homework: HomeworkDetail) {
+  form.title = homework.title;
+  form.description = homework.description;
+  form.type = homework.type;
+  form.deadline = homework.deadline.slice(0, 16);
+  form.totalScore = String(homework.totalScore);
+  form.allowResubmit = homework.allowResubmit;
+  form.allowLateSubmit = homework.allowLateSubmit;
+  form.showEvaluationBeforePublish = homework.showEvaluationBeforePublish;
+  form.languageLimitJson = homework.languageLimitJson ?? '["java"]';
+  form.timeLimitMs = String(homework.timeLimitMs ?? 1000);
+  form.memoryLimitKb = String(homework.memoryLimitKb ?? 65536);
+  form.outputCompareMode = homework.outputCompareMode ?? 'EXACT';
+  form.questions = homework.questions.length > 0
+    ? homework.questions.map((question) => ({
+      questionType: question.questionType,
+      stem: question.stem,
+      optionsJson: question.optionsJson ?? '',
+      answerJson: question.answerJson ?? '',
+      score: String(question.score)
+    }))
+    : [createEmptyQuestion()];
+  form.testCases = homework.testCases.length > 0
+    ? homework.testCases.map((testCase) => ({
+      inputData: testCase.inputData,
+      expectedOutput: testCase.expectedOutput ?? '',
+      scoreWeight: String(testCase.scoreWeight),
+      hidden: testCase.hidden,
+      timeLimitMs: String(testCase.timeLimitMs),
+      memoryLimitKb: String(testCase.memoryLimitKb)
+    }))
+    : [createEmptyTestCase()];
 }
 
 function createEmptyQuestion() {

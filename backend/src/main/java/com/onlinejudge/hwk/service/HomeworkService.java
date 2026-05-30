@@ -12,6 +12,8 @@ import com.onlinejudge.hwk.domain.HomeworkStatus;
 import com.onlinejudge.hwk.domain.HomeworkTestCase;
 import com.onlinejudge.hwk.domain.HomeworkType;
 import com.onlinejudge.integration.course.CoursePermissionClient;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,6 +23,8 @@ import java.util.List;
 
 @Service
 public class HomeworkService {
+    private static final Logger log = LoggerFactory.getLogger(HomeworkService.class);
+
     private final HomeworkRepository repository;
     private final CoursePermissionClient coursePermissionClient;
     private final NotificationEventPublisher notificationEventPublisher;
@@ -118,6 +122,10 @@ public class HomeworkService {
         return homework;
     }
 
+    public boolean canManageCourse(long courseId, long userId) {
+        return coursePermissionClient.canManageCourse(courseId, userId);
+    }
+
     @Transactional
     public Homework saveQuestions(long homeworkId, long teacherId, List<HomeworkQuestion> questions) {
         Homework existing = findExisting(homeworkId);
@@ -150,18 +158,22 @@ public class HomeworkService {
             throw new HomeworkApiException("HWK_4005", "objective homework requires at least one question", HttpStatus.BAD_REQUEST);
         }
         Homework published = repository.update(existing.publish(LocalDateTime.now()));
-        notificationEventPublisher.publish(new NotificationEvent(
-                "homework-published-" + published.id() + "-" + published.updatedAt(),
-                "HOMEWORK_PUBLISHED",
-                published.courseId(),
-                coursePermissionClient.listCourseStudentIds(published.courseId()),
-                "homework published",
-                "New homework: " + published.title(),
-                "HWK",
-                published.id(),
-                "/courses/" + published.courseId() + "/homeworks/" + published.id(),
-                published.updatedAt()
-        ));
+        try {
+            notificationEventPublisher.publish(new NotificationEvent(
+                    "homework-published-" + published.id() + "-" + published.updatedAt(),
+                    "HOMEWORK_PUBLISHED",
+                    published.courseId(),
+                    coursePermissionClient.listCourseStudentIds(published.courseId()),
+                    "homework published",
+                    "New homework: " + published.title(),
+                    "HWK",
+                    published.id(),
+                    "/courses/" + published.courseId() + "/homeworks/" + published.id(),
+                    published.updatedAt()
+            ));
+        } catch (RuntimeException ex) {
+            log.warn("Failed to publish HOMEWORK_PUBLISHED event for homework {}: {}", published.id(), ex.toString());
+        }
         return published;
     }
 

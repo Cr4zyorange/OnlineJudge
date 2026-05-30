@@ -179,6 +179,17 @@ public class CourseRepository {
                 """, Long.class, courseId);
     }
 
+    public List<Long> listActiveStudentIds(Long courseId) {
+        return jdbcTemplate.queryForList("""
+                SELECT user_id FROM crs_course_member
+                 WHERE course_id = ?
+                   AND role = 'STUDENT'
+                   AND join_status = 'ACTIVE'
+                   AND is_deleted = FALSE
+                 ORDER BY user_id
+                """, Long.class, courseId);
+    }
+
     private void bindCourse(PreparedStatement ps, String name, String description, Long teacherId, String semester,
                             String category, String coverUrl, EnrollmentMode enrollmentMode, String inviteCode,
                             Integer maxStudents, LocalDate startDate, LocalDate endDate, CourseStatus status) throws java.sql.SQLException {

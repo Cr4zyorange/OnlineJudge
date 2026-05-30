@@ -35,7 +35,7 @@ public class HomeworkController {
             @Valid @RequestBody HomeworkRequest request
     ) {
         requireTeacher(currentUser);
-        HomeworkResponse response = HomeworkResponse.from(homeworkService.create(currentUser.id(), request.toCommand()));
+        HomeworkResponse response = HomeworkResponse.fromTeacherView(homeworkService.create(currentUser.id(), request.toCommand()));
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.ok(response));
     }
 
@@ -46,7 +46,7 @@ public class HomeworkController {
             @Valid @RequestBody HomeworkRequest request
     ) {
         requireTeacher(currentUser);
-        return ApiResponse.ok(HomeworkResponse.from(homeworkService.update(homeworkId, currentUser.id(), request.toCommand())));
+        return ApiResponse.ok(HomeworkResponse.fromTeacherView(homeworkService.update(homeworkId, currentUser.id(), request.toCommand())));
     }
 
     @GetMapping
@@ -64,7 +64,11 @@ public class HomeworkController {
 
     @GetMapping("/{homeworkId}")
     public ApiResponse<HomeworkResponse> detail(@PathVariable long homeworkId, CurrentUser currentUser) {
-        return ApiResponse.ok(HomeworkResponse.from(homeworkService.detail(homeworkId, currentUser.id())));
+        com.onlinejudge.hwk.domain.Homework homework = homeworkService.detail(homeworkId, currentUser.id());
+        if (homeworkService.canManageCourse(homework.courseId(), currentUser.id())) {
+            return ApiResponse.ok(HomeworkResponse.fromTeacherView(homework));
+        }
+        return ApiResponse.ok(HomeworkResponse.fromStudentView(homework));
     }
 
     @PutMapping("/{homeworkId}/questions")
@@ -74,7 +78,7 @@ public class HomeworkController {
             @Valid @RequestBody List<HomeworkQuestionPayload> questions
     ) {
         requireTeacher(currentUser);
-        return ApiResponse.ok(HomeworkResponse.from(homeworkService.saveQuestions(
+        return ApiResponse.ok(HomeworkResponse.fromTeacherView(homeworkService.saveQuestions(
                 homeworkId,
                 currentUser.id(),
                 questions.stream().map(HomeworkQuestionPayload::toDomain).toList()
@@ -88,7 +92,7 @@ public class HomeworkController {
             @Valid @RequestBody List<HomeworkTestCasePayload> testCases
     ) {
         requireTeacher(currentUser);
-        return ApiResponse.ok(HomeworkResponse.from(homeworkService.saveTestCases(
+        return ApiResponse.ok(HomeworkResponse.fromTeacherView(homeworkService.saveTestCases(
                 homeworkId,
                 currentUser.id(),
                 testCases.stream().map(HomeworkTestCasePayload::toDomain).toList()
@@ -98,17 +102,17 @@ public class HomeworkController {
     @PutMapping("/{homeworkId}/publish")
     public ApiResponse<HomeworkResponse> publish(@PathVariable long homeworkId, CurrentUser currentUser) {
         requireTeacher(currentUser);
-        return ApiResponse.ok(HomeworkResponse.from(homeworkService.publish(homeworkId, currentUser.id())));
+        return ApiResponse.ok(HomeworkResponse.fromTeacherView(homeworkService.publish(homeworkId, currentUser.id())));
     }
 
     @PutMapping("/{homeworkId}/close")
     public ApiResponse<HomeworkResponse> close(@PathVariable long homeworkId, CurrentUser currentUser) {
         requireTeacher(currentUser);
-        return ApiResponse.ok(HomeworkResponse.from(homeworkService.close(homeworkId, currentUser.id())));
+        return ApiResponse.ok(HomeworkResponse.fromTeacherView(homeworkService.close(homeworkId, currentUser.id())));
     }
 
     private PageResponse<HomeworkResponse> mapPage(PageResponse<com.onlinejudge.hwk.domain.Homework> page) {
-        return new PageResponse<>(page.list().stream().map(HomeworkResponse::from).toList(), page.total(), page.page(), page.size());
+        return new PageResponse<>(page.list().stream().map(HomeworkResponse::summary).toList(), page.total(), page.page(), page.size());
     }
 
     private void requireTeacher(CurrentUser currentUser) {

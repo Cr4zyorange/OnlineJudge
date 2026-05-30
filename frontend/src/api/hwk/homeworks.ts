@@ -46,6 +46,10 @@ export function updateHomework(homeworkId: number, payload: HomeworkPayload): Pr
   });
 }
 
+export function getHomeworkDetail(homeworkId: number): Promise<HomeworkDetail> {
+  return request<HomeworkDetail>(`/api/v1/homeworks/${homeworkId}`);
+}
+
 export function saveHomeworkQuestions(
   homeworkId: number,
   questions: HomeworkQuestionPayload[]

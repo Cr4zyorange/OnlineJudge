@@ -8,7 +8,7 @@ export interface HomeworkQuestion {
   questionType: string;
   stem: string;
   optionsJson: string | null;
-  answerJson: string;
+  answerJson?: string;
   score: number;
   sortOrder: number;
 }
@@ -26,7 +26,7 @@ export interface HomeworkTestCase {
   id: number;
   homeworkId: number;
   inputData: string;
-  expectedOutput: string;
+  expectedOutput?: string;
   scoreWeight: number;
   hidden: boolean;
   timeLimitMs: number;
@@ -66,6 +66,10 @@ export interface HomeworkDetail extends HomeworkSummary {
   publishedAt: string | null;
   createdAt: string;
   updatedAt: string;
+  languageLimitJson?: string | null;
+  timeLimitMs?: number | null;
+  memoryLimitKb?: number | null;
+  outputCompareMode?: string | null;
   questions: HomeworkQuestion[];
   testCases: HomeworkTestCase[];
 }

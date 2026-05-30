@@ -124,6 +124,122 @@ describe('HomeworkTeacherView', () => {
     expect(homeworkApi.closeHomework).toHaveBeenCalledWith(7);
     expect(wrapper.text()).toContain('关闭成功');
   });
+
+  it('loads a draft homework into the form and updates it', async () => {
+    vi.mocked(homeworkApi.listHomeworks).mockResolvedValueOnce({
+      list: [homeworkSummary({ id: 7, title: 'Draft homework', status: 'DRAFT' })],
+      page: 1,
+      size: 20,
+      total: 1
+    });
+    vi.mocked(homeworkApi.getHomeworkDetail).mockResolvedValueOnce(homeworkDetail({
+      id: 7,
+      title: 'Draft homework',
+      questions: [
+        {
+          id: 70,
+          homeworkId: 7,
+          questionType: 'SINGLE_CHOICE',
+          stem: '1 + 1 = ?',
+          optionsJson: '["1","2"]',
+          answerJson: '["2"]',
+          score: 100,
+          sortOrder: 1
+        }
+      ]
+    }));
+    vi.mocked(homeworkApi.updateHomework).mockResolvedValueOnce(homeworkDetail({ id: 7, title: 'Draft homework updated' }));
+    vi.mocked(homeworkApi.listHomeworks).mockResolvedValueOnce({
+      list: [homeworkSummary({ id: 7, title: 'Draft homework updated', status: 'DRAFT' })],
+      page: 1,
+      size: 20,
+      total: 1
+    });
+
+    const wrapper = mount(HomeworkTeacherView, {
+      props: {
+        courseId: 101
+      }
+    });
+    await flushPromises();
+
+    await wrapper.get('[data-testid="edit-homework-7"]').trigger('click');
+    await flushPromises();
+    expect(homeworkApi.getHomeworkDetail).toHaveBeenCalledWith(7);
+    expect((wrapper.get('[name="title"]').element as HTMLInputElement).value).toBe('Draft homework');
+    expect((wrapper.get('[name="question-answer-0"]').element as HTMLInputElement).value).toBe('["2"]');
+
+    await wrapper.get('[name="title"]').setValue('Draft homework updated');
+    await wrapper.get('form').trigger('submit');
+    await flushPromises();
+
+    expect(homeworkApi.updateHomework).toHaveBeenCalledWith(7, expect.objectContaining({
+      courseId: 101,
+      title: 'Draft homework updated'
+    }));
+    expect(homeworkApi.createHomework).not.toHaveBeenCalled();
+    expect(wrapper.text()).toContain('Draft homework updated');
+  });
+
+  it('preserves code judge config when editing a draft homework', async () => {
+    vi.mocked(homeworkApi.listHomeworks).mockResolvedValueOnce({
+      list: [homeworkSummary({ id: 8, title: 'Code draft', status: 'DRAFT', type: 'CODE' })],
+      page: 1,
+      size: 20,
+      total: 1
+    });
+    vi.mocked(homeworkApi.getHomeworkDetail).mockResolvedValueOnce(homeworkDetail({
+      id: 8,
+      title: 'Code draft',
+      type: 'CODE',
+      languageLimitJson: '["python"]',
+      timeLimitMs: 2000,
+      memoryLimitKb: 131072,
+      outputCompareMode: 'TRIM',
+      testCases: [
+        {
+          id: 80,
+          homeworkId: 8,
+          inputData: '1 2',
+          expectedOutput: '3',
+          scoreWeight: 100,
+          hidden: false,
+          timeLimitMs: 2000,
+          memoryLimitKb: 131072,
+          sortOrder: 1
+        }
+      ]
+    } as Partial<HomeworkDetail>));
+    vi.mocked(homeworkApi.updateHomework).mockResolvedValueOnce(homeworkDetail({ id: 8, title: 'Code draft updated', type: 'CODE' }));
+    vi.mocked(homeworkApi.listHomeworks).mockResolvedValueOnce({
+      list: [homeworkSummary({ id: 8, title: 'Code draft updated', status: 'DRAFT', type: 'CODE' })],
+      page: 1,
+      size: 20,
+      total: 1
+    });
+
+    const wrapper = mount(HomeworkTeacherView, {
+      props: {
+        courseId: 101
+      }
+    });
+    await flushPromises();
+
+    await wrapper.get('[data-testid="edit-homework-8"]').trigger('click');
+    await flushPromises();
+    await wrapper.get('[name="title"]').setValue('Code draft updated');
+    await wrapper.get('form').trigger('submit');
+    await flushPromises();
+
+    expect(homeworkApi.updateHomework).toHaveBeenCalledWith(8, expect.objectContaining({
+      title: 'Code draft updated',
+      type: 'CODE',
+      languageLimitJson: '["python"]',
+      timeLimitMs: 2000,
+      memoryLimitKb: 131072,
+      outputCompareMode: 'TRIM'
+    }));
+  });
 });
 
 function homeworkSummary(overrides: Partial<HomeworkSummary> = {}): HomeworkSummary {
