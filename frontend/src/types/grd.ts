@@ -48,6 +48,7 @@ export interface GradeRecord {
   weightedScore: string | null;
   gradeStatus: GradeStatus;
   publishStatus: PublishStatus;
+  comment?: string | null;
   publishedAt?: string | null;
 }
 
