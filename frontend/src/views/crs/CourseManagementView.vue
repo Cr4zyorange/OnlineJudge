@@ -7,6 +7,7 @@
         </div>
         <div class="navbar-menu">
           <a class="active" href="/courses">课程中心</a>
+          <a href="/learning/tasks">学习任务</a>
           <a>实训模块</a>
           <a>作业评测</a>
           <a :class="{ disabled: !gradeAnalysisHref }" :href="gradeAnalysisHref || undefined" :aria-disabled="!gradeAnalysisHref">
@@ -40,6 +41,11 @@
             <button class="menu-button" :class="{ active: activeTab === 'archived' && !chapterCourse }" type="button" @click="switchTab('archived')">
               <i class="bi bi-archive"></i> 归档记录
             </button>
+          </li>
+          <li>
+            <a class="menu-button" data-testid="learning-task-center-entry" href="/learning/tasks">
+              <i class="bi bi-check2-square"></i> 学习任务中心
+            </a>
           </li>
         </ul>
 
