@@ -113,6 +113,7 @@ public class GradeRecordController {
             @PathVariable long courseId,
             CurrentUser currentUser
     ) {
+        requireStudent(currentUser);
         return ApiResponse.ok(gradeRecordService.getMyPublishedGrades(courseId, currentUser.id()));
     }
 
@@ -167,6 +168,12 @@ public class GradeRecordController {
     private void requireTeacher(CurrentUser currentUser) {
         if (!currentUser.hasRole("TEACHER") && !currentUser.hasRole("ADMIN")) {
             throw new AccessDeniedException("教师无课程成绩管理权限");
+        }
+    }
+
+    private void requireStudent(CurrentUser currentUser) {
+        if (!currentUser.hasRole("STUDENT")) {
+            throw new AccessDeniedException("学生无课程成绩访问权限");
         }
     }
 }

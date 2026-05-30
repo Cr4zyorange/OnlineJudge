@@ -259,6 +259,17 @@ class GradeRecordControllerTest {
     }
 
     @Test
+    void teacherCannotQueryStudentMyGradesEndpointThroughApi() throws Exception {
+        mockMvc.perform(get("/api/v1/courses/101/my-grades")
+                        .header("X-User-Id", "501")
+                        .header("X-User-Role", "TEACHER")
+                        .header("X-Course-Ids", "101")
+                        .header("X-Manageable-Course-Ids", "101"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ERR-AUTH-03"));
+    }
+
+    @Test
     void teacherCannotPublishPartialItemsUntilItemScopeVisibilityIsImplemented() throws Exception {
         createGradeItem("实验一", "LAB", 301, "0.40");
         createGradeItem("作业一", "HWK", 401, "0.60");

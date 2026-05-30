@@ -87,6 +87,15 @@ public class AuthRepository {
                 .or(() -> findUserByPhone(account));
     }
 
+    public Optional<AuthUser> findUserById(long userId) {
+        List<AuthUser> users = jdbcTemplate.query(
+                "SELECT * FROM t_auth_user WHERE user_id = ? AND deleted = FALSE",
+                userMapper,
+                userId
+        );
+        return users.stream().findFirst();
+    }
+
     public long createUser(
             String username,
             String userType,
@@ -139,9 +148,14 @@ public class AuthRepository {
         );
     }
 
-    public void updateFailedLogin(long userId, int failedLoginCount) {
-        jdbcTemplate.update("UPDATE t_auth_user SET failed_login_count = ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?",
+    public void updateFailedLogin(long userId, int failedLoginCount, LocalDateTime lockedUntil) {
+        jdbcTemplate.update("""
+                        UPDATE t_auth_user
+                        SET failed_login_count = ?, locked_until = ?, updated_at = CURRENT_TIMESTAMP
+                        WHERE user_id = ?
+                        """,
                 failedLoginCount,
+                lockedUntil == null ? null : Timestamp.valueOf(lockedUntil),
                 userId);
     }
 
@@ -154,11 +168,47 @@ public class AuthRepository {
     public void resetLoginFailure(long userId, LocalDateTime lastLoginAt) {
         jdbcTemplate.update("""
                         UPDATE t_auth_user
-                        SET failed_login_count = 0, last_login_at = ?, updated_at = CURRENT_TIMESTAMP
+                        SET failed_login_count = 0, locked_until = NULL, last_login_at = ?, updated_at = CURRENT_TIMESTAMP
                         WHERE user_id = ?
                         """,
                 Timestamp.valueOf(lastLoginAt),
                 userId);
+    }
+
+    public void updateProfile(long userId, String displayName, String phone, String email, String avatarUrl) {
+        jdbcTemplate.update("""
+                        UPDATE t_auth_user
+                        SET display_name = ?, phone = ?, email = ?, avatar_url = ?, updated_at = CURRENT_TIMESTAMP
+                        WHERE user_id = ? AND deleted = FALSE
+                        """,
+                displayName,
+                phone,
+                email,
+                avatarUrl,
+                userId);
+    }
+
+    public void updatePassword(long userId, String passwordHash, String passwordSalt) {
+        jdbcTemplate.update("""
+                        UPDATE t_auth_user
+                        SET password_hash = ?, password_salt = ?, updated_at = CURRENT_TIMESTAMP
+                        WHERE user_id = ? AND deleted = FALSE
+                        """,
+                passwordHash,
+                passwordSalt,
+                userId);
+    }
+
+    public void revokeUserSessions(long userId, LocalDateTime revokedAt) {
+        jdbcTemplate.update("""
+                        UPDATE t_auth_session
+                        SET status = ?, revoked_at = ?
+                        WHERE user_id = ? AND status = ?
+                        """,
+                SessionStatus.REVOKED.name(),
+                Timestamp.valueOf(revokedAt),
+                userId,
+                SessionStatus.VALID.name());
     }
 
     public void createSession(long userId, String tokenId, LocalDateTime issuedAt, LocalDateTime expiresAt) {
