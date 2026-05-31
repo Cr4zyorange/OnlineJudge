@@ -6,17 +6,15 @@
   outline: none;
 }
 
-/* 修改 main.css 的 body 背景，移除渐变遮罩 */
 body {
   margin: 0;
   min-height: 100vh;
   overflow-x: hidden;
   font-family: Inter, "Microsoft YaHei", sans-serif;
-  /* 替换为纯背景图，和 style.css 一致 */
-  background-image: url("./back.jpg"); /* 注意路径匹配实际文件位置 */
+  background: linear-gradient(rgba(246, 249, 247, 0.72), rgba(228, 237, 233, 0.88)),
+    url("../../../docs/过程/UI设计参考/img/back.jpg");
   background-size: cover;
   background-position: top center;
-  background-repeat: no-repeat;
   color: #2c3e50;
 }
 
