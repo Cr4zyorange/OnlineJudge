@@ -130,6 +130,21 @@ public class JdbcLabSubmissionRepository implements LabSubmissionRepository {
     }
 
     @Override
+    public List<LabSubmission> findByLabId(long labId) {
+        return jdbcTemplate.query("""
+                        SELECT id, lab_id, student_id, code_content, file_id, language, submit_status,
+                               evaluation_status, final_score, auto_score, version, is_final, submitted_at,
+                               created_at, updated_at, deleted
+                        FROM lab_submission
+                        WHERE lab_id = ? AND deleted = FALSE
+                        ORDER BY submitted_at DESC, version DESC, id DESC
+                        """,
+                SUBMISSION_ROW_MAPPER,
+                labId
+        );
+    }
+
+    @Override
     public List<LabSubmission> findByLabIdAndStudentId(long labId, long studentId) {
         return jdbcTemplate.query("""
                         SELECT id, lab_id, student_id, code_content, file_id, language, submit_status,
@@ -137,7 +152,7 @@ public class JdbcLabSubmissionRepository implements LabSubmissionRepository {
                                created_at, updated_at, deleted
                         FROM lab_submission
                         WHERE lab_id = ? AND student_id = ? AND deleted = FALSE
-                        ORDER BY version DESC, id DESC
+                        ORDER BY submitted_at DESC, version DESC, id DESC
                         """,
                 SUBMISSION_ROW_MAPPER,
                 labId,
@@ -145,7 +160,8 @@ public class JdbcLabSubmissionRepository implements LabSubmissionRepository {
         );
     }
 
-    private Optional<LabSubmission> findById(long submissionId) {
+    @Override
+    public Optional<LabSubmission> findById(long submissionId) {
         return jdbcTemplate.query("""
                         SELECT id, lab_id, student_id, code_content, file_id, language, submit_status,
                                evaluation_status, final_score, auto_score, version, is_final, submitted_at,

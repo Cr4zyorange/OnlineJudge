@@ -93,3 +93,32 @@ export interface LabSubmissionSummary {
   version: number;
   submittedAt: string;
 }
+
+export interface LabSubmissionHistoryItem {
+  submissionId: number;
+  labId: number;
+  studentId: number;
+  language: string;
+  submitStatus: LabSubmissionSummary['submitStatus'];
+  evaluationStatus: LabSubmissionSummary['evaluationStatus'];
+  autoScore: number | null;
+  finalScore: number | null;
+  version: number;
+  submittedAt: string;
+  isLatest: boolean;
+  isFinal: boolean;
+  isScoringBasis: boolean;
+  hasFile: boolean;
+}
+
+export interface LabSubmissionDetail extends LabSubmissionHistoryItem {
+  code: string | null;
+  fileId: string | null;
+}
+
+export interface LabSubmissionListFilters {
+  studentId?: number;
+  submitStatus?: LabSubmissionSummary['submitStatus'];
+  evaluationStatus?: LabSubmissionSummary['evaluationStatus'];
+  overdue?: boolean;
+}

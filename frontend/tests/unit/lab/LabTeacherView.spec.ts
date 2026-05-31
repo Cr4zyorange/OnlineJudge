@@ -322,6 +322,111 @@ describe('LabTeacherView', () => {
     expect(labApi.deleteLab).toHaveBeenCalledWith(9);
     expect(draftWrapper.text()).toContain('草稿已删除');
   });
+
+  it('filters teacher-facing submission history and opens a detail panel', async () => {
+    vi.mocked(labApi.listLabs).mockResolvedValueOnce([
+      {
+        id: 12,
+        courseId: 101,
+        title: '实验十二',
+        status: 'PUBLISHED',
+        deadline: '2026-06-25T23:59:59',
+        maxScore: 100,
+        evaluationMode: 'DOCKER_IO',
+        autoEvaluate: true,
+        reportRequired: false,
+        deleted: false
+      }
+    ]);
+    vi.mocked(labApi.listLabSubmissions)
+      .mockResolvedValueOnce([
+        {
+          submissionId: 301,
+          labId: 12,
+          studentId: 602,
+          language: 'python',
+          submitStatus: 'LATE',
+          evaluationStatus: 'ACCEPTED',
+          autoScore: 88,
+          finalScore: 90,
+          version: 2,
+          submittedAt: '2026-06-26T00:10:00',
+          isLatest: true,
+          isFinal: true,
+          isScoringBasis: true,
+          hasFile: true
+        }
+      ])
+      .mockResolvedValueOnce([
+        {
+          submissionId: 301,
+          labId: 12,
+          studentId: 602,
+          language: 'python',
+          submitStatus: 'LATE',
+          evaluationStatus: 'ACCEPTED',
+          autoScore: 88,
+          finalScore: 90,
+          version: 2,
+          submittedAt: '2026-06-26T00:10:00',
+          isLatest: true,
+          isFinal: true,
+          isScoringBasis: true,
+          hasFile: true
+        }
+      ]);
+    vi.mocked(labApi.getLabSubmissionDetail).mockResolvedValueOnce({
+      submissionId: 301,
+      labId: 12,
+      studentId: 602,
+      language: 'python',
+      submitStatus: 'LATE',
+      evaluationStatus: 'ACCEPTED',
+      autoScore: 88,
+      finalScore: 90,
+      version: 2,
+      submittedAt: '2026-06-26T00:10:00',
+      isLatest: true,
+      isFinal: true,
+      isScoringBasis: true,
+      hasFile: true,
+      code: "print('teacher detail')",
+      fileId: 'file-301'
+    });
+
+    const wrapper = mount(LabTeacherView, {
+      props: {
+        courseId: 101
+      }
+    });
+    await flushPromises();
+
+    await wrapper.findAll('button').find((button) => button.text() === '查看提交')?.trigger('click');
+    await flushPromises();
+
+    await wrapper.get('[name="studentId"]').setValue('602');
+    await wrapper.get('[name="submitStatus"]').setValue('LATE');
+    await wrapper.get('[name="evaluationStatus"]').setValue('ACCEPTED');
+    await wrapper.get('[name="overdue"]').setValue('true');
+    await wrapper.get('[data-action="search-submissions"]').trigger('click');
+    await flushPromises();
+
+    expect(labApi.listLabSubmissions).toHaveBeenCalledWith(12, {
+      studentId: 602,
+      submitStatus: 'LATE',
+      evaluationStatus: 'ACCEPTED',
+      overdue: true
+    });
+    expect(wrapper.text()).toContain('602');
+    expect(wrapper.text()).toContain('LATE');
+
+    await wrapper.get('[data-submission-id="301"] button').trigger('click');
+    await flushPromises();
+
+    expect(labApi.getLabSubmissionDetail).toHaveBeenCalledWith(12, 301);
+    expect(wrapper.text()).toContain("print('teacher detail')");
+    expect(wrapper.text()).toContain('file-301');
+  });
 });
 
 async function flushPromises() {

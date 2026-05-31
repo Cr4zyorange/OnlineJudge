@@ -19,7 +19,9 @@ import org.springframework.jdbc.core.JdbcTemplate;
 
 import static java.util.Map.entry;
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.hasSize;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -202,6 +204,105 @@ class LabSubmissionControllerTest {
                 .andExpect(jsonPath("$.message", containsString("文件")));
     }
 
+    @Test
+    void studentCanViewOwnSubmissionHistoryInDescendingOrder() throws Exception {
+        long labId = createPublishedLab(508L, true, LocalDateTime.now().plusDays(3));
+        createCodeSubmission(labId, 601L, "508", "print('first')", "python");
+        long latestSubmissionId = createCodeSubmission(labId, 601L, "508", "print('second')", "python");
+        jdbcTemplate.update(
+                "UPDATE lab_submission SET auto_score = ?, final_score = ? WHERE id = ?",
+                95,
+                98,
+                latestSubmissionId
+        );
+
+        mockMvc.perform(get("/api/v1/labs/{labId}/submissions", labId)
+                        .headers(studentHeaders("508", 601L)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"))
+                .andExpect(jsonPath("$.data", hasSize(2)))
+                .andExpect(jsonPath("$.data[0].submissionId").value(latestSubmissionId))
+                .andExpect(jsonPath("$.data[0].version").value(2))
+                .andExpect(jsonPath("$.data[0].isLatest").value(true))
+                .andExpect(jsonPath("$.data[0].isFinal").value(true))
+                .andExpect(jsonPath("$.data[0].isScoringBasis").value(true))
+                .andExpect(jsonPath("$.data[0].autoScore").value(95))
+                .andExpect(jsonPath("$.data[0].finalScore").value(98))
+                .andExpect(jsonPath("$.data[0].hasFile").value(false))
+                .andExpect(jsonPath("$.data[1].version").value(1))
+                .andExpect(jsonPath("$.data[1].isLatest").value(false))
+                .andExpect(jsonPath("$.data[1].isFinal").value(false))
+                .andExpect(jsonPath("$.data[1].isScoringBasis").value(false));
+    }
+
+    @Test
+    void teacherCanFilterLabSubmissionHistoryAndViewSubmissionDetail() throws Exception {
+        long labId = createPublishedLab(509L, true, LocalDateTime.now().plusDays(3));
+        createCodeSubmission(labId, 601L, "509", "print('student 601')", "python");
+        long targetSubmissionId = createCodeSubmission(labId, 602L, "509", "print('student 602 latest')", "python");
+
+        jdbcTemplate.update(
+                "UPDATE lab_submission SET submit_status = ?, evaluation_status = ?, auto_score = ?, final_score = ?, submitted_at = ? WHERE id = ?",
+                "LATE",
+                "ACCEPTED",
+                88,
+                90,
+                java.sql.Timestamp.valueOf(LocalDateTime.now().plusDays(4)),
+                targetSubmissionId
+        );
+
+        mockMvc.perform(get("/api/v1/labs/{labId}/submissions", labId)
+                        .headers(teacherHeaders("509", "509"))
+                        .param("studentId", "602")
+                        .param("submitStatus", "LATE")
+                        .param("evaluationStatus", "ACCEPTED")
+                        .param("overdue", "true"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"))
+                .andExpect(jsonPath("$.data", hasSize(1)))
+                .andExpect(jsonPath("$.data[0].submissionId").value(targetSubmissionId))
+                .andExpect(jsonPath("$.data[0].studentId").value(602))
+                .andExpect(jsonPath("$.data[0].submitStatus").value("LATE"))
+                .andExpect(jsonPath("$.data[0].evaluationStatus").value("ACCEPTED"))
+                .andExpect(jsonPath("$.data[0].isLatest").value(true))
+                .andExpect(jsonPath("$.data[0].isFinal").value(true))
+                .andExpect(jsonPath("$.data[0].isScoringBasis").value(true));
+
+        mockMvc.perform(get("/api/v1/labs/{labId}/submissions/{submissionId}", labId, targetSubmissionId)
+                        .headers(teacherHeaders("509", "509")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"))
+                .andExpect(jsonPath("$.data.submissionId").value(targetSubmissionId))
+                .andExpect(jsonPath("$.data.studentId").value(602))
+                .andExpect(jsonPath("$.data.code").value("print('student 602 latest')"))
+                .andExpect(jsonPath("$.data.version").value(1))
+                .andExpect(jsonPath("$.data.hasFile").value(false))
+                .andExpect(jsonPath("$.data.isScoringBasis").value(true));
+    }
+
+    @Test
+    void studentCannotViewAnotherStudentsSubmissionDetail() throws Exception {
+        long labId = createPublishedLab(510L, true, LocalDateTime.now().plusDays(3));
+        long submissionId = createCodeSubmission(labId, 601L, "510", "print('owner only')", "python");
+
+        mockMvc.perform(get("/api/v1/labs/{labId}/submissions/{submissionId}", labId, submissionId)
+                        .headers(studentHeaders("510", 602L)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("LAB-403-01"));
+    }
+
+    @Test
+    void submissionDetailReturnsNotFoundWhenSubmissionDoesNotBelongToLab() throws Exception {
+        long sourceLabId = createPublishedLab(511L, true, LocalDateTime.now().plusDays(3));
+        long anotherLabId = createPublishedLab(511L, true, LocalDateTime.now().plusDays(4));
+        long submissionId = createCodeSubmission(sourceLabId, 601L, "511", "print('wrong lab path')", "python");
+
+        mockMvc.perform(get("/api/v1/labs/{labId}/submissions/{submissionId}", anotherLabId, submissionId)
+                        .headers(teacherHeaders("511", "511")))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("LAB-404-01"));
+    }
+
     private long createPublishedLab(long courseId, boolean autoEvaluate, LocalDateTime deadline) throws Exception {
         Map<String, Object> payload = Map.ofEntries(
                 entry("title", "学生提交实验"),
@@ -244,6 +345,18 @@ class LabSubmissionControllerTest {
         }
     }
 
+    private long createCodeSubmission(long labId, long studentId, String courseIds, String code, String language) throws Exception {
+        String body = mockMvc.perform(multipart("/api/v1/labs/{labId}/submissions", labId)
+                        .headers(studentHeaders(courseIds, studentId))
+                        .param("code", code)
+                        .param("language", language))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        return objectMapper.readTree(body).path("data").path("submissionId").asLong();
+    }
+
     private HttpHeaders teacherHeaders(String courseIds, String manageableCourseIds) {
         return teacherHeaders(courseIds, manageableCourseIds, null);
     }
@@ -261,8 +374,12 @@ class LabSubmissionControllerTest {
     }
 
     private HttpHeaders studentHeaders(String courseIds) {
+        return studentHeaders(courseIds, 601L);
+    }
+
+    private HttpHeaders studentHeaders(String courseIds, long userId) {
         HttpHeaders headers = new HttpHeaders();
-        headers.add("X-User-Id", "601");
+        headers.add("X-User-Id", Long.toString(userId));
         headers.add("X-User-Role", "STUDENT");
         headers.add("X-Course-Ids", courseIds);
         return headers;
