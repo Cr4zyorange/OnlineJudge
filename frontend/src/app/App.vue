@@ -96,7 +96,12 @@ const viewMode = computed(() => {
   if (pathname.value === '/admin/auth') {
     return 'auth-admin';
   }
-  if (pathname.value === '/' || pathname.value === '/courses' || pathname.value === '/courses/') {
+  if (
+    pathname.value === '/'
+    || pathname.value === '/courses'
+    || pathname.value === '/courses/'
+    || /^\/courses\/\d+\/?$/.test(pathname.value)
+  ) {
     return 'courses';
   }
   if (pathname.value === '/learning/tasks' || pathname.value === '/learning') {

@@ -16,6 +16,7 @@ import java.time.LocalDateTime;
 import java.util.Map;
 
 import static org.hamcrest.Matchers.containsInAnyOrder;
+import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.hasSize;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -93,6 +94,8 @@ class LearningTaskControllerTest {
                 .andExpect(jsonPath("$.data.size").value(20))
                 .andExpect(jsonPath("$.data.records[*].taskType",
                         containsInAnyOrder("RESOURCE", "EXPERIMENT", "HOMEWORK", "HOMEWORK")))
+                .andExpect(jsonPath("$.data.records[?(@.title == 'Chapter 1 Slides')].actionUrl",
+                        hasItem("/courses/101")))
                 .andExpect(jsonPath("$.data.records[0].title").value("Linked List Lab"))
                 .andExpect(jsonPath("$.data.records[0].status").value("OVERDUE"));
     }
@@ -143,7 +146,7 @@ class LearningTaskControllerTest {
     void unauthenticatedTaskListRequestIsRejected() throws Exception {
         mockMvc.perform(get("/api/v1/learning/tasks"))
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.code").value("ERR-AUTH-01"));
+                .andExpect(jsonPath("$.code").value("ERR-AUTH-04"));
     }
 
     private void insertCourse(long courseId, String courseName) {
@@ -163,11 +166,12 @@ class LearningTaskControllerTest {
     private void insertResource(long resourceId, long courseId, String name, long uploaderId) {
         jdbcTemplate.update("""
                 INSERT INTO crs_resource
-                    (id, course_id, resource_name, resource_type, file_path, file_size, file_format,
-                     version, access_level, upload_user_id, is_deleted)
+                    (id, course_id, resource_name, resource_type, visibility, storage_key,
+                     original_filename, content_type, file_size, upload_user_id, is_deleted)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """, resourceId, courseId, name, 1, "/resources/" + resourceId + ".pdf",
-                1024L, "pdf", 1, "COURSE", uploaderId, 0);
+                """, resourceId, courseId, name, "COURSEWARE", "STUDENT",
+                "resources/" + resourceId + ".pdf", name + ".pdf", "application/pdf",
+                1024L, uploaderId, false);
     }
 
     private void insertLab(long labId, long courseId, String title, LocalDateTime deadline, String status) {

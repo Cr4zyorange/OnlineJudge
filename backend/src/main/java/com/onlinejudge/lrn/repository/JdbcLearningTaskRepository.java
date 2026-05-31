@@ -75,11 +75,7 @@ public class JdbcLearningTaskRepository {
                        NULL AS deadline,
                        0 AS progress,
                        'NOT_STARTED' AS status,
-                       CASE
-                           WHEN resource.external_url IS NOT NULL AND resource.external_url <> ''
-                               THEN resource.external_url
-                           ELSE CONCAT('/courses/', resource.course_id, '/resources/', resource.id)
-                       END AS action_url,
+                       CONCAT('/courses/', resource.course_id) AS action_url,
                        CURRENT_TIMESTAMP AS snapshot_at,
                        resource.created_at,
                        resource.updated_at

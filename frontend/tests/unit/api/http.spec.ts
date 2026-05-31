@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { readAuthStorage, removeAuthStorage, writeAuthStorage } from '../../../src/api/auth/storage';
-import { configureAuthContext, request } from '../../../src/api/http';
+import { configureAuthContext, request, requestBlob } from '../../../src/api/http';
 
 describe('shared API request client', () => {
   afterEach(() => {
@@ -64,6 +64,48 @@ describe('shared API request client', () => {
         Authorization: 'Bearer student-token'
       },
       body: formData
+    }));
+  });
+
+  it('does not use configured role context as runtime header auth when no bearer token exists', async () => {
+    configureAuthContext(() => ({
+      userId: 701,
+      username: 'teacher701',
+      role: 'TEACHER',
+      permissions: ['course:manage'],
+      courseIds: '*',
+      manageableCourseIds: '*'
+    }));
+    const fetchMock = vi.spyOn(globalThis, 'fetch');
+
+    await expect(request<{ list: unknown[] }>('/api/v1/courses')).rejects.toThrow('当前登录态缺失');
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(window.location.pathname).toBe('/login');
+  });
+
+  it('downloads binary resources through bearer-authenticated fetch', async () => {
+    writeAuthStorage('onlinejudge.authToken', 'student-token');
+    const blob = new Blob(['course material'], { type: 'application/pdf' });
+    const headers = new Headers({
+      'Content-Disposition': "attachment; filename*=UTF-8''lesson.pdf"
+    });
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
+      ok: true,
+      headers,
+      blob: async () => blob
+    } as Response);
+
+    const result = await requestBlob('/api/v1/courses/1/resources/2/download');
+
+    expect(result.blob).toBe(blob);
+    expect(result.filename).toBe('lesson.pdf');
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/courses/1/resources/2/download', expect.objectContaining({
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: 'Bearer student-token'
+      }
     }));
   });
 

@@ -17,6 +17,7 @@ export interface Course {
   endDate?: string;
   status: CourseStatus;
   memberCount: number;
+  member: boolean;
   manageable: boolean;
   createdAt: string;
   updatedAt: string;
@@ -57,6 +58,34 @@ export interface ChapterPayload {
   objective?: string;
   visibleStatus?: 0 | 1;
   chapterType?: 1 | 2 | 3;
+}
+
+export type ResourceType = 'DOCUMENT' | 'COURSEWARE' | 'VIDEO' | 'IMAGE' | 'ARCHIVE' | 'LINK' | 'OTHER';
+export type ResourceVisibility = 'STUDENT' | 'TEACHER';
+
+export interface CourseResource {
+  id: number;
+  courseId: number;
+  chapterId?: number | null;
+  name: string;
+  resourceType: ResourceType;
+  visibility: ResourceVisibility;
+  publishAt?: string | null;
+  originalFilename: string;
+  contentType: string;
+  fileSize: number;
+  uploadUserId: number;
+  downloadUrl: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ResourcePayload {
+  chapterId?: number | null;
+  name: string;
+  resourceType: ResourceType;
+  visibility: ResourceVisibility;
+  publishAt?: string | null;
 }
 
 export interface ApiResponse<T> {
