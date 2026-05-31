@@ -204,6 +204,7 @@
               <tr>
                 <th>学生</th>
                 <th>版本</th>
+                <th>版本标识</th>
                 <th>提交状态</th>
                 <th>评测状态</th>
                 <th>最终得分</th>
@@ -218,6 +219,18 @@
               >
                 <td>{{ submission.studentId }}</td>
                 <td>{{ submission.version }}</td>
+                <td>
+                  <div class="labs__submission-flags">
+                    <span
+                      v-for="flag in getSubmissionFlags(submission)"
+                      :key="`${submission.submissionId}-${flag}`"
+                      class="labs__submission-flag"
+                    >
+                      {{ flag }}
+                    </span>
+                    <span v-if="getSubmissionFlags(submission).length === 0">无</span>
+                  </div>
+                </td>
                 <td>{{ submission.submitStatus }}</td>
                 <td>{{ submission.evaluationStatus }}</td>
                 <td>{{ submission.finalScore ?? '未生成' }}</td>
@@ -237,6 +250,16 @@
             <h3>提交详情</h3>
             <p>学生 ID：{{ submissionDetail.studentId }}</p>
             <p>版本：{{ submissionDetail.version }}</p>
+            <div class="labs__submission-flags">
+              <span
+                v-for="flag in getSubmissionFlags(submissionDetail)"
+                :key="`detail-${submissionDetail.submissionId}-${flag}`"
+                class="labs__submission-flag"
+              >
+                {{ flag }}
+              </span>
+              <span v-if="getSubmissionFlags(submissionDetail).length === 0">无版本标识</span>
+            </div>
             <p>文件标识：{{ submissionDetail.fileId ?? '无' }}</p>
             <pre class="labs__submission-code">{{ submissionDetail.code || '本次提交未包含在线代码' }}</pre>
           </template>
@@ -607,6 +630,23 @@ function buildSubmissionFilters(): LabSubmissionListFilters {
   return filters;
 }
 
+function getSubmissionFlags(submission: Pick<LabSubmissionHistoryItem, 'isLatest' | 'isFinal' | 'isScoringBasis' | 'hasFile'>) {
+  const flags: string[] = [];
+  if (submission.isLatest) {
+    flags.push('最新版本');
+  }
+  if (submission.isFinal) {
+    flags.push('当前有效版本');
+  }
+  if (submission.isScoringBasis) {
+    flags.push('当前评分依据');
+  }
+  if (submission.hasFile) {
+    flags.push('包含文件');
+  }
+  return flags;
+}
+
 function collectActiveTestcases(): LabTestcasePayload[] {
   return form.testcases
     .map((testcase, index) => ({
@@ -714,6 +754,22 @@ function formatDeadline(value: string) {
   border: 1px solid #d7dde8;
   border-radius: 8px;
   padding: 12px;
+}
+
+.labs__submission-flags {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.labs__submission-flag {
+  background: #e8f0ff;
+  border: 1px solid #bfd3ff;
+  border-radius: 999px;
+  color: #1d4ed8;
+  font-size: 12px;
+  padding: 2px 8px;
 }
 
 .labs__submission-code {

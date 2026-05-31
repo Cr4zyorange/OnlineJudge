@@ -20,11 +20,12 @@ import org.springframework.transaction.annotation.Transactional;
 import java.io.ByteArrayInputStream;
 import java.time.LocalDateTime;
 import java.util.Arrays;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
@@ -32,6 +33,10 @@ import java.util.TreeSet;
 @Service
 public class LabSubmissionService {
     private static final long MAX_UPLOAD_SIZE_BYTES = 5L * 1024L * 1024L;
+    private static final Comparator<LabSubmission> SUBMISSION_RECENCY = Comparator
+            .comparing(LabSubmission::submittedAt)
+            .thenComparingInt(LabSubmission::version)
+            .thenComparingLong(LabSubmission::id);
     private static final Set<String> GENERIC_SOURCE_CONTENT_TYPES = Set.of(
             "application/octet-stream",
             "text/plain"
@@ -121,7 +126,8 @@ public class LabSubmissionService {
                 : findStudentSubmissions(experiment, userId, query);
 
         LabSubmissionQuery effectiveQuery = canManage ? query : sanitizeStudentQuery(query, userId);
-        return toHistoryItems(applyFilters(submissions, experiment, effectiveQuery));
+        Map<Long, SubmissionVersionFlags> flagsBySubmissionId = buildSubmissionVersionFlags(submissions);
+        return toHistoryItems(applyFilters(submissions, experiment, effectiveQuery), flagsBySubmissionId);
     }
 
     public LabSubmissionDetailView getSubmissionDetail(long labId, long submissionId, long userId) {
@@ -142,11 +148,10 @@ public class LabSubmissionService {
             }
         }
 
-        long latestSubmissionId = labSubmissionRepository.findByLabIdAndStudentId(labId, submission.studentId()).stream()
-                .findFirst()
-                .map(LabSubmission::id)
-                .orElse(submission.id());
-        return toDetail(submission, latestSubmissionId == submission.id());
+        Map<Long, SubmissionVersionFlags> flagsBySubmissionId = buildSubmissionVersionFlags(
+                labSubmissionRepository.findByLabIdAndStudentId(labId, submission.studentId())
+        );
+        return toDetail(submission, resolveSubmissionVersionFlags(flagsBySubmissionId, submission));
     }
 
     private void requireStudentCanSubmit(LabExperiment experiment, long studentId) {
@@ -302,20 +307,51 @@ public class LabSubmissionService {
         return submission.submittedAt().isAfter(deadline);
     }
 
-    private List<LabSubmissionHistoryItemView> toHistoryItems(List<LabSubmission> submissions) {
-        Map<Long, Long> latestSubmissionIdsByStudent = new LinkedHashMap<>();
+    private Map<Long, SubmissionVersionFlags> buildSubmissionVersionFlags(List<LabSubmission> submissions) {
+        Map<Long, LabSubmission> latestSubmissionByStudent = new HashMap<>();
         for (LabSubmission submission : submissions) {
-            latestSubmissionIdsByStudent.putIfAbsent(submission.studentId(), submission.id());
+            latestSubmissionByStudent.merge(
+                    submission.studentId(),
+                    submission,
+                    (current, candidate) -> SUBMISSION_RECENCY.compare(candidate, current) > 0 ? candidate : current
+            );
         }
+
+        Map<Long, SubmissionVersionFlags> flagsBySubmissionId = new LinkedHashMap<>();
+        for (LabSubmission submission : submissions) {
+            LabSubmission latestSubmission = latestSubmissionByStudent.get(submission.studentId());
+            boolean isLatest = latestSubmission != null && latestSubmission.id() == submission.id();
+            flagsBySubmissionId.put(
+                    submission.id(),
+                    new SubmissionVersionFlags(isLatest, submission.isFinal(), submission.isFinal())
+            );
+        }
+        return flagsBySubmissionId;
+    }
+
+    private SubmissionVersionFlags resolveSubmissionVersionFlags(
+            Map<Long, SubmissionVersionFlags> flagsBySubmissionId,
+            LabSubmission submission
+    ) {
+        return flagsBySubmissionId.getOrDefault(
+                submission.id(),
+                new SubmissionVersionFlags(false, submission.isFinal(), submission.isFinal())
+        );
+    }
+
+    private List<LabSubmissionHistoryItemView> toHistoryItems(
+            List<LabSubmission> submissions,
+            Map<Long, SubmissionVersionFlags> flagsBySubmissionId
+    ) {
         return submissions.stream()
-                .map(submission -> toHistoryItem(submission, Objects.equals(
-                        latestSubmissionIdsByStudent.get(submission.studentId()),
-                        submission.id()
-                )))
+                .map(submission -> toHistoryItem(submission, resolveSubmissionVersionFlags(flagsBySubmissionId, submission)))
                 .toList();
     }
 
-    private LabSubmissionHistoryItemView toHistoryItem(LabSubmission submission, boolean isLatest) {
+    private LabSubmissionHistoryItemView toHistoryItem(
+            LabSubmission submission,
+            SubmissionVersionFlags flags
+    ) {
         return new LabSubmissionHistoryItemView(
                 submission.id(),
                 submission.labId(),
@@ -327,14 +363,17 @@ public class LabSubmissionService {
                 submission.finalScore(),
                 submission.version(),
                 submission.submittedAt(),
-                isLatest,
-                submission.isFinal(),
-                submission.isFinal(),
+                flags.isLatest(),
+                flags.isFinal(),
+                flags.isScoringBasis(),
                 hasFile(submission.fileId())
         );
     }
 
-    private LabSubmissionDetailView toDetail(LabSubmission submission, boolean isLatest) {
+    private LabSubmissionDetailView toDetail(
+            LabSubmission submission,
+            SubmissionVersionFlags flags
+    ) {
         return new LabSubmissionDetailView(
                 submission.id(),
                 submission.labId(),
@@ -346,9 +385,9 @@ public class LabSubmissionService {
                 submission.finalScore(),
                 submission.version(),
                 submission.submittedAt(),
-                isLatest,
-                submission.isFinal(),
-                submission.isFinal(),
+                flags.isLatest(),
+                flags.isFinal(),
+                flags.isScoringBasis(),
                 hasFile(submission.fileId()),
                 submission.codeContent(),
                 submission.fileId()
@@ -357,5 +396,12 @@ public class LabSubmissionService {
 
     private boolean hasFile(String fileId) {
         return fileId != null && !fileId.isBlank();
+    }
+
+    private record SubmissionVersionFlags(
+            boolean isLatest,
+            boolean isFinal,
+            boolean isScoringBasis
+    ) {
     }
 }

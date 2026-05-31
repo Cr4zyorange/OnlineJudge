@@ -417,8 +417,12 @@ describe('LabTeacherView', () => {
       evaluationStatus: 'ACCEPTED',
       overdue: true
     });
-    expect(wrapper.text()).toContain('602');
-    expect(wrapper.text()).toContain('LATE');
+    expect(wrapper.get('[data-submission-id="301"]').text()).toContain('602');
+    expect(wrapper.get('[data-submission-id="301"]').text()).toContain('LATE');
+    expect(wrapper.get('[data-submission-id="301"]').text()).toContain('最新版本');
+    expect(wrapper.get('[data-submission-id="301"]').text()).toContain('当前有效版本');
+    expect(wrapper.get('[data-submission-id="301"]').text()).toContain('当前评分依据');
+    expect(wrapper.get('[data-submission-id="301"]').text()).toContain('包含文件');
 
     await wrapper.get('[data-submission-id="301"] button').trigger('click');
     await flushPromises();
@@ -426,6 +430,10 @@ describe('LabTeacherView', () => {
     expect(labApi.getLabSubmissionDetail).toHaveBeenCalledWith(12, 301);
     expect(wrapper.text()).toContain("print('teacher detail')");
     expect(wrapper.text()).toContain('file-301');
+    expect(wrapper.find('.labs__submission-detail').text()).toContain('最新版本');
+    expect(wrapper.find('.labs__submission-detail').text()).toContain('当前有效版本');
+    expect(wrapper.find('.labs__submission-detail').text()).toContain('当前评分依据');
+    expect(wrapper.find('.labs__submission-detail').text()).toContain('包含文件');
   });
 });
 

@@ -281,6 +281,34 @@ class LabSubmissionControllerTest {
     }
 
     @Test
+    void teacherFiltersDoNotPromoteHistoricalSubmissionToLatest() throws Exception {
+        long labId = createPublishedLab(512L, true, LocalDateTime.now().plusDays(3));
+        long historicalSubmissionId = createCodeSubmission(labId, 602L, "512", "print('student 602 old')", "python");
+        createCodeSubmission(labId, 602L, "512", "print('student 602 latest')", "python");
+
+        jdbcTemplate.update(
+                "UPDATE lab_submission SET submit_status = ?, evaluation_status = ? WHERE id = ?",
+                "LATE",
+                "ACCEPTED",
+                historicalSubmissionId
+        );
+
+        mockMvc.perform(get("/api/v1/labs/{labId}/submissions", labId)
+                        .headers(teacherHeaders("512", "512"))
+                        .param("studentId", "602")
+                        .param("submitStatus", "LATE")
+                        .param("evaluationStatus", "ACCEPTED"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"))
+                .andExpect(jsonPath("$.data", hasSize(1)))
+                .andExpect(jsonPath("$.data[0].submissionId").value(historicalSubmissionId))
+                .andExpect(jsonPath("$.data[0].version").value(1))
+                .andExpect(jsonPath("$.data[0].isLatest").value(false))
+                .andExpect(jsonPath("$.data[0].isFinal").value(false))
+                .andExpect(jsonPath("$.data[0].isScoringBasis").value(false));
+    }
+
+    @Test
     void studentCannotViewAnotherStudentsSubmissionDetail() throws Exception {
         long labId = createPublishedLab(510L, true, LocalDateTime.now().plusDays(3));
         long submissionId = createCodeSubmission(labId, 601L, "510", "print('owner only')", "python");
