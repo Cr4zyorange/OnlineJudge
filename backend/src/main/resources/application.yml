@@ -11,6 +11,8 @@ spring:
         - file:../database/migrations/20260525_01_create_grd_grade_item.sql
         - file:../database/migrations/20260525_02_create_lab_experiment.sql
         - file:../database/migrations/20260526_01_create_lab_submission.sql
+        - file:../database/migrations/20260530_01_create_hwk_homework.sql
+        - file:../database/migrations/20260530_02_create_hwk_submission.sql
 
 server:
   port: 8080

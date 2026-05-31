@@ -19,6 +19,15 @@
     :course-id="courseId"
     :lab-id="labId"
   />
+  <HomeworkTeacherView
+    v-else-if="viewMode === 'homework' && homeworkRole === 'teacher' && courseId !== null"
+    :course-id="courseId"
+  />
+  <HomeworkStudentView
+    v-else-if="viewMode === 'homework' && homeworkRole === 'student' && courseId !== null"
+    :course-id="courseId"
+    :initial-homework-id="homeworkId"
+  />
   <StudentGradeView
     v-else-if="courseId !== null && page === 'grades' && gradeRole === 'student'"
     :course-id="courseId"
@@ -39,6 +48,8 @@ import AuthView from '../views/auth/AuthView.vue';
 import AuthAdminView from '../views/auth/AuthAdminView.vue';
 import CourseManagementView from '../views/crs/CourseManagementView.vue';
 import GradeItemConfigView from '../views/grd/GradeItemConfigView.vue';
+import HomeworkStudentView from '../views/hwk/HomeworkStudentView.vue';
+import HomeworkTeacherView from '../views/hwk/HomeworkTeacherView.vue';
 import LabStudentView from '../views/lab/LabStudentView.vue';
 import LabTeacherView from '../views/lab/LabTeacherView.vue';
 import StudentGradeView from '../views/grd/StudentGradeView.vue';
@@ -80,12 +91,25 @@ const viewMode = computed(() => {
   if (pathname.value.includes('/labs')) {
     return 'lab';
   }
+  if (pathname.value.includes('/homeworks')) {
+    return 'homework';
+  }
   return 'grade';
 });
 
 const authMode = computed(() => pathname.value === '/register' ? 'register' : 'login');
 
 const labRole = computed(() => {
+  const queryRole = searchParams.value.get('role')?.toLowerCase();
+  if (queryRole === 'student' || queryRole === 'teacher') {
+    return queryRole;
+  }
+  const storedRole = window.localStorage.getItem('onlinejudge.userRole')
+    ?? window.localStorage.getItem('onlinejudge.role');
+  return storedRole === 'STUDENT' ? 'student' : 'teacher';
+});
+
+const homeworkRole = computed(() => {
   const queryRole = searchParams.value.get('role')?.toLowerCase();
   if (queryRole === 'student' || queryRole === 'teacher') {
     return queryRole;
@@ -121,6 +145,15 @@ const labId = computed(() => {
   }
   const pathLabId = window.location.pathname.match(/\/labs\/(\d+)(?:\/|$)/)?.[1] ?? null;
   return parseCourseId(pathLabId);
+});
+
+const homeworkId = computed(() => {
+  const queryHomeworkId = parseCourseId(searchParams.value.get('homeworkId'));
+  if (queryHomeworkId !== null) {
+    return queryHomeworkId;
+  }
+  const pathHomeworkId = window.location.pathname.match(/\/homeworks\/(\d+)(?:\/|$)/)?.[1] ?? null;
+  return parseCourseId(pathHomeworkId);
 });
 
 function parseCourseId(value: string | null) {
