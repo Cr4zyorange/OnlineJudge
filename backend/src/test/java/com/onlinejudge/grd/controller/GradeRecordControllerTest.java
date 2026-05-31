@@ -87,7 +87,7 @@ class GradeRecordControllerTest {
                         .header("X-User-Role", "STUDENT")
                         .header("X-Course-Ids", "101"))
                 .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.code").value("ERR-AUTH-03"));
+                .andExpect(jsonPath("$.code").value("ERR-AUTH-05"));
     }
 
     @Test
@@ -256,6 +256,17 @@ class GradeRecordControllerTest {
                 .andExpect(jsonPath("$.data.records[0].publishScope").value("PARTIAL_STUDENTS"))
                 .andExpect(jsonPath("$.data.records[0].publishedBy").value(501))
                 .andExpect(jsonPath("$.data.records[0].notificationStatus").value("SENT"));
+    }
+
+    @Test
+    void teacherCannotQueryStudentMyGradesEndpointThroughApi() throws Exception {
+        mockMvc.perform(get("/api/v1/courses/101/my-grades")
+                        .header("X-User-Id", "501")
+                        .header("X-User-Role", "TEACHER")
+                        .header("X-Course-Ids", "101")
+                        .header("X-Manageable-Course-Ids", "101"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ERR-AUTH-05"));
     }
 
     @Test

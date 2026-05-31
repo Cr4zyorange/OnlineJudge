@@ -1,4 +1,4 @@
-import { readAuthStorage } from './auth/storage';
+import { readAuthStorage, removeAuthStorage } from './auth/storage';
 
 export interface AuthContext {
   userId: number | string;
@@ -28,6 +28,8 @@ interface ApiResponse<T> {
 }
 
 type AuthContextProvider = () => AuthContext | null;
+
+const NAVIGATION_EVENT = 'onlinejudge:navigation';
 
 export function configureAuthContext(_provider: AuthContextProvider | null) {
   // Bearer/session auth is the only runtime identity source.
@@ -78,6 +80,7 @@ function requestHeaders(requireAuth: boolean, body: unknown) {
   if (requireAuth) {
     const token = storedToken();
     if (!token) {
+      redirectTo('/login');
       throw new Error('当前登录态缺失，无法访问接口');
     }
     headers.Authorization = `Bearer ${token}`;
@@ -106,6 +109,7 @@ function isSuccessCode(code: string | number | undefined) {
 async function unwrap<T>(response: Response): Promise<T> {
   const body = (await response.json()) as ApiResponse<T>;
   if (!response.ok || !isSuccessCode(body.code)) {
+    handleAuthFailure(body.code);
     throw new Error(body.message || '接口请求失败');
   }
   return body.data;
@@ -114,6 +118,7 @@ async function unwrap<T>(response: Response): Promise<T> {
 async function errorMessage(response: Response) {
   try {
     const body = (await response.json()) as Partial<ApiResponse<unknown>>;
+    handleAuthFailure(body.code);
     return body.message || '接口请求失败';
   } catch {
     return response.statusText || '接口请求失败';
@@ -134,4 +139,42 @@ function filenameFromDisposition(disposition: string | null) {
   }
   const plainMatch = disposition.match(/filename=([^;]+)/i);
   return plainMatch?.[1]?.trim();
+}
+
+function handleAuthFailure(code: string | number | undefined) {
+  if (code === 'ERR-AUTH-03') {
+    clearStoredAuthSession();
+    redirectTo('/account-disabled');
+    return;
+  }
+  if (code === 'ERR-AUTH-04') {
+    clearStoredAuthSession();
+    redirectTo('/session-expired');
+    return;
+  }
+  if (code === 'ERR-AUTH-05') {
+    redirectTo('/403');
+  }
+}
+
+function clearStoredAuthSession() {
+  [
+    'onlinejudge.authToken',
+    'onlinejudge.authExpiresAt',
+    'onlinejudge.userId',
+    'onlinejudge.username',
+    'onlinejudge.userRole',
+    'onlinejudge.role',
+    'onlinejudge.permissions'
+  ].forEach((key) => removeAuthStorage(key));
+}
+
+function redirectTo(path: string) {
+  if (typeof window === 'undefined') {
+    return;
+  }
+  if (window.location.pathname !== path) {
+    window.history.pushState({}, '', path);
+  }
+  window.dispatchEvent(new Event(NAVIGATION_EVENT));
 }

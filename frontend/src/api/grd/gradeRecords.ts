@@ -1,4 +1,5 @@
 import type {
+  CourseGradeRow,
   CourseGradeTablePage,
   GradeAdjustmentPayload,
   GradeAdjustmentResult,
@@ -99,6 +100,10 @@ export async function listCourseGrades(
     ? `/api/v1/courses/${courseId}/grades?${queryString}`
     : `/api/v1/courses/${courseId}/grades`;
   return request<CourseGradeTablePage>(url);
+}
+
+export async function getMyPublishedGrades(courseId: number): Promise<CourseGradeRow> {
+  return request<CourseGradeRow>(`/api/v1/courses/${courseId}/my-grades`);
 }
 
 export async function adjustGradeRecord(
