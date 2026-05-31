@@ -25,6 +25,7 @@ interface ApiResponse<T> {
 type AuthContextProvider = () => AuthContext | null;
 
 let authContextProvider: AuthContextProvider | null = null;
+const NAVIGATION_EVENT = 'onlinejudge:navigation';
 
 export function configureAuthContext(provider: AuthContextProvider | null) {
   authContextProvider = provider;
@@ -140,6 +141,11 @@ async function unwrap<T>(response: Response): Promise<T> {
 }
 
 function handleAuthFailure(code: string | number | undefined) {
+  if (code === 'ERR-AUTH-03') {
+    clearStoredAuthSession();
+    redirectTo('/account-disabled');
+    return;
+  }
   if (code === 'ERR-AUTH-04') {
     clearStoredAuthSession();
     redirectTo('/session-expired');
@@ -166,8 +172,8 @@ function redirectTo(path: string) {
   if (typeof window === 'undefined') {
     return;
   }
-  if (window.location.pathname === path) {
-    return;
+  if (window.location.pathname !== path) {
+    window.history.pushState({}, '', path);
   }
-  window.history.pushState({}, '', path);
+  window.dispatchEvent(new Event(NAVIGATION_EVENT));
 }
