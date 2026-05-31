@@ -13,7 +13,7 @@ public class AuthApiException extends ApiException {
     }
 
     public static AuthApiException loginFailed() {
-        return new AuthApiException("AUTH_401", "账号或密码错误", HttpStatus.UNAUTHORIZED);
+        return new AuthApiException("ERR-AUTH-01", "账号或密码错误", HttpStatus.UNAUTHORIZED);
     }
 
     public static AuthApiException oldPasswordWrong() {
@@ -21,11 +21,11 @@ public class AuthApiException extends ApiException {
     }
 
     public static AuthApiException disabled() {
-        return new AuthApiException("AUTH_403", "账号状态异常，请联系管理员", HttpStatus.FORBIDDEN);
+        return new AuthApiException("ERR-AUTH-03", "账号状态异常，请联系管理员", HttpStatus.FORBIDDEN);
     }
 
     public static AuthApiException locked() {
-        return new AuthApiException("AUTH_423", "账号已被锁定，请稍后重试", HttpStatus.LOCKED);
+        return new AuthApiException("ERR-AUTH-03", "账号状态异常，请联系管理员", HttpStatus.FORBIDDEN);
     }
 
     public static AuthApiException conflict(String message) {

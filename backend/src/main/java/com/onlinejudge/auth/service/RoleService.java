@@ -15,6 +15,7 @@ import com.onlinejudge.common.security.CurrentUser;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Locale;
 
@@ -112,6 +113,9 @@ public class RoleService {
         }
         AccountStatus status = parseAccountStatus(accountStatus);
         authRepository.updateAccountStatus(userId, status);
+        if (status != AccountStatus.ACTIVE) {
+            authRepository.revokeUserSessions(userId, LocalDateTime.now());
+        }
         authAuditService.record(currentUser.id(), "ACCOUNT_STATUS_UPDATED", "AUTH_USER", String.valueOf(userId), "SUCCESS", status.name());
         return authRepository.toUserView(userId);
     }
