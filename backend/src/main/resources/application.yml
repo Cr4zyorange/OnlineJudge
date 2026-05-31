@@ -11,6 +11,7 @@ spring:
         - file:../database/migrations/20260525_01_create_grd_grade_item.sql
         - file:../database/migrations/20260525_02_create_lab_experiment.sql
         - file:../database/migrations/20260526_01_create_lab_submission.sql
+        - file:../database/migrations/20260531_01_create_lrn_task_source_tables.sql
         - file:../database/migrations/20260530_01_create_lrn_learning_task.sql
 
 server:

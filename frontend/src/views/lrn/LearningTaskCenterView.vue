@@ -75,7 +75,7 @@
         <p v-else-if="tasks.length === 0" class="task-center__state">暂无符合条件的学习任务</p>
 
         <div v-else class="task-center__list">
-          <article v-for="task in tasks" :key="task.taskId" class="task-card">
+          <article v-for="task in tasks" :key="`${task.taskType}-${task.taskId}`" class="task-card">
             <div class="task-card__main">
               <div class="task-card__badges">
                 <span>{{ taskTypeLabel(task.taskType) }}</span>
@@ -102,6 +102,30 @@
             <a class="task-card__link" :href="task.actionUrl ?? '#'">进入任务</a>
           </article>
         </div>
+
+        <nav
+          v-if="taskPage && taskPage.total > 0"
+          class="task-center__pagination"
+          aria-label="任务列表分页"
+        >
+          <button
+            type="button"
+            data-testid="prev-page"
+            :disabled="loading || !canGoPrevious"
+            @click="goPreviousPage"
+          >
+            上一页
+          </button>
+          <span>第 {{ taskPage.page }} / {{ totalPages }} 页</span>
+          <button
+            type="button"
+            data-testid="next-page"
+            :disabled="loading || !canGoNext"
+            @click="goNextPage"
+          >
+            下一页
+          </button>
+        </nav>
       </section>
     </section>
   </main>
@@ -132,6 +156,14 @@ const size = ref(20);
 const tasks = computed(() => taskPage.value?.records ?? []);
 const overdueCount = computed(() => tasks.value.filter((task) => task.status === 'OVERDUE').length);
 const inProgressCount = computed(() => tasks.value.filter((task) => task.status === 'IN_PROGRESS').length);
+const totalPages = computed(() => {
+  if (!taskPage.value || taskPage.value.total <= 0) {
+    return 1;
+  }
+  return Math.max(1, Math.ceil(taskPage.value.total / taskPage.value.size));
+});
+const canGoPrevious = computed(() => page.value > 1);
+const canGoNext = computed(() => page.value < totalPages.value);
 
 onMounted(loadTasks);
 
@@ -157,6 +189,22 @@ async function loadTasks() {
   } finally {
     loading.value = false;
   }
+}
+
+async function goPreviousPage() {
+  if (!canGoPrevious.value) {
+    return;
+  }
+  page.value -= 1;
+  await loadTasks();
+}
+
+async function goNextPage() {
+  if (!canGoNext.value) {
+    return;
+  }
+  page.value += 1;
+  await loadTasks();
 }
 
 function taskTypeLabel(type: LearningTask['taskType']) {
@@ -356,6 +404,19 @@ button:disabled {
   gap: 14px;
 }
 
+.task-center__pagination {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+.task-center__pagination span {
+  color: #20302c;
+  font-weight: 700;
+}
+
 .task-card {
   grid-template-columns: minmax(0, 1.3fr) minmax(240px, 0.9fr) 120px;
   padding: 18px;
@@ -458,6 +519,14 @@ button:disabled {
 
   .task-center__refresh {
     width: 100%;
+  }
+
+  .task-center__pagination {
+    justify-content: stretch;
+  }
+
+  .task-center__pagination button {
+    flex: 1 1 120px;
   }
 }
 </style>

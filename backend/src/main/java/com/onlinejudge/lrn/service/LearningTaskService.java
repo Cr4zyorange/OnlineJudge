@@ -10,8 +10,10 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -45,7 +47,7 @@ public class LearningTaskService {
         String sortBy = normalizeSortBy(query.sortBy());
         LocalDateTime now = LocalDateTime.now();
 
-        List<LearningTaskWithStatus> filtered = learningTaskRepository.findByUserId(userId).stream()
+        List<LearningTaskWithStatus> filtered = deduplicateBySource(learningTaskRepository.findByUserId(userId)).stream()
                 .filter(task -> query.courseId() == null || task.courseId() == query.courseId())
                 .filter(task -> coursePermissionClient.canViewCourse(task.courseId(), userId))
                 .filter(task -> taskTypes.isEmpty() || taskTypes.contains(normalizeRequired(task.taskType(), "任务类型不合法")))
@@ -61,6 +63,15 @@ public class LearningTaskService {
                 .map(this::toSummary)
                 .toList();
         return new LearningTaskPage(records, total, page, size);
+    }
+
+    private List<LearningTask> deduplicateBySource(List<LearningTask> tasks) {
+        Map<String, LearningTask> deduplicated = new LinkedHashMap<>();
+        for (LearningTask task : tasks) {
+            String key = task.sourceModule() + ":" + task.courseId() + ":" + task.sourceId() + ":" + task.taskType();
+            deduplicated.putIfAbsent(key, task);
+        }
+        return List.copyOf(deduplicated.values());
     }
 
     private Set<String> parseTaskTypes(String rawTaskTypes) {

@@ -101,4 +101,34 @@ describe('LearningTaskCenterView', () => {
     expect(learningTasksApi.listLearningTasks).toHaveBeenCalledTimes(2);
     expect(wrapper.text()).toContain('Java作业1');
   });
+  it('requests the next and previous pages from pagination controls', async () => {
+    vi.mocked(learningTasksApi.listLearningTasks)
+      .mockResolvedValueOnce({ ...taskPage, total: 45, page: 1, size: 20 })
+      .mockResolvedValueOnce({
+        records: [taskPage.records[1]],
+        total: 45,
+        page: 2,
+        size: 20
+      })
+      .mockResolvedValueOnce({ ...taskPage, total: 45, page: 1, size: 20 });
+
+    const wrapper = mount(LearningTaskCenterView);
+    await flushPromises();
+
+    await wrapper.get('[data-testid="next-page"]').trigger('click');
+    await flushPromises();
+
+    expect(learningTasksApi.listLearningTasks).toHaveBeenLastCalledWith(expect.objectContaining({
+      page: 2,
+      size: 20
+    }));
+
+    await wrapper.get('[data-testid="prev-page"]').trigger('click');
+    await flushPromises();
+
+    expect(learningTasksApi.listLearningTasks).toHaveBeenLastCalledWith(expect.objectContaining({
+      page: 1,
+      size: 20
+    }));
+  });
 });
