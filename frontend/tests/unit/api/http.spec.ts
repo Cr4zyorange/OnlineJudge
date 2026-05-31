@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { removeAuthStorage, writeAuthStorage } from '../../../src/api/auth/storage';
+import { readAuthStorage, removeAuthStorage, writeAuthStorage } from '../../../src/api/auth/storage';
 import { configureAuthContext, request } from '../../../src/api/http';
 
 describe('shared API request client', () => {
@@ -100,7 +100,7 @@ describe('shared API request client', () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
       ok: false,
       json: async () => ({
-        code: 'ERR-AUTH-03',
+        code: 'ERR-GRD-01',
         message: '无权限访问',
         data: null
       })
@@ -124,8 +124,27 @@ describe('shared API request client', () => {
 
     await expect(request('/api/v1/users/me')).rejects.toThrow('登录已失效，请重新登录');
 
-    expect(window.localStorage.getItem('onlinejudge.authToken')).toBeNull();
+    expect(readAuthStorage('onlinejudge.authToken')).toBeNull();
     expect(window.location.pathname).toBe('/session-expired');
+  });
+
+  it('routes disabled or locked account responses to the account status page and clears local auth state', async () => {
+    writeAuthStorage('onlinejudge.authToken', 'locked-token');
+    writeAuthStorage('onlinejudge.userId', '602');
+    writeAuthStorage('onlinejudge.userRole', 'STUDENT');
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
+      ok: false,
+      json: async () => ({
+        code: 'ERR-AUTH-03',
+        message: '账号已被禁用、冻结或锁定',
+        data: null
+      })
+    } as Response);
+
+    await expect(request('/api/v1/users/me')).rejects.toThrow('账号已被禁用、冻结或锁定');
+
+    expect(readAuthStorage('onlinejudge.authToken')).toBeNull();
+    expect(window.location.pathname).toBe('/account-disabled');
   });
 
   it('routes forbidden responses to the 403 page without clearing the active session', async () => {
@@ -141,7 +160,7 @@ describe('shared API request client', () => {
 
     await expect(request('/api/v1/admin/roles')).rejects.toThrow('无权限访问');
 
-    expect(window.localStorage.getItem('onlinejudge.authToken')).toBe('student-token');
+    expect(readAuthStorage('onlinejudge.authToken')).toBe('student-token');
     expect(window.location.pathname).toBe('/403');
   });
 
