@@ -11,6 +11,7 @@
     <p v-else>无权限访问</p>
   </main>
   <CourseManagementView v-else-if="viewMode === 'courses'" />
+  <LearningTaskCenterView v-else-if="viewMode === 'learning-tasks'" />
   <LabTeacherView
     v-else-if="viewMode === 'lab' && labRole === 'teacher' && courseId !== null"
     :course-id="courseId"
@@ -42,6 +43,7 @@ import CourseManagementView from '../views/crs/CourseManagementView.vue';
 import GradeItemConfigView from '../views/grd/GradeItemConfigView.vue';
 import LabStudentView from '../views/lab/LabStudentView.vue';
 import LabTeacherView from '../views/lab/LabTeacherView.vue';
+import LearningTaskCenterView from '../views/lrn/LearningTaskCenterView.vue';
 import StudentGradeView from '../views/grd/StudentGradeView.vue';
 import TeacherGradeTableView from '../views/grd/TeacherGradeTableView.vue';
 
@@ -101,6 +103,9 @@ const viewMode = computed(() => {
     || /^\/courses\/\d+\/?$/.test(pathname.value)
   ) {
     return 'courses';
+  }
+  if (pathname.value === '/learning/tasks' || pathname.value === '/learning') {
+    return 'learning-tasks';
   }
   if (pathname.value.includes('/labs')) {
     return 'lab';

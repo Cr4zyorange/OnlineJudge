@@ -54,6 +54,8 @@ describe('CourseManagementView', () => {
     await flushPromises();
 
     expect(wrapper.get('.card-desc').text().length).toBeLessThan(longDescription.length);
+    const learningTaskLink = wrapper.findAll('.navbar-menu a').find((link) => link.text().includes('学习任务'));
+    expect(learningTaskLink?.attributes('href')).toBe('/learning/tasks');
     const gradeLink = wrapper.findAll('.navbar-menu a').find((link) => link.text().includes('成绩分析'));
     expect(gradeLink?.attributes('href')).toBe('/courses/1/grd/grade-items');
 
@@ -64,6 +66,27 @@ describe('CourseManagementView', () => {
     expect(wrapper.text()).toContain(longDescription);
     expect(wrapper.text()).toContain('预留操作区');
     expect(wrapper.text()).toContain('暂无章节目录');
+  });
+
+  it('exposes a glass style sidebar entry for the learning task center', async () => {
+    const page = (list = [course], total = list.length) => ({
+      code: '0',
+      message: 'success',
+      data: { list, total, page: 1, size: 20 }
+    });
+    vi.stubGlobal('fetch', vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => page([course], 1) })
+      .mockResolvedValueOnce({ ok: true, json: async () => page([course], 1) })
+      .mockResolvedValueOnce({ ok: true, json: async () => page([course], 1) })
+      .mockResolvedValueOnce({ ok: true, json: async () => page([], 0) }));
+
+    const wrapper = mount(CourseManagementView);
+    await flushPromises();
+
+    const sidebarEntry = wrapper.get('a[data-testid="learning-task-center-entry"]');
+    expect(sidebarEntry.attributes('href')).toBe('/learning/tasks');
+    expect(sidebarEntry.classes()).toContain('menu-button');
+    expect(sidebarEntry.text()).toContain('学习任务中心');
   });
 
   it('uses different layouts for all courses and managed courses, then creates a course', async () => {
