@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { removeAuthStorage, writeAuthStorage } from '../../../src/api/auth/storage';
+import { readAuthStorage, removeAuthStorage, writeAuthStorage } from '../../../src/api/auth/storage';
 import { configureAuthContext, request } from '../../../src/api/http';
 
 describe('shared API request client', () => {
@@ -7,6 +7,11 @@ describe('shared API request client', () => {
     configureAuthContext(null);
     vi.restoreAllMocks();
     removeAuthStorage('onlinejudge.authToken');
+    removeAuthStorage('onlinejudge.userId');
+    removeAuthStorage('onlinejudge.username');
+    removeAuthStorage('onlinejudge.userRole');
+    removeAuthStorage('onlinejudge.role');
+    window.history.pushState({}, '', '/');
   });
 
   it('unwraps standard ApiResponse data and injects the bearer token instead of user-controlled headers', async () => {
@@ -95,7 +100,7 @@ describe('shared API request client', () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
       ok: false,
       json: async () => ({
-        code: 'ERR-AUTH-03',
+        code: 'ERR-GRD-01',
         message: '无权限访问',
         data: null
       })
@@ -104,11 +109,67 @@ describe('shared API request client', () => {
     await expect(request('/api/v1/forbidden')).rejects.toThrow('无权限访问');
   });
 
+  it('routes unauthorized responses to the expired session page and clears local auth state', async () => {
+    writeAuthStorage('onlinejudge.authToken', 'expired-token');
+    writeAuthStorage('onlinejudge.userId', '601');
+    writeAuthStorage('onlinejudge.userRole', 'STUDENT');
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
+      ok: false,
+      json: async () => ({
+        code: 'ERR-AUTH-04',
+        message: '登录已失效，请重新登录',
+        data: null
+      })
+    } as Response);
+
+    await expect(request('/api/v1/users/me')).rejects.toThrow('登录已失效，请重新登录');
+
+    expect(readAuthStorage('onlinejudge.authToken')).toBeNull();
+    expect(window.location.pathname).toBe('/session-expired');
+  });
+
+  it('routes disabled or locked account responses to the account status page and clears local auth state', async () => {
+    writeAuthStorage('onlinejudge.authToken', 'locked-token');
+    writeAuthStorage('onlinejudge.userId', '602');
+    writeAuthStorage('onlinejudge.userRole', 'STUDENT');
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
+      ok: false,
+      json: async () => ({
+        code: 'ERR-AUTH-03',
+        message: '账号已被禁用、冻结或锁定',
+        data: null
+      })
+    } as Response);
+
+    await expect(request('/api/v1/users/me')).rejects.toThrow('账号已被禁用、冻结或锁定');
+
+    expect(readAuthStorage('onlinejudge.authToken')).toBeNull();
+    expect(window.location.pathname).toBe('/account-disabled');
+  });
+
+  it('routes forbidden responses to the 403 page without clearing the active session', async () => {
+    writeAuthStorage('onlinejudge.authToken', 'student-token');
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
+      ok: false,
+      json: async () => ({
+        code: 'ERR-AUTH-05',
+        message: '无权限访问',
+        data: null
+      })
+    } as Response);
+
+    await expect(request('/api/v1/admin/roles')).rejects.toThrow('无权限访问');
+
+    expect(readAuthStorage('onlinejudge.authToken')).toBe('student-token');
+    expect(window.location.pathname).toBe('/403');
+  });
+
   it('fails fast before network calls when no login context exists', async () => {
     vi.spyOn(globalThis, 'fetch');
 
     await expect(request('/api/v1/example')).rejects.toThrow('当前登录态缺失');
     expect(globalThis.fetch).not.toHaveBeenCalled();
+    expect(window.location.pathname).toBe('/login');
   });
 });
 

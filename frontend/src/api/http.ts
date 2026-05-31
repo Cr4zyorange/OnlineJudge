@@ -1,4 +1,4 @@
-import { readAuthStorage } from './auth/storage';
+import { readAuthStorage, removeAuthStorage } from './auth/storage';
 
 export interface AuthContext {
   userId: number | string;
@@ -25,6 +25,7 @@ interface ApiResponse<T> {
 type AuthContextProvider = () => AuthContext | null;
 
 let authContextProvider: AuthContextProvider | null = null;
+const NAVIGATION_EVENT = 'onlinejudge:navigation';
 
 export function configureAuthContext(provider: AuthContextProvider | null) {
   authContextProvider = provider;
@@ -57,6 +58,7 @@ function requestHeaders(requireAuth: boolean, body: unknown) {
   if (requireAuth) {
     const token = storedToken();
     if (!token) {
+      redirectTo('/login');
       throw new Error('当前登录态缺失，无法访问接口');
     }
     headers.Authorization = `Bearer ${token}`;
@@ -132,7 +134,46 @@ function isSuccessCode(code: string | number | undefined) {
 async function unwrap<T>(response: Response): Promise<T> {
   const body = (await response.json()) as ApiResponse<T>;
   if (!response.ok || !isSuccessCode(body.code)) {
+    handleAuthFailure(body.code);
     throw new Error(body.message || '接口请求失败');
   }
   return body.data;
+}
+
+function handleAuthFailure(code: string | number | undefined) {
+  if (code === 'ERR-AUTH-03') {
+    clearStoredAuthSession();
+    redirectTo('/account-disabled');
+    return;
+  }
+  if (code === 'ERR-AUTH-04') {
+    clearStoredAuthSession();
+    redirectTo('/session-expired');
+    return;
+  }
+  if (code === 'ERR-AUTH-05') {
+    redirectTo('/403');
+  }
+}
+
+function clearStoredAuthSession() {
+  [
+    'onlinejudge.authToken',
+    'onlinejudge.authExpiresAt',
+    'onlinejudge.userId',
+    'onlinejudge.username',
+    'onlinejudge.userRole',
+    'onlinejudge.role',
+    'onlinejudge.permissions'
+  ].forEach((key) => removeAuthStorage(key));
+}
+
+function redirectTo(path: string) {
+  if (typeof window === 'undefined') {
+    return;
+  }
+  if (window.location.pathname !== path) {
+    window.history.pushState({}, '', path);
+  }
+  window.dispatchEvent(new Event(NAVIGATION_EVENT));
 }

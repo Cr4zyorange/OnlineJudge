@@ -215,7 +215,7 @@ class GradeItemControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(payload)))
                 .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.code").value("ERR-AUTH-03"))
+                .andExpect(jsonPath("$.code").value("ERR-AUTH-05"))
                 .andExpect(jsonPath("$.message", containsString("教师无课程成绩管理权限")));
     }
 

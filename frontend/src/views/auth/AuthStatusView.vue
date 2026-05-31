@@ -19,10 +19,21 @@ import { computed, onMounted } from 'vue';
 import { clearAuthSession } from '../../api/auth/auth';
 
 const props = defineProps<{
-  kind: 'forbidden' | 'expired';
+  kind: 'forbidden' | 'expired' | 'account-disabled';
 }>();
 
 const content = computed(() => {
+  if (props.kind === 'account-disabled') {
+    return {
+      kicker: 'ACCOUNT LOCKED',
+      title: '账号状态异常',
+      message: '当前账号已被禁用、冻结或锁定，请联系管理员处理后重新登录。',
+      primaryAction: '重新登录',
+      primaryHref: '/login',
+      secondaryAction: '',
+      secondaryHref: ''
+    };
+  }
   if (props.kind === 'expired') {
     return {
       kicker: 'SESSION EXPIRED',
@@ -46,7 +57,7 @@ const content = computed(() => {
 });
 
 onMounted(() => {
-  if (props.kind === 'expired') {
+  if (props.kind === 'expired' || props.kind === 'account-disabled') {
     clearAuthSession();
   }
 });

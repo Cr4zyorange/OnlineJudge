@@ -358,7 +358,7 @@ class LabExperimentControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(validPayload)))
                 .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.code").value("ERR-AUTH-03"));
+                .andExpect(jsonPath("$.code").value("ERR-AUTH-05"));
 
         mockMvc.perform(post("/api/v1/courses/303/labs")
                         .headers(teacherHeaders("202", "202"))

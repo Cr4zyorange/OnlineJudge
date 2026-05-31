@@ -242,6 +242,19 @@ public class AuthRepository {
         return Optional.of(user);
     }
 
+    public Optional<AuthUserView> findSessionUser(String tokenId) {
+        List<Long> userIds = jdbcTemplate.query("""
+                        SELECT user_id FROM t_auth_session
+                        WHERE token_id = ?
+                        """,
+                (rs, rowNum) -> rs.getLong("user_id"),
+                tokenId);
+        if (userIds.isEmpty()) {
+            return Optional.empty();
+        }
+        return Optional.of(toUserView(userIds.get(0)));
+    }
+
     public void revokeSession(String tokenId, LocalDateTime revokedAt) {
         jdbcTemplate.update("""
                         UPDATE t_auth_session
