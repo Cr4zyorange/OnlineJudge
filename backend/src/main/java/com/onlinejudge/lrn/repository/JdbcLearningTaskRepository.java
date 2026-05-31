@@ -1,6 +1,7 @@
 package com.onlinejudge.lrn.repository;
 
 import com.onlinejudge.lrn.domain.LearningTask;
+import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
@@ -21,9 +22,15 @@ public class JdbcLearningTaskRepository {
     public List<LearningTask> findByUserId(long userId) {
         List<LearningTask> tasks = new ArrayList<>();
         tasks.addAll(findSnapshotTasks(userId));
-        tasks.addAll(findCourseResourceTasks(userId));
-        tasks.addAll(findLabExperimentTasks(userId));
-        tasks.addAll(findHomeworkTasks(userId));
+        if (tableExists("crs_resource")) {
+            tasks.addAll(findCourseResourceTasks(userId));
+        }
+        if (tableExists("lab_experiment")) {
+            tasks.addAll(findLabExperimentTasks(userId));
+        }
+        if (tableExists("t_hwk_homework")) {
+            tasks.addAll(findHomeworkTasks(userId));
+        }
         return tasks;
     }
 
@@ -45,9 +52,14 @@ public class JdbcLearningTaskRepository {
                        task.created_at,
                        task.updated_at
                 FROM lrn_learning_task task
+                INNER JOIN crs_course_member member
+                    ON member.course_id = task.course_id
+                    AND member.user_id = ?
+                    AND member.join_status = 'ACTIVE'
+                    AND member.is_deleted = FALSE
                 LEFT JOIN crs_course course ON course.id = task.course_id
                 WHERE task.user_id = ?
-                """, this::mapRow, userId);
+                """, this::mapRow, userId, userId);
     }
 
     private List<LearningTask> findCourseResourceTasks(long userId) {
@@ -168,5 +180,18 @@ public class JdbcLearningTaskRepository {
     private LocalDateTime nullableDateTime(ResultSet rs, String columnName) throws SQLException {
         java.sql.Timestamp timestamp = rs.getTimestamp(columnName);
         return timestamp == null ? null : timestamp.toLocalDateTime();
+    }
+
+    private boolean tableExists(String tableName) {
+        try {
+            Integer count = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE LOWER(TABLE_NAME) = LOWER(?)",
+                    Integer.class,
+                    tableName
+            );
+            return count != null && count > 0;
+        } catch (DataAccessException ignored) {
+            return false;
+        }
     }
 }

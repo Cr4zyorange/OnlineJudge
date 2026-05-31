@@ -14,10 +14,7 @@ CREATE TABLE IF NOT EXISTS crs_resource (
     upload_user_id BIGINT NULL,
     is_deleted TINYINT(1) NOT NULL DEFAULT 0,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    KEY idx_crs_resource_course (course_id),
-    KEY idx_crs_resource_chapter (chapter_id),
-    KEY idx_crs_resource_deleted (is_deleted)
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS t_hwk_homework (
@@ -38,9 +35,5 @@ CREATE TABLE IF NOT EXISTS t_hwk_homework (
     published_at DATETIME NULL,
     is_deleted TINYINT(1) NOT NULL DEFAULT 0,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    KEY idx_hwk_homework_course (course_id),
-    KEY idx_hwk_homework_status (status),
-    KEY idx_hwk_homework_deadline (deadline),
-    KEY idx_hwk_homework_deleted (is_deleted)
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );

@@ -1,7 +1,6 @@
 package com.onlinejudge.lrn.service;
 
 import com.onlinejudge.common.exception.ApiException;
-import com.onlinejudge.integration.course.CoursePermissionClient;
 import com.onlinejudge.lrn.domain.LearningTask;
 import com.onlinejudge.lrn.repository.JdbcLearningTaskRepository;
 import org.springframework.http.HttpStatus;
@@ -24,14 +23,9 @@ public class LearningTaskService {
     private static final DateTimeFormatter RESPONSE_TIME_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     private final JdbcLearningTaskRepository learningTaskRepository;
-    private final CoursePermissionClient coursePermissionClient;
 
-    public LearningTaskService(
-            JdbcLearningTaskRepository learningTaskRepository,
-            CoursePermissionClient coursePermissionClient
-    ) {
+    public LearningTaskService(JdbcLearningTaskRepository learningTaskRepository) {
         this.learningTaskRepository = learningTaskRepository;
-        this.coursePermissionClient = coursePermissionClient;
     }
 
     public LearningTaskPage listTasks(long userId, LearningTaskQuery query) {
@@ -49,7 +43,6 @@ public class LearningTaskService {
 
         List<LearningTaskWithStatus> filtered = deduplicateBySource(learningTaskRepository.findByUserId(userId)).stream()
                 .filter(task -> query.courseId() == null || task.courseId() == query.courseId())
-                .filter(task -> coursePermissionClient.canViewCourse(task.courseId(), userId))
                 .filter(task -> taskTypes.isEmpty() || taskTypes.contains(normalizeRequired(task.taskType(), "任务类型不合法")))
                 .map(task -> new LearningTaskWithStatus(task, effectiveStatus(task, now)))
                 .filter(task -> requestedStatus == null || requestedStatus.equals(task.status()))
