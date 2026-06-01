@@ -37,6 +37,30 @@ export interface CoursePayload {
   status: CourseStatus;
 }
 
+export interface CourseJoinPayload {
+  inviteCode?: string;
+  applyReason?: string;
+}
+
+export interface CoursePermission {
+  courseId: number;
+  userId: number;
+  member: boolean;
+  teacher: boolean;
+  role?: 'TEACHER' | 'ASSISTANT' | 'STUDENT';
+  status?: 'PENDING' | 'ACTIVE' | 'REJECTED' | 'REMOVED';
+}
+
+export interface CourseMember {
+  courseId: number;
+  userId: number;
+  role: 'TEACHER' | 'ASSISTANT' | 'STUDENT';
+  status: 'PENDING' | 'ACTIVE' | 'REJECTED' | 'REMOVED';
+  joinMethod: EnrollmentMode | 'CREATED';
+  approvedBy?: number | null;
+  joinedAt?: string | null;
+}
+
 export interface Chapter {
   id: number;
   courseId: number;

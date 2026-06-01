@@ -15,6 +15,7 @@ import java.sql.Timestamp;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 @Repository
 public class CourseRepository {
@@ -62,7 +63,7 @@ public class CourseRepository {
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """, Statement.RETURN_GENERATED_KEYS);
             bindCourse(ps, request.name(), request.description(), teacherId, request.semester(), request.category(),
-                    request.coverUrl(), defaultEnrollmentMode(request.enrollmentMode()), request.inviteCode(),
+                    request.coverUrl(), defaultEnrollmentMode(request.enrollmentMode()), normalizedInviteCode(request.enrollmentMode(), request.inviteCode()),
                     request.maxStudents(), request.startDate(), request.endDate(), defaultStatus(request.status()));
             return ps;
         }, keyHolder);
@@ -77,7 +78,7 @@ public class CourseRepository {
                        status = ?, updated_at = CURRENT_TIMESTAMP
                  WHERE id = ? AND is_deleted = FALSE
                 """, request.name(), request.description(), request.semester(), request.category(), request.coverUrl(),
-                defaultEnrollmentMode(request.enrollmentMode()).name(), request.inviteCode(), request.maxStudents(),
+                defaultEnrollmentMode(request.enrollmentMode()).name(), normalizedInviteCode(request.enrollmentMode(), request.inviteCode()), request.maxStudents(),
                 request.startDate(), request.endDate(), defaultStatus(request.status()).name(), courseId);
         return findById(courseId).orElseThrow();
     }
@@ -164,6 +165,21 @@ public class CourseRepository {
         return findMember(courseId, userId).orElseThrow();
     }
 
+    public CourseMember updateMemberForJoin(Long courseId, Long userId, CourseMemberStatus status, String method, Long approvedBy) {
+        jdbcTemplate.update("""
+                UPDATE crs_course_member
+                   SET role = 'STUDENT',
+                       join_method = ?,
+                       join_status = ?,
+                       approved_by = ?,
+                       joined_at = CASE WHEN ? = 'ACTIVE' THEN CURRENT_TIMESTAMP ELSE joined_at END,
+                       left_at = NULL,
+                       updated_at = CURRENT_TIMESTAMP
+                 WHERE course_id = ? AND user_id = ? AND is_deleted = FALSE
+                """, method, status.name(), approvedBy, status.name(), courseId, userId);
+        return findMember(courseId, userId).orElseThrow();
+    }
+
     public Optional<CourseMember> findMember(Long courseId, Long userId) {
         List<CourseMember> members = jdbcTemplate.query("""
                 SELECT * FROM crs_course_member
@@ -172,10 +188,49 @@ public class CourseRepository {
         return members.stream().findFirst();
     }
 
+    public List<CourseMember> listMembers(Long courseId, CourseMemberStatus status) {
+        if (status == null) {
+            return jdbcTemplate.query("""
+                    SELECT * FROM crs_course_member
+                     WHERE course_id = ? AND is_deleted = FALSE
+                     ORDER BY join_status, role, user_id
+                    """, memberMapper, courseId);
+        }
+        return jdbcTemplate.query("""
+                SELECT * FROM crs_course_member
+                 WHERE course_id = ? AND join_status = ? AND is_deleted = FALSE
+                 ORDER BY role, user_id
+                """, memberMapper, courseId, status.name());
+    }
+
+    public CourseMember updateMember(Long courseId, Long userId, CourseMemberRole role, CourseMemberStatus status, Long approvedBy) {
+        jdbcTemplate.update("""
+                UPDATE crs_course_member
+                   SET role = ?,
+                       join_status = ?,
+                       approved_by = CASE WHEN ? = 'ACTIVE' THEN ? ELSE approved_by END,
+                       joined_at = CASE WHEN ? = 'ACTIVE' THEN CURRENT_TIMESTAMP ELSE joined_at END,
+                       left_at = CASE WHEN ? = 'REMOVED' THEN CURRENT_TIMESTAMP ELSE NULL END,
+                       updated_at = CURRENT_TIMESTAMP
+                 WHERE course_id = ? AND user_id = ? AND is_deleted = FALSE
+                """, role.name(), status.name(), status.name(), approvedBy, status.name(), status.name(), courseId, userId);
+        return findMember(courseId, userId).orElseThrow();
+    }
+
     public long memberCount(Long courseId) {
         return jdbcTemplate.queryForObject("""
                 SELECT COUNT(*) FROM crs_course_member
                  WHERE course_id = ? AND join_status = 'ACTIVE' AND is_deleted = FALSE
+                """, Long.class, courseId);
+    }
+
+    public long activeStudentCount(Long courseId) {
+        return jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM crs_course_member
+                 WHERE course_id = ?
+                   AND role = 'STUDENT'
+                   AND join_status = 'ACTIVE'
+                   AND is_deleted = FALSE
                 """, Long.class, courseId);
     }
 
@@ -213,6 +268,17 @@ public class CourseRepository {
 
     private CourseStatus defaultStatus(CourseStatus value) {
         return value == null ? CourseStatus.DRAFT : value;
+    }
+
+    private String normalizedInviteCode(EnrollmentMode enrollmentMode, String inviteCode) {
+        EnrollmentMode mode = defaultEnrollmentMode(enrollmentMode);
+        if (mode != EnrollmentMode.INVITE) {
+            return inviteCode == null || inviteCode.isBlank() ? null : inviteCode.trim();
+        }
+        if (inviteCode != null && !inviteCode.isBlank()) {
+            return inviteCode.trim();
+        }
+        return UUID.randomUUID().toString().replace("-", "").substring(0, 8).toUpperCase();
     }
 
     private LocalDate nullableDate(Object value) {
