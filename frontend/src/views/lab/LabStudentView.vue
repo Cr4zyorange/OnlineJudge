@@ -7,6 +7,7 @@
         <header class="lab-student__header">
           <h1>{{ labDetail.title }}</h1>
           <p>{{ labDetail.description }}</p>
+          <p v-if="resumeMessage" class="lab-student__feedback">{{ resumeMessage }}</p>
         </header>
 
         <dl class="lab-student__meta">
@@ -51,7 +52,7 @@
 
           <label class="lab-student__code">
             <span>代码内容</span>
-            <textarea v-model="code" name="code" rows="10" />
+            <textarea v-model="code" name="code" rows="10" @blur="saveDraftProgress" />
           </label>
 
           <label>
@@ -88,6 +89,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { getLabDetail, listLabSubmissions, submitLab } from '../../api/lab/labs';
+import { saveLearningProgress } from '../../api/lrn/learningProgress';
 import type { LabExperimentDetail, LabSubmissionHistoryItem, LabSubmissionSummary } from '../../types/lab';
 
 const MAX_UPLOAD_SIZE_BYTES = 5 * 1024 * 1024;
@@ -110,6 +112,7 @@ const latestSubmission = ref<LabSubmissionSummary | LabSubmissionHistoryItem | n
 const errorMessage = ref('');
 const submitErrorMessage = ref('');
 const feedbackMessage = ref('');
+const resumeMessage = ref('');
 const historyErrorMessage = ref('');
 const language = ref('');
 const code = ref('');
@@ -132,8 +135,12 @@ async function loadLabDetail() {
   errorMessage.value = '';
   try {
     labDetail.value = await getLabDetail(props.labId);
+    const resumed = restoreResumeCode();
     if (languageOptions.value.length === 1) {
       language.value = languageOptions.value[0];
+    }
+    if (!resumed) {
+      await recordProgress(10, `labId=${props.labId}`);
     }
     void loadLatestSubmission();
   } catch (error) {
@@ -168,6 +175,7 @@ async function submit() {
       file: selectedFile.value ?? undefined
     });
     feedbackMessage.value = `提交成功，版本 ${latestSubmission.value.version}`;
+    await recordProgress(100, `submittedVersion=${latestSubmission.value.version}`);
     code.value = '';
     selectedFile.value = null;
   } catch (error) {
@@ -175,6 +183,43 @@ async function submit() {
   } finally {
     submitting.value = false;
   }
+}
+
+async function saveDraftProgress() {
+  if (!code.value.trim()) {
+    return;
+  }
+  await recordProgress(40, `code=${code.value.slice(0, 450)}`);
+}
+
+async function recordProgress(progressPercent: number, lastPosition: string) {
+  if (!labDetail.value) {
+    return;
+  }
+  try {
+    await saveLearningProgress({
+      courseId: props.courseId,
+      chapterId: labDetail.value.chapterId,
+      sourceModule: 'LAB',
+      sourceId: props.labId,
+      progressPercent,
+      lastPosition
+    });
+  } catch {
+    // Progress persistence should not block lab reading or submission.
+  }
+}
+
+function restoreResumeCode() {
+  const resume = new URLSearchParams(window.location.search).get('resume');
+  if (!resume) {
+    return false;
+  }
+  resumeMessage.value = `已恢复上次断点：${resume}`;
+  if (resume.startsWith('code=')) {
+    code.value = resume.slice('code='.length);
+  }
+  return true;
 }
 
 function validateForm() {

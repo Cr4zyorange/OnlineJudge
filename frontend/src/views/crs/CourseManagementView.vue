@@ -43,8 +43,8 @@
             </button>
           </li>
           <li>
-            <a class="menu-button" data-testid="learning-task-center-entry" href="/learning/tasks">
-              <i class="bi bi-check2-square"></i> 学习任务中心
+            <a class="menu-button" data-testid="learning-progress-entry" href="/learning/progress">
+              <i class="bi bi-graph-up-arrow"></i> 学习进度
             </a>
           </li>
         </ul>
@@ -458,18 +458,21 @@
           </label>
           <p v-if="detailResourceLoading">资源加载中...</p>
           <p v-else-if="detailResourceError">{{ detailResourceError }}</p>
-          <p v-else-if="filteredDetailResources.length === 0">暂无可下载资源</p>
-          <div v-else class="resource-list">
-            <article v-for="resource in filteredDetailResources" :key="resource.id" class="resource-row">
-              <div>
-                <strong>{{ resource.name }}</strong>
-                <p>{{ resourceTypeText(resource.resourceType) }} · {{ formatFileSize(resource.fileSize) }} · {{ chapterName(resource.chapterId) }}</p>
-              </div>
-              <button class="card-btn" type="button" @click="downloadCourseResource(resource)">
-                <i class="bi bi-download"></i> 下载
-              </button>
-            </article>
-          </div>
+          <template v-else>
+            <p v-if="resumeMessage" class="message success">{{ resumeMessage }}</p>
+            <p v-if="filteredDetailResources.length === 0">暂无可下载资源</p>
+            <div v-else class="resource-list">
+              <article v-for="resource in filteredDetailResources" :key="resource.id" class="resource-row">
+                <div>
+                  <strong>{{ resource.name }}</strong>
+                  <p>{{ resourceTypeText(resource.resourceType) }} · {{ formatFileSize(resource.fileSize) }} · {{ chapterName(resource.chapterId) }}</p>
+                </div>
+                <button class="card-btn" type="button" @click="downloadCourseResource(resource)">
+                  <i class="bi bi-download"></i> 下载
+                </button>
+              </article>
+            </div>
+          </template>
         </div>
 
         <div v-if="selectedCourse.manageable" class="modal-section">
@@ -533,6 +536,7 @@ import {
   updateResource,
   uploadResource
 } from '../../api/crs/courses';
+import { saveLearningProgress } from '../../api/lrn/learningProgress';
 import type { CourseScope } from '../../api/crs/courses';
 import type { Chapter, ChapterPayload, Course, CourseMember, CoursePayload, CourseResource, ResourcePayload } from '../../types/crs';
 
@@ -678,6 +682,7 @@ const detailResourceError = ref('');
 const memberReviewError = ref('');
 const resourceError = ref('');
 const resourceSuccess = ref('');
+const resumeMessage = ref('');
 const courseNotice = ref('');
 const editingCourse = ref<Course | null>(null);
 const selectedCourse = ref<Course | null>(null);
@@ -868,6 +873,7 @@ async function openCourseDetail(course: Course) {
   pendingMembers.value = [];
   detailChapterError.value = '';
   detailResourceError.value = '';
+  resumeMessage.value = '';
   memberReviewError.value = '';
   detailChapterLoading.value = true;
   detailResourceLoading.value = true;
@@ -885,6 +891,7 @@ async function openCourseDetail(course: Course) {
   } finally {
     detailResourceLoading.value = false;
   }
+  applyResumeQuery(course.id);
   if (course.manageable) {
     await loadPendingMembers(course.id);
   }
@@ -1260,6 +1267,14 @@ async function downloadCourseResource(resource: CourseResource) {
     link.click();
     link.remove();
     window.URL.revokeObjectURL(objectUrl);
+    await saveLearningProgress({
+      courseId: resource.courseId,
+      chapterId: resource.chapterId ?? null,
+      sourceModule: 'CRS',
+      sourceId: resource.id,
+      progressPercent: 100,
+      lastPosition: `resourceId=${resource.id}`
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : '资源下载失败';
     if (resourceCourse.value) {
@@ -1267,6 +1282,22 @@ async function downloadCourseResource(resource: CourseResource) {
     } else {
       detailResourceError.value = message;
     }
+  }
+}
+
+function applyResumeQuery(courseId: number) {
+  const pathCourseId = Number(window.location.pathname.match(/\/courses\/(\d+)(?:\/|$)/)?.[1]);
+  if (pathCourseId !== courseId) {
+    return;
+  }
+  const params = new URLSearchParams(window.location.search);
+  const chapterId = params.get('chapterId');
+  if (chapterId && flatDetailChapters.value.some((item) => item.chapter.id === Number(chapterId))) {
+    selectedDetailChapterValue.value = chapterId;
+  }
+  const resume = params.get('resume');
+  if (resume) {
+    resumeMessage.value = `已恢复上次学习位置：${resume}`;
   }
 }
 

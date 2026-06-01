@@ -34,6 +34,7 @@ describe('CourseManagementView', () => {
     window.localStorage.setItem('onlinejudge.userId', '101');
     window.localStorage.setItem('onlinejudge.userRole', 'TEACHER');
     window.localStorage.setItem('onlinejudge.username', 'Teacher101');
+    window.history.replaceState({}, '', '/courses');
   });
 
   it('truncates long descriptions and opens a detail modal from the all courses view', async () => {
@@ -56,6 +57,8 @@ describe('CourseManagementView', () => {
     expect(wrapper.get('.card-desc').text().length).toBeLessThan(longDescription.length);
     const learningTaskLink = wrapper.findAll('.navbar-menu a').find((link) => link.text().includes('学习任务'));
     expect(learningTaskLink?.attributes('href')).toBe('/learning/tasks');
+    const learningProgressLink = wrapper.findAll('.navbar-menu a').find((link) => link.attributes('href') === '/learning/progress');
+    expect(learningProgressLink).toBeUndefined();
     const gradeLink = wrapper.findAll('.navbar-menu a').find((link) => link.text().includes('成绩分析'));
     expect(gradeLink?.attributes('href')).toBe('/courses/1/grd/grade-items');
 
@@ -68,7 +71,7 @@ describe('CourseManagementView', () => {
     expect(wrapper.text()).toContain('暂无章节目录');
   });
 
-  it('exposes a glass style sidebar entry for the learning task center', async () => {
+  it('exposes only the learning progress entry in the glass style sidebar', async () => {
     const page = (list = [course], total = list.length) => ({
       code: '0',
       message: 'success',
@@ -83,10 +86,11 @@ describe('CourseManagementView', () => {
     const wrapper = mount(CourseManagementView);
     await flushPromises();
 
-    const sidebarEntry = wrapper.get('a[data-testid="learning-task-center-entry"]');
-    expect(sidebarEntry.attributes('href')).toBe('/learning/tasks');
-    expect(sidebarEntry.classes()).toContain('menu-button');
-    expect(sidebarEntry.text()).toContain('学习任务中心');
+    expect(wrapper.find('a[data-testid="learning-task-center-entry"]').exists()).toBe(false);
+    const progressEntry = wrapper.get('a[data-testid="learning-progress-entry"]');
+    expect(progressEntry.attributes('href')).toBe('/learning/progress');
+    expect(progressEntry.classes()).toContain('menu-button');
+    expect(progressEntry.text()).toContain('学习进度');
   });
 
   it('uses different layouts for all courses and managed courses, then creates a course', async () => {
@@ -265,7 +269,7 @@ describe('CourseManagementView', () => {
     const resources = [{
       id: 21,
       courseId: 1,
-      chapterId: null,
+      chapterId: 11,
       name: 'Lesson PDF',
       resourceType: 'DOCUMENT',
       visibility: 'STUDENT',
@@ -296,6 +300,23 @@ describe('CourseManagementView', () => {
         ok: true,
         headers: new Headers({ 'Content-Disposition': "attachment; filename*=UTF-8''lesson.pdf" }),
         blob: async () => fileBlob
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ code: '0', message: 'success', data: {
+          progressId: 1,
+          courseId: 1,
+          courseName: '软件工程基础',
+          chapterId: 11,
+          chapterName: '课程导论',
+          sourceModule: 'CRS',
+          sourceId: 21,
+          progressPercent: 100,
+          lastPosition: 'resourceId=21',
+          status: 'COMPLETED',
+          continueUrl: '/courses/1?chapterId=11&resourceId=21',
+          updatedAt: '2026-06-01 10:00:00'
+        } })
       });
     vi.stubGlobal('fetch', fetchMock);
 
@@ -322,6 +343,70 @@ describe('CourseManagementView', () => {
         Authorization: 'Bearer teacher-token'
       }
     }));
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/learning/progress', expect.objectContaining({
+      method: 'POST',
+      body: JSON.stringify({
+        courseId: 1,
+        chapterId: 11,
+        sourceModule: 'CRS',
+        sourceId: 21,
+        progressPercent: 100,
+        lastPosition: 'resourceId=21'
+      })
+    }));
+  });
+
+  it('restores the course chapter context from the resume query', async () => {
+    window.history.replaceState({}, '', '/courses/1?chapterId=11&resourceId=21&resume=resourceId%3D21');
+    const page = (list = [course], total = list.length) => ({
+      code: '0',
+      message: 'success',
+      data: { list, total, page: 1, size: 20 }
+    });
+    const chapters = [{
+      id: 11,
+      courseId: 1,
+      parentId: null,
+      chapterName: '课程导论',
+      sortOrder: 1,
+      objective: '',
+      visibleStatus: 1,
+      chapterType: 1,
+      children: [],
+      createdAt: '2026-05-25T00:00:00',
+      updatedAt: '2026-05-25T00:00:00'
+    }];
+    const resources = [{
+      id: 21,
+      courseId: 1,
+      chapterId: 11,
+      name: 'Lesson PDF',
+      resourceType: 'DOCUMENT',
+      visibility: 'STUDENT',
+      publishAt: null,
+      originalFilename: 'lesson.pdf',
+      contentType: 'application/pdf',
+      fileSize: 15,
+      uploadUserId: 101,
+      downloadUrl: '/api/v1/courses/1/resources/21/download',
+      createdAt: '2026-05-25T00:00:00',
+      updatedAt: '2026-05-25T00:00:00'
+    }];
+    vi.stubGlobal('fetch', vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => page([course], 1) })
+      .mockResolvedValueOnce({ ok: true, json: async () => page([course], 1) })
+      .mockResolvedValueOnce({ ok: true, json: async () => page([course], 1) })
+      .mockResolvedValueOnce({ ok: true, json: async () => page([], 0) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ code: '0', message: 'success', data: course }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ code: '0', message: 'success', data: chapters }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ code: '0', message: 'success', data: resources }) }));
+
+    const wrapper = mount(CourseManagementView);
+    await flushPromises();
+
+    expect((wrapper.get('.resource-filter select').element as HTMLSelectElement).value).toBe('11');
+    expect(wrapper.text()).toContain('已恢复上次学习位置');
+    expect(wrapper.text()).toContain('Lesson PDF');
   });
 
   it('sends the entered invite code when a student joins an invite course', async () => {
