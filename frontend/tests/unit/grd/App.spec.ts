@@ -210,6 +210,32 @@ describe('App', () => {
     expect(wrapper.text()).not.toContain('用户权限管理');
   });
 
+  it('switches the mounted administrator page to the expired session view when the request is rejected', async () => {
+    window.localStorage.setItem('onlinejudge.authToken', 'expired-token');
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(errorResponse('ERR-AUTH-04', '登录已失效，请重新登录'));
+    window.history.pushState({}, '', '/admin/auth');
+
+    const wrapper = mount(App);
+    await flushPromises();
+
+    expect(wrapper.find('[data-status-kind="expired"]').exists()).toBe(true);
+    expect(wrapper.text()).toContain('登录状态已失效');
+    expect(window.localStorage.getItem('onlinejudge.authToken')).toBeNull();
+  });
+
+  it('switches the mounted administrator page to the account status view when the account is disabled', async () => {
+    window.localStorage.setItem('onlinejudge.authToken', 'locked-token');
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(errorResponse('ERR-AUTH-03', '账号已被禁用、冻结或锁定'));
+    window.history.pushState({}, '', '/admin/auth');
+
+    const wrapper = mount(App);
+    await flushPromises();
+
+    expect(wrapper.find('[data-status-kind="account-disabled"]').exists()).toBe(true);
+    expect(wrapper.text()).toContain('账号状态异常');
+    expect(window.localStorage.getItem('onlinejudge.authToken')).toBeNull();
+  });
+
   it('renders the forbidden access page for unauthorized routes', async () => {
     Object.defineProperty(window, 'location', {
       configurable: true,
@@ -264,6 +290,17 @@ function jsonResponse<T>(data: T) {
       code: '0',
       message: 'success',
       data
+    })
+  } as Response;
+}
+
+function errorResponse(code: string, message: string) {
+  return {
+    ok: false,
+    json: async () => ({
+      code,
+      message,
+      data: null
     })
   } as Response;
 }

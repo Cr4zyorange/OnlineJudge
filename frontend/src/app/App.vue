@@ -2,6 +2,7 @@
   <AuthView v-if="viewMode === 'auth'" :initial-mode="authMode" />
   <AuthStatusView v-else-if="viewMode === 'forbidden'" kind="forbidden" />
   <AuthStatusView v-else-if="viewMode === 'session-expired'" kind="expired" />
+  <AuthStatusView v-else-if="viewMode === 'account-disabled'" kind="account-disabled" />
   <AuthProfileView v-else-if="viewMode === 'profile'" />
   <AuthAdminView v-else-if="viewMode === 'auth-admin' && adminGate === 'allowed'" />
   <main v-else-if="viewMode === 'auth-admin'" class="app-empty-state">
@@ -10,6 +11,7 @@
     <p v-else>无权限访问</p>
   </main>
   <CourseManagementView v-else-if="viewMode === 'courses'" />
+  <LearningTaskCenterView v-else-if="viewMode === 'learning-tasks'" />
   <LabTeacherView
     v-else-if="viewMode === 'lab' && labRole === 'teacher' && courseId !== null"
     :course-id="courseId"
@@ -38,7 +40,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { getCurrentUser } from '../api/auth/auth';
 import AuthProfileView from '../views/auth/AuthProfileView.vue';
 import AuthStatusView from '../views/auth/AuthStatusView.vue';
@@ -49,14 +51,31 @@ import GradeItemConfigView from '../views/grd/GradeItemConfigView.vue';
 import HomeworkTeacherView from '../views/hwk/HomeworkTeacherView.vue';
 import LabStudentView from '../views/lab/LabStudentView.vue';
 import LabTeacherView from '../views/lab/LabTeacherView.vue';
+import LearningTaskCenterView from '../views/lrn/LearningTaskCenterView.vue';
 import StudentGradeView from '../views/grd/StudentGradeView.vue';
 import TeacherGradeTableView from '../views/grd/TeacherGradeTableView.vue';
 
-const pathname = computed(() => window.location.pathname);
-const searchParams = computed(() => new URLSearchParams(window.location.search));
+const NAVIGATION_EVENT = 'onlinejudge:navigation';
+
+const currentLocation = ref({
+  pathname: window.location.pathname,
+  search: window.location.search
+});
+const pathname = computed(() => currentLocation.value.pathname);
+const searchParams = computed(() => new URLSearchParams(currentLocation.value.search));
 const adminGate = ref<'idle' | 'checking' | 'allowed' | 'forbidden' | 'expired'>('idle');
 
-onMounted(validateAdminRoute);
+onMounted(() => {
+  syncLocation();
+  window.addEventListener('popstate', syncLocation);
+  window.addEventListener(NAVIGATION_EVENT, syncLocation);
+  void validateAdminRoute();
+});
+
+onUnmounted(() => {
+  window.removeEventListener('popstate', syncLocation);
+  window.removeEventListener(NAVIGATION_EVENT, syncLocation);
+});
 
 const page = computed(() => {
   const queryPage = searchParams.value.get('page');
@@ -76,14 +95,25 @@ const viewMode = computed(() => {
   if (pathname.value === '/session-expired') {
     return 'session-expired';
   }
+  if (pathname.value === '/account-disabled') {
+    return 'account-disabled';
+  }
   if (pathname.value === '/profile' || pathname.value === '/profile/password') {
     return 'profile';
   }
   if (pathname.value === '/admin/auth') {
     return 'auth-admin';
   }
-  if (pathname.value === '/' || pathname.value === '/courses' || pathname.value === '/courses/') {
+  if (
+    pathname.value === '/'
+    || pathname.value === '/courses'
+    || pathname.value === '/courses/'
+    || /^\/courses\/\d+\/?$/.test(pathname.value)
+  ) {
     return 'courses';
+  }
+  if (pathname.value === '/learning/tasks' || pathname.value === '/learning') {
+    return 'learning-tasks';
   }
   if (pathname.value.includes('/labs')) {
     return 'lab';
@@ -121,7 +151,7 @@ const courseId = computed(() => {
   if (queryCourseId !== null) {
     return queryCourseId;
   }
-  const pathCourseId = window.location.pathname.match(/\/courses\/(\d+)(?:\/|$)/)?.[1] ?? null;
+  const pathCourseId = pathname.value.match(/\/courses\/(\d+)(?:\/|$)/)?.[1] ?? null;
   return parseCourseId(pathCourseId);
 });
 
@@ -130,13 +160,20 @@ const labId = computed(() => {
   if (queryLabId !== null) {
     return queryLabId;
   }
-  const pathLabId = window.location.pathname.match(/\/labs\/(\d+)(?:\/|$)/)?.[1] ?? null;
+  const pathLabId = pathname.value.match(/\/labs\/(\d+)(?:\/|$)/)?.[1] ?? null;
   return parseCourseId(pathLabId);
 });
 
 function parseCourseId(value: string | null) {
   const parsedCourseId = Number(value);
   return Number.isInteger(parsedCourseId) && parsedCourseId > 0 ? parsedCourseId : null;
+}
+
+function syncLocation() {
+  currentLocation.value = {
+    pathname: window.location.pathname,
+    search: window.location.search
+  };
 }
 
 async function validateAdminRoute() {

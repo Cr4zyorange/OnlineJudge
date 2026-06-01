@@ -87,7 +87,7 @@ class GradeRecordControllerTest {
                         .header("X-User-Role", "STUDENT")
                         .header("X-Course-Ids", "101"))
                 .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.code").value("ERR-AUTH-03"));
+                .andExpect(jsonPath("$.code").value("ERR-AUTH-05"));
     }
 
     @Test
@@ -266,7 +266,7 @@ class GradeRecordControllerTest {
                         .header("X-Course-Ids", "101")
                         .header("X-Manageable-Course-Ids", "101"))
                 .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.code").value("ERR-AUTH-03"));
+                .andExpect(jsonPath("$.code").value("ERR-AUTH-05"));
     }
 
     @Test

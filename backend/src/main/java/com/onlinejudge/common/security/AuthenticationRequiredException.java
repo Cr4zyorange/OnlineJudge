@@ -5,6 +5,6 @@ import org.springframework.http.HttpStatus;
 
 public class AuthenticationRequiredException extends ApiException {
     public AuthenticationRequiredException(String message) {
-        super("ERR-AUTH-01", message, HttpStatus.UNAUTHORIZED);
+        super("ERR-AUTH-04", "登录已失效，请重新登录", HttpStatus.UNAUTHORIZED);
     }
 }

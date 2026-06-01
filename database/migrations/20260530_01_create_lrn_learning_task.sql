@@ -1,0 +1,20 @@
+CREATE TABLE IF NOT EXISTS lrn_learning_task (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+    course_id BIGINT NOT NULL,
+    source_module VARCHAR(20) NOT NULL,
+    source_id BIGINT NOT NULL,
+    task_type VARCHAR(20) NOT NULL,
+    title VARCHAR(200) NOT NULL,
+    deadline DATETIME NULL,
+    progress INT NOT NULL DEFAULT 0,
+    status VARCHAR(20) NOT NULL DEFAULT 'NOT_STARTED',
+    action_url VARCHAR(500) NULL,
+    snapshot_at DATETIME NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    KEY idx_lrn_task_user_course (user_id, course_id),
+    KEY idx_lrn_task_user_type_status_deadline (user_id, task_type, status, deadline),
+    KEY idx_lrn_task_status_deadline (status, deadline),
+    KEY idx_lrn_task_source (source_module, source_id)
+);

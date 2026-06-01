@@ -59,7 +59,7 @@ class HeaderCurrentUserProviderTest {
 
         assertThatThrownBy(provider::requireCurrentUser)
                 .isInstanceOf(AuthenticationRequiredException.class)
-                .hasMessageContaining("未登录或登录状态已失效");
+                .hasMessageContaining("登录已失效，请重新登录");
     }
 
     private void bind(HttpServletRequest request) {
