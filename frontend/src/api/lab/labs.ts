@@ -1,4 +1,5 @@
 import type {
+  LabSubmissionResult,
   LabSubmissionDetail,
   LabSubmissionHistoryItem,
   LabSubmissionListFilters,
@@ -117,4 +118,8 @@ export async function listLabSubmissions(
 
 export async function getLabSubmissionDetail(labId: number, submissionId: number): Promise<LabSubmissionDetail> {
   return request<LabSubmissionDetail>(`/api/v1/labs/${labId}/submissions/${submissionId}`);
+}
+
+export async function getLabSubmissionResult(labId: number, submissionId: number): Promise<LabSubmissionResult> {
+  return request<LabSubmissionResult>(`/api/v1/labs/${labId}/submissions/${submissionId}/result`);
 }

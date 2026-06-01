@@ -12,6 +12,7 @@ public record LabSubmissionResponse(
         long studentId,
         LabSubmitStatus submitStatus,
         EvaluationStatus evaluationStatus,
+        Integer autoScore,
         int version,
         LocalDateTime submittedAt
 ) {
@@ -22,6 +23,7 @@ public record LabSubmissionResponse(
                 submission.studentId(),
                 submission.submitStatus(),
                 submission.evaluationStatus(),
+                submission.autoScore(),
                 submission.version(),
                 submission.submittedAt()
         );

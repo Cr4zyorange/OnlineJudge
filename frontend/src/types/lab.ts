@@ -90,6 +90,7 @@ export interface LabSubmissionSummary {
     | 'RUNTIME_ERROR'
     | 'TIME_LIMIT_EXCEEDED'
     | 'SYSTEM_ERROR';
+  autoScore?: number | null;
   version: number;
   submittedAt: string;
 }
@@ -114,6 +115,29 @@ export interface LabSubmissionHistoryItem {
 export interface LabSubmissionDetail extends LabSubmissionHistoryItem {
   code: string | null;
   fileId: string | null;
+}
+
+export interface LabEvaluationCaseResult {
+  testcaseId: number;
+  orderNum: number;
+  passed: boolean;
+  score: number;
+  input: string;
+  expectedOutput: string;
+  actualOutput: string;
+  message: string;
+}
+
+export interface LabSubmissionResult {
+  submissionId: number;
+  evaluationStatus: LabSubmissionSummary['evaluationStatus'];
+  score: number;
+  passedCases: number;
+  totalCases: number;
+  message: string;
+  caseResults: LabEvaluationCaseResult[];
+  submittedAt: string;
+  finishedAt: string;
 }
 
 export interface LabSubmissionListFilters {

@@ -60,14 +60,59 @@ describe('LabStudentView', () => {
         hasFile: false
       }
     ]);
+    vi.mocked(labApi.getLabSubmissionResult).mockResolvedValueOnce({
+      submissionId: 88,
+      evaluationStatus: 'ACCEPTED',
+      score: 92,
+      passedCases: 1,
+      totalCases: 1,
+      message: '全部用例通过',
+      caseResults: [
+        {
+          testcaseId: 1,
+          orderNum: 1,
+          passed: true,
+          score: 92,
+          input: '1 2',
+          expectedOutput: '3',
+          actualOutput: '3',
+          message: '通过'
+        }
+      ],
+      submittedAt: '2026-06-01T09:30:00',
+      finishedAt: '2026-06-01T09:31:00'
+    });
     vi.mocked(labApi.submitLab).mockResolvedValueOnce({
       submissionId: 99,
       labId: 7,
       studentId: 601,
       submitStatus: 'SUBMITTED',
-      evaluationStatus: 'PENDING',
+      evaluationStatus: 'ACCEPTED',
+      autoScore: 100,
       version: 1,
       submittedAt: '2026-06-01T10:00:00'
+    });
+    vi.mocked(labApi.getLabSubmissionResult).mockResolvedValueOnce({
+      submissionId: 99,
+      evaluationStatus: 'ACCEPTED',
+      score: 100,
+      passedCases: 1,
+      totalCases: 1,
+      message: '全部用例通过',
+      caseResults: [
+        {
+          testcaseId: 1,
+          orderNum: 1,
+          passed: true,
+          score: 100,
+          input: '1 2',
+          expectedOutput: '3',
+          actualOutput: '3',
+          message: '通过'
+        }
+      ],
+      submittedAt: '2026-06-01T10:00:00',
+      finishedAt: '2026-06-01T10:00:05'
     });
 
     const wrapper = mount(LabStudentView, {
@@ -82,9 +127,12 @@ describe('LabStudentView', () => {
     expect(wrapper.text()).toContain('完成基础排序实现');
     expect(wrapper.text()).toContain('java,python');
     expect(labApi.listLabSubmissions).toHaveBeenCalledWith(7);
+    expect(labApi.getLabSubmissionResult).toHaveBeenCalledWith(7, 88);
     expect(wrapper.text()).toContain('查看提交历史');
     expect(wrapper.text()).toContain('版本 2');
     expect(wrapper.text()).toContain('ACCEPTED');
+    expect(wrapper.text()).toContain('全部用例通过');
+    expect(wrapper.text()).toContain('92');
 
     await wrapper.get('[name="language"]').setValue('python');
     await wrapper.get('[name="code"]').setValue("print('hello lab')");
@@ -97,7 +145,8 @@ describe('LabStudentView', () => {
     }));
     expect(wrapper.text()).toContain('提交成功');
     expect(wrapper.text()).toContain('版本 1');
-    expect(wrapper.text()).toContain('PENDING');
+    expect(wrapper.text()).toContain('100');
+    expect(wrapper.text()).toContain('通过用例：1 / 1');
   });
 
   it('shows frontend validation errors before calling the submit api', async () => {
@@ -256,6 +305,91 @@ describe('LabStudentView', () => {
 
     expect(wrapper.text()).toContain('实验十一');
     expect(wrapper.text()).toContain('提交历史加载失败');
+  });
+
+  it('shows evaluation failure details for the latest submission', async () => {
+    vi.mocked(labApi.getLabDetail).mockResolvedValueOnce({
+      id: 12,
+      courseId: 101,
+      chapterId: null,
+      title: '实验十二',
+      description: '查看失败详情',
+      status: 'PUBLISHED',
+      deadline: '2026-06-30T23:59:59',
+      maxScore: 100,
+      attachmentIds: [],
+      allowedLanguages: 'python',
+      evaluationMode: 'DOCKER_IO',
+      autoEvaluate: true,
+      reportRequired: false,
+      timeLimitMs: 60000,
+      memoryLimitKb: 262144,
+      deleted: false,
+      testcases: []
+    });
+    vi.mocked(labApi.listLabSubmissions).mockResolvedValueOnce([
+      {
+        submissionId: 120,
+        labId: 12,
+        studentId: 601,
+        language: 'python',
+        submitStatus: 'SUBMITTED',
+        evaluationStatus: 'WRONG_ANSWER',
+        autoScore: 50,
+        finalScore: null,
+        version: 1,
+        submittedAt: '2026-06-01T11:00:00',
+        isLatest: true,
+        isFinal: true,
+        isScoringBasis: true,
+        hasFile: false
+      }
+    ]);
+    vi.mocked(labApi.getLabSubmissionResult).mockResolvedValueOnce({
+      submissionId: 120,
+      evaluationStatus: 'WRONG_ANSWER',
+      score: 50,
+      passedCases: 1,
+      totalCases: 2,
+      message: '部分用例未通过',
+      caseResults: [
+        {
+          testcaseId: 1,
+          orderNum: 1,
+          passed: true,
+          score: 50,
+          input: 'a',
+          expectedOutput: 'A',
+          actualOutput: 'A',
+          message: '通过'
+        },
+        {
+          testcaseId: 2,
+          orderNum: 2,
+          passed: false,
+          score: 0,
+          input: 'b',
+          expectedOutput: 'B',
+          actualOutput: 'C',
+          message: '期望输出 B，实际输出 C'
+        }
+      ],
+      submittedAt: '2026-06-01T11:00:00',
+      finishedAt: '2026-06-01T11:00:03'
+    });
+
+    const wrapper = mount(LabStudentView, {
+      props: {
+        courseId: 101,
+        labId: 12
+      }
+    });
+    await flushPromises();
+
+    expect(wrapper.text()).toContain('WRONG_ANSWER');
+    expect(wrapper.text()).toContain('部分用例未通过');
+    expect(wrapper.text()).toContain('通过用例：1 / 2');
+    expect(wrapper.text()).toContain('期望输出 B，实际输出 C');
   });
 });
 

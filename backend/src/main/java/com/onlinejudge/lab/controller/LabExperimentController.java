@@ -170,6 +170,17 @@ public class LabExperimentController {
         ));
     }
 
+    @GetMapping("/labs/{labId}/submissions/{submissionId}/result")
+    public ApiResponse<LabEvaluationResultResponse> getSubmissionResult(
+            @PathVariable long labId,
+            @PathVariable long submissionId,
+            CurrentUser currentUser
+    ) {
+        return ApiResponse.ok(LabEvaluationResultResponse.from(
+                labSubmissionService.getSubmissionResult(labId, submissionId, currentUser.id())
+        ));
+    }
+
     private LabExperimentResponse toResponse(LabExperiment experiment, CurrentUser currentUser, long courseId) {
         if (coursePermissionClient.canManageCourse(courseId, currentUser.id())) {
             return LabExperimentResponse.fromTeacherView(experiment);

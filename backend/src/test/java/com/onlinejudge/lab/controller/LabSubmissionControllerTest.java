@@ -20,6 +20,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import static java.util.Map.entry;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.hasSize;
+import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -281,6 +282,155 @@ class LabSubmissionControllerTest {
     }
 
     @Test
+    void submissionAutoEvaluationReturnsAcceptedResultWithCaseDetails() throws Exception {
+        long labId = createPublishedLab(
+                513L,
+                true,
+                LocalDateTime.now().plusDays(3),
+                List.of(Map.of(
+                        "input", "1 2",
+                        "expectedOutput", "sum:3",
+                        "scoreWeight", 40,
+                        "public", true,
+                        "timeLimitMs", 1000,
+                        "memoryLimitKb", 65536,
+                        "orderNum", 1
+                ), Map.of(
+                        "input", "2 3",
+                        "expectedOutput", "sum:5",
+                        "scoreWeight", 60,
+                        "public", false,
+                        "timeLimitMs", 1000,
+                        "memoryLimitKb", 65536,
+                        "orderNum", 2
+                ))
+        );
+
+        String body = mockMvc.perform(multipart("/api/v1/labs/{labId}/submissions", labId)
+                        .headers(studentHeaders("513"))
+                        .param("code", """
+                                # CASE 1
+                                sum:3
+                                # CASE 2
+                                sum:5
+                                """)
+                        .param("language", "python"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.evaluationStatus").value("ACCEPTED"))
+                .andExpect(jsonPath("$.data.autoScore").value(100))
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        long submissionId = objectMapper.readTree(body).path("data").path("submissionId").asLong();
+
+        mockMvc.perform(get("/api/v1/labs/{labId}/submissions/{submissionId}/result", labId, submissionId)
+                        .headers(studentHeaders("513")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"))
+                .andExpect(jsonPath("$.data.submissionId").value(submissionId))
+                .andExpect(jsonPath("$.data.evaluationStatus").value("ACCEPTED"))
+                .andExpect(jsonPath("$.data.score").value(100))
+                .andExpect(jsonPath("$.data.passedCases").value(2))
+                .andExpect(jsonPath("$.data.totalCases").value(2))
+                .andExpect(jsonPath("$.data.caseResults", hasSize(2)))
+                .andExpect(jsonPath("$.data.caseResults[0].passed").value(true))
+                .andExpect(jsonPath("$.data.caseResults[0].score").value(40))
+                .andExpect(jsonPath("$.data.caseResults[1].passed").value(true))
+                .andExpect(jsonPath("$.data.finishedAt").isNotEmpty());
+    }
+
+    @Test
+    void submissionAutoEvaluationReturnsWrongAnswerAndPersistsFailureReason() throws Exception {
+        long labId = createPublishedLab(
+                514L,
+                true,
+                LocalDateTime.now().plusDays(3),
+                List.of(
+                        Map.of(
+                                "input", "case-a",
+                                "expectedOutput", "answer-a",
+                                "scoreWeight", 50,
+                                "public", true,
+                                "timeLimitMs", 1000,
+                                "memoryLimitKb", 65536,
+                                "orderNum", 1
+                        ),
+                        Map.of(
+                                "input", "case-b",
+                                "expectedOutput", "answer-b",
+                                "scoreWeight", 50,
+                                "public", true,
+                                "timeLimitMs", 1000,
+                                "memoryLimitKb", 65536,
+                                "orderNum", 2
+                        )
+                )
+        );
+
+        String body = mockMvc.perform(multipart("/api/v1/labs/{labId}/submissions", labId)
+                        .headers(studentHeaders("514"))
+                        .param("code", """
+                                # CASE 1
+                                answer-a
+                                # CASE 2
+                                wrong-b
+                                """)
+                        .param("language", "python"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.evaluationStatus").value("WRONG_ANSWER"))
+                .andExpect(jsonPath("$.data.autoScore").value(50))
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        long submissionId = objectMapper.readTree(body).path("data").path("submissionId").asLong();
+
+        mockMvc.perform(get("/api/v1/labs/{labId}/submissions/{submissionId}/result", labId, submissionId)
+                        .headers(teacherHeaders("514", "514")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.evaluationStatus").value("WRONG_ANSWER"))
+                .andExpect(jsonPath("$.data.score").value(50))
+                .andExpect(jsonPath("$.data.passedCases").value(1))
+                .andExpect(jsonPath("$.data.totalCases").value(2))
+                .andExpect(jsonPath("$.data.message", containsString("未通过")))
+                .andExpect(jsonPath("$.data.caseResults[1].passed").value(false))
+                .andExpect(jsonPath("$.data.caseResults[1].message", containsString("期望输出")))
+                .andExpect(jsonPath("$.data.caseResults[1].actualOutput").value("wrong-b"));
+
+        Integer evaluationRows = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM lab_evaluation_result WHERE submission_id = ?",
+                Integer.class,
+                submissionId
+        );
+        org.assertj.core.api.Assertions.assertThat(evaluationRows).isEqualTo(2);
+    }
+
+    @Test
+    void studentCannotViewAnotherStudentsEvaluationResult() throws Exception {
+        long labId = createPublishedLab(
+                515L,
+                true,
+                LocalDateTime.now().plusDays(3),
+                List.of(Map.of(
+                        "input", "1",
+                        "expectedOutput", "1",
+                        "scoreWeight", 100,
+                        "public", true,
+                        "timeLimitMs", 1000,
+                        "memoryLimitKb", 65536,
+                        "orderNum", 1
+                ))
+        );
+        long submissionId = createCodeSubmission(labId, 601L, "515", "# CASE 1\n1", "python");
+
+        mockMvc.perform(get("/api/v1/labs/{labId}/submissions/{submissionId}/result", labId, submissionId)
+                        .headers(studentHeaders("515", 602L)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("LAB-403-01"));
+    }
+
+    @Test
     void teacherFiltersDoNotPromoteHistoricalSubmissionToLatest() throws Exception {
         long labId = createPublishedLab(512L, true, LocalDateTime.now().plusDays(3));
         long historicalSubmissionId = createCodeSubmission(labId, 602L, "512", "print('student 602 old')", "python");
@@ -332,6 +482,15 @@ class LabSubmissionControllerTest {
     }
 
     private long createPublishedLab(long courseId, boolean autoEvaluate, LocalDateTime deadline) throws Exception {
+        return createPublishedLab(courseId, autoEvaluate, deadline, List.of());
+    }
+
+    private long createPublishedLab(
+            long courseId,
+            boolean autoEvaluate,
+            LocalDateTime deadline,
+            List<Map<String, Object>> testcases
+    ) throws Exception {
         Map<String, Object> payload = Map.ofEntries(
                 entry("title", "学生提交实验"),
                 entry("description", "用于学生提交流程验证"),
@@ -344,7 +503,7 @@ class LabSubmissionControllerTest {
                 entry("reportRequired", false),
                 entry("timeLimitMs", 60000),
                 entry("memoryLimitKb", 262144),
-                entry("testcases", List.of())
+                entry("testcases", testcases)
         );
 
         String body = mockMvc.perform(post("/api/v1/courses/{courseId}/labs", courseId)

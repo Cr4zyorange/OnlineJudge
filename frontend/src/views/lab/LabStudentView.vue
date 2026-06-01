@@ -79,6 +79,19 @@
           <p>提交状态：{{ latestSubmission.submitStatus }}</p>
           <p>评测状态：{{ latestSubmission.evaluationStatus }}</p>
           <p>提交时间：{{ formatDateTime(latestSubmission.submittedAt) }}</p>
+          <template v-if="latestEvaluationResult">
+            <p>自动得分：{{ latestEvaluationResult.score }}</p>
+            <p>通过用例：{{ latestEvaluationResult.passedCases }} / {{ latestEvaluationResult.totalCases }}</p>
+            <p>{{ latestEvaluationResult.message }}</p>
+            <ul class="lab-student__case-results">
+              <li v-for="item in latestEvaluationResult.caseResults" :key="item.testcaseId">
+                <strong>用例 {{ item.orderNum }}</strong>
+                <span>状态：{{ item.passed ? '通过' : '失败' }}</span>
+                <span>得分：{{ item.score }}</span>
+                <span>{{ item.message }}</span>
+              </li>
+            </ul>
+          </template>
         </section>
       </template>
     </section>
@@ -87,8 +100,13 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
-import { getLabDetail, listLabSubmissions, submitLab } from '../../api/lab/labs';
-import type { LabExperimentDetail, LabSubmissionHistoryItem, LabSubmissionSummary } from '../../types/lab';
+import { getLabDetail, getLabSubmissionResult, listLabSubmissions, submitLab } from '../../api/lab/labs';
+import type {
+  LabExperimentDetail,
+  LabSubmissionHistoryItem,
+  LabSubmissionResult,
+  LabSubmissionSummary
+} from '../../types/lab';
 
 const MAX_UPLOAD_SIZE_BYTES = 5 * 1024 * 1024;
 const ALLOWED_FILE_EXTENSIONS: Record<string, string[]> = {
@@ -107,6 +125,7 @@ const loading = ref(false);
 const submitting = ref(false);
 const labDetail = ref<LabExperimentDetail | null>(null);
 const latestSubmission = ref<LabSubmissionSummary | LabSubmissionHistoryItem | null>(null);
+const latestEvaluationResult = ref<LabSubmissionResult | null>(null);
 const errorMessage = ref('');
 const submitErrorMessage = ref('');
 const feedbackMessage = ref('');
@@ -148,6 +167,11 @@ async function loadLatestSubmission() {
   try {
     const history = await listLabSubmissions(props.labId);
     latestSubmission.value = history[0] ?? null;
+    if (latestSubmission.value) {
+      latestEvaluationResult.value = await getLabSubmissionResult(props.labId, latestSubmission.value.submissionId);
+    } else {
+      latestEvaluationResult.value = null;
+    }
   } catch (error) {
     historyErrorMessage.value = error instanceof Error ? error.message : '提交历史加载失败';
   }
@@ -167,6 +191,7 @@ async function submit() {
       code: code.value.trim() || undefined,
       file: selectedFile.value ?? undefined
     });
+    latestEvaluationResult.value = await getLabSubmissionResult(props.labId, latestSubmission.value.submissionId);
     feedbackMessage.value = `提交成功，版本 ${latestSubmission.value.version}`;
     code.value = '';
     selectedFile.value = null;
@@ -277,9 +302,26 @@ function getFileExtension(fileName: string) {
   padding: 0;
 }
 
+.lab-student__case-results {
+  display: grid;
+  gap: 10px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
 .lab-student__cases li {
   display: grid;
   gap: 6px;
+}
+
+.lab-student__case-results li {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  display: grid;
+  gap: 6px;
+  padding: 12px;
 }
 
 .lab-student__form label {
