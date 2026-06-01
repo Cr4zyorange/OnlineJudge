@@ -4,6 +4,7 @@ import com.onlinejudge.common.evaluation.EvaluationResult;
 import com.onlinejudge.common.evaluation.EvaluationStatus;
 import com.onlinejudge.common.evaluation.EvaluationTask;
 import com.onlinejudge.common.evaluation.Evaluator;
+import com.onlinejudge.common.evaluation.SandboxExecutor;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -12,18 +13,21 @@ import java.util.List;
 
 @Component
 public class SandboxBackedLabEvaluator implements Evaluator {
-    private static final String SANDBOX_UNAVAILABLE_MESSAGE = "评测沙箱未接入，当前环境禁止直接执行学生代码";
+    private final SandboxExecutor sandboxExecutor;
+
+    public SandboxBackedLabEvaluator(SandboxExecutor sandboxExecutor) {
+        this.sandboxExecutor = sandboxExecutor;
+    }
 
     @Override
     public EvaluationResult evaluate(EvaluationTask task) {
-        // LAB/HWK share the Evaluator abstraction, but the actual untrusted code execution
-        // must happen behind a sandbox boundary rather than inside the backend host process.
+        var result = sandboxExecutor.execute(task);
         return new EvaluationResult(
                 task.taskId(),
-                EvaluationStatus.SYSTEM_ERROR,
-                BigDecimal.ZERO,
-                SANDBOX_UNAVAILABLE_MESSAGE,
-                List.of(),
+                result.status(),
+                result.status() == EvaluationStatus.ACCEPTED ? BigDecimal.ONE : BigDecimal.ZERO,
+                result.message(),
+                List.of(result.actualOutput()),
                 LocalDateTime.now()
         );
     }

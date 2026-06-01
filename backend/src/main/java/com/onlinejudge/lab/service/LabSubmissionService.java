@@ -1,8 +1,6 @@
 package com.onlinejudge.lab.service;
 
 import com.onlinejudge.common.evaluation.EvaluationStatus;
-import com.onlinejudge.common.evaluation.EvaluationTask;
-import com.onlinejudge.common.evaluation.Evaluator;
 import com.onlinejudge.common.storage.FileStorageService;
 import com.onlinejudge.common.storage.StoredFile;
 import com.onlinejudge.integration.course.CoursePermissionClient;
@@ -27,7 +25,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -67,26 +64,26 @@ public class LabSubmissionService {
     private final LabSubmissionRepository labSubmissionRepository;
     private final LabEvaluationRepository labEvaluationRepository;
     private final LabEvaluationResultRepository labEvaluationResultRepository;
+    private final LabEvaluationService labEvaluationService;
     private final CoursePermissionClient coursePermissionClient;
     private final FileStorageService fileStorageService;
-    private final Evaluator evaluator;
 
     public LabSubmissionService(
             LabExperimentRepository labExperimentRepository,
             LabSubmissionRepository labSubmissionRepository,
             LabEvaluationRepository labEvaluationRepository,
             LabEvaluationResultRepository labEvaluationResultRepository,
+            LabEvaluationService labEvaluationService,
             CoursePermissionClient coursePermissionClient,
-            FileStorageService fileStorageService,
-            Evaluator evaluator
+            FileStorageService fileStorageService
     ) {
         this.labExperimentRepository = labExperimentRepository;
         this.labSubmissionRepository = labSubmissionRepository;
         this.labEvaluationRepository = labEvaluationRepository;
-        this.labEvaluationResultRepository = labEvaluationResultRepository;
+        this.labEvaluationService = labEvaluationService;
         this.coursePermissionClient = coursePermissionClient;
         this.fileStorageService = fileStorageService;
-        this.evaluator = evaluator;
+        this.labEvaluationResultRepository = labEvaluationResultRepository;
     }
 
     @Transactional
@@ -138,6 +135,7 @@ public class LabSubmissionService {
             return savedSubmission;
         }
         markSubmissionPendingEvaluation(savedSubmission, experiment.testcases().size(), now);
+        labEvaluationService.evaluateSubmissionAsync(experiment, savedSubmission, resolveSubmissionSource(savedSubmission));
         return savedSubmission;
     }
 
@@ -226,7 +224,11 @@ public class LabSubmissionService {
         }
         LabExperiment experiment = findExistingExperiment(labId);
         markSubmissionPendingEvaluation(access.submission(), experiment.testcases().size(), LocalDateTime.now());
-        LabSubmission evaluated = evaluateSubmission(experiment, access.submission());
+        LabSubmission evaluated = labEvaluationService.evaluateSubmissionSync(
+                experiment,
+                access.submission(),
+                resolveSubmissionSource(access.submission())
+        );
         return getSubmissionResult(labId, evaluated.id(), teacherId);
     }
 
@@ -492,137 +494,6 @@ public class LabSubmissionService {
         return fileId != null && !fileId.isBlank();
     }
 
-    private LabSubmission evaluateSubmission(LabExperiment experiment, LabSubmission submission) {
-        LocalDateTime startedAt = LocalDateTime.now();
-        LabEvaluation createdEvaluation = labEvaluationRepository.save(new LabEvaluation(
-                0L,
-                submission.id(),
-                EvaluationStatus.RUNNING,
-                0,
-                0,
-                experiment.testcases().size(),
-                null,
-                null,
-                "评测进行中",
-                null,
-                null,
-                startedAt,
-                null,
-                startedAt,
-                startedAt
-        ));
-        List<LabTestcaseEvaluationProjection> testcaseEvaluations = evaluateAgainstTestcases(experiment, submission, startedAt);
-        List<LabEvaluationCaseResult> caseResults = testcaseEvaluations.stream()
-                .map(item -> item.result)
-                .toList();
-        labEvaluationResultRepository.replaceSubmissionResults(submission.id(), caseResults);
-
-        int autoScore = caseResults.stream().mapToInt(LabEvaluationCaseResult::score).sum();
-        EvaluationStatus finalStatus = resolveFinalStatus(caseResults);
-        int passedCases = (int) caseResults.stream().filter(LabEvaluationCaseResult::passed).count();
-        LocalDateTime finishedAt = LocalDateTime.now();
-        labEvaluationRepository.update(new LabEvaluation(
-                createdEvaluation.id(),
-                submission.id(),
-                finalStatus,
-                autoScore,
-                passedCases,
-                caseResults.size(),
-                Math.toIntExact(java.time.Duration.between(startedAt, finishedAt).toMillis()),
-                null,
-                resolveEvaluationMessage(finalStatus, passedCases, caseResults.size()),
-                null,
-                caseResults.stream().map(LabEvaluationCaseResult::message).reduce((left, right) -> left + "\n" + right).orElse(null),
-                startedAt,
-                finishedAt,
-                createdEvaluation.createdAt(),
-                finishedAt
-        ));
-        LabSubmission evaluatedSubmission = submission.withEvaluationResult(
-                finalStatus,
-                autoScore,
-                submission.finalScore(),
-                finishedAt
-        );
-        return labSubmissionRepository.update(evaluatedSubmission);
-    }
-
-    private List<LabTestcaseEvaluationProjection> evaluateAgainstTestcases(
-            LabExperiment experiment,
-            LabSubmission submission,
-            LocalDateTime startedAt
-    ) {
-        String sourceCode = resolveSubmissionSource(submission);
-        List<LabTestcaseEvaluationProjection> evaluations = new ArrayList<>();
-        for (int index = 0; index < experiment.testcases().size(); index += 1) {
-            var testcase = experiment.testcases().get(index);
-            var evaluationTask = new EvaluationTask(
-                    submission.id() + "-" + testcase.id(),
-                    "LAB",
-                    experiment.courseId(),
-                    experiment.id(),
-                    submission.id(),
-                    submission.studentId(),
-                    submission.language(),
-                    sourceCode,
-                    Map.of(
-                            "stdin", testcase.input(),
-                            "expectedOutput", testcase.expectedOutput(),
-                            "timeLimitMs", Integer.toString(testcase.timeLimitMs()),
-                            "memoryLimitKb", Integer.toString(testcase.memoryLimitKb())
-                    ),
-                    submission.submittedAt()
-            );
-            var evaluationResult = evaluator.evaluate(evaluationTask);
-            String actualOutput = evaluationResult.caseResults().isEmpty() ? "" : normalizeOutput(evaluationResult.caseResults().get(0));
-            boolean passed = evaluationResult.status() == EvaluationStatus.ACCEPTED;
-            int score = passed ? testcase.scoreWeight() : 0;
-            evaluations.add(new LabTestcaseEvaluationProjection(new LabEvaluationCaseResult(
-                    0L,
-                    submission.id(),
-                    testcase.id(),
-                    testcase.orderNum(),
-                    testcase.isPublic(),
-                    evaluationResult.status(),
-                    passed,
-                    score,
-                    testcase.input(),
-                    testcase.expectedOutput(),
-                    actualOutput,
-                    evaluationResult.message(),
-                    evaluationResult.finishedAt(),
-                    startedAt,
-                    evaluationResult.finishedAt()
-            )));
-        }
-        return evaluations;
-    }
-
-    private EvaluationStatus resolveFinalStatus(List<LabEvaluationCaseResult> caseResults) {
-        if (caseResults.isEmpty()) {
-            return EvaluationStatus.PENDING;
-        }
-        boolean hasSystemFailure = caseResults.stream().anyMatch(result ->
-                result.status() == EvaluationStatus.SYSTEM_ERROR
-                        || result.status() == EvaluationStatus.RUNTIME_ERROR
-                        || result.status() == EvaluationStatus.COMPILE_ERROR
-                        || result.status() == EvaluationStatus.TIME_LIMIT_EXCEEDED
-        );
-        if (hasSystemFailure) {
-            return EvaluationStatus.SYSTEM_ERROR;
-        }
-        return caseResults.stream().allMatch(LabEvaluationCaseResult::passed)
-                ? EvaluationStatus.ACCEPTED
-                : EvaluationStatus.WRONG_ANSWER;
-    }
-
-    private String normalizeOutput(String value) {
-        if (value == null) {
-            return "";
-        }
-        return value.replace("\r\n", "\n").trim();
-    }
-
     private String resolveSubmissionSource(LabSubmission submission) {
         if (submission.codeContent() != null && !submission.codeContent().isBlank()) {
             return submission.codeContent();
@@ -694,8 +565,4 @@ public class LabSubmissionService {
     ) {
     }
 
-    private record LabTestcaseEvaluationProjection(
-            LabEvaluationCaseResult result
-    ) {
-    }
 }
