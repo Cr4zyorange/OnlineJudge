@@ -20,7 +20,6 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import static java.util.Map.entry;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.hasSize;
-import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -309,10 +308,8 @@ class LabSubmissionControllerTest {
         String body = mockMvc.perform(multipart("/api/v1/labs/{labId}/submissions", labId)
                         .headers(studentHeaders("513"))
                         .param("code", """
-                                # CASE 1
-                                sum:3
-                                # CASE 2
-                                sum:5
+                                first, second = map(int, input().split())
+                                print(f"sum:{first + second}")
                                 """)
                         .param("language", "python"))
                 .andExpect(status().isCreated())
@@ -337,7 +334,15 @@ class LabSubmissionControllerTest {
                 .andExpect(jsonPath("$.data.caseResults[0].passed").value(true))
                 .andExpect(jsonPath("$.data.caseResults[0].score").value(40))
                 .andExpect(jsonPath("$.data.caseResults[1].passed").value(true))
+                .andExpect(jsonPath("$.data.caseResults[1].input").doesNotExist())
+                .andExpect(jsonPath("$.data.caseResults[1].expectedOutput").doesNotExist())
                 .andExpect(jsonPath("$.data.finishedAt").isNotEmpty());
+
+        mockMvc.perform(get("/api/v1/labs/{labId}/submissions/{submissionId}/result", labId, submissionId)
+                        .headers(teacherHeaders("513", "513")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.caseResults[1].input").value("2 3"))
+                .andExpect(jsonPath("$.data.caseResults[1].expectedOutput").value("sum:5"));
     }
 
     @Test
@@ -371,10 +376,11 @@ class LabSubmissionControllerTest {
         String body = mockMvc.perform(multipart("/api/v1/labs/{labId}/submissions", labId)
                         .headers(studentHeaders("514"))
                         .param("code", """
-                                # CASE 1
-                                answer-a
-                                # CASE 2
-                                wrong-b
+                                value = input().strip()
+                                if value == "case-a":
+                                    print("answer-a")
+                                else:
+                                    print("wrong-b")
                                 """)
                         .param("language", "python"))
                 .andExpect(status().isCreated())
@@ -404,6 +410,13 @@ class LabSubmissionControllerTest {
                 submissionId
         );
         org.assertj.core.api.Assertions.assertThat(evaluationRows).isEqualTo(2);
+
+        Integer aggregateRows = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM lab_evaluation WHERE submission_id = ?",
+                Integer.class,
+                submissionId
+        );
+        org.assertj.core.api.Assertions.assertThat(aggregateRows).isEqualTo(1);
     }
 
     @Test
@@ -422,12 +435,57 @@ class LabSubmissionControllerTest {
                         "orderNum", 1
                 ))
         );
-        long submissionId = createCodeSubmission(labId, 601L, "515", "# CASE 1\n1", "python");
+        long submissionId = createCodeSubmission(
+                labId,
+                601L,
+                "515",
+                """
+                print(input().strip())
+                """,
+                "python"
+        );
 
         mockMvc.perform(get("/api/v1/labs/{labId}/submissions/{submissionId}/result", labId, submissionId)
                         .headers(studentHeaders("515", 602L)))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("LAB-403-01"));
+    }
+
+    @Test
+    void teacherCanTriggerEvaluationEndpointForExistingSubmission() throws Exception {
+        long labId = createPublishedLab(
+                516L,
+                false,
+                LocalDateTime.now().plusDays(3),
+                List.of(Map.of(
+                        "input", "5 6",
+                        "expectedOutput", "11",
+                        "scoreWeight", 100,
+                        "public", true,
+                        "timeLimitMs", 1000,
+                        "memoryLimitKb", 65536,
+                        "orderNum", 1
+                ))
+        );
+        long submissionId = createCodeSubmission(
+                labId,
+                601L,
+                "516",
+                """
+                left, right = map(int, input().split())
+                print(left + right)
+                """,
+                "python"
+        );
+
+        mockMvc.perform(post("/api/v1/labs/{labId}/submissions/{submissionId}/evaluate", labId, submissionId)
+                        .headers(teacherHeaders("516", "516")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.submissionId").value(submissionId))
+                .andExpect(jsonPath("$.data.evaluationStatus").value("ACCEPTED"))
+                .andExpect(jsonPath("$.data.score").value(100))
+                .andExpect(jsonPath("$.data.passedCases").value(1))
+                .andExpect(jsonPath("$.data.totalCases").value(1));
     }
 
     @Test

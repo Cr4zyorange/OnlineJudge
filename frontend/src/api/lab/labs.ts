@@ -123,3 +123,9 @@ export async function getLabSubmissionDetail(labId: number, submissionId: number
 export async function getLabSubmissionResult(labId: number, submissionId: number): Promise<LabSubmissionResult> {
   return request<LabSubmissionResult>(`/api/v1/labs/${labId}/submissions/${submissionId}/result`);
 }
+
+export async function evaluateLabSubmission(labId: number, submissionId: number): Promise<LabSubmissionResult> {
+  return request<LabSubmissionResult>(`/api/v1/labs/${labId}/submissions/${submissionId}/evaluate`, {
+    method: 'POST'
+  });
+}

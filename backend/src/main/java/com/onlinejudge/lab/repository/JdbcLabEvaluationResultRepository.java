@@ -17,6 +17,7 @@ public class JdbcLabEvaluationResultRepository implements LabEvaluationResultRep
             resultSet.getLong("submission_id"),
             resultSet.getLong("testcase_id"),
             resultSet.getInt("order_num"),
+            resultSet.getBoolean("is_public"),
             EvaluationStatus.valueOf(resultSet.getString("status")),
             resultSet.getBoolean("passed"),
             resultSet.getInt("score"),
@@ -62,7 +63,7 @@ public class JdbcLabEvaluationResultRepository implements LabEvaluationResultRep
     public List<LabEvaluationCaseResult> findBySubmissionId(long submissionId) {
         return jdbcTemplate.query("""
                         SELECT r.id, r.submission_id, r.testcase_id, t.order_num, r.status, r.passed, r.score,
-                               t.input, t.expected_output, r.actual_output, r.message, r.executed_at, r.created_at, r.updated_at
+                               t.is_public, t.input, t.expected_output, r.actual_output, r.message, r.executed_at, r.created_at, r.updated_at
                         FROM lab_evaluation_result r
                         INNER JOIN lab_testcase t ON t.id = r.testcase_id
                         WHERE r.submission_id = ?

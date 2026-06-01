@@ -9,6 +9,7 @@ public record LabEvaluationCaseResult(
         long submissionId,
         long testcaseId,
         int orderNum,
+        boolean isPublic,
         EvaluationStatus status,
         boolean passed,
         int score,
@@ -20,4 +21,23 @@ public record LabEvaluationCaseResult(
         LocalDateTime createdAt,
         LocalDateTime updatedAt
 ) {
+    public LabEvaluationCaseResult hideSensitiveContent() {
+        return new LabEvaluationCaseResult(
+                id,
+                submissionId,
+                testcaseId,
+                orderNum,
+                isPublic,
+                status,
+                passed,
+                score,
+                isPublic ? input : null,
+                isPublic ? expectedOutput : null,
+                actualOutput,
+                message,
+                executedAt,
+                createdAt,
+                updatedAt
+        );
+    }
 }
