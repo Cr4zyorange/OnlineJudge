@@ -56,6 +56,8 @@ describe('CourseManagementView', () => {
     expect(wrapper.get('.card-desc').text().length).toBeLessThan(longDescription.length);
     const learningTaskLink = wrapper.findAll('.navbar-menu a').find((link) => link.text().includes('学习任务'));
     expect(learningTaskLink?.attributes('href')).toBe('/learning/tasks');
+    const learningProgressLink = wrapper.findAll('.navbar-menu a').find((link) => link.attributes('href') === '/learning/progress');
+    expect(learningProgressLink?.attributes('href')).toBe('/learning/progress');
     const gradeLink = wrapper.findAll('.navbar-menu a').find((link) => link.text().includes('成绩分析'));
     expect(gradeLink?.attributes('href')).toBe('/courses/1/grd/grade-items');
 
@@ -87,6 +89,9 @@ describe('CourseManagementView', () => {
     expect(sidebarEntry.attributes('href')).toBe('/learning/tasks');
     expect(sidebarEntry.classes()).toContain('menu-button');
     expect(sidebarEntry.text()).toContain('学习任务中心');
+    const progressEntry = wrapper.get('a[data-testid="learning-progress-entry"]');
+    expect(progressEntry.attributes('href')).toBe('/learning/progress');
+    expect(progressEntry.classes()).toContain('menu-button');
   });
 
   it('uses different layouts for all courses and managed courses, then creates a course', async () => {
