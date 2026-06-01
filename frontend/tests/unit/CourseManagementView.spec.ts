@@ -34,6 +34,7 @@ describe('CourseManagementView', () => {
     window.localStorage.setItem('onlinejudge.userId', '101');
     window.localStorage.setItem('onlinejudge.userRole', 'TEACHER');
     window.localStorage.setItem('onlinejudge.username', 'Teacher101');
+    window.history.replaceState({}, '', '/courses');
   });
 
   it('truncates long descriptions and opens a detail modal from the all courses view', async () => {
@@ -406,6 +407,180 @@ describe('CourseManagementView', () => {
     expect((wrapper.get('.resource-filter select').element as HTMLSelectElement).value).toBe('11');
     expect(wrapper.text()).toContain('已恢复上次学习位置');
     expect(wrapper.text()).toContain('Lesson PDF');
+  });
+
+  it('sends the entered invite code when a student joins an invite course', async () => {
+    const inviteCourse = {
+      ...course,
+      id: 31,
+      enrollmentMode: 'INVITE',
+      inviteCode: undefined,
+      member: false,
+      manageable: false,
+      memberCount: 1
+    };
+    const joinedCourse = {
+      ...inviteCourse,
+      member: true,
+      memberCount: 2
+    };
+    const page = (list = [inviteCourse], total = list.length) => ({
+      code: '0',
+      message: 'success',
+      data: { list, total, page: 1, size: 20 }
+    });
+    vi.spyOn(window, 'prompt').mockReturnValue('JOIN-31');
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => page([inviteCourse], 1) })
+      .mockResolvedValueOnce({ ok: true, json: async () => page([inviteCourse], 1) })
+      .mockResolvedValueOnce({ ok: true, json: async () => page([], 0) })
+      .mockResolvedValueOnce({ ok: true, json: async () => page([], 0) })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          code: '0',
+          message: 'success',
+          data: { courseId: 31, userId: 201, member: true, teacher: false, role: 'STUDENT', status: 'ACTIVE' }
+        })
+      })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ code: '0', message: 'success', data: joinedCourse }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ code: '0', message: 'success', data: [] }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ code: '0', message: 'success', data: [] }) });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const wrapper = mount(CourseManagementView);
+    await flushPromises();
+
+    const joinButton = wrapper.findAll('button.card-btn').find((button) => button.text().includes('加入'));
+    expect(joinButton).toBeTruthy();
+    await joinButton!.trigger('click');
+    await flushPromises();
+
+    const joinCall = fetchMock.mock.calls.find(([url, options]) => url === '/api/v1/courses/31/join' && options.method === 'POST');
+    expect(joinCall).toBeTruthy();
+    expect(JSON.parse(joinCall![1].body)).toEqual({ inviteCode: 'JOIN-31' });
+  });
+
+  it('shows a pending success notice and refreshes the list for review-mode joins', async () => {
+    const reviewCourse = {
+      ...course,
+      id: 41,
+      enrollmentMode: 'REVIEW',
+      member: false,
+      manageable: false,
+      memberCount: 1
+    };
+    const page = (list = [reviewCourse], total = list.length) => ({
+      code: '0',
+      message: 'success',
+      data: { list, total, page: 1, size: 20 }
+    });
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => page([reviewCourse], 1) })
+      .mockResolvedValueOnce({ ok: true, json: async () => page([reviewCourse], 1) })
+      .mockResolvedValueOnce({ ok: true, json: async () => page([], 0) })
+      .mockResolvedValueOnce({ ok: true, json: async () => page([], 0) })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          code: '0',
+          message: 'success',
+          data: { courseId: 41, userId: 201, member: false, teacher: false, role: 'STUDENT', status: 'PENDING' }
+        })
+      })
+      .mockResolvedValueOnce({ ok: true, json: async () => page([reviewCourse], 1) })
+      .mockResolvedValueOnce({ ok: true, json: async () => page([reviewCourse], 1) })
+      .mockResolvedValueOnce({ ok: true, json: async () => page([], 0) })
+      .mockResolvedValueOnce({ ok: true, json: async () => page([], 0) });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const wrapper = mount(CourseManagementView);
+    await flushPromises();
+
+    const joinButton = wrapper.findAll('button.card-btn').find((button) => button.text().includes('加入'));
+    expect(joinButton).toBeTruthy();
+    await joinButton!.trigger('click');
+    await flushPromises();
+
+    expect(wrapper.text()).toContain('申请已提交');
+    const refreshedAllCourses = fetchMock.mock.calls.filter(([url, init]) =>
+      url === '/api/v1/courses?page=1&size=20&scope=all' && init?.method === 'GET'
+    );
+    expect(refreshedAllCourses.length).toBeGreaterThan(1);
+  });
+
+  it('lets a teacher approve and reject pending course members', async () => {
+    const pendingOne = {
+      courseId: 1,
+      userId: 501,
+      role: 'STUDENT',
+      status: 'PENDING',
+      joinMethod: 'REVIEW',
+      approvedBy: null,
+      joinedAt: null
+    };
+    const pendingTwo = {
+      ...pendingOne,
+      userId: 502
+    };
+    const page = (list = [course], total = list.length) => ({
+      code: '0',
+      message: 'success',
+      data: { list, total, page: 1, size: 20 }
+    });
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => page([course], 1) })
+      .mockResolvedValueOnce({ ok: true, json: async () => page([course], 1) })
+      .mockResolvedValueOnce({ ok: true, json: async () => page([course], 1) })
+      .mockResolvedValueOnce({ ok: true, json: async () => page([], 0) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ code: '0', message: 'success', data: [] }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ code: '0', message: 'success', data: [] }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ code: '0', message: 'success', data: [pendingOne, pendingTwo] }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ code: '0', message: 'success', data: { ...pendingOne, status: 'ACTIVE', approvedBy: 101 } }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ code: '0', message: 'success', data: [pendingTwo] }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => page([course], 1) })
+      .mockResolvedValueOnce({ ok: true, json: async () => page([course], 1) })
+      .mockResolvedValueOnce({ ok: true, json: async () => page([course], 1) })
+      .mockResolvedValueOnce({ ok: true, json: async () => page([], 0) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ code: '0', message: 'success', data: { ...pendingTwo, status: 'REJECTED', approvedBy: 101 } }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ code: '0', message: 'success', data: [] }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => page([course], 1) })
+      .mockResolvedValueOnce({ ok: true, json: async () => page([course], 1) })
+      .mockResolvedValueOnce({ ok: true, json: async () => page([course], 1) })
+      .mockResolvedValueOnce({ ok: true, json: async () => page([], 0) });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const wrapper = mount(CourseManagementView);
+    await flushPromises();
+
+    await wrapper.get('.course-card').trigger('click');
+    await flushPromises();
+
+    expect(wrapper.text()).toContain('学生 501');
+    expect(wrapper.text()).toContain('学生 502');
+
+    const approveButton = wrapper.findAll('button.card-btn').find((button) => button.text().includes('通过'));
+    expect(approveButton).toBeTruthy();
+    await approveButton!.trigger('click');
+    await flushPromises();
+
+    const approveCall = fetchMock.mock.calls.find(([url, options]) => url === '/api/v1/courses/1/members/501' && options.method === 'PUT');
+    expect(approveCall).toBeTruthy();
+    expect(JSON.parse(approveCall![1].body)).toEqual({ role: 'STUDENT', status: 'ACTIVE' });
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/courses/1/members?status=PENDING', expect.objectContaining({ method: 'GET' }));
+    expect(wrapper.text()).not.toContain('学生 501');
+    expect(wrapper.text()).toContain('学生 502');
+
+    const rejectButton = wrapper.findAll('button.card-btn').find((button) => button.text().includes('拒绝'));
+    expect(rejectButton).toBeTruthy();
+    await rejectButton!.trigger('click');
+    await flushPromises();
+
+    const rejectCall = fetchMock.mock.calls.find(([url, options]) => url === '/api/v1/courses/1/members/502' && options.method === 'PUT');
+    expect(rejectCall).toBeTruthy();
+    expect(JSON.parse(rejectCall![1].body)).toEqual({ role: 'STUDENT', status: 'REJECTED' });
+    expect(fetchMock.mock.calls.filter(([url]) => url === '/api/v1/courses/1/members?status=PENDING')).toHaveLength(3);
+    expect(wrapper.text()).toContain('暂无待审核申请');
   });
 });
 

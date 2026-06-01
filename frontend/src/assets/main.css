@@ -371,6 +371,13 @@ button:disabled {
   color: #16423c;
 }
 
+.state-card.success {
+  margin-bottom: 1rem;
+  background: rgba(22, 66, 60, 0.12);
+  color: #16423c;
+  font-weight: 700;
+}
+
 .card-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));

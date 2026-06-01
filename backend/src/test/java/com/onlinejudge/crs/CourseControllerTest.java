@@ -5,10 +5,13 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.not;
+import static org.hamcrest.Matchers.emptyOrNullString;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -19,6 +22,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class CourseControllerTest {
     @Autowired
     MockMvc mockMvc;
+
+    @Autowired
+    JdbcTemplate jdbcTemplate;
 
     @Test
     void teacherCreatesCourseAndBecomesCourseTeacher() throws Exception {
@@ -89,6 +95,272 @@ class CourseControllerTest {
                         .header("X-User-Role", "STUDENT"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.name", is("公开课程")));
+    }
+
+    @Test
+    void studentJoinsInviteCourseWithValidCodeAndCanAccessResources() throws Exception {
+        String response = mockMvc.perform(post("/api/v1/courses")
+                        .header("X-User-Id", "351")
+                        .header("X-User-Role", "TEACHER")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"invite-course-" + System.nanoTime() + "\",\"enrollmentMode\":\"INVITE\",\"inviteCode\":\"JOIN-351\",\"status\":\"ACTIVE\"}"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        String courseId = response.replaceAll("(?s).*\"id\":(\\d+).*", "$1");
+
+        mockMvc.perform(post("/api/v1/courses/" + courseId + "/join")
+                        .header("X-User-Id", "352")
+                        .header("X-User-Role", "STUDENT")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"inviteCode\":\"WRONG\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message", is("INVALID_INVITE_CODE")));
+
+        mockMvc.perform(get("/api/v1/courses/" + courseId)
+                        .header("X-User-Id", "352")
+                        .header("X-User-Role", "STUDENT"))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(post("/api/v1/courses/" + courseId + "/join")
+                        .header("X-User-Id", "352")
+                        .header("X-User-Role", "STUDENT")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"inviteCode\":\"JOIN-351\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.member", is(true)))
+                .andExpect(jsonPath("$.data.status", is("ACTIVE")))
+                .andExpect(jsonPath("$.data.role", is("STUDENT")));
+
+        mockMvc.perform(get("/api/v1/courses/" + courseId + "/resources")
+                        .header("X-User-Id", "352")
+                        .header("X-User-Role", "STUDENT"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void inviteCourseGeneratesVisibleInviteCodeForTeacherOnly() throws Exception {
+        String response = mockMvc.perform(post("/api/v1/courses")
+                        .header("X-User-Id", "356")
+                        .header("X-User-Role", "TEACHER")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"generated-invite-" + System.nanoTime() + "\",\"enrollmentMode\":\"INVITE\",\"status\":\"ACTIVE\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.inviteCode", not(emptyOrNullString())))
+                .andReturn().getResponse().getContentAsString();
+        String courseId = response.replaceAll("(?s).*\"id\":(\\d+).*", "$1");
+        String inviteCode = response.replaceAll("(?s).*\"inviteCode\":\"([^\"]+)\".*", "$1");
+
+        mockMvc.perform(get("/api/v1/courses/" + courseId)
+                        .header("X-User-Id", "356")
+                        .header("X-User-Role", "TEACHER"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.inviteCode", is(inviteCode)));
+
+        mockMvc.perform(post("/api/v1/courses/" + courseId + "/join")
+                        .header("X-User-Id", "357")
+                        .header("X-User-Role", "STUDENT")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"inviteCode\":\"" + inviteCode + "\"}"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/v1/courses/" + courseId)
+                        .header("X-User-Id", "357")
+                        .header("X-User-Role", "STUDENT"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.inviteCode").doesNotExist());
+    }
+
+    @Test
+    void reviewCourseCreatesPendingMembershipAndDuplicateJoinReturnsPendingStatus() throws Exception {
+        String response = mockMvc.perform(post("/api/v1/courses")
+                        .header("X-User-Id", "361")
+                        .header("X-User-Role", "TEACHER")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"review-course-" + System.nanoTime() + "\",\"enrollmentMode\":\"REVIEW\",\"status\":\"ACTIVE\"}"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        String courseId = response.replaceAll("(?s).*\"id\":(\\d+).*", "$1");
+
+        mockMvc.perform(post("/api/v1/courses/" + courseId + "/join")
+                        .header("X-User-Id", "362")
+                        .header("X-User-Role", "STUDENT")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"applyReason\":\"please approve\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.member", is(false)))
+                .andExpect(jsonPath("$.data.status", is("PENDING")))
+                .andExpect(jsonPath("$.data.role", is("STUDENT")));
+
+        mockMvc.perform(get("/api/v1/courses/" + courseId)
+                        .header("X-User-Id", "362")
+                        .header("X-User-Role", "STUDENT"))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(post("/api/v1/courses/" + courseId + "/join")
+                        .header("X-User-Id", "362")
+                        .header("X-User-Role", "STUDENT")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"applyReason\":\"again\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message", is("JOIN_PENDING")));
+
+        mockMvc.perform(get("/api/v1/courses/" + courseId + "/members?status=PENDING")
+                        .header("X-User-Id", "361")
+                        .header("X-User-Role", "TEACHER"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()", is(1)))
+                .andExpect(jsonPath("$.data[0].userId", is(362)))
+                .andExpect(jsonPath("$.data[0].status", is("PENDING")));
+
+        mockMvc.perform(put("/api/v1/courses/" + courseId + "/members/362")
+                        .header("X-User-Id", "361")
+                        .header("X-User-Role", "TEACHER")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"ACTIVE\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status", is("ACTIVE")))
+                .andExpect(jsonPath("$.data.approvedBy", is(361)));
+
+        mockMvc.perform(get("/api/v1/courses/" + courseId)
+                        .header("X-User-Id", "362")
+                        .header("X-User-Role", "STUDENT"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void teacherRejectsPendingJoinRequestAndStudentCanApplyAgain() throws Exception {
+        String response = mockMvc.perform(post("/api/v1/courses")
+                        .header("X-User-Id", "366")
+                        .header("X-User-Role", "TEACHER")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"reject-review-" + System.nanoTime() + "\",\"enrollmentMode\":\"REVIEW\",\"status\":\"ACTIVE\"}"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        String courseId = response.replaceAll("(?s).*\"id\":(\\d+).*", "$1");
+
+        mockMvc.perform(post("/api/v1/courses/" + courseId + "/join")
+                        .header("X-User-Id", "367")
+                        .header("X-User-Role", "STUDENT")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"applyReason\":\"please approve\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status", is("PENDING")));
+
+        mockMvc.perform(put("/api/v1/courses/" + courseId + "/members/367")
+                        .header("X-User-Id", "366")
+                        .header("X-User-Role", "TEACHER")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"REJECTED\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status", is("REJECTED")));
+
+        mockMvc.perform(get("/api/v1/courses/" + courseId)
+                        .header("X-User-Id", "367")
+                        .header("X-User-Role", "STUDENT"))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(get("/api/v1/courses/" + courseId + "/members?status=PENDING")
+                        .header("X-User-Id", "366")
+                        .header("X-User-Role", "TEACHER"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()", is(0)));
+
+        mockMvc.perform(post("/api/v1/courses/" + courseId + "/join")
+                        .header("X-User-Id", "367")
+                        .header("X-User-Role", "STUDENT")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"applyReason\":\"try again\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status", is("PENDING")));
+    }
+
+    @Test
+    void duplicateActiveJoinClosedCourseAndRemovedMemberAreHandledExplicitly() throws Exception {
+        String response = mockMvc.perform(post("/api/v1/courses")
+                        .header("X-User-Id", "371")
+                        .header("X-User-Role", "TEACHER")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"duplicate-course-" + System.nanoTime() + "\",\"enrollmentMode\":\"PUBLIC\",\"status\":\"ACTIVE\"}"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        String courseId = response.replaceAll("(?s).*\"id\":(\\d+).*", "$1");
+
+        mockMvc.perform(post("/api/v1/courses/" + courseId + "/join")
+                        .header("X-User-Id", "372")
+                        .header("X-User-Role", "STUDENT"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/v1/courses/" + courseId + "/join")
+                        .header("X-User-Id", "372")
+                        .header("X-User-Role", "STUDENT"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message", is("ALREADY_JOINED")));
+
+        mockMvc.perform(put("/api/v1/courses/" + courseId)
+                        .header("X-User-Id", "371")
+                        .header("X-User-Role", "TEACHER")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"closed-course\",\"enrollmentMode\":\"PUBLIC\",\"status\":\"CLOSED\"}"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/v1/courses/" + courseId + "/join")
+                        .header("X-User-Id", "373")
+                        .header("X-User-Role", "STUDENT"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message", is("COURSE_CLOSED")));
+
+        mockMvc.perform(put("/api/v1/courses/" + courseId)
+                        .header("X-User-Id", "371")
+                        .header("X-User-Role", "TEACHER")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"reopened-course\",\"enrollmentMode\":\"PUBLIC\",\"status\":\"ACTIVE\"}"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/v1/courses/" + courseId + "/join")
+                        .header("X-User-Id", "374")
+                        .header("X-User-Role", "STUDENT"))
+                .andExpect(status().isOk());
+
+        jdbcTemplate.update("""
+                UPDATE crs_course_member
+                   SET join_status = 'REMOVED', left_at = CURRENT_TIMESTAMP
+                 WHERE course_id = ? AND user_id = ?
+                """, Long.parseLong(courseId), 374L);
+
+        mockMvc.perform(get("/api/v1/courses/" + courseId)
+                        .header("X-User-Id", "374")
+                        .header("X-User-Role", "STUDENT"))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(post("/api/v1/courses/" + courseId + "/join")
+                        .header("X-User-Id", "374")
+                        .header("X-User-Role", "STUDENT"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.member", is(true)))
+                .andExpect(jsonPath("$.data.status", is("ACTIVE")));
+    }
+
+    @Test
+    void fullCourseRejectsAdditionalActiveStudents() throws Exception {
+        String response = mockMvc.perform(post("/api/v1/courses")
+                        .header("X-User-Id", "381")
+                        .header("X-User-Role", "TEACHER")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"full-course-" + System.nanoTime() + "\",\"enrollmentMode\":\"PUBLIC\",\"maxStudents\":1,\"status\":\"ACTIVE\"}"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        String courseId = response.replaceAll("(?s).*\"id\":(\\d+).*", "$1");
+
+        mockMvc.perform(post("/api/v1/courses/" + courseId + "/join")
+                        .header("X-User-Id", "382")
+                        .header("X-User-Role", "STUDENT"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/v1/courses/" + courseId + "/join")
+                        .header("X-User-Id", "383")
+                        .header("X-User-Role", "STUDENT"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message", is("COURSE_FULL")));
     }
 
     @Test

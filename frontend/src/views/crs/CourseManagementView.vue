@@ -316,6 +316,11 @@
               </label>
             </div>
 
+            <label v-if="form.enrollmentMode === 'INVITE'">
+              <span>邀请码</span>
+              <input v-model.trim="form.inviteCode" type="text" maxlength="64" placeholder="留空时系统自动生成" />
+            </label>
+
             <p v-if="formError" class="message error">{{ formError }}</p>
             <p v-if="successMessage" class="message success">{{ successMessage }}</p>
 
@@ -326,6 +331,7 @@
           </form>
 
           <section class="course-panel">
+            <div v-if="courseNotice" class="state-card success">{{ courseNotice }}</div>
             <div v-if="loading" class="state-card">课程加载中...</div>
             <div v-else-if="loadError" class="state-card error">{{ loadError }}</div>
             <div v-else-if="visibleCourses.length === 0" class="state-card">{{ emptyText }}</div>
@@ -424,6 +430,11 @@
           <p>{{ selectedCourse.description || '暂无课程简介' }}</p>
         </div>
 
+        <div v-if="selectedCourse.manageable && selectedCourse.enrollmentMode === 'INVITE'" class="detail-block">
+          <span>课程邀请码</span>
+          <p>{{ selectedCourse.inviteCode || '暂无邀请码' }}</p>
+        </div>
+
         <div class="detail-block">
           <span>章节目录</span>
           <p v-if="detailChapterLoading">章节加载中...</p>
@@ -464,6 +475,26 @@
           </template>
         </div>
 
+        <div v-if="selectedCourse.manageable" class="modal-section">
+          <h3>选课审核</h3>
+          <p v-if="memberReviewError" class="inline-error">{{ memberReviewError }}</p>
+          <p v-else-if="pendingMembers.length === 0">暂无待审核申请</p>
+          <div v-else class="resource-list">
+            <article v-for="member in pendingMembers" :key="member.userId" class="resource-row">
+              <div>
+                <strong>学生 {{ member.userId }}</strong>
+                <p>{{ enrollmentModeText(member.joinMethod === 'CREATED' ? 'PUBLIC' : member.joinMethod) }} · {{ member.status }}</p>
+              </div>
+              <button class="card-btn" type="button" :disabled="approvingUserId === member.userId" @click="approvePendingMember(member)">
+                <i class="bi bi-check2-circle"></i> 通过
+              </button>
+              <button class="card-btn danger" type="button" :disabled="approvingUserId === member.userId" @click="rejectPendingMember(member)">
+                <i class="bi bi-x-circle"></i> 拒绝
+              </button>
+            </article>
+          </div>
+        </div>
+
         <div class="modal-actions-placeholder">
           <span>预留操作区</span>
           <div class="placeholder-actions">
@@ -496,16 +527,18 @@ import {
   getCourse,
   joinCourse,
   listChapters,
+  listCourseMembers,
   listCourses,
   listResources,
   updateChapter,
+  updateCourseMember,
   updateCourse,
   updateResource,
   uploadResource
 } from '../../api/crs/courses';
 import { saveLearningProgress } from '../../api/lrn/learningProgress';
 import type { CourseScope } from '../../api/crs/courses';
-import type { Chapter, ChapterPayload, Course, CoursePayload, CourseResource, ResourcePayload } from '../../types/crs';
+import type { Chapter, ChapterPayload, Course, CourseMember, CoursePayload, CourseResource, ResourcePayload } from '../../types/crs';
 
 const ChapterNode: Component = defineComponent({
   name: 'ChapterNode',
@@ -646,9 +679,11 @@ const chapterError = ref('');
 const chapterSuccess = ref('');
 const detailChapterError = ref('');
 const detailResourceError = ref('');
+const memberReviewError = ref('');
 const resourceError = ref('');
 const resourceSuccess = ref('');
 const resumeMessage = ref('');
+const courseNotice = ref('');
 const editingCourse = ref<Course | null>(null);
 const selectedCourse = ref<Course | null>(null);
 const chapterCourse = ref<Course | null>(null);
@@ -657,6 +692,7 @@ const editingChapter = ref<Chapter | null>(null);
 const editingResourceId = ref<number | null>(null);
 const selectedResourceFile = ref<File | null>(null);
 const joiningCourseId = ref<number | null>(null);
+const approvingUserId = ref<number | null>(null);
 const draggedChapterId = ref<number | null>(null);
 const activeTab = ref<CourseScope>('all');
 const stats = reactive<Record<CourseScope, number>>({
@@ -723,6 +759,7 @@ const filteredDetailResources = computed(() => {
   const chapterId = Number(selectedDetailChapterValue.value);
   return detailResources.value.filter((resource) => resource.chapterId === chapterId);
 });
+const pendingMembers = ref<CourseMember[]>([]);
 const canOpenCourseDetail = computed(() => activeTab.value === 'all' || activeTab.value === 'archived');
 const gradeAnalysisCourse = computed(() => editingCourse.value ?? selectedCourse.value ?? chapterCourse.value ?? visibleCourses.value.find((course) => course.manageable) ?? visibleCourses.value[0] ?? null);
 const gradeAnalysisHref = computed(() => {
@@ -833,9 +870,11 @@ async function openCourseDetail(course: Course) {
   selectedDetailChapterValue.value = '';
   detailChapters.value = [];
   detailResources.value = [];
+  pendingMembers.value = [];
   detailChapterError.value = '';
   detailResourceError.value = '';
   resumeMessage.value = '';
+  memberReviewError.value = '';
   detailChapterLoading.value = true;
   detailResourceLoading.value = true;
   try {
@@ -853,10 +892,14 @@ async function openCourseDetail(course: Course) {
     detailResourceLoading.value = false;
   }
   applyResumeQuery(course.id);
+  if (course.manageable) {
+    await loadPendingMembers(course.id);
+  }
 }
 
 function closeCourseDetail() {
   selectedCourse.value = null;
+  pendingMembers.value = [];
   resetResourceForm();
 }
 
@@ -883,9 +926,28 @@ async function enterCourse(course: Course) {
 }
 
 async function joinVisibleCourse(course: Course) {
+  loadError.value = '';
+  successMessage.value = '';
+  courseNotice.value = '';
+  const payload = joinPayloadForCourse(course);
+  if (payload === null) {
+    return;
+  }
   joiningCourseId.value = course.id;
   try {
-    await joinCourse(course.id);
+    const permission = await joinCourse(course.id, payload);
+    if (permission.status === 'PENDING') {
+      closeCourseDetail();
+      closeManagementWorkspace();
+      activeTab.value = 'all';
+      keyword.value = '';
+      courseNotice.value = '申请已提交';
+      await Promise.all([loadCourses(), loadStats()]);
+      window.setTimeout(() => {
+        courseNotice.value = '';
+      }, 2000);
+      return;
+    }
     const joinedCourse = await getCourse(course.id);
     const index = courses.value.findIndex((item) => item.id === course.id);
     if (index >= 0) {
@@ -896,6 +958,64 @@ async function joinVisibleCourse(course: Course) {
     loadError.value = error instanceof Error ? error.message : '加入课程失败';
   } finally {
     joiningCourseId.value = null;
+  }
+}
+
+function joinPayloadForCourse(course: Course) {
+  if (course.status === 'CLOSED' || course.status === 'ARCHIVED') {
+    loadError.value = '课程已关闭，暂时不能加入';
+    return null;
+  }
+  if (course.enrollmentMode === 'INVITE') {
+    const inviteCode = window.prompt('请输入课程邀请码');
+    if (inviteCode == null) {
+      return null;
+    }
+    if (!inviteCode.trim()) {
+      loadError.value = '请输入有效的邀请码';
+      return null;
+    }
+    return { inviteCode: inviteCode.trim() };
+  }
+  if (course.enrollmentMode === 'REVIEW') {
+    return { applyReason: 'student requested from course list' };
+  }
+  return {};
+}
+
+async function loadPendingMembers(courseId: number) {
+  memberReviewError.value = '';
+  try {
+    pendingMembers.value = await listCourseMembers(courseId, 'PENDING');
+  } catch (error) {
+    memberReviewError.value = error instanceof Error ? error.message : '选课申请加载失败';
+  }
+}
+
+async function approvePendingMember(member: CourseMember) {
+  await reviewPendingMember(member, 'ACTIVE');
+}
+
+async function rejectPendingMember(member: CourseMember) {
+  await reviewPendingMember(member, 'REJECTED');
+}
+
+async function reviewPendingMember(member: CourseMember, status: 'ACTIVE' | 'REJECTED') {
+  if (!selectedCourse.value) {
+    return;
+  }
+  approvingUserId.value = member.userId;
+  memberReviewError.value = '';
+  try {
+    await updateCourseMember(member.courseId, member.userId, {
+      role: 'STUDENT',
+      status
+    });
+    await Promise.all([loadPendingMembers(member.courseId), loadCourses(), loadStats()]);
+  } catch (error) {
+    memberReviewError.value = error instanceof Error ? error.message : '选课申请处理失败';
+  } finally {
+    approvingUserId.value = null;
   }
 }
 
