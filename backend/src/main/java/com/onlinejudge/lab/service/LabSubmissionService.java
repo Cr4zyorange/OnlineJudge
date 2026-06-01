@@ -137,7 +137,8 @@ public class LabSubmissionService {
         if (!experiment.autoEvaluate() || experiment.testcases().isEmpty()) {
             return savedSubmission;
         }
-        return evaluateSubmission(experiment, savedSubmission);
+        markSubmissionPendingEvaluation(savedSubmission, experiment.testcases().size(), now);
+        return savedSubmission;
     }
 
     public List<LabSubmissionHistoryItemView> listSubmissions(long labId, long userId, LabSubmissionQuery query) {
@@ -224,6 +225,7 @@ public class LabSubmissionService {
             throw new LabPermissionException("无课程管理权限");
         }
         LabExperiment experiment = findExistingExperiment(labId);
+        markSubmissionPendingEvaluation(access.submission(), experiment.testcases().size(), LocalDateTime.now());
         LabSubmission evaluated = evaluateSubmission(experiment, access.submission());
         return getSubmissionResult(labId, evaluated.id(), teacherId);
     }
@@ -516,9 +518,7 @@ public class LabSubmissionService {
         labEvaluationResultRepository.replaceSubmissionResults(submission.id(), caseResults);
 
         int autoScore = caseResults.stream().mapToInt(LabEvaluationCaseResult::score).sum();
-        EvaluationStatus finalStatus = caseResults.stream().allMatch(LabEvaluationCaseResult::passed)
-                ? EvaluationStatus.ACCEPTED
-                : EvaluationStatus.WRONG_ANSWER;
+        EvaluationStatus finalStatus = resolveFinalStatus(caseResults);
         int passedCases = (int) caseResults.stream().filter(LabEvaluationCaseResult::passed).count();
         LocalDateTime finishedAt = LocalDateTime.now();
         labEvaluationRepository.update(new LabEvaluation(
@@ -598,6 +598,24 @@ public class LabSubmissionService {
         return evaluations;
     }
 
+    private EvaluationStatus resolveFinalStatus(List<LabEvaluationCaseResult> caseResults) {
+        if (caseResults.isEmpty()) {
+            return EvaluationStatus.PENDING;
+        }
+        boolean hasSystemFailure = caseResults.stream().anyMatch(result ->
+                result.status() == EvaluationStatus.SYSTEM_ERROR
+                        || result.status() == EvaluationStatus.RUNTIME_ERROR
+                        || result.status() == EvaluationStatus.COMPILE_ERROR
+                        || result.status() == EvaluationStatus.TIME_LIMIT_EXCEEDED
+        );
+        if (hasSystemFailure) {
+            return EvaluationStatus.SYSTEM_ERROR;
+        }
+        return caseResults.stream().allMatch(LabEvaluationCaseResult::passed)
+                ? EvaluationStatus.ACCEPTED
+                : EvaluationStatus.WRONG_ANSWER;
+    }
+
     private String normalizeOutput(String value) {
         if (value == null) {
             return "";
@@ -629,6 +647,15 @@ public class LabSubmissionService {
         if (status == EvaluationStatus.WRONG_ANSWER) {
             return passedCases == 0 ? "未通过任何用例" : "部分用例未通过";
         }
+        if (status == EvaluationStatus.PENDING) {
+            return "等待评测";
+        }
+        if (status == EvaluationStatus.RUNNING) {
+            return "评测进行中";
+        }
+        if (status == EvaluationStatus.SYSTEM_ERROR) {
+            return "评测失败";
+        }
         return status.name();
     }
 
@@ -651,3 +678,23 @@ public class LabSubmissionService {
     ) {
     }
 }
+    private void markSubmissionPendingEvaluation(LabSubmission submission, int testcaseCount, LocalDateTime now) {
+        labSubmissionRepository.update(submission.withEvaluationResult(EvaluationStatus.PENDING, null, submission.finalScore(), now));
+        labEvaluationRepository.save(new LabEvaluation(
+                0L,
+                submission.id(),
+                EvaluationStatus.PENDING,
+                0,
+                0,
+                testcaseCount,
+                null,
+                null,
+                "等待评测",
+                null,
+                null,
+                now,
+                null,
+                now,
+                now
+        ));
+    }

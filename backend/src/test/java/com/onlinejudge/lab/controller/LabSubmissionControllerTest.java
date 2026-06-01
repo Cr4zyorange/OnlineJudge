@@ -44,6 +44,8 @@ class LabSubmissionControllerTest {
 
     @BeforeEach
     void cleanTables() {
+        deleteIfExists("DELETE FROM lab_evaluation_result");
+        deleteIfExists("DELETE FROM lab_evaluation");
         deleteIfExists("DELETE FROM lab_submission");
         deleteIfExists("DELETE FROM lab_testcase");
         deleteIfExists("DELETE FROM lab_experiment");
@@ -281,7 +283,7 @@ class LabSubmissionControllerTest {
     }
 
     @Test
-    void submissionAutoEvaluationReturnsAcceptedResultWithCaseDetails() throws Exception {
+    void autoEvaluateSubmissionReturnsPendingAndCreatesAggregatePendingRecord() throws Exception {
         long labId = createPublishedLab(
                 513L,
                 true,
@@ -313,8 +315,8 @@ class LabSubmissionControllerTest {
                                 """)
                         .param("language", "python"))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.data.evaluationStatus").value("ACCEPTED"))
-                .andExpect(jsonPath("$.data.autoScore").value(100))
+                .andExpect(jsonPath("$.data.evaluationStatus").value("PENDING"))
+                .andExpect(jsonPath("$.data.autoScore").doesNotExist())
                 .andReturn()
                 .getResponse()
                 .getContentAsString();
@@ -326,30 +328,31 @@ class LabSubmissionControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("0"))
                 .andExpect(jsonPath("$.data.submissionId").value(submissionId))
-                .andExpect(jsonPath("$.data.evaluationStatus").value("ACCEPTED"))
-                .andExpect(jsonPath("$.data.score").value(100))
-                .andExpect(jsonPath("$.data.passedCases").value(2))
-                .andExpect(jsonPath("$.data.totalCases").value(2))
-                .andExpect(jsonPath("$.data.caseResults", hasSize(2)))
-                .andExpect(jsonPath("$.data.caseResults[0].passed").value(true))
-                .andExpect(jsonPath("$.data.caseResults[0].score").value(40))
-                .andExpect(jsonPath("$.data.caseResults[1].passed").value(true))
-                .andExpect(jsonPath("$.data.caseResults[1].input").doesNotExist())
-                .andExpect(jsonPath("$.data.caseResults[1].expectedOutput").doesNotExist())
-                .andExpect(jsonPath("$.data.finishedAt").isNotEmpty());
+                .andExpect(jsonPath("$.data.evaluationStatus").value("PENDING"))
+                .andExpect(jsonPath("$.data.score").value(0))
+                .andExpect(jsonPath("$.data.passedCases").value(0))
+                .andExpect(jsonPath("$.data.totalCases").value(0))
+                .andExpect(jsonPath("$.data.caseResults", hasSize(0)));
 
         mockMvc.perform(get("/api/v1/labs/{labId}/submissions/{submissionId}/result", labId, submissionId)
                         .headers(teacherHeaders("513", "513")))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.caseResults[1].input").value("2 3"))
-                .andExpect(jsonPath("$.data.caseResults[1].expectedOutput").value("sum:5"));
+                .andExpect(jsonPath("$.data.evaluationStatus").value("PENDING"));
+
+        Integer aggregateRows = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM lab_evaluation WHERE submission_id = ? AND status = ?",
+                Integer.class,
+                submissionId,
+                "PENDING"
+        );
+        org.assertj.core.api.Assertions.assertThat(aggregateRows).isEqualTo(1);
     }
 
     @Test
-    void submissionAutoEvaluationReturnsWrongAnswerAndPersistsFailureReason() throws Exception {
+    void teacherTriggeredEvaluationReturnsSystemErrorUntilSandboxIsAvailable() throws Exception {
         long labId = createPublishedLab(
                 514L,
-                true,
+                false,
                 LocalDateTime.now().plusDays(3),
                 List.of(
                         Map.of(
@@ -384,25 +387,32 @@ class LabSubmissionControllerTest {
                                 """)
                         .param("language", "python"))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.data.evaluationStatus").value("WRONG_ANSWER"))
-                .andExpect(jsonPath("$.data.autoScore").value(50))
+                .andExpect(jsonPath("$.data.evaluationStatus").value("NONE"))
                 .andReturn()
                 .getResponse()
                 .getContentAsString();
 
         long submissionId = objectMapper.readTree(body).path("data").path("submissionId").asLong();
 
+        mockMvc.perform(post("/api/v1/labs/{labId}/submissions/{submissionId}/evaluate", labId, submissionId)
+                        .headers(teacherHeaders("514", "514")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.evaluationStatus").value("SYSTEM_ERROR"))
+                .andExpect(jsonPath("$.data.score").value(0))
+                .andExpect(jsonPath("$.data.passedCases").value(0))
+                .andExpect(jsonPath("$.data.totalCases").value(2))
+                .andExpect(jsonPath("$.data.message", containsString("评测失败")));
+
         mockMvc.perform(get("/api/v1/labs/{labId}/submissions/{submissionId}/result", labId, submissionId)
                         .headers(teacherHeaders("514", "514")))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.evaluationStatus").value("WRONG_ANSWER"))
-                .andExpect(jsonPath("$.data.score").value(50))
-                .andExpect(jsonPath("$.data.passedCases").value(1))
+                .andExpect(jsonPath("$.data.evaluationStatus").value("SYSTEM_ERROR"))
+                .andExpect(jsonPath("$.data.score").value(0))
+                .andExpect(jsonPath("$.data.passedCases").value(0))
                 .andExpect(jsonPath("$.data.totalCases").value(2))
-                .andExpect(jsonPath("$.data.message", containsString("未通过")))
+                .andExpect(jsonPath("$.data.message", containsString("评测失败")))
                 .andExpect(jsonPath("$.data.caseResults[1].passed").value(false))
-                .andExpect(jsonPath("$.data.caseResults[1].message", containsString("期望输出")))
-                .andExpect(jsonPath("$.data.caseResults[1].actualOutput").value("wrong-b"));
+                .andExpect(jsonPath("$.data.caseResults[1].message", containsString("评测沙箱未接入")));
 
         Integer evaluationRows = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM lab_evaluation_result WHERE submission_id = ?",
@@ -482,9 +492,9 @@ class LabSubmissionControllerTest {
                         .headers(teacherHeaders("516", "516")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.submissionId").value(submissionId))
-                .andExpect(jsonPath("$.data.evaluationStatus").value("ACCEPTED"))
-                .andExpect(jsonPath("$.data.score").value(100))
-                .andExpect(jsonPath("$.data.passedCases").value(1))
+                .andExpect(jsonPath("$.data.evaluationStatus").value("SYSTEM_ERROR"))
+                .andExpect(jsonPath("$.data.score").value(0))
+                .andExpect(jsonPath("$.data.passedCases").value(0))
                 .andExpect(jsonPath("$.data.totalCases").value(1));
     }
 
