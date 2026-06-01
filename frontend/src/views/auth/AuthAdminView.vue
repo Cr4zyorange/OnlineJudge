@@ -211,6 +211,14 @@
               <option value="DENIED">DENIED</option>
             </select>
           </label>
+          <label>
+            开始时间
+            <input v-model="auditFilters.startTime" name="startTime" type="datetime-local" />
+          </label>
+          <label>
+            结束时间
+            <input v-model="auditFilters.endTime" name="endTime" type="datetime-local" />
+          </label>
           <button type="submit" class="ghost-action">筛选日志</button>
         </form>
 
@@ -280,7 +288,9 @@ const newUserRoleIds = ref<number[]>([]);
 const auditFilters = reactive({
   operatorId: '',
   operationType: '',
-  resultStatus: ''
+  resultStatus: '',
+  startTime: '',
+  endTime: ''
 });
 const loading = ref(false);
 const error = ref('');
@@ -318,6 +328,8 @@ async function loadAuditLogs() {
       operatorId: auditFilters.operatorId ? Number(auditFilters.operatorId) : undefined,
       operationType: auditFilters.operationType || undefined,
       resultStatus: auditFilters.resultStatus || undefined,
+      startTime: auditFilters.startTime || undefined,
+      endTime: auditFilters.endTime || undefined,
       page: 1,
       size: 20
     });
@@ -588,7 +600,7 @@ h2 {
 }
 
 .audit-filter-form {
-  grid-template-columns: minmax(120px, 0.8fr) minmax(180px, 1fr) minmax(120px, 0.7fr) auto;
+  grid-template-columns: minmax(100px, 0.7fr) minmax(160px, 1fr) minmax(110px, 0.7fr) repeat(2, minmax(170px, 1fr)) auto;
   border-bottom: 1px solid rgba(23, 43, 39, 0.08);
 }
 

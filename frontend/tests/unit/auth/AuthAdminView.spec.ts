@@ -99,6 +99,21 @@ describe('AuthAdminView', () => {
         accountStatus: 'DISABLED',
         roles: ['STUDENT', 'TEACHER'],
         permissions: ['course:manage']
+      }))
+      .mockResolvedValueOnce(jsonResponse({
+        records: [{
+          logId: 51,
+          operatorId: 1,
+          operationType: 'LOGIN_SUCCESS',
+          targetType: 'AUTH_USER',
+          targetId: 'admin',
+          resultStatus: 'SUCCESS',
+          failureReason: null,
+          clientIp: '203.0.113.51',
+          userAgent: 'AuditTest/51',
+          createdAt: '2026-06-01T13:00:00'
+        }],
+        total: 1
       }));
 
     const wrapper = mount(AuthAdminView);
@@ -150,6 +165,16 @@ describe('AuthAdminView', () => {
     expect(wrapper.text()).toContain('账号状态已更新');
     expect(wrapper.text()).toContain('DISABLED');
 
+    await wrapper.find('input[name="operatorId"]').setValue('1');
+    await wrapper.find('input[name="operationType"]').setValue('LOGIN_SUCCESS');
+    await wrapper.find('select[name="resultStatus"]').setValue('SUCCESS');
+    await wrapper.find('input[name="startTime"]').setValue('2026-06-01T00:00');
+    await wrapper.find('input[name="endTime"]').setValue('2026-06-01T23:59');
+    await wrapper.find('[data-audit-filter-form]').trigger('submit');
+    await flushPromises();
+    expect(wrapper.text()).toContain('LOGIN_SUCCESS');
+    expect(wrapper.text()).toContain('203.0.113.51');
+
     expect(fetchMock).toHaveBeenNthCalledWith(4, '/api/v1/admin/audit-logs?page=1&size=20', expect.objectContaining({
       headers: expect.objectContaining({ Authorization: 'Bearer admin-token' })
     }));
@@ -184,6 +209,9 @@ describe('AuthAdminView', () => {
     expect(fetchMock).toHaveBeenNthCalledWith(10, '/api/v1/admin/users/46/status', expect.objectContaining({
       method: 'PUT',
       body: JSON.stringify({ accountStatus: 'DISABLED' })
+    }));
+    expect(fetchMock).toHaveBeenNthCalledWith(11, '/api/v1/admin/audit-logs?operatorId=1&operationType=LOGIN_SUCCESS&resultStatus=SUCCESS&startTime=2026-06-01T00%3A00&endTime=2026-06-01T23%3A59&page=1&size=20', expect.objectContaining({
+      headers: expect.objectContaining({ Authorization: 'Bearer admin-token' })
     }));
   });
 });

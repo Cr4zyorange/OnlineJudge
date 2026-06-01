@@ -11,6 +11,9 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 
 @Service
 public class AuthAuditService {
+    private static final int CLIENT_IP_MAX_LENGTH = 64;
+    private static final int USER_AGENT_MAX_LENGTH = 255;
+
     private final AuthRepository authRepository;
 
     public AuthAuditService(AuthRepository authRepository) {
@@ -53,7 +56,18 @@ public class AuthAuditService {
         String clientIp = forwardedFor == null || forwardedFor.isBlank()
                 ? request.getRemoteAddr()
                 : forwardedFor.split(",")[0].trim();
-        return new AuditClient(clientIp, request.getHeader(HttpHeaders.USER_AGENT));
+        return new AuditClient(
+                truncate(clientIp, CLIENT_IP_MAX_LENGTH),
+                truncate(request.getHeader(HttpHeaders.USER_AGENT), USER_AGENT_MAX_LENGTH)
+        );
+    }
+
+    private String truncate(String value, int maxLength) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.length() <= maxLength ? trimmed : trimmed.substring(0, maxLength);
     }
 
     private record AuditClient(String clientIp, String userAgent) {

@@ -140,6 +140,32 @@ class AuthAdminControllerTest {
     }
 
     @Test
+    void loginAuditBoundsClientIpAndUserAgentToColumnLimits() throws Exception {
+        seedUser("admin-header50", "Admin50@pass", "ADMIN");
+        String longForwardedFor = "203.0.113." + "5".repeat(80);
+        String longUserAgent = "AuditTest/" + "5".repeat(300);
+
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .header("X-Forwarded-For", longForwardedFor + ", 198.51.100.1")
+                        .header(HttpHeaders.USER_AGENT, longUserAgent)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "account", "admin-header50",
+                                "password", "Admin50@pass"
+                        ))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.token").isNotEmpty());
+
+        Map<String, Object> auditClient = jdbcTemplate.queryForMap("""
+                SELECT client_ip, user_agent
+                FROM t_auth_audit_log
+                WHERE operation_type = 'LOGIN_SUCCESS'
+                """);
+        assertThat((String) auditClient.get("CLIENT_IP")).hasSize(64);
+        assertThat((String) auditClient.get("USER_AGENT")).hasSize(255);
+    }
+
+    @Test
     void studentCannotAccessRoleManagementApi() throws Exception {
         seedUser("student46", "Student46@pass", "STUDENT");
         String studentToken = loginToken("student46", "Student46@pass");
