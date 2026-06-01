@@ -76,7 +76,10 @@
           <template v-if="homework.type === 'CODE'">
             <label>
               <span>Language</span>
-              <input v-model="language" name="language" type="text" />
+              <select v-if="allowedCodeLanguages.length > 0" v-model="language" name="language">
+                <option v-for="item in allowedCodeLanguages" :key="item" :value="item">{{ item }}</option>
+              </select>
+              <input v-else v-model="language" name="language" type="text" />
             </label>
             <label>
               <span>Code</span>
@@ -110,7 +113,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { getHomeworkDetail, submitHomework } from '../../api/hwk/homeworks';
 import type { HomeworkDetail, HomeworkSubmissionSummary } from '../../types/hwk';
 
@@ -131,6 +134,7 @@ const answerJson = ref('');
 const fileIdsInput = ref('');
 const codeText = ref('');
 const language = ref('');
+const allowedCodeLanguages = computed(() => parseLanguageLimit(homework.value?.languageLimitJson));
 
 onMounted(loadHomework);
 
@@ -187,7 +191,28 @@ function validateForm() {
   if (homework.value.type === 'CODE' && (!codeText.value.trim() || !language.value.trim())) {
     return 'Code and language are required';
   }
+  if (
+    homework.value.type === 'CODE'
+    && allowedCodeLanguages.value.length > 0
+    && !allowedCodeLanguages.value.includes(language.value.trim())
+  ) {
+    return 'Language is not allowed for this homework';
+  }
   return '';
+}
+
+function parseLanguageLimit(value: string | null | undefined) {
+  if (!value) {
+    return [];
+  }
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed)
+      ? parsed.map((item) => String(item).trim()).filter(Boolean)
+      : [];
+  } catch {
+    return [];
+  }
 }
 
 function parseFileIds() {
@@ -265,6 +290,7 @@ label {
 
 input,
 textarea,
+select,
 button {
   background: #ffffff;
   border: 1px solid #b8c2d2;

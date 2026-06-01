@@ -261,7 +261,7 @@ class HomeworkControllerTest {
         mockMvc.perform(get("/api/v1/homeworks/{homeworkId}", codeHomeworkId)
                         .headers(studentHeaders("101")))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.languageLimitJson").doesNotExist())
+                .andExpect(jsonPath("$.data.languageLimitJson").value("[\"java\"]"))
                 .andExpect(jsonPath("$.data.timeLimitMs").doesNotExist())
                 .andExpect(jsonPath("$.data.memoryLimitKb").doesNotExist())
                 .andExpect(jsonPath("$.data.outputCompareMode").doesNotExist())
@@ -318,6 +318,36 @@ class HomeworkControllerTest {
                 .andExpect(jsonPath("$.data.reviewStatus").value("REVIEWED"))
                 .andExpect(jsonPath("$.data.autoScore").value(100))
                 .andExpect(jsonPath("$.data.finalScore").value(100));
+    }
+
+    @Test
+    void codeHomeworkSubmissionRejectsLanguageOutsideConfiguredAllowlist() throws Exception {
+        long homeworkId = createHomeworkAndReturnId(codePayload("[\"python\"]"));
+        mockMvc.perform(put("/api/v1/homeworks/{homeworkId}/publish", homeworkId)
+                        .headers(teacherHeaders("101", "101", "101:601")))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/v1/homeworks/{homeworkId}/submissions", homeworkId)
+                        .headers(studentHeaders("101"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "codeText", "public class Main {}",
+                                "language", "java"
+                        ))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("HWK_4005"))
+                .andExpect(jsonPath("$.message", containsString("language")));
+
+        mockMvc.perform(post("/api/v1/homeworks/{homeworkId}/submissions", homeworkId)
+                        .headers(studentHeaders("101"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "codeText", "print(input())",
+                                "language", "python"
+                        ))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.evaluationStatus").value("PENDING"))
+                .andExpect(jsonPath("$.data.reviewStatus").value("NEED_REVIEW"));
     }
 
     @Test
@@ -560,6 +590,36 @@ class HomeworkControllerTest {
                 entry("showEvaluationBeforePublish", true),
                 entry("questions", List.of()),
                 entry("testCases", List.of())
+        );
+    }
+
+    private Map<String, Object> codePayload(String languageLimitJson) {
+        return Map.ofEntries(
+                entry("courseId", 101),
+                entry("chapterId", 11),
+                entry("title", "HWK02 code homework"),
+                entry("description", "Implement addition."),
+                entry("type", "CODE"),
+                entry("deadline", "2026-06-30T23:59:59"),
+                entry("totalScore", 100),
+                entry("allowResubmit", true),
+                entry("allowLateSubmit", false),
+                entry("showEvaluationBeforePublish", true),
+                entry("languageLimitJson", languageLimitJson),
+                entry("timeLimitMs", 1000),
+                entry("memoryLimitKb", 65536),
+                entry("outputCompareMode", "EXACT"),
+                entry("testCases", List.of(
+                        Map.of(
+                                "inputData", "1 2",
+                                "expectedOutput", "3",
+                                "scoreWeight", 100,
+                                "hidden", false,
+                                "timeLimitMs", 1000,
+                                "memoryLimitKb", 65536,
+                                "sortOrder", 1
+                        )
+                ))
         );
     }
 

@@ -86,7 +86,7 @@ public record HomeworkResponse(
                 homework.deleted(),
                 homework.createdAt(),
                 homework.updatedAt(),
-                null,
+                languageLimitJson(homework),
                 null,
                 null,
                 null,

@@ -67,6 +67,60 @@ describe('HomeworkStudentView', () => {
     expect(homeworkApi.submitHomework).not.toHaveBeenCalled();
     expect(wrapper.text()).toContain('Answer content is required');
   });
+
+  it('renders configured code languages and submits only the selected language', async () => {
+    vi.mocked(homeworkApi.getHomeworkDetail).mockResolvedValueOnce(homeworkDetail({
+      title: 'HWK02 code homework',
+      type: 'CODE',
+      languageLimitJson: '["python","java"]',
+      testCases: [{
+        id: 1,
+        homeworkId: 11,
+        inputData: '1 2',
+        expectedOutput: '3',
+        scoreWeight: 100,
+        hidden: false,
+        timeLimitMs: 1000,
+        memoryLimitKb: 65536,
+        sortOrder: 1
+      }]
+    }));
+    vi.mocked(homeworkApi.submitHomework).mockResolvedValueOnce({
+      submissionId: 92,
+      homeworkId: 11,
+      studentId: 601,
+      submitStatus: 'SUBMITTED',
+      evaluationStatus: 'PENDING',
+      reviewStatus: 'NEED_REVIEW',
+      version: 1,
+      final: true,
+      submittedAt: '2026-06-01T10:00:00'
+    });
+
+    const wrapper = mount(HomeworkStudentView, {
+      props: {
+        courseId: 101,
+        homeworkId: 11
+      }
+    });
+    await flushPromises();
+
+    const languageSelect = wrapper.get('select[name="language"]');
+    const options = languageSelect.findAll('option').map((option) => option.text());
+    expect(options).toEqual(['python', 'java']);
+
+    await languageSelect.setValue('java');
+    await wrapper.get('[name="codeText"]').setValue('public class Main {}');
+    await wrapper.get('form').trigger('submit');
+    await flushPromises();
+
+    expect(homeworkApi.submitHomework).toHaveBeenCalledWith(11, expect.objectContaining({
+      codeText: 'public class Main {}',
+      language: 'java'
+    }));
+    expect(wrapper.text()).toContain('PENDING');
+    expect(wrapper.text()).toContain('NEED_REVIEW');
+  });
 });
 
 function homeworkDetail(overrides: Partial<HomeworkDetail> = {}): HomeworkDetail {

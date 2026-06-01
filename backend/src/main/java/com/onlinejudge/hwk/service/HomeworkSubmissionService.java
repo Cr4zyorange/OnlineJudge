@@ -19,6 +19,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
@@ -49,7 +50,7 @@ public class HomeworkSubmissionService {
 
         requireStudentCanSubmit(homework, studentId);
         CreateHomeworkSubmissionCommand normalized = normalize(command);
-        validateContent(homework.type(), normalized);
+        validateContent(homework, normalized);
 
         LocalDateTime now = LocalDateTime.now();
         Optional<HomeworkSubmission> latestFinal = submissionRepository.findLatestFinalByHomeworkIdAndStudentId(homeworkId, studentId);
@@ -198,7 +199,8 @@ public class HomeworkSubmissionService {
         );
     }
 
-    private void validateContent(HomeworkType type, CreateHomeworkSubmissionCommand command) {
+    private void validateContent(Homework homework, CreateHomeworkSubmissionCommand command) {
+        HomeworkType type = homework.type();
         boolean hasText = command.answerText() != null;
         boolean hasAnswerJson = command.answerJson() != null;
         boolean hasFile = command.fileIds() != null;
@@ -214,6 +216,44 @@ public class HomeworkSubmissionService {
         }
         if (type == HomeworkType.CODE && (!hasCode || command.language() == null)) {
             throw invalidFormat("code homework requires code and language");
+        }
+        if (type == HomeworkType.CODE) {
+            validateCodeLanguage(homework, command.language());
+        }
+    }
+
+    private void validateCodeLanguage(Homework homework, String language) {
+        List<String> allowedLanguages = allowedLanguages(homework);
+        if (!allowedLanguages.isEmpty() && !allowedLanguages.contains(language)) {
+            throw invalidFormat("code language is not supported");
+        }
+    }
+
+    private List<String> allowedLanguages(Homework homework) {
+        if (homework.judgeConfig() == null || homework.judgeConfig().languageLimitJson() == null) {
+            return List.of();
+        }
+        String value = homework.judgeConfig().languageLimitJson().trim();
+        if (value.isEmpty()) {
+            return List.of();
+        }
+        try {
+            JsonNode node = OBJECT_MAPPER.readTree(value);
+            if (!node.isArray()) {
+                throw invalidFormat("code language allowlist format is invalid");
+            }
+            List<String> languages = new ArrayList<>();
+            node.forEach(item -> {
+                String normalized = item.asText("").toLowerCase(Locale.ROOT).trim();
+                if (!normalized.isEmpty()) {
+                    languages.add(normalized);
+                }
+            });
+            return languages;
+        } catch (HomeworkApiException exception) {
+            throw exception;
+        } catch (Exception exception) {
+            throw invalidFormat("code language allowlist format is invalid");
         }
     }
 
