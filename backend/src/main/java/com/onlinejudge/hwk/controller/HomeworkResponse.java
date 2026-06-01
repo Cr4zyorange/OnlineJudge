@@ -86,10 +86,10 @@ public record HomeworkResponse(
                 homework.deleted(),
                 homework.createdAt(),
                 homework.updatedAt(),
-                languageLimitJson(homework),
-                timeLimitMs(homework),
-                memoryLimitKb(homework),
-                outputCompareMode(homework),
+                null,
+                null,
+                null,
+                null,
                 homework.questions().stream().map(HomeworkQuestionResponse::fromStudentView).toList(),
                 homework.testCases().stream()
                         .filter(testCase -> !testCase.hidden())
@@ -118,10 +118,10 @@ public record HomeworkResponse(
                 homework.deleted(),
                 homework.createdAt(),
                 homework.updatedAt(),
-                languageLimitJson(homework),
-                timeLimitMs(homework),
-                memoryLimitKb(homework),
-                outputCompareMode(homework),
+                null,
+                null,
+                null,
+                null,
                 List.of(),
                 List.of()
         );

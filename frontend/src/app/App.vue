@@ -26,8 +26,17 @@
     :course-id="courseId"
     :lab-id="labId"
   />
+  <HomeworkStudentView
+    v-else-if="viewMode === 'homework' && homeworkRole === 'student' && courseId !== null && homeworkId !== null"
+    :course-id="courseId"
+    :homework-id="homeworkId"
+  />
+  <HomeworkStudentListView
+    v-else-if="viewMode === 'homework' && homeworkRole === 'student' && courseId !== null"
+    :course-id="courseId"
+  />
   <HomeworkTeacherView
-    v-else-if="viewMode === 'homework' && courseId !== null"
+    v-else-if="viewMode === 'homework' && homeworkRole === 'teacher' && courseId !== null"
     :course-id="courseId"
   />
   <StudentGradeView
@@ -53,6 +62,8 @@ import AuthView from '../views/auth/AuthView.vue';
 import AuthAdminView from '../views/auth/AuthAdminView.vue';
 import CourseManagementView from '../views/crs/CourseManagementView.vue';
 import GradeItemConfigView from '../views/grd/GradeItemConfigView.vue';
+import HomeworkStudentListView from '../views/hwk/HomeworkStudentListView.vue';
+import HomeworkStudentView from '../views/hwk/HomeworkStudentView.vue';
 import HomeworkTeacherView from '../views/hwk/HomeworkTeacherView.vue';
 import LabSubmissionHistoryView from '../views/lab/LabSubmissionHistoryView.vue';
 import LabStudentView from '../views/lab/LabStudentView.vue';
@@ -144,6 +155,16 @@ const labRole = computed(() => {
   return storedRole === 'STUDENT' ? 'student' : 'teacher';
 });
 
+const homeworkRole = computed(() => {
+  const queryRole = searchParams.value.get('role')?.toLowerCase();
+  if (queryRole === 'student' || queryRole === 'teacher') {
+    return queryRole;
+  }
+  const storedRole = window.localStorage.getItem('onlinejudge.userRole')
+    ?? window.localStorage.getItem('onlinejudge.role');
+  return storedRole === 'STUDENT' ? 'student' : 'teacher';
+});
+
 const gradeRole = computed(() => {
   const queryRole = searchParams.value.get('role')?.toLowerCase();
   if (queryRole === 'student' || queryRole === 'teacher') {
@@ -170,6 +191,15 @@ const labId = computed(() => {
   }
   const pathLabId = pathname.value.match(/\/labs\/(\d+)(?:\/|$)/)?.[1] ?? null;
   return parseCourseId(pathLabId);
+});
+
+const homeworkId = computed(() => {
+  const queryHomeworkId = parseCourseId(searchParams.value.get('homeworkId'));
+  if (queryHomeworkId !== null) {
+    return queryHomeworkId;
+  }
+  const pathHomeworkId = pathname.value.match(/\/homeworks\/(\d+)(?:\/|$)/)?.[1] ?? null;
+  return parseCourseId(pathHomeworkId);
 });
 
 function parseCourseId(value: string | null) {
