@@ -134,6 +134,7 @@ public class CourseService {
                 course.endDate(),
                 course.status(),
                 courseRepository.memberCount(course.id()),
+                isAdmin(viewer) || isActiveMember(course.id(), viewer.id()),
                 isAdmin(viewer) || courseRepository.findMember(course.id(), viewer.id())
                         .filter(member -> member.status() == CourseMemberStatus.ACTIVE && member.role() == CourseMemberRole.TEACHER)
                         .isPresent(),

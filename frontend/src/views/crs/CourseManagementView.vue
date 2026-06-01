@@ -7,6 +7,7 @@
         </div>
         <div class="navbar-menu">
           <a class="active" href="/courses">课程中心</a>
+          <a href="/learning/tasks">学习任务</a>
           <a>实训模块</a>
           <a>作业评测</a>
           <a :class="{ disabled: !gradeAnalysisHref }" :href="gradeAnalysisHref || undefined" :aria-disabled="!gradeAnalysisHref">
@@ -27,19 +28,24 @@
         </div>
         <ul class="sidebar-menu">
           <li>
-            <button class="menu-button" :class="{ active: activeTab === 'all' && !chapterCourse }" type="button" @click="switchTab('all')">
+            <button class="menu-button" :class="{ active: activeTab === 'all' && !chapterCourse && !resourceCourse }" type="button" @click="switchTab('all')">
               <i class="bi bi-grid"></i> 全部课程
             </button>
           </li>
           <li>
-            <button class="menu-button" :class="{ active: activeTab === 'managed' && !chapterCourse }" type="button" @click="switchTab('managed')">
+            <button class="menu-button" :class="{ active: activeTab === 'managed' && !chapterCourse && !resourceCourse }" type="button" @click="switchTab('managed')">
               <i class="bi bi-person-check"></i> 我管理的
             </button>
           </li>
           <li>
-            <button class="menu-button" :class="{ active: activeTab === 'archived' && !chapterCourse }" type="button" @click="switchTab('archived')">
+            <button class="menu-button" :class="{ active: activeTab === 'archived' && !chapterCourse && !resourceCourse }" type="button" @click="switchTab('archived')">
               <i class="bi bi-archive"></i> 归档记录
             </button>
+          </li>
+          <li>
+            <a class="menu-button" data-testid="learning-task-center-entry" href="/learning/tasks">
+              <i class="bi bi-check2-square"></i> 学习任务中心
+            </a>
           </li>
         </ul>
 
@@ -66,7 +72,7 @@
             <h2>{{ pageTitle }}</h2>
             <p>{{ pageSubtitle }}</p>
           </div>
-          <div v-if="!chapterCourse" class="header-actions">
+          <div v-if="!chapterCourse && !resourceCourse" class="header-actions">
             <label class="search-box">
               <i class="bi bi-search"></i>
               <input v-model="keyword" type="search" placeholder="搜索课程、学期或分类" @keyup.enter="loadCourses" />
@@ -76,10 +82,10 @@
             </button>
           </div>
           <div v-else class="header-actions">
-            <button class="btn btn-secondary" type="button" @click="closeChapterManagement">
+            <button class="btn btn-secondary" type="button" @click="closeManagementWorkspace">
               <i class="bi bi-arrow-left"></i> 返回课程
             </button>
-            <button class="btn btn-secondary icon-btn" type="button" title="刷新章节" @click="loadChapters">
+            <button class="btn btn-secondary icon-btn" type="button" title="刷新" @click="refreshManagementWorkspace">
               <i class="bi bi-arrow-clockwise"></i>
             </button>
           </div>
@@ -153,6 +159,104 @@
                 @move="moveChapter"
                 @drag-sort="dragSortChapter"
               />
+            </div>
+          </section>
+        </section>
+
+        <section v-else-if="resourceCourse" class="workspace">
+          <form class="course-form resource-form" @submit.prevent="submitResource">
+            <div class="form-title">
+              <h3>{{ editingResourceId ? '更新资源' : '上传资源' }}</h3>
+              <button v-if="editingResourceId" class="text-button" type="button" @click="resetResourceForm">取消更新</button>
+            </div>
+            <label>
+              <span>资源名称</span>
+              <input v-model.trim="resourceForm.name" type="text" maxlength="255" placeholder="例如：第1章课件" />
+            </label>
+            <label>
+              <span>所属章节</span>
+              <select v-model="resourceChapterValue">
+                <option value="">不绑定章节</option>
+                <option v-for="item in flatDetailChapters" :key="item.chapter.id" :value="String(item.chapter.id)">
+                  {{ item.prefix }}{{ item.chapter.chapterName }}
+                </option>
+              </select>
+            </label>
+            <div class="form-grid">
+              <label>
+                <span>资源类型</span>
+                <select v-model="resourceForm.resourceType">
+                  <option value="DOCUMENT">文档</option>
+                  <option value="COURSEWARE">课件</option>
+                  <option value="VIDEO">视频</option>
+                  <option value="IMAGE">图片</option>
+                  <option value="ARCHIVE">压缩包</option>
+                  <option value="OTHER">其他</option>
+                </select>
+              </label>
+              <label>
+                <span>可见范围</span>
+                <select v-model="resourceForm.visibility">
+                  <option value="STUDENT">学生可见</option>
+                  <option value="TEACHER">仅教师</option>
+                </select>
+              </label>
+            </div>
+            <label>
+              <span>发布时间</span>
+              <input v-model="resourceForm.publishAt" type="datetime-local" />
+            </label>
+            <label v-if="!editingResourceId">
+              <span>文件</span>
+              <input type="file" @change="selectResourceFile" />
+            </label>
+            <p v-if="resourceError" class="message error">{{ resourceError }}</p>
+            <p v-if="resourceSuccess" class="message success">{{ resourceSuccess }}</p>
+            <button class="btn submit-btn" type="submit" :disabled="resourceSubmitting">
+              <i class="bi bi-cloud-arrow-up"></i>
+              {{ resourceSubmitting ? '提交中' : editingResourceId ? '保存资源' : '上传资源' }}
+            </button>
+          </form>
+
+          <section class="course-panel">
+            <div class="resource-toolbar">
+              <label class="resource-filter">
+                <span>按章节查看资源</span>
+                <select v-model="selectedDetailChapterValue">
+                  <option value="">全部章节</option>
+                  <option v-for="item in flatDetailChapters" :key="item.chapter.id" :value="String(item.chapter.id)">
+                    {{ item.prefix }}{{ item.chapter.chapterName }}
+                  </option>
+                </select>
+              </label>
+            </div>
+            <div v-if="detailChapterLoading || detailResourceLoading" class="state-card">资源加载中...</div>
+            <div v-else-if="detailChapterError || detailResourceError" class="state-card error">{{ detailChapterError || detailResourceError }}</div>
+            <div v-else class="resource-management-grid">
+              <div>
+                <h4>章节树</h4>
+                <div v-if="detailChapters.length === 0" class="state-card">暂无章节目录</div>
+                <div v-else class="compact-tree">
+                  <CompactChapterNode v-for="chapter in detailChapters" :key="chapter.id" :chapter="chapter" :depth="0" />
+                </div>
+              </div>
+              <div>
+                <h4>章节资源</h4>
+                <div v-if="filteredDetailResources.length === 0" class="state-card">暂无资源</div>
+                <div v-else class="resource-list">
+                  <article v-for="resource in filteredDetailResources" :key="resource.id" class="resource-row">
+                    <div>
+                      <strong>{{ resource.name }}</strong>
+                      <p>{{ resourceTypeText(resource.resourceType) }} · {{ formatFileSize(resource.fileSize) }} · {{ chapterName(resource.chapterId) }}</p>
+                    </div>
+                    <button class="card-btn" type="button" @click="downloadCourseResource(resource)">
+                      <i class="bi bi-download"></i> 下载
+                    </button>
+                    <button class="card-btn" type="button" @click="editResource(resource)">编辑</button>
+                    <button class="card-btn danger" type="button" @click="removeResource(resource)">删除</button>
+                  </article>
+                </div>
+              </div>
             </div>
           </section>
         </section>
@@ -252,8 +356,22 @@
                     <button class="card-btn" type="button" :disabled="!course.manageable" @click.stop="openChapterManagement(course)">
                       <i class="bi bi-list-nested"></i> 章节
                     </button>
+                    <button class="card-btn" type="button" :disabled="!course.manageable" @click.stop="openResourceManagement(course)">
+                      <i class="bi bi-folder2-open"></i> 资源
+                    </button>
                     <button class="card-btn danger" type="button" :disabled="!course.manageable" @click.stop="archive(course)">
                       <i class="bi bi-archive"></i> 归档
+                    </button>
+                  </div>
+                  <div v-else class="card-actions">
+                    <button v-if="course.manageable" class="card-btn" type="button" @click.stop="openCourseDetail(course)">
+                      <i class="bi bi-kanban"></i> 管理课程
+                    </button>
+                    <button v-else-if="course.member" class="card-btn" type="button" @click.stop="enterCourse(course)">
+                      <i class="bi bi-box-arrow-in-right"></i> 进入学习
+                    </button>
+                    <button v-else class="card-btn" type="button" :disabled="joiningCourseId === course.id" @click.stop="joinVisibleCourse(course)">
+                      <i class="bi bi-person-plus"></i> 加入课程
                     </button>
                   </div>
                 </div>
@@ -316,11 +434,41 @@
           </div>
         </div>
 
+        <div class="detail-block">
+          <span>教学资源</span>
+          <label class="resource-filter">
+            <span>章节</span>
+            <select v-model="selectedDetailChapterValue">
+              <option value="">全部章节</option>
+              <option v-for="item in flatDetailChapters" :key="item.chapter.id" :value="String(item.chapter.id)">
+                {{ item.prefix }}{{ item.chapter.chapterName }}
+              </option>
+            </select>
+          </label>
+          <p v-if="detailResourceLoading">资源加载中...</p>
+          <p v-else-if="detailResourceError">{{ detailResourceError }}</p>
+          <p v-else-if="filteredDetailResources.length === 0">暂无可下载资源</p>
+          <div v-else class="resource-list">
+            <article v-for="resource in filteredDetailResources" :key="resource.id" class="resource-row">
+              <div>
+                <strong>{{ resource.name }}</strong>
+                <p>{{ resourceTypeText(resource.resourceType) }} · {{ formatFileSize(resource.fileSize) }} · {{ chapterName(resource.chapterId) }}</p>
+              </div>
+              <button class="card-btn" type="button" @click="downloadCourseResource(resource)">
+                <i class="bi bi-download"></i> 下载
+              </button>
+            </article>
+          </div>
+        </div>
+
         <div class="modal-actions-placeholder">
           <span>预留操作区</span>
           <div class="placeholder-actions">
-            <button class="card-btn" type="button" disabled>
-              <i class="bi bi-box-arrow-in-right"></i> 加入课程
+            <button v-if="!selectedCourse.manageable && selectedCourse.member" class="card-btn" type="button" @click="enterCourse(selectedCourse)">
+              <i class="bi bi-box-arrow-in-right"></i> 进入学习
+            </button>
+            <button v-else-if="!selectedCourse.manageable" class="card-btn" type="button" :disabled="joiningCourseId === selectedCourse.id" @click="joinVisibleCourse(selectedCourse)">
+              <i class="bi bi-person-plus"></i> 加入课程
             </button>
             <button v-if="selectedCourse.manageable" class="card-btn" type="button" @click="manageSelectedCourseChapters">
               <i class="bi bi-list-nested"></i> 管理章节
@@ -339,14 +487,21 @@ import {
   archiveCourse,
   createChapter,
   createCourse,
+  deleteResource,
   deleteChapter,
+  downloadResource,
+  getCourse,
+  joinCourse,
   listChapters,
   listCourses,
+  listResources,
   updateChapter,
-  updateCourse
+  updateCourse,
+  updateResource,
+  uploadResource
 } from '../../api/crs/courses';
 import type { CourseScope } from '../../api/crs/courses';
-import type { Chapter, ChapterPayload, Course, CoursePayload } from '../../types/crs';
+import type { Chapter, ChapterPayload, Course, CoursePayload, CourseResource, ResourcePayload } from '../../types/crs';
 
 const ChapterNode: Component = defineComponent({
   name: 'ChapterNode',
@@ -453,18 +608,32 @@ const blankChapterForm = (): ChapterPayload => ({
   chapterType: 1
 });
 
+const blankResourceForm = (): ResourcePayload => ({
+  chapterId: null,
+  name: '',
+  resourceType: 'DOCUMENT',
+  visibility: 'STUDENT',
+  publishAt: null
+});
+
 const form = reactive<CoursePayload>(blankForm());
 const chapterForm = reactive<ChapterPayload>(blankChapterForm());
+const resourceForm = reactive<ResourcePayload>(blankResourceForm());
 const chapterParentValue = ref('');
+const resourceChapterValue = ref('');
 const courses = ref<Course[]>([]);
 const chapters = ref<Chapter[]>([]);
 const detailChapters = ref<Chapter[]>([]);
+const detailResources = ref<CourseResource[]>([]);
 const keyword = ref('');
+const selectedDetailChapterValue = ref('');
 const loading = ref(false);
 const submitting = ref(false);
 const chapterLoading = ref(false);
 const chapterSubmitting = ref(false);
 const detailChapterLoading = ref(false);
+const detailResourceLoading = ref(false);
+const resourceSubmitting = ref(false);
 const loadError = ref('');
 const formError = ref('');
 const successMessage = ref('');
@@ -472,10 +641,17 @@ const chapterLoadError = ref('');
 const chapterError = ref('');
 const chapterSuccess = ref('');
 const detailChapterError = ref('');
+const detailResourceError = ref('');
+const resourceError = ref('');
+const resourceSuccess = ref('');
 const editingCourse = ref<Course | null>(null);
 const selectedCourse = ref<Course | null>(null);
 const chapterCourse = ref<Course | null>(null);
+const resourceCourse = ref<Course | null>(null);
 const editingChapter = ref<Chapter | null>(null);
+const editingResourceId = ref<number | null>(null);
+const selectedResourceFile = ref<File | null>(null);
+const joiningCourseId = ref<number | null>(null);
 const draggedChapterId = ref<number | null>(null);
 const activeTab = ref<CourseScope>('all');
 const stats = reactive<Record<CourseScope, number>>({
@@ -487,6 +663,9 @@ const stats = reactive<Record<CourseScope, number>>({
 const pageTitle = computed(() => {
   if (chapterCourse.value) {
     return `章节目录：${chapterCourse.value.name}`;
+  }
+  if (resourceCourse.value) {
+    return `资源管理：${resourceCourse.value.name}`;
   }
   if (activeTab.value === 'managed') {
     return '课程创建与管理';
@@ -501,8 +680,11 @@ const pageSubtitle = computed(() => {
   if (chapterCourse.value) {
     return '维护课程章节树，支持一级章节、子章节、编辑、排序和删除。';
   }
+  if (resourceCourse.value) {
+    return '按章节组织教学资源，上传、更新、删除资源，并查看章节对应资源。';
+  }
   if (activeTab.value === 'managed') {
-    return '创建课程、维护基础信息，并从课程卡片进入章节目录管理。';
+    return '创建课程、维护基础信息，并从课程卡片进入章节目录或资源管理。';
   }
   if (activeTab.value === 'archived') {
     return '查看已经归档的课程，保留历史课程信息。';
@@ -528,6 +710,14 @@ const visibleCourses = computed(() => {
 });
 
 const flatChapters = computed(() => flattenChapters(chapters.value));
+const flatDetailChapters = computed(() => flattenChapters(detailChapters.value));
+const filteredDetailResources = computed(() => {
+  if (!selectedDetailChapterValue.value) {
+    return detailResources.value;
+  }
+  const chapterId = Number(selectedDetailChapterValue.value);
+  return detailResources.value.filter((resource) => resource.chapterId === chapterId);
+});
 const canOpenCourseDetail = computed(() => activeTab.value === 'all' || activeTab.value === 'archived');
 const gradeAnalysisCourse = computed(() => editingCourse.value ?? selectedCourse.value ?? chapterCourse.value ?? visibleCourses.value.find((course) => course.manageable) ?? visibleCourses.value[0] ?? null);
 const gradeAnalysisHref = computed(() => {
@@ -564,7 +754,7 @@ async function switchTab(tab: CourseScope) {
   activeTab.value = tab;
   keyword.value = '';
   closeCourseDetail();
-  closeChapterManagement();
+  closeManagementWorkspace();
   resetForm();
   await loadCourses();
 }
@@ -635,9 +825,13 @@ async function openCourseDetail(course: Course) {
     return;
   }
   selectedCourse.value = course;
+  selectedDetailChapterValue.value = '';
   detailChapters.value = [];
+  detailResources.value = [];
   detailChapterError.value = '';
+  detailResourceError.value = '';
   detailChapterLoading.value = true;
+  detailResourceLoading.value = true;
   try {
     detailChapters.value = await listChapters(course.id);
   } catch (error) {
@@ -645,23 +839,85 @@ async function openCourseDetail(course: Course) {
   } finally {
     detailChapterLoading.value = false;
   }
+  try {
+    detailResources.value = await listResources(course.id);
+  } catch (error) {
+    detailResourceError.value = error instanceof Error ? error.message : '资源列表加载失败';
+  } finally {
+    detailResourceLoading.value = false;
+  }
 }
 
 function closeCourseDetail() {
   selectedCourse.value = null;
+  resetResourceForm();
 }
 
 async function openChapterManagement(course: Course) {
   chapterCourse.value = course;
+  resourceCourse.value = null;
   closeCourseDetail();
   resetChapterForm();
   await loadChapters();
+}
+
+async function openResourceManagement(course: Course) {
+  resourceCourse.value = course;
+  chapterCourse.value = null;
+  closeCourseDetail();
+  resetResourceForm();
+  selectedDetailChapterValue.value = '';
+  await loadResourceWorkspace();
+}
+
+async function enterCourse(course: Course) {
+  window.history.pushState({}, '', `/courses/${course.id}`);
+  await openCourseDetail(course);
+}
+
+async function joinVisibleCourse(course: Course) {
+  joiningCourseId.value = course.id;
+  try {
+    await joinCourse(course.id);
+    const joinedCourse = await getCourse(course.id);
+    const index = courses.value.findIndex((item) => item.id === course.id);
+    if (index >= 0) {
+      courses.value[index] = joinedCourse;
+    }
+    await openCourseDetail(joinedCourse);
+  } catch (error) {
+    loadError.value = error instanceof Error ? error.message : '加入课程失败';
+  } finally {
+    joiningCourseId.value = null;
+  }
 }
 
 function closeChapterManagement() {
   chapterCourse.value = null;
   chapters.value = [];
   resetChapterForm();
+}
+
+function closeResourceManagement() {
+  resourceCourse.value = null;
+  detailChapters.value = [];
+  detailResources.value = [];
+  selectedDetailChapterValue.value = '';
+  resetResourceForm();
+}
+
+function closeManagementWorkspace() {
+  closeChapterManagement();
+  closeResourceManagement();
+}
+
+async function refreshManagementWorkspace() {
+  if (chapterCourse.value) {
+    await loadChapters();
+  }
+  if (resourceCourse.value) {
+    await loadResourceWorkspace();
+  }
 }
 
 async function loadChapters() {
@@ -786,6 +1042,129 @@ function normalizeChapterPayload(): ChapterPayload {
   };
 }
 
+function selectResourceFile(event: Event) {
+  const input = event.target as HTMLInputElement;
+  selectedResourceFile.value = input.files?.[0] ?? null;
+  if (selectedResourceFile.value && !resourceForm.name) {
+    resourceForm.name = selectedResourceFile.value.name;
+  }
+}
+
+async function loadResourceWorkspace() {
+  if (!resourceCourse.value) {
+    return;
+  }
+  detailChapterLoading.value = true;
+  detailResourceLoading.value = true;
+  detailChapterError.value = '';
+  detailResourceError.value = '';
+  try {
+    detailChapters.value = await listChapters(resourceCourse.value.id);
+  } catch (error) {
+    detailChapterError.value = error instanceof Error ? error.message : '章节目录加载失败';
+  } finally {
+    detailChapterLoading.value = false;
+  }
+  try {
+    detailResources.value = await listResources(resourceCourse.value.id);
+  } catch (error) {
+    detailResourceError.value = error instanceof Error ? error.message : '资源列表加载失败';
+  } finally {
+    detailResourceLoading.value = false;
+  }
+}
+
+async function submitResource() {
+  if (!resourceCourse.value) {
+    return;
+  }
+  resourceError.value = '';
+  resourceSuccess.value = '';
+  if (!resourceForm.name.trim()) {
+    resourceError.value = '请填写资源名称';
+    return;
+  }
+  resourceSubmitting.value = true;
+  const payload = normalizeResourcePayload();
+  try {
+    if (editingResourceId.value) {
+      await updateResource(resourceCourse.value.id, editingResourceId.value, payload);
+      resourceSuccess.value = '资源已更新';
+    } else {
+      if (!selectedResourceFile.value) {
+        resourceError.value = '请选择要上传的文件';
+        return;
+      }
+      await uploadResource(resourceCourse.value.id, payload, selectedResourceFile.value);
+      resourceSuccess.value = '资源上传成功';
+    }
+    resetResourceForm();
+    detailResources.value = await listResources(resourceCourse.value.id);
+  } catch (error) {
+    resourceError.value = error instanceof Error ? error.message : '资源提交失败';
+  } finally {
+    resourceSubmitting.value = false;
+  }
+}
+
+function editResource(resource: CourseResource) {
+  editingResourceId.value = resource.id;
+  Object.assign(resourceForm, {
+    chapterId: resource.chapterId ?? null,
+    name: resource.name,
+    resourceType: resource.resourceType,
+    visibility: resource.visibility,
+    publishAt: resource.publishAt ?? null
+  });
+  resourceChapterValue.value = resource.chapterId == null ? '' : String(resource.chapterId);
+}
+
+async function removeResource(resource: CourseResource) {
+  if (!resourceCourse.value || !window.confirm(`确认删除资源《${resource.name}》？`)) {
+    return;
+  }
+  await deleteResource(resourceCourse.value.id, resource.id);
+  detailResources.value = await listResources(resourceCourse.value.id);
+}
+
+async function downloadCourseResource(resource: CourseResource) {
+  resourceError.value = '';
+  detailResourceError.value = '';
+  try {
+    const { blob, filename } = await downloadResource(resource.courseId, resource.id);
+    const objectUrl = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = objectUrl;
+    link.download = filename || resource.originalFilename || resource.name;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(objectUrl);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : '资源下载失败';
+    if (resourceCourse.value) {
+      resourceError.value = message;
+    } else {
+      detailResourceError.value = message;
+    }
+  }
+}
+
+function resetResourceForm() {
+  editingResourceId.value = null;
+  selectedResourceFile.value = null;
+  Object.assign(resourceForm, blankResourceForm());
+  resourceChapterValue.value = '';
+}
+
+function normalizeResourcePayload(): ResourcePayload {
+  return {
+    ...resourceForm,
+    chapterId: resourceChapterValue.value ? Number(resourceChapterValue.value) : null,
+    name: resourceForm.name.trim()
+  };
+}
+
 async function manageSelectedCourseChapters() {
   if (selectedCourse.value) {
     await openChapterManagement(selectedCourse.value);
@@ -853,6 +1232,36 @@ function chapterTypeText(type: Chapter['chapterType']) {
   return map[type];
 }
 
+function resourceTypeText(type: CourseResource['resourceType']) {
+  const map: Record<CourseResource['resourceType'], string> = {
+    DOCUMENT: '文档',
+    COURSEWARE: '课件',
+    VIDEO: '视频',
+    IMAGE: '图片',
+    ARCHIVE: '压缩包',
+    LINK: '链接',
+    OTHER: '其他'
+  };
+  return map[type];
+}
+
+function formatFileSize(size: number) {
+  if (size >= 1024 * 1024) {
+    return `${(size / 1024 / 1024).toFixed(1)} MB`;
+  }
+  if (size >= 1024) {
+    return `${(size / 1024).toFixed(1)} KB`;
+  }
+  return `${size} B`;
+}
+
+function chapterName(chapterId?: number | null) {
+  if (chapterId == null) {
+    return '未绑定章节';
+  }
+  return findChapterById(detailChapters.value, chapterId)?.chapterName ?? '未知章节';
+}
+
 function canDropOnChapter(target: Chapter) {
   if (draggedChapterId.value == null || draggedChapterId.value === target.id) {
     return false;
@@ -883,5 +1292,13 @@ function flattenChapters(items: Chapter[], depth = 0): Array<{ chapter: Chapter;
 
 onMounted(async () => {
   await Promise.all([loadCourses(), loadStats()]);
+  const courseId = Number(window.location.pathname.match(/\/courses\/(\d+)(?:\/|$)/)?.[1]);
+  if (Number.isFinite(courseId) && courseId > 0) {
+    try {
+      await openCourseDetail(await getCourse(courseId));
+    } catch (error) {
+      loadError.value = error instanceof Error ? error.message : '课程详情加载失败';
+    }
+  }
 });
 </script>

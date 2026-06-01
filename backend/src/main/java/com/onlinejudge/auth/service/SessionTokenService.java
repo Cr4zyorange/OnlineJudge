@@ -1,6 +1,7 @@
 package com.onlinejudge.auth.service;
 
 import com.onlinejudge.auth.domain.AuthUserView;
+import com.onlinejudge.auth.exception.AuthApiException;
 import com.onlinejudge.auth.repository.AuthRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -48,7 +49,17 @@ public class SessionTokenService {
         if (token == null || token.isBlank()) {
             return Optional.empty();
         }
-        return authRepository.findValidSessionUser(digest(token.trim()), LocalDateTime.now(clock));
+        String tokenId = digest(token.trim());
+        Optional<AuthUserView> activeSessionUser = authRepository.findValidSessionUser(tokenId, LocalDateTime.now(clock));
+        if (activeSessionUser.isPresent()) {
+            return activeSessionUser;
+        }
+        authRepository.findSessionUser(tokenId)
+                .filter(user -> !"ACTIVE".equals(user.accountStatus()))
+                .ifPresent(user -> {
+                    throw AuthApiException.disabled();
+                });
+        return Optional.empty();
     }
 
     public void revoke(String token) {

@@ -103,7 +103,7 @@ class AuthAdminControllerTest {
         mockMvc.perform(get("/api/v1/admin/roles")
                         .header(HttpHeaders.AUTHORIZATION, bearer(studentToken)))
                 .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.code").value("ERR-AUTH-03"));
+                .andExpect(jsonPath("$.code").value("ERR-AUTH-05"));
     }
 
     @Test
@@ -120,7 +120,37 @@ class AuthAdminControllerTest {
                                 "permissionIds", List.of(authManagePermissionId)
                         ))))
                 .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.code").value("ERR-AUTH-03"));
+                .andExpect(jsonPath("$.code").value("ERR-AUTH-05"));
+    }
+
+    @Test
+    void adminDisablingAccountRevokesExistingSessionsAndReportsAccountStatusError() throws Exception {
+        seedUser("admin-status49", "Admin49@pass", "ADMIN");
+        long targetUserId = seedUser("target-status49", "Target49@pass", "STUDENT");
+        String adminToken = loginToken("admin-status49", "Admin49@pass");
+        String targetToken = loginToken("target-status49", "Target49@pass");
+
+        mockMvc.perform(put("/api/v1/admin/users/{userId}/status", targetUserId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "accountStatus", "DISABLED"
+                        ))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.accountStatus").value("DISABLED"));
+
+        String sessionStatus = jdbcTemplate.queryForObject(
+                "SELECT status FROM t_auth_session WHERE user_id = ?",
+                String.class,
+                targetUserId
+        );
+        assertThat(sessionStatus).isEqualTo("REVOKED");
+
+        mockMvc.perform(get("/api/v1/users/me")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(targetToken)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ERR-AUTH-03"))
+                .andExpect(jsonPath("$.message").value("账号状态异常，请联系管理员"));
     }
 
     @Test

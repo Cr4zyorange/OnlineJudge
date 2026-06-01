@@ -105,7 +105,7 @@ class AuthControllerTest {
         mockMvc.perform(get("/api/v1/auth/me")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.code").value("ERR-AUTH-01"));
+                .andExpect(jsonPath("$.code").value("ERR-AUTH-04"));
     }
 
     @Test
@@ -119,7 +119,7 @@ class AuthControllerTest {
                                 "password", "wrong-password"
                         ))))
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.code").value("AUTH_401"))
+                .andExpect(jsonPath("$.code").value("ERR-AUTH-01"))
                 .andExpect(jsonPath("$.message").value("账号或密码错误"))
                 .andExpect(jsonPath("$.message").value(not(containsString("不存在"))));
         assertThat(auditCount("LOGIN_FAILURE", "FAILURE")).isEqualTo(1);
@@ -129,7 +129,7 @@ class AuthControllerTest {
     void logoutRequiresAuthenticatedSession() throws Exception {
         mockMvc.perform(post("/api/v1/auth/logout"))
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.code").value("ERR-AUTH-01"));
+                .andExpect(jsonPath("$.code").value("ERR-AUTH-04"));
     }
 
     @Test
@@ -139,7 +139,7 @@ class AuthControllerTest {
                         .header("X-User-Name", "student45")
                         .header("X-User-Role", "STUDENT"))
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.code").value("ERR-AUTH-01"));
+                .andExpect(jsonPath("$.code").value("ERR-AUTH-04"));
     }
 
     @Test
@@ -225,7 +225,23 @@ class AuthControllerTest {
                         .header("X-User-Id", "501")
                         .header("X-User-Role", "TEACHER"))
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.code").value("ERR-AUTH-01"));
+                .andExpect(jsonPath("$.code").value("ERR-AUTH-04"));
+    }
+
+    @Test
+    void expiredOrRevokedSessionUsesDocumentedSessionExpiredErrorCode() throws Exception {
+        registerStudent("student-session49", "Student49@pass", "session49@example.com", "13900000049");
+        String token = loginToken("student-session49", "Student49@pass");
+
+        mockMvc.perform(post("/api/v1/auth/logout")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/v1/users/me")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("ERR-AUTH-04"))
+                .andExpect(jsonPath("$.message").value("登录已失效，请重新登录"));
     }
 
     @Test
@@ -261,7 +277,7 @@ class AuthControllerTest {
                                 "resourceId", "roles"
                         ))))
                 .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.code").value("ERR-AUTH-03"))
+                .andExpect(jsonPath("$.code").value("ERR-AUTH-05"))
                 .andExpect(jsonPath("$.message").value("无权限访问"));
 
         assertThat(auditCount("ACCESS_DENIED", "DENIED")).isEqualTo(1);
@@ -287,7 +303,7 @@ class AuthControllerTest {
     void authInterceptorProtectsBusinessEndpointWithoutCurrentUserArgument() throws Exception {
         mockMvc.perform(get("/api/v1/courses/1/permissions/1"))
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.code").value("ERR-AUTH-01"));
+                .andExpect(jsonPath("$.code").value("ERR-AUTH-04"));
     }
 
     @Test
@@ -424,7 +440,7 @@ class AuthControllerTest {
         mockMvc.perform(get("/api/v1/users/me")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.code").value("ERR-AUTH-01"));
+                .andExpect(jsonPath("$.code").value("ERR-AUTH-04"));
 
         mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -433,7 +449,7 @@ class AuthControllerTest {
                                 "password", "Student55@pass"
                         ))))
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.code").value("AUTH_401"));
+                .andExpect(jsonPath("$.code").value("ERR-AUTH-01"));
 
         mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -457,7 +473,7 @@ class AuthControllerTest {
                                     "password", "bad-password"
                             ))))
                     .andExpect(status().isUnauthorized())
-                    .andExpect(jsonPath("$.code").value("AUTH_401"));
+                    .andExpect(jsonPath("$.code").value("ERR-AUTH-01"));
         }
 
         Integer failedCount = jdbcTemplate.queryForObject(
@@ -480,9 +496,9 @@ class AuthControllerTest {
                         .content(objectMapper.writeValueAsString(Map.of(
                                 "account", "student56",
                                 "password", "Student56@pass"
-                        ))))
-                .andExpect(status().isLocked())
-                .andExpect(jsonPath("$.code").value("AUTH_423"));
+                ))))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ERR-AUTH-03"));
     }
 
     private void registerStudent(String username, String password, String email, String phone) throws Exception {

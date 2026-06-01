@@ -18,6 +18,7 @@ body {
   color: #2c3e50;
 }
 
+
 button,
 input,
 select,
@@ -187,7 +188,9 @@ button:disabled {
   background: transparent;
   color: #2c3e50;
   text-align: left;
+  text-decoration: none;
   cursor: pointer;
+  transition: all 0.3s ease;
 }
 
 .menu-button.active,
@@ -688,9 +691,59 @@ button:disabled {
   color: #344e49;
 }
 
+.resource-toolbar {
+  margin-bottom: 1rem;
+}
+
+.resource-filter {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.resource-management-grid {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.85fr) minmax(0, 1.4fr);
+  gap: 1rem;
+  align-items: start;
+}
+
+.resource-management-grid h4 {
+  margin: 0 0 0.7rem;
+  color: #263d39;
+}
+
+.resource-list {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.resource-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) repeat(3, minmax(72px, auto));
+  gap: 0.65rem;
+  align-items: center;
+  padding: 0.9rem;
+  border: 1px solid rgba(22, 66, 60, 0.12);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.42);
+}
+
+.resource-row strong {
+  display: block;
+  margin-bottom: 0.25rem;
+  color: #263d39;
+}
+
+.resource-row p {
+  margin: 0;
+  color: #5d716d;
+  font-size: 0.86rem;
+}
+
 @media (max-width: 1180px) {
   .container,
-  .workspace {
+  .workspace,
+  .resource-management-grid {
     grid-template-columns: 1fr;
   }
 
@@ -744,5 +797,9 @@ button:disabled {
   .chapter-actions {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .resource-row {
+    grid-template-columns: 1fr;
   }
 }

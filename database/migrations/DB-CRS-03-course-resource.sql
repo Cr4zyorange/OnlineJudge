@@ -1,0 +1,22 @@
+CREATE TABLE IF NOT EXISTS crs_resource (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    course_id BIGINT NOT NULL,
+    chapter_id BIGINT NULL,
+    resource_name VARCHAR(255) NOT NULL,
+    resource_type VARCHAR(32) NOT NULL,
+    visibility VARCHAR(32) NOT NULL DEFAULT 'STUDENT',
+    publish_at DATETIME NULL,
+    storage_key VARCHAR(500) NOT NULL,
+    original_filename VARCHAR(255) NOT NULL,
+    content_type VARCHAR(128) NOT NULL,
+    file_size BIGINT NOT NULL DEFAULT 0,
+    upload_user_id BIGINT NOT NULL,
+    is_deleted TINYINT(1) NOT NULL DEFAULT 0,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_crs_resource_course (course_id),
+    INDEX idx_crs_resource_chapter (chapter_id),
+    INDEX idx_crs_resource_uploader (upload_user_id),
+    CONSTRAINT fk_crs_resource_course FOREIGN KEY (course_id) REFERENCES crs_course (id),
+    CONSTRAINT fk_crs_resource_chapter FOREIGN KEY (chapter_id) REFERENCES crs_chapter (id)
+);
