@@ -152,6 +152,7 @@ async function loadHomework() {
   errorMessage.value = '';
   try {
     homework.value = await getHomeworkDetail(props.homeworkId);
+    syncDefaultCodeLanguage();
     restoreResume();
     await recordProgress(20, `homeworkId=${props.homeworkId}`);
   } catch (error) {
@@ -269,7 +270,17 @@ function resetForm() {
   fileIdsInput.value = '';
   codeText.value = '';
   language.value = '';
+  syncDefaultCodeLanguage();
   submitErrorMessage.value = '';
+}
+
+function syncDefaultCodeLanguage() {
+  if (homework.value?.type !== 'CODE') {
+    return;
+  }
+  if (allowedCodeLanguages.value.length > 0 && !allowedCodeLanguages.value.includes(language.value.trim())) {
+    language.value = allowedCodeLanguages.value[0];
+  }
 }
 
 function restoreResume() {

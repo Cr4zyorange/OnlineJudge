@@ -147,6 +147,57 @@ describe('HomeworkStudentView', () => {
     expect(wrapper.text()).toContain('NEED_REVIEW');
   });
 
+  it('submits the default language when code homework has a single configured language', async () => {
+    vi.mocked(homeworkApi.getHomeworkDetail).mockResolvedValueOnce(homeworkDetail({
+      title: 'HWK02 python homework',
+      type: 'CODE',
+      languageLimitJson: '["python"]',
+      testCases: [{
+        id: 1,
+        homeworkId: 11,
+        inputData: '1 2',
+        expectedOutput: '3',
+        scoreWeight: 100,
+        hidden: false,
+        timeLimitMs: 1000,
+        memoryLimitKb: 65536,
+        sortOrder: 1
+      }]
+    }));
+    vi.mocked(homeworkApi.submitHomework).mockResolvedValueOnce({
+      submissionId: 93,
+      homeworkId: 11,
+      studentId: 601,
+      submitStatus: 'SUBMITTED',
+      evaluationStatus: 'PENDING',
+      reviewStatus: 'NEED_REVIEW',
+      version: 1,
+      final: true,
+      submittedAt: '2026-06-01T10:00:00'
+    });
+
+    const wrapper = mount(HomeworkStudentView, {
+      props: {
+        courseId: 101,
+        homeworkId: 11
+      }
+    });
+    await flushPromises();
+
+    const languageSelect = wrapper.get('select[name="language"]');
+    expect(languageSelect.findAll('option').map((option) => option.text())).toEqual(['python']);
+
+    await wrapper.get('[name="codeText"]').setValue('print(input())');
+    await wrapper.get('form').trigger('submit');
+    await flushPromises();
+
+    expect(homeworkApi.submitHomework).toHaveBeenCalledWith(11, expect.objectContaining({
+      codeText: 'print(input())',
+      language: 'python'
+    }));
+    expect(wrapper.text()).toContain('PENDING');
+  });
+
   it('records homework progress when a student opens and completes homework', async () => {
     vi.mocked(homeworkApi.getHomeworkDetail).mockResolvedValueOnce(homeworkDetail({
       id: 501,
