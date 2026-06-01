@@ -1,4 +1,7 @@
 import type {
+  LabSubmissionDetail,
+  LabSubmissionHistoryItem,
+  LabSubmissionListFilters,
   LabExperimentDetail,
   LabExperimentPayload,
   LabExperimentStatus,
@@ -89,4 +92,29 @@ export async function submitLab(labId: number, payload: LabSubmissionPayload): P
     method: 'POST',
     body: formData
   });
+}
+
+export async function listLabSubmissions(
+  labId: number,
+  filters: LabSubmissionListFilters = {}
+): Promise<LabSubmissionHistoryItem[]> {
+  const query = new URLSearchParams();
+  if (filters.studentId !== undefined) {
+    query.set('studentId', String(filters.studentId));
+  }
+  if (filters.submitStatus) {
+    query.set('submitStatus', filters.submitStatus);
+  }
+  if (filters.evaluationStatus) {
+    query.set('evaluationStatus', filters.evaluationStatus);
+  }
+  if (filters.overdue !== undefined) {
+    query.set('overdue', String(filters.overdue));
+  }
+  const suffix = query.size > 0 ? `?${query.toString()}` : '';
+  return request<LabSubmissionHistoryItem[]>(`/api/v1/labs/${labId}/submissions${suffix}`);
+}
+
+export async function getLabSubmissionDetail(labId: number, submissionId: number): Promise<LabSubmissionDetail> {
+  return request<LabSubmissionDetail>(`/api/v1/labs/${labId}/submissions/${submissionId}`);
 }

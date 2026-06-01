@@ -67,6 +67,11 @@
 
         <p v-if="feedbackMessage" class="lab-student__feedback">{{ feedbackMessage }}</p>
         <p v-if="submitErrorMessage" class="lab-student__error">{{ submitErrorMessage }}</p>
+        <p v-if="historyErrorMessage" class="lab-student__error">{{ historyErrorMessage }}</p>
+
+        <div class="lab-student__history-link">
+          <a :href="historyHref">查看提交历史</a>
+        </div>
 
         <section v-if="latestSubmission" class="lab-student__submission" aria-label="最近一次提交">
           <h2>最近一次提交</h2>
@@ -82,8 +87,8 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
-import { getLabDetail, submitLab } from '../../api/lab/labs';
-import type { LabExperimentDetail, LabSubmissionSummary } from '../../types/lab';
+import { getLabDetail, listLabSubmissions, submitLab } from '../../api/lab/labs';
+import type { LabExperimentDetail, LabSubmissionHistoryItem, LabSubmissionSummary } from '../../types/lab';
 
 const MAX_UPLOAD_SIZE_BYTES = 5 * 1024 * 1024;
 const ALLOWED_FILE_EXTENSIONS: Record<string, string[]> = {
@@ -101,10 +106,11 @@ const props = defineProps<{
 const loading = ref(false);
 const submitting = ref(false);
 const labDetail = ref<LabExperimentDetail | null>(null);
-const latestSubmission = ref<LabSubmissionSummary | null>(null);
+const latestSubmission = ref<LabSubmissionSummary | LabSubmissionHistoryItem | null>(null);
 const errorMessage = ref('');
 const submitErrorMessage = ref('');
 const feedbackMessage = ref('');
+const historyErrorMessage = ref('');
 const language = ref('');
 const code = ref('');
 const selectedFile = ref<File | null>(null);
@@ -117,6 +123,7 @@ const languageOptions = computed(() => {
   }
   return raw.split(',').map((item) => item.trim()).filter(Boolean);
 });
+const historyHref = computed(() => `/courses/${props.courseId}/labs/${props.labId}/submissions?role=student`);
 
 onMounted(loadLabDetail);
 
@@ -128,10 +135,21 @@ async function loadLabDetail() {
     if (languageOptions.value.length === 1) {
       language.value = languageOptions.value[0];
     }
+    void loadLatestSubmission();
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '实验详情加载失败';
   } finally {
     loading.value = false;
+  }
+}
+
+async function loadLatestSubmission() {
+  historyErrorMessage.value = '';
+  try {
+    const history = await listLabSubmissions(props.labId);
+    latestSubmission.value = history[0] ?? null;
+  } catch (error) {
+    historyErrorMessage.value = error instanceof Error ? error.message : '提交历史加载失败';
   }
 }
 
@@ -276,6 +294,11 @@ function getFileExtension(fileName: string) {
 .lab-student__actions {
   display: flex;
   gap: 8px;
+}
+
+.lab-student__history-link a {
+  color: #175cd3;
+  text-decoration: none;
 }
 
 input,

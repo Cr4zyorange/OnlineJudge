@@ -9,6 +9,9 @@ import com.onlinejudge.lab.domain.LabExperiment;
 import com.onlinejudge.lab.domain.LabExperimentRepository;
 import com.onlinejudge.lab.domain.LabExperimentStatus;
 import com.onlinejudge.lab.domain.LabSubmission;
+import com.onlinejudge.lab.domain.LabSubmissionDetailView;
+import com.onlinejudge.lab.domain.LabSubmissionHistoryItemView;
+import com.onlinejudge.lab.domain.LabSubmissionQuery;
 import com.onlinejudge.lab.domain.LabSubmissionRepository;
 import com.onlinejudge.lab.domain.LabSubmitStatus;
 import org.springframework.stereotype.Service;
@@ -17,6 +20,10 @@ import org.springframework.transaction.annotation.Transactional;
 import java.io.ByteArrayInputStream;
 import java.time.LocalDateTime;
 import java.util.Arrays;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
@@ -26,6 +33,10 @@ import java.util.TreeSet;
 @Service
 public class LabSubmissionService {
     private static final long MAX_UPLOAD_SIZE_BYTES = 5L * 1024L * 1024L;
+    private static final Comparator<LabSubmission> SUBMISSION_RECENCY = Comparator
+            .comparing(LabSubmission::submittedAt)
+            .thenComparingInt(LabSubmission::version)
+            .thenComparingLong(LabSubmission::id);
     private static final Set<String> GENERIC_SOURCE_CONTENT_TYPES = Set.of(
             "application/octet-stream",
             "text/plain"
@@ -105,6 +116,42 @@ public class LabSubmissionService {
         );
 
         return labSubmissionRepository.save(submission);
+    }
+
+    public List<LabSubmissionHistoryItemView> listSubmissions(long labId, long userId, LabSubmissionQuery query) {
+        LabExperiment experiment = findExistingExperiment(labId);
+        boolean canManage = coursePermissionClient.canManageCourse(experiment.courseId(), userId);
+        List<LabSubmission> submissions = canManage
+                ? labSubmissionRepository.findByLabId(labId)
+                : findStudentSubmissions(experiment, userId, query);
+
+        LabSubmissionQuery effectiveQuery = canManage ? query : sanitizeStudentQuery(query, userId);
+        Map<Long, SubmissionVersionFlags> flagsBySubmissionId = buildSubmissionVersionFlags(submissions);
+        return toHistoryItems(applyFilters(submissions, experiment, effectiveQuery), flagsBySubmissionId);
+    }
+
+    public LabSubmissionDetailView getSubmissionDetail(long labId, long submissionId, long userId) {
+        LabExperiment experiment = findExistingExperiment(labId);
+        LabSubmission submission = labSubmissionRepository.findById(submissionId)
+                .filter(item -> !item.deleted())
+                .orElseThrow(() -> new LabNotFoundException("提交不存在"));
+
+        if (submission.labId() != labId) {
+            throw new LabNotFoundException("提交不存在");
+        }
+
+        boolean canManage = coursePermissionClient.canManageCourse(experiment.courseId(), userId);
+        if (!canManage) {
+            requireCourseViewPermission(experiment.courseId(), userId);
+            if (submission.studentId() != userId) {
+                throw new LabPermissionException("无权限查看他人提交");
+            }
+        }
+
+        Map<Long, SubmissionVersionFlags> flagsBySubmissionId = buildSubmissionVersionFlags(
+                labSubmissionRepository.findByLabIdAndStudentId(labId, submission.studentId())
+        );
+        return toDetail(submission, resolveSubmissionVersionFlags(flagsBySubmissionId, submission));
     }
 
     private void requireStudentCanSubmit(LabExperiment experiment, long studentId) {
@@ -219,5 +266,142 @@ public class LabSubmissionService {
                 .map(extension -> "." + extension)
                 .reduce((left, right) -> left + "、" + right)
                 .orElse("受支持");
+    }
+
+    private LabExperiment findExistingExperiment(long labId) {
+        return labExperimentRepository.findById(labId)
+                .filter(item -> !item.deleted())
+                .orElseThrow(() -> new LabNotFoundException("实验不存在"));
+    }
+
+    private void requireCourseViewPermission(long courseId, long userId) {
+        if (!coursePermissionClient.canViewCourse(courseId, userId)) {
+            throw new LabPermissionException("无课程访问权限");
+        }
+    }
+
+    private List<LabSubmission> findStudentSubmissions(LabExperiment experiment, long userId, LabSubmissionQuery query) {
+        requireCourseViewPermission(experiment.courseId(), userId);
+        sanitizeStudentQuery(query, userId);
+        return labSubmissionRepository.findByLabIdAndStudentId(experiment.id(), userId);
+    }
+
+    private LabSubmissionQuery sanitizeStudentQuery(LabSubmissionQuery query, long userId) {
+        if (query.studentId() != null && query.studentId() != userId) {
+            throw new LabPermissionException("学生只能查看本人提交");
+        }
+        return new LabSubmissionQuery(userId, query.submitStatus(), query.evaluationStatus(), query.overdue());
+    }
+
+    private List<LabSubmission> applyFilters(List<LabSubmission> submissions, LabExperiment experiment, LabSubmissionQuery query) {
+        return submissions.stream()
+                .filter(submission -> query.studentId() == null || submission.studentId() == query.studentId())
+                .filter(submission -> query.submitStatus() == null || submission.submitStatus() == query.submitStatus())
+                .filter(submission -> query.evaluationStatus() == null || submission.evaluationStatus() == query.evaluationStatus())
+                .filter(submission -> query.overdue() == null
+                        || isOverdue(submission, experiment.deadline()) == query.overdue())
+                .toList();
+    }
+
+    private boolean isOverdue(LabSubmission submission, LocalDateTime deadline) {
+        return submission.submittedAt().isAfter(deadline);
+    }
+
+    private Map<Long, SubmissionVersionFlags> buildSubmissionVersionFlags(List<LabSubmission> submissions) {
+        Map<Long, LabSubmission> latestSubmissionByStudent = new HashMap<>();
+        for (LabSubmission submission : submissions) {
+            latestSubmissionByStudent.merge(
+                    submission.studentId(),
+                    submission,
+                    (current, candidate) -> SUBMISSION_RECENCY.compare(candidate, current) > 0 ? candidate : current
+            );
+        }
+
+        Map<Long, SubmissionVersionFlags> flagsBySubmissionId = new LinkedHashMap<>();
+        for (LabSubmission submission : submissions) {
+            LabSubmission latestSubmission = latestSubmissionByStudent.get(submission.studentId());
+            boolean isLatest = latestSubmission != null && latestSubmission.id() == submission.id();
+            flagsBySubmissionId.put(
+                    submission.id(),
+                    new SubmissionVersionFlags(isLatest, submission.isFinal(), submission.isFinal())
+            );
+        }
+        return flagsBySubmissionId;
+    }
+
+    private SubmissionVersionFlags resolveSubmissionVersionFlags(
+            Map<Long, SubmissionVersionFlags> flagsBySubmissionId,
+            LabSubmission submission
+    ) {
+        return flagsBySubmissionId.getOrDefault(
+                submission.id(),
+                new SubmissionVersionFlags(false, submission.isFinal(), submission.isFinal())
+        );
+    }
+
+    private List<LabSubmissionHistoryItemView> toHistoryItems(
+            List<LabSubmission> submissions,
+            Map<Long, SubmissionVersionFlags> flagsBySubmissionId
+    ) {
+        return submissions.stream()
+                .map(submission -> toHistoryItem(submission, resolveSubmissionVersionFlags(flagsBySubmissionId, submission)))
+                .toList();
+    }
+
+    private LabSubmissionHistoryItemView toHistoryItem(
+            LabSubmission submission,
+            SubmissionVersionFlags flags
+    ) {
+        return new LabSubmissionHistoryItemView(
+                submission.id(),
+                submission.labId(),
+                submission.studentId(),
+                submission.language(),
+                submission.submitStatus(),
+                submission.evaluationStatus(),
+                submission.autoScore(),
+                submission.finalScore(),
+                submission.version(),
+                submission.submittedAt(),
+                flags.isLatest(),
+                flags.isFinal(),
+                flags.isScoringBasis(),
+                hasFile(submission.fileId())
+        );
+    }
+
+    private LabSubmissionDetailView toDetail(
+            LabSubmission submission,
+            SubmissionVersionFlags flags
+    ) {
+        return new LabSubmissionDetailView(
+                submission.id(),
+                submission.labId(),
+                submission.studentId(),
+                submission.language(),
+                submission.submitStatus(),
+                submission.evaluationStatus(),
+                submission.autoScore(),
+                submission.finalScore(),
+                submission.version(),
+                submission.submittedAt(),
+                flags.isLatest(),
+                flags.isFinal(),
+                flags.isScoringBasis(),
+                hasFile(submission.fileId()),
+                submission.codeContent(),
+                submission.fileId()
+        );
+    }
+
+    private boolean hasFile(String fileId) {
+        return fileId != null && !fileId.isBlank();
+    }
+
+    private record SubmissionVersionFlags(
+            boolean isLatest,
+            boolean isFinal,
+            boolean isScoringBasis
+    ) {
     }
 }

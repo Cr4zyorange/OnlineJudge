@@ -42,6 +42,24 @@ describe('LabStudentView', () => {
         }
       ]
     });
+    vi.mocked(labApi.listLabSubmissions).mockResolvedValueOnce([
+      {
+        submissionId: 88,
+        labId: 7,
+        studentId: 601,
+        language: 'python',
+        submitStatus: 'SUBMITTED',
+        evaluationStatus: 'ACCEPTED',
+        autoScore: 92,
+        finalScore: 95,
+        version: 2,
+        submittedAt: '2026-06-01T09:30:00',
+        isLatest: true,
+        isFinal: true,
+        isScoringBasis: true,
+        hasFile: false
+      }
+    ]);
     vi.mocked(labApi.submitLab).mockResolvedValueOnce({
       submissionId: 99,
       labId: 7,
@@ -63,6 +81,10 @@ describe('LabStudentView', () => {
     expect(wrapper.text()).toContain('实验七');
     expect(wrapper.text()).toContain('完成基础排序实现');
     expect(wrapper.text()).toContain('java,python');
+    expect(labApi.listLabSubmissions).toHaveBeenCalledWith(7);
+    expect(wrapper.text()).toContain('查看提交历史');
+    expect(wrapper.text()).toContain('版本 2');
+    expect(wrapper.text()).toContain('ACCEPTED');
 
     await wrapper.get('[name="language"]').setValue('python');
     await wrapper.get('[name="code"]').setValue("print('hello lab')");
@@ -98,6 +120,7 @@ describe('LabStudentView', () => {
       deleted: false,
       testcases: []
     });
+    vi.mocked(labApi.listLabSubmissions).mockResolvedValueOnce([]);
 
     const wrapper = mount(LabStudentView, {
       props: {
@@ -136,6 +159,7 @@ describe('LabStudentView', () => {
       deleted: false,
       testcases: []
     });
+    vi.mocked(labApi.listLabSubmissions).mockResolvedValueOnce([]);
 
     const wrapper = mount(LabStudentView, {
       props: {
@@ -181,6 +205,7 @@ describe('LabStudentView', () => {
       deleted: false,
       testcases: []
     });
+    vi.mocked(labApi.listLabSubmissions).mockResolvedValueOnce([]);
     vi.mocked(labApi.submitLab).mockRejectedValueOnce(new Error('实验已截止，当前不允许提交'));
 
     const wrapper = mount(LabStudentView, {
@@ -198,9 +223,44 @@ describe('LabStudentView', () => {
 
     expect(wrapper.text()).toContain('实验已截止，当前不允许提交');
   });
+
+  it('shows a history loading failure without breaking the detail page', async () => {
+    vi.mocked(labApi.getLabDetail).mockResolvedValueOnce({
+      id: 11,
+      courseId: 101,
+      chapterId: null,
+      title: '实验十一',
+      description: '历史记录加载失败',
+      status: 'PUBLISHED',
+      deadline: '2026-06-30T23:59:59',
+      maxScore: 100,
+      attachmentIds: [],
+      allowedLanguages: 'java,python',
+      evaluationMode: 'DOCKER_IO',
+      autoEvaluate: true,
+      reportRequired: false,
+      timeLimitMs: 60000,
+      memoryLimitKb: 262144,
+      deleted: false,
+      testcases: []
+    });
+    vi.mocked(labApi.listLabSubmissions).mockRejectedValueOnce(new Error('提交历史加载失败'));
+
+    const wrapper = mount(LabStudentView, {
+      props: {
+        courseId: 101,
+        labId: 11
+      }
+    });
+    await flushPromises();
+
+    expect(wrapper.text()).toContain('实验十一');
+    expect(wrapper.text()).toContain('提交历史加载失败');
+  });
 });
 
 async function flushPromises() {
-  await Promise.resolve();
-  await Promise.resolve();
+  for (let tick = 0; tick < 6; tick += 1) {
+    await Promise.resolve();
+  }
 }
