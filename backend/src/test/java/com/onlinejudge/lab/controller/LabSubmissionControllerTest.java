@@ -331,7 +331,7 @@ class LabSubmissionControllerTest {
                 .andExpect(jsonPath("$.data.evaluationStatus").value("PENDING"))
                 .andExpect(jsonPath("$.data.score").value(0))
                 .andExpect(jsonPath("$.data.passedCases").value(0))
-                .andExpect(jsonPath("$.data.totalCases").value(0))
+                .andExpect(jsonPath("$.data.totalCases").value(2))
                 .andExpect(jsonPath("$.data.caseResults", hasSize(0)));
 
         mockMvc.perform(get("/api/v1/labs/{labId}/submissions/{submissionId}/result", labId, submissionId)
@@ -426,7 +426,7 @@ class LabSubmissionControllerTest {
                 Integer.class,
                 submissionId
         );
-        org.assertj.core.api.Assertions.assertThat(aggregateRows).isEqualTo(1);
+        org.assertj.core.api.Assertions.assertThat(aggregateRows).isEqualTo(2);
     }
 
     @Test

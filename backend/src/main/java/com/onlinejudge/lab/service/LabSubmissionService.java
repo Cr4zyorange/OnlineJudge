@@ -659,25 +659,6 @@ public class LabSubmissionService {
         return status.name();
     }
 
-    private record SubmissionVersionFlags(
-            boolean isLatest,
-            boolean isFinal,
-            boolean isScoringBasis
-    ) {
-    }
-
-    private record SubmissionAccess(
-            LabExperiment experiment,
-            LabSubmission submission,
-            boolean canManage
-    ) {
-    }
-
-    private record LabTestcaseEvaluationProjection(
-            LabEvaluationCaseResult result
-    ) {
-    }
-}
     private void markSubmissionPendingEvaluation(LabSubmission submission, int testcaseCount, LocalDateTime now) {
         labSubmissionRepository.update(submission.withEvaluationResult(EvaluationStatus.PENDING, null, submission.finalScore(), now));
         labEvaluationRepository.save(new LabEvaluation(
@@ -698,3 +679,23 @@ public class LabSubmissionService {
                 now
         ));
     }
+
+    private record SubmissionVersionFlags(
+            boolean isLatest,
+            boolean isFinal,
+            boolean isScoringBasis
+    ) {
+    }
+
+    private record SubmissionAccess(
+            LabExperiment experiment,
+            LabSubmission submission,
+            boolean canManage
+    ) {
+    }
+
+    private record LabTestcaseEvaluationProjection(
+            LabEvaluationCaseResult result
+    ) {
+    }
+}
