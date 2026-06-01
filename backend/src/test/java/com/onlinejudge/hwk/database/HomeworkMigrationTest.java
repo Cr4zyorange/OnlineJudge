@@ -8,15 +8,22 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.jdbc.Sql;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @JdbcTest(properties = {
-        "spring.datasource.url=jdbc:h2:mem:homework_migration;MODE=MySQL;DATABASE_TO_LOWER=TRUE;CASE_INSENSITIVE_IDENTIFIERS=TRUE;DB_CLOSE_DELAY=-1"
+        "spring.datasource.url=jdbc:h2:mem:homework_migration;MODE=MySQL;DATABASE_TO_LOWER=TRUE;CASE_INSENSITIVE_IDENTIFIERS=TRUE;DB_CLOSE_DELAY=-1",
+        "spring.sql.init.mode=never"
 })
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Sql(scripts = "file:../database/migrations/20260530_01_create_hwk_homework.sql")
 class HomeworkMigrationTest {
+    private static final Path HOMEWORK_MIGRATION_PATH = Path.of(
+            "../database/migrations/20260530_01_create_hwk_homework.sql"
+    );
+
     private final JdbcTemplate jdbcTemplate;
 
     @Autowired
@@ -25,7 +32,16 @@ class HomeworkMigrationTest {
     }
 
     @Test
-    void judgeConfigContractAllowsOnlyOneConfigAndRequiresReferencedConfig() {
+    void homeworkMigrationUsesMySqlCompatibleConstraintSyntax() throws Exception {
+        String migrationSql = Files.readString(HOMEWORK_MIGRATION_PATH);
+
+        assertThat(migrationSql)
+                .doesNotContainPattern("(?i)ADD\\s+CONSTRAINT\\s+IF\\s+NOT\\s+EXISTS");
+    }
+
+    @Test
+    @Sql(scripts = "file:../database/migrations/20260530_01_create_hwk_homework.sql")
+    void judgeConfigContractAllowsOnlyOneConfigAndRequiresReferencedHomework() {
         long homeworkId = insertHomework(null);
         long judgeConfigId = insertJudgeConfig(homeworkId);
 
@@ -39,11 +55,15 @@ class HomeworkMigrationTest {
                 homeworkId
         )).isEqualTo(judgeConfigId);
 
-        assertThatThrownBy(() -> insertHomework(999_999L))
-                .isInstanceOf(DataIntegrityViolationException.class);
-
         assertThatThrownBy(() -> insertJudgeConfig(999_999L))
                 .isInstanceOf(DataIntegrityViolationException.class);
+
+        jdbcTemplate.update("DELETE FROM t_hwk_homework WHERE id = ?", homeworkId);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM t_hwk_judge_config WHERE id = ?",
+                Long.class,
+                judgeConfigId
+        )).isZero();
     }
 
     private long insertHomework(Long judgeConfigId) {
