@@ -162,6 +162,11 @@ describe('LabStudentView', () => {
     await flushPromises();
 
     expect((wrapper.get('[name="code"]').element as HTMLTextAreaElement).value).toBe("print('resume')");
+    expect(learningProgressApi.saveLearningProgress).not.toHaveBeenCalledWith(expect.objectContaining({
+      sourceModule: 'LAB',
+      sourceId: 7,
+      lastPosition: 'labId=7'
+    }));
     expect(wrapper.text()).toContain('已恢复上次断点');
   });
 

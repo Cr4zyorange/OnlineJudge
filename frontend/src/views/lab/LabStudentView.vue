@@ -135,11 +135,13 @@ async function loadLabDetail() {
   errorMessage.value = '';
   try {
     labDetail.value = await getLabDetail(props.labId);
-    restoreResumeCode();
+    const resumed = restoreResumeCode();
     if (languageOptions.value.length === 1) {
       language.value = languageOptions.value[0];
     }
-    await recordProgress(10, `labId=${props.labId}`);
+    if (!resumed) {
+      await recordProgress(10, `labId=${props.labId}`);
+    }
     void loadLatestSubmission();
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '实验详情加载失败';
@@ -211,12 +213,13 @@ async function recordProgress(progressPercent: number, lastPosition: string) {
 function restoreResumeCode() {
   const resume = new URLSearchParams(window.location.search).get('resume');
   if (!resume) {
-    return;
+    return false;
   }
   resumeMessage.value = `已恢复上次断点：${resume}`;
   if (resume.startsWith('code=')) {
     code.value = resume.slice('code='.length);
   }
+  return true;
 }
 
 function validateForm() {

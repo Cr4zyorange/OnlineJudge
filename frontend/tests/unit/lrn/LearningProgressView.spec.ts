@@ -50,7 +50,9 @@ const progressOverview: LearningProgressOverview = {
 describe('LearningProgressView', () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    installLocalStorageMock();
     window.localStorage.clear();
+    window.history.replaceState({}, '', '/learning/progress');
   });
 
   it('renders course and chapter progress with a continue learning entry', async () => {
@@ -117,3 +119,16 @@ describe('LearningProgressView', () => {
     expect(wrapper.text()).toContain('65%');
   });
 });
+
+function installLocalStorageMock() {
+  const values = new Map<string, string>();
+  Object.defineProperty(window, 'localStorage', {
+    configurable: true,
+    value: {
+      getItem: vi.fn((key: string) => values.get(key) ?? null),
+      setItem: vi.fn((key: string, value: string) => values.set(key, value)),
+      removeItem: vi.fn((key: string) => values.delete(key)),
+      clear: vi.fn(() => values.clear())
+    }
+  });
+}
