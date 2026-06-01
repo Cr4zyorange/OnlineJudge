@@ -229,6 +229,62 @@ public class JdbcHomeworkRepository implements HomeworkRepository {
         return count == null ? 0 : count;
     }
 
+    @Override
+    public List<Homework> findByCourseIdAndStatuses(
+            long courseId,
+            List<HomeworkStatus> statuses,
+            String keyword,
+            int page,
+            int size
+    ) {
+        if (statuses == null || statuses.isEmpty()) {
+            return List.of();
+        }
+        String sql = """
+                SELECT id, course_id, chapter_id, title, description, type, status, total_score, deadline,
+                       allow_resubmit, allow_late_submit, show_evaluation_before_publish, judge_config_id,
+                       created_by, published_at, is_deleted, created_at, updated_at
+                FROM t_hwk_homework
+                WHERE course_id = ? AND is_deleted = FALSE
+                  AND status IN (%s)
+                """.formatted(placeholders(statuses.size()));
+        List<Object> args = new ArrayList<>();
+        args.add(courseId);
+        statuses.stream().map(HomeworkStatus::name).forEach(args::add);
+        if (keyword != null && !keyword.isBlank()) {
+            sql += " AND LOWER(title) LIKE ? ";
+            args.add("%" + keyword.trim().toLowerCase(Locale.ROOT) + "%");
+        }
+        sql += " ORDER BY updated_at DESC, id DESC LIMIT ? OFFSET ? ";
+        args.add(size);
+        args.add((Math.max(page, 1) - 1) * size);
+        return jdbcTemplate.query(sql, HOMEWORK_ROW_MAPPER, args.toArray()).stream()
+                .map(this::attachChildren)
+                .toList();
+    }
+
+    @Override
+    public long countByCourseIdAndStatuses(long courseId, List<HomeworkStatus> statuses, String keyword) {
+        if (statuses == null || statuses.isEmpty()) {
+            return 0;
+        }
+        String sql = """
+                SELECT COUNT(*)
+                FROM t_hwk_homework
+                WHERE course_id = ? AND is_deleted = FALSE
+                  AND status IN (%s)
+                """.formatted(placeholders(statuses.size()));
+        List<Object> args = new ArrayList<>();
+        args.add(courseId);
+        statuses.stream().map(HomeworkStatus::name).forEach(args::add);
+        if (keyword != null && !keyword.isBlank()) {
+            sql += " AND LOWER(title) LIKE ? ";
+            args.add("%" + keyword.trim().toLowerCase(Locale.ROOT) + "%");
+        }
+        Long count = jdbcTemplate.queryForObject(sql, Long.class, args.toArray());
+        return count == null ? 0 : count;
+    }
+
     private Homework attachChildren(Homework homework) {
         List<HomeworkQuestion> questions = jdbcTemplate.query("""
                         SELECT id, homework_id, question_type, stem, options_json, answer_json, score,
@@ -368,5 +424,9 @@ public class JdbcHomeworkRepository implements HomeworkRepository {
 
     private static LocalDateTime toLocalDateTime(Timestamp timestamp) {
         return timestamp == null ? null : timestamp.toLocalDateTime();
+    }
+
+    private static String placeholders(int count) {
+        return String.join(", ", java.util.Collections.nCopies(count, "?"));
     }
 }

@@ -24,6 +24,12 @@ import java.util.List;
 @Service
 public class HomeworkService {
     private static final Logger log = LoggerFactory.getLogger(HomeworkService.class);
+    private static final List<HomeworkStatus> STUDENT_VISIBLE_STATUSES = List.of(
+            HomeworkStatus.PUBLISHED,
+            HomeworkStatus.CLOSED,
+            HomeworkStatus.SCORE_PUBLISHED,
+            HomeworkStatus.ARCHIVED
+    );
 
     private final HomeworkRepository repository;
     private final CoursePermissionClient coursePermissionClient;
@@ -101,11 +107,25 @@ public class HomeworkService {
     public PageResponse<Homework> list(long userId, long courseId, HomeworkStatus status, String keyword, int page, int size) {
         requireViewPermission(courseId, userId);
         boolean canManage = coursePermissionClient.canManageCourse(courseId, userId);
-        HomeworkStatus queryStatus = canManage ? status : HomeworkStatus.PUBLISHED;
         int normalizedPage = Math.max(page, 1);
         int normalizedSize = Math.max(1, Math.min(size, 100));
-        List<Homework> homeworks = repository.findByCourseId(courseId, queryStatus, keyword, normalizedPage, normalizedSize);
-        long total = repository.countByCourseId(courseId, queryStatus, keyword);
+        if (canManage) {
+            List<Homework> homeworks = repository.findByCourseId(courseId, status, keyword, normalizedPage, normalizedSize);
+            long total = repository.countByCourseId(courseId, status, keyword);
+            return new PageResponse<>(homeworks, total, normalizedPage, normalizedSize);
+        }
+        if (status != null && !STUDENT_VISIBLE_STATUSES.contains(status)) {
+            return new PageResponse<>(List.of(), 0, normalizedPage, normalizedSize);
+        }
+        List<HomeworkStatus> visibleStatuses = status == null ? STUDENT_VISIBLE_STATUSES : List.of(status);
+        List<Homework> homeworks = repository.findByCourseIdAndStatuses(
+                courseId,
+                visibleStatuses,
+                keyword,
+                normalizedPage,
+                normalizedSize
+        );
+        long total = repository.countByCourseIdAndStatuses(courseId, visibleStatuses, keyword);
         return new PageResponse<>(homeworks, total, normalizedPage, normalizedSize);
     }
 

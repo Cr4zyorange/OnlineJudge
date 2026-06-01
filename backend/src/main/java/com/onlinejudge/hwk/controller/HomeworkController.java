@@ -1,6 +1,5 @@
 package com.onlinejudge.hwk.controller;
 
-import com.onlinejudge.common.security.AccessDeniedException;
 import com.onlinejudge.common.security.CurrentUser;
 import com.onlinejudge.common.web.ApiResponse;
 import com.onlinejudge.common.web.PageResponse;
@@ -34,7 +33,6 @@ public class HomeworkController {
             CurrentUser currentUser,
             @Valid @RequestBody HomeworkRequest request
     ) {
-        requireTeacher(currentUser);
         HomeworkResponse response = HomeworkResponse.fromTeacherView(homeworkService.create(currentUser.id(), request.toCommand()));
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.ok(response));
     }
@@ -45,7 +43,6 @@ public class HomeworkController {
             CurrentUser currentUser,
             @Valid @RequestBody HomeworkRequest request
     ) {
-        requireTeacher(currentUser);
         return ApiResponse.ok(HomeworkResponse.fromTeacherView(homeworkService.update(homeworkId, currentUser.id(), request.toCommand())));
     }
 
@@ -77,7 +74,6 @@ public class HomeworkController {
             CurrentUser currentUser,
             @Valid @RequestBody List<HomeworkQuestionPayload> questions
     ) {
-        requireTeacher(currentUser);
         return ApiResponse.ok(HomeworkResponse.fromTeacherView(homeworkService.saveQuestions(
                 homeworkId,
                 currentUser.id(),
@@ -91,7 +87,6 @@ public class HomeworkController {
             CurrentUser currentUser,
             @Valid @RequestBody List<HomeworkTestCasePayload> testCases
     ) {
-        requireTeacher(currentUser);
         return ApiResponse.ok(HomeworkResponse.fromTeacherView(homeworkService.saveTestCases(
                 homeworkId,
                 currentUser.id(),
@@ -101,23 +96,15 @@ public class HomeworkController {
 
     @PutMapping("/{homeworkId}/publish")
     public ApiResponse<HomeworkResponse> publish(@PathVariable long homeworkId, CurrentUser currentUser) {
-        requireTeacher(currentUser);
         return ApiResponse.ok(HomeworkResponse.fromTeacherView(homeworkService.publish(homeworkId, currentUser.id())));
     }
 
     @PutMapping("/{homeworkId}/close")
     public ApiResponse<HomeworkResponse> close(@PathVariable long homeworkId, CurrentUser currentUser) {
-        requireTeacher(currentUser);
         return ApiResponse.ok(HomeworkResponse.fromTeacherView(homeworkService.close(homeworkId, currentUser.id())));
     }
 
     private PageResponse<HomeworkResponse> mapPage(PageResponse<com.onlinejudge.hwk.domain.Homework> page) {
         return new PageResponse<>(page.list().stream().map(HomeworkResponse::summary).toList(), page.total(), page.page(), page.size());
-    }
-
-    private void requireTeacher(CurrentUser currentUser) {
-        if (!currentUser.hasRole("TEACHER") && !currentUser.hasRole("ADMIN")) {
-            throw new AccessDeniedException("teacher role is required");
-        }
     }
 }

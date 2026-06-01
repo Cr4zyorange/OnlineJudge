@@ -17,4 +17,8 @@ public interface HomeworkRepository {
     List<Homework> findByCourseId(long courseId, HomeworkStatus status, String keyword, int page, int size);
 
     long countByCourseId(long courseId, HomeworkStatus status, String keyword);
+
+    List<Homework> findByCourseIdAndStatuses(long courseId, List<HomeworkStatus> statuses, String keyword, int page, int size);
+
+    long countByCourseIdAndStatuses(long courseId, List<HomeworkStatus> statuses, String keyword);
 }
