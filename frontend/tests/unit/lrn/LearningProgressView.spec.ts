@@ -50,6 +50,7 @@ const progressOverview: LearningProgressOverview = {
 describe('LearningProgressView', () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    window.localStorage.clear();
   });
 
   it('renders course and chapter progress with a continue learning entry', async () => {
@@ -82,5 +83,37 @@ describe('LearningProgressView', () => {
 
     expect(learningProgressApi.getLearningProgress).toHaveBeenCalledTimes(2);
     expect(wrapper.text()).toContain('Java Programming');
+  });
+
+  it('lets teachers query managed course aggregate progress', async () => {
+    window.localStorage.setItem('onlinejudge.userRole', 'TEACHER');
+    window.history.replaceState({}, '', '/learning/progress?courseId=101');
+    vi.mocked(learningProgressApi.getLearningProgress).mockResolvedValueOnce({ courses: [], total: 0 });
+    vi.mocked(learningProgressApi.getTeacherLearningProgress).mockResolvedValueOnce({
+      courseId: 101,
+      courseName: 'Java Programming',
+      studentCount: 1,
+      averageProgressPercent: 65,
+      students: [
+        {
+          studentId: 601,
+          studentName: 'Student 601',
+          progressPercent: 65,
+          status: 'IN_PROGRESS',
+          updatedAt: '2026-06-01 10:00:00'
+        }
+      ]
+    });
+
+    const wrapper = mount(LearningProgressView);
+    await flushPromises();
+
+    expect(wrapper.text()).toContain('课程学习统计');
+    await wrapper.findAll('button').find((button) => button.text() === '查询')?.trigger('click');
+    await flushPromises();
+
+    expect(learningProgressApi.getTeacherLearningProgress).toHaveBeenCalledWith(101);
+    expect(wrapper.text()).toContain('Student 601');
+    expect(wrapper.text()).toContain('65%');
   });
 });

@@ -3,6 +3,7 @@ package com.onlinejudge.lrn.service;
 import com.onlinejudge.common.exception.ApiException;
 import com.onlinejudge.common.security.AccessDeniedException;
 import com.onlinejudge.lrn.domain.LearningProgress;
+import com.onlinejudge.lrn.domain.LearningStudentProgressRow;
 import com.onlinejudge.lrn.repository.JdbcLearningProgressRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -10,6 +11,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -37,6 +40,28 @@ public class LearningProgressService {
         List<LearningProgress> records = progressRepository.findByUser(userId, courseId);
         List<LearningCourseProgress> courses = toCourseProgress(records);
         return new LearningProgressOverview(courses, courses.size());
+    }
+
+    public LearningCourseProgressAggregate listTeacherCourseProgress(long teacherId, long courseId) {
+        requirePositive(courseId, "课程ID不合法");
+        if (!progressRepository.canManageCourse(teacherId, courseId)) {
+            throw new AccessDeniedException("无权查看该课程学习进度统计");
+        }
+        List<LearningStudentProgressRow> rows = progressRepository.findStudentProgressByCourse(courseId);
+        String courseName = rows.isEmpty() ? "" : rows.get(0).courseName();
+        List<LearningStudentProgressSummary> students = rows.stream()
+                .map(row -> new LearningStudentProgressSummary(
+                        row.studentId(),
+                        row.studentName(),
+                        row.progressPercent(),
+                        statusFor(row.progressPercent()),
+                        formatTime(row.updatedAt())
+                ))
+                .toList();
+        int averageProgress = students.isEmpty()
+                ? 0
+                : (int) Math.round(students.stream().mapToInt(LearningStudentProgressSummary::progressPercent).average().orElse(0));
+        return new LearningCourseProgressAggregate(courseId, courseName, students.size(), averageProgress, students);
     }
 
     @Transactional
@@ -199,13 +224,26 @@ public class LearningProgressService {
     }
 
     private String continueUrl(LearningProgress progress) {
+        String resumeQuery = progress.lastPosition() == null ? "" : "&resume=" + encode(progress.lastPosition());
         return switch (progress.sourceModule()) {
-            case "LAB" -> "/courses/" + progress.courseId() + "/labs/" + progress.sourceId();
-            case "HWK" -> "/courses/" + progress.courseId() + "/homeworks/" + progress.sourceId();
-            default -> progress.chapterId() == null
-                    ? "/courses/" + progress.courseId()
-                    : "/courses/" + progress.courseId() + "?chapterId=" + progress.chapterId();
+            case "LAB" -> "/courses/" + progress.courseId() + "/labs/" + progress.sourceId() + "?role=student" + resumeQuery;
+            case "HWK" -> "/courses/" + progress.courseId() + "/homeworks/" + progress.sourceId() + "?role=student" + resumeQuery;
+            default -> {
+                StringBuilder url = new StringBuilder("/courses/").append(progress.courseId()).append("?");
+                if (progress.chapterId() != null) {
+                    url.append("chapterId=").append(progress.chapterId()).append("&");
+                }
+                url.append("resourceId=").append(progress.sourceId());
+                if (progress.lastPosition() != null) {
+                    url.append("&resume=").append(encode(progress.lastPosition()));
+                }
+                yield url.toString();
+            }
         };
+    }
+
+    private String encode(String value) {
+        return URLEncoder.encode(value, StandardCharsets.UTF_8);
     }
 
     private String statusFor(int progressPercent) {

@@ -66,20 +66,61 @@
           </article>
         </div>
       </section>
+
+      <section v-if="isTeacher" class="progress-page__content" aria-label="教师课程学习统计">
+        <header class="progress-page__header">
+          <div>
+            <p class="progress-page__eyebrow">FR-LN-02</p>
+            <h2>课程学习统计</h2>
+          </div>
+          <button type="button" :disabled="teacherLoading" @click="loadTeacherProgress">查询</button>
+        </header>
+        <label class="teacher-query">
+          <span>课程 ID</span>
+          <input v-model.number="teacherCourseId" type="number" min="1" />
+        </label>
+        <p v-if="teacherError" class="progress-page__state progress-page__state--error">{{ teacherError }}</p>
+        <article v-if="teacherOverview" class="course-progress">
+          <header class="course-progress__header">
+            <div>
+              <h3>{{ teacherOverview.courseName || `课程 ${teacherOverview.courseId}` }}</h3>
+              <p>{{ teacherOverview.studentCount }} 名学生</p>
+            </div>
+            <strong>{{ teacherOverview.averageProgressPercent }}%</strong>
+          </header>
+          <section class="course-progress__chapters" aria-label="学生进度">
+            <article v-for="student in teacherOverview.students" :key="student.studentId" class="chapter-progress">
+              <div>
+                <h4>{{ student.studentName }}</h4>
+                <p>{{ student.status }}</p>
+              </div>
+              <strong>{{ student.progressPercent }}%</strong>
+            </article>
+          </section>
+        </article>
+      </section>
     </section>
   </main>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
-import { getLearningProgress } from '../../api/lrn/learningProgress';
-import type { LearningProgressOverview } from '../../types/lrn';
+import { getLearningProgress, getTeacherLearningProgress } from '../../api/lrn/learningProgress';
+import type { LearningCourseProgressAggregate, LearningProgressOverview } from '../../types/lrn';
 
 const loading = ref(false);
 const errorMessage = ref('');
 const progressOverview = ref<LearningProgressOverview | null>(null);
+const teacherLoading = ref(false);
+const teacherError = ref('');
+const teacherOverview = ref<LearningCourseProgressAggregate | null>(null);
+const teacherCourseId = ref<number | null>(Number(new URLSearchParams(window.location.search).get('courseId')) || null);
 
 const courses = computed(() => progressOverview.value?.courses ?? []);
+const isTeacher = computed(() => {
+  const role = window.localStorage.getItem('onlinejudge.userRole') ?? window.localStorage.getItem('onlinejudge.role');
+  return role === 'TEACHER' || role === 'ADMIN';
+});
 const averageProgress = computed(() => {
   if (courses.value.length === 0) {
     return 0;
@@ -100,6 +141,23 @@ async function loadProgress() {
     errorMessage.value = error instanceof Error ? error.message : '进度加载失败';
   } finally {
     loading.value = false;
+  }
+}
+
+async function loadTeacherProgress() {
+  teacherError.value = '';
+  teacherOverview.value = null;
+  if (!teacherCourseId.value || teacherCourseId.value <= 0) {
+    teacherError.value = '请输入课程 ID';
+    return;
+  }
+  teacherLoading.value = true;
+  try {
+    teacherOverview.value = await getTeacherLearningProgress(teacherCourseId.value);
+  } catch (error) {
+    teacherError.value = error instanceof Error ? error.message : '课程学习统计加载失败';
+  } finally {
+    teacherLoading.value = false;
   }
 }
 </script>
@@ -210,6 +268,7 @@ async function loadProgress() {
 }
 
 button,
+.teacher-query input,
 .course-progress__continue {
   align-items: center;
   background: #16423c;
@@ -223,6 +282,11 @@ button,
   min-height: 40px;
   padding: 0 14px;
   text-decoration: none;
+}
+
+.teacher-query {
+  display: grid;
+  gap: 6px;
 }
 
 button:disabled {

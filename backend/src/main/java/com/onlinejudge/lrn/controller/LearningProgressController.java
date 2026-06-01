@@ -1,7 +1,9 @@
 package com.onlinejudge.lrn.controller;
 
 import com.onlinejudge.common.security.CurrentUser;
+import com.onlinejudge.common.security.AccessDeniedException;
 import com.onlinejudge.common.web.ApiResponse;
+import com.onlinejudge.lrn.service.LearningCourseProgressAggregate;
 import com.onlinejudge.lrn.service.LearningProgressItem;
 import com.onlinejudge.lrn.service.LearningProgressOverview;
 import com.onlinejudge.lrn.service.LearningProgressSaveRequest;
@@ -28,6 +30,17 @@ public class LearningProgressController {
             @RequestParam(required = false) Long courseId
     ) {
         return ApiResponse.ok(learningProgressService.listProgress(currentUser.id(), courseId));
+    }
+
+    @GetMapping("/progress/teacher")
+    public ApiResponse<LearningCourseProgressAggregate> teacherProgress(
+            CurrentUser currentUser,
+            @RequestParam Long courseId
+    ) {
+        if (!currentUser.hasRole("TEACHER") && !currentUser.hasRole("ADMIN")) {
+            throw new AccessDeniedException("无权查看课程学习进度统计");
+        }
+        return ApiResponse.ok(learningProgressService.listTeacherCourseProgress(currentUser.id(), courseId));
     }
 
     @PostMapping("/progress")

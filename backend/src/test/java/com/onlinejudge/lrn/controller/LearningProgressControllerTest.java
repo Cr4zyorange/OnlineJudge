@@ -2,6 +2,8 @@ package com.onlinejudge.lrn.controller;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.onlinejudge.auth.controller.RegisterRequest;
+import com.onlinejudge.auth.service.AuthService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -36,8 +38,12 @@ class LearningProgressControllerTest {
     @Autowired
     private ObjectMapper objectMapper;
 
+    @Autowired
+    private AuthService authService;
+
     private SessionUser student;
     private SessionUser otherStudent;
+    private SessionUser teacher;
 
     @BeforeEach
     void setUp() throws Exception {
@@ -55,6 +61,7 @@ class LearningProgressControllerTest {
 
         student = registerAndLogin("progress601", "Student601@pass", "progress601@example.com", "13900001601");
         otherStudent = registerAndLogin("progress602", "Student602@pass", "progress602@example.com", "13900001602");
+        teacher = registerTrustedAndLogin("progressTeacher", "Teacher601@pass", "TEACHER", "progress-teacher@example.com");
 
         insertCourse(101L, "Java Programming");
         insertCourse(102L, "Database Systems");
@@ -62,6 +69,7 @@ class LearningProgressControllerTest {
         insertChapter(1002L, 101L, "Collections");
         insertChapter(2001L, 102L, "Indexes");
         insertMember(101L, student.id());
+        insertTeacherMember(101L, teacher.id());
         insertMember(102L, otherStudent.id());
     }
 
@@ -181,6 +189,39 @@ class LearningProgressControllerTest {
                 .andExpect(jsonPath("$.code").value("ERR-AUTH-04"));
     }
 
+    @Test
+    void teacherCanViewAggregateProgressOnlyForManagedCourse() throws Exception {
+        saveProgress(student.token(), 101, 1001, "CRS", 701, 80, "resourceId=701");
+        saveProgress(student.token(), 101, 1002, "LAB", 301, 20, "code=print");
+
+        mockMvc.perform(get("/api/v1/learning/progress/teacher")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + teacher.token())
+                        .param("courseId", "101"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.courseId").value(101))
+                .andExpect(jsonPath("$.data.courseName").value("Java Programming"))
+                .andExpect(jsonPath("$.data.studentCount").value(1))
+                .andExpect(jsonPath("$.data.averageProgressPercent").value(50))
+                .andExpect(jsonPath("$.data.students", hasSize(1)))
+                .andExpect(jsonPath("$.data.students[0].studentId").value(student.id()))
+                .andExpect(jsonPath("$.data.students[0].progressPercent").value(50));
+
+        mockMvc.perform(get("/api/v1/learning/progress/teacher")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + teacher.token())
+                        .param("courseId", "102"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ERR-AUTH-05"));
+    }
+
+    @Test
+    void studentCannotViewTeacherAggregateProgress() throws Exception {
+        mockMvc.perform(get("/api/v1/learning/progress/teacher")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + student.token())
+                        .param("courseId", "101"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ERR-AUTH-05"));
+    }
+
     private void saveProgress(
             String token,
             long courseId,
@@ -225,6 +266,13 @@ class LearningProgressControllerTest {
                 """, courseId, userId, "STUDENT", "ACTIVE");
     }
 
+    private void insertTeacherMember(long courseId, long userId) {
+        jdbcTemplate.update("""
+                INSERT INTO crs_course_member (course_id, user_id, role, join_status, joined_at)
+                VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+                """, courseId, userId, "TEACHER", "ACTIVE");
+    }
+
     private SessionUser registerAndLogin(String username, String password, String email, String phone) throws Exception {
         mockMvc.perform(post("/api/v1/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -237,6 +285,34 @@ class LearningProgressControllerTest {
                                 "phone", phone
                         ))))
                 .andExpect(status().isOk());
+
+        String body = mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "account", username,
+                                "password", password
+                        ))))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        JsonNode json = objectMapper.readTree(body);
+        return new SessionUser(
+                json.path("data").path("user").path("id").asLong(),
+                json.path("data").path("token").asText()
+        );
+    }
+
+    private SessionUser registerTrustedAndLogin(String username, String password, String userType, String email) throws Exception {
+        authService.registerTrusted(new RegisterRequest(
+                username,
+                password,
+                userType,
+                username,
+                null,
+                email,
+                null
+        ), userType);
 
         String body = mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)

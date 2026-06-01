@@ -1,6 +1,7 @@
 package com.onlinejudge.lrn.repository;
 
 import com.onlinejudge.lrn.domain.LearningProgress;
+import com.onlinejudge.lrn.domain.LearningStudentProgressRow;
 import com.onlinejudge.lrn.service.LearningProgressSaveCommand;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -42,6 +43,48 @@ public class JdbcLearningProgressRepository {
                   AND is_deleted = FALSE
                 """, Integer.class, chapterId, courseId);
         return count != null && count > 0;
+    }
+
+    public boolean canManageCourse(long userId, long courseId) {
+        Integer count = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*)
+                FROM crs_course_member member
+                INNER JOIN crs_course course ON course.id = member.course_id
+                WHERE member.user_id = ?
+                  AND member.course_id = ?
+                  AND member.join_status = 'ACTIVE'
+                  AND member.role IN ('TEACHER', 'ASSISTANT')
+                  AND member.is_deleted = FALSE
+                  AND course.is_deleted = FALSE
+                """, Integer.class, userId, courseId);
+        return count != null && count > 0;
+    }
+
+    public List<LearningStudentProgressRow> findStudentProgressByCourse(long courseId) {
+        return jdbcTemplate.query("""
+                SELECT member.user_id AS student_id,
+                       auth.display_name AS student_name,
+                       course.id AS course_id,
+                       course.course_name AS course_name,
+                       COALESCE(ROUND(AVG(progress.progress_percent)), 0) AS progress_percent,
+                       MAX(progress.updated_at) AS updated_at
+                FROM crs_course_member member
+                INNER JOIN crs_course course
+                    ON course.id = member.course_id
+                    AND course.is_deleted = FALSE
+                LEFT JOIN t_auth_user auth
+                    ON auth.user_id = member.user_id
+                    AND auth.deleted = FALSE
+                LEFT JOIN lrn_learning_progress progress
+                    ON progress.user_id = member.user_id
+                    AND progress.course_id = member.course_id
+                WHERE member.course_id = ?
+                  AND member.role = 'STUDENT'
+                  AND member.join_status = 'ACTIVE'
+                  AND member.is_deleted = FALSE
+                GROUP BY member.user_id, auth.display_name, course.id, course.course_name
+                ORDER BY member.user_id
+                """, this::mapStudentProgressRow, courseId);
     }
 
     public LearningProgress save(long userId, LearningProgressSaveCommand command, String status) {
@@ -165,6 +208,19 @@ public class JdbcLearningProgressRepository {
                 rs.getInt("progress_percent"),
                 rs.getString("last_position"),
                 rs.getString("status"),
+                nullableDateTime(rs, "updated_at")
+        );
+    }
+
+    private LearningStudentProgressRow mapStudentProgressRow(ResultSet rs, int rowNum) throws SQLException {
+        long studentId = rs.getLong("student_id");
+        String studentName = rs.getString("student_name");
+        return new LearningStudentProgressRow(
+                studentId,
+                studentName == null || studentName.isBlank() ? "学生 " + studentId : studentName,
+                rs.getLong("course_id"),
+                rs.getString("course_name"),
+                rs.getInt("progress_percent"),
                 nullableDateTime(rs, "updated_at")
         );
     }

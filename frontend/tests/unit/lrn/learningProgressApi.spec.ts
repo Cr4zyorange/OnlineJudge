@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { removeAuthStorage, writeAuthStorage } from '../../../src/api/auth/storage';
-import { getLearningProgress, saveLearningProgress } from '../../../src/api/lrn/learningProgress';
+import { getLearningProgress, getTeacherLearningProgress, saveLearningProgress } from '../../../src/api/lrn/learningProgress';
 
 describe('learning progress API client', () => {
   afterEach(() => {
@@ -25,6 +25,13 @@ describe('learning progress API client', () => {
         status: 'IN_PROGRESS',
         continueUrl: '/courses/101',
         updatedAt: '2026-06-01 10:00:00'
+      }))
+      .mockResolvedValueOnce(jsonResponse({
+        courseId: 101,
+        courseName: 'Java Programming',
+        studentCount: 1,
+        averageProgressPercent: 65,
+        students: []
       }));
 
     await getLearningProgress(101);
@@ -36,6 +43,7 @@ describe('learning progress API client', () => {
       progressPercent: 65,
       lastPosition: 'video_play_time=1234'
     });
+    await getTeacherLearningProgress(101);
 
     expect(fetchMock).toHaveBeenNthCalledWith(1, '/api/v1/learning/progress?courseId=101', expect.objectContaining({
       method: 'GET',
@@ -55,6 +63,12 @@ describe('learning progress API client', () => {
         sourceId: 701,
         progressPercent: 65,
         lastPosition: 'video_play_time=1234'
+      })
+    }));
+    expect(fetchMock).toHaveBeenNthCalledWith(3, '/api/v1/learning/progress/teacher?courseId=101', expect.objectContaining({
+      method: 'GET',
+      headers: expect.objectContaining({
+        Authorization: 'Bearer student-token'
       })
     }));
   });

@@ -1,4 +1,5 @@
 import type {
+  LearningCourseProgressAggregate,
   LearningProgressItem,
   LearningProgressOverview,
   LearningProgressSaveRequest
@@ -23,4 +24,8 @@ export async function saveLearningProgress(
     method: 'POST',
     body: payload
   });
+}
+
+export async function getTeacherLearningProgress(courseId: number): Promise<LearningCourseProgressAggregate> {
+  return request<LearningCourseProgressAggregate>(`/api/v1/learning/progress/teacher?courseId=${courseId}`);
 }

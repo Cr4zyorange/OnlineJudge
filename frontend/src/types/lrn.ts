@@ -78,6 +78,22 @@ export interface LearningProgressOverview {
   total: number;
 }
 
+export interface LearningStudentProgressSummary {
+  studentId: number;
+  studentName: string;
+  progressPercent: number;
+  status: LearningProgressStatus;
+  updatedAt: string | null;
+}
+
+export interface LearningCourseProgressAggregate {
+  courseId: number;
+  courseName: string;
+  studentCount: number;
+  averageProgressPercent: number;
+  students: LearningStudentProgressSummary[];
+}
+
 export interface LearningProgressSaveRequest {
   courseId: number;
   chapterId?: number | null;
