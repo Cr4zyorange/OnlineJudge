@@ -1,6 +1,7 @@
 package com.onlinejudge.auth.repository;
 
 import com.onlinejudge.auth.domain.AccountStatus;
+import com.onlinejudge.auth.domain.AuthAuditLogView;
 import com.onlinejudge.auth.domain.AuthUser;
 import com.onlinejudge.auth.domain.AuthUserView;
 import com.onlinejudge.auth.domain.PermissionView;
@@ -13,6 +14,7 @@ import org.springframework.stereotype.Repository;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.ArrayList;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -275,17 +277,85 @@ public class AuthRepository {
             String resultStatus,
             String failureReason
     ) {
+        recordAudit(operatorId, operationType, targetType, targetId, resultStatus, failureReason, null, null);
+    }
+
+    public void recordAudit(
+            Long operatorId,
+            String operationType,
+            String targetType,
+            String targetId,
+            String resultStatus,
+            String failureReason,
+            String clientIp,
+            String userAgent
+    ) {
         jdbcTemplate.update("""
                         INSERT INTO t_auth_audit_log (
-                            operator_id, operation_type, target_type, target_id, result_status, failure_reason
-                        ) VALUES (?, ?, ?, ?, ?, ?)
+                            operator_id, operation_type, target_type, target_id, result_status, failure_reason,
+                            client_ip, user_agent
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                         """,
                 operatorId,
                 operationType,
                 targetType,
                 targetId,
                 resultStatus,
-                failureReason);
+                failureReason,
+                clientIp,
+                userAgent);
+    }
+
+    public List<AuthAuditLogView> listAuditLogs(
+            Long operatorId,
+            String operationType,
+            String resultStatus,
+            LocalDateTime startTime,
+            LocalDateTime endTime,
+            int page,
+            int size
+    ) {
+        QueryParts query = auditLogQuery(operatorId, operationType, resultStatus, startTime, endTime);
+        List<Object> args = new ArrayList<>(query.args());
+        args.add(size);
+        args.add((page - 1) * size);
+        return jdbcTemplate.query("""
+                        SELECT log_id, operator_id, operation_type, target_type, target_id, result_status,
+                               failure_reason, client_ip, user_agent, created_at
+                        FROM t_auth_audit_log
+                        """ + query.where() + """
+                        ORDER BY created_at DESC, log_id DESC
+                        LIMIT ? OFFSET ?
+                        """,
+                (rs, rowNum) -> new AuthAuditLogView(
+                        rs.getLong("log_id"),
+                        rs.getObject("operator_id") == null ? null : rs.getLong("operator_id"),
+                        rs.getString("operation_type"),
+                        rs.getString("target_type"),
+                        rs.getString("target_id"),
+                        rs.getString("result_status"),
+                        rs.getString("failure_reason"),
+                        rs.getString("client_ip"),
+                        rs.getString("user_agent"),
+                        toLocalDateTime(rs.getTimestamp("created_at"))
+                ),
+                args.toArray());
+    }
+
+    public long countAuditLogs(
+            Long operatorId,
+            String operationType,
+            String resultStatus,
+            LocalDateTime startTime,
+            LocalDateTime endTime
+    ) {
+        QueryParts query = auditLogQuery(operatorId, operationType, resultStatus, startTime, endTime);
+        Long count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM t_auth_audit_log " + query.where(),
+                Long.class,
+                query.args().toArray()
+        );
+        return count == null ? 0 : count;
     }
 
     public AuthUserView toUserView(long userId) {
@@ -567,6 +637,39 @@ public class AuthRepository {
         return new UserFilter(keywordLike, normalizedRole, normalizedStatus);
     }
 
+    private QueryParts auditLogQuery(
+            Long operatorId,
+            String operationType,
+            String resultStatus,
+            LocalDateTime startTime,
+            LocalDateTime endTime
+    ) {
+        List<String> conditions = new ArrayList<>();
+        List<Object> args = new ArrayList<>();
+        if (operatorId != null) {
+            conditions.add("operator_id = ?");
+            args.add(operatorId);
+        }
+        if (operationType != null && !operationType.isBlank()) {
+            conditions.add("operation_type = ?");
+            args.add(operationType.trim());
+        }
+        if (resultStatus != null && !resultStatus.isBlank()) {
+            conditions.add("result_status = ?");
+            args.add(resultStatus.trim());
+        }
+        if (startTime != null) {
+            conditions.add("created_at >= ?");
+            args.add(Timestamp.valueOf(startTime));
+        }
+        if (endTime != null) {
+            conditions.add("created_at <= ?");
+            args.add(Timestamp.valueOf(endTime));
+        }
+        String where = conditions.isEmpty() ? "" : " WHERE " + String.join(" AND ", conditions) + " ";
+        return new QueryParts(where, args);
+    }
+
     private void upsertRole(String code, String name, String description) {
         Integer count = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM t_auth_role WHERE role_code = ?",
@@ -641,5 +744,8 @@ public class AuthRepository {
     }
 
     private record UserFilter(String keywordLike, String role, String status) {
+    }
+
+    private record QueryParts(String where, List<Object> args) {
     }
 }

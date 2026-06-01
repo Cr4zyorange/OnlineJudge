@@ -1,14 +1,31 @@
-import { mount } from '@vue/test-utils';
+import { flushPromises, mount } from '@vue/test-utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import HomeworkStudentView from '../../../src/views/hwk/HomeworkStudentView.vue';
 import * as homeworkApi from '../../../src/api/hwk/homeworks';
+import * as learningProgressApi from '../../../src/api/lrn/learningProgress';
 import type { HomeworkDetail } from '../../../src/types/hwk';
 
 vi.mock('../../../src/api/hwk/homeworks');
+vi.mock('../../../src/api/lrn/learningProgress');
 
 describe('HomeworkStudentView', () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    window.history.replaceState({}, '', '/courses/101/homeworks/11?role=student');
+    vi.mocked(learningProgressApi.saveLearningProgress).mockResolvedValue({
+      progressId: 1,
+      courseId: 101,
+      courseName: '软件工程基础',
+      chapterId: 1001,
+      chapterName: '课程导论',
+      sourceModule: 'HWK',
+      sourceId: 11,
+      progressPercent: 20,
+      lastPosition: 'homeworkId=11',
+      status: 'IN_PROGRESS',
+      continueUrl: '/courses/101/homeworks/11?role=student',
+      updatedAt: '2026-06-01 10:00:00'
+    });
   });
 
   it('loads published homework detail and submits a text answer', async () => {
@@ -45,6 +62,14 @@ describe('HomeworkStudentView', () => {
     expect(homeworkApi.submitHomework).toHaveBeenCalledWith(11, expect.objectContaining({
       answerText: 'Use dynamic programming.'
     }));
+    expect(learningProgressApi.saveLearningProgress).toHaveBeenLastCalledWith({
+      courseId: 101,
+      chapterId: 1001,
+      sourceModule: 'HWK',
+      sourceId: 11,
+      progressPercent: 100,
+      lastPosition: 'homeworkId=11;submitted=91'
+    });
     expect(wrapper.text()).toContain('Submission 91');
     expect(wrapper.text()).toContain('SUBMITTED');
     expect(wrapper.text()).toContain('UNREVIEWED');
@@ -121,13 +146,72 @@ describe('HomeworkStudentView', () => {
     expect(wrapper.text()).toContain('PENDING');
     expect(wrapper.text()).toContain('NEED_REVIEW');
   });
+
+  it('records homework progress when a student opens and completes homework', async () => {
+    vi.mocked(homeworkApi.getHomeworkDetail).mockResolvedValueOnce(homeworkDetail({
+      id: 501,
+      chapterId: 1001,
+      title: '作业一',
+      description: '完成第一章练习'
+    }));
+
+    const wrapper = mount(HomeworkStudentView, {
+      props: {
+        courseId: 101,
+        homeworkId: 501
+      }
+    });
+    await flushPromises();
+
+    expect(wrapper.text()).toContain('作业一');
+    expect(learningProgressApi.saveLearningProgress).toHaveBeenCalledWith({
+      courseId: 101,
+      chapterId: 1001,
+      sourceModule: 'HWK',
+      sourceId: 501,
+      progressPercent: 20,
+      lastPosition: 'homeworkId=501'
+    });
+
+    await wrapper.get('[data-testid="complete-homework"]').trigger('click');
+    await flushPromises();
+
+    expect(learningProgressApi.saveLearningProgress).toHaveBeenLastCalledWith({
+      courseId: 101,
+      chapterId: 1001,
+      sourceModule: 'HWK',
+      sourceId: 501,
+      progressPercent: 100,
+      lastPosition: 'homeworkId=501;completed=true'
+    });
+    expect(wrapper.text()).toContain('已记录完成进度');
+  });
+
+  it('shows the restored homework breakpoint from the resume query', async () => {
+    window.history.replaceState({}, '', '/courses/101/homeworks/501?role=student&resume=question%3D2');
+    vi.mocked(homeworkApi.getHomeworkDetail).mockResolvedValueOnce(homeworkDetail({
+      id: 501,
+      title: '作业一',
+      description: '完成第一章练习'
+    }));
+
+    const wrapper = mount(HomeworkStudentView, {
+      props: {
+        courseId: 101,
+        homeworkId: 501
+      }
+    });
+    await flushPromises();
+
+    expect(wrapper.text()).toContain('已恢复上次断点：question=2');
+  });
 });
 
 function homeworkDetail(overrides: Partial<HomeworkDetail> = {}): HomeworkDetail {
   return {
     id: 11,
     courseId: 101,
-    chapterId: null,
+    chapterId: 1001,
     title: 'HWK02 text homework',
     description: 'Explain your algorithm.',
     type: 'TEXT',
@@ -147,10 +231,4 @@ function homeworkDetail(overrides: Partial<HomeworkDetail> = {}): HomeworkDetail
     testCases: [],
     ...overrides
   };
-}
-
-async function flushPromises() {
-  for (let tick = 0; tick < 6; tick += 1) {
-    await Promise.resolve();
-  }
 }

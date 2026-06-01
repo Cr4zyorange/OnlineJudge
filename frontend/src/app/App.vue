@@ -12,6 +12,7 @@
   </main>
   <CourseManagementView v-else-if="viewMode === 'courses'" />
   <LearningTaskCenterView v-else-if="viewMode === 'learning-tasks'" />
+  <LearningProgressView v-else-if="viewMode === 'learning-progress'" />
   <LabSubmissionHistoryView
     v-else-if="viewMode === 'lab' && labRole === 'student' && labPage === 'history' && courseId !== null && labId !== null"
     :course-id="courseId"
@@ -68,6 +69,7 @@ import HomeworkTeacherView from '../views/hwk/HomeworkTeacherView.vue';
 import LabSubmissionHistoryView from '../views/lab/LabSubmissionHistoryView.vue';
 import LabStudentView from '../views/lab/LabStudentView.vue';
 import LabTeacherView from '../views/lab/LabTeacherView.vue';
+import LearningProgressView from '../views/lrn/LearningProgressView.vue';
 import LearningTaskCenterView from '../views/lrn/LearningTaskCenterView.vue';
 import StudentGradeView from '../views/grd/StudentGradeView.vue';
 import TeacherGradeTableView from '../views/grd/TeacherGradeTableView.vue';
@@ -133,6 +135,9 @@ const viewMode = computed(() => {
   }
   if (pathname.value === '/learning/tasks' || pathname.value === '/learning') {
     return 'learning-tasks';
+  }
+  if (pathname.value === '/learning/progress') {
+    return 'learning-progress';
   }
   if (pathname.value.includes('/labs')) {
     return 'lab';

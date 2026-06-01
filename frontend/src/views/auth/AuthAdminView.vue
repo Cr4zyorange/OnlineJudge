@@ -183,6 +183,60 @@
           </button>
         </section>
       </article>
+
+      <article class="admin-panel audit-panel">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">UI-AUTH-09</p>
+            <h2>安全审计日志</h2>
+          </div>
+          <span>{{ auditLogs.length }} 条</span>
+        </div>
+
+        <form class="audit-filter-form" data-audit-filter-form @submit.prevent="loadAuditLogs">
+          <label>
+            操作人ID
+            <input v-model.trim="auditFilters.operatorId" name="operatorId" inputmode="numeric" />
+          </label>
+          <label>
+            操作类型
+            <input v-model.trim="auditFilters.operationType" name="operationType" placeholder="LOGIN_FAILURE" />
+          </label>
+          <label>
+            结果
+            <select v-model="auditFilters.resultStatus" name="resultStatus">
+              <option value="">全部</option>
+              <option value="SUCCESS">SUCCESS</option>
+              <option value="FAILURE">FAILURE</option>
+              <option value="DENIED">DENIED</option>
+            </select>
+          </label>
+          <label>
+            开始时间
+            <input v-model="auditFilters.startTime" name="startTime" type="datetime-local" />
+          </label>
+          <label>
+            结束时间
+            <input v-model="auditFilters.endTime" name="endTime" type="datetime-local" />
+          </label>
+          <button type="submit" class="ghost-action">筛选日志</button>
+        </form>
+
+        <div v-if="!loading && auditLogs.length === 0" class="state-block">暂无审计日志</div>
+        <div v-else class="audit-list">
+          <section v-for="log in auditLogs" :key="log.logId" class="audit-row">
+            <div>
+              <strong>{{ log.operationType }}</strong>
+              <span>{{ log.createdAt }}</span>
+            </div>
+            <mark>{{ log.resultStatus }}</mark>
+            <span>{{ log.operatorId ?? 'SYSTEM' }}</span>
+            <span>{{ log.targetType ?? '-' }} / {{ log.targetId ?? '-' }}</span>
+            <span>{{ log.clientIp ?? '-' }}</span>
+            <small>{{ log.failureReason ?? log.userAgent ?? '-' }}</small>
+          </section>
+        </div>
+      </article>
     </section>
   </main>
 </template>
@@ -192,6 +246,7 @@ import { onMounted, reactive, ref } from 'vue';
 import {
   createAdminUser,
   createRole,
+  listAuditLogs,
   listPermissions,
   listRoles,
   listUsers,
@@ -200,6 +255,7 @@ import {
   updateUserStatus,
   updateUserRoles,
   type AdminUserPayload,
+  type AuditLogRecord,
   type AuthUser,
   type RolePermission,
   type RolePayload,
@@ -209,6 +265,7 @@ import {
 const users = ref<AuthUser[]>([]);
 const roles = ref<RoleView[]>([]);
 const permissions = ref<RolePermission[]>([]);
+const auditLogs = ref<AuditLogRecord[]>([]);
 const userRoleSelection = reactive<Record<number, number[]>>({});
 const rolePermissionSelection = reactive<Record<number, number[]>>({});
 const roleDrafts = reactive<Record<number, RolePayload>>({});
@@ -228,6 +285,13 @@ const newUserForm = reactive<AdminUserPayload>({
   roleIds: []
 });
 const newUserRoleIds = ref<number[]>([]);
+const auditFilters = reactive({
+  operatorId: '',
+  operationType: '',
+  resultStatus: '',
+  startTime: '',
+  endTime: ''
+});
 const loading = ref(false);
 const error = ref('');
 const feedback = ref('');
@@ -240,20 +304,37 @@ async function loadAll() {
   error.value = '';
   feedback.value = '';
   try {
-    const [userPage, roleList, permissionList] = await Promise.all([
+    const [userPage, roleList, permissionList, auditPage] = await Promise.all([
       listUsers({ page: 1, size: 50 }),
       listRoles(),
-      listPermissions()
+      listPermissions(),
+      listAuditLogs({ page: 1, size: 20 })
     ]);
     users.value = userPage.records;
     roles.value = roleList;
     permissions.value = permissionList;
+    auditLogs.value = auditPage.records;
     initializeSelections();
   } catch (loadError) {
     error.value = loadError instanceof Error ? loadError.message : '加载失败';
   } finally {
     loading.value = false;
   }
+}
+
+async function loadAuditLogs() {
+  await runAction('审计日志已刷新', async () => {
+    const page = await listAuditLogs({
+      operatorId: auditFilters.operatorId ? Number(auditFilters.operatorId) : undefined,
+      operationType: auditFilters.operationType || undefined,
+      resultStatus: auditFilters.resultStatus || undefined,
+      startTime: auditFilters.startTime || undefined,
+      endTime: auditFilters.endTime || undefined,
+      page: 1,
+      size: 20
+    });
+    auditLogs.value = page.records;
+  });
 }
 
 async function saveUserRoles(userId: number) {
@@ -462,6 +543,10 @@ h2 {
   box-shadow: 0 12px 30px rgba(31, 54, 49, 0.08);
 }
 
+.audit-panel {
+  grid-column: 1 / -1;
+}
+
 .panel-heading {
   padding: 18px 18px 12px;
   border-bottom: 1px solid rgba(23, 43, 39, 0.1);
@@ -496,7 +581,8 @@ h2 {
 
 .user-form,
 .role-form,
-.role-edit-form {
+.role-edit-form,
+.audit-filter-form {
   display: grid;
   grid-template-columns: minmax(110px, 0.8fr) minmax(120px, 1fr) minmax(140px, 1.2fr) auto auto;
   align-items: end;
@@ -513,6 +599,11 @@ h2 {
   padding: 0;
 }
 
+.audit-filter-form {
+  grid-template-columns: minmax(100px, 0.7fr) minmax(160px, 1fr) minmax(110px, 0.7fr) repeat(2, minmax(170px, 1fr)) auto;
+  border-bottom: 1px solid rgba(23, 43, 39, 0.08);
+}
+
 .user-row {
   display: grid;
   grid-template-columns: minmax(150px, 0.8fr) minmax(240px, 1fr) auto;
@@ -522,6 +613,39 @@ h2 {
   border: 1px solid rgba(23, 43, 39, 0.1);
   border-radius: 8px;
   background: #fbfdfc;
+}
+
+.audit-list {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+}
+
+.audit-row {
+  display: grid;
+  grid-template-columns: minmax(190px, 1fr) 90px 90px minmax(150px, 1fr) 130px minmax(180px, 1.2fr);
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid rgba(23, 43, 39, 0.1);
+  border-radius: 8px;
+  background: #fbfdfc;
+}
+
+.audit-row div {
+  display: grid;
+  gap: 4px;
+}
+
+.audit-row span,
+.audit-row small {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: #5a6f69;
+}
+
+.audit-row mark {
+  justify-self: start;
 }
 
 .user-main {
@@ -569,7 +693,8 @@ label select {
 
 .user-form label,
 .role-form label,
-.role-edit-form label {
+.role-edit-form label,
+.audit-filter-form label {
   display: grid;
   gap: 5px;
   padding: 8px 10px;
@@ -656,9 +781,11 @@ code {
 
   .admin-grid,
   .user-row,
+  .audit-row,
   .user-form,
   .role-form,
-  .role-edit-form {
+  .role-edit-form,
+  .audit-filter-form {
     grid-template-columns: 1fr;
   }
 }

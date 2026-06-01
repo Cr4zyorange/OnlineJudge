@@ -14,6 +14,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 class LearningTaskDefaultConfigurationTest {
     private static final String LEARNING_TASK_MIGRATION =
             "file:../database/migrations/20260530_01_create_lrn_learning_task.sql";
+    private static final String LEARNING_PROGRESS_MIGRATION =
+            "file:../database/migrations/20260531_01_create_lrn_learning_progress.sql";
 
     @Test
     void defaultRuntimeSchemaLocationsIncludeLearningTaskMigration() throws IOException {
@@ -25,6 +27,6 @@ class LearningTaskDefaultConfigurationTest {
         String schemaLocations = runtimeProperties.getProperty("spring.sql.init.schema-locations", "");
 
         assertThat(Arrays.stream(schemaLocations.split(",")).map(String::trim))
-                .contains(LEARNING_TASK_MIGRATION);
+                .contains(LEARNING_TASK_MIGRATION, LEARNING_PROGRESS_MIGRATION);
     }
 }
