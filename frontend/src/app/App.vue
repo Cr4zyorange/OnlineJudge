@@ -12,12 +12,17 @@
   </main>
   <CourseManagementView v-else-if="viewMode === 'courses'" />
   <LearningTaskCenterView v-else-if="viewMode === 'learning-tasks'" />
+  <LabSubmissionHistoryView
+    v-else-if="viewMode === 'lab' && labRole === 'student' && labPage === 'history' && courseId !== null && labId !== null"
+    :course-id="courseId"
+    :lab-id="labId"
+  />
   <LabTeacherView
     v-else-if="viewMode === 'lab' && labRole === 'teacher' && courseId !== null"
     :course-id="courseId"
   />
   <LabStudentView
-    v-else-if="viewMode === 'lab' && labRole === 'student' && courseId !== null && labId !== null"
+    v-else-if="viewMode === 'lab' && labRole === 'student' && labPage === 'detail' && courseId !== null && labId !== null"
     :course-id="courseId"
     :lab-id="labId"
   />
@@ -41,6 +46,7 @@ import AuthView from '../views/auth/AuthView.vue';
 import AuthAdminView from '../views/auth/AuthAdminView.vue';
 import CourseManagementView from '../views/crs/CourseManagementView.vue';
 import GradeItemConfigView from '../views/grd/GradeItemConfigView.vue';
+import LabSubmissionHistoryView from '../views/lab/LabSubmissionHistoryView.vue';
 import LabStudentView from '../views/lab/LabStudentView.vue';
 import LabTeacherView from '../views/lab/LabTeacherView.vue';
 import LearningTaskCenterView from '../views/lrn/LearningTaskCenterView.vue';
@@ -76,6 +82,8 @@ const page = computed(() => {
   }
   return pathname.value.includes('/grades') ? 'grades' : 'grade-items';
 });
+
+const labPage = computed(() => pathname.value.endsWith('/submissions') ? 'history' : 'detail');
 
 const viewMode = computed(() => {
   if (pathname.value === '/login' || pathname.value === '/register') {

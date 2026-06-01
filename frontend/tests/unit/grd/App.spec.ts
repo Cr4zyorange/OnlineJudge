@@ -94,7 +94,6 @@ describe('App', () => {
 
   it('routes logged-in students from the lab detail path to the student lab page', async () => {
     window.localStorage.setItem('onlinejudge.userRole', 'STUDENT');
-    vi.mocked(labApi.listLabs).mockResolvedValueOnce([]);
     vi.mocked(labApi.getLabDetail).mockResolvedValueOnce({
       id: 7,
       courseId: 101,
@@ -114,6 +113,7 @@ describe('App', () => {
       deleted: false,
       testcases: []
     });
+    vi.mocked(labApi.listLabSubmissions).mockResolvedValueOnce([]);
     Object.defineProperty(window, 'location', {
       configurable: true,
       value: new URL('http://localhost/courses/101/labs/7')
@@ -125,6 +125,40 @@ describe('App', () => {
     expect(labApi.getLabDetail).toHaveBeenCalledWith(7);
     expect(labApi.listLabs).not.toHaveBeenCalled();
     expect(wrapper.text()).toContain('学生实验详情');
+  });
+
+  it('routes student history paths to the lab submission history page', async () => {
+    window.localStorage.setItem('onlinejudge.userRole', 'STUDENT');
+    vi.mocked(labApi.listLabSubmissions).mockResolvedValueOnce([
+      {
+        submissionId: 401,
+        labId: 7,
+        studentId: 601,
+        language: 'python',
+        submitStatus: 'SUBMITTED',
+        evaluationStatus: 'ACCEPTED',
+        autoScore: 98,
+        finalScore: 99,
+        version: 3,
+        submittedAt: '2026-06-02T08:00:00',
+        isLatest: true,
+        isFinal: true,
+        isScoringBasis: true,
+        hasFile: false
+      }
+    ]);
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: new URL('http://localhost/courses/101/labs/7/submissions?role=student')
+    });
+
+    const wrapper = mount(App);
+    await flushPromises();
+
+    expect(labApi.listLabSubmissions).toHaveBeenCalledWith(7);
+    expect(labApi.getLabDetail).not.toHaveBeenCalled();
+    expect(wrapper.text()).toContain('提交历史');
+    expect(wrapper.text()).toContain('版本 3');
   });
 
   it('does not load grade items without an active course context', async () => {

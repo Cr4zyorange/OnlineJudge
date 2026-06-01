@@ -1,11 +1,14 @@
 package com.onlinejudge.lab.controller;
 
+import com.onlinejudge.common.evaluation.EvaluationStatus;
 import com.onlinejudge.common.security.AccessDeniedException;
 import com.onlinejudge.common.security.CurrentUser;
 import com.onlinejudge.common.web.ApiResponse;
 import com.onlinejudge.integration.course.CoursePermissionClient;
 import com.onlinejudge.lab.domain.LabExperiment;
 import com.onlinejudge.lab.domain.LabExperimentStatus;
+import com.onlinejudge.lab.domain.LabSubmissionQuery;
+import com.onlinejudge.lab.domain.LabSubmitStatus;
 import com.onlinejudge.lab.service.LabExperimentService;
 import com.onlinejudge.lab.service.LabPermissionException;
 import com.onlinejudge.lab.service.LabSubmissionService;
@@ -138,6 +141,33 @@ public class LabExperimentController {
                 )
         ));
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.ok(submission));
+    }
+
+    @GetMapping("/labs/{labId}/submissions")
+    public ApiResponse<List<LabSubmissionHistoryItemResponse>> listSubmissions(
+            @PathVariable long labId,
+            CurrentUser currentUser,
+            @RequestParam(required = false) Long studentId,
+            @RequestParam(required = false) LabSubmitStatus submitStatus,
+            @RequestParam(required = false) EvaluationStatus evaluationStatus,
+            @RequestParam(required = false) Boolean overdue
+    ) {
+        return ApiResponse.ok(labSubmissionService.listSubmissions(
+                labId,
+                currentUser.id(),
+                new LabSubmissionQuery(studentId, submitStatus, evaluationStatus, overdue)
+        ).stream().map(LabSubmissionHistoryItemResponse::from).toList());
+    }
+
+    @GetMapping("/labs/{labId}/submissions/{submissionId}")
+    public ApiResponse<LabSubmissionDetailResponse> getSubmissionDetail(
+            @PathVariable long labId,
+            @PathVariable long submissionId,
+            CurrentUser currentUser
+    ) {
+        return ApiResponse.ok(LabSubmissionDetailResponse.from(
+                labSubmissionService.getSubmissionDetail(labId, submissionId, currentUser.id())
+        ));
     }
 
     private LabExperimentResponse toResponse(LabExperiment experiment, CurrentUser currentUser, long courseId) {

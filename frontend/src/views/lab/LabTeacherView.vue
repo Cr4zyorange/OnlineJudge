@@ -138,10 +138,133 @@
               <button v-if="lab.status === 'DRAFT'" type="button" @click="publish(lab.id)">发布</button>
               <button v-if="lab.status === 'PUBLISHED'" type="button" @click="close(lab.id)">截止</button>
               <button v-if="lab.status === 'DRAFT'" type="button" @click="removeLab(lab.id)">删除草稿</button>
+              <button type="button" @click="openSubmissionPanel(lab.id, lab.title)">查看提交</button>
             </td>
           </tr>
         </tbody>
       </table>
+    </section>
+
+    <section class="labs__submissions" aria-label="提交版本查看">
+      <header class="labs__submissions-header">
+        <div>
+          <h2>提交版本查看</h2>
+          <p v-if="selectedSubmissionLabId === null">请选择实验查看提交</p>
+          <p v-else>当前实验：{{ selectedSubmissionLabTitle }}</p>
+        </div>
+      </header>
+
+      <div v-if="selectedSubmissionLabId !== null" class="labs__submission-layout">
+        <form class="labs__submission-filters" @submit.prevent="searchSubmissions">
+          <label>
+            <span>学生 ID</span>
+            <input v-model="submissionFilters.studentId" name="studentId" type="number" min="1" />
+          </label>
+          <label>
+            <span>提交状态</span>
+            <select v-model="submissionFilters.submitStatus" name="submitStatus">
+              <option value="">全部</option>
+              <option value="SUBMITTED">SUBMITTED</option>
+              <option value="LATE">LATE</option>
+              <option value="WITHDRAWN">WITHDRAWN</option>
+            </select>
+          </label>
+          <label>
+            <span>评测状态</span>
+            <select v-model="submissionFilters.evaluationStatus" name="evaluationStatus">
+              <option value="">全部</option>
+              <option value="NONE">NONE</option>
+              <option value="PENDING">PENDING</option>
+              <option value="RUNNING">RUNNING</option>
+              <option value="ACCEPTED">ACCEPTED</option>
+              <option value="WRONG_ANSWER">WRONG_ANSWER</option>
+              <option value="COMPILE_ERROR">COMPILE_ERROR</option>
+              <option value="RUNTIME_ERROR">RUNTIME_ERROR</option>
+              <option value="TIME_LIMIT_EXCEEDED">TIME_LIMIT_EXCEEDED</option>
+              <option value="SYSTEM_ERROR">SYSTEM_ERROR</option>
+            </select>
+          </label>
+          <label>
+            <span>逾期提交</span>
+            <select v-model="submissionFilters.overdue" name="overdue">
+              <option value="">全部</option>
+              <option value="true">是</option>
+              <option value="false">否</option>
+            </select>
+          </label>
+          <button data-action="search-submissions" type="button" @click="searchSubmissions">查询提交</button>
+        </form>
+
+        <div class="labs__submission-results">
+          <p v-if="submissionLoading">加载中</p>
+          <p v-else-if="submissionErrorMessage" class="labs__error">{{ submissionErrorMessage }}</p>
+          <p v-else-if="submissions.length === 0">暂无提交记录</p>
+          <table v-else>
+            <thead>
+              <tr>
+                <th>学生</th>
+                <th>版本</th>
+                <th>版本标识</th>
+                <th>提交状态</th>
+                <th>评测状态</th>
+                <th>最终得分</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="submission in submissions"
+                :key="submission.submissionId"
+                :data-submission-id="submission.submissionId"
+              >
+                <td>{{ submission.studentId }}</td>
+                <td>{{ submission.version }}</td>
+                <td>
+                  <div class="labs__submission-flags">
+                    <span
+                      v-for="flag in getSubmissionFlags(submission)"
+                      :key="`${submission.submissionId}-${flag}`"
+                      class="labs__submission-flag"
+                    >
+                      {{ flag }}
+                    </span>
+                    <span v-if="getSubmissionFlags(submission).length === 0">无</span>
+                  </div>
+                </td>
+                <td>{{ submission.submitStatus }}</td>
+                <td>{{ submission.evaluationStatus }}</td>
+                <td>{{ submission.finalScore ?? '未生成' }}</td>
+                <td>
+                  <button type="button" @click="openSubmissionDetail(submission.submissionId)">查看详情</button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <aside class="labs__submission-detail">
+          <p v-if="submissionDetailLoading">详情加载中</p>
+          <p v-else-if="submissionDetailErrorMessage" class="labs__error">{{ submissionDetailErrorMessage }}</p>
+          <p v-else-if="submissionDetail === null">请选择一个提交版本查看详情</p>
+          <template v-else>
+            <h3>提交详情</h3>
+            <p>学生 ID：{{ submissionDetail.studentId }}</p>
+            <p>版本：{{ submissionDetail.version }}</p>
+            <div class="labs__submission-flags">
+              <span
+                v-for="flag in getSubmissionFlags(submissionDetail)"
+                :key="`detail-${submissionDetail.submissionId}-${flag}`"
+                class="labs__submission-flag"
+              >
+                {{ flag }}
+              </span>
+              <span v-if="getSubmissionFlags(submissionDetail).length === 0">无版本标识</span>
+            </div>
+            <p>文件标识：{{ submissionDetail.fileId ?? '无' }}</p>
+            <pre class="labs__submission-code">{{ submissionDetail.code || '本次提交未包含在线代码' }}</pre>
+          </template>
+        </aside>
+      </div>
     </section>
   </main>
 </template>
@@ -152,12 +275,17 @@ import {
   closeLab,
   createLab,
   deleteLab,
+  getLabSubmissionDetail,
   getLabDetail,
+  listLabSubmissions,
   listLabs,
   publishLab,
   updateLab
 } from '../../api/lab/labs';
 import type {
+  LabSubmissionDetail,
+  LabSubmissionHistoryItem,
+  LabSubmissionListFilters,
   LabEvaluationMode,
   LabExperimentPayload,
   LabExperimentStatus,
@@ -177,6 +305,20 @@ const feedback = ref('');
 const errorMessage = ref('');
 const editingId = ref<number | null>(null);
 const selectedStatus = ref('');
+const selectedSubmissionLabId = ref<number | null>(null);
+const selectedSubmissionLabTitle = ref('');
+const submissions = ref<LabSubmissionHistoryItem[]>([]);
+const submissionLoading = ref(false);
+const submissionErrorMessage = ref('');
+const submissionDetail = ref<LabSubmissionDetail | null>(null);
+const submissionDetailLoading = ref(false);
+const submissionDetailErrorMessage = ref('');
+const submissionFilters = reactive({
+  studentId: '',
+  submitStatus: '',
+  evaluationStatus: '',
+  overdue: ''
+});
 
 const form = reactive({
   title: '',
@@ -299,6 +441,48 @@ async function removeLab(labId: number) {
     await loadLabs();
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '草稿删除失败';
+  }
+}
+
+async function openSubmissionPanel(labId: number, title: string) {
+  selectedSubmissionLabId.value = labId;
+  selectedSubmissionLabTitle.value = title;
+  submissionDetail.value = null;
+  submissionDetailErrorMessage.value = '';
+  await loadSubmissions();
+}
+
+async function searchSubmissions() {
+  await loadSubmissions();
+}
+
+async function loadSubmissions() {
+  if (selectedSubmissionLabId.value === null) {
+    return;
+  }
+  submissionLoading.value = true;
+  submissionErrorMessage.value = '';
+  try {
+    submissions.value = await listLabSubmissions(selectedSubmissionLabId.value, buildSubmissionFilters());
+  } catch (error) {
+    submissionErrorMessage.value = error instanceof Error ? error.message : '提交列表加载失败';
+  } finally {
+    submissionLoading.value = false;
+  }
+}
+
+async function openSubmissionDetail(submissionId: number) {
+  if (selectedSubmissionLabId.value === null) {
+    return;
+  }
+  submissionDetailLoading.value = true;
+  submissionDetailErrorMessage.value = '';
+  try {
+    submissionDetail.value = await getLabSubmissionDetail(selectedSubmissionLabId.value, submissionId);
+  } catch (error) {
+    submissionDetailErrorMessage.value = error instanceof Error ? error.message : '提交详情加载失败';
+  } finally {
+    submissionDetailLoading.value = false;
   }
 }
 
@@ -425,6 +609,44 @@ function parseAttachmentIds(value: string) {
     .filter((item) => Number.isInteger(item) && item > 0);
 }
 
+function buildSubmissionFilters(): LabSubmissionListFilters {
+  const filters: LabSubmissionListFilters = {};
+  const studentId = Number(submissionFilters.studentId);
+  if (Number.isInteger(studentId) && studentId > 0) {
+    filters.studentId = studentId;
+  }
+  if (submissionFilters.submitStatus) {
+    filters.submitStatus = submissionFilters.submitStatus as LabSubmissionListFilters['submitStatus'];
+  }
+  if (submissionFilters.evaluationStatus) {
+    filters.evaluationStatus = submissionFilters.evaluationStatus as LabSubmissionListFilters['evaluationStatus'];
+  }
+  if (submissionFilters.overdue === 'true') {
+    filters.overdue = true;
+  }
+  if (submissionFilters.overdue === 'false') {
+    filters.overdue = false;
+  }
+  return filters;
+}
+
+function getSubmissionFlags(submission: Pick<LabSubmissionHistoryItem, 'isLatest' | 'isFinal' | 'isScoringBasis' | 'hasFile'>) {
+  const flags: string[] = [];
+  if (submission.isLatest) {
+    flags.push('最新版本');
+  }
+  if (submission.isFinal) {
+    flags.push('当前有效版本');
+  }
+  if (submission.isScoringBasis) {
+    flags.push('当前评分依据');
+  }
+  if (submission.hasFile) {
+    flags.push('包含文件');
+  }
+  return flags;
+}
+
 function collectActiveTestcases(): LabTestcasePayload[] {
   return form.testcases
     .map((testcase, index) => ({
@@ -468,7 +690,8 @@ function formatDeadline(value: string) {
 }
 
 .labs__panel,
-.labs__list {
+.labs__list,
+.labs__submissions {
   background: #ffffff;
   border: 1px solid #d7dde8;
   border-radius: 8px;
@@ -496,7 +719,8 @@ function formatDeadline(value: string) {
 .labs__form-actions,
 .labs__toolbar,
 .labs__row-actions,
-.labs__checkbox {
+.labs__checkbox,
+.labs__submissions-header {
   align-items: center;
   display: flex;
   gap: 8px;
@@ -504,6 +728,57 @@ function formatDeadline(value: string) {
 
 .labs__testcases-header {
   justify-content: space-between;
+}
+
+.labs__submissions-header {
+  justify-content: space-between;
+}
+
+.labs__submission-layout {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr);
+  margin-top: 16px;
+}
+
+.labs__submission-filters {
+  display: grid;
+  gap: 12px;
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+}
+
+.labs__submission-results,
+.labs__submission-detail {
+  background: #f8fafc;
+  border: 1px solid #d7dde8;
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.labs__submission-flags {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.labs__submission-flag {
+  background: #e8f0ff;
+  border: 1px solid #bfd3ff;
+  border-radius: 999px;
+  color: #1d4ed8;
+  font-size: 12px;
+  padding: 2px 8px;
+}
+
+.labs__submission-code {
+  background: #111827;
+  border-radius: 8px;
+  color: #f8fafc;
+  overflow-x: auto;
+  padding: 12px;
+  white-space: pre-wrap;
 }
 
 .labs__testcase-card {
@@ -563,5 +838,11 @@ td {
   border-bottom: 1px solid #d7dde8;
   padding: 10px;
   text-align: left;
+}
+
+@media (max-width: 960px) {
+  .labs__submission-layout {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

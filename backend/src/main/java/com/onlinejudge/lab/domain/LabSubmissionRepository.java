@@ -8,7 +8,11 @@ public interface LabSubmissionRepository {
 
     LabSubmission update(LabSubmission submission);
 
+    java.util.Optional<LabSubmission> findById(long submissionId);
+
     Optional<LabSubmission> findLatestFinalByLabIdAndStudentId(long labId, long studentId);
+
+    List<LabSubmission> findByLabId(long labId);
 
     List<LabSubmission> findByLabIdAndStudentId(long labId, long studentId);
 }
