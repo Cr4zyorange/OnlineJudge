@@ -37,6 +37,21 @@ describe('AuthAdminView', () => {
         { permissionId: 12, permissionCode: 'course:manage', permissionName: '管理课程', moduleCode: 'CRS' }
       ]))
       .mockResolvedValueOnce(jsonResponse({
+        records: [{
+          logId: 50,
+          operatorId: 1,
+          operationType: 'LOGIN_FAILURE',
+          targetType: 'AUTH_USER',
+          targetId: 'teacher46',
+          resultStatus: 'FAILURE',
+          failureReason: '账号或密码错误',
+          clientIp: '203.0.113.50',
+          userAgent: 'AuditTest/50',
+          createdAt: '2026-06-01T12:00:00'
+        }],
+        total: 1
+      }))
+      .mockResolvedValueOnce(jsonResponse({
         id: 46,
         username: 'teacher46',
         userType: 'TEACHER',
@@ -93,6 +108,9 @@ describe('AuthAdminView', () => {
     expect(wrapper.text()).toContain('角色管理');
     expect(wrapper.text()).toContain('权限分配');
     expect(wrapper.text()).toContain('用户角色分配');
+    expect(wrapper.text()).toContain('UI-AUTH-09');
+    expect(wrapper.text()).toContain('LOGIN_FAILURE');
+    expect(wrapper.text()).toContain('203.0.113.50');
     expect(wrapper.text()).toContain('teacher46');
     expect(wrapper.text()).toContain('auth:manage');
 
@@ -132,23 +150,26 @@ describe('AuthAdminView', () => {
     expect(wrapper.text()).toContain('账号状态已更新');
     expect(wrapper.text()).toContain('DISABLED');
 
-    expect(fetchMock).toHaveBeenNthCalledWith(4, '/api/v1/admin/users/46/roles', expect.objectContaining({
+    expect(fetchMock).toHaveBeenNthCalledWith(4, '/api/v1/admin/audit-logs?page=1&size=20', expect.objectContaining({
+      headers: expect.objectContaining({ Authorization: 'Bearer admin-token' })
+    }));
+    expect(fetchMock).toHaveBeenNthCalledWith(5, '/api/v1/admin/users/46/roles', expect.objectContaining({
       method: 'PUT',
       body: JSON.stringify({ roleIds: [1, 2] })
     }));
-    expect(fetchMock).toHaveBeenNthCalledWith(5, '/api/v1/admin/roles', expect.objectContaining({
+    expect(fetchMock).toHaveBeenNthCalledWith(6, '/api/v1/admin/roles', expect.objectContaining({
       method: 'POST',
       body: JSON.stringify({ roleCode: 'ASSISTANT', roleName: '助教', description: '课程助教', enabled: true })
     }));
-    expect(fetchMock).toHaveBeenNthCalledWith(6, '/api/v1/admin/roles', expect.objectContaining({
+    expect(fetchMock).toHaveBeenNthCalledWith(7, '/api/v1/admin/roles', expect.objectContaining({
       method: 'PUT',
       body: JSON.stringify({ roleId: 4, roleCode: 'ASSISTANT', roleName: '助教', description: '课程助教', enabled: false })
     }));
-    expect(fetchMock).toHaveBeenNthCalledWith(7, '/api/v1/admin/roles/2/permissions', expect.objectContaining({
+    expect(fetchMock).toHaveBeenNthCalledWith(8, '/api/v1/admin/roles/2/permissions', expect.objectContaining({
       method: 'PUT',
       body: JSON.stringify({ permissionIds: [11, 12] })
     }));
-    expect(fetchMock).toHaveBeenNthCalledWith(8, '/api/v1/admin/users', expect.objectContaining({
+    expect(fetchMock).toHaveBeenNthCalledWith(9, '/api/v1/admin/users', expect.objectContaining({
       method: 'POST',
       body: JSON.stringify({
         username: 'newteacher46',
@@ -160,7 +181,7 @@ describe('AuthAdminView', () => {
         roleIds: [2]
       })
     }));
-    expect(fetchMock).toHaveBeenNthCalledWith(9, '/api/v1/admin/users/46/status', expect.objectContaining({
+    expect(fetchMock).toHaveBeenNthCalledWith(10, '/api/v1/admin/users/46/status', expect.objectContaining({
       method: 'PUT',
       body: JSON.stringify({ accountStatus: 'DISABLED' })
     }));

@@ -1,5 +1,6 @@
 package com.onlinejudge.auth.controller;
 
+import com.onlinejudge.auth.domain.AuthAuditLogView;
 import com.onlinejudge.auth.domain.AuthUserView;
 import com.onlinejudge.auth.domain.PageResult;
 import com.onlinejudge.auth.domain.PermissionView;
@@ -89,5 +90,28 @@ public class AuthAdminController {
     @GetMapping("/permissions")
     public ApiResponse<List<PermissionView>> listPermissions(CurrentUser currentUser) {
         return ApiResponse.ok(roleService.listPermissions(currentUser));
+    }
+
+    @GetMapping("/audit-logs")
+    public ApiResponse<PageResult<AuthAuditLogView>> listAuditLogs(
+            CurrentUser currentUser,
+            @RequestParam(required = false) Long operatorId,
+            @RequestParam(required = false) String operationType,
+            @RequestParam(required = false) String resultStatus,
+            @RequestParam(required = false) String startTime,
+            @RequestParam(required = false) String endTime,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "20") int size
+    ) {
+        return ApiResponse.ok(roleService.listAuditLogs(
+                currentUser,
+                operatorId,
+                operationType,
+                resultStatus,
+                startTime,
+                endTime,
+                page,
+                size
+        ));
     }
 }

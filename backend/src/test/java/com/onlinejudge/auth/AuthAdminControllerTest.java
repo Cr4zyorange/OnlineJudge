@@ -96,6 +96,50 @@ class AuthAdminControllerTest {
     }
 
     @Test
+    void adminQueriesAuditLogsWithOperationResultOperatorAndTimeFilters() throws Exception {
+        long adminId = seedUser("admin-audit50", "Admin50@pass", "ADMIN");
+        seedUser("student-audit50", "Student50@pass", "STUDENT");
+        String adminToken = loginToken("admin-audit50", "Admin50@pass");
+
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .header("X-Forwarded-For", "203.0.113.50")
+                        .header(HttpHeaders.USER_AGENT, "AuditTest/50")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "account", "student-audit50",
+                                "password", "wrong-password"
+                        ))))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(get("/api/v1/admin/audit-logs")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken))
+                        .param("operatorId", String.valueOf(adminId))
+                        .param("operationType", "LOGIN_SUCCESS")
+                        .param("resultStatus", "SUCCESS")
+                        .param("startTime", "2026-01-01T00:00:00")
+                        .param("endTime", "2099-12-31T23:59:59")
+                        .param("page", "1")
+                        .param("size", "10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.total").value(1))
+                .andExpect(jsonPath("$.data.records[0].operatorId").value(adminId))
+                .andExpect(jsonPath("$.data.records[0].operationType").value("LOGIN_SUCCESS"))
+                .andExpect(jsonPath("$.data.records[0].targetType").value("AUTH_USER"))
+                .andExpect(jsonPath("$.data.records[0].resultStatus").value("SUCCESS"))
+                .andExpect(jsonPath("$.data.records[0].createdAt").isNotEmpty());
+
+        mockMvc.perform(get("/api/v1/admin/audit-logs")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken))
+                        .param("operationType", "LOGIN_FAILURE")
+                        .param("resultStatus", "FAILURE"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.total").value(1))
+                .andExpect(jsonPath("$.data.records[0].clientIp").value("203.0.113.50"))
+                .andExpect(jsonPath("$.data.records[0].userAgent").value("AuditTest/50"))
+                .andExpect(jsonPath("$.data.records[0].failureReason").isNotEmpty());
+    }
+
+    @Test
     void studentCannotAccessRoleManagementApi() throws Exception {
         seedUser("student46", "Student46@pass", "STUDENT");
         String studentToken = loginToken("student46", "Student46@pass");

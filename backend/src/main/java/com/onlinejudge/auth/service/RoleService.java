@@ -4,6 +4,7 @@ import com.onlinejudge.auth.controller.AdminCreateUserRequest;
 import com.onlinejudge.auth.controller.RegisterRequest;
 import com.onlinejudge.auth.controller.RoleUpsertRequest;
 import com.onlinejudge.auth.domain.AccountStatus;
+import com.onlinejudge.auth.domain.AuthAuditLogView;
 import com.onlinejudge.auth.domain.AuthUserView;
 import com.onlinejudge.auth.domain.PageResult;
 import com.onlinejudge.auth.domain.PermissionView;
@@ -16,6 +17,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.Locale;
 
@@ -49,6 +51,27 @@ public class RoleService {
     public List<PermissionView> listPermissions(CurrentUser currentUser) {
         requireAdmin(currentUser);
         return authRepository.listPermissions();
+    }
+
+    public PageResult<AuthAuditLogView> listAuditLogs(
+            CurrentUser currentUser,
+            Long operatorId,
+            String operationType,
+            String resultStatus,
+            String startTime,
+            String endTime,
+            int page,
+            int size
+    ) {
+        requireAdmin(currentUser);
+        int normalizedPage = Math.max(page, 1);
+        int normalizedSize = Math.min(Math.max(size, 1), 100);
+        LocalDateTime start = parseTime(startTime, "startTime");
+        LocalDateTime end = parseTime(endTime, "endTime");
+        return new PageResult<>(
+                authRepository.listAuditLogs(operatorId, operationType, resultStatus, start, end, normalizedPage, normalizedSize),
+                authRepository.countAuditLogs(operatorId, operationType, resultStatus, start, end)
+        );
     }
 
     @Transactional
@@ -160,6 +183,17 @@ public class RoleService {
             return AccountStatus.valueOf(requireText(value, "账号状态不能为空").toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException exception) {
             throw AuthApiException.badRequest("账号状态不合法");
+        }
+    }
+
+    private LocalDateTime parseTime(String value, String fieldName) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            return LocalDateTime.parse(value.trim());
+        } catch (DateTimeParseException exception) {
+            throw AuthApiException.badRequest(fieldName + "格式不合法");
         }
     }
 
