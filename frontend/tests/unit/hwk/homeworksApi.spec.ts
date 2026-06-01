@@ -13,6 +13,7 @@ import {
 describe('homeworks api', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    installLocalStorageMock();
     window.localStorage.setItem('onlinejudge.authToken', 'token-1');
     window.localStorage.setItem('onlinejudge.userId', '501');
     window.localStorage.setItem('onlinejudge.userRole', 'TEACHER');
@@ -54,6 +55,19 @@ describe('homeworks api', () => {
     ]);
   });
 });
+
+function installLocalStorageMock() {
+  const values = new Map<string, string>();
+  Object.defineProperty(window, 'localStorage', {
+    configurable: true,
+    value: {
+      getItem: vi.fn((key: string) => values.get(key) ?? null),
+      setItem: vi.fn((key: string, value: string) => values.set(key, value)),
+      removeItem: vi.fn((key: string) => values.delete(key)),
+      clear: vi.fn(() => values.clear())
+    }
+  });
+}
 
 function homeworkPayload() {
   return {

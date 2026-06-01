@@ -138,6 +138,61 @@ class HomeworkControllerTest {
     }
 
     @Test
+    void assistantCourseManagerCreatesConfiguresAndPublishesHomework() throws Exception {
+        String body = mockMvc.perform(post("/api/v1/homeworks")
+                        .headers(assistantHeaders("101", "101"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(objectivePayload())))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.status").value("DRAFT"))
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        long homeworkId = objectMapper.readTree(body).path("data").path("id").asLong();
+
+        mockMvc.perform(put("/api/v1/homeworks/{homeworkId}/questions", homeworkId)
+                        .headers(assistantHeaders("101", "101"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(List.of(
+                                Map.of(
+                                        "questionType", "SINGLE_CHOICE",
+                                        "stem", "2 + 2 = ?",
+                                        "optionsJson", "[\"3\",\"4\"]",
+                                        "answerJson", "[\"4\"]",
+                                        "score", 100,
+                                        "sortOrder", 1
+                                )
+                        ))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.questions", hasSize(1)));
+
+        mockMvc.perform(put("/api/v1/homeworks/{homeworkId}/publish", homeworkId)
+                        .headers(assistantHeaders("101", "101", "101:601")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("PUBLISHED"));
+    }
+
+    @Test
+    void studentListKeepsClosedHomeworkVisibleForFeedbackAndHistoryEntry() throws Exception {
+        long homeworkId = createHomeworkAndReturnId(objectivePayload());
+        mockMvc.perform(put("/api/v1/homeworks/{homeworkId}/publish", homeworkId)
+                        .headers(teacherHeaders("101", "101", "101:601")))
+                .andExpect(status().isOk());
+        mockMvc.perform(put("/api/v1/homeworks/{homeworkId}/close", homeworkId)
+                        .headers(teacherHeaders("101", "101")))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/v1/homeworks")
+                        .headers(studentHeaders("101"))
+                        .param("courseId", "101"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.list", hasSize(1)))
+                .andExpect(jsonPath("$.data.list[0].id").value(homeworkId))
+                .andExpect(jsonPath("$.data.list[0].status").value("CLOSED"));
+    }
+
+    @Test
     void studentPublishedHomeworkListAndDetailDoNotExposeAnswersOrHiddenTestCaseOutput() throws Exception {
         long objectiveHomeworkId = createHomeworkAndReturnId(objectivePayload());
         mockMvc.perform(put("/api/v1/homeworks/{homeworkId}/publish", objectiveHomeworkId)
@@ -357,6 +412,26 @@ class HomeworkControllerTest {
         org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
         headers.add("X-User-Id", "501");
         headers.add("X-User-Role", "TEACHER");
+        headers.add("X-Course-Ids", courseIds);
+        headers.add("X-Manageable-Course-Ids", manageableCourseIds);
+        if (studentIds != null) {
+            headers.add("X-Course-Student-Ids", studentIds);
+        }
+        return headers;
+    }
+
+    private org.springframework.http.HttpHeaders assistantHeaders(String courseIds, String manageableCourseIds) {
+        return assistantHeaders(courseIds, manageableCourseIds, null);
+    }
+
+    private org.springframework.http.HttpHeaders assistantHeaders(
+            String courseIds,
+            String manageableCourseIds,
+            String studentIds
+    ) {
+        org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
+        headers.add("X-User-Id", "502");
+        headers.add("X-User-Role", "ASSISTANT");
         headers.add("X-Course-Ids", courseIds);
         headers.add("X-Manageable-Course-Ids", manageableCourseIds);
         if (studentIds != null) {
