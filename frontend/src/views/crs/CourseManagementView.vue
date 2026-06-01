@@ -10,7 +10,6 @@
           <a href="/learning/tasks">学习任务</a>
           <a>实训模块</a>
           <a>作业评测</a>
-          <a href="/learning/progress">学习进度</a>
           <a :class="{ disabled: !gradeAnalysisHref }" :href="gradeAnalysisHref || undefined" :aria-disabled="!gradeAnalysisHref">
             成绩分析
           </a>
@@ -42,11 +41,6 @@
             <button class="menu-button" :class="{ active: activeTab === 'archived' && !chapterCourse && !resourceCourse }" type="button" @click="switchTab('archived')">
               <i class="bi bi-archive"></i> 归档记录
             </button>
-          </li>
-          <li>
-            <a class="menu-button" data-testid="learning-task-center-entry" href="/learning/tasks">
-              <i class="bi bi-check2-square"></i> 学习任务中心
-            </a>
           </li>
           <li>
             <a class="menu-button" data-testid="learning-progress-entry" href="/learning/progress">

@@ -57,7 +57,7 @@ describe('CourseManagementView', () => {
     const learningTaskLink = wrapper.findAll('.navbar-menu a').find((link) => link.text().includes('学习任务'));
     expect(learningTaskLink?.attributes('href')).toBe('/learning/tasks');
     const learningProgressLink = wrapper.findAll('.navbar-menu a').find((link) => link.attributes('href') === '/learning/progress');
-    expect(learningProgressLink?.attributes('href')).toBe('/learning/progress');
+    expect(learningProgressLink).toBeUndefined();
     const gradeLink = wrapper.findAll('.navbar-menu a').find((link) => link.text().includes('成绩分析'));
     expect(gradeLink?.attributes('href')).toBe('/courses/1/grd/grade-items');
 
@@ -70,7 +70,7 @@ describe('CourseManagementView', () => {
     expect(wrapper.text()).toContain('暂无章节目录');
   });
 
-  it('exposes a glass style sidebar entry for the learning task center', async () => {
+  it('exposes only the learning progress entry in the glass style sidebar', async () => {
     const page = (list = [course], total = list.length) => ({
       code: '0',
       message: 'success',
@@ -85,13 +85,11 @@ describe('CourseManagementView', () => {
     const wrapper = mount(CourseManagementView);
     await flushPromises();
 
-    const sidebarEntry = wrapper.get('a[data-testid="learning-task-center-entry"]');
-    expect(sidebarEntry.attributes('href')).toBe('/learning/tasks');
-    expect(sidebarEntry.classes()).toContain('menu-button');
-    expect(sidebarEntry.text()).toContain('学习任务中心');
+    expect(wrapper.find('a[data-testid="learning-task-center-entry"]').exists()).toBe(false);
     const progressEntry = wrapper.get('a[data-testid="learning-progress-entry"]');
     expect(progressEntry.attributes('href')).toBe('/learning/progress');
     expect(progressEntry.classes()).toContain('menu-button');
+    expect(progressEntry.text()).toContain('学习进度');
   });
 
   it('uses different layouts for all courses and managed courses, then creates a course', async () => {
