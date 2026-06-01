@@ -12,6 +12,7 @@ spring:
         - file:../database/migrations/DB-CRS-03-course-resource.sql
         - file:../database/migrations/20260525_02_create_lab_experiment.sql
         - file:../database/migrations/20260526_01_create_lab_submission.sql
+        - file:../database/migrations/20260530_01_create_hwk_homework.sql
         - file:../database/migrations/20260530_01_create_lrn_learning_task.sql
 
 server:

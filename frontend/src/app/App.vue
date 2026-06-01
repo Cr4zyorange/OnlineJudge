@@ -26,11 +26,18 @@
     :course-id="courseId"
     :lab-id="labId"
   />
+  <HomeworkTeacherView
+    v-else-if="viewMode === 'homework' && courseId !== null"
+    :course-id="courseId"
+  />
   <StudentGradeView
     v-else-if="courseId !== null && page === 'grades' && gradeRole === 'student'"
     :course-id="courseId"
   />
-  <TeacherGradeTableView v-else-if="courseId !== null && page === 'grades'" :course-id="courseId" />
+  <TeacherGradeTableView
+    v-else-if="courseId !== null && page === 'grades'"
+    :course-id="courseId"
+  />
   <GradeItemConfigView v-else-if="courseId !== null" :course-id="courseId" />
   <main v-else class="app-empty-state">
     <p>缺少课程上下文</p>
@@ -46,6 +53,7 @@ import AuthView from '../views/auth/AuthView.vue';
 import AuthAdminView from '../views/auth/AuthAdminView.vue';
 import CourseManagementView from '../views/crs/CourseManagementView.vue';
 import GradeItemConfigView from '../views/grd/GradeItemConfigView.vue';
+import HomeworkTeacherView from '../views/hwk/HomeworkTeacherView.vue';
 import LabSubmissionHistoryView from '../views/lab/LabSubmissionHistoryView.vue';
 import LabStudentView from '../views/lab/LabStudentView.vue';
 import LabTeacherView from '../views/lab/LabTeacherView.vue';
@@ -117,6 +125,9 @@ const viewMode = computed(() => {
   }
   if (pathname.value.includes('/labs')) {
     return 'lab';
+  }
+  if (pathname.value.includes('/homeworks')) {
+    return 'homework';
   }
   return 'grade';
 });

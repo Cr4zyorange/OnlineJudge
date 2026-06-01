@@ -92,6 +92,26 @@ describe('App', () => {
     expect(gradeItemApi.listGradeItems).not.toHaveBeenCalled();
   });
 
+  it('keeps the student grade page on course grade paths when role is student', async () => {
+    window.localStorage.setItem('onlinejudge.userRole', 'STUDENT');
+    vi.mocked(gradeRecordsApi.getMyPublishedGrades).mockResolvedValueOnce({
+      studentId: 101,
+      records: [],
+      summary: null
+    });
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: new URL('http://localhost/courses/505/grades?role=student')
+    });
+
+    const wrapper = mount(App);
+    await flushPromises();
+
+    expect(gradeRecordsApi.getMyPublishedGrades).toHaveBeenCalledWith(505);
+    expect(gradeRecordsApi.listCourseGrades).not.toHaveBeenCalled();
+    expect(wrapper.find('[data-testid="final-score"]').exists()).toBe(true);
+  });
+
   it('routes logged-in students from the lab detail path to the student lab page', async () => {
     window.localStorage.setItem('onlinejudge.userRole', 'STUDENT');
     vi.mocked(labApi.getLabDetail).mockResolvedValueOnce({
