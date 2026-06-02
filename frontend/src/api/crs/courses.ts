@@ -12,7 +12,7 @@ import type {
   ResourcePayload
 } from '../../types/crs';
 
-export type CourseScope = 'all' | 'managed' | 'archived';
+export type CourseScope = 'all' | 'mine' | 'managed' | 'archived';
 
 export function listCourses(keyword = '', scope: CourseScope = 'all') {
   const params = new URLSearchParams({ page: '1', size: '20', scope });
@@ -62,6 +62,12 @@ export function updateCourseMember(courseId: number, userId: number, payload: Pi
   return request<CourseMember>(`/api/v1/courses/${courseId}/members/${userId}`, {
     method: 'PUT',
     body: payload
+  });
+}
+
+export function removeCourseMember(courseId: number, userId: number) {
+  return request<void>(`/api/v1/courses/${courseId}/members/${userId}`, {
+    method: 'DELETE'
   });
 }
 

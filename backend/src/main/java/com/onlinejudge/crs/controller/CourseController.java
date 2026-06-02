@@ -88,12 +88,25 @@ public class CourseController {
         return ApiResponse.ok(courseService.members(courseId, status, currentUser));
     }
 
+    @GetMapping("/{courseId}/students")
+    public ApiResponse<java.util.List<Long>> students(@PathVariable Long courseId, CurrentUser currentUser) {
+        return ApiResponse.ok(courseService.students(courseId, currentUser));
+    }
+
     @PutMapping("/{courseId}/members/{userId}")
     public ApiResponse<CourseMemberResponse> updateMember(@PathVariable Long courseId,
                                                          @PathVariable Long userId,
                                                          @Valid @RequestBody CourseMemberUpdateRequest request,
                                                          CurrentUser currentUser) {
         return ApiResponse.ok(courseService.updateMember(courseId, userId, request, currentUser));
+    }
+
+    @DeleteMapping("/{courseId}/members/{userId}")
+    public ApiResponse<Void> removeMember(@PathVariable Long courseId,
+                                          @PathVariable Long userId,
+                                          CurrentUser currentUser) {
+        courseService.removeMember(courseId, userId, currentUser);
+        return ApiResponse.ok(null);
     }
 
     @PostMapping("/{courseId}/chapters")

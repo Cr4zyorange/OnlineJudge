@@ -364,6 +364,134 @@ class CourseControllerTest {
     }
 
     @Test
+    void courseMembersCanBeListedAndOnlyTeacherCanUpdateOrRemoveMembers() throws Exception {
+        String response = mockMvc.perform(post("/api/v1/courses")
+                        .header("X-User-Id", "391")
+                        .header("X-User-Role", "TEACHER")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"member-management-" + System.nanoTime() + "\",\"enrollmentMode\":\"PUBLIC\",\"status\":\"ACTIVE\"}"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        String courseId = response.replaceAll("(?s).*\"id\":(\\d+).*", "$1");
+
+        mockMvc.perform(post("/api/v1/courses/" + courseId + "/join")
+                        .header("X-User-Id", "392")
+                        .header("X-User-Role", "STUDENT"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/v1/courses/" + courseId + "/members")
+                        .header("X-User-Id", "392")
+                        .header("X-User-Role", "STUDENT"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()", is(2)))
+                .andExpect(jsonPath("$.data[0].userId", is(392)))
+                .andExpect(jsonPath("$.data[0].status", is("ACTIVE")));
+
+        mockMvc.perform(put("/api/v1/courses/" + courseId + "/members/391")
+                        .header("X-User-Id", "392")
+                        .header("X-User-Role", "STUDENT")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"role\":\"ASSISTANT\",\"status\":\"ACTIVE\"}"))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(put("/api/v1/courses/" + courseId + "/members/392")
+                        .header("X-User-Id", "391")
+                        .header("X-User-Role", "TEACHER")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"role\":\"ASSISTANT\",\"status\":\"ACTIVE\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.role", is("ASSISTANT")))
+                .andExpect(jsonPath("$.data.status", is("ACTIVE")));
+
+        mockMvc.perform(put("/api/v1/courses/" + courseId + "/members/392")
+                        .header("X-User-Id", "391")
+                        .header("X-User-Role", "TEACHER")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"role\":\"ASSISTANT\",\"status\":\"PENDING\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message", is("INVALID_MEMBER_STATUS_TRANSITION")));
+
+        mockMvc.perform(delete("/api/v1/courses/" + courseId + "/members/392")
+                        .header("X-User-Id", "392")
+                        .header("X-User-Role", "STUDENT"))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(delete("/api/v1/courses/" + courseId + "/members/392")
+                        .header("X-User-Id", "391")
+                        .header("X-User-Role", "TEACHER"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/v1/courses/" + courseId + "/permissions/392")
+                        .header("X-User-Id", "391")
+                        .header("X-User-Role", "TEACHER"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.member", is(false)))
+                .andExpect(jsonPath("$.data.teacher", is(false)))
+                .andExpect(jsonPath("$.data.role", is("ASSISTANT")))
+                .andExpect(jsonPath("$.data.status", is("REMOVED")));
+
+        mockMvc.perform(get("/api/v1/courses/" + courseId)
+                        .header("X-User-Id", "392")
+                        .header("X-User-Role", "STUDENT"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void teacherCanListOnlyActiveStudentIdsForCourse() throws Exception {
+        String response = mockMvc.perform(post("/api/v1/courses")
+                        .header("X-User-Id", "395")
+                        .header("X-User-Role", "TEACHER")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"student-roster-" + System.nanoTime() + "\",\"enrollmentMode\":\"PUBLIC\",\"status\":\"ACTIVE\"}"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        String courseId = response.replaceAll("(?s).*\"id\":(\\d+).*", "$1");
+
+        mockMvc.perform(post("/api/v1/courses/" + courseId + "/join")
+                        .header("X-User-Id", "396")
+                        .header("X-User-Role", "STUDENT"))
+                .andExpect(status().isOk());
+        mockMvc.perform(post("/api/v1/courses/" + courseId + "/join")
+                        .header("X-User-Id", "397")
+                        .header("X-User-Role", "STUDENT"))
+                .andExpect(status().isOk());
+        mockMvc.perform(put("/api/v1/courses/" + courseId + "/members/397")
+                        .header("X-User-Id", "395")
+                        .header("X-User-Role", "TEACHER")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"role\":\"ASSISTANT\",\"status\":\"ACTIVE\"}"))
+                .andExpect(status().isOk());
+        mockMvc.perform(post("/api/v1/courses/" + courseId + "/join")
+                        .header("X-User-Id", "398")
+                        .header("X-User-Role", "STUDENT"))
+                .andExpect(status().isOk());
+        mockMvc.perform(delete("/api/v1/courses/" + courseId + "/members/398")
+                        .header("X-User-Id", "395")
+                        .header("X-User-Role", "TEACHER"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/v1/courses/" + courseId + "/students")
+                        .header("X-User-Id", "396")
+                        .header("X-User-Role", "STUDENT"))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(get("/api/v1/courses/" + courseId + "/students")
+                        .header("X-User-Id", "399")
+                        .header("X-User-Role", "GRD")
+                        .header("X-Permissions", "course:students:read"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()", is(1)))
+                .andExpect(jsonPath("$.data[0]", is(396)));
+
+        mockMvc.perform(get("/api/v1/courses/" + courseId + "/students")
+                        .header("X-User-Id", "395")
+                        .header("X-User-Role", "TEACHER"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()", is(1)))
+                .andExpect(jsonPath("$.data[0]", is(396)));
+    }
+
+    @Test
     void archivedCourseAppearsInArchivedList() throws Exception {
         String suffix = "401-" + System.nanoTime();
         String currentName = "current-" + suffix;
@@ -405,6 +533,56 @@ class CourseControllerTest {
                 .andExpect(jsonPath("$.data.total", is(1)))
                 .andExpect(jsonPath("$.data.list[0].name", is(currentName)))
                 .andExpect(jsonPath("$.data.list[0].status", is("ACTIVE")));
+    }
+
+    @Test
+    void mineScopeShowsTeacherCreatedCoursesAndStudentJoinedCourses() throws Exception {
+        String suffix = "mine-" + System.nanoTime();
+        String teacherMine = "teacher-" + suffix;
+        String otherTeacher = "other-" + suffix;
+        String studentJoined = "student-" + suffix;
+
+        mockMvc.perform(post("/api/v1/courses")
+                        .header("X-User-Id", "421")
+                        .header("X-User-Role", "TEACHER")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"" + teacherMine + "\",\"enrollmentMode\":\"PUBLIC\",\"status\":\"ACTIVE\"}"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/v1/courses")
+                        .header("X-User-Id", "422")
+                        .header("X-User-Role", "TEACHER")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"" + otherTeacher + "\",\"enrollmentMode\":\"PUBLIC\",\"status\":\"ACTIVE\"}"))
+                .andExpect(status().isOk());
+
+        String joinedResponse = mockMvc.perform(post("/api/v1/courses")
+                        .header("X-User-Id", "423")
+                        .header("X-User-Role", "TEACHER")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"" + studentJoined + "\",\"enrollmentMode\":\"PUBLIC\",\"status\":\"ACTIVE\"}"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        String joinedCourseId = joinedResponse.replaceAll("(?s).*\"id\":(\\d+).*", "$1");
+
+        mockMvc.perform(post("/api/v1/courses/" + joinedCourseId + "/join")
+                        .header("X-User-Id", "424")
+                        .header("X-User-Role", "STUDENT"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/v1/courses?scope=mine&keyword=" + suffix)
+                        .header("X-User-Id", "421")
+                        .header("X-User-Role", "TEACHER"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.total", is(1)))
+                .andExpect(jsonPath("$.data.list[0].name", is(teacherMine)));
+
+        mockMvc.perform(get("/api/v1/courses?scope=mine&keyword=" + suffix)
+                        .header("X-User-Id", "424")
+                        .header("X-User-Role", "STUDENT"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.total", is(1)))
+                .andExpect(jsonPath("$.data.list[0].name", is(studentJoined)));
     }
 
     @Test

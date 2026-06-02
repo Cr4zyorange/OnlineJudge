@@ -33,6 +33,11 @@
             </button>
           </li>
           <li>
+            <button class="menu-button" :class="{ active: activeTab === 'mine' && !chapterCourse && !resourceCourse }" type="button" @click="switchTab('mine')">
+              <i class="bi bi-bookmark-check"></i> 我的课程
+            </button>
+          </li>
+          <li>
             <button class="menu-button" :class="{ active: activeTab === 'managed' && !chapterCourse && !resourceCourse }" type="button" @click="switchTab('managed')">
               <i class="bi bi-person-check"></i> 我管理的
             </button>
@@ -495,6 +500,41 @@
           </div>
         </div>
 
+        <div v-if="selectedCourse.manageable" class="modal-section">
+          <h3>课程成员</h3>
+          <p v-if="memberManageError" class="inline-error">{{ memberManageError }}</p>
+          <p v-else-if="memberLoading">成员加载中...</p>
+          <p v-else-if="activeMembers.length === 0">暂无在课成员</p>
+          <div v-else class="resource-list">
+            <article v-for="member in activeMembers" :key="member.userId" class="resource-row">
+              <div>
+                <strong>{{ memberRoleText(member.role) }} {{ member.userId }}</strong>
+                <p>{{ memberStatusText(member.status) }} · {{ member.joinedAt ? formatDateTime(member.joinedAt) : '未记录加入时间' }}</p>
+              </div>
+              <label class="resource-filter member-role-control">
+                <span>角色</span>
+                <select
+                  :value="member.role"
+                  :disabled="memberActionUserId === member.userId"
+                  @change="changeMemberRole(member, ($event.target as HTMLSelectElement).value as CourseMember['role'])"
+                >
+                  <option value="STUDENT">学生</option>
+                  <option value="ASSISTANT">助教</option>
+                  <option value="TEACHER">教师</option>
+                </select>
+              </label>
+              <button
+                class="card-btn danger"
+                type="button"
+                :disabled="memberActionUserId === member.userId"
+                @click="removeActiveMember(member)"
+              >
+                <i class="bi bi-person-dash"></i> 移除
+              </button>
+            </article>
+          </div>
+        </div>
+
         <div class="modal-actions-placeholder">
           <span>预留操作区</span>
           <div class="placeholder-actions">
@@ -530,6 +570,7 @@ import {
   listCourseMembers,
   listCourses,
   listResources,
+  removeCourseMember,
   updateChapter,
   updateCourseMember,
   updateCourse,
@@ -697,6 +738,7 @@ const draggedChapterId = ref<number | null>(null);
 const activeTab = ref<CourseScope>('all');
 const stats = reactive<Record<CourseScope, number>>({
   all: 0,
+  mine: 0,
   managed: 0,
   archived: 0
 });
@@ -710,6 +752,9 @@ const pageTitle = computed(() => {
   }
   if (activeTab.value === 'managed') {
     return '课程创建与管理';
+  }
+  if (activeTab.value === 'mine') {
+    return '我的课程';
   }
   if (activeTab.value === 'archived') {
     return '归档记录';
@@ -727,6 +772,9 @@ const pageSubtitle = computed(() => {
   if (activeTab.value === 'managed') {
     return '创建课程、维护基础信息，并从课程卡片进入章节目录或资源管理。';
   }
+  if (activeTab.value === 'mine') {
+    return '教师查看自己创建的课程，学生查看已经加入的课程。';
+  }
   if (activeTab.value === 'archived') {
     return '查看已经归档的课程，保留历史课程信息。';
   }
@@ -736,6 +784,9 @@ const pageSubtitle = computed(() => {
 const emptyText = computed(() => {
   if (activeTab.value === 'managed') {
     return '暂无可管理课程，创建第一门课程后会显示在这里。';
+  }
+  if (activeTab.value === 'mine') {
+    return '暂无我的课程。';
   }
   if (activeTab.value === 'archived') {
     return '暂无归档课程。';
@@ -760,12 +811,17 @@ const filteredDetailResources = computed(() => {
   return detailResources.value.filter((resource) => resource.chapterId === chapterId);
 });
 const pendingMembers = ref<CourseMember[]>([]);
-const canOpenCourseDetail = computed(() => activeTab.value === 'all' || activeTab.value === 'archived');
+const members = ref<CourseMember[]>([]);
+const memberLoading = ref(false);
+const memberManageError = ref('');
+const memberActionUserId = ref<number | null>(null);
+const canOpenCourseDetail = computed(() => activeTab.value === 'all' || activeTab.value === 'mine' || activeTab.value === 'archived');
 const gradeAnalysisCourse = computed(() => editingCourse.value ?? selectedCourse.value ?? chapterCourse.value ?? visibleCourses.value.find((course) => course.manageable) ?? visibleCourses.value[0] ?? null);
 const gradeAnalysisHref = computed(() => {
   const course = gradeAnalysisCourse.value;
   return course ? `/courses/${course.id}/grd/grade-items` : '';
 });
+const activeMembers = computed(() => members.value.filter((member) => member.status === 'ACTIVE'));
 
 async function loadCourses() {
   loading.value = true;
@@ -871,10 +927,12 @@ async function openCourseDetail(course: Course) {
   detailChapters.value = [];
   detailResources.value = [];
   pendingMembers.value = [];
+  members.value = [];
   detailChapterError.value = '';
   detailResourceError.value = '';
   resumeMessage.value = '';
   memberReviewError.value = '';
+  memberManageError.value = '';
   detailChapterLoading.value = true;
   detailResourceLoading.value = true;
   try {
@@ -893,13 +951,14 @@ async function openCourseDetail(course: Course) {
   }
   applyResumeQuery(course.id);
   if (course.manageable) {
-    await loadPendingMembers(course.id);
+    await Promise.all([loadPendingMembers(course.id), loadCourseMembers(course.id)]);
   }
 }
 
 function closeCourseDetail() {
   selectedCourse.value = null;
   pendingMembers.value = [];
+  members.value = [];
   resetResourceForm();
 }
 
@@ -992,6 +1051,18 @@ async function loadPendingMembers(courseId: number) {
   }
 }
 
+async function loadCourseMembers(courseId: number) {
+  memberLoading.value = true;
+  memberManageError.value = '';
+  try {
+    members.value = await listCourseMembers(courseId);
+  } catch (error) {
+    memberManageError.value = error instanceof Error ? error.message : '课程成员加载失败';
+  } finally {
+    memberLoading.value = false;
+  }
+}
+
 async function approvePendingMember(member: CourseMember) {
   await reviewPendingMember(member, 'ACTIVE');
 }
@@ -1011,11 +1082,46 @@ async function reviewPendingMember(member: CourseMember, status: 'ACTIVE' | 'REJ
       role: 'STUDENT',
       status
     });
-    await Promise.all([loadPendingMembers(member.courseId), loadCourses(), loadStats()]);
+    await Promise.all([loadPendingMembers(member.courseId), loadCourseMembers(member.courseId), loadCourses(), loadStats()]);
   } catch (error) {
     memberReviewError.value = error instanceof Error ? error.message : '选课申请处理失败';
   } finally {
     approvingUserId.value = null;
+  }
+}
+
+async function changeMemberRole(member: CourseMember, role: CourseMember['role']) {
+  if (role === member.role) {
+    return;
+  }
+  memberActionUserId.value = member.userId;
+  memberManageError.value = '';
+  try {
+    await updateCourseMember(member.courseId, member.userId, {
+      role,
+      status: member.status
+    });
+    await Promise.all([loadCourseMembers(member.courseId), loadCourses(), loadStats()]);
+  } catch (error) {
+    memberManageError.value = error instanceof Error ? error.message : '成员角色调整失败';
+  } finally {
+    memberActionUserId.value = null;
+  }
+}
+
+async function removeActiveMember(member: CourseMember) {
+  if (!window.confirm(`确认移除成员 ${member.userId}？`)) {
+    return;
+  }
+  memberActionUserId.value = member.userId;
+  memberManageError.value = '';
+  try {
+    await removeCourseMember(member.courseId, member.userId);
+    await Promise.all([loadCourseMembers(member.courseId), loadCourses(), loadStats()]);
+  } catch (error) {
+    memberManageError.value = error instanceof Error ? error.message : '成员移除失败';
+  } finally {
+    memberActionUserId.value = null;
   }
 }
 
@@ -1342,6 +1448,10 @@ function syncActiveTabStat(list: Course[], total: number) {
     stats.managed = list.filter((course) => course.status !== 'ARCHIVED').length || total;
     return;
   }
+  if (activeTab.value === 'mine') {
+    stats.mine = list.filter((course) => course.status !== 'ARCHIVED').length || total;
+    return;
+  }
   stats.all = list.filter((course) => course.status !== 'ARCHIVED').length || total;
 }
 
@@ -1361,6 +1471,29 @@ function enrollmentModeText(mode: Course['enrollmentMode']) {
     REVIEW: '申请审核'
   };
   return map[mode];
+}
+
+function memberRoleText(role: CourseMember['role']) {
+  const map: Record<CourseMember['role'], string> = {
+    TEACHER: '教师',
+    ASSISTANT: '助教',
+    STUDENT: '学生'
+  };
+  return map[role];
+}
+
+function memberStatusText(status: CourseMember['status']) {
+  const map: Record<CourseMember['status'], string> = {
+    ACTIVE: '在课',
+    PENDING: '待审核',
+    REJECTED: '已拒绝',
+    REMOVED: '已移除'
+  };
+  return map[status];
+}
+
+function formatDateTime(value: string) {
+  return value.replace('T', ' ').slice(0, 16);
 }
 
 function statusText(status: Course['status']) {
