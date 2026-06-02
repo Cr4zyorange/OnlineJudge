@@ -680,13 +680,70 @@ describe('CourseManagementView', () => {
     expect(JSON.parse(roleCall![1].body)).toEqual({ role: 'ASSISTANT', status: 'ACTIVE' });
     expect(wrapper.text()).toContain('601');
 
-    const removeButton = wrapper.findAll('button.card-btn.danger').find((button) => button.attributes('disabled') == null);
+    const studentRow = wrapper.findAll('.resource-row').find((row) => row.text().includes('601'));
+    expect(studentRow).toBeTruthy();
+    const removeButton = studentRow!.find('button.card-btn.danger');
     expect(removeButton).toBeTruthy();
-    await removeButton!.trigger('click');
+    await removeButton.trigger('click');
     await flushPromises();
 
     const removeCall = fetchMock.mock.calls.find(([url, options]) => url === '/api/v1/courses/1/members/601' && options.method === 'DELETE');
     expect(removeCall).toBeTruthy();
+  });
+
+  it('allows teacher rows to request role changes and lets the backend enforce last-teacher rules', async () => {
+    const teacherMember = {
+      courseId: 1,
+      userId: 101,
+      role: 'TEACHER',
+      status: 'ACTIVE',
+      joinMethod: 'CREATED',
+      approvedBy: 101,
+      joinedAt: '2026-03-01T08:00:00'
+    };
+    const extraTeacherMember = {
+      ...teacherMember,
+      userId: 602
+    };
+    const page = (list = [course], total = list.length) => ({
+      code: '0',
+      message: 'success',
+      data: { list, total, page: 1, size: 20 }
+    });
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => page([course], 1) })
+      .mockResolvedValueOnce({ ok: true, json: async () => page([course], 1) })
+      .mockResolvedValueOnce({ ok: true, json: async () => page([course], 1) })
+      .mockResolvedValueOnce({ ok: true, json: async () => page([], 0) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ code: '0', message: 'success', data: [] }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ code: '0', message: 'success', data: [] }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ code: '0', message: 'success', data: [] }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ code: '0', message: 'success', data: [teacherMember, extraTeacherMember] }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ code: '0', message: 'success', data: { ...extraTeacherMember, role: 'ASSISTANT' } }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ code: '0', message: 'success', data: [teacherMember, { ...extraTeacherMember, role: 'ASSISTANT' }] }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => page([course], 1) })
+      .mockResolvedValueOnce({ ok: true, json: async () => page([course], 1) })
+      .mockResolvedValueOnce({ ok: true, json: async () => page([course], 1) })
+      .mockResolvedValueOnce({ ok: true, json: async () => page([], 0) });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const wrapper = mount(CourseManagementView);
+    await flushPromises();
+
+    await wrapper.get('.course-card').trigger('click');
+    await flushPromises();
+
+    const teacherRow = wrapper.findAll('.resource-row').find((row) => row.text().includes('602'));
+    expect(teacherRow).toBeTruthy();
+    const teacherRoleSelect = teacherRow!.find('select');
+    expect(teacherRoleSelect.attributes('disabled')).toBeUndefined();
+
+    await teacherRoleSelect.setValue('ASSISTANT');
+    await flushPromises();
+
+    const roleCall = fetchMock.mock.calls.find(([url, options]) => url === '/api/v1/courses/1/members/602' && options.method === 'PUT');
+    expect(roleCall).toBeTruthy();
+    expect(JSON.parse(roleCall![1].body)).toEqual({ role: 'ASSISTANT', status: 'ACTIVE' });
   });
 });
 

@@ -88,6 +88,11 @@ public class CourseController {
         return ApiResponse.ok(courseService.members(courseId, status, currentUser));
     }
 
+    @GetMapping("/{courseId}/students")
+    public ApiResponse<java.util.List<Long>> students(@PathVariable Long courseId, CurrentUser currentUser) {
+        return ApiResponse.ok(courseService.students(courseId, currentUser));
+    }
+
     @PutMapping("/{courseId}/members/{userId}")
     public ApiResponse<CourseMemberResponse> updateMember(@PathVariable Long courseId,
                                                          @PathVariable Long userId,

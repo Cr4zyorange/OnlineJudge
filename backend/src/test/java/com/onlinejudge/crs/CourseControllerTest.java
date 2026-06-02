@@ -403,6 +403,14 @@ class CourseControllerTest {
                 .andExpect(jsonPath("$.data.role", is("ASSISTANT")))
                 .andExpect(jsonPath("$.data.status", is("ACTIVE")));
 
+        mockMvc.perform(put("/api/v1/courses/" + courseId + "/members/392")
+                        .header("X-User-Id", "391")
+                        .header("X-User-Role", "TEACHER")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"role\":\"ASSISTANT\",\"status\":\"PENDING\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message", is("INVALID_MEMBER_STATUS_TRANSITION")));
+
         mockMvc.perform(delete("/api/v1/courses/" + courseId + "/members/392")
                         .header("X-User-Id", "392")
                         .header("X-User-Role", "STUDENT"))
@@ -426,6 +434,61 @@ class CourseControllerTest {
                         .header("X-User-Id", "392")
                         .header("X-User-Role", "STUDENT"))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void teacherCanListOnlyActiveStudentIdsForCourse() throws Exception {
+        String response = mockMvc.perform(post("/api/v1/courses")
+                        .header("X-User-Id", "395")
+                        .header("X-User-Role", "TEACHER")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"student-roster-" + System.nanoTime() + "\",\"enrollmentMode\":\"PUBLIC\",\"status\":\"ACTIVE\"}"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        String courseId = response.replaceAll("(?s).*\"id\":(\\d+).*", "$1");
+
+        mockMvc.perform(post("/api/v1/courses/" + courseId + "/join")
+                        .header("X-User-Id", "396")
+                        .header("X-User-Role", "STUDENT"))
+                .andExpect(status().isOk());
+        mockMvc.perform(post("/api/v1/courses/" + courseId + "/join")
+                        .header("X-User-Id", "397")
+                        .header("X-User-Role", "STUDENT"))
+                .andExpect(status().isOk());
+        mockMvc.perform(put("/api/v1/courses/" + courseId + "/members/397")
+                        .header("X-User-Id", "395")
+                        .header("X-User-Role", "TEACHER")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"role\":\"ASSISTANT\",\"status\":\"ACTIVE\"}"))
+                .andExpect(status().isOk());
+        mockMvc.perform(post("/api/v1/courses/" + courseId + "/join")
+                        .header("X-User-Id", "398")
+                        .header("X-User-Role", "STUDENT"))
+                .andExpect(status().isOk());
+        mockMvc.perform(delete("/api/v1/courses/" + courseId + "/members/398")
+                        .header("X-User-Id", "395")
+                        .header("X-User-Role", "TEACHER"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/v1/courses/" + courseId + "/students")
+                        .header("X-User-Id", "396")
+                        .header("X-User-Role", "STUDENT"))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(get("/api/v1/courses/" + courseId + "/students")
+                        .header("X-User-Id", "399")
+                        .header("X-User-Role", "GRD")
+                        .header("X-Permissions", "course:students:read"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()", is(1)))
+                .andExpect(jsonPath("$.data[0]", is(396)));
+
+        mockMvc.perform(get("/api/v1/courses/" + courseId + "/students")
+                        .header("X-User-Id", "395")
+                        .header("X-User-Role", "TEACHER"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()", is(1)))
+                .andExpect(jsonPath("$.data[0]", is(396)));
     }
 
     @Test

@@ -515,7 +515,7 @@
                 <span>角色</span>
                 <select
                   :value="member.role"
-                  :disabled="memberActionUserId === member.userId || member.role === 'TEACHER'"
+                  :disabled="memberActionUserId === member.userId"
                   @change="changeMemberRole(member, ($event.target as HTMLSelectElement).value as CourseMember['role'])"
                 >
                   <option value="STUDENT">学生</option>
@@ -526,7 +526,7 @@
               <button
                 class="card-btn danger"
                 type="button"
-                :disabled="memberActionUserId === member.userId || member.role === 'TEACHER'"
+                :disabled="memberActionUserId === member.userId"
                 @click="removeActiveMember(member)"
               >
                 <i class="bi bi-person-dash"></i> 移除
@@ -1091,7 +1091,7 @@ async function reviewPendingMember(member: CourseMember, status: 'ACTIVE' | 'REJ
 }
 
 async function changeMemberRole(member: CourseMember, role: CourseMember['role']) {
-  if (role === member.role || member.role === 'TEACHER') {
+  if (role === member.role) {
     return;
   }
   memberActionUserId.value = member.userId;
@@ -1110,9 +1110,6 @@ async function changeMemberRole(member: CourseMember, role: CourseMember['role']
 }
 
 async function removeActiveMember(member: CourseMember) {
-  if (member.role === 'TEACHER') {
-    return;
-  }
   if (!window.confirm(`确认移除成员 ${member.userId}？`)) {
     return;
   }

@@ -115,6 +115,11 @@ public class CourseService {
                 .toList();
     }
 
+    public List<Long> students(Long courseId, CurrentUser user) {
+        requireStudentRosterPermission(courseId, user);
+        return courseRepository.listActiveStudentIds(courseId);
+    }
+
     @Transactional
     public CourseMemberResponse updateMember(Long courseId, Long userId, CourseMemberUpdateRequest request, CurrentUser user) {
         requireManagePermission(courseId, user);
@@ -122,6 +127,7 @@ public class CourseService {
                 .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "MEMBER_NOT_FOUND"));
         CourseMemberRole role = request.role() == null ? member.role() : request.role();
         CourseMemberStatus status = request.status();
+        validateMemberTransition(member.status(), status);
         if (user.id() == userId && (role != CourseMemberRole.TEACHER || status == CourseMemberStatus.REMOVED)) {
             throw new BusinessException(HttpStatus.CONFLICT, "CANNOT_CHANGE_SELF_TEACHER");
         }
@@ -130,7 +136,7 @@ public class CourseService {
                 && courseRepository.activeTeacherCount(courseId) <= 1) {
             throw new BusinessException(HttpStatus.CONFLICT, "LAST_TEACHER_REQUIRED");
         }
-        if (status == CourseMemberStatus.ACTIVE) {
+        if (willAddActiveStudent(member, role, status)) {
             requireCapacity(getCourse(courseId), CourseMemberStatus.ACTIVE);
         }
         if (status == CourseMemberStatus.REJECTED && member.status() != CourseMemberStatus.PENDING) {
@@ -150,6 +156,7 @@ public class CourseService {
         if (member.role() == CourseMemberRole.TEACHER && courseRepository.activeTeacherCount(courseId) <= 1) {
             throw new BusinessException(HttpStatus.CONFLICT, "LAST_TEACHER_REQUIRED");
         }
+        validateMemberTransition(member.status(), CourseMemberStatus.REMOVED);
         courseRepository.updateMember(courseId, userId, member.role(), CourseMemberStatus.REMOVED, user.id());
     }
 
@@ -176,6 +183,14 @@ public class CourseService {
         }
     }
 
+    private void requireStudentRosterPermission(Long courseId, CurrentUser user) {
+        getCourse(courseId);
+        if (isAdmin(user) || user.hasPermission("course:students:read") || user.hasPermission("course:manage")) {
+            return;
+        }
+        requireManagePermission(courseId, user);
+    }
+
     private void requireActiveMembership(Long courseId, CurrentUser user) {
         getCourse(courseId);
         if (isAdmin(user)) {
@@ -184,6 +199,24 @@ public class CourseService {
         if (!isActiveMember(courseId, user.id())) {
             throw new BusinessException(HttpStatus.FORBIDDEN, "NO_COURSE_MEMBERSHIP");
         }
+    }
+
+    private void validateMemberTransition(CourseMemberStatus current, CourseMemberStatus target) {
+        boolean valid = switch (current) {
+            case PENDING -> target == CourseMemberStatus.ACTIVE || target == CourseMemberStatus.REJECTED;
+            case ACTIVE -> target == CourseMemberStatus.ACTIVE || target == CourseMemberStatus.REMOVED;
+            case REJECTED, REMOVED -> false;
+        };
+        if (!valid) {
+            throw new BusinessException(HttpStatus.CONFLICT, "INVALID_MEMBER_STATUS_TRANSITION");
+        }
+    }
+
+    private boolean willAddActiveStudent(CourseMember current, CourseMemberRole targetRole, CourseMemberStatus targetStatus) {
+        if (targetStatus != CourseMemberStatus.ACTIVE || targetRole != CourseMemberRole.STUDENT) {
+            return false;
+        }
+        return current.status() != CourseMemberStatus.ACTIVE || current.role() != CourseMemberRole.STUDENT;
     }
 
     private boolean isActiveMember(Long courseId, Long userId) {
