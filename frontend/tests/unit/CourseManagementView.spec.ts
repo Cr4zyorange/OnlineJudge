@@ -26,6 +26,16 @@ const course = {
   updatedAt: '2026-05-25T00:00:00'
 };
 
+const homeSummary = (targetCourse = course, announcements: unknown[] = [], recentTasks: unknown[] = []) => ({
+  code: '0',
+  message: 'success',
+  data: {
+    course: targetCourse,
+    announcements,
+    recentTasks
+  }
+});
+
 describe('CourseManagementView', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
@@ -48,6 +58,10 @@ describe('CourseManagementView', () => {
       .mockResolvedValueOnce({ ok: true, json: async () => page([course], 1) })
       .mockResolvedValueOnce({ ok: true, json: async () => page([course], 1) })
       .mockResolvedValueOnce({ ok: true, json: async () => page([], 0) })
+      .mockResolvedValueOnce({ ok: true, json: async () => homeSummary(course) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ code: '0', message: 'success', data: [] }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ code: '0', message: 'success', data: [] }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ code: '0', message: 'success', data: [] }) })
       .mockResolvedValueOnce({ ok: true, json: async () => ({ code: '0', message: 'success', data: [] }) });
     vi.stubGlobal('fetch', fetchMock);
 
@@ -69,6 +83,119 @@ describe('CourseManagementView', () => {
     expect(wrapper.text()).toContain(longDescription);
     expect(wrapper.text()).toContain('预留操作区');
     expect(wrapper.text()).toContain('暂无章节目录');
+  });
+
+  it('shows course announcements in the detail sidebar and lets teachers publish one', async () => {
+    const page = (list = [course], total = list.length) => ({
+      code: '0',
+      message: 'success',
+      data: { list, total, page: 1, size: 20 }
+    });
+    const announcements = [{
+      id: 71,
+      courseId: 1,
+      title: 'Pinned notice',
+      content: 'Read chapter 1 before class.',
+      top: true,
+      publisherId: 101,
+      publisherName: 'Teacher101',
+      createdAt: '2026-06-02T09:00:00',
+      updatedAt: '2026-06-02T09:00:00'
+    }];
+    const createdAnnouncement = {
+      ...announcements[0],
+      id: 72,
+      title: 'Lab reminder',
+      content: 'Bring your laptop.',
+      top: false
+    };
+    const recentTasks = [{
+      taskId: 501,
+      taskType: 'HOMEWORK',
+      title: 'Submit homework 1',
+      courseId: 1,
+      courseName: course.name,
+      deadline: '2026-06-10 23:59:00',
+      progress: 20,
+      status: 'IN_PROGRESS',
+      actionUrl: '/courses/1/homeworks/501'
+    }];
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => page([course], 1) })
+      .mockResolvedValueOnce({ ok: true, json: async () => page([course], 1) })
+      .mockResolvedValueOnce({ ok: true, json: async () => page([course], 1) })
+      .mockResolvedValueOnce({ ok: true, json: async () => page([], 0) })
+      .mockResolvedValueOnce({ ok: true, json: async () => homeSummary(course, announcements, recentTasks) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ code: '0', message: 'success', data: [] }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ code: '0', message: 'success', data: [] }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ code: '0', message: 'success', data: [] }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ code: '0', message: 'success', data: [] }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ code: '0', message: 'success', data: announcements }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ code: '0', message: 'success', data: createdAnnouncement }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ code: '0', message: 'success', data: [createdAnnouncement, ...announcements] }) });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const wrapper = mount(CourseManagementView);
+    await flushPromises();
+
+    await wrapper.get('.course-card').trigger('click');
+    await flushPromises();
+
+    const sidebar = wrapper.get('[data-testid="course-announcement-sidebar"]');
+    expect(sidebar.text()).toContain('Pinned notice');
+    expect(sidebar.text()).toContain('Read chapter 1 before class.');
+    expect(wrapper.get('[data-testid="course-recent-tasks"]').text()).toContain('Submit homework 1');
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/courses/1/home-summary', expect.objectContaining({ method: 'GET' }));
+
+    await sidebar.find('button').trigger('click');
+    await flushPromises();
+
+    await wrapper.get('[data-testid="announcement-title"]').setValue('Lab reminder');
+    await wrapper.get('[data-testid="announcement-content"]').setValue('Bring your laptop.');
+    await wrapper.get('[data-testid="announcement-form"]').trigger('submit.prevent');
+    await flushPromises();
+
+    const createCall = fetchMock.mock.calls.find(([url, options]) => url === '/api/v1/courses/1/announcements' && options.method === 'POST');
+    expect(createCall).toBeTruthy();
+    expect(JSON.parse(createCall![1].body)).toEqual({
+      title: 'Lab reminder',
+      content: 'Bring your laptop.',
+      isTop: false
+    });
+    expect(wrapper.text()).toContain('公告发布成功');
+  });
+
+  it('keeps the original detail modal for students who have not joined a course', async () => {
+    const publicCourse = {
+      ...course,
+      id: 81,
+      member: false,
+      manageable: false
+    };
+    const page = (list = [publicCourse], total = list.length) => ({
+      code: '0',
+      message: 'success',
+      data: { list, total, page: 1, size: 20 }
+    });
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => page([publicCourse], 1) })
+      .mockResolvedValueOnce({ ok: true, json: async () => page([], 0) })
+      .mockResolvedValueOnce({ ok: true, json: async () => page([], 0) })
+      .mockResolvedValueOnce({ ok: true, json: async () => page([], 0) });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const wrapper = mount(CourseManagementView);
+    await flushPromises();
+
+    await wrapper.get('.course-card').trigger('click');
+    await flushPromises();
+
+    expect(wrapper.get('.course-modal').classes()).not.toContain('course-modal-expanded');
+    expect(wrapper.find('[data-testid="course-announcement-sidebar"]').exists()).toBe(false);
+    expect(fetchMock.mock.calls.some(([url]) => String(url).includes('/chapters'))).toBe(false);
+    expect(fetchMock.mock.calls.some(([url]) => String(url).includes('/resources'))).toBe(false);
+    expect(fetchMock.mock.calls.some(([url]) => String(url).includes('/announcements'))).toBe(false);
+    expect(fetchMock.mock.calls.some(([url]) => String(url).includes('/home-summary'))).toBe(false);
   });
 
   it('exposes only the learning progress entry in the glass style sidebar', async () => {
@@ -425,8 +552,11 @@ describe('CourseManagementView', () => {
       .mockResolvedValueOnce({ ok: true, json: async () => page([course], 1) })
       .mockResolvedValueOnce({ ok: true, json: async () => page([], 0) })
       .mockResolvedValueOnce({ ok: true, json: async () => ({ code: '0', message: 'success', data: course }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => homeSummary(course) })
       .mockResolvedValueOnce({ ok: true, json: async () => ({ code: '0', message: 'success', data: chapters }) })
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ code: '0', message: 'success', data: resources }) }));
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ code: '0', message: 'success', data: resources }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ code: '0', message: 'success', data: [] }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ code: '0', message: 'success', data: [] }) }));
 
     const wrapper = mount(CourseManagementView);
     await flushPromises();
@@ -560,10 +690,11 @@ describe('CourseManagementView', () => {
       .mockResolvedValueOnce({ ok: true, json: async () => page([course], 1) })
       .mockResolvedValueOnce({ ok: true, json: async () => page([course], 1) })
       .mockResolvedValueOnce({ ok: true, json: async () => page([], 0) })
+      .mockResolvedValueOnce({ ok: true, json: async () => homeSummary(course) })
       .mockResolvedValueOnce({ ok: true, json: async () => ({ code: '0', message: 'success', data: [] }) })
       .mockResolvedValueOnce({ ok: true, json: async () => ({ code: '0', message: 'success', data: [] }) })
       .mockResolvedValueOnce({ ok: true, json: async () => ({ code: '0', message: 'success', data: [pendingOne, pendingTwo] }) })
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ code: '0', message: 'success', data: [pendingOne, pendingTwo] }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ code: '0', message: 'success', data: [] }) })
       .mockResolvedValueOnce({ ok: true, json: async () => ({ code: '0', message: 'success', data: { ...pendingOne, status: 'ACTIVE', approvedBy: 101 } }) })
       .mockResolvedValueOnce({ ok: true, json: async () => ({ code: '0', message: 'success', data: [pendingTwo] }) })
       .mockResolvedValueOnce({ ok: true, json: async () => ({ code: '0', message: 'success', data: [{ ...pendingOne, status: 'ACTIVE', approvedBy: 101 }, pendingTwo] }) })
@@ -643,6 +774,7 @@ describe('CourseManagementView', () => {
       .mockResolvedValueOnce({ ok: true, json: async () => page([course], 1) })
       .mockResolvedValueOnce({ ok: true, json: async () => page([course], 1) })
       .mockResolvedValueOnce({ ok: true, json: async () => page([], 0) })
+      .mockResolvedValueOnce({ ok: true, json: async () => homeSummary(course) })
       .mockResolvedValueOnce({ ok: true, json: async () => ({ code: '0', message: 'success', data: [] }) })
       .mockResolvedValueOnce({ ok: true, json: async () => ({ code: '0', message: 'success', data: [] }) })
       .mockResolvedValueOnce({ ok: true, json: async () => ({ code: '0', message: 'success', data: [] }) })
@@ -715,6 +847,7 @@ describe('CourseManagementView', () => {
       .mockResolvedValueOnce({ ok: true, json: async () => page([course], 1) })
       .mockResolvedValueOnce({ ok: true, json: async () => page([course], 1) })
       .mockResolvedValueOnce({ ok: true, json: async () => page([], 0) })
+      .mockResolvedValueOnce({ ok: true, json: async () => homeSummary(course) })
       .mockResolvedValueOnce({ ok: true, json: async () => ({ code: '0', message: 'success', data: [] }) })
       .mockResolvedValueOnce({ ok: true, json: async () => ({ code: '0', message: 'success', data: [] }) })
       .mockResolvedValueOnce({ ok: true, json: async () => ({ code: '0', message: 'success', data: [] }) })

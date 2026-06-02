@@ -104,6 +104,42 @@ export interface CourseResource {
   updatedAt: string;
 }
 
+export interface CourseAnnouncement {
+  id: number;
+  courseId: number;
+  title: string;
+  content: string;
+  top: boolean;
+  publisherId: number;
+  publisherName: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AnnouncementPayload {
+  title: string;
+  content: string;
+  isTop?: boolean;
+}
+
+export interface CourseRecentTask {
+  taskId: number;
+  taskType: 'RESOURCE' | 'EXPERIMENT' | 'HOMEWORK';
+  title: string;
+  courseId: number;
+  courseName: string;
+  deadline?: string | null;
+  progress: number;
+  status: 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED' | 'OVERDUE';
+  actionUrl?: string | null;
+}
+
+export interface CourseHomeSummary {
+  course: Course;
+  announcements: CourseAnnouncement[];
+  recentTasks: CourseRecentTask[];
+}
+
 export interface ResourcePayload {
   chapterId?: number | null;
   name: string;

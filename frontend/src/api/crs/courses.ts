@@ -5,6 +5,9 @@ import type {
   Course,
   CourseJoinPayload,
   CourseMember,
+  CourseAnnouncement,
+  AnnouncementPayload,
+  CourseHomeSummary,
   CoursePayload,
   CoursePermission,
   CourseResource,
@@ -132,4 +135,39 @@ export function deleteResource(courseId: number, resourceId: number) {
 
 export function downloadResource(courseId: number, resourceId: number) {
   return requestBlob(`/api/v1/courses/${courseId}/resources/${resourceId}/download`);
+}
+
+export function listAnnouncements(courseId: number) {
+  return request<CourseAnnouncement[]>(`/api/v1/courses/${courseId}/announcements`);
+}
+
+export function createAnnouncement(courseId: number, payload: AnnouncementPayload) {
+  return request<CourseAnnouncement>(`/api/v1/courses/${courseId}/announcements`, {
+    method: 'POST',
+    body: payload
+  });
+}
+
+export function updateAnnouncement(courseId: number, announcementId: number, payload: AnnouncementPayload) {
+  return request<CourseAnnouncement>(`/api/v1/courses/${courseId}/announcements/${announcementId}`, {
+    method: 'PUT',
+    body: payload
+  });
+}
+
+export function pinAnnouncement(courseId: number, announcementId: number, isTop: boolean) {
+  return request<CourseAnnouncement>(`/api/v1/courses/${courseId}/announcements/${announcementId}/top`, {
+    method: 'PUT',
+    body: { isTop }
+  });
+}
+
+export function deleteAnnouncement(courseId: number, announcementId: number) {
+  return request<void>(`/api/v1/courses/${courseId}/announcements/${announcementId}`, {
+    method: 'DELETE'
+  });
+}
+
+export function getCourseHomeSummary(courseId: number) {
+  return request<CourseHomeSummary>(`/api/v1/courses/${courseId}/home-summary`);
 }
