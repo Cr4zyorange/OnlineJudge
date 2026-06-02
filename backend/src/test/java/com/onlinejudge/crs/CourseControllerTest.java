@@ -918,12 +918,23 @@ class CourseControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.top", is(true)));
 
+        jdbcTemplate.update("""
+                INSERT INTO lrn_learning_task
+                    (user_id, course_id, source_module, source_id, task_type, title, deadline, progress, status, action_url)
+                VALUES
+                    (?, ?, 'HWK', 77, 'HOMEWORK', 'Submit homework 1', '2026-06-10 23:59:00', 20, 'IN_PROGRESS', ?)
+                """, 902L, Long.parseLong(courseId), "/courses/" + courseId + "/homeworks/77");
+
         mockMvc.perform(get("/api/v1/courses/" + courseId + "/home-summary")
                         .header("X-User-Id", "902")
                         .header("X-User-Role", "STUDENT"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.course.id", is(Integer.parseInt(courseId))))
-                .andExpect(jsonPath("$.data.announcements.length()", is(2)));
+                .andExpect(jsonPath("$.data.announcements.length()", is(2)))
+                .andExpect(jsonPath("$.data.recentTasks.length()", is(1)))
+                .andExpect(jsonPath("$.data.recentTasks[0].title", is("Submit homework 1")))
+                .andExpect(jsonPath("$.data.recentTasks[0].taskType", is("HOMEWORK")))
+                .andExpect(jsonPath("$.data.recentTasks[0].status", is("IN_PROGRESS")));
 
         mockMvc.perform(delete("/api/v1/courses/" + courseId + "/announcements/" + secondId)
                         .header("X-User-Id", "901")

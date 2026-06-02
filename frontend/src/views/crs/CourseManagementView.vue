@@ -483,6 +483,24 @@
               <small>{{ announcement.publisherName }} · {{ formatDateTime(announcement.createdAt) }}</small>
             </article>
           </div>
+
+          <div class="recent-task-panel" data-testid="course-recent-tasks">
+            <div class="sidebar-section-title">
+              <h3>最近任务</h3>
+            </div>
+            <p v-if="announcementLoading">任务加载中...</p>
+            <p v-else-if="announcementLoadError" class="inline-error">{{ announcementLoadError }}</p>
+            <p v-else-if="recentTasks.length === 0">暂无最近任务</p>
+            <div v-else class="recent-task-stack">
+              <article v-for="task in recentTasks" :key="task.taskId" class="recent-task-card">
+                <strong>{{ task.title }}</strong>
+                <p>{{ taskTypeText(task.taskType) }} · {{ taskStatusText(task.status) }} · {{ task.deadline ? formatDateTime(task.deadline) : '无截止时间' }}</p>
+                <a v-if="task.actionUrl" class="card-btn task-link" :href="task.actionUrl">
+                  <i class="bi bi-arrow-right-circle"></i> 查看
+                </a>
+              </article>
+            </div>
+          </div>
         </aside>
 
         <div class="modal-grid">
@@ -641,6 +659,7 @@ import {
   deleteChapter,
   downloadResource,
   getCourse,
+  getCourseHomeSummary,
   joinCourse,
   listAnnouncements,
   listChapters,
@@ -658,7 +677,7 @@ import {
 } from '../../api/crs/courses';
 import { saveLearningProgress } from '../../api/lrn/learningProgress';
 import type { CourseScope } from '../../api/crs/courses';
-import type { AnnouncementPayload, Chapter, ChapterPayload, Course, CourseAnnouncement, CourseMember, CoursePayload, CourseResource, ResourcePayload } from '../../types/crs';
+import type { AnnouncementPayload, Chapter, ChapterPayload, Course, CourseAnnouncement, CourseMember, CoursePayload, CourseRecentTask, CourseResource, ResourcePayload } from '../../types/crs';
 
 const ChapterNode: Component = defineComponent({
   name: 'ChapterNode',
@@ -790,6 +809,7 @@ const chapters = ref<Chapter[]>([]);
 const detailChapters = ref<Chapter[]>([]);
 const detailResources = ref<CourseResource[]>([]);
 const announcements = ref<CourseAnnouncement[]>([]);
+const recentTasks = ref<CourseRecentTask[]>([]);
 const keyword = ref('');
 const selectedDetailChapterValue = ref('');
 const loading = ref(false);
@@ -1025,6 +1045,7 @@ async function openCourseDetail(course: Course) {
   detailChapters.value = [];
   detailResources.value = [];
   announcements.value = [];
+  recentTasks.value = [];
   pendingMembers.value = [];
   members.value = [];
   detailChapterError.value = '';
@@ -1040,6 +1061,11 @@ async function openCourseDetail(course: Course) {
   }
   detailChapterLoading.value = true;
   detailResourceLoading.value = true;
+  try {
+    await loadHomeSummary(course.id);
+  } catch {
+    // loadHomeSummary already records the user-facing error.
+  }
   try {
     detailChapters.value = await listChapters(course.id);
   } catch (error) {
@@ -1058,7 +1084,6 @@ async function openCourseDetail(course: Course) {
   if (course.manageable) {
     await Promise.all([loadPendingMembers(course.id), loadCourseMembers(course.id)]);
   }
-  await loadAnnouncements(course.id);
 }
 
 function closeCourseDetail() {
@@ -1066,6 +1091,7 @@ function closeCourseDetail() {
   pendingMembers.value = [];
   members.value = [];
   announcements.value = [];
+  recentTasks.value = [];
   resetResourceForm();
 }
 
@@ -1565,6 +1591,28 @@ async function loadAnnouncements(courseId: number) {
   }
 }
 
+async function loadHomeSummary(courseId: number) {
+  announcementLoading.value = true;
+  announcementLoadError.value = '';
+  try {
+    const summary = await getCourseHomeSummary(courseId);
+    selectedCourse.value = summary.course;
+    announcements.value = Array.isArray(summary.announcements)
+      ? summary.announcements.filter((item) => item && typeof item.title === 'string' && typeof item.content === 'string')
+      : [];
+    recentTasks.value = Array.isArray(summary.recentTasks)
+      ? summary.recentTasks.filter((item) => item && typeof item.title === 'string')
+      : [];
+  } catch (error) {
+    announcementLoadError.value = error instanceof Error ? error.message : '课程首页摘要加载失败';
+    announcements.value = [];
+    recentTasks.value = [];
+    throw error;
+  } finally {
+    announcementLoading.value = false;
+  }
+}
+
 async function submitAnnouncement() {
   if (!announcementCourse.value) {
     return;
@@ -1750,6 +1798,25 @@ function resourceTypeText(type: CourseResource['resourceType']) {
   return map[type];
 }
 
+function taskTypeText(type: CourseRecentTask['taskType']) {
+  const map: Record<CourseRecentTask['taskType'], string> = {
+    RESOURCE: '资源',
+    EXPERIMENT: '实验',
+    HOMEWORK: '作业'
+  };
+  return map[type] ?? type;
+}
+
+function taskStatusText(status: CourseRecentTask['status']) {
+  const map: Record<CourseRecentTask['status'], string> = {
+    NOT_STARTED: '未开始',
+    IN_PROGRESS: '进行中',
+    COMPLETED: '已完成',
+    OVERDUE: '已超期'
+  };
+  return map[status] ?? status;
+}
+
 function formatFileSize(size: number) {
   if (size >= 1024 * 1024) {
     return `${(size / 1024 / 1024).toFixed(1)} MB`;
@@ -1870,6 +1937,35 @@ onMounted(async () => {
 .announcement-card:last-child {
   border-bottom: 0;
   padding-bottom: 0;
+}
+
+.recent-task-panel {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(15, 23, 42, 0.12);
+}
+
+.recent-task-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.recent-task-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.1);
+}
+
+.recent-task-card:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.task-link {
+  align-self: flex-start;
 }
 
 .announcement-card strong,

@@ -11,8 +11,12 @@ import com.onlinejudge.crs.domain.CourseMemberStatus;
 import com.onlinejudge.crs.domain.dto.AnnouncementRequest;
 import com.onlinejudge.crs.domain.dto.AnnouncementResponse;
 import com.onlinejudge.crs.domain.dto.CourseHomeSummaryResponse;
+import com.onlinejudge.crs.domain.dto.CourseRecentTaskResponse;
 import com.onlinejudge.crs.mapper.AnnouncementRepository;
 import com.onlinejudge.crs.mapper.CourseRepository;
+import com.onlinejudge.lrn.service.LearningTaskQuery;
+import com.onlinejudge.lrn.service.LearningTaskService;
+import com.onlinejudge.lrn.service.LearningTaskSummary;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,15 +30,18 @@ public class AnnouncementService {
     private final CourseRepository courseRepository;
     private final CourseService courseService;
     private final NotificationEventPublisher notificationEventPublisher;
+    private final LearningTaskService learningTaskService;
 
     public AnnouncementService(AnnouncementRepository announcementRepository,
                                CourseRepository courseRepository,
                                CourseService courseService,
-                               NotificationEventPublisher notificationEventPublisher) {
+                               NotificationEventPublisher notificationEventPublisher,
+                               LearningTaskService learningTaskService) {
         this.announcementRepository = announcementRepository;
         this.courseRepository = courseRepository;
         this.courseService = courseService;
         this.notificationEventPublisher = notificationEventPublisher;
+        this.learningTaskService = learningTaskService;
     }
 
     @Transactional
@@ -68,7 +75,26 @@ public class AnnouncementService {
         return new CourseHomeSummaryResponse(
                 courseService.detail(courseId, user),
                 list(courseId, user).stream().limit(5).toList(),
-                List.of()
+                learningTaskService.listTasks(
+                                user.id(),
+                                new LearningTaskQuery(null, null, courseId, "deadline", "asc", 1, 5)
+                        ).records().stream()
+                        .map(this::toRecentTaskResponse)
+                        .toList()
+        );
+    }
+
+    private CourseRecentTaskResponse toRecentTaskResponse(LearningTaskSummary task) {
+        return new CourseRecentTaskResponse(
+                task.taskId(),
+                task.taskType(),
+                task.title(),
+                task.courseId(),
+                task.courseName(),
+                task.deadline(),
+                task.progress(),
+                task.status(),
+                task.actionUrl()
         );
     }
 
