@@ -27,8 +27,14 @@
     :course-id="courseId"
     :lab-id="labId"
   />
+  <HomeworkSubmissionHistoryView
+    v-else-if="viewMode === 'homework' && homeworkPage === 'history' && courseId !== null && homeworkId !== null"
+    :course-id="courseId"
+    :homework-id="homeworkId"
+    :role="homeworkRole"
+  />
   <HomeworkStudentView
-    v-else-if="viewMode === 'homework' && homeworkRole === 'student' && courseId !== null && homeworkId !== null"
+    v-else-if="viewMode === 'homework' && homeworkRole === 'student' && homeworkPage === 'detail' && courseId !== null && homeworkId !== null"
     :course-id="courseId"
     :homework-id="homeworkId"
   />
@@ -63,6 +69,7 @@ import AuthView from '../views/auth/AuthView.vue';
 import AuthAdminView from '../views/auth/AuthAdminView.vue';
 import CourseManagementView from '../views/crs/CourseManagementView.vue';
 import GradeItemConfigView from '../views/grd/GradeItemConfigView.vue';
+import HomeworkSubmissionHistoryView from '../views/hwk/HomeworkSubmissionHistoryView.vue';
 import HomeworkStudentListView from '../views/hwk/HomeworkStudentListView.vue';
 import HomeworkStudentView from '../views/hwk/HomeworkStudentView.vue';
 import HomeworkTeacherView from '../views/hwk/HomeworkTeacherView.vue';
@@ -105,6 +112,7 @@ const page = computed(() => {
 });
 
 const labPage = computed(() => pathname.value.endsWith('/submissions') ? 'history' : 'detail');
+const homeworkPage = computed(() => pathname.value.endsWith('/submissions') ? 'history' : 'detail');
 
 const viewMode = computed(() => {
   if (pathname.value === '/login' || pathname.value === '/register') {

@@ -120,16 +120,24 @@ export interface HomeworkSubmissionSummary {
   submissionId: number;
   homeworkId: number;
   studentId: number;
+  submitType?: HomeworkType;
+  answerText?: string | null;
+  answerJson?: string | null;
+  fileUrl?: string | null;
+  language?: string | null;
   submitStatus: HomeworkSubmitStatus;
   evaluationStatus: HomeworkEvaluationStatus;
   reviewStatus: HomeworkReviewStatus;
   autoScore?: number | null;
   manualScore?: number | null;
   finalScore?: number | null;
+  comment?: string | null;
   version: number;
   final: boolean;
   submittedAt: string;
 }
+
+export type HomeworkSubmissionDetail = HomeworkSubmissionSummary;
 
 export interface PageResponse<T> {
   list: T[];

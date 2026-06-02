@@ -1,9 +1,13 @@
 package com.onlinejudge.hwk.controller;
 
 import com.onlinejudge.common.security.CurrentUser;
+import com.onlinejudge.common.evaluation.EvaluationStatus;
 import com.onlinejudge.common.web.ApiResponse;
 import com.onlinejudge.common.web.PageResponse;
+import com.onlinejudge.hwk.domain.HomeworkReviewStatus;
 import com.onlinejudge.hwk.domain.HomeworkStatus;
+import com.onlinejudge.hwk.domain.HomeworkSubmissionSearchCriteria;
+import com.onlinejudge.hwk.domain.HomeworkSubmitStatus;
 import com.onlinejudge.hwk.service.HomeworkService;
 import com.onlinejudge.hwk.service.HomeworkSubmissionService;
 import jakarta.validation.Valid;
@@ -71,6 +75,53 @@ public class HomeworkController {
         return ApiResponse.ok(HomeworkResponse.fromStudentView(homework));
     }
 
+    @GetMapping("/{homeworkId}/my-submissions")
+    public ApiResponse<List<HomeworkSubmissionResponse>> mySubmissions(
+            @PathVariable long homeworkId,
+            CurrentUser currentUser
+    ) {
+        if (!currentUser.hasRole("STUDENT")) {
+            throw new com.onlinejudge.hwk.service.HomeworkApiException(
+                    "HWK_4031",
+                    "only students can view own homework submissions",
+                    HttpStatus.FORBIDDEN
+            );
+        }
+        com.onlinejudge.hwk.service.HomeworkSubmissionService.SubmissionHistory history =
+                homeworkSubmissionService.listMine(homeworkId, currentUser.id());
+        return ApiResponse.ok(history.submissions()
+                .stream()
+                .map(submission -> HomeworkSubmissionResponse.fromStudentView(history.homework(), submission))
+                .toList());
+    }
+
+    @GetMapping("/{homeworkId}/submissions")
+    public ApiResponse<PageResponse<HomeworkSubmissionResponse>> submissions(
+            @PathVariable long homeworkId,
+            CurrentUser currentUser,
+            @RequestParam(required = false) String studentKeyword,
+            @RequestParam(required = false) HomeworkSubmitStatus submitStatus,
+            @RequestParam(required = false) EvaluationStatus evaluationStatus,
+            @RequestParam(required = false) HomeworkReviewStatus reviewStatus,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "20") int size
+    ) {
+        PageResponse<com.onlinejudge.hwk.domain.HomeworkSubmission> submissions =
+                homeworkSubmissionService.listForManager(
+                        homeworkId,
+                        currentUser.id(),
+                        HomeworkSubmissionSearchCriteria.of(studentKeyword, submitStatus, evaluationStatus, reviewStatus),
+                        page,
+                        size
+                );
+        return ApiResponse.ok(new PageResponse<>(
+                submissions.list().stream().map(HomeworkSubmissionResponse::fromTeacherView).toList(),
+                submissions.total(),
+                submissions.page(),
+                submissions.size()
+        ));
+    }
+
     @PostMapping("/{homeworkId}/submissions")
     public ResponseEntity<ApiResponse<HomeworkSubmissionResponse>> submit(
             @PathVariable long homeworkId,
@@ -84,11 +135,16 @@ public class HomeworkController {
                     HttpStatus.FORBIDDEN
             );
         }
-        HomeworkSubmissionResponse response = HomeworkSubmissionResponse.from(homeworkSubmissionService.submit(
-                homeworkId,
-                currentUser.id(),
-                request == null ? null : request.toCommand()
-        ));
+        com.onlinejudge.hwk.service.HomeworkSubmissionService.SubmittedHomeworkSubmission submitted =
+                homeworkSubmissionService.submit(
+                        homeworkId,
+                        currentUser.id(),
+                        request == null ? null : request.toCommand()
+                );
+        HomeworkSubmissionResponse response = HomeworkSubmissionResponse.fromStudentView(
+                submitted.homework(),
+                submitted.submission()
+        );
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.ok(response));
     }
 

@@ -3,7 +3,10 @@ import {
   closeHomework,
   createHomework,
   getHomeworkDetail,
+  getHomeworkSubmission,
   listHomeworks,
+  listHomeworkSubmissions,
+  listMyHomeworkSubmissions,
   publishHomework,
   saveHomeworkQuestions,
   saveHomeworkTestCases,
@@ -91,6 +94,55 @@ describe('homeworks api', () => {
         language: ''
       })
     }));
+  });
+
+  it('builds documented HWK03 submission history and detail routes', async () => {
+    const submission = {
+      submissionId: 91,
+      homeworkId: 11,
+      studentId: 601,
+      submitType: 'TEXT',
+      answerText: 'Use dynamic programming.',
+      submitStatus: 'SUBMITTED',
+      evaluationStatus: 'NONE',
+      reviewStatus: 'UNREVIEWED',
+      version: 2,
+      final: true,
+      submittedAt: '2026-06-01T10:00:00'
+    };
+    const fetchMock = vi.spyOn(globalThis, 'fetch');
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse([submission]))
+      .mockResolvedValueOnce(jsonResponse({ list: [submission], page: 2, size: 5, total: 6 }))
+      .mockResolvedValueOnce(jsonResponse({ ...submission, answerJson: '{"q1":"B"}' }));
+
+    await expect(listMyHomeworkSubmissions(11)).resolves.toEqual([submission]);
+    await expect(listHomeworkSubmissions(11, {
+      page: 2,
+      size: 5,
+      studentKeyword: '602',
+      submitStatus: 'LATE',
+      evaluationStatus: 'PENDING',
+      reviewStatus: 'NEED_REVIEW'
+    })).resolves.toEqual({
+      list: [submission],
+      page: 2,
+      size: 5,
+      total: 6
+    });
+    await expect(getHomeworkSubmission(91)).resolves.toEqual(expect.objectContaining({
+      submissionId: 91,
+      answerJson: '{"q1":"B"}'
+    }));
+
+    expect(fetchMock.mock.calls.map((call) => [call[0], (call[1] as RequestInit).method])).toEqual([
+      ['/api/v1/homeworks/11/my-submissions', 'GET'],
+      [
+        '/api/v1/homeworks/11/submissions?page=2&size=5&studentKeyword=602&submitStatus=LATE&evaluationStatus=PENDING&reviewStatus=NEED_REVIEW',
+        'GET'
+      ],
+      ['/api/v1/submissions/91', 'GET']
+    ]);
   });
 });
 
