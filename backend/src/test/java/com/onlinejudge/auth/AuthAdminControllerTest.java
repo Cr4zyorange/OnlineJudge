@@ -17,7 +17,9 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.hasItem;
+import static org.hamcrest.Matchers.not;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -93,6 +95,76 @@ class AuthAdminControllerTest {
 
         assertThat(auditCount("USER_ROLE_UPDATED")).isEqualTo(1);
         assertThat(auditCount("ROLE_PERMISSION_UPDATED")).isEqualTo(1);
+    }
+
+    @Test
+    void adminQueriesAuditLogsWithOperationResultOperatorAndTimeFilters() throws Exception {
+        long adminId = seedUser("admin-audit50", "Admin50@pass", "ADMIN");
+        seedUser("student-audit50", "Student50@pass", "STUDENT");
+        String adminToken = loginToken("admin-audit50", "Admin50@pass");
+
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .header("X-Forwarded-For", "203.0.113.50")
+                        .header(HttpHeaders.USER_AGENT, "AuditTest/50")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "account", "student-audit50",
+                                "password", "wrong-password"
+                        ))))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(get("/api/v1/admin/audit-logs")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken))
+                        .param("operatorId", String.valueOf(adminId))
+                        .param("operationType", "LOGIN_SUCCESS")
+                        .param("resultStatus", "SUCCESS")
+                        .param("startTime", "2026-01-01T00:00:00")
+                        .param("endTime", "2099-12-31T23:59:59")
+                        .param("page", "1")
+                        .param("size", "10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.total").value(1))
+                .andExpect(jsonPath("$.data.records[0].operatorId").value(adminId))
+                .andExpect(jsonPath("$.data.records[0].operationType").value("LOGIN_SUCCESS"))
+                .andExpect(jsonPath("$.data.records[0].targetType").value("AUTH_USER"))
+                .andExpect(jsonPath("$.data.records[0].resultStatus").value("SUCCESS"))
+                .andExpect(jsonPath("$.data.records[0].createdAt").isNotEmpty());
+
+        mockMvc.perform(get("/api/v1/admin/audit-logs")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken))
+                        .param("operationType", "LOGIN_FAILURE")
+                        .param("resultStatus", "FAILURE"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.total").value(1))
+                .andExpect(jsonPath("$.data.records[0].clientIp").value("203.0.113.50"))
+                .andExpect(jsonPath("$.data.records[0].userAgent").value("AuditTest/50"))
+                .andExpect(jsonPath("$.data.records[0].failureReason").isNotEmpty());
+    }
+
+    @Test
+    void loginAuditBoundsClientIpAndUserAgentToColumnLimits() throws Exception {
+        seedUser("admin-header50", "Admin50@pass", "ADMIN");
+        String longForwardedFor = "203.0.113." + "5".repeat(80);
+        String longUserAgent = "AuditTest/" + "5".repeat(300);
+
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .header("X-Forwarded-For", longForwardedFor + ", 198.51.100.1")
+                        .header(HttpHeaders.USER_AGENT, longUserAgent)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "account", "admin-header50",
+                                "password", "Admin50@pass"
+                        ))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.token").isNotEmpty());
+
+        Map<String, Object> auditClient = jdbcTemplate.queryForMap("""
+                SELECT client_ip, user_agent
+                FROM t_auth_audit_log
+                WHERE operation_type = 'LOGIN_SUCCESS'
+                """);
+        assertThat((String) auditClient.get("CLIENT_IP")).hasSize(64);
+        assertThat((String) auditClient.get("USER_AGENT")).hasSize(255);
     }
 
     @Test
@@ -173,6 +245,43 @@ class AuthAdminControllerTest {
                 .andExpect(jsonPath("$.code").value("AUTH_409"));
 
         assertThat(userCount("bad-role46")).isZero();
+    }
+
+    @Test
+    void adminCreateUserDoesNotExposePasswordInResponseOrAuditLogs() throws Exception {
+        seedUser("admin-safe51", "Admin51@pass", "ADMIN");
+        String adminToken = loginToken("admin-safe51", "Admin51@pass");
+
+        String response = mockMvc.perform(post("/api/v1/admin/users")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "username", "safe-user51",
+                                "password", "SafeUser51@pass",
+                                "userType", "TEACHER",
+                                "displayName", "Safe User",
+                                "email", "safe-user51@example.com"
+                        ))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.username").value("safe-user51"))
+                .andExpect(jsonPath("$.data.password").doesNotExist())
+                .andExpect(jsonPath("$.data.passwordHash").doesNotExist())
+                .andExpect(jsonPath("$.data.passwordSalt").doesNotExist())
+                .andExpect(jsonPath("$.message").value(not(containsString("SafeUser51@pass"))))
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        assertThat(response).doesNotContain("SafeUser51@pass");
+
+        assertThat(auditCount("USER_CREATED")).isEqualTo(1);
+        String auditText = jdbcTemplate.queryForObject("""
+                SELECT COALESCE(target_id, '') || ' ' || COALESCE(failure_reason, '')
+                FROM t_auth_audit_log
+                WHERE operation_type = 'USER_CREATED'
+                """, String.class);
+        assertThat(auditText).doesNotContain("SafeUser51@pass");
+        assertThat(auditText).doesNotContain("password");
     }
 
     @Test

@@ -5,6 +5,7 @@ import com.onlinejudge.common.web.ApiResponse;
 import com.onlinejudge.common.web.PageResponse;
 import com.onlinejudge.hwk.domain.HomeworkStatus;
 import com.onlinejudge.hwk.service.HomeworkService;
+import com.onlinejudge.hwk.service.HomeworkSubmissionService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -23,9 +24,11 @@ import java.util.List;
 @RequestMapping("/api/v1/homeworks")
 public class HomeworkController {
     private final HomeworkService homeworkService;
+    private final HomeworkSubmissionService homeworkSubmissionService;
 
-    public HomeworkController(HomeworkService homeworkService) {
+    public HomeworkController(HomeworkService homeworkService, HomeworkSubmissionService homeworkSubmissionService) {
         this.homeworkService = homeworkService;
+        this.homeworkSubmissionService = homeworkSubmissionService;
     }
 
     @PostMapping
@@ -66,6 +69,27 @@ public class HomeworkController {
             return ApiResponse.ok(HomeworkResponse.fromTeacherView(homework));
         }
         return ApiResponse.ok(HomeworkResponse.fromStudentView(homework));
+    }
+
+    @PostMapping("/{homeworkId}/submissions")
+    public ResponseEntity<ApiResponse<HomeworkSubmissionResponse>> submit(
+            @PathVariable long homeworkId,
+            CurrentUser currentUser,
+            @RequestBody(required = false) HomeworkSubmissionRequest request
+    ) {
+        if (!currentUser.hasRole("STUDENT")) {
+            throw new com.onlinejudge.hwk.service.HomeworkApiException(
+                    "HWK_4031",
+                    "only students can submit homework",
+                    HttpStatus.FORBIDDEN
+            );
+        }
+        HomeworkSubmissionResponse response = HomeworkSubmissionResponse.from(homeworkSubmissionService.submit(
+                homeworkId,
+                currentUser.id(),
+                request == null ? null : request.toCommand()
+        ));
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.ok(response));
     }
 
     @PutMapping("/{homeworkId}/questions")

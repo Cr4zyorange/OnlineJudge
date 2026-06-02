@@ -2,12 +2,29 @@ import { mount } from '@vue/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import LabStudentView from '../../../src/views/lab/LabStudentView.vue';
 import * as labApi from '../../../src/api/lab/labs';
+import * as learningProgressApi from '../../../src/api/lrn/learningProgress';
 
 vi.mock('../../../src/api/lab/labs');
+vi.mock('../../../src/api/lrn/learningProgress');
 
 describe('LabStudentView', () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    window.history.replaceState({}, '', '/courses/101/labs/7?role=student');
+    vi.mocked(learningProgressApi.saveLearningProgress).mockResolvedValue({
+      progressId: 1,
+      courseId: 101,
+      courseName: '软件工程基础',
+      chapterId: null,
+      chapterName: null,
+      sourceModule: 'LAB',
+      sourceId: 7,
+      progressPercent: 10,
+      lastPosition: 'labId=7',
+      status: 'IN_PROGRESS',
+      continueUrl: '/courses/101/labs/7?role=student',
+      updatedAt: '2026-06-01 10:00:00'
+    });
   });
 
   afterEach(() => {
@@ -149,6 +166,12 @@ describe('LabStudentView', () => {
     expect(wrapper.text()).toContain('ACCEPTED');
     expect(wrapper.text()).toContain('全部用例通过');
     expect(wrapper.text()).toContain('92');
+    expect(learningProgressApi.saveLearningProgress).toHaveBeenCalledWith(expect.objectContaining({
+      courseId: 101,
+      sourceModule: 'LAB',
+      sourceId: 7,
+      progressPercent: 10
+    }));
 
     await wrapper.get('[name="language"]').setValue('python');
     await wrapper.get('[name="code"]').setValue("print('hello lab')");
@@ -158,6 +181,13 @@ describe('LabStudentView', () => {
     expect(labApi.submitLab).toHaveBeenCalledWith(7, expect.objectContaining({
       language: 'python',
       code: "print('hello lab')"
+    }));
+    expect(learningProgressApi.saveLearningProgress).toHaveBeenLastCalledWith(expect.objectContaining({
+      courseId: 101,
+      sourceModule: 'LAB',
+      sourceId: 7,
+      progressPercent: 100,
+      lastPosition: expect.stringContaining('submittedVersion=1')
     }));
     expect(wrapper.text()).toContain('提交成功');
     expect(wrapper.text()).toContain('版本 1');
@@ -170,6 +200,46 @@ describe('LabStudentView', () => {
     expect(wrapper.text()).toContain('100');
     expect(wrapper.text()).toContain('通过用例：1 / 1');
     expect(labApi.getLabSubmissionResult).toHaveBeenCalledWith(7, 99);
+  });
+
+  it('restores lab draft code from the resume query parameter', async () => {
+    window.history.replaceState({}, '', `/courses/101/labs/7?role=student&resume=${encodeURIComponent("code=print('resume')")}`);
+    vi.mocked(labApi.getLabDetail).mockResolvedValueOnce({
+      id: 7,
+      courseId: 101,
+      chapterId: null,
+      title: '实验七',
+      description: '断点恢复',
+      status: 'PUBLISHED',
+      deadline: '2026-06-30T23:59:59',
+      maxScore: 100,
+      attachmentIds: [],
+      allowedLanguages: 'python',
+      evaluationMode: 'DOCKER_IO',
+      autoEvaluate: true,
+      reportRequired: false,
+      timeLimitMs: 60000,
+      memoryLimitKb: 262144,
+      deleted: false,
+      testcases: []
+    });
+    vi.mocked(labApi.listLabSubmissions).mockResolvedValueOnce([]);
+
+    const wrapper = mount(LabStudentView, {
+      props: {
+        courseId: 101,
+        labId: 7
+      }
+    });
+    await flushPromises();
+
+    expect((wrapper.get('[name="code"]').element as HTMLTextAreaElement).value).toBe("print('resume')");
+    expect(learningProgressApi.saveLearningProgress).not.toHaveBeenCalledWith(expect.objectContaining({
+      sourceModule: 'LAB',
+      sourceId: 7,
+      lastPosition: 'labId=7'
+    }));
+    expect(wrapper.text()).toContain('已恢复上次断点');
   });
 
   it('shows frontend validation errors before calling the submit api', async () => {

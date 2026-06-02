@@ -6,6 +6,10 @@ import com.onlinejudge.common.web.PageResponse;
 import com.onlinejudge.crs.domain.dto.ChapterCreateRequest;
 import com.onlinejudge.crs.domain.dto.ChapterResponse;
 import com.onlinejudge.crs.domain.dto.CourseCreateRequest;
+import com.onlinejudge.crs.domain.dto.CourseJoinRequest;
+import com.onlinejudge.crs.domain.CourseMemberStatus;
+import com.onlinejudge.crs.domain.dto.CourseMemberResponse;
+import com.onlinejudge.crs.domain.dto.CourseMemberUpdateRequest;
 import com.onlinejudge.crs.domain.dto.CoursePermissionResponse;
 import com.onlinejudge.crs.domain.dto.CourseResponse;
 import com.onlinejudge.crs.domain.dto.CourseUpdateRequest;
@@ -66,13 +70,43 @@ public class CourseController {
     }
 
     @PostMapping("/{courseId}/join")
-    public ApiResponse<CoursePermissionResponse> join(@PathVariable Long courseId, CurrentUser currentUser) {
-        return ApiResponse.ok(courseService.join(courseId, currentUser));
+    public ApiResponse<CoursePermissionResponse> join(@PathVariable Long courseId,
+                                                      @RequestBody(required = false) CourseJoinRequest request,
+                                                      CurrentUser currentUser) {
+        return ApiResponse.ok(courseService.join(courseId, request, currentUser));
     }
 
     @GetMapping("/{courseId}/permissions/{userId}")
     public ApiResponse<CoursePermissionResponse> permission(@PathVariable Long courseId, @PathVariable Long userId) {
         return ApiResponse.ok(courseService.permission(courseId, userId));
+    }
+
+    @GetMapping("/{courseId}/members")
+    public ApiResponse<java.util.List<CourseMemberResponse>> members(@PathVariable Long courseId,
+                                                                     @RequestParam(required = false) CourseMemberStatus status,
+                                                                     CurrentUser currentUser) {
+        return ApiResponse.ok(courseService.members(courseId, status, currentUser));
+    }
+
+    @GetMapping("/{courseId}/students")
+    public ApiResponse<java.util.List<Long>> students(@PathVariable Long courseId, CurrentUser currentUser) {
+        return ApiResponse.ok(courseService.students(courseId, currentUser));
+    }
+
+    @PutMapping("/{courseId}/members/{userId}")
+    public ApiResponse<CourseMemberResponse> updateMember(@PathVariable Long courseId,
+                                                         @PathVariable Long userId,
+                                                         @Valid @RequestBody CourseMemberUpdateRequest request,
+                                                         CurrentUser currentUser) {
+        return ApiResponse.ok(courseService.updateMember(courseId, userId, request, currentUser));
+    }
+
+    @DeleteMapping("/{courseId}/members/{userId}")
+    public ApiResponse<Void> removeMember(@PathVariable Long courseId,
+                                          @PathVariable Long userId,
+                                          CurrentUser currentUser) {
+        courseService.removeMember(courseId, userId, currentUser);
+        return ApiResponse.ok(null);
     }
 
     @PostMapping("/{courseId}/chapters")

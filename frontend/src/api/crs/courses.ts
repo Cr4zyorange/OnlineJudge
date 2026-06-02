@@ -1,7 +1,18 @@
 import { request, requestBlob } from '../http';
-import type { Chapter, ChapterPayload, Course, CoursePayload, CourseResource, PageResponse, ResourcePayload } from '../../types/crs';
+import type {
+  Chapter,
+  ChapterPayload,
+  Course,
+  CourseJoinPayload,
+  CourseMember,
+  CoursePayload,
+  CoursePermission,
+  CourseResource,
+  PageResponse,
+  ResourcePayload
+} from '../../types/crs';
 
-export type CourseScope = 'all' | 'managed' | 'archived';
+export type CourseScope = 'all' | 'mine' | 'managed' | 'archived';
 
 export function listCourses(keyword = '', scope: CourseScope = 'all') {
   const params = new URLSearchParams({ page: '1', size: '20', scope });
@@ -35,9 +46,28 @@ export function getCourse(courseId: number) {
   return request<Course>(`/api/v1/courses/${courseId}`);
 }
 
-export function joinCourse(courseId: number) {
-  return request<void>(`/api/v1/courses/${courseId}/join`, {
-    method: 'POST'
+export function joinCourse(courseId: number, payload?: CourseJoinPayload) {
+  return request<CoursePermission>(`/api/v1/courses/${courseId}/join`, {
+    method: 'POST',
+    body: payload ?? {}
+  });
+}
+
+export function listCourseMembers(courseId: number, status?: CourseMember['status']) {
+  const params = status ? `?status=${status}` : '';
+  return request<CourseMember[]>(`/api/v1/courses/${courseId}/members${params}`);
+}
+
+export function updateCourseMember(courseId: number, userId: number, payload: Pick<CourseMember, 'status'> & Partial<Pick<CourseMember, 'role'>>) {
+  return request<CourseMember>(`/api/v1/courses/${courseId}/members/${userId}`, {
+    method: 'PUT',
+    body: payload
+  });
+}
+
+export function removeCourseMember(courseId: number, userId: number) {
+  return request<void>(`/api/v1/courses/${courseId}/members/${userId}`, {
+    method: 'DELETE'
   });
 }
 

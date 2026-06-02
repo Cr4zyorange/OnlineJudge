@@ -7,6 +7,7 @@ import {
   createRole,
   getCurrentUser,
   getProfile,
+  listAuditLogs,
   listPermissions,
   listRoles,
   listUsers,
@@ -194,6 +195,44 @@ describe('AUTH API client', () => {
       method: 'PUT',
       body: JSON.stringify({ permissionIds: [11] })
     }));
+  });
+
+  it('queries audit logs through API-AUTH-17 with documented filters', async () => {
+    window.localStorage.setItem('onlinejudge.authToken', 'admin-token');
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(jsonResponse({
+      records: [{
+        logId: 50,
+        operatorId: 1,
+        operationType: 'LOGIN_FAILURE',
+        targetType: 'AUTH_USER',
+        targetId: 'student50',
+        resultStatus: 'FAILURE',
+        failureReason: '账号或密码错误',
+        clientIp: '203.0.113.50',
+        userAgent: 'AuditTest/50',
+        createdAt: '2026-06-01T12:00:00'
+      }],
+      total: 1
+    }));
+
+    const result = await listAuditLogs({
+      operatorId: 1,
+      operationType: 'LOGIN_FAILURE',
+      resultStatus: 'FAILURE',
+      startTime: '2026-06-01T00:00:00',
+      endTime: '2026-06-01T23:59:59',
+      page: 1,
+      size: 20
+    });
+
+    expect(result.total).toBe(1);
+    expect(result.records[0].clientIp).toBe('203.0.113.50');
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/v1/admin/audit-logs?operatorId=1&operationType=LOGIN_FAILURE&resultStatus=FAILURE&startTime=2026-06-01T00%3A00%3A00&endTime=2026-06-01T23%3A59%3A59&page=1&size=20',
+      expect.objectContaining({
+        headers: expect.objectContaining({ Authorization: 'Bearer admin-token' })
+      })
+    );
   });
 
   it('checks platform permissions through API-AUTH-16 with bearer authentication', async () => {

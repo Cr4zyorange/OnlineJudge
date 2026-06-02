@@ -4,6 +4,8 @@ import type {
   HomeworkPayload,
   HomeworkQuestionPayload,
   HomeworkStatus,
+  HomeworkSubmissionPayload,
+  HomeworkSubmissionSummary,
   HomeworkSummary,
   HomeworkTestCasePayload,
   PageResponse
@@ -79,5 +81,15 @@ export function publishHomework(homeworkId: number): Promise<HomeworkDetail> {
 export function closeHomework(homeworkId: number): Promise<HomeworkDetail> {
   return request<HomeworkDetail>(`/api/v1/homeworks/${homeworkId}/close`, {
     method: 'PUT'
+  });
+}
+
+export function submitHomework(
+  homeworkId: number,
+  payload: HomeworkSubmissionPayload
+): Promise<HomeworkSubmissionSummary> {
+  return request<HomeworkSubmissionSummary>(`/api/v1/homeworks/${homeworkId}/submissions`, {
+    method: 'POST',
+    body: payload
   });
 }

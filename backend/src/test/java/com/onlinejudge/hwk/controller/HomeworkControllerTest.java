@@ -12,6 +12,7 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.jdbc.Sql;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -39,6 +40,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
                 "DELETE FROM t_hwk_test_case",
                 "DELETE FROM t_hwk_question",
                 "DELETE FROM t_hwk_judge_config",
+                "DELETE FROM t_hwk_submission",
                 "DELETE FROM t_hwk_homework"
         },
         executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD
@@ -58,6 +60,9 @@ class HomeworkControllerTest {
 
     @Autowired
     private ObjectMapper objectMapper;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
 
     @Autowired
     private RecordingNotificationEventPublisher notificationEventPublisher;
@@ -256,9 +261,176 @@ class HomeworkControllerTest {
         mockMvc.perform(get("/api/v1/homeworks/{homeworkId}", codeHomeworkId)
                         .headers(studentHeaders("101")))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.languageLimitJson").value("[\"java\"]"))
+                .andExpect(jsonPath("$.data.timeLimitMs").doesNotExist())
+                .andExpect(jsonPath("$.data.memoryLimitKb").doesNotExist())
+                .andExpect(jsonPath("$.data.outputCompareMode").doesNotExist())
                 .andExpect(jsonPath("$.data.testCases", hasSize(1)))
                 .andExpect(jsonPath("$.data.testCases[0].hidden").value(false))
                 .andExpect(jsonPath("$.data.testCases[0].expectedOutput").value("3"));
+    }
+
+    @Test
+    void studentSubmitsPublishedTextHomeworkAndReceivesSubmissionReceipt() throws Exception {
+        long homeworkId = createHomeworkAndReturnId(textPayload());
+        mockMvc.perform(put("/api/v1/homeworks/{homeworkId}/publish", homeworkId)
+                        .headers(teacherHeaders("101", "101", "101:601")))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/v1/homeworks/{homeworkId}/submissions", homeworkId)
+                        .headers(studentHeaders("101"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "answerText", "I would solve it with dynamic programming.",
+                                "answerJson", "{\"q1\":\"B\"}",
+                                "fileIds", List.of("file-1"),
+                                "codeText", "",
+                                "language", ""
+                        ))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.code").value("0"))
+                .andExpect(jsonPath("$.data.submissionId").isNumber())
+                .andExpect(jsonPath("$.data.homeworkId").value(homeworkId))
+                .andExpect(jsonPath("$.data.studentId").value(601))
+                .andExpect(jsonPath("$.data.submitStatus").value("SUBMITTED"))
+                .andExpect(jsonPath("$.data.evaluationStatus").value("NONE"))
+                .andExpect(jsonPath("$.data.reviewStatus").value("UNREVIEWED"))
+                .andExpect(jsonPath("$.data.final").value(true))
+                .andExpect(jsonPath("$.data.submittedAt").exists());
+    }
+
+    @Test
+    void objectiveHomeworkSubmissionIsScoredAndMarkedReviewed() throws Exception {
+        long homeworkId = createHomeworkAndReturnId(objectivePayload());
+        mockMvc.perform(put("/api/v1/homeworks/{homeworkId}/publish", homeworkId)
+                        .headers(teacherHeaders("101", "101", "101:601")))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/v1/homeworks/{homeworkId}/submissions", homeworkId)
+                        .headers(studentHeaders("101"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "answerJson", "{\"q1\":[\"2\"],\"q2\":[\"true\"]}"
+                        ))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.submitStatus").value("SUBMITTED"))
+                .andExpect(jsonPath("$.data.evaluationStatus").value("ACCEPTED"))
+                .andExpect(jsonPath("$.data.reviewStatus").value("REVIEWED"))
+                .andExpect(jsonPath("$.data.autoScore").value(100))
+                .andExpect(jsonPath("$.data.finalScore").value(100));
+    }
+
+    @Test
+    void codeHomeworkSubmissionRejectsLanguageOutsideConfiguredAllowlist() throws Exception {
+        long homeworkId = createHomeworkAndReturnId(codePayload("[\"python\"]"));
+        mockMvc.perform(put("/api/v1/homeworks/{homeworkId}/publish", homeworkId)
+                        .headers(teacherHeaders("101", "101", "101:601")))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/v1/homeworks/{homeworkId}/submissions", homeworkId)
+                        .headers(studentHeaders("101"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "codeText", "public class Main {}",
+                                "language", "java"
+                        ))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("HWK_4005"))
+                .andExpect(jsonPath("$.message", containsString("language")));
+
+        mockMvc.perform(post("/api/v1/homeworks/{homeworkId}/submissions", homeworkId)
+                        .headers(studentHeaders("101"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "codeText", "print(input())",
+                                "language", "python"
+                        ))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.evaluationStatus").value("PENDING"))
+                .andExpect(jsonPath("$.data.reviewStatus").value("NEED_REVIEW"));
+    }
+
+    @Test
+    void studentCannotSubmitAgainWhenHomeworkDisallowsResubmit() throws Exception {
+        long homeworkId = createHomeworkAndReturnId(textPayload(false, false));
+        mockMvc.perform(put("/api/v1/homeworks/{homeworkId}/publish", homeworkId)
+                        .headers(teacherHeaders("101", "101", "101:601")))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/v1/homeworks/{homeworkId}/submissions", homeworkId)
+                        .headers(studentHeaders("101"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of("answerText", "first answer"))))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(post("/api/v1/homeworks/{homeworkId}/submissions", homeworkId)
+                        .headers(studentHeaders("101"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of("answerText", "second answer"))))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("HWK_4006"));
+    }
+
+    @Test
+    void studentCannotSubmitAfterDeadlineWhenLateSubmitIsDisabled() throws Exception {
+        long homeworkId = createHomeworkAndReturnId(textPayload(true, false));
+        mockMvc.perform(put("/api/v1/homeworks/{homeworkId}/publish", homeworkId)
+                        .headers(teacherHeaders("101", "101", "101:601")))
+                .andExpect(status().isOk());
+        jdbcTemplate.update("UPDATE t_hwk_homework SET deadline = '2026-05-01 23:59:59' WHERE id = ?", homeworkId);
+
+        mockMvc.perform(post("/api/v1/homeworks/{homeworkId}/submissions", homeworkId)
+                        .headers(studentHeaders("101"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of("answerText", "late answer"))))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("HWK_4004"));
+    }
+
+    @Test
+    void lateSubmissionIsSavedAsLateWhenHomeworkAllowsLateSubmit() throws Exception {
+        long homeworkId = createHomeworkAndReturnId(textPayload(true, true));
+        mockMvc.perform(put("/api/v1/homeworks/{homeworkId}/publish", homeworkId)
+                        .headers(teacherHeaders("101", "101", "101:601")))
+                .andExpect(status().isOk());
+        jdbcTemplate.update("UPDATE t_hwk_homework SET deadline = '2026-05-01 23:59:59' WHERE id = ?", homeworkId);
+
+        mockMvc.perform(post("/api/v1/homeworks/{homeworkId}/submissions", homeworkId)
+                        .headers(studentHeaders("101"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of("answerText", "late but allowed"))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.submitStatus").value("LATE"));
+    }
+
+    @Test
+    void nonMemberStudentCannotSubmitHomework() throws Exception {
+        long homeworkId = createHomeworkAndReturnId(textPayload());
+        mockMvc.perform(put("/api/v1/homeworks/{homeworkId}/publish", homeworkId)
+                        .headers(teacherHeaders("101", "101", "101:601")))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/v1/homeworks/{homeworkId}/submissions", homeworkId)
+                        .headers(studentHeaders("202"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of("answerText", "not my course"))))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("HWK_4031"));
+    }
+
+    @Test
+    void emptySubmissionBodyReturnsFormatErrorInsteadOfServerError() throws Exception {
+        long homeworkId = createHomeworkAndReturnId(textPayload());
+        mockMvc.perform(put("/api/v1/homeworks/{homeworkId}/publish", homeworkId)
+                        .headers(teacherHeaders("101", "101", "101:601")))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/v1/homeworks/{homeworkId}/submissions", homeworkId)
+                        .headers(studentHeaders("101"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("null"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("HWK_4005"));
     }
 
     @Test
@@ -395,6 +567,57 @@ class HomeworkControllerTest {
                                 "answerJson", "[\"true\"]",
                                 "score", 60,
                                 "sortOrder", 2
+                        )
+                ))
+        );
+    }
+
+    private Map<String, Object> textPayload() {
+        return textPayload(true, false);
+    }
+
+    private Map<String, Object> textPayload(boolean allowResubmit, boolean allowLateSubmit) {
+        return Map.ofEntries(
+                entry("courseId", 101),
+                entry("chapterId", 11),
+                entry("title", "HWK02 text homework"),
+                entry("description", "Explain your algorithm."),
+                entry("type", "TEXT"),
+                entry("deadline", "2026-06-30T23:59:59"),
+                entry("totalScore", 100),
+                entry("allowResubmit", allowResubmit),
+                entry("allowLateSubmit", allowLateSubmit),
+                entry("showEvaluationBeforePublish", true),
+                entry("questions", List.of()),
+                entry("testCases", List.of())
+        );
+    }
+
+    private Map<String, Object> codePayload(String languageLimitJson) {
+        return Map.ofEntries(
+                entry("courseId", 101),
+                entry("chapterId", 11),
+                entry("title", "HWK02 code homework"),
+                entry("description", "Implement addition."),
+                entry("type", "CODE"),
+                entry("deadline", "2026-06-30T23:59:59"),
+                entry("totalScore", 100),
+                entry("allowResubmit", true),
+                entry("allowLateSubmit", false),
+                entry("showEvaluationBeforePublish", true),
+                entry("languageLimitJson", languageLimitJson),
+                entry("timeLimitMs", 1000),
+                entry("memoryLimitKb", 65536),
+                entry("outputCompareMode", "EXACT"),
+                entry("testCases", List.of(
+                        Map.of(
+                                "inputData", "1 2",
+                                "expectedOutput", "3",
+                                "scoreWeight", 100,
+                                "hidden", false,
+                                "timeLimitMs", 1000,
+                                "memoryLimitKb", 65536,
+                                "sortOrder", 1
                         )
                 ))
         );

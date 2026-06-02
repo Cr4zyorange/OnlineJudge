@@ -12,6 +12,7 @@
   </main>
   <CourseManagementView v-else-if="viewMode === 'courses'" />
   <LearningTaskCenterView v-else-if="viewMode === 'learning-tasks'" />
+  <LearningProgressView v-else-if="viewMode === 'learning-progress'" />
   <LabSubmissionHistoryView
     v-else-if="viewMode === 'lab' && labRole === 'student' && labPage === 'history' && courseId !== null && labId !== null"
     :course-id="courseId"
@@ -26,8 +27,17 @@
     :course-id="courseId"
     :lab-id="labId"
   />
+  <HomeworkStudentView
+    v-else-if="viewMode === 'homework' && homeworkRole === 'student' && courseId !== null && homeworkId !== null"
+    :course-id="courseId"
+    :homework-id="homeworkId"
+  />
+  <HomeworkStudentListView
+    v-else-if="viewMode === 'homework' && homeworkRole === 'student' && courseId !== null"
+    :course-id="courseId"
+  />
   <HomeworkTeacherView
-    v-else-if="viewMode === 'homework' && courseId !== null"
+    v-else-if="viewMode === 'homework' && homeworkRole === 'teacher' && courseId !== null"
     :course-id="courseId"
   />
   <StudentGradeView
@@ -53,10 +63,13 @@ import AuthView from '../views/auth/AuthView.vue';
 import AuthAdminView from '../views/auth/AuthAdminView.vue';
 import CourseManagementView from '../views/crs/CourseManagementView.vue';
 import GradeItemConfigView from '../views/grd/GradeItemConfigView.vue';
+import HomeworkStudentListView from '../views/hwk/HomeworkStudentListView.vue';
+import HomeworkStudentView from '../views/hwk/HomeworkStudentView.vue';
 import HomeworkTeacherView from '../views/hwk/HomeworkTeacherView.vue';
 import LabSubmissionHistoryView from '../views/lab/LabSubmissionHistoryView.vue';
 import LabStudentView from '../views/lab/LabStudentView.vue';
 import LabTeacherView from '../views/lab/LabTeacherView.vue';
+import LearningProgressView from '../views/lrn/LearningProgressView.vue';
 import LearningTaskCenterView from '../views/lrn/LearningTaskCenterView.vue';
 import StudentGradeView from '../views/grd/StudentGradeView.vue';
 import TeacherGradeTableView from '../views/grd/TeacherGradeTableView.vue';
@@ -123,6 +136,9 @@ const viewMode = computed(() => {
   if (pathname.value === '/learning/tasks' || pathname.value === '/learning') {
     return 'learning-tasks';
   }
+  if (pathname.value === '/learning/progress') {
+    return 'learning-progress';
+  }
   if (pathname.value.includes('/labs')) {
     return 'lab';
   }
@@ -135,6 +151,16 @@ const viewMode = computed(() => {
 const authMode = computed(() => pathname.value === '/register' ? 'register' : 'login');
 
 const labRole = computed(() => {
+  const queryRole = searchParams.value.get('role')?.toLowerCase();
+  if (queryRole === 'student' || queryRole === 'teacher') {
+    return queryRole;
+  }
+  const storedRole = window.localStorage.getItem('onlinejudge.userRole')
+    ?? window.localStorage.getItem('onlinejudge.role');
+  return storedRole === 'STUDENT' ? 'student' : 'teacher';
+});
+
+const homeworkRole = computed(() => {
   const queryRole = searchParams.value.get('role')?.toLowerCase();
   if (queryRole === 'student' || queryRole === 'teacher') {
     return queryRole;
@@ -170,6 +196,15 @@ const labId = computed(() => {
   }
   const pathLabId = pathname.value.match(/\/labs\/(\d+)(?:\/|$)/)?.[1] ?? null;
   return parseCourseId(pathLabId);
+});
+
+const homeworkId = computed(() => {
+  const queryHomeworkId = parseCourseId(searchParams.value.get('homeworkId'));
+  if (queryHomeworkId !== null) {
+    return queryHomeworkId;
+  }
+  const pathHomeworkId = pathname.value.match(/\/homeworks\/(\d+)(?:\/|$)/)?.[1] ?? null;
+  return parseCourseId(pathHomeworkId);
 });
 
 function parseCourseId(value: string | null) {

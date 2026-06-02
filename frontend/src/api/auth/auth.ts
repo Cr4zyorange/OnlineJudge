@@ -85,6 +85,29 @@ export interface UserQuery {
   size?: number;
 }
 
+export interface AuditLogQuery {
+  operatorId?: number;
+  operationType?: string;
+  resultStatus?: string;
+  startTime?: string;
+  endTime?: string;
+  page?: number;
+  size?: number;
+}
+
+export interface AuditLogRecord {
+  logId: number;
+  operatorId?: number | null;
+  operationType: string;
+  targetType?: string | null;
+  targetId?: string | null;
+  resultStatus: string;
+  failureReason?: string | null;
+  clientIp?: string | null;
+  userAgent?: string | null;
+  createdAt: string;
+}
+
 export interface LoginResult {
   token: string;
   expiresAt: string;
@@ -167,6 +190,19 @@ export function listUsers(query: UserQuery = {}) {
   addQuery(params, 'size', query.size);
   const suffix = params.toString();
   return request<PageResult<AuthUser>>(`/api/v1/admin/users${suffix ? `?${suffix}` : ''}`);
+}
+
+export function listAuditLogs(query: AuditLogQuery = {}) {
+  const params = new URLSearchParams();
+  addQuery(params, 'operatorId', query.operatorId);
+  addQuery(params, 'operationType', query.operationType);
+  addQuery(params, 'resultStatus', query.resultStatus);
+  addQuery(params, 'startTime', query.startTime);
+  addQuery(params, 'endTime', query.endTime);
+  addQuery(params, 'page', query.page);
+  addQuery(params, 'size', query.size);
+  const suffix = params.toString();
+  return request<PageResult<AuditLogRecord>>(`/api/v1/admin/audit-logs${suffix ? `?${suffix}` : ''}`);
 }
 
 export function createAdminUser(payload: AdminUserPayload) {
