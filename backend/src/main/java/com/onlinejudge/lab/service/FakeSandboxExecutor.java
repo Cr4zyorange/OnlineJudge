@@ -4,12 +4,24 @@ import com.onlinejudge.common.evaluation.EvaluationStatus;
 import com.onlinejudge.common.evaluation.EvaluationTask;
 import com.onlinejudge.common.evaluation.SandboxExecutionResult;
 import com.onlinejudge.common.evaluation.SandboxExecutor;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
 @Component
+@Profile("test")
+@ConditionalOnProperty(prefix = "onlinejudge.evaluation.sandbox", name = "mode", havingValue = "fake")
 public class FakeSandboxExecutor implements SandboxExecutor {
+    private final long delayMs;
+
+    public FakeSandboxExecutor(@Value("${onlinejudge.evaluation.fake.delay-ms:0}") long delayMs) {
+        this.delayMs = delayMs;
+    }
+
     @Override
     public SandboxExecutionResult execute(EvaluationTask task) {
+        delayIfConfigured();
         if (!"python".equalsIgnoreCase(task.language())) {
             return new SandboxExecutionResult(
                     EvaluationStatus.SYSTEM_ERROR,
@@ -27,6 +39,15 @@ public class FakeSandboxExecutor implements SandboxExecutor {
         String expectedOutput = normalize(task.options().get("expectedOutput"));
         int timeLimitMs = parseInt(task.options().get("timeLimitMs"), 1000);
 
+        if (source.strip().equals("print(")) {
+            return new SandboxExecutionResult(EvaluationStatus.COMPILE_ERROR, "", "编译失败", 1, 1024, "syntax error", null);
+        }
+        if (source.contains("raise RuntimeError")) {
+            return new SandboxExecutionResult(EvaluationStatus.RUNTIME_ERROR, "", "运行时异常", 1, 1024, null, "runtime error");
+        }
+        if (source.contains("while True:")) {
+            return new SandboxExecutionResult(EvaluationStatus.TIME_LIMIT_EXCEEDED, "", "程序运行超时", timeLimitMs + 1, 1024, null, "timeout");
+        }
         if (source.contains("#FAKE_SANDBOX_SYSTEM_ERROR")) {
             return new SandboxExecutionResult(EvaluationStatus.SYSTEM_ERROR, "", "假沙箱内部错误", 1, 1024, null, "fake sandbox error");
         }
@@ -118,5 +139,16 @@ public class FakeSandboxExecutor implements SandboxExecutor {
             return "";
         }
         return value.replace("\r\n", "\n").trim();
+    }
+
+    private void delayIfConfigured() {
+        if (delayMs <= 0) {
+            return;
+        }
+        try {
+            Thread.sleep(delayMs);
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+        }
     }
 }

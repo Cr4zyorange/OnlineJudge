@@ -2,7 +2,7 @@ package com.onlinejudge.lab.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.task.SyncTaskExecutor;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.scheduling.annotation.EnableAsync;
 
 import java.util.concurrent.Executor;
@@ -12,7 +12,12 @@ import java.util.concurrent.Executor;
 public class LabEvaluationAsyncConfig {
     @Bean(name = "labEvaluationExecutor")
     public Executor labEvaluationExecutor() {
-        // A sync executor keeps test behavior deterministic while preserving the async boundary.
-        return new SyncTaskExecutor();
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(2);
+        executor.setMaxPoolSize(4);
+        executor.setQueueCapacity(100);
+        executor.setThreadNamePrefix("lab-evaluation-");
+        executor.initialize();
+        return executor;
     }
 }

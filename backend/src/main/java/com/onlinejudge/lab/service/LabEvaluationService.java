@@ -46,11 +46,6 @@ public class LabEvaluationService {
         evaluateSubmission(experiment, submission, sourceCode);
     }
 
-    @Transactional
-    public LabSubmission evaluateSubmissionSync(LabExperiment experiment, LabSubmission submission, String sourceCode) {
-        return evaluateSubmission(experiment, submission, sourceCode);
-    }
-
     private LabSubmission evaluateSubmission(LabExperiment experiment, LabSubmission submission, String sourceCode) {
         LocalDateTime startedAt = LocalDateTime.now();
         LabEvaluation evaluation = upsertEvaluation(

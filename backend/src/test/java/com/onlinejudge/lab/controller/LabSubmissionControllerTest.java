@@ -8,12 +8,14 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.HttpHeaders;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.springframework.jdbc.core.JdbcTemplate;
 
@@ -27,9 +29,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest(properties = {
-        "spring.datasource.url=jdbc:h2:mem:lab_submission_controller;MODE=MySQL;DATABASE_TO_LOWER=TRUE;CASE_INSENSITIVE_IDENTIFIERS=TRUE;DB_CLOSE_DELAY=-1"
+        "spring.datasource.url=jdbc:h2:mem:lab_submission_controller;MODE=MySQL;DATABASE_TO_LOWER=TRUE;CASE_INSENSITIVE_IDENTIFIERS=TRUE;DB_CLOSE_DELAY=-1",
+        "onlinejudge.evaluation.sandbox.mode=fake",
+        "onlinejudge.evaluation.fake.delay-ms=150"
 })
 @AutoConfigureMockMvc
+@ActiveProfiles("test")
 class LabSubmissionControllerTest {
     private static final DateTimeFormatter DEADLINE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss");
 
@@ -323,6 +328,9 @@ class LabSubmissionControllerTest {
 
         long submissionId = objectMapper.readTree(body).path("data").path("submissionId").asLong();
 
+        assertEvaluationStatusOneOf(labId, submissionId, studentHeaders("513"), Set.of("PENDING", "RUNNING"));
+        waitForEvaluationStatus(labId, submissionId, teacherHeaders("513", "513"), "ACCEPTED");
+
         mockMvc.perform(get("/api/v1/labs/{labId}/submissions/{submissionId}/result", labId, submissionId)
                         .headers(studentHeaders("513")))
                 .andExpect(status().isOk())
@@ -396,6 +404,7 @@ class LabSubmissionControllerTest {
                 .getContentAsString();
 
         long submissionId = objectMapper.readTree(body).path("data").path("submissionId").asLong();
+        waitForEvaluationStatus(labId, submissionId, teacherHeaders("514", "514"), "WRONG_ANSWER");
 
         mockMvc.perform(get("/api/v1/labs/{labId}/submissions/{submissionId}/result", labId, submissionId)
                         .headers(teacherHeaders("514", "514")))
@@ -428,7 +437,7 @@ class LabSubmissionControllerTest {
     void studentCannotViewAnotherStudentsEvaluationResult() throws Exception {
         long labId = createPublishedLab(
                 515L,
-                true,
+                false,
                 LocalDateTime.now().plusDays(3),
                 List.of(Map.of(
                         "input", "1",
@@ -487,10 +496,12 @@ class LabSubmissionControllerTest {
                         .headers(teacherHeaders("516", "516")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.submissionId").value(submissionId))
-                .andExpect(jsonPath("$.data.evaluationStatus").value("ACCEPTED"))
-                .andExpect(jsonPath("$.data.score").value(100))
-                .andExpect(jsonPath("$.data.passedCases").value(1))
+                .andExpect(jsonPath("$.data.evaluationStatus").value("PENDING"))
+                .andExpect(jsonPath("$.data.score").value(0))
+                .andExpect(jsonPath("$.data.passedCases").value(0))
                 .andExpect(jsonPath("$.data.totalCases").value(1));
+
+        waitForEvaluationStatus(labId, submissionId, teacherHeaders("516", "516"), "ACCEPTED");
     }
 
     @Test
@@ -512,13 +523,14 @@ class LabSubmissionControllerTest {
 
         String body = mockMvc.perform(multipart("/api/v1/labs/{labId}/submissions", labId)
                         .headers(studentHeaders("517"))
-                        .param("code", "#FAKE_SANDBOX_TIMEOUT=500")
+                        .param("code", "while True:\n    pass")
                         .param("language", "python"))
                 .andExpect(status().isCreated())
                 .andReturn()
                 .getResponse()
                 .getContentAsString();
         long submissionId = objectMapper.readTree(body).path("data").path("submissionId").asLong();
+        waitForEvaluationStatus(labId, submissionId, teacherHeaders("517", "517"), "TIME_LIMIT_EXCEEDED");
 
         mockMvc.perform(get("/api/v1/labs/{labId}/submissions/{submissionId}/result", labId, submissionId)
                         .headers(teacherHeaders("517", "517")))
@@ -546,13 +558,14 @@ class LabSubmissionControllerTest {
 
         String body = mockMvc.perform(multipart("/api/v1/labs/{labId}/submissions", labId)
                         .headers(studentHeaders("518"))
-                        .param("code", "#FAKE_SANDBOX_COMPILE_ERROR")
+                        .param("code", "print(")
                         .param("language", "python"))
                 .andExpect(status().isCreated())
                 .andReturn()
                 .getResponse()
                 .getContentAsString();
         long submissionId = objectMapper.readTree(body).path("data").path("submissionId").asLong();
+        waitForEvaluationStatus(labId, submissionId, teacherHeaders("518", "518"), "COMPILE_ERROR");
 
         mockMvc.perform(get("/api/v1/labs/{labId}/submissions/{submissionId}/result", labId, submissionId)
                         .headers(teacherHeaders("518", "518")))
@@ -580,13 +593,14 @@ class LabSubmissionControllerTest {
 
         String body = mockMvc.perform(multipart("/api/v1/labs/{labId}/submissions", labId)
                         .headers(studentHeaders("519"))
-                        .param("code", "#FAKE_SANDBOX_RUNTIME_ERROR")
+                        .param("code", "raise RuntimeError('boom')")
                         .param("language", "python"))
                 .andExpect(status().isCreated())
                 .andReturn()
                 .getResponse()
                 .getContentAsString();
         long submissionId = objectMapper.readTree(body).path("data").path("submissionId").asLong();
+        waitForEvaluationStatus(labId, submissionId, teacherHeaders("519", "519"), "RUNTIME_ERROR");
 
         mockMvc.perform(get("/api/v1/labs/{labId}/submissions/{submissionId}/result", labId, submissionId)
                         .headers(teacherHeaders("519", "519")))
@@ -707,6 +721,36 @@ class LabSubmissionControllerTest {
                 .getResponse()
                 .getContentAsString();
         return objectMapper.readTree(body).path("data").path("submissionId").asLong();
+    }
+
+    private void assertEvaluationStatusOneOf(long labId, long submissionId, HttpHeaders headers, Set<String> statuses) throws Exception {
+        String body = mockMvc.perform(get("/api/v1/labs/{labId}/submissions/{submissionId}/result", labId, submissionId)
+                        .headers(headers))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        String actualStatus = objectMapper.readTree(body).path("data").path("evaluationStatus").asText();
+        org.assertj.core.api.Assertions.assertThat(statuses).contains(actualStatus);
+    }
+
+    private void waitForEvaluationStatus(long labId, long submissionId, HttpHeaders headers, String expectedStatus) throws Exception {
+        long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(5);
+        String actualStatus = "";
+        while (System.nanoTime() < deadline) {
+            String body = mockMvc.perform(get("/api/v1/labs/{labId}/submissions/{submissionId}/result", labId, submissionId)
+                            .headers(headers))
+                    .andExpect(status().isOk())
+                    .andReturn()
+                    .getResponse()
+                    .getContentAsString();
+            actualStatus = objectMapper.readTree(body).path("data").path("evaluationStatus").asText();
+            if (expectedStatus.equals(actualStatus)) {
+                return;
+            }
+            Thread.sleep(50);
+        }
+        org.assertj.core.api.Assertions.assertThat(actualStatus).isEqualTo(expectedStatus);
     }
 
     private HttpHeaders teacherHeaders(String courseIds, String manageableCourseIds) {

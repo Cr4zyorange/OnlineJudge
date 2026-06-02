@@ -21,6 +21,8 @@ import com.onlinejudge.lab.domain.LabSubmissionRepository;
 import com.onlinejudge.lab.domain.LabSubmitStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -135,7 +137,7 @@ public class LabSubmissionService {
             return savedSubmission;
         }
         markSubmissionPendingEvaluation(savedSubmission, experiment.testcases().size(), now);
-        labEvaluationService.evaluateSubmissionAsync(experiment, savedSubmission, resolveSubmissionSource(savedSubmission));
+        scheduleEvaluationAfterCommit(experiment, savedSubmission, resolveSubmissionSource(savedSubmission));
         return savedSubmission;
     }
 
@@ -224,12 +226,12 @@ public class LabSubmissionService {
         }
         LabExperiment experiment = findExistingExperiment(labId);
         markSubmissionPendingEvaluation(access.submission(), experiment.testcases().size(), LocalDateTime.now());
-        LabSubmission evaluated = labEvaluationService.evaluateSubmissionSync(
+        scheduleEvaluationAfterCommit(
                 experiment,
                 access.submission(),
                 resolveSubmissionSource(access.submission())
         );
-        return getSubmissionResult(labId, evaluated.id(), teacherId);
+        return getSubmissionResult(labId, submissionId, teacherId);
     }
 
     private void requireStudentCanSubmit(LabExperiment experiment, long studentId) {
@@ -549,6 +551,20 @@ public class LabSubmissionService {
                 now,
                 now
         ));
+    }
+
+    private void scheduleEvaluationAfterCommit(LabExperiment experiment, LabSubmission submission, String sourceCode) {
+        Runnable trigger = () -> labEvaluationService.evaluateSubmissionAsync(experiment, submission, sourceCode);
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            trigger.run();
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                trigger.run();
+            }
+        });
     }
 
     private record SubmissionVersionFlags(

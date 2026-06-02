@@ -1,5 +1,5 @@
 import { mount } from '@vue/test-utils';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import LabStudentView from '../../../src/views/lab/LabStudentView.vue';
 import * as labApi from '../../../src/api/lab/labs';
 
@@ -10,7 +10,12 @@ describe('LabStudentView', () => {
     vi.resetAllMocks();
   });
 
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('loads published lab detail and submits code successfully', async () => {
+    vi.useFakeTimers();
     vi.mocked(labApi.getLabDetail).mockResolvedValueOnce({
       id: 7,
       courseId: 101,
@@ -87,10 +92,21 @@ describe('LabStudentView', () => {
       labId: 7,
       studentId: 601,
       submitStatus: 'SUBMITTED',
-      evaluationStatus: 'ACCEPTED',
-      autoScore: 100,
+      evaluationStatus: 'PENDING',
+      autoScore: null,
       version: 1,
       submittedAt: '2026-06-01T10:00:00'
+    });
+    vi.mocked(labApi.getLabSubmissionResult).mockResolvedValueOnce({
+      submissionId: 99,
+      evaluationStatus: 'RUNNING',
+      score: 0,
+      passedCases: 0,
+      totalCases: 1,
+      message: '评测进行中',
+      caseResults: [],
+      submittedAt: '2026-06-01T10:00:00',
+      finishedAt: '2026-06-01T10:00:00'
     });
     vi.mocked(labApi.getLabSubmissionResult).mockResolvedValueOnce({
       submissionId: 99,
@@ -145,8 +161,15 @@ describe('LabStudentView', () => {
     }));
     expect(wrapper.text()).toContain('提交成功');
     expect(wrapper.text()).toContain('版本 1');
+    expect(wrapper.text()).toContain('RUNNING');
+    expect(wrapper.text()).toContain('评测进行中');
+
+    await vi.advanceTimersByTimeAsync(1000);
+    await flushPromises();
+
     expect(wrapper.text()).toContain('100');
     expect(wrapper.text()).toContain('通过用例：1 / 1');
+    expect(labApi.getLabSubmissionResult).toHaveBeenCalledWith(7, 99);
   });
 
   it('shows frontend validation errors before calling the submit api', async () => {
