@@ -1,9 +1,11 @@
 package com.onlinejudge.hwk.repository;
 
 import com.onlinejudge.common.evaluation.EvaluationStatus;
+import com.onlinejudge.common.web.PageResponse;
 import com.onlinejudge.hwk.domain.HomeworkReviewStatus;
 import com.onlinejudge.hwk.domain.HomeworkSubmission;
 import com.onlinejudge.hwk.domain.HomeworkSubmissionRepository;
+import com.onlinejudge.hwk.domain.HomeworkSubmissionSearchCriteria;
 import com.onlinejudge.hwk.domain.HomeworkSubmitStatus;
 import com.onlinejudge.hwk.domain.HomeworkType;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -15,6 +17,8 @@ import org.springframework.stereotype.Repository;
 import java.sql.PreparedStatement;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -161,14 +165,71 @@ public class JdbcHomeworkSubmissionRepository implements HomeworkSubmissionRepos
         ).stream().findFirst();
     }
 
-    private Optional<HomeworkSubmission> findById(long submissionId) {
+    @Override
+    public List<HomeworkSubmission> findByHomeworkIdAndStudentId(long homeworkId, long studentId) {
         return jdbcTemplate.query("""
                         SELECT id, homework_id, student_id, submit_type, answer_text, answer_json, file_url, language,
                                submit_status, evaluation_status, review_status, auto_score, manual_score, final_score,
                                comment, version, is_final, submitted_at, reviewed_by, reviewed_at, created_at,
                                updated_at, is_deleted
                         FROM t_hwk_submission
-                        WHERE id = ?
+                        WHERE homework_id = ? AND student_id = ? AND is_deleted = FALSE
+                        ORDER BY version DESC, submitted_at DESC, id DESC
+                        """,
+                SUBMISSION_ROW_MAPPER,
+                homeworkId,
+                studentId
+        );
+    }
+
+    @Override
+    public PageResponse<HomeworkSubmission> findByHomeworkId(
+            long homeworkId,
+            HomeworkSubmissionSearchCriteria criteria,
+            int page,
+            int size
+    ) {
+        int offset = Math.max(page - 1, 0) * size;
+        QueryFilter filter = buildFilter(homeworkId, criteria);
+        String listSql = """
+                        SELECT id, homework_id, student_id, submit_type, answer_text, answer_json, file_url, language,
+                               submit_status, evaluation_status, review_status, auto_score, manual_score, final_score,
+                               comment, version, is_final, submitted_at, reviewed_by, reviewed_at, created_at,
+                               updated_at, is_deleted
+                        FROM t_hwk_submission
+                        """
+                + filter.whereClause()
+                + """
+                        ORDER BY submitted_at DESC, id DESC
+                        LIMIT ? OFFSET ?
+                        """;
+        List<HomeworkSubmission> submissions = jdbcTemplate.query(
+                listSql,
+                SUBMISSION_ROW_MAPPER,
+                withPaging(filter.parameters(), size, offset)
+        );
+        String countSql = """
+                        SELECT COUNT(*)
+                        FROM t_hwk_submission
+                        """
+                + filter.whereClause();
+        long total = jdbcTemplate.queryForObject(
+                countSql,
+                Long.class,
+                filter.parameters().toArray()
+        );
+        return new PageResponse<>(submissions, total, page, size);
+    }
+
+    @Override
+    public Optional<HomeworkSubmission> findById(long submissionId) {
+        return jdbcTemplate.query("""
+                        SELECT id, homework_id, student_id, submit_type, answer_text, answer_json, file_url, language,
+                               submit_status, evaluation_status, review_status, auto_score, manual_score, final_score,
+                               comment, version, is_final, submitted_at, reviewed_by, reviewed_at, created_at,
+                               updated_at, is_deleted
+                        FROM t_hwk_submission
+                        WHERE id = ? AND is_deleted = FALSE
                         """,
                 SUBMISSION_ROW_MAPPER,
                 submissionId
@@ -177,5 +238,38 @@ public class JdbcHomeworkSubmissionRepository implements HomeworkSubmissionRepos
 
     private static LocalDateTime toLocalDateTime(Timestamp timestamp) {
         return timestamp == null ? null : timestamp.toLocalDateTime();
+    }
+
+    private static QueryFilter buildFilter(long homeworkId, HomeworkSubmissionSearchCriteria criteria) {
+        StringBuilder where = new StringBuilder("WHERE homework_id = ? AND is_deleted = FALSE");
+        List<Object> parameters = new ArrayList<>();
+        parameters.add(homeworkId);
+        if (criteria != null && criteria.studentKeyword() != null) {
+            where.append(" AND CONCAT('', student_id) LIKE ?");
+            parameters.add("%" + criteria.studentKeyword() + "%");
+        }
+        if (criteria != null && criteria.submitStatus() != null) {
+            where.append(" AND submit_status = ?");
+            parameters.add(criteria.submitStatus().name());
+        }
+        if (criteria != null && criteria.evaluationStatus() != null) {
+            where.append(" AND evaluation_status = ?");
+            parameters.add(criteria.evaluationStatus().name());
+        }
+        if (criteria != null && criteria.reviewStatus() != null) {
+            where.append(" AND review_status = ?");
+            parameters.add(criteria.reviewStatus().name());
+        }
+        return new QueryFilter(where + " ", parameters);
+    }
+
+    private static Object[] withPaging(List<Object> parameters, int size, int offset) {
+        List<Object> pagedParameters = new ArrayList<>(parameters);
+        pagedParameters.add(size);
+        pagedParameters.add(offset);
+        return pagedParameters.toArray();
+    }
+
+    private record QueryFilter(String whereClause, List<Object> parameters) {
     }
 }

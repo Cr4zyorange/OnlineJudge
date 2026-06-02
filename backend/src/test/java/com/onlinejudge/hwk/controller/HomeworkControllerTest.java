@@ -300,7 +300,165 @@ class HomeworkControllerTest {
     }
 
     @Test
-    void objectiveHomeworkSubmissionIsScoredAndMarkedReviewed() throws Exception {
+    void studentSubmissionHistoryKeepsPreviousVersionsAndMarksOnlyLatestFinal() throws Exception {
+        long homeworkId = createHomeworkAndReturnId(textPayload());
+        mockMvc.perform(put("/api/v1/homeworks/{homeworkId}/publish", homeworkId)
+                        .headers(teacherHeaders("101", "101", "101:601")))
+                .andExpect(status().isOk());
+
+        submitTextAnswer(homeworkId, "first answer", studentHeaders("101"));
+        submitTextAnswer(homeworkId, "second answer", studentHeaders("101"));
+
+        mockMvc.perform(get("/api/v1/homeworks/{homeworkId}/my-submissions", homeworkId)
+                        .headers(studentHeaders("101")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"))
+                .andExpect(jsonPath("$.data", hasSize(2)))
+                .andExpect(jsonPath("$.data[0].version").value(2))
+                .andExpect(jsonPath("$.data[0].final").value(true))
+                .andExpect(jsonPath("$.data[0].answerText").value("second answer"))
+                .andExpect(jsonPath("$.data[1].version").value(1))
+                .andExpect(jsonPath("$.data[1].final").value(false))
+                .andExpect(jsonPath("$.data[1].answerText").value("first answer"));
+
+        int finalCount = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM t_hwk_submission WHERE homework_id = ? AND student_id = 601 AND is_final = TRUE",
+                Integer.class,
+                homeworkId
+        );
+        assertThat(finalCount).isEqualTo(1);
+    }
+
+    @Test
+    void courseManagerListsSubmissionsWithPaginationAndReadsSubmissionDetail() throws Exception {
+        long homeworkId = createHomeworkAndReturnId(textPayload());
+        mockMvc.perform(put("/api/v1/homeworks/{homeworkId}/publish", homeworkId)
+                        .headers(teacherHeaders("101", "101", "101:601,602")))
+                .andExpect(status().isOk());
+
+        long firstSubmissionId = submitTextAnswer(homeworkId, "student 601 answer", studentHeaders("101", "601"));
+        submitTextAnswer(homeworkId, "student 602 answer", studentHeaders("101", "602"));
+
+        mockMvc.perform(get("/api/v1/homeworks/{homeworkId}/submissions", homeworkId)
+                        .headers(assistantHeaders("101", "101"))
+                        .param("page", "1")
+                        .param("size", "1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"))
+                .andExpect(jsonPath("$.data.total").value(2))
+                .andExpect(jsonPath("$.data.page").value(1))
+                .andExpect(jsonPath("$.data.size").value(1))
+                .andExpect(jsonPath("$.data.list", hasSize(1)))
+                .andExpect(jsonPath("$.data.list[0].homeworkId").value(homeworkId));
+
+        mockMvc.perform(get("/api/v1/submissions/{submissionId}", firstSubmissionId)
+                        .headers(teacherHeaders("101", "101")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.submissionId").value(firstSubmissionId))
+                .andExpect(jsonPath("$.data.homeworkId").value(homeworkId))
+                .andExpect(jsonPath("$.data.studentId").value(601))
+                .andExpect(jsonPath("$.data.answerText").value("student 601 answer"));
+    }
+
+    @Test
+    void courseManagerFiltersSubmissionsByStudentAndStatuses() throws Exception {
+        long homeworkId = createHomeworkAndReturnId(textPayload());
+        mockMvc.perform(put("/api/v1/homeworks/{homeworkId}/publish", homeworkId)
+                        .headers(teacherHeaders("101", "101", "101:601,602,603")))
+                .andExpect(status().isOk());
+
+        submitTextAnswer(homeworkId, "student 601 submitted answer", studentHeaders("101", "601"));
+        long matchingSubmissionId = submitTextAnswer(homeworkId, "student 602 late pending answer", studentHeaders("101", "602"));
+        submitTextAnswer(homeworkId, "student 603 submitted answer", studentHeaders("101", "603"));
+        jdbcTemplate.update("""
+                        UPDATE t_hwk_submission
+                        SET submit_status = 'LATE',
+                            evaluation_status = 'PENDING',
+                            review_status = 'NEED_REVIEW'
+                        WHERE id = ?
+                        """,
+                matchingSubmissionId
+        );
+
+        mockMvc.perform(get("/api/v1/homeworks/{homeworkId}/submissions", homeworkId)
+                        .headers(teacherHeaders("101", "101"))
+                        .param("studentKeyword", "602")
+                        .param("submitStatus", "LATE")
+                        .param("evaluationStatus", "PENDING")
+                        .param("reviewStatus", "NEED_REVIEW")
+                        .param("page", "1")
+                        .param("size", "20"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.total").value(1))
+                .andExpect(jsonPath("$.data.list", hasSize(1)))
+                .andExpect(jsonPath("$.data.list[0].submissionId").value(matchingSubmissionId))
+                .andExpect(jsonPath("$.data.list[0].studentId").value(602))
+                .andExpect(jsonPath("$.data.list[0].submitStatus").value("LATE"))
+                .andExpect(jsonPath("$.data.list[0].evaluationStatus").value("PENDING"))
+                .andExpect(jsonPath("$.data.list[0].reviewStatus").value("NEED_REVIEW"));
+    }
+
+    @Test
+    void studentCannotReadAnotherStudentsSubmission() throws Exception {
+        long homeworkId = createHomeworkAndReturnId(textPayload());
+        mockMvc.perform(put("/api/v1/homeworks/{homeworkId}/publish", homeworkId)
+                        .headers(teacherHeaders("101", "101", "101:601,602")))
+                .andExpect(status().isOk());
+
+        long submissionId = submitTextAnswer(homeworkId, "private answer", studentHeaders("101", "601"));
+
+        mockMvc.perform(get("/api/v1/submissions/{submissionId}", submissionId)
+                        .headers(studentHeaders("101", "602")))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("HWK_4031"));
+    }
+
+    @Test
+    void studentHistoryAndDetailHideUnpublishedScoresAndTeacherComment() throws Exception {
+        long homeworkId = createHomeworkAndReturnId(textPayload());
+        mockMvc.perform(put("/api/v1/homeworks/{homeworkId}/publish", homeworkId)
+                        .headers(teacherHeaders("101", "101", "101:601")))
+                .andExpect(status().isOk());
+
+        long submissionId = submitTextAnswer(homeworkId, "answer awaiting review", studentHeaders("101"));
+        jdbcTemplate.update("""
+                        UPDATE t_hwk_submission
+                        SET manual_score = 88,
+                            final_score = 90,
+                            comment = 'private teacher feedback',
+                            review_status = 'REVIEWED'
+                        WHERE id = ?
+                        """,
+                submissionId
+        );
+
+        mockMvc.perform(get("/api/v1/homeworks/{homeworkId}/my-submissions", homeworkId)
+                        .headers(studentHeaders("101")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].submissionId").value(submissionId))
+                .andExpect(jsonPath("$.data[0].answerText").value("answer awaiting review"))
+                .andExpect(jsonPath("$.data[0].manualScore").doesNotExist())
+                .andExpect(jsonPath("$.data[0].finalScore").doesNotExist())
+                .andExpect(jsonPath("$.data[0].comment").doesNotExist());
+
+        mockMvc.perform(get("/api/v1/submissions/{submissionId}", submissionId)
+                        .headers(studentHeaders("101")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.answerText").value("answer awaiting review"))
+                .andExpect(jsonPath("$.data.manualScore").doesNotExist())
+                .andExpect(jsonPath("$.data.finalScore").doesNotExist())
+                .andExpect(jsonPath("$.data.comment").doesNotExist());
+
+        mockMvc.perform(get("/api/v1/submissions/{submissionId}", submissionId)
+                        .headers(teacherHeaders("101", "101")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.manualScore").value(88))
+                .andExpect(jsonPath("$.data.finalScore").value(90))
+                .andExpect(jsonPath("$.data.comment").value("private teacher feedback"));
+    }
+
+    @Test
+    void objectiveHomeworkSubmissionShowsEvaluationButHidesUnpublishedFinalScore() throws Exception {
         long homeworkId = createHomeworkAndReturnId(objectivePayload());
         mockMvc.perform(put("/api/v1/homeworks/{homeworkId}/publish", homeworkId)
                         .headers(teacherHeaders("101", "101", "101:601")))
@@ -317,7 +475,9 @@ class HomeworkControllerTest {
                 .andExpect(jsonPath("$.data.evaluationStatus").value("ACCEPTED"))
                 .andExpect(jsonPath("$.data.reviewStatus").value("REVIEWED"))
                 .andExpect(jsonPath("$.data.autoScore").value(100))
-                .andExpect(jsonPath("$.data.finalScore").value(100));
+                .andExpect(jsonPath("$.data.manualScore").doesNotExist())
+                .andExpect(jsonPath("$.data.finalScore").doesNotExist())
+                .andExpect(jsonPath("$.data.comment").doesNotExist());
     }
 
     @Test
@@ -539,6 +699,18 @@ class HomeworkControllerTest {
         return objectMapper.readTree(body).path("data").path("id").asLong();
     }
 
+    private long submitTextAnswer(long homeworkId, String answerText, org.springframework.http.HttpHeaders headers) throws Exception {
+        String body = mockMvc.perform(post("/api/v1/homeworks/{homeworkId}/submissions", homeworkId)
+                        .headers(headers)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of("answerText", answerText))))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        return objectMapper.readTree(body).path("data").path("submissionId").asLong();
+    }
+
     private Map<String, Object> objectivePayload() {
         return Map.ofEntries(
                 entry("courseId", 101),
@@ -664,8 +836,12 @@ class HomeworkControllerTest {
     }
 
     private org.springframework.http.HttpHeaders studentHeaders(String courseIds) {
+        return studentHeaders(courseIds, "601");
+    }
+
+    private org.springframework.http.HttpHeaders studentHeaders(String courseIds, String userId) {
         org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
-        headers.add("X-User-Id", "601");
+        headers.add("X-User-Id", userId);
         headers.add("X-User-Role", "STUDENT");
         headers.add("X-Course-Ids", courseIds);
         return headers;

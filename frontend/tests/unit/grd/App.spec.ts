@@ -220,6 +220,44 @@ describe('App', () => {
     expect(wrapper.text()).toContain('HWK02 text homework');
   });
 
+  it('routes student homework submission paths to the HWK submission history page', async () => {
+    window.localStorage.setItem('onlinejudge.userRole', 'STUDENT');
+    vi.mocked(homeworkApi.listMyHomeworkSubmissions).mockResolvedValueOnce([
+      {
+        submissionId: 701,
+        homeworkId: 11,
+        studentId: 601,
+        submitType: 'TEXT',
+        answerText: 'history answer',
+        answerJson: null,
+        fileUrl: null,
+        language: null,
+        submitStatus: 'SUBMITTED',
+        evaluationStatus: 'NONE',
+        reviewStatus: 'UNREVIEWED',
+        autoScore: null,
+        manualScore: null,
+        finalScore: null,
+        comment: null,
+        version: 2,
+        final: true,
+        submittedAt: '2026-06-02T08:00:00'
+      }
+    ]);
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: new URL('http://localhost/courses/101/homeworks/11/submissions?role=student')
+    });
+
+    const wrapper = mount(App);
+    await flushPromises();
+
+    expect(homeworkApi.listMyHomeworkSubmissions).toHaveBeenCalledWith(11);
+    expect(homeworkApi.getHomeworkDetail).not.toHaveBeenCalled();
+    expect(wrapper.text()).toContain('提交历史');
+    expect(wrapper.text()).toContain('版本 2');
+  });
+
   it('routes logged-in students from homework center paths to the student homework list page', async () => {
     window.localStorage.setItem('onlinejudge.userRole', 'STUDENT');
     vi.mocked(homeworkApi.listHomeworks).mockResolvedValueOnce({

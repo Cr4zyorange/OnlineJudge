@@ -1,11 +1,15 @@
 import { request } from '../http';
 import type {
   HomeworkDetail,
+  HomeworkEvaluationStatus,
   HomeworkPayload,
   HomeworkQuestionPayload,
+  HomeworkReviewStatus,
   HomeworkStatus,
+  HomeworkSubmissionDetail,
   HomeworkSubmissionPayload,
   HomeworkSubmissionSummary,
+  HomeworkSubmitStatus,
   HomeworkSummary,
   HomeworkTestCasePayload,
   PageResponse
@@ -92,4 +96,46 @@ export function submitHomework(
     method: 'POST',
     body: payload
   });
+}
+
+export interface HomeworkSubmissionListQuery {
+  studentKeyword?: string;
+  submitStatus?: HomeworkSubmitStatus;
+  evaluationStatus?: HomeworkEvaluationStatus;
+  reviewStatus?: HomeworkReviewStatus;
+  page?: number;
+  size?: number;
+}
+
+export function listMyHomeworkSubmissions(homeworkId: number): Promise<HomeworkSubmissionSummary[]> {
+  return request<HomeworkSubmissionSummary[]>(`/api/v1/homeworks/${homeworkId}/my-submissions`);
+}
+
+export function listHomeworkSubmissions(
+  homeworkId: number,
+  query: HomeworkSubmissionListQuery = {}
+): Promise<PageResponse<HomeworkSubmissionSummary>> {
+  const params = new URLSearchParams({
+    page: String(query.page ?? 1),
+    size: String(query.size ?? 20)
+  });
+  if (query.studentKeyword?.trim()) {
+    params.set('studentKeyword', query.studentKeyword.trim());
+  }
+  if (query.submitStatus) {
+    params.set('submitStatus', query.submitStatus);
+  }
+  if (query.evaluationStatus) {
+    params.set('evaluationStatus', query.evaluationStatus);
+  }
+  if (query.reviewStatus) {
+    params.set('reviewStatus', query.reviewStatus);
+  }
+  return request<PageResponse<HomeworkSubmissionSummary>>(
+    `/api/v1/homeworks/${homeworkId}/submissions?${params.toString()}`
+  );
+}
+
+export function getHomeworkSubmission(submissionId: number): Promise<HomeworkSubmissionDetail> {
+  return request<HomeworkSubmissionDetail>(`/api/v1/submissions/${submissionId}`);
 }

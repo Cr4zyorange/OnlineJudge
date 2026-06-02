@@ -3,6 +3,7 @@ package com.onlinejudge.hwk.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.onlinejudge.common.evaluation.EvaluationStatus;
+import com.onlinejudge.common.web.PageResponse;
 import com.onlinejudge.hwk.domain.CreateHomeworkSubmissionCommand;
 import com.onlinejudge.hwk.domain.Homework;
 import com.onlinejudge.hwk.domain.HomeworkRepository;
@@ -11,9 +12,11 @@ import com.onlinejudge.hwk.domain.HomeworkReviewStatus;
 import com.onlinejudge.hwk.domain.HomeworkStatus;
 import com.onlinejudge.hwk.domain.HomeworkSubmission;
 import com.onlinejudge.hwk.domain.HomeworkSubmissionRepository;
+import com.onlinejudge.hwk.domain.HomeworkSubmissionSearchCriteria;
 import com.onlinejudge.hwk.domain.HomeworkSubmitStatus;
 import com.onlinejudge.hwk.domain.HomeworkType;
 import com.onlinejudge.integration.course.CoursePermissionClient;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,6 +30,12 @@ import java.util.Optional;
 @Service
 public class HomeworkSubmissionService {
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+    private static final List<HomeworkStatus> STUDENT_VISIBLE_STATUSES = List.of(
+            HomeworkStatus.PUBLISHED,
+            HomeworkStatus.CLOSED,
+            HomeworkStatus.SCORE_PUBLISHED,
+            HomeworkStatus.ARCHIVED
+    );
 
     private final HomeworkRepository homeworkRepository;
     private final HomeworkSubmissionRepository submissionRepository;
@@ -43,7 +52,7 @@ public class HomeworkSubmissionService {
     }
 
     @Transactional
-    public HomeworkSubmission submit(long homeworkId, long studentId, CreateHomeworkSubmissionCommand command) {
+    public SubmittedHomeworkSubmission submit(long homeworkId, long studentId, CreateHomeworkSubmissionCommand command) {
         Homework homework = homeworkRepository.findById(homeworkId)
                 .filter(item -> !item.deleted())
                 .orElseThrow(() -> new HomeworkApiException("HWK_4001", "homework not found", HttpStatus.NOT_FOUND));
@@ -89,7 +98,52 @@ public class HomeworkSubmissionService {
                 now,
                 false
         );
-        return submissionRepository.save(submission);
+        try {
+            return new SubmittedHomeworkSubmission(homework, submissionRepository.save(submission));
+        } catch (DataIntegrityViolationException exception) {
+            throw new HomeworkApiException("HWK_4006", "submission version conflict, please retry", HttpStatus.CONFLICT);
+        }
+    }
+
+    public SubmissionHistory listMine(long homeworkId, long studentId) {
+        Homework homework = findExistingHomework(homeworkId);
+        requireStudentCanViewHistory(homework, studentId);
+        return new SubmissionHistory(homework, submissionRepository.findByHomeworkIdAndStudentId(homeworkId, studentId));
+    }
+
+    public PageResponse<HomeworkSubmission> listForManager(
+            long homeworkId,
+            long managerId,
+            HomeworkSubmissionSearchCriteria criteria,
+            int page,
+            int size
+    ) {
+        Homework homework = findExistingHomework(homeworkId);
+        requireManagePermission(homework.courseId(), managerId);
+        int normalizedPage = Math.max(page, 1);
+        int normalizedSize = Math.max(1, Math.min(size, 100));
+        return submissionRepository.findByHomeworkId(homeworkId, criteria, normalizedPage, normalizedSize);
+    }
+
+    public SubmissionDetail detail(long submissionId, long userId) {
+        HomeworkSubmission submission = submissionRepository.findById(submissionId)
+                .orElseThrow(() -> new HomeworkApiException("HWK_4001", "submission not found", HttpStatus.NOT_FOUND));
+        Homework homework = findExistingHomework(submission.homeworkId());
+        if (submission.studentId() == userId) {
+            requireStudentCanViewHistory(homework, userId);
+            return new SubmissionDetail(homework, submission, false);
+        }
+        requireManagePermission(homework.courseId(), userId);
+        return new SubmissionDetail(homework, submission, true);
+    }
+
+    public record SubmissionHistory(Homework homework, List<HomeworkSubmission> submissions) {
+    }
+
+    public record SubmittedHomeworkSubmission(Homework homework, HomeworkSubmission submission) {
+    }
+
+    public record SubmissionDetail(Homework homework, HomeworkSubmission submission, boolean managerView) {
     }
 
     private EvaluationStatus evaluationStatus(Homework homework, CreateHomeworkSubmissionCommand command) {
@@ -183,6 +237,27 @@ public class HomeworkSubmissionService {
         }
         if (LocalDateTime.now().isAfter(homework.deadline()) && !homework.allowLateSubmit()) {
             throw new HomeworkApiException("HWK_4004", "deadline exceeded", HttpStatus.CONFLICT);
+        }
+    }
+
+    private Homework findExistingHomework(long homeworkId) {
+        return homeworkRepository.findById(homeworkId)
+                .filter(item -> !item.deleted())
+                .orElseThrow(() -> new HomeworkApiException("HWK_4001", "homework not found", HttpStatus.NOT_FOUND));
+    }
+
+    private void requireStudentCanViewHistory(Homework homework, long studentId) {
+        if (!coursePermissionClient.canViewCourse(homework.courseId(), studentId)) {
+            throw new HomeworkApiException("HWK_4031", "course access denied", HttpStatus.FORBIDDEN);
+        }
+        if (!STUDENT_VISIBLE_STATUSES.contains(homework.status())) {
+            throw new HomeworkApiException("HWK_4002", "homework is not published", HttpStatus.FORBIDDEN);
+        }
+    }
+
+    private void requireManagePermission(long courseId, long userId) {
+        if (!coursePermissionClient.canManageCourse(courseId, userId)) {
+            throw new HomeworkApiException("HWK_4031", "course management permission denied", HttpStatus.FORBIDDEN);
         }
     }
 
