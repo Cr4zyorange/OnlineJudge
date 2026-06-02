@@ -122,6 +122,7 @@
 import { computed, onMounted, ref } from 'vue';
 import { getHomeworkDetail, submitHomework } from '../../api/hwk/homeworks';
 import { saveLearningProgress } from '../../api/lrn/learningProgress';
+import { reportLearningRecord } from '../../api/lrn/learningRecords';
 import type { HomeworkDetail, HomeworkSubmissionSummary } from '../../types/hwk';
 
 const props = defineProps<{
@@ -143,6 +144,7 @@ const answerJson = ref('');
 const fileIdsInput = ref('');
 const codeText = ref('');
 const language = ref('');
+const openedAt = ref<Date | null>(null);
 const allowedCodeLanguages = computed(() => parseLanguageLimit(homework.value?.languageLimitJson));
 
 onMounted(loadHomework);
@@ -152,9 +154,11 @@ async function loadHomework() {
   errorMessage.value = '';
   try {
     homework.value = await getHomeworkDetail(props.homeworkId);
+    openedAt.value = new Date();
     syncDefaultCodeLanguage();
     restoreResume();
     await recordProgress(20, `homeworkId=${props.homeworkId}`);
+    await recordBehavior('ACCESS', 0);
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '作业详情加载失败';
   } finally {
@@ -179,6 +183,7 @@ async function submit() {
       language: language.value.trim() || undefined
     });
     await recordProgress(100, `homeworkId=${props.homeworkId};submitted=${latestSubmission.value.submissionId}`);
+    await recordBehavior('SUBMIT', elapsedSeconds());
     feedbackMessage.value = `Submission ${latestSubmission.value.submissionId} ${latestSubmission.value.submitStatus}`;
     resetForm();
   } catch (error) {
@@ -193,6 +198,7 @@ async function markCompleted() {
   saving.value = true;
   try {
     await recordProgress(100, `homeworkId=${props.homeworkId};completed=true`);
+    await recordBehavior('COMPLETE', elapsedSeconds());
     feedbackMessage.value = '已记录完成进度';
   } finally {
     saving.value = false;
@@ -215,6 +221,30 @@ async function recordProgress(progressPercent: number, lastPosition: string) {
   } catch {
     // Progress persistence should not block reading or submitting homework.
   }
+}
+
+async function recordBehavior(actionType: 'ACCESS' | 'SUBMIT' | 'COMPLETE', durationSeconds: number) {
+  if (!homework.value) {
+    return;
+  }
+  try {
+    await reportLearningRecord({
+      courseId: props.courseId,
+      sourceModule: 'HWK',
+      sourceId: props.homeworkId,
+      actionType,
+      durationSeconds
+    });
+  } catch {
+    // Behavior tracking should not block reading or submitting homework.
+  }
+}
+
+function elapsedSeconds() {
+  if (!openedAt.value) {
+    return 0;
+  }
+  return Math.max(0, Math.round((Date.now() - openedAt.value.getTime()) / 1000));
 }
 
 function validateForm() {

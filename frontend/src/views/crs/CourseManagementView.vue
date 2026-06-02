@@ -52,6 +52,11 @@
               <i class="bi bi-graph-up-arrow"></i> 学习进度
             </a>
           </li>
+          <li>
+            <a class="menu-button" data-testid="learning-statistics-entry" href="/learning/statistics">
+              <i class="bi bi-bar-chart-line"></i> 学习仪表盘
+            </a>
+          </li>
         </ul>
 
         <div class="sidebar-card">
@@ -676,6 +681,7 @@ import {
   uploadResource
 } from '../../api/crs/courses';
 import { saveLearningProgress } from '../../api/lrn/learningProgress';
+import { reportLearningRecord } from '../../api/lrn/learningRecords';
 import type { CourseScope } from '../../api/crs/courses';
 import type { AnnouncementPayload, Chapter, ChapterPayload, Course, CourseAnnouncement, CourseMember, CoursePayload, CourseRecentTask, CourseResource, ResourcePayload } from '../../types/crs';
 
@@ -1534,6 +1540,13 @@ async function downloadCourseResource(resource: CourseResource) {
       sourceId: resource.id,
       progressPercent: 100,
       lastPosition: `resourceId=${resource.id}`
+    });
+    await reportLearningRecord({
+      courseId: resource.courseId,
+      sourceModule: 'CRS',
+      sourceId: resource.id,
+      actionType: 'DOWNLOAD',
+      durationSeconds: 0
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : '资源下载失败';

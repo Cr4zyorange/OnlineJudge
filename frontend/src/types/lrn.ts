@@ -102,3 +102,49 @@ export interface LearningProgressSaveRequest {
   progressPercent: number;
   lastPosition?: string | null;
 }
+
+export type LearningRecordActionType = 'ACCESS' | 'DOWNLOAD' | 'STUDY' | 'SUBMIT' | 'COMPLETE';
+
+export interface LearningRecordItem {
+  id: number;
+  courseId: number;
+  courseName: string;
+  sourceModule: LearningProgressSourceModule;
+  sourceId: number;
+  actionType: LearningRecordActionType;
+  durationSeconds: number;
+  startedAt: string;
+  endedAt: string;
+}
+
+export interface LearningStatisticsSummary {
+  totalDurationSeconds: number;
+  resourceAccessCount: number;
+  completedTaskCount: number;
+  submittedTaskCount: number;
+  totalRecordCount: number;
+}
+
+export interface LearningTrendPoint {
+  date: string;
+  durationSeconds: number;
+  resourceAccessCount: number;
+  completedTaskCount: number;
+}
+
+export interface LearningStatisticsOverview {
+  summary: LearningStatisticsSummary;
+  trends: LearningTrendPoint[];
+  recentRecords: LearningRecordItem[];
+  fromCache?: boolean;
+}
+
+export interface LearningRecordRequest {
+  courseId: number;
+  sourceModule: LearningProgressSourceModule;
+  sourceId: number;
+  actionType: LearningRecordActionType;
+  durationSeconds?: number;
+  startedAt?: string;
+  endedAt?: string;
+}

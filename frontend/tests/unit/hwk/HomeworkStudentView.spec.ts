@@ -3,15 +3,28 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import HomeworkStudentView from '../../../src/views/hwk/HomeworkStudentView.vue';
 import * as homeworkApi from '../../../src/api/hwk/homeworks';
 import * as learningProgressApi from '../../../src/api/lrn/learningProgress';
+import * as learningRecordsApi from '../../../src/api/lrn/learningRecords';
 import type { HomeworkDetail } from '../../../src/types/hwk';
 
 vi.mock('../../../src/api/hwk/homeworks');
 vi.mock('../../../src/api/lrn/learningProgress');
+vi.mock('../../../src/api/lrn/learningRecords');
 
 describe('HomeworkStudentView', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     window.history.replaceState({}, '', '/courses/101/homeworks/11?role=student');
+    vi.mocked(learningRecordsApi.reportLearningRecord).mockResolvedValue({
+      id: 1,
+      courseId: 101,
+      courseName: '软件工程基础',
+      sourceModule: 'HWK',
+      sourceId: 11,
+      actionType: 'ACCESS',
+      durationSeconds: 0,
+      startedAt: '2026-06-01 10:00:00',
+      endedAt: '2026-06-01 10:00:00'
+    });
     vi.mocked(learningProgressApi.saveLearningProgress).mockResolvedValue({
       progressId: 1,
       courseId: 101,
@@ -54,6 +67,12 @@ describe('HomeworkStudentView', () => {
     expect(wrapper.text()).toContain('HWK02 text homework');
     expect(wrapper.text()).toContain('Explain your algorithm.');
     expect(wrapper.text()).toContain('TEXT');
+    expect(learningRecordsApi.reportLearningRecord).toHaveBeenCalledWith(expect.objectContaining({
+      courseId: 101,
+      sourceModule: 'HWK',
+      sourceId: 11,
+      actionType: 'ACCESS'
+    }));
 
     await wrapper.get('[name="answerText"]').setValue('Use dynamic programming.');
     await wrapper.get('form').trigger('submit');
@@ -70,6 +89,12 @@ describe('HomeworkStudentView', () => {
       progressPercent: 100,
       lastPosition: 'homeworkId=11;submitted=91'
     });
+    expect(learningRecordsApi.reportLearningRecord).toHaveBeenLastCalledWith(expect.objectContaining({
+      courseId: 101,
+      sourceModule: 'HWK',
+      sourceId: 11,
+      actionType: 'SUBMIT'
+    }));
     expect(wrapper.text()).toContain('Submission 91');
     expect(wrapper.text()).toContain('SUBMITTED');
     expect(wrapper.text()).toContain('UNREVIEWED');
@@ -235,6 +260,12 @@ describe('HomeworkStudentView', () => {
       progressPercent: 100,
       lastPosition: 'homeworkId=501;completed=true'
     });
+    expect(learningRecordsApi.reportLearningRecord).toHaveBeenLastCalledWith(expect.objectContaining({
+      courseId: 101,
+      sourceModule: 'HWK',
+      sourceId: 501,
+      actionType: 'COMPLETE'
+    }));
     expect(wrapper.text()).toContain('已记录完成进度');
   });
 

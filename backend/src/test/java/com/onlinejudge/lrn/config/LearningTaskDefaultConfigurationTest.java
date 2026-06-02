@@ -16,6 +16,8 @@ class LearningTaskDefaultConfigurationTest {
             "file:../database/migrations/20260530_01_create_lrn_learning_task.sql";
     private static final String LEARNING_PROGRESS_MIGRATION =
             "file:../database/migrations/20260531_01_create_lrn_learning_progress.sql";
+    private static final String LEARNING_RECORD_MIGRATION =
+            "file:../database/migrations/20260602_01_create_lrn_learning_record.sql";
 
     @Test
     void defaultRuntimeSchemaLocationsIncludeLearningTaskMigration() throws IOException {
@@ -27,6 +29,6 @@ class LearningTaskDefaultConfigurationTest {
         String schemaLocations = runtimeProperties.getProperty("spring.sql.init.schema-locations", "");
 
         assertThat(Arrays.stream(schemaLocations.split(",")).map(String::trim))
-                .contains(LEARNING_TASK_MIGRATION, LEARNING_PROGRESS_MIGRATION);
+                .contains(LEARNING_TASK_MIGRATION, LEARNING_PROGRESS_MIGRATION, LEARNING_RECORD_MIGRATION);
     }
 }
