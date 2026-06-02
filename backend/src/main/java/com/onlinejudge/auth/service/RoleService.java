@@ -87,9 +87,12 @@ public class RoleService {
                 request.avatarUrl()
         ), request.userType());
         if (request.roleIds() == null || request.roleIds().isEmpty()) {
+            authAuditService.record(currentUser.id(), "USER_CREATED", "AUTH_USER", String.valueOf(user.id()), "SUCCESS", null);
             return user;
         }
-        return updateUserRoles(currentUser, user.id(), request.roleIds());
+        AuthUserView updatedUser = updateUserRoles(currentUser, user.id(), request.roleIds());
+        authAuditService.record(currentUser.id(), "USER_CREATED", "AUTH_USER", String.valueOf(user.id()), "SUCCESS", null);
+        return updatedUser;
     }
 
     @Transactional

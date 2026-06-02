@@ -307,6 +307,31 @@ class AuthControllerTest {
     }
 
     @Test
+    void malformedAuthJsonReturnsSafeValidationErrorWithoutInternalDetails() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"account":"student51","password":
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("AUTH_400"))
+                .andExpect(jsonPath("$.message").value("请求参数不合法"))
+                .andExpect(jsonPath("$.message").value(not(containsString("JsonParseException"))))
+                .andExpect(jsonPath("$.message").value(not(containsString("HttpMessageNotReadableException"))))
+                .andExpect(jsonPath("$.message").value(not(containsString("password"))));
+    }
+
+    @Test
+    void forgedBearerTokenUsesSafeAuthenticationFailureMessage() throws Exception {
+        mockMvc.perform(get("/api/v1/auth/me")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer forged.token.value"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("ERR-AUTH-04"))
+                .andExpect(jsonPath("$.message").value("登录已失效，请重新登录"))
+                .andExpect(jsonPath("$.message").value(not(containsString("forged.token.value"))));
+    }
+
+    @Test
     void currentUserProfileCanBeReadAndUpdatedWithoutSensitiveFields() throws Exception {
         registerStudent("student54", "Student54@pass", "student54@example.com", "13900000054");
         String token = loginToken("student54", "Student54@pass");
