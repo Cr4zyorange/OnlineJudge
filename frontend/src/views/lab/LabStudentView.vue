@@ -80,6 +80,19 @@
           <p>提交状态：{{ latestSubmission.submitStatus }}</p>
           <p>评测状态：{{ latestSubmission.evaluationStatus }}</p>
           <p>提交时间：{{ formatDateTime(latestSubmission.submittedAt) }}</p>
+          <template v-if="latestEvaluationResult">
+            <p>自动得分：{{ latestEvaluationResult.score }}</p>
+            <p>通过用例：{{ latestEvaluationResult.passedCases }} / {{ latestEvaluationResult.totalCases }}</p>
+            <p>{{ latestEvaluationResult.message }}</p>
+            <ul class="lab-student__case-results">
+              <li v-for="item in latestEvaluationResult.caseResults" :key="item.testcaseId">
+                <strong>用例 {{ item.orderNum }}</strong>
+                <span>状态：{{ item.passed ? '通过' : '失败' }}</span>
+                <span>得分：{{ item.score }}</span>
+                <span>{{ item.message }}</span>
+              </li>
+            </ul>
+          </template>
         </section>
       </template>
     </section>
@@ -87,12 +100,27 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
-import { getLabDetail, listLabSubmissions, submitLab } from '../../api/lab/labs';
+import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { getLabDetail, getLabSubmissionResult, listLabSubmissions, submitLab } from '../../api/lab/labs';
 import { saveLearningProgress } from '../../api/lrn/learningProgress';
-import type { LabExperimentDetail, LabSubmissionHistoryItem, LabSubmissionSummary } from '../../types/lab';
+import type {
+  LabExperimentDetail,
+  LabSubmissionHistoryItem,
+  LabSubmissionResult,
+  LabSubmissionSummary
+} from '../../types/lab';
 
 const MAX_UPLOAD_SIZE_BYTES = 5 * 1024 * 1024;
+const EVALUATION_POLL_INTERVAL_MS = 1000;
+const TERMINAL_EVALUATION_STATUSES = new Set<LabSubmissionSummary['evaluationStatus']>([
+  'NONE',
+  'ACCEPTED',
+  'WRONG_ANSWER',
+  'COMPILE_ERROR',
+  'RUNTIME_ERROR',
+  'TIME_LIMIT_EXCEEDED',
+  'SYSTEM_ERROR'
+]);
 const ALLOWED_FILE_EXTENSIONS: Record<string, string[]> = {
   java: ['java'],
   python: ['py'],
@@ -109,6 +137,7 @@ const loading = ref(false);
 const submitting = ref(false);
 const labDetail = ref<LabExperimentDetail | null>(null);
 const latestSubmission = ref<LabSubmissionSummary | LabSubmissionHistoryItem | null>(null);
+const latestEvaluationResult = ref<LabSubmissionResult | null>(null);
 const errorMessage = ref('');
 const submitErrorMessage = ref('');
 const feedbackMessage = ref('');
@@ -117,6 +146,7 @@ const historyErrorMessage = ref('');
 const language = ref('');
 const code = ref('');
 const selectedFile = ref<File | null>(null);
+let evaluationPollTimer: number | null = null;
 
 const publicTestcases = computed(() => (labDetail.value?.testcases ?? []).filter((testcase) => testcase.public));
 const languageOptions = computed(() => {
@@ -129,6 +159,7 @@ const languageOptions = computed(() => {
 const historyHref = computed(() => `/courses/${props.courseId}/labs/${props.labId}/submissions?role=student`);
 
 onMounted(loadLabDetail);
+onUnmounted(clearEvaluationPoll);
 
 async function loadLabDetail() {
   loading.value = true;
@@ -155,6 +186,12 @@ async function loadLatestSubmission() {
   try {
     const history = await listLabSubmissions(props.labId);
     latestSubmission.value = history[0] ?? null;
+    if (latestSubmission.value) {
+      await refreshLatestEvaluationResult(latestSubmission.value.submissionId);
+    } else {
+      clearEvaluationPoll();
+      latestEvaluationResult.value = null;
+    }
   } catch (error) {
     historyErrorMessage.value = error instanceof Error ? error.message : '提交历史加载失败';
   }
@@ -174,6 +211,8 @@ async function submit() {
       code: code.value.trim() || undefined,
       file: selectedFile.value ?? undefined
     });
+    latestEvaluationResult.value = null;
+    await refreshLatestEvaluationResult(latestSubmission.value.submissionId);
     feedbackMessage.value = `提交成功，版本 ${latestSubmission.value.version}`;
     await recordProgress(100, `submittedVersion=${latestSubmission.value.version}`);
     code.value = '';
@@ -183,6 +222,45 @@ async function submit() {
   } finally {
     submitting.value = false;
   }
+}
+
+async function refreshLatestEvaluationResult(submissionId: number) {
+  clearEvaluationPoll();
+  try {
+    const result = await getLabSubmissionResult(props.labId, submissionId);
+    latestEvaluationResult.value = result;
+    updateLatestSubmissionEvaluation(result);
+    if (!isTerminalEvaluationStatus(result.evaluationStatus)) {
+      evaluationPollTimer = window.setTimeout(() => {
+        void refreshLatestEvaluationResult(submissionId);
+      }, EVALUATION_POLL_INTERVAL_MS);
+    }
+  } catch (error) {
+    historyErrorMessage.value = error instanceof Error ? error.message : '评测结果加载失败';
+  }
+}
+
+function updateLatestSubmissionEvaluation(result: LabSubmissionResult) {
+  if (!latestSubmission.value || latestSubmission.value.submissionId !== result.submissionId) {
+    return;
+  }
+  latestSubmission.value = {
+    ...latestSubmission.value,
+    evaluationStatus: result.evaluationStatus,
+    autoScore: result.score
+  };
+}
+
+function isTerminalEvaluationStatus(status: LabSubmissionSummary['evaluationStatus']) {
+  return TERMINAL_EVALUATION_STATUSES.has(status);
+}
+
+function clearEvaluationPoll() {
+  if (evaluationPollTimer === null) {
+    return;
+  }
+  window.clearTimeout(evaluationPollTimer);
+  evaluationPollTimer = null;
 }
 
 async function saveDraftProgress() {
@@ -322,9 +400,26 @@ function getFileExtension(fileName: string) {
   padding: 0;
 }
 
+.lab-student__case-results {
+  display: grid;
+  gap: 10px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
 .lab-student__cases li {
   display: grid;
   gap: 6px;
+}
+
+.lab-student__case-results li {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  display: grid;
+  gap: 6px;
+  padding: 12px;
 }
 
 .lab-student__form label {

@@ -8,12 +8,14 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.HttpHeaders;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.springframework.jdbc.core.JdbcTemplate;
 
@@ -27,9 +29,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest(properties = {
-        "spring.datasource.url=jdbc:h2:mem:lab_submission_controller;MODE=MySQL;DATABASE_TO_LOWER=TRUE;CASE_INSENSITIVE_IDENTIFIERS=TRUE;DB_CLOSE_DELAY=-1"
+        "spring.datasource.url=jdbc:h2:mem:lab_submission_controller;MODE=MySQL;DATABASE_TO_LOWER=TRUE;CASE_INSENSITIVE_IDENTIFIERS=TRUE;DB_CLOSE_DELAY=-1",
+        "onlinejudge.evaluation.sandbox.mode=fake",
+        "onlinejudge.evaluation.fake.delay-ms=150"
 })
 @AutoConfigureMockMvc
+@ActiveProfiles("test")
 class LabSubmissionControllerTest {
     private static final DateTimeFormatter DEADLINE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss");
 
@@ -44,6 +49,8 @@ class LabSubmissionControllerTest {
 
     @BeforeEach
     void cleanTables() {
+        deleteIfExists("DELETE FROM lab_evaluation_result");
+        deleteIfExists("DELETE FROM lab_evaluation");
         deleteIfExists("DELETE FROM lab_submission");
         deleteIfExists("DELETE FROM lab_testcase");
         deleteIfExists("DELETE FROM lab_experiment");
@@ -281,6 +288,328 @@ class LabSubmissionControllerTest {
     }
 
     @Test
+    void autoEvaluateSubmissionEventuallyReturnsAcceptedAndHidesHiddenCaseFromStudent() throws Exception {
+        long labId = createPublishedLab(
+                513L,
+                true,
+                LocalDateTime.now().plusDays(3),
+                List.of(Map.of(
+                        "input", "1 2",
+                        "expectedOutput", "sum:3",
+                        "scoreWeight", 40,
+                        "public", true,
+                        "timeLimitMs", 1000,
+                        "memoryLimitKb", 65536,
+                        "orderNum", 1
+                ), Map.of(
+                        "input", "2 3",
+                        "expectedOutput", "sum:5",
+                        "scoreWeight", 60,
+                        "public", false,
+                        "timeLimitMs", 1000,
+                        "memoryLimitKb", 65536,
+                        "orderNum", 2
+                ))
+        );
+
+        String body = mockMvc.perform(multipart("/api/v1/labs/{labId}/submissions", labId)
+                        .headers(studentHeaders("513"))
+                        .param("code", """
+                                first, second = map(int, input().split())
+                                print(f"sum:{first + second}")
+                                """)
+                        .param("language", "python"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.evaluationStatus").value("PENDING"))
+                .andExpect(jsonPath("$.data.autoScore").doesNotExist())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        long submissionId = objectMapper.readTree(body).path("data").path("submissionId").asLong();
+
+        assertEvaluationStatusOneOf(labId, submissionId, studentHeaders("513"), Set.of("PENDING", "RUNNING"));
+        waitForEvaluationStatus(labId, submissionId, teacherHeaders("513", "513"), "ACCEPTED");
+
+        mockMvc.perform(get("/api/v1/labs/{labId}/submissions/{submissionId}/result", labId, submissionId)
+                        .headers(studentHeaders("513")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"))
+                .andExpect(jsonPath("$.data.submissionId").value(submissionId))
+                .andExpect(jsonPath("$.data.evaluationStatus").value("ACCEPTED"))
+                .andExpect(jsonPath("$.data.score").value(100))
+                .andExpect(jsonPath("$.data.passedCases").value(2))
+                .andExpect(jsonPath("$.data.totalCases").value(2))
+                .andExpect(jsonPath("$.data.caseResults", hasSize(2)))
+                .andExpect(jsonPath("$.data.caseResults[1].input").doesNotExist())
+                .andExpect(jsonPath("$.data.caseResults[1].expectedOutput").doesNotExist());
+
+        mockMvc.perform(get("/api/v1/labs/{labId}/submissions/{submissionId}/result", labId, submissionId)
+                        .headers(teacherHeaders("513", "513")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.evaluationStatus").value("ACCEPTED"))
+                .andExpect(jsonPath("$.data.caseResults[1].input").value("2 3"))
+                .andExpect(jsonPath("$.data.caseResults[1].expectedOutput").value("sum:5"));
+
+        Integer aggregateRows = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM lab_evaluation WHERE submission_id = ?",
+                Integer.class,
+                submissionId
+        );
+        org.assertj.core.api.Assertions.assertThat(aggregateRows).isEqualTo(1);
+    }
+
+    @Test
+    void autoEvaluateSubmissionReturnsWrongAnswerAndPersistsCaseDetails() throws Exception {
+        long labId = createPublishedLab(
+                514L,
+                true,
+                LocalDateTime.now().plusDays(3),
+                List.of(
+                        Map.of(
+                                "input", "case-a",
+                                "expectedOutput", "answer-a",
+                                "scoreWeight", 50,
+                                "public", true,
+                                "timeLimitMs", 1000,
+                                "memoryLimitKb", 65536,
+                                "orderNum", 1
+                        ),
+                        Map.of(
+                                "input", "case-b",
+                                "expectedOutput", "answer-b",
+                                "scoreWeight", 50,
+                                "public", true,
+                                "timeLimitMs", 1000,
+                                "memoryLimitKb", 65536,
+                                "orderNum", 2
+                        )
+                )
+        );
+
+        String body = mockMvc.perform(multipart("/api/v1/labs/{labId}/submissions", labId)
+                        .headers(studentHeaders("514"))
+                        .param("code", """
+                                value = input().strip()
+                                if value == "case-a":
+                                    print("answer-a")
+                                else:
+                                    print("wrong-b")
+                                """)
+                        .param("language", "python"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.evaluationStatus").value("PENDING"))
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        long submissionId = objectMapper.readTree(body).path("data").path("submissionId").asLong();
+        waitForEvaluationStatus(labId, submissionId, teacherHeaders("514", "514"), "WRONG_ANSWER");
+
+        mockMvc.perform(get("/api/v1/labs/{labId}/submissions/{submissionId}/result", labId, submissionId)
+                        .headers(teacherHeaders("514", "514")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.evaluationStatus").value("WRONG_ANSWER"))
+                .andExpect(jsonPath("$.data.score").value(50))
+                .andExpect(jsonPath("$.data.passedCases").value(1))
+                .andExpect(jsonPath("$.data.totalCases").value(2))
+                .andExpect(jsonPath("$.data.message", containsString("部分用例未通过")))
+                .andExpect(jsonPath("$.data.caseResults[1].passed").value(false))
+                .andExpect(jsonPath("$.data.caseResults[1].message", containsString("期望输出")))
+                .andExpect(jsonPath("$.data.caseResults[1].actualOutput").value("wrong-b"));
+
+        Integer evaluationRows = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM lab_evaluation_result WHERE submission_id = ?",
+                Integer.class,
+                submissionId
+        );
+        org.assertj.core.api.Assertions.assertThat(evaluationRows).isEqualTo(2);
+
+        Integer aggregateRows = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM lab_evaluation WHERE submission_id = ?",
+                Integer.class,
+                submissionId
+        );
+        org.assertj.core.api.Assertions.assertThat(aggregateRows).isEqualTo(1);
+    }
+
+    @Test
+    void studentCannotViewAnotherStudentsEvaluationResult() throws Exception {
+        long labId = createPublishedLab(
+                515L,
+                false,
+                LocalDateTime.now().plusDays(3),
+                List.of(Map.of(
+                        "input", "1",
+                        "expectedOutput", "1",
+                        "scoreWeight", 100,
+                        "public", true,
+                        "timeLimitMs", 1000,
+                        "memoryLimitKb", 65536,
+                        "orderNum", 1
+                ))
+        );
+        long submissionId = createCodeSubmission(
+                labId,
+                601L,
+                "515",
+                """
+                print(input().strip())
+                """,
+                "python"
+        );
+
+        mockMvc.perform(get("/api/v1/labs/{labId}/submissions/{submissionId}/result", labId, submissionId)
+                        .headers(studentHeaders("515", 602L)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("LAB-403-01"));
+    }
+
+    @Test
+    void teacherCanTriggerEvaluationEndpointForExistingSubmission() throws Exception {
+        long labId = createPublishedLab(
+                516L,
+                false,
+                LocalDateTime.now().plusDays(3),
+                List.of(Map.of(
+                        "input", "5 6",
+                        "expectedOutput", "11",
+                        "scoreWeight", 100,
+                        "public", true,
+                        "timeLimitMs", 1000,
+                        "memoryLimitKb", 65536,
+                        "orderNum", 1
+                ))
+        );
+        long submissionId = createCodeSubmission(
+                labId,
+                601L,
+                "516",
+                """
+                left, right = map(int, input().split())
+                print(left + right)
+                """,
+                "python"
+        );
+
+        mockMvc.perform(post("/api/v1/labs/{labId}/submissions/{submissionId}/evaluate", labId, submissionId)
+                        .headers(teacherHeaders("516", "516")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.submissionId").value(submissionId))
+                .andExpect(jsonPath("$.data.evaluationStatus").value("PENDING"))
+                .andExpect(jsonPath("$.data.score").value(0))
+                .andExpect(jsonPath("$.data.passedCases").value(0))
+                .andExpect(jsonPath("$.data.totalCases").value(1));
+
+        waitForEvaluationStatus(labId, submissionId, teacherHeaders("516", "516"), "ACCEPTED");
+    }
+
+    @Test
+    void autoEvaluateSubmissionReturnsTimeLimitExceeded() throws Exception {
+        long labId = createPublishedLab(
+                517L,
+                true,
+                LocalDateTime.now().plusDays(3),
+                List.of(Map.of(
+                        "input", "ignored",
+                        "expectedOutput", "ignored",
+                        "scoreWeight", 100,
+                        "public", true,
+                        "timeLimitMs", 100,
+                        "memoryLimitKb", 65536,
+                        "orderNum", 1
+                ))
+        );
+
+        String body = mockMvc.perform(multipart("/api/v1/labs/{labId}/submissions", labId)
+                        .headers(studentHeaders("517"))
+                        .param("code", "while True:\n    pass")
+                        .param("language", "python"))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        long submissionId = objectMapper.readTree(body).path("data").path("submissionId").asLong();
+        waitForEvaluationStatus(labId, submissionId, teacherHeaders("517", "517"), "TIME_LIMIT_EXCEEDED");
+
+        mockMvc.perform(get("/api/v1/labs/{labId}/submissions/{submissionId}/result", labId, submissionId)
+                        .headers(teacherHeaders("517", "517")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.evaluationStatus").value("TIME_LIMIT_EXCEEDED"))
+                .andExpect(jsonPath("$.data.caseResults[0].message", containsString("超时")));
+    }
+
+    @Test
+    void autoEvaluateSubmissionReturnsCompileError() throws Exception {
+        long labId = createPublishedLab(
+                518L,
+                true,
+                LocalDateTime.now().plusDays(3),
+                List.of(Map.of(
+                        "input", "ignored",
+                        "expectedOutput", "ignored",
+                        "scoreWeight", 100,
+                        "public", true,
+                        "timeLimitMs", 1000,
+                        "memoryLimitKb", 65536,
+                        "orderNum", 1
+                ))
+        );
+
+        String body = mockMvc.perform(multipart("/api/v1/labs/{labId}/submissions", labId)
+                        .headers(studentHeaders("518"))
+                        .param("code", "print(")
+                        .param("language", "python"))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        long submissionId = objectMapper.readTree(body).path("data").path("submissionId").asLong();
+        waitForEvaluationStatus(labId, submissionId, teacherHeaders("518", "518"), "COMPILE_ERROR");
+
+        mockMvc.perform(get("/api/v1/labs/{labId}/submissions/{submissionId}/result", labId, submissionId)
+                        .headers(teacherHeaders("518", "518")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.evaluationStatus").value("COMPILE_ERROR"))
+                .andExpect(jsonPath("$.data.caseResults[0].message", containsString("编译失败")));
+    }
+
+    @Test
+    void autoEvaluateSubmissionReturnsRuntimeError() throws Exception {
+        long labId = createPublishedLab(
+                519L,
+                true,
+                LocalDateTime.now().plusDays(3),
+                List.of(Map.of(
+                        "input", "ignored",
+                        "expectedOutput", "ignored",
+                        "scoreWeight", 100,
+                        "public", true,
+                        "timeLimitMs", 1000,
+                        "memoryLimitKb", 65536,
+                        "orderNum", 1
+                ))
+        );
+
+        String body = mockMvc.perform(multipart("/api/v1/labs/{labId}/submissions", labId)
+                        .headers(studentHeaders("519"))
+                        .param("code", "raise RuntimeError('boom')")
+                        .param("language", "python"))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        long submissionId = objectMapper.readTree(body).path("data").path("submissionId").asLong();
+        waitForEvaluationStatus(labId, submissionId, teacherHeaders("519", "519"), "RUNTIME_ERROR");
+
+        mockMvc.perform(get("/api/v1/labs/{labId}/submissions/{submissionId}/result", labId, submissionId)
+                        .headers(teacherHeaders("519", "519")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.evaluationStatus").value("RUNTIME_ERROR"))
+                .andExpect(jsonPath("$.data.caseResults[0].message", containsString("运行时异常")));
+    }
+
+    @Test
     void teacherFiltersDoNotPromoteHistoricalSubmissionToLatest() throws Exception {
         long labId = createPublishedLab(512L, true, LocalDateTime.now().plusDays(3));
         long historicalSubmissionId = createCodeSubmission(labId, 602L, "512", "print('student 602 old')", "python");
@@ -332,6 +661,15 @@ class LabSubmissionControllerTest {
     }
 
     private long createPublishedLab(long courseId, boolean autoEvaluate, LocalDateTime deadline) throws Exception {
+        return createPublishedLab(courseId, autoEvaluate, deadline, List.of());
+    }
+
+    private long createPublishedLab(
+            long courseId,
+            boolean autoEvaluate,
+            LocalDateTime deadline,
+            List<Map<String, Object>> testcases
+    ) throws Exception {
         Map<String, Object> payload = Map.ofEntries(
                 entry("title", "学生提交实验"),
                 entry("description", "用于学生提交流程验证"),
@@ -344,7 +682,7 @@ class LabSubmissionControllerTest {
                 entry("reportRequired", false),
                 entry("timeLimitMs", 60000),
                 entry("memoryLimitKb", 262144),
-                entry("testcases", List.of())
+                entry("testcases", testcases)
         );
 
         String body = mockMvc.perform(post("/api/v1/courses/{courseId}/labs", courseId)
@@ -383,6 +721,36 @@ class LabSubmissionControllerTest {
                 .getResponse()
                 .getContentAsString();
         return objectMapper.readTree(body).path("data").path("submissionId").asLong();
+    }
+
+    private void assertEvaluationStatusOneOf(long labId, long submissionId, HttpHeaders headers, Set<String> statuses) throws Exception {
+        String body = mockMvc.perform(get("/api/v1/labs/{labId}/submissions/{submissionId}/result", labId, submissionId)
+                        .headers(headers))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        String actualStatus = objectMapper.readTree(body).path("data").path("evaluationStatus").asText();
+        org.assertj.core.api.Assertions.assertThat(statuses).contains(actualStatus);
+    }
+
+    private void waitForEvaluationStatus(long labId, long submissionId, HttpHeaders headers, String expectedStatus) throws Exception {
+        long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(5);
+        String actualStatus = "";
+        while (System.nanoTime() < deadline) {
+            String body = mockMvc.perform(get("/api/v1/labs/{labId}/submissions/{submissionId}/result", labId, submissionId)
+                            .headers(headers))
+                    .andExpect(status().isOk())
+                    .andReturn()
+                    .getResponse()
+                    .getContentAsString();
+            actualStatus = objectMapper.readTree(body).path("data").path("evaluationStatus").asText();
+            if (expectedStatus.equals(actualStatus)) {
+                return;
+            }
+            Thread.sleep(50);
+        }
+        org.assertj.core.api.Assertions.assertThat(actualStatus).isEqualTo(expectedStatus);
     }
 
     private HttpHeaders teacherHeaders(String courseIds, String manageableCourseIds) {

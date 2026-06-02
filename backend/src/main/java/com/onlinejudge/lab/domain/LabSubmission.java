@@ -63,4 +63,30 @@ public record LabSubmission(
                 deleted
         );
     }
+
+    public LabSubmission withEvaluationResult(
+            EvaluationStatus evaluationStatus,
+            Integer autoScore,
+            Integer finalScore,
+            LocalDateTime updatedAt
+    ) {
+        return new LabSubmission(
+                id,
+                labId,
+                studentId,
+                codeContent,
+                fileId,
+                language,
+                submitStatus,
+                evaluationStatus,
+                finalScore,
+                autoScore,
+                version,
+                isFinal,
+                submittedAt,
+                createdAt,
+                updatedAt,
+                deleted
+        );
+    }
 }

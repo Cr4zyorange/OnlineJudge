@@ -4,6 +4,11 @@ import com.onlinejudge.common.evaluation.EvaluationStatus;
 import com.onlinejudge.common.storage.FileStorageService;
 import com.onlinejudge.common.storage.StoredFile;
 import com.onlinejudge.integration.course.CoursePermissionClient;
+import com.onlinejudge.lab.domain.LabEvaluation;
+import com.onlinejudge.lab.domain.LabEvaluationCaseResult;
+import com.onlinejudge.lab.domain.LabEvaluationRepository;
+import com.onlinejudge.lab.domain.LabEvaluationResultRepository;
+import com.onlinejudge.lab.domain.LabEvaluationResultView;
 import com.onlinejudge.lab.domain.CreateLabSubmissionCommand;
 import com.onlinejudge.lab.domain.LabExperiment;
 import com.onlinejudge.lab.domain.LabExperimentRepository;
@@ -16,8 +21,11 @@ import com.onlinejudge.lab.domain.LabSubmissionRepository;
 import com.onlinejudge.lab.domain.LabSubmitStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -56,19 +64,28 @@ public class LabSubmissionService {
 
     private final LabExperimentRepository labExperimentRepository;
     private final LabSubmissionRepository labSubmissionRepository;
+    private final LabEvaluationRepository labEvaluationRepository;
+    private final LabEvaluationResultRepository labEvaluationResultRepository;
+    private final LabEvaluationService labEvaluationService;
     private final CoursePermissionClient coursePermissionClient;
     private final FileStorageService fileStorageService;
 
     public LabSubmissionService(
             LabExperimentRepository labExperimentRepository,
             LabSubmissionRepository labSubmissionRepository,
+            LabEvaluationRepository labEvaluationRepository,
+            LabEvaluationResultRepository labEvaluationResultRepository,
+            LabEvaluationService labEvaluationService,
             CoursePermissionClient coursePermissionClient,
             FileStorageService fileStorageService
     ) {
         this.labExperimentRepository = labExperimentRepository;
         this.labSubmissionRepository = labSubmissionRepository;
+        this.labEvaluationRepository = labEvaluationRepository;
+        this.labEvaluationService = labEvaluationService;
         this.coursePermissionClient = coursePermissionClient;
         this.fileStorageService = fileStorageService;
+        this.labEvaluationResultRepository = labEvaluationResultRepository;
     }
 
     @Transactional
@@ -115,7 +132,13 @@ public class LabSubmissionService {
                 false
         );
 
-        return labSubmissionRepository.save(submission);
+        LabSubmission savedSubmission = labSubmissionRepository.save(submission);
+        if (!experiment.autoEvaluate() || experiment.testcases().isEmpty()) {
+            return savedSubmission;
+        }
+        markSubmissionPendingEvaluation(savedSubmission, experiment.testcases().size(), now);
+        scheduleEvaluationAfterCommit(experiment, savedSubmission, resolveSubmissionSource(savedSubmission));
+        return savedSubmission;
     }
 
     public List<LabSubmissionHistoryItemView> listSubmissions(long labId, long userId, LabSubmissionQuery query) {
@@ -152,6 +175,63 @@ public class LabSubmissionService {
                 labSubmissionRepository.findByLabIdAndStudentId(labId, submission.studentId())
         );
         return toDetail(submission, resolveSubmissionVersionFlags(flagsBySubmissionId, submission));
+    }
+
+    public LabEvaluationResultView getSubmissionResult(long labId, long submissionId, long userId) {
+        SubmissionAccess access = verifySubmissionAccess(labId, submissionId, userId);
+        LabSubmission submission = access.submission();
+        List<LabEvaluationCaseResult> caseResults = labEvaluationResultRepository.findBySubmissionId(submissionId);
+        if (!access.canManage()) {
+            caseResults = caseResults.stream().map(LabEvaluationCaseResult::hideSensitiveContent).toList();
+        }
+        int passedCases = (int) caseResults.stream().filter(LabEvaluationCaseResult::passed).count();
+        int totalCases = caseResults.size();
+        String fallbackMessage = resolveEvaluationMessage(submission.evaluationStatus(), passedCases, totalCases);
+        LabEvaluation evaluation = labEvaluationRepository.findLatestBySubmissionId(submissionId)
+                .orElseGet(() -> new LabEvaluation(
+                        0L,
+                        submissionId,
+                        submission.evaluationStatus(),
+                        submission.autoScore() == null ? 0 : submission.autoScore(),
+                        passedCases,
+                        totalCases,
+                        null,
+                        null,
+                        fallbackMessage,
+                        null,
+                        null,
+                        submission.submittedAt(),
+                        submission.updatedAt(),
+                        submission.createdAt(),
+                        submission.updatedAt()
+                ));
+        return new LabEvaluationResultView(
+                submission.id(),
+                evaluation.status(),
+                evaluation.score(),
+                evaluation.passedCases(),
+                evaluation.totalCases(),
+                evaluation.feedback(),
+                caseResults,
+                submission.submittedAt(),
+                evaluation.finishedAt() == null ? submission.updatedAt() : evaluation.finishedAt()
+        );
+    }
+
+    @Transactional
+    public LabEvaluationResultView evaluateSubmissionByTeacher(long labId, long submissionId, long teacherId) {
+        SubmissionAccess access = verifySubmissionAccess(labId, submissionId, teacherId);
+        if (!access.canManage()) {
+            throw new LabPermissionException("无课程管理权限");
+        }
+        LabExperiment experiment = findExistingExperiment(labId);
+        markSubmissionPendingEvaluation(access.submission(), experiment.testcases().size(), LocalDateTime.now());
+        scheduleEvaluationAfterCommit(
+                experiment,
+                access.submission(),
+                resolveSubmissionSource(access.submission())
+        );
+        return getSubmissionResult(labId, submissionId, teacherId);
     }
 
     private void requireStudentCanSubmit(LabExperiment experiment, long studentId) {
@@ -272,6 +352,24 @@ public class LabSubmissionService {
         return labExperimentRepository.findById(labId)
                 .filter(item -> !item.deleted())
                 .orElseThrow(() -> new LabNotFoundException("实验不存在"));
+    }
+
+    private SubmissionAccess verifySubmissionAccess(long labId, long submissionId, long userId) {
+        LabExperiment experiment = findExistingExperiment(labId);
+        LabSubmission submission = labSubmissionRepository.findById(submissionId)
+                .filter(item -> !item.deleted())
+                .orElseThrow(() -> new LabNotFoundException("提交不存在"));
+        if (submission.labId() != labId) {
+            throw new LabNotFoundException("提交不存在");
+        }
+        boolean canManage = coursePermissionClient.canManageCourse(experiment.courseId(), userId);
+        if (!canManage) {
+            requireCourseViewPermission(experiment.courseId(), userId);
+            if (submission.studentId() != userId) {
+                throw new LabPermissionException("无权限查看他人提交");
+            }
+        }
+        return new SubmissionAccess(experiment, submission, canManage);
     }
 
     private void requireCourseViewPermission(long courseId, long userId) {
@@ -398,10 +496,89 @@ public class LabSubmissionService {
         return fileId != null && !fileId.isBlank();
     }
 
+    private String resolveSubmissionSource(LabSubmission submission) {
+        if (submission.codeContent() != null && !submission.codeContent().isBlank()) {
+            return submission.codeContent();
+        }
+        if (!hasFile(submission.fileId())) {
+            throw new LabSubmissionValidationException("LAB-400-03", "提交代码不能为空且必须上传文件");
+        }
+        try {
+            return new String(
+                    fileStorageService.load(submission.fileId()).resource().getInputStream().readAllBytes(),
+                    java.nio.charset.StandardCharsets.UTF_8
+            );
+        } catch (IOException exception) {
+            throw new IllegalStateException("读取提交文件失败", exception);
+        }
+    }
+
+    private String resolveEvaluationMessage(EvaluationStatus status, int passedCases, int totalCases) {
+        if (status == EvaluationStatus.ACCEPTED) {
+            return "全部用例通过";
+        }
+        if (status == EvaluationStatus.WRONG_ANSWER) {
+            return passedCases == 0 ? "未通过任何用例" : "部分用例未通过";
+        }
+        if (status == EvaluationStatus.PENDING) {
+            return "等待评测";
+        }
+        if (status == EvaluationStatus.RUNNING) {
+            return "评测进行中";
+        }
+        if (status == EvaluationStatus.SYSTEM_ERROR) {
+            return "评测失败";
+        }
+        return status.name();
+    }
+
+    private void markSubmissionPendingEvaluation(LabSubmission submission, int testcaseCount, LocalDateTime now) {
+        labSubmissionRepository.update(submission.withEvaluationResult(EvaluationStatus.PENDING, null, submission.finalScore(), now));
+        labEvaluationRepository.save(new LabEvaluation(
+                0L,
+                submission.id(),
+                EvaluationStatus.PENDING,
+                0,
+                0,
+                testcaseCount,
+                null,
+                null,
+                "等待评测",
+                null,
+                null,
+                now,
+                null,
+                now,
+                now
+        ));
+    }
+
+    private void scheduleEvaluationAfterCommit(LabExperiment experiment, LabSubmission submission, String sourceCode) {
+        Runnable trigger = () -> labEvaluationService.evaluateSubmissionAsync(experiment, submission, sourceCode);
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            trigger.run();
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                trigger.run();
+            }
+        });
+    }
+
     private record SubmissionVersionFlags(
             boolean isLatest,
             boolean isFinal,
             boolean isScoringBasis
     ) {
     }
+
+    private record SubmissionAccess(
+            LabExperiment experiment,
+            LabSubmission submission,
+            boolean canManage
+    ) {
+    }
+
 }
