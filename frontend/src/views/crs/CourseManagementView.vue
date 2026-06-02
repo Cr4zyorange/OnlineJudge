@@ -28,22 +28,22 @@
         </div>
         <ul class="sidebar-menu">
           <li>
-            <button class="menu-button" :class="{ active: activeTab === 'all' && !chapterCourse && !resourceCourse }" type="button" @click="switchTab('all')">
+            <button class="menu-button" :class="{ active: activeTab === 'all' && !chapterCourse && !resourceCourse && !announcementCourse }" type="button" @click="switchTab('all')">
               <i class="bi bi-grid"></i> 全部课程
             </button>
           </li>
           <li>
-            <button class="menu-button" :class="{ active: activeTab === 'mine' && !chapterCourse && !resourceCourse }" type="button" @click="switchTab('mine')">
+            <button class="menu-button" :class="{ active: activeTab === 'mine' && !chapterCourse && !resourceCourse && !announcementCourse }" type="button" @click="switchTab('mine')">
               <i class="bi bi-bookmark-check"></i> 我的课程
             </button>
           </li>
           <li>
-            <button class="menu-button" :class="{ active: activeTab === 'managed' && !chapterCourse && !resourceCourse }" type="button" @click="switchTab('managed')">
+            <button class="menu-button" :class="{ active: activeTab === 'managed' && !chapterCourse && !resourceCourse && !announcementCourse }" type="button" @click="switchTab('managed')">
               <i class="bi bi-person-check"></i> 我管理的
             </button>
           </li>
           <li>
-            <button class="menu-button" :class="{ active: activeTab === 'archived' && !chapterCourse && !resourceCourse }" type="button" @click="switchTab('archived')">
+            <button class="menu-button" :class="{ active: activeTab === 'archived' && !chapterCourse && !resourceCourse && !announcementCourse }" type="button" @click="switchTab('archived')">
               <i class="bi bi-archive"></i> 归档记录
             </button>
           </li>
@@ -77,7 +77,7 @@
             <h2>{{ pageTitle }}</h2>
             <p>{{ pageSubtitle }}</p>
           </div>
-          <div v-if="!chapterCourse && !resourceCourse" class="header-actions">
+          <div v-if="!chapterCourse && !resourceCourse && !announcementCourse" class="header-actions">
             <label class="search-box">
               <i class="bi bi-search"></i>
               <input v-model="keyword" type="search" placeholder="搜索课程、学期或分类" @keyup.enter="loadCourses" />
@@ -266,6 +266,57 @@
           </section>
         </section>
 
+        <section v-else-if="announcementCourse" class="workspace">
+          <form class="course-form" data-testid="announcement-form" @submit.prevent="submitAnnouncement">
+            <div class="form-title">
+              <h3>{{ editingAnnouncement ? '编辑公告' : '发布公告' }}</h3>
+              <button v-if="editingAnnouncement" class="text-button" type="button" @click="resetAnnouncementForm">取消编辑</button>
+            </div>
+            <p class="form-context">当前课程：{{ announcementCourse.name }}</p>
+            <label>
+              <span>公告标题</span>
+              <input data-testid="announcement-title" v-model.trim="announcementForm.title" type="text" maxlength="200" placeholder="例如：第一次课程安排" />
+            </label>
+            <label>
+              <span>公告内容</span>
+              <textarea data-testid="announcement-content" v-model.trim="announcementForm.content" rows="6" maxlength="5000" placeholder="填写课程公告内容"></textarea>
+            </label>
+            <label class="checkbox-line">
+              <input v-model="announcementForm.isTop" type="checkbox" />
+              <span>置顶公告</span>
+            </label>
+            <p v-if="announcementError" class="message error">{{ announcementError }}</p>
+            <p v-if="announcementSuccess" class="message success">{{ announcementSuccess }}</p>
+            <button class="btn submit-btn" type="submit" :disabled="announcementSubmitting">
+              <i class="bi bi-megaphone"></i>
+              {{ announcementSubmitting ? '提交中' : editingAnnouncement ? '保存公告' : '发布公告' }}
+            </button>
+          </form>
+
+          <section class="course-panel">
+            <div v-if="announcementLoading" class="state-card">公告加载中...</div>
+            <div v-else-if="announcementLoadError" class="state-card error">{{ announcementLoadError }}</div>
+            <div v-else-if="announcements.length === 0" class="state-card">暂无公告，发布后会展示在课程详情右侧。</div>
+            <div v-else class="resource-list announcement-list">
+              <article v-for="announcement in announcements" :key="announcement.id" class="resource-row announcement-row">
+                <div>
+                  <strong>
+                    <span v-if="announcement.top" class="status-pill">置顶</span>
+                    {{ announcement.title }}
+                  </strong>
+                  <p>{{ announcement.content }}</p>
+                  <small>{{ announcement.publisherName }} · {{ formatDateTime(announcement.createdAt) }}</small>
+                </div>
+                <button class="card-btn" type="button" @click="editAnnouncement(announcement)">编辑</button>
+                <button class="card-btn" type="button" @click="toggleAnnouncementTop(announcement)">
+                  {{ announcement.top ? '取消置顶' : '置顶' }}
+                </button>
+                <button class="card-btn danger" type="button" @click="removeAnnouncement(announcement)">删除</button>
+              </article>
+            </div>
+          </section>
+        </section>
+
         <section v-else class="workspace" :class="{ single: activeTab !== 'managed' }">
           <form v-if="activeTab === 'managed'" class="course-form" @submit.prevent="submitCourse">
             <div class="form-title">
@@ -370,6 +421,9 @@
                     <button class="card-btn" type="button" :disabled="!course.manageable" @click.stop="openResourceManagement(course)">
                       <i class="bi bi-folder2-open"></i> 资源
                     </button>
+                    <button class="card-btn" type="button" :disabled="!course.manageable" @click.stop="openAnnouncementManagement(course)">
+                      <i class="bi bi-megaphone"></i> 公告
+                    </button>
                     <button class="card-btn danger" type="button" :disabled="!course.manageable" @click.stop="archive(course)">
                       <i class="bi bi-archive"></i> 归档
                     </button>
@@ -394,7 +448,7 @@
     </div>
 
     <div v-if="selectedCourse" class="modal-backdrop" @click.self="closeCourseDetail">
-      <section class="course-modal" role="dialog" aria-modal="true" aria-label="课程详情">
+      <section class="course-modal" :class="{ 'course-modal-expanded': canViewCourseContent(selectedCourse) }" role="dialog" aria-modal="true" aria-label="课程详情">
         <div class="modal-header">
           <div>
             <p class="modal-label">课程详情</p>
@@ -410,6 +464,26 @@
           <span class="card-tag">{{ enrollmentModeText(selectedCourse.enrollmentMode) }}</span>
           <span class="status-pill">{{ statusText(selectedCourse.status) }}</span>
         </div>
+
+        <aside v-if="canViewCourseContent(selectedCourse)" class="announcement-sidebar" data-testid="course-announcement-sidebar">
+          <div class="sidebar-section-title">
+            <h3>课程公告</h3>
+            <button v-if="selectedCourse.manageable" class="card-btn" type="button" @click="manageSelectedCourseAnnouncements">管理</button>
+          </div>
+          <p v-if="announcementLoading">公告加载中...</p>
+          <p v-else-if="announcementLoadError" class="inline-error">{{ announcementLoadError }}</p>
+          <p v-else-if="announcements.length === 0">暂无课程公告</p>
+          <div v-else class="announcement-stack">
+            <article v-for="announcement in announcements" :key="announcement.id" class="announcement-card">
+              <strong>
+                <span v-if="announcement.top" class="status-pill">置顶</span>
+                {{ announcement.title }}
+              </strong>
+              <p>{{ announcement.content }}</p>
+              <small>{{ announcement.publisherName }} · {{ formatDateTime(announcement.createdAt) }}</small>
+            </article>
+          </div>
+        </aside>
 
         <div class="modal-grid">
           <div class="detail-item">
@@ -440,8 +514,8 @@
           <p>{{ selectedCourse.inviteCode || '暂无邀请码' }}</p>
         </div>
 
-        <div class="detail-block">
-          <span>章节目录</span>
+        <div v-if="canViewCourseContent(selectedCourse)" class="modal-section course-chapter-section">
+          <h3>课程章节</h3>
           <p v-if="detailChapterLoading">章节加载中...</p>
           <p v-else-if="detailChapterError">{{ detailChapterError }}</p>
           <p v-else-if="detailChapters.length === 0">暂无章节目录</p>
@@ -450,7 +524,7 @@
           </div>
         </div>
 
-        <div class="detail-block">
+        <div v-if="canViewCourseContent(selectedCourse)" class="detail-block">
           <span>教学资源</span>
           <label class="resource-filter">
             <span>章节</span>
@@ -560,18 +634,23 @@ import type { Component, VNode } from 'vue';
 import {
   archiveCourse,
   createChapter,
+  createAnnouncement,
   createCourse,
+  deleteAnnouncement,
   deleteResource,
   deleteChapter,
   downloadResource,
   getCourse,
   joinCourse,
+  listAnnouncements,
   listChapters,
   listCourseMembers,
   listCourses,
   listResources,
   removeCourseMember,
   updateChapter,
+  pinAnnouncement,
+  updateAnnouncement,
   updateCourseMember,
   updateCourse,
   updateResource,
@@ -579,7 +658,7 @@ import {
 } from '../../api/crs/courses';
 import { saveLearningProgress } from '../../api/lrn/learningProgress';
 import type { CourseScope } from '../../api/crs/courses';
-import type { Chapter, ChapterPayload, Course, CourseMember, CoursePayload, CourseResource, ResourcePayload } from '../../types/crs';
+import type { AnnouncementPayload, Chapter, ChapterPayload, Course, CourseAnnouncement, CourseMember, CoursePayload, CourseResource, ResourcePayload } from '../../types/crs';
 
 const ChapterNode: Component = defineComponent({
   name: 'ChapterNode',
@@ -694,15 +773,23 @@ const blankResourceForm = (): ResourcePayload => ({
   publishAt: null
 });
 
+const blankAnnouncementForm = (): AnnouncementPayload => ({
+  title: '',
+  content: '',
+  isTop: false
+});
+
 const form = reactive<CoursePayload>(blankForm());
 const chapterForm = reactive<ChapterPayload>(blankChapterForm());
 const resourceForm = reactive<ResourcePayload>(blankResourceForm());
+const announcementForm = reactive<AnnouncementPayload>(blankAnnouncementForm());
 const chapterParentValue = ref('');
 const resourceChapterValue = ref('');
 const courses = ref<Course[]>([]);
 const chapters = ref<Chapter[]>([]);
 const detailChapters = ref<Chapter[]>([]);
 const detailResources = ref<CourseResource[]>([]);
+const announcements = ref<CourseAnnouncement[]>([]);
 const keyword = ref('');
 const selectedDetailChapterValue = ref('');
 const loading = ref(false);
@@ -712,6 +799,7 @@ const chapterSubmitting = ref(false);
 const detailChapterLoading = ref(false);
 const detailResourceLoading = ref(false);
 const resourceSubmitting = ref(false);
+const announcementSubmitting = ref(false);
 const loadError = ref('');
 const formError = ref('');
 const successMessage = ref('');
@@ -723,18 +811,24 @@ const detailResourceError = ref('');
 const memberReviewError = ref('');
 const resourceError = ref('');
 const resourceSuccess = ref('');
+const announcementError = ref('');
+const announcementSuccess = ref('');
+const announcementLoadError = ref('');
 const resumeMessage = ref('');
 const courseNotice = ref('');
 const editingCourse = ref<Course | null>(null);
 const selectedCourse = ref<Course | null>(null);
 const chapterCourse = ref<Course | null>(null);
 const resourceCourse = ref<Course | null>(null);
+const announcementCourse = ref<Course | null>(null);
 const editingChapter = ref<Chapter | null>(null);
 const editingResourceId = ref<number | null>(null);
+const editingAnnouncement = ref<CourseAnnouncement | null>(null);
 const selectedResourceFile = ref<File | null>(null);
 const joiningCourseId = ref<number | null>(null);
 const approvingUserId = ref<number | null>(null);
 const draggedChapterId = ref<number | null>(null);
+const announcementLoading = ref(false);
 const activeTab = ref<CourseScope>('all');
 const stats = reactive<Record<CourseScope, number>>({
   all: 0,
@@ -822,6 +916,10 @@ const gradeAnalysisHref = computed(() => {
   return course ? `/courses/${course.id}/grd/grade-items` : '';
 });
 const activeMembers = computed(() => members.value.filter((member) => member.status === 'ACTIVE'));
+
+function canViewCourseContent(course: Course) {
+  return course.member || course.manageable;
+}
 
 async function loadCourses() {
   loading.value = true;
@@ -926,13 +1024,20 @@ async function openCourseDetail(course: Course) {
   selectedDetailChapterValue.value = '';
   detailChapters.value = [];
   detailResources.value = [];
+  announcements.value = [];
   pendingMembers.value = [];
   members.value = [];
   detailChapterError.value = '';
   detailResourceError.value = '';
+  announcementLoadError.value = '';
   resumeMessage.value = '';
   memberReviewError.value = '';
   memberManageError.value = '';
+  if (!canViewCourseContent(course)) {
+    detailChapterLoading.value = false;
+    detailResourceLoading.value = false;
+    return;
+  }
   detailChapterLoading.value = true;
   detailResourceLoading.value = true;
   try {
@@ -953,18 +1058,21 @@ async function openCourseDetail(course: Course) {
   if (course.manageable) {
     await Promise.all([loadPendingMembers(course.id), loadCourseMembers(course.id)]);
   }
+  await loadAnnouncements(course.id);
 }
 
 function closeCourseDetail() {
   selectedCourse.value = null;
   pendingMembers.value = [];
   members.value = [];
+  announcements.value = [];
   resetResourceForm();
 }
 
 async function openChapterManagement(course: Course) {
   chapterCourse.value = course;
   resourceCourse.value = null;
+  announcementCourse.value = null;
   closeCourseDetail();
   resetChapterForm();
   await loadChapters();
@@ -973,10 +1081,20 @@ async function openChapterManagement(course: Course) {
 async function openResourceManagement(course: Course) {
   resourceCourse.value = course;
   chapterCourse.value = null;
+  announcementCourse.value = null;
   closeCourseDetail();
   resetResourceForm();
   selectedDetailChapterValue.value = '';
   await loadResourceWorkspace();
+}
+
+async function openAnnouncementManagement(course: Course) {
+  announcementCourse.value = course;
+  chapterCourse.value = null;
+  resourceCourse.value = null;
+  closeCourseDetail();
+  resetAnnouncementForm();
+  await loadAnnouncements(course.id);
 }
 
 async function enterCourse(course: Course) {
@@ -1139,9 +1257,16 @@ function closeResourceManagement() {
   resetResourceForm();
 }
 
+function closeAnnouncementManagement() {
+  announcementCourse.value = null;
+  announcements.value = [];
+  resetAnnouncementForm();
+}
+
 function closeManagementWorkspace() {
   closeChapterManagement();
   closeResourceManagement();
+  closeAnnouncementManagement();
 }
 
 async function refreshManagementWorkspace() {
@@ -1150,6 +1275,9 @@ async function refreshManagementWorkspace() {
   }
   if (resourceCourse.value) {
     await loadResourceWorkspace();
+  }
+  if (announcementCourse.value) {
+    await loadAnnouncements(announcementCourse.value.id);
   }
 }
 
@@ -1422,9 +1550,102 @@ function normalizeResourcePayload(): ResourcePayload {
   };
 }
 
+async function loadAnnouncements(courseId: number) {
+  announcementLoading.value = true;
+  announcementLoadError.value = '';
+  try {
+    const result = await listAnnouncements(courseId);
+    announcements.value = Array.isArray(result)
+      ? result.filter((item) => item && typeof item.title === 'string' && typeof item.content === 'string')
+      : [];
+  } catch (error) {
+    announcementLoadError.value = error instanceof Error ? error.message : '公告加载失败';
+  } finally {
+    announcementLoading.value = false;
+  }
+}
+
+async function submitAnnouncement() {
+  if (!announcementCourse.value) {
+    return;
+  }
+  announcementError.value = '';
+  announcementSuccess.value = '';
+  if (!announcementForm.title.trim()) {
+    announcementError.value = '请填写公告标题';
+    return;
+  }
+  if (!announcementForm.content.trim()) {
+    announcementError.value = '请填写公告内容';
+    return;
+  }
+  announcementSubmitting.value = true;
+  const payload = normalizeAnnouncementPayload();
+  try {
+    if (editingAnnouncement.value) {
+      await updateAnnouncement(announcementCourse.value.id, editingAnnouncement.value.id, payload);
+      announcementSuccess.value = '公告已保存';
+    } else {
+      await createAnnouncement(announcementCourse.value.id, payload);
+      announcementSuccess.value = '公告发布成功';
+    }
+    resetAnnouncementForm();
+    await loadAnnouncements(announcementCourse.value.id);
+  } catch (error) {
+    announcementError.value = error instanceof Error ? error.message : '公告提交失败';
+  } finally {
+    announcementSubmitting.value = false;
+  }
+}
+
+function editAnnouncement(announcement: CourseAnnouncement) {
+  editingAnnouncement.value = announcement;
+  Object.assign(announcementForm, {
+    title: announcement.title,
+    content: announcement.content,
+    isTop: announcement.top
+  });
+}
+
+async function toggleAnnouncementTop(announcement: CourseAnnouncement) {
+  if (!announcementCourse.value) {
+    return;
+  }
+  await pinAnnouncement(announcementCourse.value.id, announcement.id, !announcement.top);
+  await loadAnnouncements(announcementCourse.value.id);
+}
+
+async function removeAnnouncement(announcement: CourseAnnouncement) {
+  if (!announcementCourse.value || !window.confirm(`确认删除公告《${announcement.title}》？`)) {
+    return;
+  }
+  await deleteAnnouncement(announcementCourse.value.id, announcement.id);
+  await loadAnnouncements(announcementCourse.value.id);
+}
+
+function resetAnnouncementForm() {
+  editingAnnouncement.value = null;
+  Object.assign(announcementForm, blankAnnouncementForm());
+  announcementError.value = '';
+}
+
+function normalizeAnnouncementPayload(): AnnouncementPayload {
+  return {
+    title: announcementForm.title.trim(),
+    content: announcementForm.content.trim(),
+    isTop: Boolean(announcementForm.isTop)
+  };
+}
+
 async function manageSelectedCourseChapters() {
   if (selectedCourse.value) {
     await openChapterManagement(selectedCourse.value);
+  }
+}
+
+async function manageSelectedCourseAnnouncements() {
+  if (selectedCourse.value) {
+    await openAnnouncementManagement(selectedCourse.value);
   }
 }
 
@@ -1586,3 +1807,111 @@ onMounted(async () => {
   }
 });
 </script>
+
+<style scoped>
+.course-modal.course-modal-expanded {
+  display: grid;
+  width: min(1120px, calc(100vw - 40px));
+  grid-template-columns: minmax(640px, 720px) 360px;
+  align-items: start;
+  gap: 18px 24px;
+}
+
+.course-modal.course-modal-expanded > .modal-header,
+.course-modal.course-modal-expanded > .modal-status-row,
+.course-modal.course-modal-expanded > .modal-actions-placeholder {
+  grid-column: 1;
+}
+
+.course-modal.course-modal-expanded > .modal-grid,
+.course-modal.course-modal-expanded > .detail-block,
+.course-modal.course-modal-expanded > .modal-section {
+  grid-column: 1;
+}
+
+.announcement-sidebar {
+  grid-column: 2;
+  grid-row: 1 / span 8;
+  position: sticky;
+  top: 18px;
+  width: auto;
+  margin: 0;
+  padding: 16px;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.sidebar-section-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.sidebar-section-title h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.announcement-stack,
+.announcement-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.announcement-card {
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.1);
+}
+
+.announcement-card:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.announcement-card strong,
+.announcement-row strong {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.announcement-card p,
+.announcement-row p {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.checkbox-line {
+  display: inline-flex;
+  align-items: center;
+  flex-direction: row;
+  gap: 8px;
+}
+
+.form-context {
+  margin: -4px 0 12px;
+  color: #475569;
+  font-size: 14px;
+}
+
+.course-chapter-section {
+  margin-top: 18px;
+}
+
+@media (max-width: 1100px) {
+  .course-modal.course-modal-expanded {
+    display: block;
+    width: min(720px, calc(100vw - 40px));
+  }
+
+  .announcement-sidebar {
+    width: auto;
+    margin: 0 0 18px;
+    position: static;
+  }
+}
+</style>

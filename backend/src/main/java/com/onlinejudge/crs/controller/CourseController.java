@@ -3,6 +3,9 @@ package com.onlinejudge.crs.controller;
 import com.onlinejudge.common.security.CurrentUser;
 import com.onlinejudge.common.web.ApiResponse;
 import com.onlinejudge.common.web.PageResponse;
+import com.onlinejudge.crs.domain.dto.AnnouncementPinRequest;
+import com.onlinejudge.crs.domain.dto.AnnouncementRequest;
+import com.onlinejudge.crs.domain.dto.AnnouncementResponse;
 import com.onlinejudge.crs.domain.dto.ChapterCreateRequest;
 import com.onlinejudge.crs.domain.dto.ChapterResponse;
 import com.onlinejudge.crs.domain.dto.CourseCreateRequest;
@@ -13,6 +16,8 @@ import com.onlinejudge.crs.domain.dto.CourseMemberUpdateRequest;
 import com.onlinejudge.crs.domain.dto.CoursePermissionResponse;
 import com.onlinejudge.crs.domain.dto.CourseResponse;
 import com.onlinejudge.crs.domain.dto.CourseUpdateRequest;
+import com.onlinejudge.crs.domain.dto.CourseHomeSummaryResponse;
+import com.onlinejudge.crs.service.AnnouncementService;
 import com.onlinejudge.crs.service.ChapterService;
 import com.onlinejudge.crs.service.CourseService;
 import jakarta.validation.Valid;
@@ -31,10 +36,12 @@ import org.springframework.web.bind.annotation.RestController;
 public class CourseController {
     private final CourseService courseService;
     private final ChapterService chapterService;
+    private final AnnouncementService announcementService;
 
-    public CourseController(CourseService courseService, ChapterService chapterService) {
+    public CourseController(CourseService courseService, ChapterService chapterService, AnnouncementService announcementService) {
         this.courseService = courseService;
         this.chapterService = chapterService;
+        this.announcementService = announcementService;
     }
 
     @PostMapping
@@ -119,6 +126,47 @@ public class CourseController {
     @GetMapping("/{courseId}/chapters")
     public ApiResponse<java.util.List<ChapterResponse>> chapterTree(@PathVariable Long courseId, CurrentUser currentUser) {
         return ApiResponse.ok(chapterService.tree(courseId, currentUser));
+    }
+
+    @PostMapping("/{courseId}/announcements")
+    public ApiResponse<AnnouncementResponse> createAnnouncement(@PathVariable Long courseId,
+                                                                @Valid @RequestBody AnnouncementRequest request,
+                                                                CurrentUser currentUser) {
+        return ApiResponse.ok(announcementService.create(courseId, request, currentUser));
+    }
+
+    @GetMapping("/{courseId}/announcements")
+    public ApiResponse<java.util.List<AnnouncementResponse>> announcements(@PathVariable Long courseId, CurrentUser currentUser) {
+        return ApiResponse.ok(announcementService.list(courseId, currentUser));
+    }
+
+    @PutMapping("/{courseId}/announcements/{announcementId}")
+    public ApiResponse<AnnouncementResponse> updateAnnouncement(@PathVariable Long courseId,
+                                                                @PathVariable Long announcementId,
+                                                                @Valid @RequestBody AnnouncementRequest request,
+                                                                CurrentUser currentUser) {
+        return ApiResponse.ok(announcementService.update(courseId, announcementId, request, currentUser));
+    }
+
+    @PutMapping("/{courseId}/announcements/{announcementId}/top")
+    public ApiResponse<AnnouncementResponse> pinAnnouncement(@PathVariable Long courseId,
+                                                             @PathVariable Long announcementId,
+                                                             @RequestBody(required = false) AnnouncementPinRequest request,
+                                                             CurrentUser currentUser) {
+        return ApiResponse.ok(announcementService.updateTop(courseId, announcementId, request == null || Boolean.TRUE.equals(request.isTop()), currentUser));
+    }
+
+    @DeleteMapping("/{courseId}/announcements/{announcementId}")
+    public ApiResponse<Void> deleteAnnouncement(@PathVariable Long courseId,
+                                                @PathVariable Long announcementId,
+                                                CurrentUser currentUser) {
+        announcementService.delete(courseId, announcementId, currentUser);
+        return ApiResponse.ok(null);
+    }
+
+    @GetMapping("/{courseId}/home-summary")
+    public ApiResponse<CourseHomeSummaryResponse> homeSummary(@PathVariable Long courseId, CurrentUser currentUser) {
+        return ApiResponse.ok(announcementService.homeSummary(courseId, currentUser));
     }
 
 }

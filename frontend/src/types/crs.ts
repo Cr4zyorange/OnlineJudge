@@ -104,6 +104,30 @@ export interface CourseResource {
   updatedAt: string;
 }
 
+export interface CourseAnnouncement {
+  id: number;
+  courseId: number;
+  title: string;
+  content: string;
+  top: boolean;
+  publisherId: number;
+  publisherName: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AnnouncementPayload {
+  title: string;
+  content: string;
+  isTop?: boolean;
+}
+
+export interface CourseHomeSummary {
+  course: Course;
+  announcements: CourseAnnouncement[];
+  recentTasks: string[];
+}
+
 export interface ResourcePayload {
   chapterId?: number | null;
   name: string;
