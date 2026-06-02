@@ -4,11 +4,13 @@ import App from '../../../src/app/App.vue';
 import * as courseApi from '../../../src/api/crs/courses';
 import * as gradeItemApi from '../../../src/api/grd/gradeItems';
 import * as gradeRecordsApi from '../../../src/api/grd/gradeRecords';
+import * as homeworkApi from '../../../src/api/hwk/homeworks';
 import * as labApi from '../../../src/api/lab/labs';
 
 vi.mock('../../../src/api/grd/gradeItems');
 vi.mock('../../../src/api/grd/gradeRecords');
 vi.mock('../../../src/api/crs/courses');
+vi.mock('../../../src/api/hwk/homeworks');
 vi.mock('../../../src/api/lab/labs');
 
 describe('App', () => {
@@ -179,6 +181,79 @@ describe('App', () => {
     expect(labApi.getLabDetail).not.toHaveBeenCalled();
     expect(wrapper.text()).toContain('提交历史');
     expect(wrapper.text()).toContain('版本 3');
+  });
+
+  it('routes logged-in students from homework detail paths to the student homework page', async () => {
+    window.localStorage.setItem('onlinejudge.userRole', 'STUDENT');
+    vi.mocked(homeworkApi.getHomeworkDetail).mockResolvedValueOnce({
+      id: 11,
+      courseId: 101,
+      chapterId: null,
+      title: 'HWK02 text homework',
+      description: 'Explain your algorithm.',
+      type: 'TEXT',
+      status: 'PUBLISHED',
+      deadline: '2026-06-30T23:59:59',
+      totalScore: 100,
+      allowResubmit: true,
+      allowLateSubmit: false,
+      showEvaluationBeforePublish: true,
+      judgeConfigId: null,
+      createdBy: 501,
+      publishedAt: '2026-06-01T09:00:00',
+      deleted: false,
+      createdAt: '2026-05-30T12:00:00',
+      updatedAt: '2026-06-01T09:00:00',
+      questions: [],
+      testCases: []
+    });
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: new URL('http://localhost/courses/101/homeworks/11?role=student')
+    });
+
+    const wrapper = mount(App);
+    await flushPromises();
+
+    expect(homeworkApi.getHomeworkDetail).toHaveBeenCalledWith(11);
+    expect(homeworkApi.listHomeworks).not.toHaveBeenCalled();
+    expect(wrapper.text()).toContain('HWK02 text homework');
+  });
+
+  it('routes logged-in students from homework center paths to the student homework list page', async () => {
+    window.localStorage.setItem('onlinejudge.userRole', 'STUDENT');
+    vi.mocked(homeworkApi.listHomeworks).mockResolvedValueOnce({
+      list: [
+        {
+          id: 11,
+          courseId: 101,
+          title: 'HWK02 visible homework',
+          description: 'Read and submit.',
+          type: 'TEXT',
+          status: 'PUBLISHED',
+          deadline: '2026-06-30T23:59:59',
+          totalScore: 100,
+          allowResubmit: true,
+          allowLateSubmit: false,
+          showEvaluationBeforePublish: true,
+          deleted: false
+        }
+      ],
+      page: 1,
+      size: 20,
+      total: 1
+    });
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: new URL('http://localhost/courses/101/homeworks?role=student')
+    });
+
+    const wrapper = mount(App);
+    await flushPromises();
+
+    expect(homeworkApi.listHomeworks).toHaveBeenCalledWith({ courseId: 101, page: 1, size: 20 });
+    expect(gradeItemApi.listGradeItems).not.toHaveBeenCalled();
+    expect(wrapper.text()).toContain('HWK02 visible homework');
   });
 
   it('does not load grade items without an active course context', async () => {

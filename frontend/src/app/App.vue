@@ -32,8 +32,12 @@
     :course-id="courseId"
     :homework-id="homeworkId"
   />
+  <HomeworkStudentListView
+    v-else-if="viewMode === 'homework' && homeworkRole === 'student' && courseId !== null"
+    :course-id="courseId"
+  />
   <HomeworkTeacherView
-    v-else-if="viewMode === 'homework' && courseId !== null"
+    v-else-if="viewMode === 'homework' && homeworkRole === 'teacher' && courseId !== null"
     :course-id="courseId"
   />
   <StudentGradeView
@@ -59,6 +63,7 @@ import AuthView from '../views/auth/AuthView.vue';
 import AuthAdminView from '../views/auth/AuthAdminView.vue';
 import CourseManagementView from '../views/crs/CourseManagementView.vue';
 import GradeItemConfigView from '../views/grd/GradeItemConfigView.vue';
+import HomeworkStudentListView from '../views/hwk/HomeworkStudentListView.vue';
 import HomeworkStudentView from '../views/hwk/HomeworkStudentView.vue';
 import HomeworkTeacherView from '../views/hwk/HomeworkTeacherView.vue';
 import LabSubmissionHistoryView from '../views/lab/LabSubmissionHistoryView.vue';

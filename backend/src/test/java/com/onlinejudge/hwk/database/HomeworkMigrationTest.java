@@ -10,6 +10,7 @@ import org.springframework.test.context.jdbc.Sql;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -23,6 +24,9 @@ class HomeworkMigrationTest {
     private static final Path HOMEWORK_MIGRATION_PATH = Path.of(
             "../database/migrations/20260530_01_create_hwk_homework.sql"
     );
+    private static final Path SUBMISSION_MIGRATION_PATH = Path.of(
+            "../database/migrations/20260601_01_create_hwk_submission.sql"
+    );
 
     private final JdbcTemplate jdbcTemplate;
 
@@ -34,8 +38,11 @@ class HomeworkMigrationTest {
     @Test
     void homeworkMigrationUsesMySqlCompatibleConstraintSyntax() throws Exception {
         String migrationSql = Files.readString(HOMEWORK_MIGRATION_PATH);
+        String submissionSql = Files.readString(SUBMISSION_MIGRATION_PATH);
 
         assertThat(migrationSql)
+                .doesNotContainPattern("(?i)ADD\\s+CONSTRAINT\\s+IF\\s+NOT\\s+EXISTS");
+        assertThat(submissionSql)
                 .doesNotContainPattern("(?i)ADD\\s+CONSTRAINT\\s+IF\\s+NOT\\s+EXISTS");
     }
 
@@ -66,6 +73,56 @@ class HomeworkMigrationTest {
         )).isZero();
     }
 
+    @Test
+    @Sql(scripts = {
+            "file:../database/migrations/20260530_01_create_hwk_homework.sql",
+            "file:../database/migrations/20260601_01_create_hwk_submission.sql"
+    })
+    void submissionContractKeepsDocumentedReviewAndContentColumns() {
+        List<String> columns = jdbcTemplate.queryForList("""
+                SELECT LOWER(column_name)
+                FROM information_schema.columns
+                WHERE table_name = 't_hwk_submission'
+                """, String.class);
+
+        assertThat(columns).contains(
+                "submit_type",
+                "answer_text",
+                "answer_json",
+                "file_url",
+                "language",
+                "submit_status",
+                "evaluation_status",
+                "review_status",
+                "auto_score",
+                "manual_score",
+                "final_score",
+                "comment",
+                "is_final",
+                "submitted_at",
+                "reviewed_by",
+                "reviewed_at",
+                "created_at",
+                "updated_at"
+        );
+    }
+
+    @Test
+    @Sql(scripts = {
+            "file:../database/migrations/20260530_01_create_hwk_homework.sql",
+            "file:../database/migrations/20260601_01_create_hwk_submission.sql"
+    })
+    void submissionContractRequiresHomeworkAndUniqueStudentVersion() {
+        long homeworkId = insertHomework(null);
+        insertSubmission(homeworkId, 601L, 1);
+
+        assertThatThrownBy(() -> insertSubmission(homeworkId, 601L, 1))
+                .isInstanceOf(DataIntegrityViolationException.class);
+
+        assertThatThrownBy(() -> insertSubmission(999_999L, 601L, 1))
+                .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
     private long insertHomework(Long judgeConfigId) {
         jdbcTemplate.update("""
                 INSERT INTO t_hwk_homework
@@ -86,5 +143,17 @@ class HomeworkMigrationTest {
                 VALUES (?, '[\"java\"]', 1000, 65536, 'EXACT', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                 """, homeworkId);
         return jdbcTemplate.queryForObject("SELECT MAX(id) FROM t_hwk_judge_config", Long.class);
+    }
+
+    private void insertSubmission(long homeworkId, long studentId, int version) {
+        jdbcTemplate.update("""
+                INSERT INTO t_hwk_submission
+                (homework_id, student_id, submit_type, answer_text, answer_json, file_url, language,
+                 submit_status, evaluation_status, review_status, auto_score, manual_score, final_score,
+                 comment, version, is_final, submitted_at, reviewed_by, reviewed_at, created_at, updated_at, is_deleted)
+                VALUES (?, ?, 'TEXT', 'answer', NULL, NULL, NULL, 'SUBMITTED', 'NONE', 'UNREVIEWED',
+                        NULL, NULL, NULL, NULL, ?, 1, CURRENT_TIMESTAMP, NULL, NULL,
+                        CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0)
+                """, homeworkId, studentId, version);
     }
 }

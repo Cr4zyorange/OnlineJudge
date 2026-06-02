@@ -7,6 +7,7 @@ import {
   publishHomework,
   saveHomeworkQuestions,
   saveHomeworkTestCases,
+  submitHomework,
   updateHomework
 } from '../../../src/api/hwk/homeworks';
 
@@ -53,6 +54,43 @@ describe('homeworks api', () => {
       ['/api/v1/homeworks/11/publish', 'PUT'],
       ['/api/v1/homeworks/11/close', 'PUT']
     ]);
+  });
+
+  it('posts documented HWK02 student submissions and returns the receipt', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(jsonResponse({
+        submissionId: 91,
+        homeworkId: 11,
+        studentId: 601,
+        submitStatus: 'SUBMITTED',
+        evaluationStatus: 'NONE',
+        version: 1,
+        final: true,
+        submittedAt: '2026-06-01T10:00:00'
+      }));
+
+    await expect(submitHomework(11, {
+      answerText: 'Use dynamic programming.',
+      answerJson: '{"q1":"B"}',
+      fileIds: ['file-1'],
+      codeText: '',
+      language: ''
+    })).resolves.toEqual(expect.objectContaining({
+      submissionId: 91,
+      submitStatus: 'SUBMITTED',
+      evaluationStatus: 'NONE'
+    }));
+
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/homeworks/11/submissions', expect.objectContaining({
+      method: 'POST',
+      body: JSON.stringify({
+        answerText: 'Use dynamic programming.',
+        answerJson: '{"q1":"B"}',
+        fileIds: ['file-1'],
+        codeText: '',
+        language: ''
+      })
+    }));
   });
 });
 
