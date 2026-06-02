@@ -45,10 +45,10 @@ public class CourseService {
         String normalizedScope = scope == null || scope.isBlank() ? "all" : scope;
         boolean admin = isAdmin(user);
         return new PageResponse<>(
-                courseRepository.list(keyword, normalizedPage, normalizedSize, normalizedScope, user.id(), admin).stream()
+                courseRepository.list(keyword, normalizedPage, normalizedSize, normalizedScope, user.id(), admin, user.hasRole("TEACHER")).stream()
                         .map(course -> toResponse(course, user))
                         .toList(),
-                courseRepository.count(keyword, normalizedScope, user.id(), admin),
+                courseRepository.count(keyword, normalizedScope, user.id(), admin, user.hasRole("TEACHER")),
                 normalizedPage,
                 normalizedSize
         );
@@ -109,7 +109,7 @@ public class CourseService {
     }
 
     public List<CourseMemberResponse> members(Long courseId, CourseMemberStatus status, CurrentUser user) {
-        requireManagePermission(courseId, user);
+        requireActiveMembership(courseId, user);
         return courseRepository.listMembers(courseId, status).stream()
                 .map(this::toMemberResponse)
                 .toList();
@@ -121,13 +121,36 @@ public class CourseService {
         CourseMember member = courseRepository.findMember(courseId, userId)
                 .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "MEMBER_NOT_FOUND"));
         CourseMemberRole role = request.role() == null ? member.role() : request.role();
-        if (request.status() == CourseMemberStatus.ACTIVE) {
+        CourseMemberStatus status = request.status();
+        if (user.id() == userId && (role != CourseMemberRole.TEACHER || status == CourseMemberStatus.REMOVED)) {
+            throw new BusinessException(HttpStatus.CONFLICT, "CANNOT_CHANGE_SELF_TEACHER");
+        }
+        if (member.role() == CourseMemberRole.TEACHER
+                && (role != CourseMemberRole.TEACHER || status == CourseMemberStatus.REMOVED)
+                && courseRepository.activeTeacherCount(courseId) <= 1) {
+            throw new BusinessException(HttpStatus.CONFLICT, "LAST_TEACHER_REQUIRED");
+        }
+        if (status == CourseMemberStatus.ACTIVE) {
             requireCapacity(getCourse(courseId), CourseMemberStatus.ACTIVE);
         }
-        if (request.status() == CourseMemberStatus.REJECTED && member.status() != CourseMemberStatus.PENDING) {
+        if (status == CourseMemberStatus.REJECTED && member.status() != CourseMemberStatus.PENDING) {
             throw new BusinessException(HttpStatus.CONFLICT, "ONLY_PENDING_CAN_BE_REJECTED");
         }
-        return toMemberResponse(courseRepository.updateMember(courseId, userId, role, request.status(), user.id()));
+        return toMemberResponse(courseRepository.updateMember(courseId, userId, role, status, user.id()));
+    }
+
+    @Transactional
+    public void removeMember(Long courseId, Long userId, CurrentUser user) {
+        requireManagePermission(courseId, user);
+        CourseMember member = courseRepository.findMember(courseId, userId)
+                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "MEMBER_NOT_FOUND"));
+        if (user.id() == userId) {
+            throw new BusinessException(HttpStatus.CONFLICT, "CANNOT_REMOVE_SELF");
+        }
+        if (member.role() == CourseMemberRole.TEACHER && courseRepository.activeTeacherCount(courseId) <= 1) {
+            throw new BusinessException(HttpStatus.CONFLICT, "LAST_TEACHER_REQUIRED");
+        }
+        courseRepository.updateMember(courseId, userId, member.role(), CourseMemberStatus.REMOVED, user.id());
     }
 
     private Course getCourse(Long courseId) {
@@ -150,6 +173,16 @@ public class CourseService {
                 .orElseThrow(() -> new BusinessException(HttpStatus.FORBIDDEN, "无权限访问"));
         if (member.status() != CourseMemberStatus.ACTIVE || member.role() != CourseMemberRole.TEACHER) {
             throw new BusinessException(HttpStatus.FORBIDDEN, "无权限访问");
+        }
+    }
+
+    private void requireActiveMembership(Long courseId, CurrentUser user) {
+        getCourse(courseId);
+        if (isAdmin(user)) {
+            return;
+        }
+        if (!isActiveMember(courseId, user.id())) {
+            throw new BusinessException(HttpStatus.FORBIDDEN, "NO_COURSE_MEMBERSHIP");
         }
     }
 

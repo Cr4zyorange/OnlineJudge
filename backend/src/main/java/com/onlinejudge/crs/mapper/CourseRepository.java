@@ -88,9 +88,34 @@ public class CourseRepository {
         return courses.stream().findFirst();
     }
 
-    public List<Course> list(String keyword, int page, int size, String scope, Long userId, boolean admin) {
+    public List<Course> list(String keyword, int page, int size, String scope, Long userId, boolean admin, boolean teacher) {
         String like = "%" + (keyword == null ? "" : keyword.trim()) + "%";
         String scopeCondition = scopeCondition(scope, admin);
+        if ("mine".equalsIgnoreCase(scope)) {
+            if (teacher) {
+                return jdbcTemplate.query("""
+                        SELECT c.* FROM crs_course c
+                         WHERE c.is_deleted = FALSE
+                           AND c.teacher_id = ?
+                           AND (c.course_name LIKE ? OR c.category LIKE ? OR c.semester LIKE ?)
+                        """ + scopeCondition + """
+                         ORDER BY c.created_at DESC
+                         LIMIT ? OFFSET ?
+                        """, courseMapper, userId, like, like, like, size, (page - 1) * size);
+            }
+            return jdbcTemplate.query("""
+                    SELECT c.* FROM crs_course c
+                    JOIN crs_course_member m ON m.course_id = c.id
+                     WHERE c.is_deleted = FALSE
+                       AND m.user_id = ?
+                       AND m.join_status = 'ACTIVE'
+                       AND m.is_deleted = FALSE
+                       AND (c.course_name LIKE ? OR c.category LIKE ? OR c.semester LIKE ?)
+                    """ + scopeCondition + """
+                     ORDER BY c.created_at DESC
+                     LIMIT ? OFFSET ?
+                    """, courseMapper, userId, like, like, like, size, (page - 1) * size);
+        }
         if (requiresUser(scope, admin)) {
             return jdbcTemplate.query("""
                     SELECT c.* FROM crs_course c
@@ -116,9 +141,28 @@ public class CourseRepository {
                 """, courseMapper, like, like, like, size, (page - 1) * size);
     }
 
-    public long count(String keyword, String scope, Long userId, boolean admin) {
+    public long count(String keyword, String scope, Long userId, boolean admin, boolean teacher) {
         String like = "%" + (keyword == null ? "" : keyword.trim()) + "%";
         String scopeCondition = scopeCondition(scope, admin);
+        if ("mine".equalsIgnoreCase(scope)) {
+            if (teacher) {
+                return jdbcTemplate.queryForObject("""
+                        SELECT COUNT(*) FROM crs_course c
+                         WHERE c.is_deleted = FALSE
+                           AND c.teacher_id = ?
+                           AND (c.course_name LIKE ? OR c.category LIKE ? OR c.semester LIKE ?)
+                        """ + scopeCondition, Long.class, userId, like, like, like);
+            }
+            return jdbcTemplate.queryForObject("""
+                    SELECT COUNT(*) FROM crs_course c
+                    JOIN crs_course_member m ON m.course_id = c.id
+                     WHERE c.is_deleted = FALSE
+                       AND m.user_id = ?
+                       AND m.join_status = 'ACTIVE'
+                       AND m.is_deleted = FALSE
+                       AND (c.course_name LIKE ? OR c.category LIKE ? OR c.semester LIKE ?)
+                    """ + scopeCondition, Long.class, userId, like, like, like);
+        }
         if (requiresUser(scope, admin)) {
             return jdbcTemplate.queryForObject("""
                     SELECT COUNT(*) FROM crs_course c
@@ -229,6 +273,16 @@ public class CourseRepository {
                 SELECT COUNT(*) FROM crs_course_member
                  WHERE course_id = ?
                    AND role = 'STUDENT'
+                   AND join_status = 'ACTIVE'
+                   AND is_deleted = FALSE
+                """, Long.class, courseId);
+    }
+
+    public long activeTeacherCount(Long courseId) {
+        return jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM crs_course_member
+                 WHERE course_id = ?
+                   AND role = 'TEACHER'
                    AND join_status = 'ACTIVE'
                    AND is_deleted = FALSE
                 """, Long.class, courseId);

@@ -96,6 +96,14 @@ public class CourseController {
         return ApiResponse.ok(courseService.updateMember(courseId, userId, request, currentUser));
     }
 
+    @DeleteMapping("/{courseId}/members/{userId}")
+    public ApiResponse<Void> removeMember(@PathVariable Long courseId,
+                                          @PathVariable Long userId,
+                                          CurrentUser currentUser) {
+        courseService.removeMember(courseId, userId, currentUser);
+        return ApiResponse.ok(null);
+    }
+
     @PostMapping("/{courseId}/chapters")
     public ApiResponse<ChapterResponse> createChapter(@PathVariable Long courseId,
                                                       @Valid @RequestBody ChapterCreateRequest request,
