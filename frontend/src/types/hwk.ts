@@ -139,6 +139,24 @@ export interface HomeworkSubmissionSummary {
 
 export type HomeworkSubmissionDetail = HomeworkSubmissionSummary;
 
+export interface HomeworkEvaluationResult {
+  evaluationId: number;
+  submissionId: number;
+  evaluationStatus: HomeworkEvaluationStatus;
+  score: number;
+  passedCases: number;
+  totalCases: number;
+  durationMs?: number | null;
+  errorMessage?: string | null;
+  feedback?: string | null;
+  compileLog?: string | null;
+  runLog?: string | null;
+  reevaluation: boolean;
+  triggeredBy?: number | null;
+  startedAt: string;
+  finishedAt?: string | null;
+}
+
 export interface PageResponse<T> {
   list: T[];
   total: number;

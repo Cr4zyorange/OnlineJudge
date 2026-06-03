@@ -1,6 +1,7 @@
 import { request } from '../http';
 import type {
   HomeworkDetail,
+  HomeworkEvaluationResult,
   HomeworkEvaluationStatus,
   HomeworkPayload,
   HomeworkQuestionPayload,
@@ -138,4 +139,18 @@ export function listHomeworkSubmissions(
 
 export function getHomeworkSubmission(submissionId: number): Promise<HomeworkSubmissionDetail> {
   return request<HomeworkSubmissionDetail>(`/api/v1/submissions/${submissionId}`);
+}
+
+export function getHomeworkSubmissionEvaluation(submissionId: number): Promise<HomeworkEvaluationResult> {
+  return request<HomeworkEvaluationResult>(`/api/v1/submissions/${submissionId}/evaluation`);
+}
+
+export function getHomeworkEvaluationLogs(evaluationId: number): Promise<HomeworkEvaluationResult> {
+  return request<HomeworkEvaluationResult>(`/api/v1/evaluations/${evaluationId}/logs`);
+}
+
+export function reevaluateHomeworkSubmission(submissionId: number): Promise<HomeworkEvaluationResult> {
+  return request<HomeworkEvaluationResult>(`/api/v1/submissions/${submissionId}/reevaluate`, {
+    method: 'POST'
+  });
 }
