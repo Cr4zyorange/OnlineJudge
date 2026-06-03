@@ -47,7 +47,7 @@ public record HomeworkEvaluationResponse(
                 evaluation.score(),
                 evaluation.passedCases(),
                 evaluation.totalCases(),
-                evaluation.durationMs(),
+                evaluation.timeUsedMs(),
                 hidePrivateCodeFeedback ? null : evaluation.errorMessage(),
                 hidePrivateCodeFeedback ? safeCodeFeedback(evaluation) : evaluation.feedback(),
                 managerView ? evaluation.compileLog() : null,

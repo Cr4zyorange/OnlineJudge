@@ -6,6 +6,7 @@ import {
   getHomeworkEvaluationLogs,
   getHomeworkSubmissionEvaluation,
   getHomeworkSubmission,
+  getHomeworkTestCases,
   listHomeworks,
   listHomeworkSubmissions,
   listMyHomeworkSubmissions,
@@ -36,6 +37,7 @@ describe('homeworks api', () => {
       .mockResolvedValueOnce(jsonResponse(homeworkDetail({ id: 11, title: 'updated' })))
       .mockResolvedValueOnce(jsonResponse(homeworkDetail({ id: 11, questions: [{ ...questionPayload(), id: 7, homeworkId: 11 }] })))
       .mockResolvedValueOnce(jsonResponse(homeworkDetail({ id: 11, testCases: [{ ...testCasePayload(), id: 9, homeworkId: 11 }] })))
+      .mockResolvedValueOnce(jsonResponse([{ ...testCasePayload(), id: 9, homeworkId: 11 }]))
       .mockResolvedValueOnce(jsonResponse(homeworkDetail({ id: 11 })))
       .mockResolvedValueOnce(jsonResponse(homeworkDetail({ id: 11, status: 'PUBLISHED' })))
       .mockResolvedValueOnce(jsonResponse(homeworkDetail({ id: 11, status: 'CLOSED' })));
@@ -46,6 +48,7 @@ describe('homeworks api', () => {
     await updateHomework(11, { ...homeworkPayload(), title: 'updated' });
     await saveHomeworkQuestions(11, [questionPayload()]);
     await saveHomeworkTestCases(11, [testCasePayload()]);
+    await expect(getHomeworkTestCases(11)).resolves.toEqual([{ ...testCasePayload(), id: 9, homeworkId: 11 }]);
     await getHomeworkDetail(11);
     await publishHomework(11);
     await closeHomework(11);
@@ -56,6 +59,7 @@ describe('homeworks api', () => {
       ['/api/v1/homeworks/11', 'PUT'],
       ['/api/v1/homeworks/11/questions', 'PUT'],
       ['/api/v1/homeworks/11/test-cases', 'PUT'],
+      ['/api/v1/homeworks/11/test-cases', 'GET'],
       ['/api/v1/homeworks/11', 'GET'],
       ['/api/v1/homeworks/11/publish', 'PUT'],
       ['/api/v1/homeworks/11/close', 'PUT']
@@ -173,7 +177,7 @@ describe('homeworks api', () => {
       compileLog: 'compile ok',
       runLog: 'case output'
     }));
-    await expect(reevaluateHomeworkSubmission(91)).resolves.toEqual(expect.objectContaining({
+    await expect(reevaluateHomeworkSubmission(91, 'teacher requested a fresh judge')).resolves.toEqual(expect.objectContaining({
       evaluationId: 502,
       reevaluation: true
     }));
@@ -183,6 +187,9 @@ describe('homeworks api', () => {
       ['/api/v1/evaluations/501/logs', 'GET'],
       ['/api/v1/submissions/91/reevaluate', 'POST']
     ]);
+    expect(fetchMock.mock.calls[2][1]).toEqual(expect.objectContaining({
+      body: JSON.stringify({ reason: 'teacher requested a fresh judge' })
+    }));
   });
 });
 

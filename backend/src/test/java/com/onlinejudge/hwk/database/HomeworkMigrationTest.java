@@ -30,6 +30,9 @@ class HomeworkMigrationTest {
     private static final Path EVALUATION_MIGRATION_PATH = Path.of(
             "../database/migrations/20260602_01_create_hwk_evaluation.sql"
     );
+    private static final Path REVIEW_LOG_MIGRATION_PATH = Path.of(
+            "../database/migrations/20260602_02_create_hwk_review_log.sql"
+    );
 
     private final JdbcTemplate jdbcTemplate;
 
@@ -43,12 +46,15 @@ class HomeworkMigrationTest {
         String migrationSql = Files.readString(HOMEWORK_MIGRATION_PATH);
         String submissionSql = Files.readString(SUBMISSION_MIGRATION_PATH);
         String evaluationSql = Files.readString(EVALUATION_MIGRATION_PATH);
+        String reviewLogSql = Files.readString(REVIEW_LOG_MIGRATION_PATH);
 
         assertThat(migrationSql)
                 .doesNotContainPattern("(?i)ADD\\s+CONSTRAINT\\s+IF\\s+NOT\\s+EXISTS");
         assertThat(submissionSql)
                 .doesNotContainPattern("(?i)ADD\\s+CONSTRAINT\\s+IF\\s+NOT\\s+EXISTS");
         assertThat(evaluationSql)
+                .doesNotContainPattern("(?i)ADD\\s+CONSTRAINT\\s+IF\\s+NOT\\s+EXISTS");
+        assertThat(reviewLogSql)
                 .doesNotContainPattern("(?i)ADD\\s+CONSTRAINT\\s+IF\\s+NOT\\s+EXISTS");
     }
 
@@ -135,7 +141,7 @@ class HomeworkMigrationTest {
             "file:../database/migrations/20260601_01_create_hwk_submission.sql",
             "file:../database/migrations/20260602_01_create_hwk_evaluation.sql"
     })
-    void evaluationContractStoresTraceableResultAndRequiresSubmission() {
+    void evaluationContractStoresDocumentedTraceableResultAndRequiresSubmission() {
         List<String> columns = jdbcTemplate.queryForList("""
                 SELECT LOWER(column_name)
                 FROM information_schema.columns
@@ -144,34 +150,78 @@ class HomeworkMigrationTest {
 
         assertThat(columns).contains(
                 "submission_id",
+                "homework_id",
+                "student_id",
+                "evaluation_type",
                 "status",
                 "score",
                 "passed_cases",
                 "total_cases",
-                "duration_ms",
-                "error_message",
+                "time_used_ms",
+                "memory_used_kb",
                 "feedback",
-                "compile_log",
-                "run_log",
-                "reevaluation",
-                "triggered_by",
+                "log_url",
                 "started_at",
-                "finished_at",
-                "created_at",
-                "updated_at"
+                "finished_at"
         );
 
         long homeworkId = insertHomework(null);
         long submissionId = insertSubmission(homeworkId, 601L, 1);
-        insertEvaluation(submissionId, 501L, false);
-        insertEvaluation(submissionId, 501L, true);
+        insertEvaluation(submissionId, homeworkId, 601L, "CODE_JUDGE");
+        insertEvaluation(submissionId, homeworkId, 601L, "REJUDGE");
 
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM t_hwk_evaluation WHERE submission_id = ?",
                 Integer.class,
                 submissionId
         )).isEqualTo(2);
-        assertThatThrownBy(() -> insertEvaluation(999_999L, 501L, false))
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT evaluation_type FROM t_hwk_evaluation WHERE submission_id = ? ORDER BY id DESC LIMIT 1",
+                String.class,
+                submissionId
+        )).isEqualTo("REJUDGE");
+        assertThatThrownBy(() -> insertEvaluation(999_999L, homeworkId, 601L, "CODE_JUDGE"))
+                .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    @Sql(scripts = {
+            "file:../database/migrations/20260530_01_create_hwk_homework.sql",
+            "file:../database/migrations/20260601_01_create_hwk_submission.sql",
+            "file:../database/migrations/20260602_02_create_hwk_review_log.sql"
+    })
+    void reviewLogContractStoresRejudgeAuditAndRequiresSubmissionAndHomework() {
+        List<String> columns = jdbcTemplate.queryForList("""
+                SELECT LOWER(column_name)
+                FROM information_schema.columns
+                WHERE table_name = 't_hwk_review_log'
+                """, String.class);
+
+        assertThat(columns).contains(
+                "submission_id",
+                "homework_id",
+                "student_id",
+                "operation_type",
+                "old_score",
+                "new_score",
+                "comment",
+                "operator_id",
+                "reason",
+                "created_at"
+        );
+
+        long homeworkId = insertHomework(null);
+        long submissionId = insertSubmission(homeworkId, 601L, 1);
+        insertReviewLog(submissionId, homeworkId, 601L, 501L, "teacher requested new judge");
+
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT reason FROM t_hwk_review_log WHERE submission_id = ?",
+                String.class,
+                submissionId
+        )).isEqualTo("teacher requested new judge");
+        assertThatThrownBy(() -> insertReviewLog(999_999L, homeworkId, 601L, 501L, "bad submission"))
+                .isInstanceOf(DataIntegrityViolationException.class);
+        assertThatThrownBy(() -> insertReviewLog(submissionId, 999_999L, 601L, 501L, "bad homework"))
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
 
@@ -210,15 +260,23 @@ class HomeworkMigrationTest {
         return jdbcTemplate.queryForObject("SELECT MAX(id) FROM t_hwk_submission", Long.class);
     }
 
-    private void insertEvaluation(long submissionId, long triggeredBy, boolean reevaluation) {
+    private void insertEvaluation(long submissionId, long homeworkId, long studentId, String evaluationType) {
         jdbcTemplate.update("""
                 INSERT INTO t_hwk_evaluation
-                (submission_id, status, score, passed_cases, total_cases, duration_ms, error_message,
-                 feedback, compile_log, run_log, reevaluation, triggered_by, started_at, finished_at,
-                 created_at, updated_at)
-                VALUES (?, 'ACCEPTED', 100, 2, 2, 120, NULL, 'all cases passed',
-                        NULL, 'case logs', ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP,
+                (submission_id, homework_id, student_id, evaluation_type, status, score, passed_cases, total_cases,
+                 time_used_ms, memory_used_kb, feedback, log_url, started_at, finished_at, created_at, updated_at)
+                VALUES (?, ?, ?, ?, 'ACCEPTED', 100, 2, 2, 120, 1024, 'all cases passed',
+                        '/logs/hwk/evaluation/1', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP,
                         CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-                """, submissionId, reevaluation, triggeredBy);
+                """, submissionId, homeworkId, studentId, evaluationType);
+    }
+
+    private void insertReviewLog(long submissionId, long homeworkId, long studentId, long operatorId, String reason) {
+        jdbcTemplate.update("""
+                INSERT INTO t_hwk_review_log
+                (submission_id, homework_id, student_id, operation_type, old_score, new_score,
+                 comment, operator_id, reason, created_at)
+                VALUES (?, ?, ?, 'REJUDGE', 40, 100, NULL, ?, ?, CURRENT_TIMESTAMP)
+                """, submissionId, homeworkId, studentId, operatorId, reason);
     }
 }

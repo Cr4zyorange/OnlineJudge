@@ -3,6 +3,7 @@ package com.onlinejudge.hwk.repository;
 import com.onlinejudge.common.evaluation.EvaluationStatus;
 import com.onlinejudge.hwk.domain.HomeworkEvaluation;
 import com.onlinejudge.hwk.domain.HomeworkEvaluationRepository;
+import com.onlinejudge.hwk.domain.HomeworkEvaluationType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
@@ -17,16 +18,28 @@ import java.util.Optional;
 
 @Repository
 public class JdbcHomeworkEvaluationRepository implements HomeworkEvaluationRepository {
+    private static final String SELECT_COLUMNS = """
+            id, submission_id, homework_id, student_id, evaluation_type, status, score,
+            passed_cases, total_cases, time_used_ms, memory_used_kb, error_message, feedback,
+            log_url, compile_log, run_log, reevaluation, triggered_by, started_at, finished_at,
+            created_at, updated_at
+            """;
+
     private static final RowMapper<HomeworkEvaluation> ROW_MAPPER = (resultSet, rowNum) -> new HomeworkEvaluation(
             resultSet.getLong("id"),
             resultSet.getLong("submission_id"),
+            resultSet.getLong("homework_id"),
+            resultSet.getLong("student_id"),
+            HomeworkEvaluationType.valueOf(resultSet.getString("evaluation_type")),
             EvaluationStatus.valueOf(resultSet.getString("status")),
             resultSet.getBigDecimal("score").intValue(),
             resultSet.getInt("passed_cases"),
             resultSet.getInt("total_cases"),
-            resultSet.getObject("duration_ms", Integer.class),
+            resultSet.getObject("time_used_ms", Integer.class),
+            resultSet.getObject("memory_used_kb", Integer.class),
             resultSet.getString("error_message"),
             resultSet.getString("feedback"),
+            resultSet.getString("log_url"),
             resultSet.getString("compile_log"),
             resultSet.getString("run_log"),
             resultSet.getBoolean("reevaluation"),
@@ -49,12 +62,13 @@ public class JdbcHomeworkEvaluationRepository implements HomeworkEvaluationRepos
         jdbcTemplate.update(connection -> {
             PreparedStatement statement = connection.prepareStatement("""
                     INSERT INTO t_hwk_evaluation
-                    (submission_id, status, score, passed_cases, total_cases, duration_ms, error_message,
-                     feedback, compile_log, run_log, reevaluation, triggered_by, started_at, finished_at,
+                    (submission_id, homework_id, student_id, evaluation_type, status, score,
+                     passed_cases, total_cases, time_used_ms, memory_used_kb, error_message, feedback,
+                     log_url, compile_log, run_log, reevaluation, triggered_by, started_at, finished_at,
                      created_at, updated_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """, new String[]{"id"});
-            bind(statement, evaluation);
+            bindForInsert(statement, evaluation);
             return statement;
         }, keyHolder);
         long id = Objects.requireNonNull(keyHolder.getKey()).longValue();
@@ -65,13 +79,18 @@ public class JdbcHomeworkEvaluationRepository implements HomeworkEvaluationRepos
     public HomeworkEvaluation update(HomeworkEvaluation evaluation) {
         int updated = jdbcTemplate.update("""
                 UPDATE t_hwk_evaluation
-                SET status = ?,
+                SET homework_id = ?,
+                    student_id = ?,
+                    evaluation_type = ?,
+                    status = ?,
                     score = ?,
                     passed_cases = ?,
                     total_cases = ?,
-                    duration_ms = ?,
+                    time_used_ms = ?,
+                    memory_used_kb = ?,
                     error_message = ?,
                     feedback = ?,
+                    log_url = ?,
                     compile_log = ?,
                     run_log = ?,
                     reevaluation = ?,
@@ -81,13 +100,18 @@ public class JdbcHomeworkEvaluationRepository implements HomeworkEvaluationRepos
                     updated_at = ?
                 WHERE id = ?
                 """,
+                evaluation.homeworkId(),
+                evaluation.studentId(),
+                evaluation.evaluationType().name(),
                 evaluation.status().name(),
                 evaluation.score(),
                 evaluation.passedCases(),
                 evaluation.totalCases(),
-                evaluation.durationMs(),
+                evaluation.timeUsedMs(),
+                evaluation.memoryUsedKb(),
                 evaluation.errorMessage(),
                 evaluation.feedback(),
+                evaluation.logUrl(),
                 evaluation.compileLog(),
                 evaluation.runLog(),
                 evaluation.reevaluation(),
@@ -106,14 +130,12 @@ public class JdbcHomeworkEvaluationRepository implements HomeworkEvaluationRepos
     @Override
     public Optional<HomeworkEvaluation> findLatestBySubmissionId(long submissionId) {
         return jdbcTemplate.query("""
-                        SELECT id, submission_id, status, score, passed_cases, total_cases, duration_ms,
-                               error_message, feedback, compile_log, run_log, reevaluation, triggered_by,
-                               started_at, finished_at, created_at, updated_at
+                        SELECT %s
                         FROM t_hwk_evaluation
                         WHERE submission_id = ?
                         ORDER BY id DESC
                         LIMIT 1
-                        """,
+                        """.formatted(SELECT_COLUMNS),
                 ROW_MAPPER,
                 submissionId
         ).stream().findFirst();
@@ -122,34 +144,37 @@ public class JdbcHomeworkEvaluationRepository implements HomeworkEvaluationRepos
     @Override
     public Optional<HomeworkEvaluation> findById(long id) {
         return jdbcTemplate.query("""
-                        SELECT id, submission_id, status, score, passed_cases, total_cases, duration_ms,
-                               error_message, feedback, compile_log, run_log, reevaluation, triggered_by,
-                               started_at, finished_at, created_at, updated_at
+                        SELECT %s
                         FROM t_hwk_evaluation
                         WHERE id = ?
-                        """,
+                        """.formatted(SELECT_COLUMNS),
                 ROW_MAPPER,
                 id
         ).stream().findFirst();
     }
 
-    private static void bind(PreparedStatement statement, HomeworkEvaluation evaluation) throws java.sql.SQLException {
+    private static void bindForInsert(PreparedStatement statement, HomeworkEvaluation evaluation) throws java.sql.SQLException {
         statement.setLong(1, evaluation.submissionId());
-        statement.setString(2, evaluation.status().name());
-        statement.setInt(3, evaluation.score());
-        statement.setInt(4, evaluation.passedCases());
-        statement.setInt(5, evaluation.totalCases());
-        statement.setObject(6, evaluation.durationMs());
-        statement.setString(7, evaluation.errorMessage());
-        statement.setString(8, evaluation.feedback());
-        statement.setString(9, evaluation.compileLog());
-        statement.setString(10, evaluation.runLog());
-        statement.setBoolean(11, evaluation.reevaluation());
-        statement.setObject(12, evaluation.triggeredBy());
-        statement.setTimestamp(13, Timestamp.valueOf(evaluation.startedAt()));
-        statement.setObject(14, evaluation.finishedAt() == null ? null : Timestamp.valueOf(evaluation.finishedAt()));
-        statement.setTimestamp(15, Timestamp.valueOf(evaluation.createdAt()));
-        statement.setTimestamp(16, Timestamp.valueOf(evaluation.updatedAt()));
+        statement.setLong(2, evaluation.homeworkId());
+        statement.setLong(3, evaluation.studentId());
+        statement.setString(4, evaluation.evaluationType().name());
+        statement.setString(5, evaluation.status().name());
+        statement.setInt(6, evaluation.score());
+        statement.setInt(7, evaluation.passedCases());
+        statement.setInt(8, evaluation.totalCases());
+        statement.setObject(9, evaluation.timeUsedMs());
+        statement.setObject(10, evaluation.memoryUsedKb());
+        statement.setString(11, evaluation.errorMessage());
+        statement.setString(12, evaluation.feedback());
+        statement.setString(13, evaluation.logUrl());
+        statement.setString(14, evaluation.compileLog());
+        statement.setString(15, evaluation.runLog());
+        statement.setBoolean(16, evaluation.reevaluation());
+        statement.setObject(17, evaluation.triggeredBy());
+        statement.setTimestamp(18, Timestamp.valueOf(evaluation.startedAt()));
+        statement.setObject(19, evaluation.finishedAt() == null ? null : Timestamp.valueOf(evaluation.finishedAt()));
+        statement.setTimestamp(20, Timestamp.valueOf(evaluation.createdAt()));
+        statement.setTimestamp(21, Timestamp.valueOf(evaluation.updatedAt()));
     }
 
     private static LocalDateTime toLocalDateTime(Timestamp timestamp) {

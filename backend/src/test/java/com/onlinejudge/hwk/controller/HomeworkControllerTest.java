@@ -45,12 +45,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         scripts = {
                 "file:../database/migrations/20260530_01_create_hwk_homework.sql",
                 "file:../database/migrations/20260601_01_create_hwk_submission.sql",
-                "file:../database/migrations/20260602_01_create_hwk_evaluation.sql"
+                "file:../database/migrations/20260602_01_create_hwk_evaluation.sql",
+                "file:../database/migrations/20260602_02_create_hwk_review_log.sql"
         },
         executionPhase = Sql.ExecutionPhase.BEFORE_TEST_CLASS
 )
 @Sql(
         statements = {
+                "DELETE FROM t_hwk_review_log",
                 "DELETE FROM t_hwk_evaluation",
                 "DELETE FROM t_hwk_test_case",
                 "DELETE FROM t_hwk_question",
@@ -559,7 +561,9 @@ class HomeworkControllerTest {
                 .andExpect(jsonPath("$.data.reevaluation").value(false));
 
         mockMvc.perform(post("/api/v1/submissions/{submissionId}/reevaluate", submissionId)
-                        .headers(teacherHeaders("101", "101")))
+                        .headers(teacherHeaders("101", "101"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of("reason", "verify fixed judge data"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.submissionId").value(submissionId))
                 .andExpect(jsonPath("$.data.evaluationStatus").value("ACCEPTED"))
@@ -571,6 +575,33 @@ class HomeworkControllerTest {
                 Integer.class,
                 submissionId
         )).isEqualTo(2);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT evaluation_type FROM t_hwk_evaluation WHERE submission_id = ? ORDER BY id DESC LIMIT 1",
+                String.class,
+                submissionId
+        )).isEqualTo("REJUDGE");
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT reason FROM t_hwk_review_log WHERE submission_id = ? AND operation_type = 'REJUDGE'",
+                String.class,
+                submissionId
+        )).isEqualTo("verify fixed judge data");
+    }
+
+    @Test
+    void teacherReevaluationRequiresReason() throws Exception {
+        long homeworkId = createHomeworkAndReturnId(objectivePayload());
+        mockMvc.perform(put("/api/v1/homeworks/{homeworkId}/publish", homeworkId)
+                        .headers(teacherHeaders("101", "101", "101:601")))
+                .andExpect(status().isOk());
+        long submissionId = submitObjectiveAnswer(homeworkId, "{\"q1\":[\"2\"],\"q2\":[\"true\"]}", studentHeaders("101"));
+
+        mockMvc.perform(post("/api/v1/submissions/{submissionId}/reevaluate", submissionId)
+                        .headers(teacherHeaders("101", "101"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of("reason", "   "))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("HWK_4005"))
+                .andExpect(jsonPath("$.message", containsString("reason")));
     }
 
     @Test
@@ -676,7 +707,9 @@ class HomeworkControllerTest {
         );
 
         mockMvc.perform(post("/api/v1/submissions/{submissionId}/reevaluate", submissionId)
-                        .headers(teacherHeaders("101", "101")))
+                        .headers(teacherHeaders("101", "101"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of("reason", "answer key corrected"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.evaluationStatus").value("ACCEPTED"))
                 .andExpect(jsonPath("$.data.score").value(100))
@@ -890,6 +923,18 @@ class HomeworkControllerTest {
                         ))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.testCases", hasSize(1)));
+
+        mockMvc.perform(get("/api/v1/homeworks/{homeworkId}/test-cases", homeworkId)
+                        .headers(teacherHeaders("101", "101")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data", hasSize(1)))
+                .andExpect(jsonPath("$.data[0].inputData").value("1 2"))
+                .andExpect(jsonPath("$.data[0].expectedOutput").value("3"));
+
+        mockMvc.perform(get("/api/v1/homeworks/{homeworkId}/test-cases", homeworkId)
+                        .headers(studentHeaders("101")))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("HWK_4031"));
 
         mockMvc.perform(put("/api/v1/homeworks/{homeworkId}/publish", homeworkId)
                         .headers(teacherHeaders("101", "101", "101:7001")))

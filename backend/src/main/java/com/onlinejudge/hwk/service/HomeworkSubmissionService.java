@@ -11,8 +11,12 @@ import com.onlinejudge.hwk.domain.CreateHomeworkSubmissionCommand;
 import com.onlinejudge.hwk.domain.Homework;
 import com.onlinejudge.hwk.domain.HomeworkEvaluation;
 import com.onlinejudge.hwk.domain.HomeworkEvaluationRepository;
+import com.onlinejudge.hwk.domain.HomeworkEvaluationType;
 import com.onlinejudge.hwk.domain.HomeworkRepository;
 import com.onlinejudge.hwk.domain.HomeworkQuestion;
+import com.onlinejudge.hwk.domain.HomeworkReviewLog;
+import com.onlinejudge.hwk.domain.HomeworkReviewLogRepository;
+import com.onlinejudge.hwk.domain.HomeworkReviewOperationType;
 import com.onlinejudge.hwk.domain.HomeworkReviewStatus;
 import com.onlinejudge.hwk.domain.HomeworkStatus;
 import com.onlinejudge.hwk.domain.HomeworkSubmission;
@@ -48,6 +52,7 @@ public class HomeworkSubmissionService {
     private final HomeworkRepository homeworkRepository;
     private final HomeworkSubmissionRepository submissionRepository;
     private final HomeworkEvaluationRepository evaluationRepository;
+    private final HomeworkReviewLogRepository reviewLogRepository;
     private final CoursePermissionClient coursePermissionClient;
     private final Evaluator evaluator;
 
@@ -55,12 +60,14 @@ public class HomeworkSubmissionService {
             HomeworkRepository homeworkRepository,
             HomeworkSubmissionRepository submissionRepository,
             HomeworkEvaluationRepository evaluationRepository,
+            HomeworkReviewLogRepository reviewLogRepository,
             CoursePermissionClient coursePermissionClient,
             Evaluator evaluator
     ) {
         this.homeworkRepository = homeworkRepository;
         this.submissionRepository = submissionRepository;
         this.evaluationRepository = evaluationRepository;
+        this.reviewLogRepository = reviewLogRepository;
         this.coursePermissionClient = coursePermissionClient;
         this.evaluator = evaluator;
     }
@@ -167,7 +174,8 @@ public class HomeworkSubmissionService {
     }
 
     @Transactional
-    public EvaluationDetail reevaluate(long submissionId, long managerId) {
+    public EvaluationDetail reevaluate(long submissionId, long managerId, String reason) {
+        String normalizedReason = normalizeReason(reason);
         HomeworkSubmission submission = submissionRepository.findById(submissionId)
                 .orElseThrow(() -> new HomeworkApiException("HWK_4001", "submission not found", HttpStatus.NOT_FOUND));
         Homework homework = findExistingHomework(submission.homeworkId());
@@ -178,6 +186,7 @@ public class HomeworkSubmissionService {
         HomeworkEvaluation evaluation = homework.type() == HomeworkType.OBJECTIVE
                 ? reevaluateObjective(homework, submission, managerId)
                 : evaluateCodeSubmission(homework, submission, managerId, true, null);
+        writeRejudgeLog(homework, submission, evaluation, managerId, normalizedReason);
         HomeworkSubmission updated = submissionRepository.findById(submissionId).orElse(submission);
         return new EvaluationDetail(homework, updated, evaluation, true);
     }
@@ -255,20 +264,25 @@ public class HomeworkSubmissionService {
             LocalDateTime now
     ) {
         if (homework.type() == HomeworkType.OBJECTIVE) {
-            saveObjectiveEvaluation(submission, objectiveScore, false, null, now);
+            saveObjectiveEvaluation(homework, submission, objectiveScore, HomeworkEvaluationType.OBJECTIVE_AUTO, false, null, now);
             return;
         }
         if (homework.type() == HomeworkType.CODE) {
             evaluationRepository.save(new HomeworkEvaluation(
                     0L,
                     submission.id(),
+                    homework.id(),
+                    submission.studentId(),
+                    HomeworkEvaluationType.CODE_JUDGE,
                     EvaluationStatus.PENDING,
                     0,
                     0,
                     homework.testCases().size(),
                     null,
                     null,
+                    null,
                     "waiting for evaluation",
+                    null,
                     null,
                     null,
                     false,
@@ -292,8 +306,10 @@ public class HomeworkSubmissionService {
         }
         if (homework.type() == HomeworkType.OBJECTIVE) {
             return saveObjectiveEvaluation(
+                    homework,
                     submission,
                     calculateObjectiveScore(homework, submission.answerJson()),
+                    HomeworkEvaluationType.OBJECTIVE_AUTO,
                     false,
                     null,
                     LocalDateTime.now()
@@ -306,8 +322,10 @@ public class HomeworkSubmissionService {
         LocalDateTime now = LocalDateTime.now();
         ObjectiveScore score = calculateObjectiveScore(homework, submission.answerJson());
         HomeworkEvaluation evaluation = saveObjectiveEvaluation(
+                homework,
                 submission,
                 score,
+                HomeworkEvaluationType.REJUDGE,
                 true,
                 managerId,
                 now
@@ -326,8 +344,10 @@ public class HomeworkSubmissionService {
     }
 
     private HomeworkEvaluation saveObjectiveEvaluation(
+            Homework homework,
             HomeworkSubmission submission,
             ObjectiveScore score,
+            HomeworkEvaluationType evaluationType,
             boolean reevaluation,
             Long triggeredBy,
             LocalDateTime now
@@ -338,13 +358,18 @@ public class HomeworkSubmissionService {
         return evaluationRepository.save(new HomeworkEvaluation(
                 0L,
                 submission.id(),
+                homework.id(),
+                submission.studentId(),
+                evaluationType,
                 status,
                 score.score(),
                 score.passedCases(),
                 score.totalCases(),
                 0,
                 null,
+                null,
                 "objective score %d, passed %d / %d".formatted(score.score(), score.passedCases(), score.totalCases()),
+                null,
                 null,
                 null,
                 reevaluation,
@@ -407,13 +432,19 @@ public class HomeworkSubmissionService {
         HomeworkEvaluation completed = new HomeworkEvaluation(
                 existing == null || reevaluation ? 0L : existing.id(),
                 submission.id(),
+                homework.id(),
+                submission.studentId(),
+                reevaluation ? HomeworkEvaluationType.REJUDGE
+                        : existing == null ? HomeworkEvaluationType.CODE_JUDGE : existing.evaluationType(),
                 finalStatus,
                 score,
                 passedCases,
                 caseEvaluations.size(),
                 Math.toIntExact(Duration.between(startedAt, finishedAt).toMillis()),
+                null,
                 isFailureStatus(finalStatus) ? feedback : null,
                 feedback,
+                null,
                 findFirstMessage(caseEvaluations, EvaluationStatus.COMPILE_ERROR),
                 runLog,
                 reevaluation,
@@ -487,6 +518,35 @@ public class HomeworkSubmissionService {
 
     private boolean isTerminalEvaluationStatus(EvaluationStatus status) {
         return status != EvaluationStatus.PENDING && status != EvaluationStatus.RUNNING;
+    }
+
+    private String normalizeReason(String reason) {
+        if (reason == null || reason.isBlank()) {
+            throw invalidFormat("reevaluation reason is required");
+        }
+        return reason.trim();
+    }
+
+    private void writeRejudgeLog(
+            Homework homework,
+            HomeworkSubmission submission,
+            HomeworkEvaluation evaluation,
+            long managerId,
+            String reason
+    ) {
+        reviewLogRepository.save(new HomeworkReviewLog(
+                0L,
+                submission.id(),
+                homework.id(),
+                submission.studentId(),
+                HomeworkReviewOperationType.REJUDGE,
+                submission.autoScore(),
+                evaluation.score(),
+                null,
+                managerId,
+                reason,
+                LocalDateTime.now()
+        ));
     }
 
     private record ObjectiveScore(int score, int passedCases, int totalCases, int totalScore) {

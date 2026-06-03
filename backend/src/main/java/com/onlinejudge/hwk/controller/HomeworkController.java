@@ -174,6 +174,17 @@ public class HomeworkController {
         )));
     }
 
+    @GetMapping("/{homeworkId}/test-cases")
+    public ApiResponse<List<HomeworkTestCaseResponse>> testCases(
+            @PathVariable long homeworkId,
+            CurrentUser currentUser
+    ) {
+        return ApiResponse.ok(homeworkService.testCases(homeworkId, currentUser.id())
+                .stream()
+                .map(HomeworkTestCaseResponse::from)
+                .toList());
+    }
+
     @PutMapping("/{homeworkId}/publish")
     public ApiResponse<HomeworkResponse> publish(@PathVariable long homeworkId, CurrentUser currentUser) {
         return ApiResponse.ok(HomeworkResponse.fromTeacherView(homeworkService.publish(homeworkId, currentUser.id())));

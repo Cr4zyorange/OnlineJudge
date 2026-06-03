@@ -6,6 +6,8 @@ import com.onlinejudge.hwk.domain.HomeworkEvaluation;
 import com.onlinejudge.hwk.domain.HomeworkEvaluationRepository;
 import com.onlinejudge.hwk.domain.HomeworkQuestion;
 import com.onlinejudge.hwk.domain.HomeworkRepository;
+import com.onlinejudge.hwk.domain.HomeworkReviewLog;
+import com.onlinejudge.hwk.domain.HomeworkReviewLogRepository;
 import com.onlinejudge.hwk.domain.HomeworkStatus;
 import com.onlinejudge.hwk.domain.HomeworkSubmission;
 import com.onlinejudge.hwk.domain.HomeworkSubmissionRepository;
@@ -29,6 +31,7 @@ class HomeworkSubmissionServiceTest {
                 new SingleHomeworkRepository(publishedTextHomework()),
                 new DuplicateVersionSubmissionRepository(),
                 new UnusedHomeworkEvaluationRepository(),
+                new UnusedHomeworkReviewLogRepository(),
                 (courseId, userId) -> true,
                 task -> {
                     throw new UnsupportedOperationException();
@@ -181,6 +184,13 @@ class HomeworkSubmissionServiceTest {
         @Override
         public Optional<HomeworkEvaluation> findLatestBySubmissionId(long submissionId) {
             return Optional.empty();
+        }
+    }
+
+    private static final class UnusedHomeworkReviewLogRepository implements HomeworkReviewLogRepository {
+        @Override
+        public HomeworkReviewLog save(HomeworkReviewLog reviewLog) {
+            throw new UnsupportedOperationException();
         }
     }
 }

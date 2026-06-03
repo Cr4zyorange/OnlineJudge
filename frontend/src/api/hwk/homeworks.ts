@@ -12,6 +12,7 @@ import type {
   HomeworkSubmissionSummary,
   HomeworkSubmitStatus,
   HomeworkSummary,
+  HomeworkTestCase,
   HomeworkTestCasePayload,
   PageResponse
 } from '../../types/hwk';
@@ -89,6 +90,10 @@ export function closeHomework(homeworkId: number): Promise<HomeworkDetail> {
   });
 }
 
+export function getHomeworkTestCases(homeworkId: number): Promise<HomeworkTestCase[]> {
+  return request<HomeworkTestCase[]>(`/api/v1/homeworks/${homeworkId}/test-cases`);
+}
+
 export function submitHomework(
   homeworkId: number,
   payload: HomeworkSubmissionPayload
@@ -149,8 +154,9 @@ export function getHomeworkEvaluationLogs(evaluationId: number): Promise<Homewor
   return request<HomeworkEvaluationResult>(`/api/v1/evaluations/${evaluationId}/logs`);
 }
 
-export function reevaluateHomeworkSubmission(submissionId: number): Promise<HomeworkEvaluationResult> {
+export function reevaluateHomeworkSubmission(submissionId: number, reason: string): Promise<HomeworkEvaluationResult> {
   return request<HomeworkEvaluationResult>(`/api/v1/submissions/${submissionId}/reevaluate`, {
-    method: 'POST'
+    method: 'POST',
+    body: { reason }
   });
 }
