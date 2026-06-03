@@ -66,6 +66,34 @@
           </div>
         </form>
 
+        <section
+          v-if="labDetail.reportRequired"
+          class="lab-student__report"
+          aria-label="实验报告上传"
+        >
+          <h2>实验报告</h2>
+          <p>支持 PDF、DOCX 或 ZIP，单个文件不超过 10MB。</p>
+          <form class="lab-student__report-form" @submit.prevent="submitReport">
+            <label>
+              <span>报告文件</span>
+              <input name="reportFile" type="file" @change="onReportFileChange" />
+            </label>
+            <div class="lab-student__actions">
+              <button type="submit" :disabled="reportSubmitting">上传报告</button>
+              <button type="button" :disabled="reportSubmitting" @click="resetReportForm">清空</button>
+            </div>
+          </form>
+          <p v-if="reportFeedbackMessage" class="lab-student__feedback">{{ reportFeedbackMessage }}</p>
+          <p v-if="reportErrorMessage" class="lab-student__error">{{ reportErrorMessage }}</p>
+          <div v-if="latestReport" class="lab-student__report-summary">
+            <p>最新报告版本：{{ latestReport.version }}</p>
+            <p>文件名：{{ latestReport.fileName }}</p>
+            <p>文件类型：{{ latestReport.fileType }}</p>
+            <button type="button" @click="downloadLatestReport">下载最新报告</button>
+          </div>
+          <p v-else>暂无实验报告</p>
+        </section>
+
         <p v-if="feedbackMessage" class="lab-student__feedback">{{ feedbackMessage }}</p>
         <p v-if="submitErrorMessage" class="lab-student__error">{{ submitErrorMessage }}</p>
         <p v-if="historyErrorMessage" class="lab-student__error">{{ historyErrorMessage }}</p>
@@ -101,17 +129,27 @@
 
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue';
-import { getLabDetail, getLabSubmissionResult, listLabSubmissions, submitLab } from '../../api/lab/labs';
+import {
+  downloadLabReport,
+  getLabDetail,
+  getLabSubmissionDetail,
+  getLabSubmissionResult,
+  listLabSubmissions,
+  submitLab,
+  uploadLabReport
+} from '../../api/lab/labs';
 import { saveLearningProgress } from '../../api/lrn/learningProgress';
 import { reportLearningRecord } from '../../api/lrn/learningRecords';
 import type {
   LabExperimentDetail,
+  LabReportSummary,
   LabSubmissionHistoryItem,
   LabSubmissionResult,
   LabSubmissionSummary
 } from '../../types/lab';
 
 const MAX_UPLOAD_SIZE_BYTES = 5 * 1024 * 1024;
+const MAX_REPORT_UPLOAD_SIZE_BYTES = 10 * 1024 * 1024;
 const EVALUATION_POLL_INTERVAL_MS = 1000;
 const TERMINAL_EVALUATION_STATUSES = new Set<LabSubmissionSummary['evaluationStatus']>([
   'NONE',
@@ -144,9 +182,14 @@ const submitErrorMessage = ref('');
 const feedbackMessage = ref('');
 const resumeMessage = ref('');
 const historyErrorMessage = ref('');
+const reportErrorMessage = ref('');
+const reportFeedbackMessage = ref('');
 const language = ref('');
 const code = ref('');
 const selectedFile = ref<File | null>(null);
+const selectedReportFile = ref<File | null>(null);
+const latestReport = ref<LabReportSummary | null>(null);
+const reportSubmitting = ref(false);
 let evaluationPollTimer: number | null = null;
 const openedAt = ref<Date | null>(null);
 
@@ -192,9 +235,13 @@ async function loadLatestSubmission() {
     latestSubmission.value = history[0] ?? null;
     if (latestSubmission.value) {
       await refreshLatestEvaluationResult(latestSubmission.value.submissionId);
+      if (labDetail.value?.reportRequired) {
+        await refreshLatestReport(latestSubmission.value.submissionId);
+      }
     } else {
       clearEvaluationPoll();
       latestEvaluationResult.value = null;
+      latestReport.value = null;
     }
   } catch (error) {
     historyErrorMessage.value = error instanceof Error ? error.message : '提交历史加载失败';
@@ -222,10 +269,35 @@ async function submit() {
     await recordBehavior('SUBMIT', elapsedSeconds());
     code.value = '';
     selectedFile.value = null;
+    if (labDetail.value?.reportRequired) {
+      await refreshLatestReport(latestSubmission.value.submissionId);
+    }
   } catch (error) {
     submitErrorMessage.value = error instanceof Error ? error.message : '实验提交失败';
   } finally {
     submitting.value = false;
+  }
+}
+
+async function submitReport() {
+  reportErrorMessage.value = validateReportForm();
+  reportFeedbackMessage.value = '';
+  if (reportErrorMessage.value) {
+    return;
+  }
+
+  reportSubmitting.value = true;
+  try {
+    latestReport.value = await uploadLabReport(props.labId, {
+      submissionId: latestSubmission.value?.submissionId,
+      reportFile: selectedReportFile.value as File
+    });
+    reportFeedbackMessage.value = `实验报告上传成功，版本 ${latestReport.value.version}`;
+    selectedReportFile.value = null;
+  } catch (error) {
+    reportErrorMessage.value = error instanceof Error ? error.message : '实验报告上传失败';
+  } finally {
+    reportSubmitting.value = false;
   }
 }
 
@@ -242,6 +314,35 @@ async function refreshLatestEvaluationResult(submissionId: number) {
     }
   } catch (error) {
     historyErrorMessage.value = error instanceof Error ? error.message : '评测结果加载失败';
+  }
+}
+
+async function refreshLatestReport(submissionId: number) {
+  try {
+    const detail = await getLabSubmissionDetail(props.labId, submissionId);
+    latestReport.value = detail.latestReport;
+  } catch (error) {
+    historyErrorMessage.value = error instanceof Error ? error.message : '实验报告加载失败';
+  }
+}
+
+async function downloadLatestReport() {
+  if (!latestReport.value) {
+    return;
+  }
+  reportErrorMessage.value = '';
+  try {
+    const { blob, filename } = await downloadLabReport(props.labId, latestReport.value.reportId);
+    const objectUrl = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = objectUrl;
+    link.download = filename || latestReport.value.fileName;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(objectUrl);
+  } catch (error) {
+    reportErrorMessage.value = error instanceof Error ? error.message : '实验报告下载失败';
   }
 }
 
@@ -354,9 +455,34 @@ function validateForm() {
   return errors.join('；');
 }
 
+function validateReportForm() {
+  const errors: string[] = [];
+  if (!latestSubmission.value) {
+    errors.push('请先提交实验代码，再上传实验报告');
+  }
+  if (!selectedReportFile.value) {
+    errors.push('请选择实验报告文件');
+  }
+  if (selectedReportFile.value) {
+    const extension = getFileExtension(selectedReportFile.value.name);
+    if (!['pdf', 'docx', 'zip'].includes(extension)) {
+      errors.push('实验报告仅支持 PDF、DOCX 或 ZIP');
+    }
+    if (selectedReportFile.value.size > MAX_REPORT_UPLOAD_SIZE_BYTES) {
+      errors.push('实验报告大小不能超过 10MB');
+    }
+  }
+  return errors.join('；');
+}
+
 function onFileChange(event: Event) {
   const input = event.target as HTMLInputElement;
   selectedFile.value = input.files?.[0] ?? null;
+}
+
+function onReportFileChange(event: Event) {
+  const input = event.target as HTMLInputElement;
+  selectedReportFile.value = input.files?.[0] ?? null;
 }
 
 function resetForm() {
@@ -365,6 +491,12 @@ function resetForm() {
   selectedFile.value = null;
   submitErrorMessage.value = '';
   feedbackMessage.value = '';
+}
+
+function resetReportForm() {
+  selectedReportFile.value = null;
+  reportErrorMessage.value = '';
+  reportFeedbackMessage.value = '';
 }
 
 function formatDateTime(value: string) {
@@ -402,6 +534,7 @@ function getFileExtension(fileName: string) {
 .lab-student__header,
 .lab-student__form,
 .lab-student__cases,
+.lab-student__report,
 .lab-student__submission {
   display: grid;
   gap: 12px;
@@ -449,6 +582,19 @@ function getFileExtension(fileName: string) {
   border-radius: 10px;
   display: grid;
   gap: 6px;
+  padding: 12px;
+}
+
+.lab-student__report-form,
+.lab-student__report-summary {
+  display: grid;
+  gap: 10px;
+}
+
+.lab-student__report-summary {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
   padding: 12px;
 }
 

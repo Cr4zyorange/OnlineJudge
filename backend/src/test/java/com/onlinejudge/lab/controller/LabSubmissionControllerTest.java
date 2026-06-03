@@ -22,6 +22,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import static java.util.Map.entry;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.hasSize;
+import static org.hamcrest.Matchers.notNullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -658,6 +659,123 @@ class LabSubmissionControllerTest {
                         .headers(teacherHeaders("511", "511")))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("LAB-404-01"));
+    }
+
+    @Test
+    void studentCanUploadReportTwiceAndTeacherCanViewLatestReportFromSubmissionDetail() throws Exception {
+        long labId = createPublishedLab(520L, true, LocalDateTime.now().plusDays(3));
+        long submissionId = createCodeSubmission(labId, 601L, "520", "print('report linked')", "python");
+
+        MockMultipartFile firstReport = new MockMultipartFile(
+                "reportFile",
+                "report-v1.pdf",
+                "application/pdf",
+                "report content v1".getBytes()
+        );
+        MockMultipartFile secondReport = new MockMultipartFile(
+                "reportFile",
+                "report-v2.pdf",
+                "application/pdf",
+                "report content v2".getBytes()
+        );
+
+        mockMvc.perform(multipart("/api/v1/labs/{labId}/reports", labId)
+                        .file(firstReport)
+                        .headers(studentHeaders("520"))
+                        .param("submissionId", String.valueOf(submissionId)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.code").value("0"))
+                .andExpect(jsonPath("$.data.version").value(1))
+                .andExpect(jsonPath("$.data.fileName").value("report-v1.pdf"))
+                .andExpect(jsonPath("$.data.fileType").value("PDF"))
+                .andExpect(jsonPath("$.data.submissionId").value(submissionId));
+
+        String secondBody = mockMvc.perform(multipart("/api/v1/labs/{labId}/reports", labId)
+                        .file(secondReport)
+                        .headers(studentHeaders("520"))
+                        .param("submissionId", String.valueOf(submissionId)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.version").value(2))
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        long reportId = objectMapper.readTree(secondBody).path("data").path("reportId").asLong();
+
+        mockMvc.perform(get("/api/v1/labs/{labId}/reports/{reportId}", labId, reportId)
+                        .headers(teacherHeaders("520", "520", "601")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"))
+                .andExpect(jsonPath("$.data.reportId").value(reportId))
+                .andExpect(jsonPath("$.data.version").value(2))
+                .andExpect(jsonPath("$.data.fileName").value("report-v2.pdf"))
+                .andExpect(jsonPath("$.data.fileType").value("PDF"))
+                .andExpect(jsonPath("$.data.downloadUrl", notNullValue()));
+
+        mockMvc.perform(get("/api/v1/labs/{labId}/submissions/{submissionId}", labId, submissionId)
+                        .headers(teacherHeaders("520", "520", "601")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.latestReport.reportId").value(reportId))
+                .andExpect(jsonPath("$.data.latestReport.version").value(2))
+                .andExpect(jsonPath("$.data.latestReport.fileName").value("report-v2.pdf"))
+                .andExpect(jsonPath("$.data.latestReport.fileType").value("PDF"));
+
+        Integer versions = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM lab_report WHERE lab_id = ? AND student_id = ?",
+                Integer.class,
+                labId,
+                601L
+        );
+        Integer maxVersion = jdbcTemplate.queryForObject(
+                "SELECT MAX(version) FROM lab_report WHERE lab_id = ? AND student_id = ?",
+                Integer.class,
+                labId,
+                601L
+        );
+
+        org.assertj.core.api.Assertions.assertThat(versions).isEqualTo(2);
+        org.assertj.core.api.Assertions.assertThat(maxVersion).isEqualTo(2);
+    }
+
+    @Test
+    void reportUploadRejectsUnsupportedFileTypeAndStudentCannotViewOthersReport() throws Exception {
+        long labId = createPublishedLab(521L, true, LocalDateTime.now().plusDays(3));
+        long submissionId = createCodeSubmission(labId, 601L, "521", "print('report owner')", "python");
+
+        MockMultipartFile invalidReport = new MockMultipartFile(
+                "reportFile",
+                "notes.txt",
+                "text/plain",
+                "invalid report".getBytes()
+        );
+
+        mockMvc.perform(multipart("/api/v1/labs/{labId}/reports", labId)
+                        .file(invalidReport)
+                        .headers(studentHeaders("521"))
+                        .param("submissionId", String.valueOf(submissionId)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("LAB-400-06"))
+                .andExpect(jsonPath("$.message", containsString("报告")));
+
+        MockMultipartFile validReport = new MockMultipartFile(
+                "reportFile",
+                "report.docx",
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                "valid report".getBytes()
+        );
+        String body = mockMvc.perform(multipart("/api/v1/labs/{labId}/reports", labId)
+                        .file(validReport)
+                        .headers(studentHeaders("521"))
+                        .param("submissionId", String.valueOf(submissionId)))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        long reportId = objectMapper.readTree(body).path("data").path("reportId").asLong();
+
+        mockMvc.perform(get("/api/v1/labs/{labId}/reports/{reportId}", labId, reportId)
+                        .headers(studentHeaders("521", 602L)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("LAB-403-01"));
     }
 
     private long createPublishedLab(long courseId, boolean autoEvaluate, LocalDateTime deadline) throws Exception {

@@ -261,6 +261,17 @@
               <span v-if="getSubmissionFlags(submissionDetail).length === 0">无版本标识</span>
             </div>
             <p>文件标识：{{ submissionDetail.fileId ?? '无' }}</p>
+            <template v-if="submissionDetail.latestReport">
+              <div class="labs__report-detail">
+                <p>报告版本：{{ submissionDetail.latestReport.version }}</p>
+                <p>报告文件：{{ submissionDetail.latestReport.fileName }}</p>
+                <p>报告类型：{{ submissionDetail.latestReport.fileType }}</p>
+                <p>报告评分：{{ submissionDetail.latestReport.score ?? '未评分' }}</p>
+                <p>报告评语：{{ submissionDetail.latestReport.comment ?? '暂无评语' }}</p>
+                <button type="button" @click="downloadSubmissionReport">下载报告</button>
+              </div>
+            </template>
+            <p v-else>暂无实验报告</p>
             <pre class="labs__submission-code">{{ submissionDetail.code || '本次提交未包含在线代码' }}</pre>
           </template>
         </aside>
@@ -275,6 +286,7 @@ import {
   closeLab,
   createLab,
   deleteLab,
+  downloadLabReport,
   getLabSubmissionDetail,
   getLabDetail,
   listLabSubmissions,
@@ -483,6 +495,29 @@ async function openSubmissionDetail(submissionId: number) {
     submissionDetailErrorMessage.value = error instanceof Error ? error.message : '提交详情加载失败';
   } finally {
     submissionDetailLoading.value = false;
+  }
+}
+
+async function downloadSubmissionReport() {
+  if (selectedSubmissionLabId.value === null || !submissionDetail.value?.latestReport) {
+    return;
+  }
+  submissionDetailErrorMessage.value = '';
+  try {
+    const { blob, filename } = await downloadLabReport(
+      selectedSubmissionLabId.value,
+      submissionDetail.value.latestReport.reportId
+    );
+    const objectUrl = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = objectUrl;
+    link.download = filename || submissionDetail.value.latestReport.fileName;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(objectUrl);
+  } catch (error) {
+    submissionDetailErrorMessage.value = error instanceof Error ? error.message : '实验报告下载失败';
   }
 }
 
@@ -754,6 +789,11 @@ function formatDeadline(value: string) {
   border: 1px solid #d7dde8;
   border-radius: 8px;
   padding: 12px;
+}
+
+.labs__report-detail {
+  display: grid;
+  gap: 6px;
 }
 
 .labs__submission-flags {
