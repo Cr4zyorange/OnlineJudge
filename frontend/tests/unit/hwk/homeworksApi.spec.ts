@@ -3,11 +3,14 @@ import {
   closeHomework,
   createHomework,
   getHomeworkDetail,
+  getHomeworkEvaluationLogs,
+  getHomeworkSubmissionEvaluation,
   getHomeworkSubmission,
   listHomeworks,
   listHomeworkSubmissions,
   listMyHomeworkSubmissions,
   publishHomework,
+  reevaluateHomeworkSubmission,
   saveHomeworkQuestions,
   saveHomeworkTestCases,
   submitHomework,
@@ -142,6 +145,43 @@ describe('homeworks api', () => {
         'GET'
       ],
       ['/api/v1/submissions/91', 'GET']
+    ]);
+  });
+
+  it('builds documented HWK04 evaluation result, logs, and reevaluation routes', async () => {
+    const evaluation = {
+      evaluationId: 501,
+      submissionId: 91,
+      evaluationStatus: 'ACCEPTED',
+      score: 100,
+      passedCases: 2,
+      totalCases: 2,
+      durationMs: 120,
+      feedback: 'accepted',
+      reevaluation: false,
+      startedAt: '2026-06-01T10:00:00',
+      finishedAt: '2026-06-01T10:00:01'
+    };
+    const fetchMock = vi.spyOn(globalThis, 'fetch');
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse(evaluation))
+      .mockResolvedValueOnce(jsonResponse({ ...evaluation, compileLog: 'compile ok', runLog: 'case output' }))
+      .mockResolvedValueOnce(jsonResponse({ ...evaluation, evaluationId: 502, reevaluation: true }));
+
+    await expect(getHomeworkSubmissionEvaluation(91)).resolves.toEqual(evaluation);
+    await expect(getHomeworkEvaluationLogs(501)).resolves.toEqual(expect.objectContaining({
+      compileLog: 'compile ok',
+      runLog: 'case output'
+    }));
+    await expect(reevaluateHomeworkSubmission(91)).resolves.toEqual(expect.objectContaining({
+      evaluationId: 502,
+      reevaluation: true
+    }));
+
+    expect(fetchMock.mock.calls.map((call) => [call[0], (call[1] as RequestInit).method])).toEqual([
+      ['/api/v1/submissions/91/evaluation', 'GET'],
+      ['/api/v1/evaluations/501/logs', 'GET'],
+      ['/api/v1/submissions/91/reevaluate', 'POST']
     ]);
   });
 });
