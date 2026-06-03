@@ -205,3 +205,53 @@ export interface GradeItemCompletionResult {
   sourceDataTime: string;
   generatedAt: string;
 }
+
+export type GradeReviewTargetType = 'ITEM_SCORE' | 'FINAL_SCORE';
+export type GradeReviewStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'CLOSED';
+
+export interface SubmitGradeReviewPayload {
+  gradeItemId?: number;
+  targetType: GradeReviewTargetType;
+  reason: string;
+}
+
+export interface GradeReviewSubmissionResult {
+  requestId: number;
+  status: GradeReviewStatus;
+  submittedAt: string;
+}
+
+export interface ProcessGradeReviewPayload {
+  action: 'APPROVE' | 'REJECT';
+  adjustedScore?: string | null;
+  responseComment: string;
+}
+
+export interface GradeReviewProcessResult {
+  requestId: number;
+  status: GradeReviewStatus;
+  processedAt: string;
+}
+
+export interface GradeReviewRequest {
+  requestId: number;
+  courseId: number;
+  studentId: number;
+  gradeItemId: number | null;
+  targetType: GradeReviewTargetType;
+  reason: string;
+  status: GradeReviewStatus;
+  originalScore: string | null;
+  adjustedScore: string | null;
+  responseComment: string | null;
+  submittedAt: string;
+  processedBy: number | null;
+  processedAt: string | null;
+}
+
+export interface GradeReviewRequestPage {
+  records: GradeReviewRequest[];
+  total: number;
+  page: number;
+  size: number;
+}

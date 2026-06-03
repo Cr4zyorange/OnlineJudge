@@ -232,6 +232,17 @@ public class CourseRepository {
         return members.stream().findFirst();
     }
 
+    public List<Long> listActiveTeacherIds(long courseId) {
+        return jdbcTemplate.queryForList("""
+                SELECT user_id FROM crs_course_member
+                 WHERE course_id = ?
+                   AND role = 'TEACHER'
+                   AND join_status = 'ACTIVE'
+                   AND is_deleted = FALSE
+                 ORDER BY user_id
+                """, Long.class, courseId);
+    }
+
     public List<CourseMember> listMembers(Long courseId, CourseMemberStatus status) {
         if (status == null) {
             return jdbcTemplate.query("""

@@ -572,6 +572,172 @@ describe('TeacherGradeTableView', () => {
     expect(wrapper.text()).toContain('已提交 2');
     expect(wrapper.text()).toContain('待评分 1');
   });
+
+  it('filters grade review requests by approved status and renders processed results without action buttons', async () => {
+    vi.mocked(gradeRecordsApi.listCourseGrades).mockResolvedValue({
+      records: [],
+      total: 0,
+      page: 1,
+      size: 20
+    });
+    vi.mocked(gradeRecordsApi.listGradePublishRecords).mockResolvedValue({
+      records: [],
+      total: 0,
+      page: 1,
+      size: 20
+    });
+    vi.mocked(gradeRecordsApi.listCourseGradeReviewRequests)
+      .mockResolvedValueOnce({
+        records: [],
+        total: 0,
+        page: 1,
+        size: 20
+      })
+      .mockResolvedValueOnce({
+        records: [
+          {
+            requestId: 42,
+            courseId: 101,
+            studentId: 602,
+            gradeItemId: null,
+            targetType: 'FINAL_SCORE',
+            reason: '复核后确认补交成绩',
+            status: 'APPROVED',
+            originalScore: '84.00',
+            adjustedScore: '88.00',
+            responseComment: '确认补交成绩有效',
+            submittedAt: '2026-06-03T09:00:00',
+            processedBy: 501,
+            processedAt: '2026-06-03T09:10:00'
+          }
+        ],
+        total: 1,
+        page: 1,
+        size: 20
+      });
+
+    const wrapper = mount(TeacherGradeTableView, {
+      props: {
+        courseId: 101
+      }
+    });
+    await flushPromises();
+
+    expect(gradeRecordsApi.listCourseGradeReviewRequests).toHaveBeenCalledWith(101, {
+      status: 'PENDING',
+      page: 1,
+      size: 20
+    });
+
+    await wrapper.get('[data-testid="review-status-filter"]').setValue('APPROVED');
+    await flushPromises();
+
+    expect(gradeRecordsApi.listCourseGradeReviewRequests).toHaveBeenNthCalledWith(2, 101, {
+      status: 'APPROVED',
+      page: 1,
+      size: 20
+    });
+    expect(wrapper.text()).toContain('APPROVED');
+    expect(wrapper.text()).toContain('复核后确认补交成绩');
+    expect(wrapper.text()).toContain('确认补交成绩有效');
+    expect(wrapper.text()).toContain('88.00');
+    expect(wrapper.text()).toContain('2026-06-03T09:10:00');
+    expect(wrapper.find('[data-testid="approve-review-42"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="reject-review-42"]').exists()).toBe(false);
+  });
+
+  it('loads pending grade review requests and lets the teacher process one', async () => {
+    vi.mocked(gradeRecordsApi.listCourseGrades).mockResolvedValue({
+      records: [],
+      total: 0,
+      page: 1,
+      size: 20
+    });
+    vi.mocked(gradeRecordsApi.listGradePublishRecords).mockResolvedValue({
+      records: [],
+      total: 0,
+      page: 1,
+      size: 20
+    });
+    vi.mocked(gradeRecordsApi.listCourseGradeReviewRequests)
+      .mockResolvedValueOnce({
+        records: [
+          {
+            requestId: 41,
+            courseId: 101,
+            studentId: 601,
+            gradeItemId: null,
+            targetType: 'FINAL_SCORE',
+            reason: '总评未计入补交成绩',
+            status: 'PENDING',
+            originalScore: '84.00',
+            adjustedScore: null,
+            responseComment: null,
+            submittedAt: '2026-06-03T09:00:00',
+            processedBy: null,
+            processedAt: null
+          }
+        ],
+        total: 1,
+        page: 1,
+        size: 20
+      })
+      .mockResolvedValueOnce({
+        records: [
+          {
+            requestId: 41,
+            courseId: 101,
+            studentId: 601,
+            gradeItemId: null,
+            targetType: 'FINAL_SCORE',
+            reason: '总评未计入补交成绩',
+            status: 'APPROVED',
+            originalScore: '84.00',
+            adjustedScore: '88.00',
+            responseComment: '确认补交成绩有效',
+            submittedAt: '2026-06-03T09:00:00',
+            processedBy: 501,
+            processedAt: '2026-06-03T09:10:00'
+          }
+        ],
+        total: 1,
+        page: 1,
+        size: 20
+      });
+    vi.mocked(gradeRecordsApi.processGradeReviewRequest).mockResolvedValue({
+      requestId: 41,
+      status: 'APPROVED',
+      processedAt: '2026-06-03T09:10:00'
+    });
+
+    const wrapper = mount(TeacherGradeTableView, {
+      props: {
+        courseId: 101
+      }
+    });
+    await flushPromises();
+
+    expect(gradeRecordsApi.listCourseGradeReviewRequests).toHaveBeenCalledWith(101, {
+      status: 'PENDING',
+      page: 1,
+      size: 20
+    });
+    expect(wrapper.text()).toContain('成绩复核');
+    expect(wrapper.text()).toContain('总评未计入补交成绩');
+
+    await wrapper.get('[data-testid="review-adjusted-score-41"]').setValue('88.00');
+    await wrapper.get('[data-testid="review-response-comment-41"]').setValue('确认补交成绩有效');
+    await wrapper.get('[data-testid="approve-review-41"]').trigger('click');
+    await flushPromises();
+
+    expect(gradeRecordsApi.processGradeReviewRequest).toHaveBeenCalledWith(41, {
+      action: 'APPROVE',
+      adjustedScore: '88.00',
+      responseComment: '确认补交成绩有效'
+    });
+    expect(wrapper.text()).toContain('复核已处理：APPROVED');
+    expect(wrapper.text()).toContain('确认补交成绩有效');
+  });
 });
 
 async function flushPromises() {

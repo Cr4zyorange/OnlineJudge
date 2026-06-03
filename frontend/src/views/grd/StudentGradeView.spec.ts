@@ -1,15 +1,33 @@
 import { mount } from '@vue/test-utils';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import StudentGradeView from './StudentGradeView.vue';
-import { getMyPublishedGrades } from '../../api/grd/gradeRecords';
+import {
+  getMyPublishedGrades,
+  listMyGradeReviewRequests,
+  submitGradeReviewRequest
+} from '../../api/grd/gradeRecords';
 
 vi.mock('../../api/grd/gradeRecords', () => ({
-  getMyPublishedGrades: vi.fn()
+  getMyPublishedGrades: vi.fn(),
+  listMyGradeReviewRequests: vi.fn(),
+  submitGradeReviewRequest: vi.fn()
 }));
 
 const mockedGetMyPublishedGrades = vi.mocked(getMyPublishedGrades);
+const mockedListMyGradeReviewRequests = vi.mocked(listMyGradeReviewRequests);
+const mockedSubmitGradeReviewRequest = vi.mocked(submitGradeReviewRequest);
 
 describe('StudentGradeView', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    mockedListMyGradeReviewRequests.mockResolvedValue({
+      records: [],
+      total: 0,
+      page: 1,
+      size: 20
+    });
+  });
+
   it('loads the current student published grades with sources and feedback', async () => {
     mockedGetMyPublishedGrades.mockResolvedValueOnce({
       studentId: 601,
@@ -82,6 +100,77 @@ describe('StudentGradeView', () => {
 
     expect(wrapper.text()).toContain('成绩未发布，不能查看未公开成绩');
     expect(wrapper.find('table').exists()).toBe(false);
+  });
+
+  it('submits a final score review request and renders its pending status', async () => {
+    mockedGetMyPublishedGrades.mockResolvedValueOnce({
+      studentId: 601,
+      summary: {
+        id: 31,
+        courseId: 101,
+        studentId: 601,
+        finalScore: '84.00',
+        finalStatus: 'CALCULATED',
+        publishStatus: 'PUBLISHED',
+        publishedAt: '2026-05-30T10:00:00'
+      },
+      records: []
+    });
+    mockedSubmitGradeReviewRequest.mockResolvedValueOnce({
+      requestId: 41,
+      status: 'PENDING',
+      submittedAt: '2026-06-03T09:00:00'
+    });
+    mockedListMyGradeReviewRequests
+      .mockResolvedValueOnce({
+        records: [],
+        total: 0,
+        page: 1,
+        size: 20
+      })
+      .mockResolvedValueOnce({
+        records: [
+          {
+            requestId: 41,
+            courseId: 101,
+            studentId: 601,
+            gradeItemId: null,
+            targetType: 'FINAL_SCORE',
+            reason: '总评未计入补交成绩',
+            status: 'PENDING',
+            originalScore: '84.00',
+            adjustedScore: null,
+            responseComment: null,
+            submittedAt: '2026-06-03T09:00:00',
+            processedBy: null,
+            processedAt: null
+          }
+        ],
+        total: 1,
+        page: 1,
+        size: 20
+      });
+
+    const wrapper = mount(StudentGradeView, {
+      props: {
+        courseId: 101
+      }
+    });
+    await flushPromises();
+
+    await wrapper.get('[data-testid="review-target-type"]').setValue('FINAL_SCORE');
+    await wrapper.get('[data-testid="review-reason"]').setValue('总评未计入补交成绩');
+    await wrapper.get('[data-testid="submit-grade-review"]').trigger('submit');
+    await flushPromises();
+
+    expect(mockedSubmitGradeReviewRequest).toHaveBeenCalledWith(101, {
+      targetType: 'FINAL_SCORE',
+      gradeItemId: undefined,
+      reason: '总评未计入补交成绩'
+    });
+    expect(wrapper.text()).toContain('异议已提交，等待教师复核');
+    expect(wrapper.text()).toContain('PENDING');
+    expect(wrapper.text()).toContain('总评未计入补交成绩');
   });
 });
 

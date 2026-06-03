@@ -26,6 +26,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Sql(
         statements = {
                 "DELETE FROM t_course_grade_summary",
+                "DELETE FROM t_grade_review_request",
                 "DELETE FROM t_grade_change_log",
                 "DELETE FROM t_grade_publish_record",
                 "DELETE FROM t_grade_record",
@@ -358,6 +359,97 @@ class GradeRecordControllerTest {
                 .andExpect(jsonPath("$.message").value("部分成绩项发布暂未实现，不能提前公开课程总评"));
     }
 
+    @Test
+    void studentSubmitsGradeReviewAndTeacherProcessesItThroughApi() throws Exception {
+        createGradeItem("实验一", "LAB", 301, "0.40");
+        createGradeItem("作业一", "HWK", 401, "0.60");
+        mockMvc.perform(post("/api/v1/courses/101/grades/sync")
+                        .headers(teacherHeaders("101")))
+                .andExpect(status().isOk());
+        mockMvc.perform(post("/api/v1/courses/101/grades/publish")
+                        .headers(teacherHeaders("101"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "publishScope", "PARTIAL_STUDENTS",
+                                "studentIds", java.util.List.of(601),
+                                "gradeItemIds", java.util.List.of()
+                        ))))
+                .andExpect(status().isOk());
+
+        String requestJson = mockMvc.perform(post("/api/v1/courses/101/grade-review-requests")
+                        .header("X-User-Id", "601")
+                        .header("X-User-Role", "STUDENT")
+                        .header("X-Course-Ids", "101")
+                        .header("X-Course-Teacher-Ids", "101:501")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "targetType", "FINAL_SCORE",
+                                "reason", "总评未计入补交成绩"
+                        ))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"))
+                .andExpect(jsonPath("$.data.status").value("PENDING"))
+                .andExpect(jsonPath("$.data.submittedAt").isNotEmpty())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        long requestId = objectMapper.readTree(requestJson).at("/data/requestId").asLong();
+
+        mockMvc.perform(post("/api/v1/courses/101/grade-review-requests")
+                        .header("X-User-Id", "601")
+                        .header("X-User-Role", "STUDENT")
+                        .header("X-Course-Ids", "101")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "targetType", "FINAL_SCORE",
+                                "reason", "重复申请"
+                        ))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("ERR-GRD-08"));
+
+        mockMvc.perform(get("/api/v1/courses/101/my-grade-review-requests")
+                        .header("X-User-Id", "601")
+                        .header("X-User-Role", "STUDENT")
+                        .header("X-Course-Ids", "101"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.total").value(1))
+                .andExpect(jsonPath("$.data.records[0].requestId").value(requestId))
+                .andExpect(jsonPath("$.data.records[0].reason").value("总评未计入补交成绩"));
+
+        mockMvc.perform(get("/api/v1/courses/101/grade-review-requests?status=PENDING")
+                        .headers(teacherHeaders("101")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.total").value(1))
+                .andExpect(jsonPath("$.data.records[0].requestId").value(requestId));
+
+        mockMvc.perform(put("/api/v1/grade-review-requests/{requestId}/process", requestId)
+                        .headers(teacherHeaders("101"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "action", "APPROVE",
+                                "adjustedScore", "88.00",
+                                "responseComment", "确认补交成绩有效"
+                        ))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.requestId").value(requestId))
+                .andExpect(jsonPath("$.data.status").value("APPROVED"))
+                .andExpect(jsonPath("$.data.processedAt").isNotEmpty());
+
+        mockMvc.perform(get("/api/v1/courses/101/my-grade-review-requests")
+                        .header("X-User-Id", "601")
+                        .header("X-User-Role", "STUDENT")
+                        .header("X-Course-Ids", "101"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.records[0].status").value("APPROVED"))
+                .andExpect(jsonPath("$.data.records[0].adjustedScore").value(88.00))
+                .andExpect(jsonPath("$.data.records[0].responseComment").value("确认补交成绩有效"));
+
+        mockMvc.perform(get("/api/v1/courses/101/grades?studentKeyword=601")
+                        .headers(teacherHeaders("101")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.records[0].summary.finalScore").value(88.00));
+    }
+
     private long createGradeItem(String name, String sourceType, long sourceId, String weight) throws Exception {
         Map<String, Object> payload = Map.of(
                 "name", name,
@@ -386,6 +478,7 @@ class GradeRecordControllerTest {
         headers.add("X-User-Role", "TEACHER");
         headers.add("X-Manageable-Course-Ids", manageableCourseIds);
         headers.add("X-Course-Student-Ids", "101:601,602,603");
+        headers.add("X-Course-Teacher-Ids", "101:501");
         return headers;
     }
 }
