@@ -302,6 +302,31 @@ class GradeRecordControllerTest {
     }
 
     @Test
+    void teacherQueriesGradeItemCompletionThroughApi() throws Exception {
+        createGradeItem("实验一", "LAB", 301, "0.40");
+        long homeworkItemId = createGradeItem("作业一", "HWK", 401, "0.60");
+        mockMvc.perform(post("/api/v1/courses/101/grades/sync")
+                        .headers(teacherHeaders("101")))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/v1/courses/101/grade-items/{gradeItemId}/completion", homeworkItemId)
+                        .headers(teacherHeaders("101")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"))
+                .andExpect(jsonPath("$.data.gradeItemId").value(homeworkItemId))
+                .andExpect(jsonPath("$.data.totalStudentCount").value(3))
+                .andExpect(jsonPath("$.data.submittedCount").value(2))
+                .andExpect(jsonPath("$.data.completedCount").value(1))
+                .andExpect(jsonPath("$.data.missingCount").value(1))
+                .andExpect(jsonPath("$.data.unsubmittedCount").value(0))
+                .andExpect(jsonPath("$.data.ungradedCount").value(1))
+                .andExpect(jsonPath("$.data.averageScore").value(80.00))
+                .andExpect(jsonPath("$.data.completionRate").value(0.3333))
+                .andExpect(jsonPath("$.data.sourceDataTime").isNotEmpty())
+                .andExpect(jsonPath("$.data.generatedAt").isNotEmpty());
+    }
+
+    @Test
     void teacherCannotQueryStudentMyGradesEndpointThroughApi() throws Exception {
         mockMvc.perform(get("/api/v1/courses/101/my-grades")
                         .header("X-User-Id", "501")

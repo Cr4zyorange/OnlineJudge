@@ -529,27 +529,18 @@ describe('TeacherGradeTableView', () => {
         ],
         sourceDataTime: '2026-06-03T10:00:00',
         generatedAt: '2026-06-03T10:00:01'
-      })
+      });
+    vi.mocked(gradeRecordsApi.getGradeItemCompletion)
       .mockResolvedValueOnce({
-        targetType: 'GRADE_ITEM',
         gradeItemId: 2,
         totalStudentCount: 3,
+        submittedCount: 2,
         completedCount: 1,
         missingCount: 1,
         unsubmittedCount: 0,
         ungradedCount: 1,
         averageScore: '80.00',
-        maxScore: '80.00',
-        minScore: '80.00',
-        passRate: '1.0000',
         completionRate: '0.3333',
-        distribution: [
-          { label: '0-59', count: 0 },
-          { label: '60-69', count: 0 },
-          { label: '70-79', count: 0 },
-          { label: '80-89', count: 1 },
-          { label: '90-100', count: 0 }
-        ],
         sourceDataTime: '2026-06-03T10:01:00',
         generatedAt: '2026-06-03T10:01:01'
       });
@@ -575,12 +566,10 @@ describe('TeacherGradeTableView', () => {
     await wrapper.get('[data-testid="analysis-form"]').trigger('submit');
     await flushPromises();
 
-    expect(gradeRecordsApi.getCourseGradeAnalysis).toHaveBeenLastCalledWith(101, {
-      targetType: 'GRADE_ITEM',
-      gradeItemId: 2
-    });
+    expect(gradeRecordsApi.getGradeItemCompletion).toHaveBeenCalledWith(101, 2);
     expect(wrapper.text()).toContain('成绩项 2');
     expect(wrapper.text()).toContain('80.00');
+    expect(wrapper.text()).toContain('已提交 2');
     expect(wrapper.text()).toContain('待评分 1');
   });
 });

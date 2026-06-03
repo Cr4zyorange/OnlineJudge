@@ -122,7 +122,7 @@
           </div>
         </dl>
         <p class="grade-table__analysis-counts">
-          共 {{ analysis.totalStudentCount }} 人，已完成 {{ analysis.completedCount }}，缺失 {{ analysis.missingCount }}，未提交 {{ analysis.unsubmittedCount }}，待评分 {{ analysis.ungradedCount }}
+          共 {{ analysis.totalStudentCount }} 人，已提交 {{ analysis.submittedCount ?? analysis.completedCount }}，已完成 {{ analysis.completedCount }}，缺失 {{ analysis.missingCount }}，未提交 {{ analysis.unsubmittedCount }}，待评分 {{ analysis.ungradedCount }}
         </p>
         <ul class="grade-table__distribution">
           <li v-for="bucket in analysis.distribution" :key="bucket.label">
@@ -327,6 +327,7 @@ import {
   adjustGradeRecord,
   adjustCourseFinalScore,
   getCourseGradeAnalysis,
+  getGradeItemCompletion,
   type GradeTableQuery,
   listGradePublishRecords,
   listGradeChangeLogs,
@@ -339,6 +340,7 @@ import type {
   CourseGradeRow,
   GradeAnalysisResult,
   GradeAnalysisTargetType,
+  GradeItemCompletionResult,
   GradeChangeLog,
   GradePublishRecord,
   GradeRecord,
@@ -574,20 +576,40 @@ async function refreshAnalysis() {
   analysisLoading.value = true;
   analysisError.value = '';
   try {
-    const query = analysisTargetType.value === 'GRADE_ITEM'
-      ? {
-          targetType: analysisTargetType.value,
-          gradeItemId: Number(analysisGradeItemIdInput.value)
-        }
-      : {
-          targetType: analysisTargetType.value
-        };
-    analysis.value = await getCourseGradeAnalysis(props.courseId, query);
+    if (analysisTargetType.value === 'GRADE_ITEM') {
+      const gradeItemId = Number(analysisGradeItemIdInput.value);
+      analysis.value = completionToAnalysis(await getGradeItemCompletion(props.courseId, gradeItemId));
+      return;
+    }
+    analysis.value = await getCourseGradeAnalysis(props.courseId, {
+      targetType: analysisTargetType.value
+    });
   } catch (error) {
     analysisError.value = error instanceof Error ? error.message : '教学分析加载失败';
   } finally {
     analysisLoading.value = false;
   }
+}
+
+function completionToAnalysis(completion: GradeItemCompletionResult): GradeAnalysisResult {
+  return {
+    targetType: 'GRADE_ITEM',
+    gradeItemId: completion.gradeItemId,
+    totalStudentCount: completion.totalStudentCount,
+    submittedCount: completion.submittedCount,
+    completedCount: completion.completedCount,
+    missingCount: completion.missingCount,
+    unsubmittedCount: completion.unsubmittedCount,
+    ungradedCount: completion.ungradedCount,
+    averageScore: completion.averageScore,
+    maxScore: null,
+    minScore: null,
+    passRate: '0.0000',
+    completionRate: completion.completionRate,
+    distribution: [],
+    sourceDataTime: completion.sourceDataTime,
+    generatedAt: completion.generatedAt
+  };
 }
 
 function refreshSelectedRow() {

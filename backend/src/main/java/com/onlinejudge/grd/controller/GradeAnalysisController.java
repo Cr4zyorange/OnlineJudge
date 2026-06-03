@@ -5,6 +5,7 @@ import com.onlinejudge.common.security.CurrentUser;
 import com.onlinejudge.common.web.ApiResponse;
 import com.onlinejudge.grd.service.GradeAnalysisResult;
 import com.onlinejudge.grd.service.GradeAnalysisService;
+import com.onlinejudge.grd.service.GradeItemCompletionResult;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -34,6 +35,16 @@ public class GradeAnalysisController {
                 targetType,
                 gradeItemId
         ));
+    }
+
+    @GetMapping("/courses/{courseId}/grade-items/{gradeItemId}/completion")
+    public ApiResponse<GradeItemCompletionResult> getGradeItemCompletion(
+            @PathVariable long courseId,
+            @PathVariable long gradeItemId,
+            CurrentUser currentUser
+    ) {
+        requireTeacher(currentUser);
+        return ApiResponse.ok(gradeAnalysisService.getGradeItemCompletion(courseId, gradeItemId, currentUser.id()));
     }
 
     private void requireTeacher(CurrentUser currentUser) {

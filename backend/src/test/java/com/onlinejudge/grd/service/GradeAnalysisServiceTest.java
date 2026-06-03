@@ -114,6 +114,41 @@ class GradeAnalysisServiceTest {
     }
 
     @Test
+    void teacherQueriesGradeItemCompletionThroughDocumentedPublicContract() {
+        InMemoryGradeAnalysisSnapshotRepository snapshotRepository = new InMemoryGradeAnalysisSnapshotRepository();
+        InMemoryCourseGradeSummaryRepository summaryRepository = new InMemoryCourseGradeSummaryRepository();
+        InMemoryGradeRecordRepository recordRepository = new InMemoryGradeRecordRepository();
+        InMemoryGradeItemRepository itemRepository = new InMemoryGradeItemRepository();
+        GradeAnalysisService service = new GradeAnalysisService(
+                itemRepository,
+                recordRepository,
+                summaryRepository,
+                snapshotRepository,
+                permissionClient(601L, 602L, 603L, 604L, 605L)
+        );
+        itemRepository.add(item(11L, 101L));
+        recordRepository.upsert(record(101L, 601L, 11L, "90.00", GradeStatus.SCORED));
+        recordRepository.upsert(record(101L, 602L, 11L, "70.00", GradeStatus.ADJUSTED));
+        recordRepository.upsert(record(101L, 603L, 11L, null, GradeStatus.UNGRADED));
+        recordRepository.upsert(record(101L, 604L, 11L, null, GradeStatus.UNSUBMITTED));
+
+        GradeItemCompletionResult result = service.getGradeItemCompletion(101L, 11L, 501L);
+
+        assertThat(result.gradeItemId()).isEqualTo(11L);
+        assertThat(result.totalStudentCount()).isEqualTo(5);
+        assertThat(result.submittedCount()).isEqualTo(3);
+        assertThat(result.completedCount()).isEqualTo(2);
+        assertThat(result.missingCount()).isEqualTo(1);
+        assertThat(result.unsubmittedCount()).isEqualTo(1);
+        assertThat(result.ungradedCount()).isEqualTo(1);
+        assertThat(result.averageScore()).isEqualByComparingTo("80.00");
+        assertThat(result.completionRate()).isEqualByComparingTo("0.4000");
+        assertThat(result.sourceDataTime()).isNotNull();
+        assertThat(result.generatedAt()).isNotNull();
+        assertThat(snapshotRepository.findLatest(101L, "GRADE_ITEM", 11L)).isPresent();
+    }
+
+    @Test
     void teacherCannotQueryAnalysisWithoutCoursePermission() {
         GradeAnalysisService service = new GradeAnalysisService(
                 new InMemoryGradeItemRepository(),

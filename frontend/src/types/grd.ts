@@ -177,6 +177,7 @@ export interface GradeAnalysisResult {
   targetType: GradeAnalysisTargetType;
   gradeItemId: number | null;
   totalStudentCount: number;
+  submittedCount?: number;
   completedCount: number;
   missingCount: number;
   unsubmittedCount: number;
@@ -187,6 +188,20 @@ export interface GradeAnalysisResult {
   passRate: string;
   completionRate: string;
   distribution: GradeScoreBucket[];
+  sourceDataTime: string;
+  generatedAt: string;
+}
+
+export interface GradeItemCompletionResult {
+  gradeItemId: number;
+  totalStudentCount: number;
+  submittedCount: number;
+  completedCount: number;
+  missingCount: number;
+  unsubmittedCount: number;
+  ungradedCount: number;
+  averageScore: string | null;
+  completionRate: string;
   sourceDataTime: string;
   generatedAt: string;
 }

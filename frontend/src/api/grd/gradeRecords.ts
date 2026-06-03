@@ -6,6 +6,7 @@ import type {
   GradeAnalysisResult,
   GradeAnalysisTargetType,
   FinalScoreAdjustmentResult,
+  GradeItemCompletionResult,
   GradeChangeLogPage,
   GradePublishPayload,
   GradePublishRecordPage,
@@ -175,6 +176,13 @@ export async function getCourseGradeAnalysis(
     ? `/api/v1/courses/${courseId}/grade-analysis?${queryString}`
     : `/api/v1/courses/${courseId}/grade-analysis`;
   return request<GradeAnalysisResult>(url);
+}
+
+export async function getGradeItemCompletion(
+  courseId: number,
+  gradeItemId: number
+): Promise<GradeItemCompletionResult> {
+  return request<GradeItemCompletionResult>(`/api/v1/courses/${courseId}/grade-items/${gradeItemId}/completion`);
 }
 
 function appendParam(params: URLSearchParams, name: string, value: string | number | undefined) {

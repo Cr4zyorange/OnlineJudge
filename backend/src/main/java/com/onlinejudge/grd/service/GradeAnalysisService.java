@@ -107,6 +107,52 @@ public class GradeAnalysisService {
         );
     }
 
+    @Transactional
+    public GradeItemCompletionResult getGradeItemCompletion(long courseId, long gradeItemId, long teacherId) {
+        requireCoursePermission(courseId, teacherId);
+        requireGradeItem(courseId, gradeItemId);
+        Set<Long> studentIds = studentIdsForAnalysis(courseId);
+        List<ScoreRow> rows = gradeItemRows(courseId, gradeItemId, studentIds);
+        List<BigDecimal> scores = rows.stream()
+                .map(ScoreRow::score)
+                .filter(score -> score != null)
+                .toList();
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime sourceDataTime = rows.stream()
+                .map(ScoreRow::updatedAt)
+                .filter(updatedAt -> updatedAt != null)
+                .max(Comparator.naturalOrder())
+                .orElse(now);
+        gradeAnalysisSnapshotRepository.save(new GradeAnalysisSnapshot(
+                0L,
+                courseId,
+                "GRADE_ITEM",
+                gradeItemId,
+                sourceDataTime,
+                average(scores),
+                max(scores),
+                min(scores),
+                passRate(scores),
+                rate(scores.size(), studentIds.size()),
+                distributionJson(distribution(scores)),
+                teacherId,
+                now
+        ));
+        return new GradeItemCompletionResult(
+                gradeItemId,
+                studentIds.size(),
+                scores.size() + countByStatus(rows, ScoreStatus.UNGRADED),
+                scores.size(),
+                countByStatus(rows, ScoreStatus.MISSING),
+                countByStatus(rows, ScoreStatus.UNSUBMITTED),
+                countByStatus(rows, ScoreStatus.UNGRADED),
+                average(scores),
+                rate(scores.size(), studentIds.size()),
+                sourceDataTime,
+                now
+        );
+    }
+
     private List<ScoreRow> courseTotalRows(long courseId, Set<Long> studentIds) {
         Map<Long, CourseGradeSummary> summariesByStudent = courseGradeSummaryRepository.findByCourseId(courseId).stream()
                 .collect(Collectors.toMap(CourseGradeSummary::studentId, Function.identity(), (left, right) -> right));
