@@ -23,12 +23,14 @@ import com.onlinejudge.integration.grade.SourceGradeClient;
 import com.onlinejudge.integration.grade.SourceGradeDTO;
 import com.onlinejudge.integration.grade.SourceGradeType;
 import org.junit.jupiter.api.Test;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -309,6 +311,74 @@ class GradeRecordServiceTest {
         assertThat(record.remark()).contains("students=150");
         assertThat(record.remark()).contains("gradeItems=1");
         assertThat(record.remark()).hasSizeLessThanOrEqualTo(500);
+    }
+
+    @Test
+    void resyncingPublishedSourceGradesRefreshesScoresAndBatchWithoutHidingStudentResults() {
+        InMemoryGradeItemRepository itemRepository = new InMemoryGradeItemRepository();
+        InMemoryGradeRecordRepository recordRepository = new InMemoryGradeRecordRepository();
+        InMemoryCourseGradeSummaryRepository summaryRepository = new InMemoryCourseGradeSummaryRepository();
+        InMemoryGradeChangeLogRepository changeLogRepository = new InMemoryGradeChangeLogRepository();
+        InMemoryGradeCalculationBatchRepository batchRepository = new InMemoryGradeCalculationBatchRepository();
+        RecordingNotificationEventPublisher eventPublisher = new RecordingNotificationEventPublisher();
+        AtomicReference<List<SourceGradeDTO>> sourceGrades = new AtomicReference<>();
+        GradeRecordService service = new GradeRecordService(
+                itemRepository,
+                recordRepository,
+                changeLogRepository,
+                new InMemoryGradePublishRecordRepository(),
+                summaryRepository,
+                batchRepository,
+                (courseId, sourceType, sourceId) -> sourceGrades.get(),
+                permissionClient(601L),
+                eventPublisher
+        );
+        itemRepository.add(item(1L, 101L, "实验一", SourceType.LAB, 301L, "100.00", "1.00"));
+        sourceGrades.set(List.of(source(101L, SourceGradeType.LAB, 301L, 601L, "80.00", "100.00", "SCORED")));
+        GradeSyncResult firstSync = service.syncSourceGrades(101L, 501L);
+        service.publishCourseGrades(101L, 501L, new PublishCourseGradesCommand("COURSE", List.of(), List.of()));
+        GradeRecord publishedRecord = recordRepository.findByStudentAndItem(101L, 601L, 1L).orElseThrow();
+        CourseGradeSummary publishedSummary = summaryRepository.findByStudent(101L, 601L).orElseThrow();
+
+        sourceGrades.set(List.of(source(101L, SourceGradeType.LAB, 301L, 601L, "95.00", "100.00", "SCORED")));
+        GradeSyncResult secondSync = service.syncSourceGrades(101L, 501L);
+
+        assertThat(secondSync.calculationBatchId()).isNotEqualTo(firstSync.calculationBatchId());
+        assertThat(batchRepository.findById(secondSync.calculationBatchId()).orElseThrow().triggerType()).isEqualTo("SYNC");
+        assertThat(recordRepository.findByStudentAndItem(101L, 601L, 1L).orElseThrow()).satisfies(record -> {
+            assertThat(record.rawScore()).isEqualByComparingTo("95.00");
+            assertThat(record.publishStatus()).isEqualTo(PublishStatus.PUBLISHED);
+            assertThat(record.publishedAt()).isEqualTo(publishedRecord.publishedAt());
+        });
+        assertThat(summaryRepository.findByStudent(101L, 601L).orElseThrow()).satisfies(summary -> {
+            assertThat(summary.finalScore()).isEqualByComparingTo("95.00");
+            assertThat(summary.publishStatus()).isEqualTo(PublishStatus.PUBLISHED);
+            assertThat(summary.publishedAt()).isEqualTo(publishedSummary.publishedAt());
+            assertThat(summary.calculationBatchId()).isEqualTo(secondSync.calculationBatchId());
+        });
+        assertThat(changeLogRepository.logs).singleElement().satisfies(log -> {
+            assertThat(log.changeType()).isEqualTo("SOURCE_RESYNC");
+            assertThat(log.oldValue()).isEqualByComparingTo("80.00");
+            assertThat(log.newValue()).isEqualByComparingTo("95.00");
+            assertThat(log.reason()).contains("来源成绩重新同步");
+            assertThat(log.operatorId()).isEqualTo(501L);
+        });
+        assertThat(eventPublisher.events()).hasSize(2);
+        assertThat(eventPublisher.events().get(1)).satisfies(event -> {
+            assertThat(event.type()).isEqualTo("GRADE_CHANGED");
+            assertThat(event.recipientUserIds()).containsExactly(601L);
+            assertThat(event.targetType()).isEqualTo("GRADE_ITEM");
+            assertThat(event.targetId()).isEqualTo(1L);
+        });
+    }
+
+    @Test
+    void syncSourceGradesDeclaresTransactionalBoundaryForSyncAndRecalculation() throws NoSuchMethodException {
+        Transactional transactional = GradeRecordService.class
+                .getMethod("syncSourceGrades", long.class, long.class)
+                .getAnnotation(Transactional.class);
+
+        assertThat(transactional).isNotNull();
     }
 
     private CoursePermissionClient permissionClient(Long... studentIds) {

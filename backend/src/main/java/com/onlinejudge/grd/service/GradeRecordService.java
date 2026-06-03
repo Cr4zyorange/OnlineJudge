@@ -37,6 +37,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -74,6 +75,7 @@ public class GradeRecordService {
         this.notificationEventPublisher = notificationEventPublisher;
     }
 
+    @Transactional
     public GradeSyncResult syncSourceGrades(long courseId, long teacherId) {
         requireCoursePermission(courseId, teacherId);
         List<GradeItem> sourceItems = sourceGradeItems(courseId);
@@ -83,6 +85,8 @@ public class GradeRecordService {
         int ungradedCount = 0;
         Set<Long> studentIds = courseStudentIds(courseId);
         Map<GradeItem, Map<Long, SourceGradeDTO>> sourceGradesByItem = new LinkedHashMap<>();
+        Map<String, GradeRecord> existingRecordsByStudentAndItem = gradeRecordRepository.findByCourseId(courseId).stream()
+                .collect(Collectors.toMap(record -> studentItemKey(record.studentId(), record.gradeItemId()), record -> record));
 
         for (GradeItem item : sourceItems) {
             List<SourceGradeDTO> sourceGrades = sourceGradeClient.findSourceGrades(
@@ -103,7 +107,10 @@ public class GradeRecordService {
                 GradeRecord record = sourceGradesByStudent.containsKey(studentId)
                         ? toGradeRecord(item, sourceGradesByStudent.get(studentId), now)
                         : missingGradeRecord(item, studentId, now);
+                GradeRecord existingRecord = existingRecordsByStudentAndItem.get(studentItemKey(studentId, item.id()));
+                record = preservePublishedState(record, existingRecord);
                 gradeRecordRepository.upsert(record);
+                recordSourceResyncChange(existingRecord, record, teacherId, now);
                 if (record.gradeStatus() == GradeStatus.SCORED) {
                     syncedCount++;
                 } else if (record.gradeStatus() == GradeStatus.UNGRADED) {
@@ -307,7 +314,7 @@ public class GradeRecordService {
 
     public CourseGradeRow getMyPublishedGrades(long courseId, long studentId) {
         if (!coursePermissionClient.isCourseMember(courseId, studentId)) {
-            throw new GradeItemPermissionException("学生无课程成绩访问权限");
+            throw new StudentGradeAccessException("学生无课程成绩访问权限");
         }
         CourseGradeSummary summary = courseGradeSummaryRepository.findByCourseId(courseId).stream()
                 .filter(item -> item.studentId() == studentId)
@@ -631,6 +638,77 @@ public class GradeRecordService {
                 now,
                 now
         );
+    }
+
+    private String studentItemKey(long studentId, long gradeItemId) {
+        return studentId + "|" + gradeItemId;
+    }
+
+    private GradeRecord preservePublishedState(GradeRecord record, GradeRecord existingRecord) {
+        if (existingRecord == null || existingRecord.publishStatus() != PublishStatus.PUBLISHED) {
+            return record;
+        }
+        return new GradeRecord(
+                record.id(),
+                record.courseId(),
+                record.studentId(),
+                record.gradeItemId(),
+                record.sourceType(),
+                record.sourceId(),
+                record.rawScore(),
+                record.weightedScore(),
+                record.gradeStatus(),
+                PublishStatus.PUBLISHED,
+                record.comment(),
+                record.sourceUpdatedAt(),
+                record.calculatedAt(),
+                existingRecord.publishedAt(),
+                existingRecord.createdAt(),
+                record.updatedAt()
+        );
+    }
+
+    private void recordSourceResyncChange(
+            GradeRecord existingRecord,
+            GradeRecord syncedRecord,
+            long operatorId,
+            LocalDateTime changedAt
+    ) {
+        if (existingRecord == null
+                || existingRecord.publishStatus() != PublishStatus.PUBLISHED
+                || !sourceGradeChanged(existingRecord, syncedRecord)) {
+            return;
+        }
+        GradeChangeLog changeLog = gradeChangeLogRepository.save(new GradeChangeLog(
+                0L,
+                syncedRecord.courseId(),
+                syncedRecord.studentId(),
+                syncedRecord.gradeItemId(),
+                "SOURCE_RESYNC",
+                existingRecord.rawScore(),
+                syncedRecord.rawScore(),
+                "来源成绩重新同步刷新已发布成绩",
+                operatorId,
+                changedAt
+        ));
+        publishGradeChangedEvent(changeLog, "GRADE_ITEM", syncedRecord.gradeItemId(), changedAt);
+    }
+
+    private boolean sourceGradeChanged(GradeRecord existingRecord, GradeRecord syncedRecord) {
+        return compareScore(existingRecord.rawScore(), syncedRecord.rawScore()) != 0
+                || compareScore(existingRecord.weightedScore(), syncedRecord.weightedScore()) != 0
+                || existingRecord.gradeStatus() != syncedRecord.gradeStatus()
+                || !Objects.equals(existingRecord.sourceUpdatedAt(), syncedRecord.sourceUpdatedAt());
+    }
+
+    private int compareScore(BigDecimal left, BigDecimal right) {
+        if (left == null && right == null) {
+            return 0;
+        }
+        if (left == null || right == null) {
+            return left == null ? -1 : 1;
+        }
+        return left.compareTo(right);
     }
 
     private BigDecimal normalizeRawScore(GradeItem item, SourceGradeDTO sourceGrade) {

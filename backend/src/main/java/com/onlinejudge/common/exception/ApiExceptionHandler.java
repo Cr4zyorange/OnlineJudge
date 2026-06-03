@@ -9,6 +9,7 @@ import com.onlinejudge.grd.service.GradeReviewDuplicateException;
 import com.onlinejudge.grd.service.GradeReviewPermissionException;
 import com.onlinejudge.grd.service.GradeReviewValidationException;
 import com.onlinejudge.grd.service.InvalidGradeRuleException;
+import com.onlinejudge.grd.service.StudentGradeAccessException;
 import com.onlinejudge.lab.service.LabNotFoundException;
 import com.onlinejudge.lab.service.LabPermissionException;
 import com.onlinejudge.lab.service.LabStateException;
@@ -39,6 +40,12 @@ public class ApiExceptionHandler {
     public ResponseEntity<ApiResponse<Void>> handlePermission(GradeItemPermissionException exception) {
         return ResponseEntity.status(HttpStatus.FORBIDDEN)
                 .body(ApiResponse.error("ERR-GRD-01", exception.getMessage()));
+    }
+
+    @ExceptionHandler(StudentGradeAccessException.class)
+    public ResponseEntity<ApiResponse<Void>> handleStudentGradeAccess(StudentGradeAccessException exception) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(ApiResponse.error("ERR-GRD-02", exception.getMessage()));
     }
 
     @ExceptionHandler(InvalidGradeRuleException.class)
