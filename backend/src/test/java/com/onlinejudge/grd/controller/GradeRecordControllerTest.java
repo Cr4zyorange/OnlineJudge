@@ -259,6 +259,74 @@ class GradeRecordControllerTest {
     }
 
     @Test
+    void teacherQueriesCourseGradeAnalysisThroughApi() throws Exception {
+        createGradeItem("实验一", "LAB", 301, "0.40");
+        long homeworkItemId = createGradeItem("作业一", "HWK", 401, "0.60");
+        mockMvc.perform(post("/api/v1/courses/101/grades/sync")
+                        .headers(teacherHeaders("101")))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/v1/courses/101/grade-analysis?targetType=COURSE_TOTAL")
+                        .headers(teacherHeaders("101")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"))
+                .andExpect(jsonPath("$.data.targetType").value("COURSE_TOTAL"))
+                .andExpect(jsonPath("$.data.gradeItemId", nullValue()))
+                .andExpect(jsonPath("$.data.totalStudentCount").value(3))
+                .andExpect(jsonPath("$.data.completedCount").value(1))
+                .andExpect(jsonPath("$.data.missingCount").value(2))
+                .andExpect(jsonPath("$.data.ungradedCount").value(0))
+                .andExpect(jsonPath("$.data.unsubmittedCount").value(0))
+                .andExpect(jsonPath("$.data.averageScore").value(84.00))
+                .andExpect(jsonPath("$.data.maxScore").value(84.00))
+                .andExpect(jsonPath("$.data.minScore").value(84.00))
+                .andExpect(jsonPath("$.data.passRate").value(1.0000))
+                .andExpect(jsonPath("$.data.completionRate").value(0.3333))
+                .andExpect(jsonPath("$.data.distribution", hasSize(5)))
+                .andExpect(jsonPath("$.data.distribution[3].label").value("80-89"))
+                .andExpect(jsonPath("$.data.distribution[3].count").value(1))
+                .andExpect(jsonPath("$.data.sourceDataTime").isNotEmpty())
+                .andExpect(jsonPath("$.data.generatedAt").isNotEmpty());
+
+        mockMvc.perform(get("/api/v1/courses/101/grade-analysis?targetType=GRADE_ITEM&gradeItemId={gradeItemId}", homeworkItemId)
+                        .headers(teacherHeaders("101")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.targetType").value("GRADE_ITEM"))
+                .andExpect(jsonPath("$.data.gradeItemId").value(homeworkItemId))
+                .andExpect(jsonPath("$.data.totalStudentCount").value(3))
+                .andExpect(jsonPath("$.data.completedCount").value(1))
+                .andExpect(jsonPath("$.data.missingCount").value(1))
+                .andExpect(jsonPath("$.data.ungradedCount").value(1))
+                .andExpect(jsonPath("$.data.averageScore").value(80.00))
+                .andExpect(jsonPath("$.data.completionRate").value(0.3333));
+    }
+
+    @Test
+    void teacherQueriesGradeItemCompletionThroughApi() throws Exception {
+        createGradeItem("实验一", "LAB", 301, "0.40");
+        long homeworkItemId = createGradeItem("作业一", "HWK", 401, "0.60");
+        mockMvc.perform(post("/api/v1/courses/101/grades/sync")
+                        .headers(teacherHeaders("101")))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/v1/courses/101/grade-items/{gradeItemId}/completion", homeworkItemId)
+                        .headers(teacherHeaders("101")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"))
+                .andExpect(jsonPath("$.data.gradeItemId").value(homeworkItemId))
+                .andExpect(jsonPath("$.data.totalStudentCount").value(3))
+                .andExpect(jsonPath("$.data.submittedCount").value(2))
+                .andExpect(jsonPath("$.data.completedCount").value(1))
+                .andExpect(jsonPath("$.data.missingCount").value(1))
+                .andExpect(jsonPath("$.data.unsubmittedCount").value(0))
+                .andExpect(jsonPath("$.data.ungradedCount").value(1))
+                .andExpect(jsonPath("$.data.averageScore").value(80.00))
+                .andExpect(jsonPath("$.data.completionRate").value(0.3333))
+                .andExpect(jsonPath("$.data.sourceDataTime").isNotEmpty())
+                .andExpect(jsonPath("$.data.generatedAt").isNotEmpty());
+    }
+
+    @Test
     void teacherCannotQueryStudentMyGradesEndpointThroughApi() throws Exception {
         mockMvc.perform(get("/api/v1/courses/101/my-grades")
                         .header("X-User-Id", "501")
@@ -290,7 +358,7 @@ class GradeRecordControllerTest {
                 .andExpect(jsonPath("$.message").value("部分成绩项发布暂未实现，不能提前公开课程总评"));
     }
 
-    private void createGradeItem(String name, String sourceType, long sourceId, String weight) throws Exception {
+    private long createGradeItem(String name, String sourceType, long sourceId, String weight) throws Exception {
         Map<String, Object> payload = Map.of(
                 "name", name,
                 "sourceType", sourceType,
@@ -301,11 +369,15 @@ class GradeRecordControllerTest {
                 "sortOrder", sourceId == 301 ? 1 : 2
         );
 
-        mockMvc.perform(post("/api/v1/courses/101/grade-items")
+        String responseJson = mockMvc.perform(post("/api/v1/courses/101/grade-items")
                         .headers(teacherHeaders("101"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(payload)))
-                .andExpect(status().isCreated());
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        return objectMapper.readTree(responseJson).at("/data/id").asLong();
     }
 
     private org.springframework.http.HttpHeaders teacherHeaders(String manageableCourseIds) {

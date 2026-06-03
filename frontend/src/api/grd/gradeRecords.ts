@@ -3,7 +3,10 @@ import type {
   CourseGradeTablePage,
   GradeAdjustmentPayload,
   GradeAdjustmentResult,
+  GradeAnalysisResult,
+  GradeAnalysisTargetType,
   FinalScoreAdjustmentResult,
+  GradeItemCompletionResult,
   GradeChangeLogPage,
   GradePublishPayload,
   GradePublishRecordPage,
@@ -42,6 +45,11 @@ export interface GradeChangeLogQuery {
 export interface GradePublishRecordQuery {
   page?: number;
   size?: number;
+}
+
+export interface GradeAnalysisQuery {
+  targetType: GradeAnalysisTargetType;
+  gradeItemId?: number;
 }
 
 let authContextProvider: GradeRecordAuthContextProvider | null = null;
@@ -154,6 +162,27 @@ export async function listGradePublishRecords(
     ? `/api/v1/courses/${courseId}/grade-publish-records?${queryString}`
     : `/api/v1/courses/${courseId}/grade-publish-records`;
   return request<GradePublishRecordPage>(url);
+}
+
+export async function getCourseGradeAnalysis(
+  courseId: number,
+  query: GradeAnalysisQuery = { targetType: 'COURSE_TOTAL' }
+): Promise<GradeAnalysisResult> {
+  const params = new URLSearchParams();
+  appendParam(params, 'targetType', query.targetType);
+  appendParam(params, 'gradeItemId', query.gradeItemId);
+  const queryString = params.toString();
+  const url = queryString
+    ? `/api/v1/courses/${courseId}/grade-analysis?${queryString}`
+    : `/api/v1/courses/${courseId}/grade-analysis`;
+  return request<GradeAnalysisResult>(url);
+}
+
+export async function getGradeItemCompletion(
+  courseId: number,
+  gradeItemId: number
+): Promise<GradeItemCompletionResult> {
+  return request<GradeItemCompletionResult>(`/api/v1/courses/${courseId}/grade-items/${gradeItemId}/completion`);
 }
 
 function appendParam(params: URLSearchParams, name: string, value: string | number | undefined) {

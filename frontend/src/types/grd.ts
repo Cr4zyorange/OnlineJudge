@@ -165,3 +165,43 @@ export interface GradePublishRecordPage {
   page: number;
   size: number;
 }
+
+export type GradeAnalysisTargetType = 'COURSE_TOTAL' | 'GRADE_ITEM';
+
+export interface GradeScoreBucket {
+  label: string;
+  count: number;
+}
+
+export interface GradeAnalysisResult {
+  targetType: GradeAnalysisTargetType;
+  gradeItemId: number | null;
+  totalStudentCount: number;
+  submittedCount?: number;
+  completedCount: number;
+  missingCount: number;
+  unsubmittedCount: number;
+  ungradedCount: number;
+  averageScore: string | null;
+  maxScore: string | null;
+  minScore: string | null;
+  passRate: string;
+  completionRate: string;
+  distribution: GradeScoreBucket[];
+  sourceDataTime: string;
+  generatedAt: string;
+}
+
+export interface GradeItemCompletionResult {
+  gradeItemId: number;
+  totalStudentCount: number;
+  submittedCount: number;
+  completedCount: number;
+  missingCount: number;
+  unsubmittedCount: number;
+  ungradedCount: number;
+  averageScore: string | null;
+  completionRate: string;
+  sourceDataTime: string;
+  generatedAt: string;
+}
