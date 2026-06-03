@@ -11,9 +11,15 @@ import type {
   GradePublishPayload,
   GradePublishRecordPage,
   GradePublishResult,
+  GradeReviewProcessResult,
+  GradeReviewRequestPage,
+  GradeReviewStatus,
+  GradeReviewSubmissionResult,
   GradeRecalculationResult,
   GradeStatus,
+  ProcessGradeReviewPayload,
   GradeSyncResult,
+  SubmitGradeReviewPayload,
   PublishStatus
 } from '../../types/grd';
 import { configureAuthContext, request } from '../http';
@@ -50,6 +56,14 @@ export interface GradePublishRecordQuery {
 export interface GradeAnalysisQuery {
   targetType: GradeAnalysisTargetType;
   gradeItemId?: number;
+}
+
+export interface GradeReviewQuery {
+  studentId?: number;
+  gradeItemId?: number;
+  status?: GradeReviewStatus;
+  page?: number;
+  size?: number;
 }
 
 let authContextProvider: GradeRecordAuthContextProvider | null = null;
@@ -183,6 +197,58 @@ export async function getGradeItemCompletion(
   gradeItemId: number
 ): Promise<GradeItemCompletionResult> {
   return request<GradeItemCompletionResult>(`/api/v1/courses/${courseId}/grade-items/${gradeItemId}/completion`);
+}
+
+export async function submitGradeReviewRequest(
+  courseId: number,
+  payload: SubmitGradeReviewPayload
+): Promise<GradeReviewSubmissionResult> {
+  return request<GradeReviewSubmissionResult>(`/api/v1/courses/${courseId}/grade-review-requests`, {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function listMyGradeReviewRequests(
+  courseId: number,
+  query: Omit<GradeReviewQuery, 'studentId' | 'gradeItemId'> = {}
+): Promise<GradeReviewRequestPage> {
+  const params = new URLSearchParams();
+  appendParam(params, 'status', query.status);
+  appendParam(params, 'page', query.page);
+  appendParam(params, 'size', query.size);
+  const queryString = params.toString();
+  const url = queryString
+    ? `/api/v1/courses/${courseId}/my-grade-review-requests?${queryString}`
+    : `/api/v1/courses/${courseId}/my-grade-review-requests`;
+  return request<GradeReviewRequestPage>(url);
+}
+
+export async function listCourseGradeReviewRequests(
+  courseId: number,
+  query: GradeReviewQuery = {}
+): Promise<GradeReviewRequestPage> {
+  const params = new URLSearchParams();
+  appendParam(params, 'studentId', query.studentId);
+  appendParam(params, 'gradeItemId', query.gradeItemId);
+  appendParam(params, 'status', query.status);
+  appendParam(params, 'page', query.page);
+  appendParam(params, 'size', query.size);
+  const queryString = params.toString();
+  const url = queryString
+    ? `/api/v1/courses/${courseId}/grade-review-requests?${queryString}`
+    : `/api/v1/courses/${courseId}/grade-review-requests`;
+  return request<GradeReviewRequestPage>(url);
+}
+
+export async function processGradeReviewRequest(
+  requestId: number,
+  payload: ProcessGradeReviewPayload
+): Promise<GradeReviewProcessResult> {
+  return request<GradeReviewProcessResult>(`/api/v1/grade-review-requests/${requestId}/process`, {
+    method: 'PUT',
+    body: JSON.stringify(payload)
+  });
 }
 
 function appendParam(params: URLSearchParams, name: string, value: string | number | undefined) {

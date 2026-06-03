@@ -5,6 +5,9 @@ import com.onlinejudge.grd.service.GradeAdjustmentException;
 import com.onlinejudge.grd.service.GradeItemPermissionException;
 import com.onlinejudge.grd.service.GradeItemNotFoundException;
 import com.onlinejudge.grd.service.GradePublishException;
+import com.onlinejudge.grd.service.GradeReviewDuplicateException;
+import com.onlinejudge.grd.service.GradeReviewPermissionException;
+import com.onlinejudge.grd.service.GradeReviewValidationException;
 import com.onlinejudge.grd.service.InvalidGradeRuleException;
 import com.onlinejudge.lab.service.LabNotFoundException;
 import com.onlinejudge.lab.service.LabPermissionException;
@@ -52,6 +55,24 @@ public class ApiExceptionHandler {
 
     @ExceptionHandler(GradePublishException.class)
     public ResponseEntity<ApiResponse<Void>> handleGradePublish(GradePublishException exception) {
+        return ResponseEntity.badRequest()
+                .body(ApiResponse.error("ERR-GRD-04", exception.getMessage()));
+    }
+
+    @ExceptionHandler(GradeReviewDuplicateException.class)
+    public ResponseEntity<ApiResponse<Void>> handleGradeReviewDuplicate(GradeReviewDuplicateException exception) {
+        return ResponseEntity.badRequest()
+                .body(ApiResponse.error("ERR-GRD-08", exception.getMessage()));
+    }
+
+    @ExceptionHandler(GradeReviewPermissionException.class)
+    public ResponseEntity<ApiResponse<Void>> handleGradeReviewPermission(GradeReviewPermissionException exception) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(ApiResponse.error("ERR-GRD-09", exception.getMessage()));
+    }
+
+    @ExceptionHandler(GradeReviewValidationException.class)
+    public ResponseEntity<ApiResponse<Void>> handleGradeReviewValidation(GradeReviewValidationException exception) {
         return ResponseEntity.badRequest()
                 .body(ApiResponse.error("ERR-GRD-04", exception.getMessage()));
     }

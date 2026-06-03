@@ -121,6 +121,34 @@ CREATE TABLE IF NOT EXISTS t_grade_change_log (
 CREATE INDEX IF NOT EXISTS idx_grade_change_log_course
     ON t_grade_change_log (course_id, student_id, grade_item_id, created_at);
 
+CREATE TABLE IF NOT EXISTS t_grade_review_request (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    course_id BIGINT NOT NULL,
+    student_id BIGINT NOT NULL,
+    grade_item_id BIGINT NULL,
+    target_type VARCHAR(30) NOT NULL,
+    reason VARCHAR(1000) NOT NULL,
+    status VARCHAR(30) NOT NULL,
+    original_score DECIMAL(6,2) NULL,
+    adjusted_score DECIMAL(6,2) NULL,
+    response_comment VARCHAR(1000) NULL,
+    submitted_at DATETIME NOT NULL,
+    processed_by BIGINT NULL,
+    processed_at DATETIME NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_grade_review_course_status
+    ON t_grade_review_request (course_id, status);
+
+CREATE INDEX IF NOT EXISTS idx_grade_review_student_status
+    ON t_grade_review_request (course_id, student_id, status);
+
+CREATE INDEX IF NOT EXISTS idx_grade_review_target_pending
+    ON t_grade_review_request (course_id, student_id, target_type, grade_item_id, status);
+
 CREATE TABLE IF NOT EXISTS t_grade_analysis_snapshot (
     id BIGINT NOT NULL AUTO_INCREMENT,
     course_id BIGINT NOT NULL,

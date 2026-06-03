@@ -21,4 +21,8 @@ public interface CoursePermissionClient {
     default List<Long> listCourseStudentIds(long courseId) {
         return List.of();
     }
+
+    default List<Long> listCourseTeacherIds(long courseId) {
+        return List.of();
+    }
 }

@@ -318,6 +318,84 @@
         </li>
       </ul>
     </section>
+
+    <section class="grade-table__list" data-testid="grade-review-list" aria-label="成绩复核">
+      <div class="grade-table__detail-heading">
+        <h2>成绩复核</h2>
+        <div class="grade-table__review-toolbar">
+          <label>
+            复核状态
+            <select
+              v-model="reviewStatus"
+              data-testid="review-status-filter"
+              :disabled="reviewsLoading"
+              @change="refreshReviewRequests"
+            >
+              <option value="">全部</option>
+              <option value="PENDING">待处理</option>
+              <option value="APPROVED">已同意</option>
+              <option value="REJECTED">已驳回</option>
+              <option value="CLOSED">已关闭</option>
+            </select>
+          </label>
+          <button type="button" :disabled="reviewsLoading" @click="refreshReviewRequests">刷新</button>
+        </div>
+      </div>
+      <p v-if="reviewsLoading">加载中</p>
+      <p v-else-if="reviewRequests.length === 0">暂无复核记录</p>
+      <ul v-else class="grade-table__reviews">
+        <li v-for="request in reviewRequests" :key="request.requestId">
+          <div>
+            <strong>{{ request.status }}</strong>
+            <span>学生 {{ request.studentId }}</span>
+            <span>{{ request.targetType === 'FINAL_SCORE' ? '课程总评' : `成绩项 ${request.gradeItemId}` }}</span>
+            <span>原成绩 {{ request.originalScore ?? '-' }}</span>
+          </div>
+          <p>{{ request.reason }}</p>
+          <p v-if="request.adjustedScore !== null">调整后成绩 {{ request.adjustedScore }}</p>
+          <p v-if="request.responseComment">{{ request.responseComment }}</p>
+          <p v-if="request.processedAt">处理时间 {{ request.processedAt }}</p>
+          <div v-if="request.status === 'PENDING'" class="grade-table__review-actions">
+            <label>
+              调整后成绩
+              <input
+                v-model.trim="reviewForms[request.requestId].adjustedScore"
+                :data-testid="`review-adjusted-score-${request.requestId}`"
+                inputmode="decimal"
+                type="number"
+                min="0"
+                step="0.01"
+              />
+            </label>
+            <label>
+              处理说明
+              <textarea
+                v-model.trim="reviewForms[request.requestId].responseComment"
+                :data-testid="`review-response-comment-${request.requestId}`"
+                maxlength="1000"
+                rows="3"
+              />
+            </label>
+            <button
+              type="button"
+              :data-testid="`approve-review-${request.requestId}`"
+              :disabled="busy"
+              @click="processReview(request.requestId, 'APPROVE')"
+            >
+              同意修改
+            </button>
+            <button
+              type="button"
+              :data-testid="`reject-review-${request.requestId}`"
+              :disabled="busy"
+              @click="processReview(request.requestId, 'REJECT')"
+            >
+              驳回
+            </button>
+          </div>
+        </li>
+      </ul>
+    </section>
   </main>
 </template>
 
@@ -330,8 +408,10 @@ import {
   getGradeItemCompletion,
   type GradeTableQuery,
   listGradePublishRecords,
+  listCourseGradeReviewRequests,
   listGradeChangeLogs,
   listCourseGrades,
+  processGradeReviewRequest,
   publishCourseGrades,
   recalculateCourseGrades,
   syncSourceGrades
@@ -343,6 +423,8 @@ import type {
   GradeItemCompletionResult,
   GradeChangeLog,
   GradePublishRecord,
+  GradeReviewRequest,
+  GradeReviewStatus,
   GradeRecord,
   GradeStatus,
   PublishStatus
@@ -374,6 +456,10 @@ const changeLogs = ref<GradeChangeLog[]>([]);
 const logsLoading = ref(false);
 const publishRecords = ref<GradePublishRecord[]>([]);
 const publishRecordsLoading = ref(false);
+const reviewRequests = ref<GradeReviewRequest[]>([]);
+const reviewsLoading = ref(false);
+const reviewStatus = ref<GradeReviewStatus | ''>('PENDING');
+const reviewForms = ref<Record<number, { adjustedScore: string; responseComment: string }>>({});
 const analysis = ref<GradeAnalysisResult | null>(null);
 const analysisLoading = ref(false);
 const analysisError = ref('');
@@ -383,7 +469,7 @@ const totalPages = computed(() => Math.max(1, Math.ceil(total.value / size.value
 const selectedRecord = computed(() => selectedRow.value?.records.find((record) => record.id === selectedRecordId.value) ?? null);
 
 onMounted(async () => {
-  await Promise.all([loadRows(), refreshPublishRecords(), refreshAnalysis()]);
+  await Promise.all([loadRows(), refreshPublishRecords(), refreshAnalysis(), refreshReviewRequests()]);
 });
 
 async function loadRows() {
@@ -569,6 +655,57 @@ async function refreshPublishRecords() {
     errorMessage.value = error instanceof Error ? error.message : '发布记录加载失败';
   } finally {
     publishRecordsLoading.value = false;
+  }
+}
+
+async function refreshReviewRequests() {
+  reviewsLoading.value = true;
+  try {
+    const query: {
+      status?: GradeReviewStatus;
+      page: number;
+      size: number;
+    } = {
+      page: 1,
+      size: 20
+    };
+    if (reviewStatus.value) {
+      query.status = reviewStatus.value;
+    }
+    const result = await listCourseGradeReviewRequests(props.courseId, query);
+    reviewRequests.value = result.records;
+    for (const request of result.records) {
+      if (!reviewForms.value[request.requestId]) {
+        reviewForms.value[request.requestId] = {
+          adjustedScore: request.adjustedScore ?? '',
+          responseComment: request.responseComment ?? ''
+        };
+      }
+    }
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : '复核申请加载失败';
+  } finally {
+    reviewsLoading.value = false;
+  }
+}
+
+async function processReview(requestId: number, action: 'APPROVE' | 'REJECT') {
+  busy.value = true;
+  feedback.value = '';
+  errorMessage.value = '';
+  try {
+    const form = reviewForms.value[requestId] ?? { adjustedScore: '', responseComment: '' };
+    const result = await processGradeReviewRequest(requestId, {
+      action,
+      adjustedScore: action === 'APPROVE' ? normalizeScoreInput(form.adjustedScore) : null,
+      responseComment: form.responseComment
+    });
+    feedback.value = `复核已处理：${result.status}`;
+    await Promise.all([loadRows(), refreshChangeLogs(), refreshReviewRequests()]);
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : '复核处理失败';
+  } finally {
+    busy.value = false;
   }
 }
 
@@ -814,6 +951,13 @@ td {
   gap: 10px;
 }
 
+.grade-table__review-toolbar {
+  align-items: end;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
 .grade-table__analysis-target,
 .grade-table__timestamp {
   color: #475569;
@@ -890,8 +1034,47 @@ td {
   padding-left: 18px;
 }
 
+.grade-table__reviews {
+  display: grid;
+  gap: 12px;
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+}
+
+.grade-table__reviews li {
+  border-bottom: 1px solid #e5e7eb;
+  display: grid;
+  gap: 8px;
+  padding: 8px 0 12px;
+}
+
+.grade-table__reviews li > div:first-child {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.grade-table__reviews p {
+  margin: 0;
+}
+
+.grade-table__review-actions {
+  align-items: end;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(120px, 160px) minmax(220px, 1fr) auto auto;
+}
+
 .grade-table__pagination span {
   color: #475569;
   font-size: 14px;
+}
+
+@media (max-width: 760px) {
+  .grade-table__review-actions {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

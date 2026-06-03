@@ -9,9 +9,13 @@ import {
   listGradeChangeLogs,
   listCourseGrades,
   listGradePublishRecords,
+  listCourseGradeReviewRequests,
+  listMyGradeReviewRequests,
+  processGradeReviewRequest,
   publishCourseGrades,
   type GradeTableQuery,
   recalculateCourseGrades,
+  submitGradeReviewRequest,
   syncSourceGrades
 } from '../../../src/api/grd/gradeRecords';
 
@@ -187,6 +191,66 @@ describe('gradeRecords API client', () => {
       method: 'GET',
       headers: expect.objectContaining({
         Authorization: 'Bearer teacher-token'
+      })
+    }));
+  });
+
+  it('calls documented grade review request endpoints', async () => {
+    writeAuthStorage('onlinejudge.authToken', 'grade-review-token');
+    configureGradeRecordAuthContext(() => ({
+      userId: 501,
+      userRole: 'TEACHER',
+      manageableCourseIds: [101]
+    }));
+    const fetchMock = vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(jsonResponse({ requestId: 31, status: 'PENDING' }))
+      .mockResolvedValueOnce(jsonResponse({ records: [], total: 0, page: 1, size: 20 }))
+      .mockResolvedValueOnce(jsonResponse({ records: [], total: 0, page: 1, size: 20 }))
+      .mockResolvedValueOnce(jsonResponse({ requestId: 31, status: 'APPROVED' }));
+
+    await submitGradeReviewRequest(101, {
+      targetType: 'ITEM_SCORE',
+      gradeItemId: 7,
+      reason: '实验报告评分漏看附录'
+    });
+    await listMyGradeReviewRequests(101, {
+      status: 'PENDING',
+      page: 1,
+      size: 20
+    });
+    await listCourseGradeReviewRequests(101, {
+      studentId: 601,
+      gradeItemId: 7,
+      status: 'PENDING',
+      page: 1,
+      size: 20
+    });
+    await processGradeReviewRequest(31, {
+      action: 'APPROVE',
+      adjustedScore: '95.00',
+      responseComment: '确认评分遗漏'
+    });
+
+    expect(fetchMock).toHaveBeenNthCalledWith(1, '/api/v1/courses/101/grade-review-requests', expect.objectContaining({
+      method: 'POST',
+      body: JSON.stringify({
+        targetType: 'ITEM_SCORE',
+        gradeItemId: 7,
+        reason: '实验报告评分漏看附录'
+      })
+    }));
+    expect(fetchMock).toHaveBeenNthCalledWith(2, '/api/v1/courses/101/my-grade-review-requests?status=PENDING&page=1&size=20', expect.objectContaining({
+      method: 'GET'
+    }));
+    expect(fetchMock).toHaveBeenNthCalledWith(3, '/api/v1/courses/101/grade-review-requests?studentId=601&gradeItemId=7&status=PENDING&page=1&size=20', expect.objectContaining({
+      method: 'GET'
+    }));
+    expect(fetchMock).toHaveBeenNthCalledWith(4, '/api/v1/grade-review-requests/31/process', expect.objectContaining({
+      method: 'PUT',
+      body: JSON.stringify({
+        action: 'APPROVE',
+        adjustedScore: '95.00',
+        responseComment: '确认评分遗漏'
       })
     }));
   });

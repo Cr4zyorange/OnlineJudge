@@ -86,6 +86,28 @@ public class HeaderCoursePermissionClient implements CoursePermissionClient {
         return courseRepository == null ? List.of() : courseRepository.listActiveStudentIds(courseId);
     }
 
+    @Override
+    public List<Long> listCourseTeacherIds(long courseId) {
+        if (courseId <= 0) {
+            return List.of();
+        }
+        if (allowHeaderAuth) {
+            HttpServletRequest request = currentRequest();
+            if (request != null) {
+                String teacherRoster = request.getHeader("X-Course-Teacher-Ids");
+                if (teacherRoster != null && !teacherRoster.isBlank()) {
+                    return parseCourseScopedIds(teacherRoster, courseId);
+                }
+                String currentRole = request.getHeader("X-User-Role");
+                String currentUserId = request.getHeader("X-User-Id");
+                if (("TEACHER".equals(currentRole) || "ADMIN".equals(currentRole)) && hasCourseHeader("X-Manageable-Course-Ids", courseId)) {
+                    return parseStudentIds(currentUserId == null ? "" : currentUserId);
+                }
+            }
+        }
+        return courseRepository == null ? List.of() : courseRepository.listActiveTeacherIds(courseId);
+    }
+
     private boolean isAdmin() {
         HttpServletRequest request = currentRequest();
         return request != null && "ADMIN".equals(request.getHeader("X-User-Role"));
@@ -119,6 +141,16 @@ public class HeaderCoursePermissionClient implements CoursePermissionClient {
             }
         }
         return List.copyOf(new LinkedHashSet<>(studentIds));
+    }
+
+    private List<Long> parseCourseScopedIds(String roster, long courseId) {
+        return Arrays.stream(roster.split(";"))
+                .map(String::trim)
+                .filter(value -> !value.isBlank())
+                .filter(value -> value.startsWith(courseId + ":"))
+                .findFirst()
+                .map(value -> parseStudentIds(value.substring(value.indexOf(':') + 1)))
+                .orElseGet(() -> roster.contains(":") ? List.of() : parseStudentIds(roster));
     }
 
     private boolean canManageFromRepository(long courseId, long userId) {
