@@ -373,6 +373,58 @@ class GradeRecordServiceTest {
     }
 
     @Test
+    void timestampOnlyPublishedSourceResyncDoesNotRecordVisibleGradeChange() {
+        InMemoryGradeItemRepository itemRepository = new InMemoryGradeItemRepository();
+        InMemoryGradeRecordRepository recordRepository = new InMemoryGradeRecordRepository();
+        InMemoryCourseGradeSummaryRepository summaryRepository = new InMemoryCourseGradeSummaryRepository();
+        InMemoryGradeChangeLogRepository changeLogRepository = new InMemoryGradeChangeLogRepository();
+        AtomicReference<List<SourceGradeDTO>> sourceGrades = new AtomicReference<>();
+        RecordingNotificationEventPublisher eventPublisher = new RecordingNotificationEventPublisher();
+        GradeRecordService service = new GradeRecordService(
+                itemRepository,
+                recordRepository,
+                changeLogRepository,
+                new InMemoryGradePublishRecordRepository(),
+                summaryRepository,
+                new InMemoryGradeCalculationBatchRepository(),
+                (courseId, sourceType, sourceId) -> sourceGrades.get(),
+                permissionClient(601L),
+                eventPublisher
+        );
+        itemRepository.add(item(1L, 101L, "实验一", SourceType.LAB, 301L, "100.00", "1.00"));
+        sourceGrades.set(List.of(sourceAt(
+                101L,
+                SourceGradeType.LAB,
+                301L,
+                601L,
+                "80.00",
+                "100.00",
+                "SCORED",
+                LocalDateTime.parse("2026-06-03T10:00:00")
+        )));
+        service.syncSourceGrades(101L, 501L);
+        service.publishCourseGrades(101L, 501L, new PublishCourseGradesCommand("COURSE", List.of(), List.of()));
+
+        sourceGrades.set(List.of(sourceAt(
+                101L,
+                SourceGradeType.LAB,
+                301L,
+                601L,
+                "80.00",
+                "100.00",
+                "SCORED",
+                LocalDateTime.parse("2026-06-03T11:00:00")
+        )));
+        service.syncSourceGrades(101L, 501L);
+
+        assertThat(changeLogRepository.logs).isEmpty();
+        assertThat(eventPublisher.events()).singleElement().satisfies(event -> {
+            assertThat(event.type()).isEqualTo("GRADE_PUBLISHED");
+            assertThat(event.recipientUserIds()).containsExactly(601L);
+        });
+    }
+
+    @Test
     void syncSourceGradesDeclaresTransactionalBoundaryForSyncAndRecalculation() throws NoSuchMethodException {
         Transactional transactional = GradeRecordService.class
                 .getMethod("syncSourceGrades", long.class, long.class)
@@ -434,6 +486,28 @@ class GradeRecordServiceTest {
                 new BigDecimal(fullScore),
                 status,
                 LocalDateTime.now()
+        );
+    }
+
+    private SourceGradeDTO sourceAt(
+            long courseId,
+            SourceGradeType sourceType,
+            long sourceId,
+            long studentId,
+            String score,
+            String fullScore,
+            String status,
+            LocalDateTime sourceUpdatedAt
+    ) {
+        return new SourceGradeDTO(
+                courseId,
+                sourceType,
+                sourceId,
+                studentId,
+                score == null ? null : new BigDecimal(score),
+                new BigDecimal(fullScore),
+                status,
+                sourceUpdatedAt
         );
     }
 

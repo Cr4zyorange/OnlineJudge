@@ -37,7 +37,6 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -697,8 +696,7 @@ public class GradeRecordService {
     private boolean sourceGradeChanged(GradeRecord existingRecord, GradeRecord syncedRecord) {
         return compareScore(existingRecord.rawScore(), syncedRecord.rawScore()) != 0
                 || compareScore(existingRecord.weightedScore(), syncedRecord.weightedScore()) != 0
-                || existingRecord.gradeStatus() != syncedRecord.gradeStatus()
-                || !Objects.equals(existingRecord.sourceUpdatedAt(), syncedRecord.sourceUpdatedAt());
+                || existingRecord.gradeStatus() != syncedRecord.gradeStatus();
     }
 
     private int compareScore(BigDecimal left, BigDecimal right) {
