@@ -15,7 +15,9 @@
           </a>
         </div>
         <div class="navbar-user">
-          <i class="bi bi-bell"></i>
+          <a href="/notifications" data-testid="notification-center-entry" title="消息通知中心" aria-label="消息通知中心">
+            <i class="bi bi-bell"></i>
+          </a>
           <span class="avatar">T</span>
         </div>
       </nav>

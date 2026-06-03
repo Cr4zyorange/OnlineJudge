@@ -148,3 +148,51 @@ export interface LearningRecordRequest {
   startedAt?: string;
   endedAt?: string;
 }
+
+export type NotificationType =
+  | 'LEARNING_REMINDER'
+  | 'TASK'
+  | 'GRADE'
+  | 'SYSTEM_ANNOUNCEMENT'
+  | 'TEACHER_ANNOUNCEMENT';
+
+export interface NotificationItem {
+  notificationId: number;
+  courseId: number | null;
+  title: string;
+  content: string;
+  type: NotificationType;
+  priority: number;
+  isRead: boolean;
+  sourceModule: string;
+  sourceId: number | null;
+  actionUrl: string | null;
+  createdAt: string;
+  readAt: string | null;
+}
+
+export interface NotificationPage {
+  records: NotificationItem[];
+  total: number;
+  page: number;
+  size: number;
+  unreadCount: number;
+}
+
+export interface NotificationQuery {
+  type?: NotificationType;
+  isRead?: boolean;
+  startTime?: string;
+  endTime?: string;
+  page?: number;
+  size?: number;
+}
+
+export interface NotificationReadRequest {
+  notificationIds: number[];
+  readAll: boolean;
+}
+
+export interface NotificationMutationResult {
+  updatedCount: number;
+}

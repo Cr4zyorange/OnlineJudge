@@ -14,6 +14,7 @@
   <LearningTaskCenterView v-else-if="viewMode === 'learning-tasks'" />
   <LearningProgressView v-else-if="viewMode === 'learning-progress'" />
   <LearningStatisticsView v-else-if="viewMode === 'learning-statistics'" />
+  <NotificationCenterView v-else-if="viewMode === 'notifications'" />
   <LabSubmissionHistoryView
     v-else-if="viewMode === 'lab' && labRole === 'student' && labPage === 'history' && courseId !== null && labId !== null"
     :course-id="courseId"
@@ -80,6 +81,7 @@ import LabTeacherView from '../views/lab/LabTeacherView.vue';
 import LearningProgressView from '../views/lrn/LearningProgressView.vue';
 import LearningStatisticsView from '../views/lrn/LearningStatisticsView.vue';
 import LearningTaskCenterView from '../views/lrn/LearningTaskCenterView.vue';
+import NotificationCenterView from '../views/lrn/NotificationCenterView.vue';
 import StudentGradeView from '../views/grd/StudentGradeView.vue';
 import TeacherGradeTableView from '../views/grd/TeacherGradeTableView.vue';
 
@@ -151,6 +153,9 @@ const viewMode = computed(() => {
   }
   if (pathname.value === '/learning/statistics') {
     return 'learning-statistics';
+  }
+  if (pathname.value === '/notifications') {
+    return 'notifications';
   }
   if (pathname.value.includes('/labs')) {
     return 'lab';
