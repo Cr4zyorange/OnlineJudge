@@ -339,6 +339,31 @@ class GradeRecordControllerTest {
     }
 
     @Test
+    void nonMemberStudentCannotQueryPublishedCourseGradesThroughApi() throws Exception {
+        createGradeItem("实验一", "LAB", 301, "0.40");
+        createGradeItem("作业一", "HWK", 401, "0.60");
+        mockMvc.perform(post("/api/v1/courses/101/grades/sync")
+                        .headers(teacherHeaders("101")))
+                .andExpect(status().isOk());
+        mockMvc.perform(post("/api/v1/courses/101/grades/publish")
+                        .headers(teacherHeaders("101"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "publishScope", "PARTIAL_STUDENTS",
+                                "studentIds", java.util.List.of(601),
+                                "gradeItemIds", java.util.List.of()
+                        ))))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/v1/courses/101/my-grades")
+                        .header("X-User-Id", "999")
+                        .header("X-User-Role", "STUDENT")
+                        .header("X-Course-Ids", "102"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ERR-GRD-02"));
+    }
+
+    @Test
     void teacherCannotPublishPartialItemsUntilItemScopeVisibilityIsImplemented() throws Exception {
         createGradeItem("实验一", "LAB", 301, "0.40");
         createGradeItem("作业一", "HWK", 401, "0.60");
