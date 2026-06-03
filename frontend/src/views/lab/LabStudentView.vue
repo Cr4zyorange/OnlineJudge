@@ -103,6 +103,7 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { getLabDetail, getLabSubmissionResult, listLabSubmissions, submitLab } from '../../api/lab/labs';
 import { saveLearningProgress } from '../../api/lrn/learningProgress';
+import { reportLearningRecord } from '../../api/lrn/learningRecords';
 import type {
   LabExperimentDetail,
   LabSubmissionHistoryItem,
@@ -147,6 +148,7 @@ const language = ref('');
 const code = ref('');
 const selectedFile = ref<File | null>(null);
 let evaluationPollTimer: number | null = null;
+const openedAt = ref<Date | null>(null);
 
 const publicTestcases = computed(() => (labDetail.value?.testcases ?? []).filter((testcase) => testcase.public));
 const languageOptions = computed(() => {
@@ -166,6 +168,7 @@ async function loadLabDetail() {
   errorMessage.value = '';
   try {
     labDetail.value = await getLabDetail(props.labId);
+    openedAt.value = new Date();
     const resumed = restoreResumeCode();
     if (languageOptions.value.length === 1) {
       language.value = languageOptions.value[0];
@@ -173,6 +176,7 @@ async function loadLabDetail() {
     if (!resumed) {
       await recordProgress(10, `labId=${props.labId}`);
     }
+    void recordBehavior('ACCESS', 0);
     void loadLatestSubmission();
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '实验详情加载失败';
@@ -215,6 +219,7 @@ async function submit() {
     await refreshLatestEvaluationResult(latestSubmission.value.submissionId);
     feedbackMessage.value = `提交成功，版本 ${latestSubmission.value.version}`;
     await recordProgress(100, `submittedVersion=${latestSubmission.value.version}`);
+    await recordBehavior('SUBMIT', elapsedSeconds());
     code.value = '';
     selectedFile.value = null;
   } catch (error) {
@@ -268,6 +273,7 @@ async function saveDraftProgress() {
     return;
   }
   await recordProgress(40, `code=${code.value.slice(0, 450)}`);
+  await recordBehavior('STUDY', elapsedSeconds());
 }
 
 async function recordProgress(progressPercent: number, lastPosition: string) {
@@ -286,6 +292,30 @@ async function recordProgress(progressPercent: number, lastPosition: string) {
   } catch {
     // Progress persistence should not block lab reading or submission.
   }
+}
+
+async function recordBehavior(actionType: 'ACCESS' | 'STUDY' | 'SUBMIT', durationSeconds: number) {
+  if (!labDetail.value) {
+    return;
+  }
+  try {
+    await reportLearningRecord({
+      courseId: props.courseId,
+      sourceModule: 'LAB',
+      sourceId: props.labId,
+      actionType,
+      durationSeconds
+    });
+  } catch {
+    // Behavior tracking should not block lab reading or submission.
+  }
+}
+
+function elapsedSeconds() {
+  if (!openedAt.value) {
+    return 0;
+  }
+  return Math.max(0, Math.round((Date.now() - openedAt.value.getTime()) / 1000));
 }
 
 function restoreResumeCode() {

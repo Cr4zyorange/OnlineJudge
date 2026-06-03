@@ -471,6 +471,20 @@ describe('CourseManagementView', () => {
           continueUrl: '/courses/1?chapterId=11&resourceId=21',
           updatedAt: '2026-06-01 10:00:00'
         } })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ code: '0', message: 'success', data: {
+          id: 1,
+          courseId: 1,
+          courseName: '软件工程基础',
+          sourceModule: 'CRS',
+          sourceId: 21,
+          actionType: 'DOWNLOAD',
+          durationSeconds: 0,
+          startedAt: '2026-06-01 10:00:00',
+          endedAt: '2026-06-01 10:00:00'
+        } })
       });
     vi.stubGlobal('fetch', fetchMock);
 
@@ -506,6 +520,16 @@ describe('CourseManagementView', () => {
         sourceId: 21,
         progressPercent: 100,
         lastPosition: 'resourceId=21'
+      })
+    }));
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/learning/records', expect.objectContaining({
+      method: 'POST',
+      body: JSON.stringify({
+        courseId: 1,
+        sourceModule: 'CRS',
+        sourceId: 21,
+        actionType: 'DOWNLOAD',
+        durationSeconds: 0
       })
     }));
   });

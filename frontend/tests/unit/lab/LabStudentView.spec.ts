@@ -3,14 +3,27 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import LabStudentView from '../../../src/views/lab/LabStudentView.vue';
 import * as labApi from '../../../src/api/lab/labs';
 import * as learningProgressApi from '../../../src/api/lrn/learningProgress';
+import * as learningRecordsApi from '../../../src/api/lrn/learningRecords';
 
 vi.mock('../../../src/api/lab/labs');
 vi.mock('../../../src/api/lrn/learningProgress');
+vi.mock('../../../src/api/lrn/learningRecords');
 
 describe('LabStudentView', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     window.history.replaceState({}, '', '/courses/101/labs/7?role=student');
+    vi.mocked(learningRecordsApi.reportLearningRecord).mockResolvedValue({
+      id: 1,
+      courseId: 101,
+      courseName: '软件工程基础',
+      sourceModule: 'LAB',
+      sourceId: 7,
+      actionType: 'ACCESS',
+      durationSeconds: 0,
+      startedAt: '2026-06-01 10:00:00',
+      endedAt: '2026-06-01 10:00:00'
+    });
     vi.mocked(learningProgressApi.saveLearningProgress).mockResolvedValue({
       progressId: 1,
       courseId: 101,
@@ -172,9 +185,17 @@ describe('LabStudentView', () => {
       sourceId: 7,
       progressPercent: 10
     }));
+    expect(learningRecordsApi.reportLearningRecord).toHaveBeenCalledWith(expect.objectContaining({
+      courseId: 101,
+      sourceModule: 'LAB',
+      sourceId: 7,
+      actionType: 'ACCESS'
+    }));
 
     await wrapper.get('[name="language"]').setValue('python');
     await wrapper.get('[name="code"]').setValue("print('hello lab')");
+    await wrapper.get('[name="code"]').trigger('blur');
+    await flushPromises();
     await wrapper.get('form').trigger('submit');
     await flushPromises();
 
@@ -188,6 +209,19 @@ describe('LabStudentView', () => {
       sourceId: 7,
       progressPercent: 100,
       lastPosition: expect.stringContaining('submittedVersion=1')
+    }));
+    expect(learningRecordsApi.reportLearningRecord).toHaveBeenCalledWith(expect.objectContaining({
+      courseId: 101,
+      sourceModule: 'LAB',
+      sourceId: 7,
+      actionType: 'STUDY',
+      durationSeconds: expect.any(Number)
+    }));
+    expect(learningRecordsApi.reportLearningRecord).toHaveBeenLastCalledWith(expect.objectContaining({
+      courseId: 101,
+      sourceModule: 'LAB',
+      sourceId: 7,
+      actionType: 'SUBMIT'
     }));
     expect(wrapper.text()).toContain('提交成功');
     expect(wrapper.text()).toContain('版本 1');

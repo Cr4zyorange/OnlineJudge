@@ -6,12 +6,16 @@ import * as gradeItemApi from '../../../src/api/grd/gradeItems';
 import * as gradeRecordsApi from '../../../src/api/grd/gradeRecords';
 import * as homeworkApi from '../../../src/api/hwk/homeworks';
 import * as labApi from '../../../src/api/lab/labs';
+import * as learningProgressApi from '../../../src/api/lrn/learningProgress';
+import * as learningRecordsApi from '../../../src/api/lrn/learningRecords';
 
 vi.mock('../../../src/api/grd/gradeItems');
 vi.mock('../../../src/api/grd/gradeRecords');
 vi.mock('../../../src/api/crs/courses');
 vi.mock('../../../src/api/hwk/homeworks');
 vi.mock('../../../src/api/lab/labs');
+vi.mock('../../../src/api/lrn/learningProgress');
+vi.mock('../../../src/api/lrn/learningRecords');
 
 describe('App', () => {
   const originalLocation = window.location;
@@ -22,6 +26,31 @@ describe('App', () => {
     window.localStorage.setItem('onlinejudge.userId', '101');
     window.localStorage.setItem('onlinejudge.userRole', 'TEACHER');
     window.localStorage.setItem('onlinejudge.username', 'Teacher101');
+    vi.mocked(learningProgressApi.saveLearningProgress).mockResolvedValue({
+      progressId: 1,
+      courseId: 101,
+      courseName: 'Course 101',
+      chapterId: null,
+      chapterName: null,
+      sourceModule: 'LAB',
+      sourceId: 7,
+      progressPercent: 10,
+      status: 'IN_PROGRESS',
+      lastPosition: 'labId=7',
+      continueUrl: '/courses/101/labs/7',
+      updatedAt: '2026-06-02T08:00:00'
+    });
+    vi.mocked(learningRecordsApi.reportLearningRecord).mockResolvedValue({
+      id: 1,
+      courseId: 101,
+      courseName: 'Course 101',
+      sourceModule: 'LAB',
+      sourceId: 7,
+      actionType: 'ACCESS',
+      durationSeconds: 0,
+      startedAt: '2026-06-02T08:00:00',
+      endedAt: '2026-06-02T08:00:00'
+    });
   });
 
   afterEach(() => {
