@@ -1,6 +1,10 @@
 package com.onlinejudge.hwk.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.onlinejudge.common.evaluation.EvaluationResult;
+import com.onlinejudge.common.evaluation.EvaluationStatus;
+import com.onlinejudge.common.evaluation.EvaluationTask;
+import com.onlinejudge.common.evaluation.Evaluator;
 import com.onlinejudge.common.event.NotificationEvent;
 import com.onlinejudge.common.event.NotificationEventPublisher;
 import org.junit.jupiter.api.BeforeEach;
@@ -16,6 +20,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.jdbc.Sql;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -36,7 +42,18 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 })
 @AutoConfigureMockMvc
 @Sql(
+        scripts = {
+                "file:../database/migrations/20260530_01_create_hwk_homework.sql",
+                "file:../database/migrations/20260601_01_create_hwk_submission.sql",
+                "file:../database/migrations/20260602_01_create_hwk_evaluation.sql",
+                "file:../database/migrations/20260602_02_create_hwk_review_log.sql"
+        },
+        executionPhase = Sql.ExecutionPhase.BEFORE_TEST_CLASS
+)
+@Sql(
         statements = {
+                "DELETE FROM t_hwk_review_log",
+                "DELETE FROM t_hwk_evaluation",
                 "DELETE FROM t_hwk_test_case",
                 "DELETE FROM t_hwk_question",
                 "DELETE FROM t_hwk_judge_config",
@@ -52,6 +69,23 @@ class HomeworkControllerTest {
         @Primary
         RecordingNotificationEventPublisher recordingNotificationEventPublisher() {
             return new RecordingNotificationEventPublisher();
+        }
+
+        @Bean
+        @Primary
+        Evaluator deterministicHomeworkEvaluator() {
+            return task -> {
+                boolean wrong = task.sourceCode() != null && task.sourceCode().contains("#FAKE_WRONG");
+                String expectedOutput = task.options().getOrDefault("expectedOutput", "");
+                return new EvaluationResult(
+                        task.taskId(),
+                        wrong ? EvaluationStatus.WRONG_ANSWER : EvaluationStatus.ACCEPTED,
+                        wrong ? BigDecimal.ZERO : BigDecimal.ONE,
+                        wrong ? "wrong answer expected %s actual wrong output".formatted(expectedOutput) : "accepted",
+                        List.of(wrong ? "wrong output" : expectedOutput),
+                        LocalDateTime.now()
+                );
+            };
         }
     }
 
@@ -481,6 +515,215 @@ class HomeworkControllerTest {
     }
 
     @Test
+    void objectiveHomeworkSubmissionCreatesEvaluationRecordAndResultView() throws Exception {
+        long homeworkId = createHomeworkAndReturnId(objectivePayload());
+        mockMvc.perform(put("/api/v1/homeworks/{homeworkId}/publish", homeworkId)
+                        .headers(teacherHeaders("101", "101", "101:601")))
+                .andExpect(status().isOk());
+
+        long submissionId = submitObjectiveAnswer(homeworkId, "{\"q1\":[\"2\"],\"q2\":[\"true\"]}", studentHeaders("101"));
+
+        mockMvc.perform(get("/api/v1/submissions/{submissionId}/evaluation", submissionId)
+                        .headers(studentHeaders("101")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.submissionId").value(submissionId))
+                .andExpect(jsonPath("$.data.evaluationStatus").value("ACCEPTED"))
+                .andExpect(jsonPath("$.data.score").value(100))
+                .andExpect(jsonPath("$.data.passedCases").value(2))
+                .andExpect(jsonPath("$.data.totalCases").value(2))
+                .andExpect(jsonPath("$.data.reevaluation").value(false))
+                .andExpect(jsonPath("$.data.feedback", containsString("2 / 2")));
+
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM t_hwk_evaluation WHERE submission_id = ? AND status = 'ACCEPTED'",
+                Integer.class,
+                submissionId
+        )).isEqualTo(1);
+    }
+
+    @Test
+    void codeHomeworkSubmissionEvaluatesIoCasesAndTeacherCanReevaluate() throws Exception {
+        long homeworkId = createHomeworkAndReturnId(codePayload("[\"python\"]"));
+        mockMvc.perform(put("/api/v1/homeworks/{homeworkId}/publish", homeworkId)
+                        .headers(teacherHeaders("101", "101", "101:601")))
+                .andExpect(status().isOk());
+
+        long submissionId = submitCodeAnswer(homeworkId, "print(input())", "python", studentHeaders("101"));
+
+        mockMvc.perform(get("/api/v1/submissions/{submissionId}/evaluation", submissionId)
+                        .headers(studentHeaders("101")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.submissionId").value(submissionId))
+                .andExpect(jsonPath("$.data.evaluationStatus").value("ACCEPTED"))
+                .andExpect(jsonPath("$.data.score").value(100))
+                .andExpect(jsonPath("$.data.passedCases").value(1))
+                .andExpect(jsonPath("$.data.totalCases").value(1))
+                .andExpect(jsonPath("$.data.reevaluation").value(false));
+
+        mockMvc.perform(post("/api/v1/submissions/{submissionId}/reevaluate", submissionId)
+                        .headers(teacherHeaders("101", "101"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of("reason", "verify fixed judge data"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.submissionId").value(submissionId))
+                .andExpect(jsonPath("$.data.evaluationStatus").value("ACCEPTED"))
+                .andExpect(jsonPath("$.data.score").value(100))
+                .andExpect(jsonPath("$.data.reevaluation").value(true));
+
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM t_hwk_evaluation WHERE submission_id = ?",
+                Integer.class,
+                submissionId
+        )).isEqualTo(2);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT evaluation_type FROM t_hwk_evaluation WHERE submission_id = ? ORDER BY id DESC LIMIT 1",
+                String.class,
+                submissionId
+        )).isEqualTo("REJUDGE");
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT reason FROM t_hwk_review_log WHERE submission_id = ? AND operation_type = 'REJUDGE'",
+                String.class,
+                submissionId
+        )).isEqualTo("verify fixed judge data");
+    }
+
+    @Test
+    void teacherReevaluationRequiresReason() throws Exception {
+        long homeworkId = createHomeworkAndReturnId(objectivePayload());
+        mockMvc.perform(put("/api/v1/homeworks/{homeworkId}/publish", homeworkId)
+                        .headers(teacherHeaders("101", "101", "101:601")))
+                .andExpect(status().isOk());
+        long submissionId = submitObjectiveAnswer(homeworkId, "{\"q1\":[\"2\"],\"q2\":[\"true\"]}", studentHeaders("101"));
+
+        mockMvc.perform(post("/api/v1/submissions/{submissionId}/reevaluate", submissionId)
+                        .headers(teacherHeaders("101", "101"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of("reason", "   "))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("HWK_4005"))
+                .andExpect(jsonPath("$.message", containsString("reason")));
+    }
+
+    @Test
+    void courseManagerReadsEvaluationLogsButStudentCannotReadPrivateLogs() throws Exception {
+        long homeworkId = createHomeworkAndReturnId(codePayload("[\"python\"]"));
+        mockMvc.perform(put("/api/v1/homeworks/{homeworkId}/publish", homeworkId)
+                        .headers(teacherHeaders("101", "101", "101:601")))
+                .andExpect(status().isOk());
+        long submissionId = submitCodeAnswer(homeworkId, "#FAKE_WRONG\nprint(input())", "python", studentHeaders("101"));
+
+        String evaluationBody = mockMvc.perform(get("/api/v1/submissions/{submissionId}/evaluation", submissionId)
+                        .headers(teacherHeaders("101", "101")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.evaluationStatus").value("WRONG_ANSWER"))
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        long evaluationId = objectMapper.readTree(evaluationBody).path("data").path("evaluationId").asLong();
+
+        mockMvc.perform(get("/api/v1/evaluations/{evaluationId}/logs", evaluationId)
+                        .headers(teacherHeaders("101", "101")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.evaluationId").value(evaluationId))
+                .andExpect(jsonPath("$.data.submissionId").value(submissionId))
+                .andExpect(jsonPath("$.data.runLog", containsString("wrong output")))
+                .andExpect(jsonPath("$.data.triggeredBy").doesNotExist());
+
+        mockMvc.perform(get("/api/v1/evaluations/{evaluationId}/logs", evaluationId)
+                        .headers(studentHeaders("101")))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("HWK_4031"));
+    }
+
+    @Test
+    void codeHomeworkEvaluationFailurePreservesSubmissionAndRecordsFailedStatus() throws Exception {
+        long homeworkId = createHomeworkAndReturnId(codePayload("[\"python\"]"));
+        mockMvc.perform(put("/api/v1/homeworks/{homeworkId}/publish", homeworkId)
+                        .headers(teacherHeaders("101", "101", "101:601")))
+                .andExpect(status().isOk());
+
+        long submissionId = submitCodeAnswer(homeworkId, "#FAKE_WRONG\nprint(input())", "python", studentHeaders("101"));
+
+        mockMvc.perform(get("/api/v1/submissions/{submissionId}/evaluation", submissionId)
+                        .headers(teacherHeaders("101", "101")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.evaluationStatus").value("WRONG_ANSWER"))
+                .andExpect(jsonPath("$.data.score").value(0))
+                .andExpect(jsonPath("$.data.passedCases").value(0))
+                .andExpect(jsonPath("$.data.totalCases").value(1))
+                .andExpect(jsonPath("$.data.feedback", containsString("wrong answer")));
+
+        mockMvc.perform(get("/api/v1/submissions/{submissionId}", submissionId)
+                        .headers(teacherHeaders("101", "101")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.submissionId").value(submissionId))
+                .andExpect(jsonPath("$.data.evaluationStatus").value("WRONG_ANSWER"))
+                .andExpect(jsonPath("$.data.autoScore").value(0));
+    }
+
+    @Test
+    void studentEvaluationResultHidesHiddenCaseExpectedOutput() throws Exception {
+        long homeworkId = createHomeworkAndReturnId(codePayloadWithHiddenCase("[\"python\"]"));
+        mockMvc.perform(put("/api/v1/homeworks/{homeworkId}/publish", homeworkId)
+                        .headers(teacherHeaders("101", "101", "101:601")))
+                .andExpect(status().isOk());
+        long submissionId = submitCodeAnswer(homeworkId, "#FAKE_WRONG\nprint(input())", "python", studentHeaders("101"));
+
+        String studentBody = mockMvc.perform(get("/api/v1/submissions/{submissionId}/evaluation", submissionId)
+                        .headers(studentHeaders("101")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.evaluationStatus").value("WRONG_ANSWER"))
+                .andExpect(jsonPath("$.data.feedback", containsString("passed 0 / 2 cases")))
+                .andExpect(jsonPath("$.data.compileLog").doesNotExist())
+                .andExpect(jsonPath("$.data.runLog").doesNotExist())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        assertThat(studentBody).doesNotContain("SECRET_EXPECTED");
+        assertThat(studentBody).doesNotContain("wrong output");
+    }
+
+    @Test
+    void objectiveReevaluationUpdatesSubmissionSummary() throws Exception {
+        long homeworkId = createHomeworkAndReturnId(objectivePayload());
+        mockMvc.perform(put("/api/v1/homeworks/{homeworkId}/publish", homeworkId)
+                        .headers(teacherHeaders("101", "101", "101:601")))
+                .andExpect(status().isOk());
+        long submissionId = submitObjectiveAnswer(homeworkId, "{\"q1\":[\"2\"],\"q2\":[\"false\"]}", studentHeaders("101"));
+
+        mockMvc.perform(get("/api/v1/submissions/{submissionId}", submissionId)
+                        .headers(teacherHeaders("101", "101")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.evaluationStatus").value("WRONG_ANSWER"))
+                .andExpect(jsonPath("$.data.autoScore").value(40));
+
+        jdbcTemplate.update("""
+                        UPDATE t_hwk_question
+                        SET answer_json = '[\"false\"]'
+                        WHERE homework_id = ? AND sort_order = 2
+                        """,
+                homeworkId
+        );
+
+        mockMvc.perform(post("/api/v1/submissions/{submissionId}/reevaluate", submissionId)
+                        .headers(teacherHeaders("101", "101"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of("reason", "answer key corrected"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.evaluationStatus").value("ACCEPTED"))
+                .andExpect(jsonPath("$.data.score").value(100))
+                .andExpect(jsonPath("$.data.reevaluation").value(true));
+
+        mockMvc.perform(get("/api/v1/submissions/{submissionId}", submissionId)
+                        .headers(teacherHeaders("101", "101")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.evaluationStatus").value("ACCEPTED"))
+                .andExpect(jsonPath("$.data.autoScore").value(100))
+                .andExpect(jsonPath("$.data.finalScore").value(100));
+    }
+
+    @Test
     void codeHomeworkSubmissionRejectsLanguageOutsideConfiguredAllowlist() throws Exception {
         long homeworkId = createHomeworkAndReturnId(codePayload("[\"python\"]"));
         mockMvc.perform(put("/api/v1/homeworks/{homeworkId}/publish", homeworkId)
@@ -681,6 +924,18 @@ class HomeworkControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.testCases", hasSize(1)));
 
+        mockMvc.perform(get("/api/v1/homeworks/{homeworkId}/test-cases", homeworkId)
+                        .headers(teacherHeaders("101", "101")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data", hasSize(1)))
+                .andExpect(jsonPath("$.data[0].inputData").value("1 2"))
+                .andExpect(jsonPath("$.data[0].expectedOutput").value("3"));
+
+        mockMvc.perform(get("/api/v1/homeworks/{homeworkId}/test-cases", homeworkId)
+                        .headers(studentHeaders("101")))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("HWK_4031"));
+
         mockMvc.perform(put("/api/v1/homeworks/{homeworkId}/publish", homeworkId)
                         .headers(teacherHeaders("101", "101", "101:7001")))
                 .andExpect(status().isOk())
@@ -704,6 +959,33 @@ class HomeworkControllerTest {
                         .headers(headers)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(Map.of("answerText", answerText))))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        return objectMapper.readTree(body).path("data").path("submissionId").asLong();
+    }
+
+    private long submitObjectiveAnswer(long homeworkId, String answerJson, org.springframework.http.HttpHeaders headers) throws Exception {
+        String body = mockMvc.perform(post("/api/v1/homeworks/{homeworkId}/submissions", homeworkId)
+                        .headers(headers)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of("answerJson", answerJson))))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        return objectMapper.readTree(body).path("data").path("submissionId").asLong();
+    }
+
+    private long submitCodeAnswer(long homeworkId, String codeText, String language, org.springframework.http.HttpHeaders headers) throws Exception {
+        String body = mockMvc.perform(post("/api/v1/homeworks/{homeworkId}/submissions", homeworkId)
+                        .headers(headers)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "codeText", codeText,
+                                "language", language
+                        ))))
                 .andExpect(status().isCreated())
                 .andReturn()
                 .getResponse()
@@ -790,6 +1072,45 @@ class HomeworkControllerTest {
                                 "timeLimitMs", 1000,
                                 "memoryLimitKb", 65536,
                                 "sortOrder", 1
+                        )
+                ))
+        );
+    }
+
+    private Map<String, Object> codePayloadWithHiddenCase(String languageLimitJson) {
+        return Map.ofEntries(
+                entry("courseId", 101),
+                entry("chapterId", 11),
+                entry("title", "HWK04 code hidden evaluation"),
+                entry("description", "Implement addition."),
+                entry("type", "CODE"),
+                entry("deadline", "2026-06-30T23:59:59"),
+                entry("totalScore", 100),
+                entry("allowResubmit", true),
+                entry("allowLateSubmit", false),
+                entry("showEvaluationBeforePublish", true),
+                entry("languageLimitJson", languageLimitJson),
+                entry("timeLimitMs", 1000),
+                entry("memoryLimitKb", 65536),
+                entry("outputCompareMode", "EXACT"),
+                entry("testCases", List.of(
+                        Map.of(
+                                "inputData", "1 2",
+                                "expectedOutput", "3",
+                                "scoreWeight", 50,
+                                "hidden", false,
+                                "timeLimitMs", 1000,
+                                "memoryLimitKb", 65536,
+                                "sortOrder", 1
+                        ),
+                        Map.of(
+                                "inputData", "secret input",
+                                "expectedOutput", "SECRET_EXPECTED",
+                                "scoreWeight", 50,
+                                "hidden", true,
+                                "timeLimitMs", 1000,
+                                "memoryLimitKb", 65536,
+                                "sortOrder", 2
                         )
                 ))
         );

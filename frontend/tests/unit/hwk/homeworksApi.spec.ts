@@ -3,11 +3,15 @@ import {
   closeHomework,
   createHomework,
   getHomeworkDetail,
+  getHomeworkEvaluationLogs,
+  getHomeworkSubmissionEvaluation,
   getHomeworkSubmission,
+  getHomeworkTestCases,
   listHomeworks,
   listHomeworkSubmissions,
   listMyHomeworkSubmissions,
   publishHomework,
+  reevaluateHomeworkSubmission,
   saveHomeworkQuestions,
   saveHomeworkTestCases,
   submitHomework,
@@ -33,6 +37,7 @@ describe('homeworks api', () => {
       .mockResolvedValueOnce(jsonResponse(homeworkDetail({ id: 11, title: 'updated' })))
       .mockResolvedValueOnce(jsonResponse(homeworkDetail({ id: 11, questions: [{ ...questionPayload(), id: 7, homeworkId: 11 }] })))
       .mockResolvedValueOnce(jsonResponse(homeworkDetail({ id: 11, testCases: [{ ...testCasePayload(), id: 9, homeworkId: 11 }] })))
+      .mockResolvedValueOnce(jsonResponse([{ ...testCasePayload(), id: 9, homeworkId: 11 }]))
       .mockResolvedValueOnce(jsonResponse(homeworkDetail({ id: 11 })))
       .mockResolvedValueOnce(jsonResponse(homeworkDetail({ id: 11, status: 'PUBLISHED' })))
       .mockResolvedValueOnce(jsonResponse(homeworkDetail({ id: 11, status: 'CLOSED' })));
@@ -43,6 +48,7 @@ describe('homeworks api', () => {
     await updateHomework(11, { ...homeworkPayload(), title: 'updated' });
     await saveHomeworkQuestions(11, [questionPayload()]);
     await saveHomeworkTestCases(11, [testCasePayload()]);
+    await expect(getHomeworkTestCases(11)).resolves.toEqual([{ ...testCasePayload(), id: 9, homeworkId: 11 }]);
     await getHomeworkDetail(11);
     await publishHomework(11);
     await closeHomework(11);
@@ -53,6 +59,7 @@ describe('homeworks api', () => {
       ['/api/v1/homeworks/11', 'PUT'],
       ['/api/v1/homeworks/11/questions', 'PUT'],
       ['/api/v1/homeworks/11/test-cases', 'PUT'],
+      ['/api/v1/homeworks/11/test-cases', 'GET'],
       ['/api/v1/homeworks/11', 'GET'],
       ['/api/v1/homeworks/11/publish', 'PUT'],
       ['/api/v1/homeworks/11/close', 'PUT']
@@ -143,6 +150,46 @@ describe('homeworks api', () => {
       ],
       ['/api/v1/submissions/91', 'GET']
     ]);
+  });
+
+  it('builds documented HWK04 evaluation result, logs, and reevaluation routes', async () => {
+    const evaluation = {
+      evaluationId: 501,
+      submissionId: 91,
+      evaluationStatus: 'ACCEPTED',
+      score: 100,
+      passedCases: 2,
+      totalCases: 2,
+      durationMs: 120,
+      feedback: 'accepted',
+      reevaluation: false,
+      startedAt: '2026-06-01T10:00:00',
+      finishedAt: '2026-06-01T10:00:01'
+    };
+    const fetchMock = vi.spyOn(globalThis, 'fetch');
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse(evaluation))
+      .mockResolvedValueOnce(jsonResponse({ ...evaluation, compileLog: 'compile ok', runLog: 'case output' }))
+      .mockResolvedValueOnce(jsonResponse({ ...evaluation, evaluationId: 502, reevaluation: true }));
+
+    await expect(getHomeworkSubmissionEvaluation(91)).resolves.toEqual(evaluation);
+    await expect(getHomeworkEvaluationLogs(501)).resolves.toEqual(expect.objectContaining({
+      compileLog: 'compile ok',
+      runLog: 'case output'
+    }));
+    await expect(reevaluateHomeworkSubmission(91, 'teacher requested a fresh judge')).resolves.toEqual(expect.objectContaining({
+      evaluationId: 502,
+      reevaluation: true
+    }));
+
+    expect(fetchMock.mock.calls.map((call) => [call[0], (call[1] as RequestInit).method])).toEqual([
+      ['/api/v1/submissions/91/evaluation', 'GET'],
+      ['/api/v1/evaluations/501/logs', 'GET'],
+      ['/api/v1/submissions/91/reevaluate', 'POST']
+    ]);
+    expect(fetchMock.mock.calls[2][1]).toEqual(expect.objectContaining({
+      body: JSON.stringify({ reason: 'teacher requested a fresh judge' })
+    }));
   });
 });
 

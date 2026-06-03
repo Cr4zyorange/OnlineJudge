@@ -164,6 +164,12 @@ public class HomeworkService {
         return repository.replaceTestCases(homeworkId, normalizeTestCases(testCases, LocalDateTime.now()));
     }
 
+    public List<HomeworkTestCase> testCases(long homeworkId, long managerId) {
+        Homework existing = findExisting(homeworkId);
+        requireManagePermission(existing.courseId(), managerId);
+        return existing.testCases();
+    }
+
     @Transactional
     public Homework publish(long homeworkId, long teacherId) {
         Homework existing = findExisting(homeworkId);

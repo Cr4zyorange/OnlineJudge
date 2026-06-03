@@ -113,6 +113,17 @@
           </p>
           <p>{{ formatDateTime(latestSubmission.submittedAt) }}</p>
         </section>
+
+        <section v-if="latestEvaluationResult" class="homework-student__submission" aria-label="evaluation result">
+          <h2>Evaluation result</h2>
+          <p>{{ latestEvaluationResult.evaluationStatus }}</p>
+          <p>Score {{ latestEvaluationResult.score }}</p>
+          <p>Passed cases {{ latestEvaluationResult.passedCases }} / {{ latestEvaluationResult.totalCases }}</p>
+          <p v-if="latestEvaluationResult.feedback">{{ latestEvaluationResult.feedback }}</p>
+          <p v-if="latestEvaluationResult.errorMessage" class="homework-student__error">
+            {{ latestEvaluationResult.errorMessage }}
+          </p>
+        </section>
       </template>
     </section>
   </main>
@@ -120,10 +131,10 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
-import { getHomeworkDetail, submitHomework } from '../../api/hwk/homeworks';
+import { getHomeworkDetail, getHomeworkSubmissionEvaluation, submitHomework } from '../../api/hwk/homeworks';
 import { saveLearningProgress } from '../../api/lrn/learningProgress';
 import { reportLearningRecord } from '../../api/lrn/learningRecords';
-import type { HomeworkDetail, HomeworkSubmissionSummary } from '../../types/hwk';
+import type { HomeworkDetail, HomeworkEvaluationResult, HomeworkSubmissionSummary } from '../../types/hwk';
 
 const props = defineProps<{
   courseId: number;
@@ -132,6 +143,7 @@ const props = defineProps<{
 
 const homework = ref<HomeworkDetail | null>(null);
 const latestSubmission = ref<HomeworkSubmissionSummary | null>(null);
+const latestEvaluationResult = ref<HomeworkEvaluationResult | null>(null);
 const loading = ref(false);
 const submitting = ref(false);
 const saving = ref(false);
@@ -185,11 +197,28 @@ async function submit() {
     await recordProgress(100, `homeworkId=${props.homeworkId};submitted=${latestSubmission.value.submissionId}`);
     await recordBehavior('SUBMIT', elapsedSeconds());
     feedbackMessage.value = `Submission ${latestSubmission.value.submissionId} ${latestSubmission.value.submitStatus}`;
+    await refreshLatestEvaluationResult(latestSubmission.value.submissionId);
     resetForm();
   } catch (error) {
     submitErrorMessage.value = error instanceof Error ? error.message : 'Homework submission failed';
   } finally {
     submitting.value = false;
+  }
+}
+
+async function refreshLatestEvaluationResult(submissionId: number) {
+  latestEvaluationResult.value = null;
+  try {
+    latestEvaluationResult.value = await getHomeworkSubmissionEvaluation(submissionId);
+    if (latestSubmission.value) {
+      latestSubmission.value = {
+        ...latestSubmission.value,
+        evaluationStatus: latestEvaluationResult.value.evaluationStatus,
+        autoScore: latestEvaluationResult.value.score
+      };
+    }
+  } catch {
+    // Evaluation visibility or transient evaluation errors should not hide the submission receipt.
   }
 }
 

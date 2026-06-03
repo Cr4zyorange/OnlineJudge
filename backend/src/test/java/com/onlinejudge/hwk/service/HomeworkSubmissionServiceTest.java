@@ -2,8 +2,12 @@ package com.onlinejudge.hwk.service;
 
 import com.onlinejudge.hwk.domain.CreateHomeworkSubmissionCommand;
 import com.onlinejudge.hwk.domain.Homework;
+import com.onlinejudge.hwk.domain.HomeworkEvaluation;
+import com.onlinejudge.hwk.domain.HomeworkEvaluationRepository;
 import com.onlinejudge.hwk.domain.HomeworkQuestion;
 import com.onlinejudge.hwk.domain.HomeworkRepository;
+import com.onlinejudge.hwk.domain.HomeworkReviewLog;
+import com.onlinejudge.hwk.domain.HomeworkReviewLogRepository;
 import com.onlinejudge.hwk.domain.HomeworkStatus;
 import com.onlinejudge.hwk.domain.HomeworkSubmission;
 import com.onlinejudge.hwk.domain.HomeworkSubmissionRepository;
@@ -26,7 +30,12 @@ class HomeworkSubmissionServiceTest {
         HomeworkSubmissionService service = new HomeworkSubmissionService(
                 new SingleHomeworkRepository(publishedTextHomework()),
                 new DuplicateVersionSubmissionRepository(),
-                (courseId, userId) -> true
+                new UnusedHomeworkEvaluationRepository(),
+                new UnusedHomeworkReviewLogRepository(),
+                (courseId, userId) -> true,
+                task -> {
+                    throw new UnsupportedOperationException();
+                }
         );
 
         assertThatThrownBy(() -> service.submit(
@@ -153,6 +162,35 @@ class HomeworkSubmissionServiceTest {
                 int size
         ) {
             return new PageResponse<>(List.of(), 0, page, size);
+        }
+    }
+
+    private static final class UnusedHomeworkEvaluationRepository implements HomeworkEvaluationRepository {
+        @Override
+        public HomeworkEvaluation save(HomeworkEvaluation evaluation) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public HomeworkEvaluation update(HomeworkEvaluation evaluation) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public Optional<HomeworkEvaluation> findById(long id) {
+            return Optional.empty();
+        }
+
+        @Override
+        public Optional<HomeworkEvaluation> findLatestBySubmissionId(long submissionId) {
+            return Optional.empty();
+        }
+    }
+
+    private static final class UnusedHomeworkReviewLogRepository implements HomeworkReviewLogRepository {
+        @Override
+        public HomeworkReviewLog save(HomeworkReviewLog reviewLog) {
+            throw new UnsupportedOperationException();
         }
     }
 }

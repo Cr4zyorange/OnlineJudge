@@ -2,18 +2,28 @@ package com.onlinejudge.hwk.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.onlinejudge.common.evaluation.EvaluationResult;
 import com.onlinejudge.common.evaluation.EvaluationStatus;
+import com.onlinejudge.common.evaluation.EvaluationTask;
+import com.onlinejudge.common.evaluation.Evaluator;
 import com.onlinejudge.common.web.PageResponse;
 import com.onlinejudge.hwk.domain.CreateHomeworkSubmissionCommand;
 import com.onlinejudge.hwk.domain.Homework;
+import com.onlinejudge.hwk.domain.HomeworkEvaluation;
+import com.onlinejudge.hwk.domain.HomeworkEvaluationRepository;
+import com.onlinejudge.hwk.domain.HomeworkEvaluationType;
 import com.onlinejudge.hwk.domain.HomeworkRepository;
 import com.onlinejudge.hwk.domain.HomeworkQuestion;
+import com.onlinejudge.hwk.domain.HomeworkReviewLog;
+import com.onlinejudge.hwk.domain.HomeworkReviewLogRepository;
+import com.onlinejudge.hwk.domain.HomeworkReviewOperationType;
 import com.onlinejudge.hwk.domain.HomeworkReviewStatus;
 import com.onlinejudge.hwk.domain.HomeworkStatus;
 import com.onlinejudge.hwk.domain.HomeworkSubmission;
 import com.onlinejudge.hwk.domain.HomeworkSubmissionRepository;
 import com.onlinejudge.hwk.domain.HomeworkSubmissionSearchCriteria;
 import com.onlinejudge.hwk.domain.HomeworkSubmitStatus;
+import com.onlinejudge.hwk.domain.HomeworkTestCase;
 import com.onlinejudge.hwk.domain.HomeworkType;
 import com.onlinejudge.integration.course.CoursePermissionClient;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -21,9 +31,11 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Locale;
 import java.util.Optional;
 
@@ -39,16 +51,25 @@ public class HomeworkSubmissionService {
 
     private final HomeworkRepository homeworkRepository;
     private final HomeworkSubmissionRepository submissionRepository;
+    private final HomeworkEvaluationRepository evaluationRepository;
+    private final HomeworkReviewLogRepository reviewLogRepository;
     private final CoursePermissionClient coursePermissionClient;
+    private final Evaluator evaluator;
 
     public HomeworkSubmissionService(
             HomeworkRepository homeworkRepository,
             HomeworkSubmissionRepository submissionRepository,
-            CoursePermissionClient coursePermissionClient
+            HomeworkEvaluationRepository evaluationRepository,
+            HomeworkReviewLogRepository reviewLogRepository,
+            CoursePermissionClient coursePermissionClient,
+            Evaluator evaluator
     ) {
         this.homeworkRepository = homeworkRepository;
         this.submissionRepository = submissionRepository;
+        this.evaluationRepository = evaluationRepository;
+        this.reviewLogRepository = reviewLogRepository;
         this.coursePermissionClient = coursePermissionClient;
+        this.evaluator = evaluator;
     }
 
     @Transactional
@@ -69,9 +90,12 @@ public class HomeworkSubmissionService {
         latestFinal.ifPresent(existing -> submissionRepository.update(existing.markHistorical(now)));
 
         HomeworkSubmitStatus submitStatus = now.isAfter(homework.deadline()) ? HomeworkSubmitStatus.LATE : HomeworkSubmitStatus.SUBMITTED;
-        EvaluationStatus evaluationStatus = evaluationStatus(homework, normalized);
+        ObjectiveScore objectiveScore = homework.type() == HomeworkType.OBJECTIVE
+                ? calculateObjectiveScore(homework, normalized.answerJson())
+                : null;
+        EvaluationStatus evaluationStatus = evaluationStatus(homework, objectiveScore);
         HomeworkReviewStatus reviewStatus = reviewStatus(homework);
-        Integer autoScore = homework.type() == HomeworkType.OBJECTIVE ? calculateObjectiveScore(homework, normalized.answerJson()) : null;
+        Integer autoScore = objectiveScore == null ? null : objectiveScore.score();
         Integer finalScore = homework.type() == HomeworkType.OBJECTIVE ? autoScore : null;
         HomeworkSubmission submission = new HomeworkSubmission(
                 0L,
@@ -99,7 +123,9 @@ public class HomeworkSubmissionService {
                 false
         );
         try {
-            return new SubmittedHomeworkSubmission(homework, submissionRepository.save(submission));
+            HomeworkSubmission saved = submissionRepository.save(submission);
+            createInitialEvaluation(homework, saved, objectiveScore, now);
+            return new SubmittedHomeworkSubmission(homework, saved);
         } catch (DataIntegrityViolationException exception) {
             throw new HomeworkApiException("HWK_4006", "submission version conflict, please retry", HttpStatus.CONFLICT);
         }
@@ -137,6 +163,44 @@ public class HomeworkSubmissionService {
         return new SubmissionDetail(homework, submission, true);
     }
 
+    @Transactional
+    public EvaluationDetail evaluationDetail(long submissionId, long userId) {
+        SubmissionDetail detail = detail(submissionId, userId);
+        if (!detail.managerView()) {
+            requireEvaluationVisible(detail.homework());
+        }
+        HomeworkEvaluation evaluation = latestOrCreateEvaluation(detail.homework(), detail.submission(), userId);
+        return new EvaluationDetail(detail.homework(), detail.submission(), evaluation, detail.managerView());
+    }
+
+    @Transactional
+    public EvaluationDetail reevaluate(long submissionId, long managerId, String reason) {
+        String normalizedReason = normalizeReason(reason);
+        HomeworkSubmission submission = submissionRepository.findById(submissionId)
+                .orElseThrow(() -> new HomeworkApiException("HWK_4001", "submission not found", HttpStatus.NOT_FOUND));
+        Homework homework = findExistingHomework(submission.homeworkId());
+        requireManagePermission(homework.courseId(), managerId);
+        if (homework.type() != HomeworkType.CODE && homework.type() != HomeworkType.OBJECTIVE) {
+            throw new HomeworkApiException("HWK_4009", "homework type does not support automatic evaluation", HttpStatus.CONFLICT);
+        }
+        HomeworkEvaluation evaluation = homework.type() == HomeworkType.OBJECTIVE
+                ? reevaluateObjective(homework, submission, managerId)
+                : evaluateCodeSubmission(homework, submission, managerId, true, null);
+        writeRejudgeLog(homework, submission, evaluation, managerId, normalizedReason);
+        HomeworkSubmission updated = submissionRepository.findById(submissionId).orElse(submission);
+        return new EvaluationDetail(homework, updated, evaluation, true);
+    }
+
+    public EvaluationDetail evaluationLogs(long evaluationId, long managerId) {
+        HomeworkEvaluation evaluation = evaluationRepository.findById(evaluationId)
+                .orElseThrow(() -> new HomeworkApiException("HWK_4009", "evaluation result not available", HttpStatus.NOT_FOUND));
+        HomeworkSubmission submission = submissionRepository.findById(evaluation.submissionId())
+                .orElseThrow(() -> new HomeworkApiException("HWK_4001", "submission not found", HttpStatus.NOT_FOUND));
+        Homework homework = findExistingHomework(submission.homeworkId());
+        requireManagePermission(homework.courseId(), managerId);
+        return new EvaluationDetail(homework, submission, evaluation, true);
+    }
+
     public record SubmissionHistory(Homework homework, List<HomeworkSubmission> submissions) {
     }
 
@@ -146,13 +210,20 @@ public class HomeworkSubmissionService {
     public record SubmissionDetail(Homework homework, HomeworkSubmission submission, boolean managerView) {
     }
 
-    private EvaluationStatus evaluationStatus(Homework homework, CreateHomeworkSubmissionCommand command) {
+    public record EvaluationDetail(
+            Homework homework,
+            HomeworkSubmission submission,
+            HomeworkEvaluation evaluation,
+            boolean managerView
+    ) {
+    }
+
+    private EvaluationStatus evaluationStatus(Homework homework, ObjectiveScore objectiveScore) {
         if (homework.type() == HomeworkType.CODE) {
             return EvaluationStatus.PENDING;
         }
         if (homework.type() == HomeworkType.OBJECTIVE) {
-            int score = calculateObjectiveScore(homework, command.answerJson());
-            return score >= homework.totalScore() ? EvaluationStatus.ACCEPTED : EvaluationStatus.WRONG_ANSWER;
+            return objectiveScore.score() >= homework.totalScore() ? EvaluationStatus.ACCEPTED : EvaluationStatus.WRONG_ANSWER;
         }
         return EvaluationStatus.NONE;
     }
@@ -169,19 +240,325 @@ public class HomeworkSubmissionService {
         return type == HomeworkType.CODE ? command.codeText() : command.answerText();
     }
 
-    private int calculateObjectiveScore(Homework homework, String answerJson) {
+    private ObjectiveScore calculateObjectiveScore(Homework homework, String answerJson) {
         JsonNode submitted = readJson(answerJson, "objective answer format is invalid");
         List<HomeworkQuestion> questions = homework.questions();
         int score = 0;
+        int passed = 0;
         for (int index = 0; index < questions.size(); index += 1) {
             HomeworkQuestion question = questions.get(index);
             JsonNode expected = readJson(question.answerJson(), "objective answer key format is invalid");
             JsonNode actual = submittedAnswerForQuestion(submitted, question, index, questions.size());
             if (actual != null && sameAnswer(expected, actual)) {
                 score += question.score();
+                passed += 1;
             }
         }
-        return Math.min(score, homework.totalScore());
+        return new ObjectiveScore(Math.min(score, homework.totalScore()), passed, questions.size(), homework.totalScore());
+    }
+
+    private void createInitialEvaluation(
+            Homework homework,
+            HomeworkSubmission submission,
+            ObjectiveScore objectiveScore,
+            LocalDateTime now
+    ) {
+        if (homework.type() == HomeworkType.OBJECTIVE) {
+            saveObjectiveEvaluation(homework, submission, objectiveScore, HomeworkEvaluationType.OBJECTIVE_AUTO, false, null, now);
+            return;
+        }
+        if (homework.type() == HomeworkType.CODE) {
+            evaluationRepository.save(new HomeworkEvaluation(
+                    0L,
+                    submission.id(),
+                    homework.id(),
+                    submission.studentId(),
+                    HomeworkEvaluationType.CODE_JUDGE,
+                    EvaluationStatus.PENDING,
+                    0,
+                    0,
+                    homework.testCases().size(),
+                    null,
+                    null,
+                    null,
+                    "waiting for evaluation",
+                    null,
+                    null,
+                    null,
+                    false,
+                    null,
+                    now,
+                    null,
+                    now,
+                    now
+            ));
+        }
+    }
+
+    private HomeworkEvaluation latestOrCreateEvaluation(Homework homework, HomeworkSubmission submission, long userId) {
+        Optional<HomeworkEvaluation> latest = evaluationRepository.findLatestBySubmissionId(submission.id());
+        if (homework.type() == HomeworkType.CODE
+                && latest.map(HomeworkEvaluation::status).filter(this::isTerminalEvaluationStatus).isEmpty()) {
+            return evaluateCodeSubmission(homework, submission, userId, false, latest.orElse(null));
+        }
+        if (latest.isPresent()) {
+            return latest.get();
+        }
+        if (homework.type() == HomeworkType.OBJECTIVE) {
+            return saveObjectiveEvaluation(
+                    homework,
+                    submission,
+                    calculateObjectiveScore(homework, submission.answerJson()),
+                    HomeworkEvaluationType.OBJECTIVE_AUTO,
+                    false,
+                    null,
+                    LocalDateTime.now()
+            );
+        }
+        throw new HomeworkApiException("HWK_4009", "evaluation result not available", HttpStatus.NOT_FOUND);
+    }
+
+    private HomeworkEvaluation reevaluateObjective(Homework homework, HomeworkSubmission submission, long managerId) {
+        LocalDateTime now = LocalDateTime.now();
+        ObjectiveScore score = calculateObjectiveScore(homework, submission.answerJson());
+        HomeworkEvaluation evaluation = saveObjectiveEvaluation(
+                homework,
+                submission,
+                score,
+                HomeworkEvaluationType.REJUDGE,
+                true,
+                managerId,
+                now
+        );
+        EvaluationStatus status = score.score() >= score.totalScore()
+                ? EvaluationStatus.ACCEPTED
+                : EvaluationStatus.WRONG_ANSWER;
+        submissionRepository.update(submission.withEvaluationResult(
+                status,
+                HomeworkReviewStatus.REVIEWED,
+                score.score(),
+                score.score(),
+                now
+        ));
+        return evaluation;
+    }
+
+    private HomeworkEvaluation saveObjectiveEvaluation(
+            Homework homework,
+            HomeworkSubmission submission,
+            ObjectiveScore score,
+            HomeworkEvaluationType evaluationType,
+            boolean reevaluation,
+            Long triggeredBy,
+            LocalDateTime now
+    ) {
+        EvaluationStatus status = score.score() >= score.totalScore()
+                ? EvaluationStatus.ACCEPTED
+                : EvaluationStatus.WRONG_ANSWER;
+        return evaluationRepository.save(new HomeworkEvaluation(
+                0L,
+                submission.id(),
+                homework.id(),
+                submission.studentId(),
+                evaluationType,
+                status,
+                score.score(),
+                score.passedCases(),
+                score.totalCases(),
+                0,
+                null,
+                null,
+                "objective score %d, passed %d / %d".formatted(score.score(), score.passedCases(), score.totalCases()),
+                null,
+                null,
+                null,
+                reevaluation,
+                triggeredBy,
+                now,
+                now,
+                now,
+                now
+        ));
+    }
+
+    private HomeworkEvaluation evaluateCodeSubmission(
+            Homework homework,
+            HomeworkSubmission submission,
+            long triggeredBy,
+            boolean reevaluation,
+            HomeworkEvaluation existing
+    ) {
+        LocalDateTime startedAt = LocalDateTime.now();
+        List<CaseEvaluation> caseEvaluations = new ArrayList<>();
+        for (HomeworkTestCase testCase : homework.testCases()) {
+            EvaluationResult result = evaluator.evaluate(new EvaluationTask(
+                    submission.id() + "-" + testCase.id() + (reevaluation ? "-retry" : ""),
+                    "HWK",
+                    homework.courseId(),
+                    homework.id(),
+                    submission.id(),
+                    submission.studentId(),
+                    submission.language(),
+                    submission.answerText(),
+                    Map.of(
+                            "stdin", testCase.inputData(),
+                            "expectedOutput", testCase.expectedOutput(),
+                            "timeLimitMs", Integer.toString(testCase.timeLimitMs()),
+                            "memoryLimitKb", Integer.toString(testCase.memoryLimitKb())
+                    ),
+                    submission.submittedAt()
+            ));
+            boolean passed = result.status() == EvaluationStatus.ACCEPTED;
+            caseEvaluations.add(new CaseEvaluation(
+                    result.status(),
+                    passed,
+                    passed ? testCase.scoreWeight() : 0,
+                    result.message(),
+                    result.caseResults().isEmpty() ? "" : result.caseResults().get(0)
+            ));
+        }
+        LocalDateTime finishedAt = LocalDateTime.now();
+        EvaluationStatus finalStatus = resolveCodeEvaluationStatus(caseEvaluations);
+        int score = caseEvaluations.stream().mapToInt(CaseEvaluation::score).sum();
+        int passedCases = (int) caseEvaluations.stream().filter(CaseEvaluation::passed).count();
+        String runLog = caseEvaluations.stream()
+                .map(CaseEvaluation::caseOutput)
+                .reduce((left, right) -> left + "\n" + right)
+                .orElse(null);
+        String feedback = caseEvaluations.stream()
+                .map(CaseEvaluation::message)
+                .reduce((left, right) -> left + "\n" + right)
+                .orElse(resolveEvaluationMessage(finalStatus, passedCases, caseEvaluations.size()));
+        HomeworkEvaluation completed = new HomeworkEvaluation(
+                existing == null || reevaluation ? 0L : existing.id(),
+                submission.id(),
+                homework.id(),
+                submission.studentId(),
+                reevaluation ? HomeworkEvaluationType.REJUDGE
+                        : existing == null ? HomeworkEvaluationType.CODE_JUDGE : existing.evaluationType(),
+                finalStatus,
+                score,
+                passedCases,
+                caseEvaluations.size(),
+                Math.toIntExact(Duration.between(startedAt, finishedAt).toMillis()),
+                null,
+                isFailureStatus(finalStatus) ? feedback : null,
+                feedback,
+                null,
+                findFirstMessage(caseEvaluations, EvaluationStatus.COMPILE_ERROR),
+                runLog,
+                reevaluation,
+                reevaluation ? triggeredBy : null,
+                startedAt,
+                finishedAt,
+                existing == null || reevaluation ? startedAt : existing.createdAt(),
+                finishedAt
+        );
+        HomeworkEvaluation saved = existing == null || reevaluation
+                ? evaluationRepository.save(completed)
+                : evaluationRepository.update(completed);
+        HomeworkReviewStatus reviewStatus = finalStatus == EvaluationStatus.ACCEPTED
+                ? HomeworkReviewStatus.REVIEWED
+                : HomeworkReviewStatus.NEED_REVIEW;
+        Integer finalScore = finalStatus == EvaluationStatus.ACCEPTED ? score : null;
+        submissionRepository.update(submission.withEvaluationResult(finalStatus, reviewStatus, score, finalScore, finishedAt));
+        return saved;
+    }
+
+    private EvaluationStatus resolveCodeEvaluationStatus(List<CaseEvaluation> caseEvaluations) {
+        if (caseEvaluations.isEmpty()) {
+            return EvaluationStatus.SYSTEM_ERROR;
+        }
+        if (containsStatus(caseEvaluations, EvaluationStatus.SYSTEM_ERROR)) {
+            return EvaluationStatus.SYSTEM_ERROR;
+        }
+        if (containsStatus(caseEvaluations, EvaluationStatus.COMPILE_ERROR)) {
+            return EvaluationStatus.COMPILE_ERROR;
+        }
+        if (containsStatus(caseEvaluations, EvaluationStatus.RUNTIME_ERROR)) {
+            return EvaluationStatus.RUNTIME_ERROR;
+        }
+        if (containsStatus(caseEvaluations, EvaluationStatus.TIME_LIMIT_EXCEEDED)) {
+            return EvaluationStatus.TIME_LIMIT_EXCEEDED;
+        }
+        return caseEvaluations.stream().allMatch(CaseEvaluation::passed)
+                ? EvaluationStatus.ACCEPTED
+                : EvaluationStatus.WRONG_ANSWER;
+    }
+
+    private boolean containsStatus(List<CaseEvaluation> caseEvaluations, EvaluationStatus status) {
+        return caseEvaluations.stream().anyMatch(item -> item.status() == status);
+    }
+
+    private String findFirstMessage(List<CaseEvaluation> caseEvaluations, EvaluationStatus status) {
+        return caseEvaluations.stream()
+                .filter(item -> item.status() == status)
+                .map(CaseEvaluation::message)
+                .findFirst()
+                .orElse(null);
+    }
+
+    private String resolveEvaluationMessage(EvaluationStatus status, int passedCases, int totalCases) {
+        return switch (status) {
+            case ACCEPTED -> "all cases passed";
+            case WRONG_ANSWER -> "passed %d / %d cases".formatted(passedCases, totalCases);
+            case COMPILE_ERROR -> "compile error";
+            case RUNTIME_ERROR -> "runtime error";
+            case TIME_LIMIT_EXCEEDED -> "time limit exceeded";
+            case SYSTEM_ERROR -> "evaluation failed";
+            case RUNNING -> "evaluation running";
+            case PENDING -> "waiting for evaluation";
+            default -> status.name();
+        };
+    }
+
+    private boolean isFailureStatus(EvaluationStatus status) {
+        return status != EvaluationStatus.ACCEPTED && status != EvaluationStatus.NONE;
+    }
+
+    private boolean isTerminalEvaluationStatus(EvaluationStatus status) {
+        return status != EvaluationStatus.PENDING && status != EvaluationStatus.RUNNING;
+    }
+
+    private String normalizeReason(String reason) {
+        if (reason == null || reason.isBlank()) {
+            throw invalidFormat("reevaluation reason is required");
+        }
+        return reason.trim();
+    }
+
+    private void writeRejudgeLog(
+            Homework homework,
+            HomeworkSubmission submission,
+            HomeworkEvaluation evaluation,
+            long managerId,
+            String reason
+    ) {
+        reviewLogRepository.save(new HomeworkReviewLog(
+                0L,
+                submission.id(),
+                homework.id(),
+                submission.studentId(),
+                HomeworkReviewOperationType.REJUDGE,
+                submission.autoScore(),
+                evaluation.score(),
+                null,
+                managerId,
+                reason,
+                LocalDateTime.now()
+        ));
+    }
+
+    private record ObjectiveScore(int score, int passedCases, int totalCases, int totalScore) {
+    }
+
+    private record CaseEvaluation(
+            EvaluationStatus status,
+            boolean passed,
+            int score,
+            String message,
+            String caseOutput
+    ) {
     }
 
     private JsonNode submittedAnswerForQuestion(JsonNode submitted, HomeworkQuestion question, int index, int questionCount) {
@@ -258,6 +635,14 @@ public class HomeworkSubmissionService {
     private void requireManagePermission(long courseId, long userId) {
         if (!coursePermissionClient.canManageCourse(courseId, userId)) {
             throw new HomeworkApiException("HWK_4031", "course management permission denied", HttpStatus.FORBIDDEN);
+        }
+    }
+
+    private void requireEvaluationVisible(Homework homework) {
+        boolean scorePublished = homework.status() == HomeworkStatus.SCORE_PUBLISHED
+                || homework.status() == HomeworkStatus.ARCHIVED;
+        if (!homework.showEvaluationBeforePublish() && !scorePublished) {
+            throw new HomeworkApiException("HWK_4010", "evaluation result is not visible", HttpStatus.FORBIDDEN);
         }
     }
 

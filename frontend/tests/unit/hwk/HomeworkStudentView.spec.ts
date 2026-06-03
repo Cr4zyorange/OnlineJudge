@@ -172,6 +172,71 @@ describe('HomeworkStudentView', () => {
     expect(wrapper.text()).toContain('NEED_REVIEW');
   });
 
+  it('loads and displays the evaluation result after submitting code homework', async () => {
+    vi.mocked(homeworkApi.getHomeworkDetail).mockResolvedValueOnce(homeworkDetail({
+      title: 'HWK04 code evaluation',
+      type: 'CODE',
+      languageLimitJson: '["python"]',
+      testCases: [{
+        id: 1,
+        homeworkId: 11,
+        inputData: '1 2',
+        expectedOutput: '3',
+        scoreWeight: 100,
+        hidden: false,
+        timeLimitMs: 1000,
+        memoryLimitKb: 65536,
+        sortOrder: 1
+      }]
+    }));
+    vi.mocked(homeworkApi.submitHomework).mockResolvedValueOnce({
+      submissionId: 94,
+      homeworkId: 11,
+      studentId: 601,
+      submitStatus: 'SUBMITTED',
+      evaluationStatus: 'PENDING',
+      reviewStatus: 'NEED_REVIEW',
+      version: 1,
+      final: true,
+      submittedAt: '2026-06-01T10:00:00'
+    });
+    vi.mocked(homeworkApi.getHomeworkSubmissionEvaluation).mockResolvedValueOnce({
+      evaluationId: 801,
+      submissionId: 94,
+      evaluationStatus: 'ACCEPTED',
+      score: 100,
+      passedCases: 1,
+      totalCases: 1,
+      durationMs: 50,
+      errorMessage: null,
+      feedback: 'accepted',
+      compileLog: null,
+      runLog: null,
+      reevaluation: false,
+      triggeredBy: null,
+      startedAt: '2026-06-01T10:00:00',
+      finishedAt: '2026-06-01T10:00:01'
+    });
+
+    const wrapper = mount(HomeworkStudentView, {
+      props: {
+        courseId: 101,
+        homeworkId: 11
+      }
+    });
+    await flushPromises();
+
+    await wrapper.get('[name="codeText"]').setValue('print(input())');
+    await wrapper.get('form').trigger('submit');
+    await flushPromises();
+
+    expect(homeworkApi.getHomeworkSubmissionEvaluation).toHaveBeenCalledWith(94);
+    expect(wrapper.text()).toContain('ACCEPTED');
+    expect(wrapper.text()).toContain('100');
+    expect(wrapper.text()).toContain('1 / 1');
+    expect(wrapper.text()).toContain('accepted');
+  });
+
   it('submits the default language when code homework has a single configured language', async () => {
     vi.mocked(homeworkApi.getHomeworkDetail).mockResolvedValueOnce(homeworkDetail({
       title: 'HWK02 python homework',

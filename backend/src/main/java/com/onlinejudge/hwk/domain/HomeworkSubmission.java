@@ -34,4 +34,16 @@ public record HomeworkSubmission(
                 submitStatus, evaluationStatus, reviewStatus, autoScore, manualScore, finalScore, comment, version,
                 false, submittedAt, reviewedBy, reviewedAt, createdAt, updatedAt, deleted);
     }
+
+    public HomeworkSubmission withEvaluationResult(
+            EvaluationStatus evaluationStatus,
+            HomeworkReviewStatus reviewStatus,
+            Integer autoScore,
+            Integer finalScore,
+            LocalDateTime updatedAt
+    ) {
+        return new HomeworkSubmission(id, homeworkId, studentId, submitType, answerText, answerJson, fileUrl, language,
+                submitStatus, evaluationStatus, reviewStatus, autoScore, manualScore, finalScore, comment, version,
+                isFinal, submittedAt, reviewedBy, reviewedAt, createdAt, updatedAt, deleted);
+    }
 }
