@@ -492,6 +492,97 @@ describe('TeacherGradeTableView', () => {
     expect(wrapper.text()).toContain('PARTIAL_STUDENTS');
     expect(wrapper.text()).toContain('通知 SENT');
   });
+
+  it('renders course grade analysis and refreshes a selected grade item analysis', async () => {
+    vi.mocked(gradeRecordsApi.listCourseGrades).mockResolvedValue({
+      records: [],
+      total: 0,
+      page: 1,
+      size: 20
+    });
+    vi.mocked(gradeRecordsApi.listGradePublishRecords).mockResolvedValue({
+      records: [],
+      total: 0,
+      page: 1,
+      size: 20
+    });
+    vi.mocked(gradeRecordsApi.getCourseGradeAnalysis)
+      .mockResolvedValueOnce({
+        targetType: 'COURSE_TOTAL',
+        gradeItemId: null,
+        totalStudentCount: 3,
+        completedCount: 1,
+        missingCount: 2,
+        unsubmittedCount: 0,
+        ungradedCount: 0,
+        averageScore: '84.00',
+        maxScore: '84.00',
+        minScore: '84.00',
+        passRate: '1.0000',
+        completionRate: '0.3333',
+        distribution: [
+          { label: '0-59', count: 0 },
+          { label: '60-69', count: 0 },
+          { label: '70-79', count: 0 },
+          { label: '80-89', count: 1 },
+          { label: '90-100', count: 0 }
+        ],
+        sourceDataTime: '2026-06-03T10:00:00',
+        generatedAt: '2026-06-03T10:00:01'
+      })
+      .mockResolvedValueOnce({
+        targetType: 'GRADE_ITEM',
+        gradeItemId: 2,
+        totalStudentCount: 3,
+        completedCount: 1,
+        missingCount: 1,
+        unsubmittedCount: 0,
+        ungradedCount: 1,
+        averageScore: '80.00',
+        maxScore: '80.00',
+        minScore: '80.00',
+        passRate: '1.0000',
+        completionRate: '0.3333',
+        distribution: [
+          { label: '0-59', count: 0 },
+          { label: '60-69', count: 0 },
+          { label: '70-79', count: 0 },
+          { label: '80-89', count: 1 },
+          { label: '90-100', count: 0 }
+        ],
+        sourceDataTime: '2026-06-03T10:01:00',
+        generatedAt: '2026-06-03T10:01:01'
+      });
+
+    const wrapper = mount(TeacherGradeTableView, {
+      props: {
+        courseId: 101
+      }
+    });
+    await flushPromises();
+
+    expect(gradeRecordsApi.getCourseGradeAnalysis).toHaveBeenCalledWith(101, {
+      targetType: 'COURSE_TOTAL'
+    });
+    expect(wrapper.text()).toContain('教学分析');
+    expect(wrapper.text()).toContain('均分');
+    expect(wrapper.text()).toContain('84.00');
+    expect(wrapper.text()).toContain('缺失 2');
+    expect(wrapper.text()).toContain('80-89：1');
+
+    await wrapper.get('[data-testid="analysis-target-type"]').setValue('GRADE_ITEM');
+    await wrapper.get('[data-testid="analysis-grade-item-id"]').setValue('2');
+    await wrapper.get('[data-testid="analysis-form"]').trigger('submit');
+    await flushPromises();
+
+    expect(gradeRecordsApi.getCourseGradeAnalysis).toHaveBeenLastCalledWith(101, {
+      targetType: 'GRADE_ITEM',
+      gradeItemId: 2
+    });
+    expect(wrapper.text()).toContain('成绩项 2');
+    expect(wrapper.text()).toContain('80.00');
+    expect(wrapper.text()).toContain('待评分 1');
+  });
 });
 
 async function flushPromises() {

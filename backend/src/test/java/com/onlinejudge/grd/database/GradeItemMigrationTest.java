@@ -2,6 +2,7 @@ package com.onlinejudge.grd.database;
 
 import com.onlinejudge.grd.domain.CourseGradeSummary;
 import com.onlinejudge.grd.domain.FinalStatus;
+import com.onlinejudge.grd.domain.GradeAnalysisSnapshot;
 import com.onlinejudge.grd.domain.GradeChangeLog;
 import com.onlinejudge.grd.domain.GradeItem;
 import com.onlinejudge.grd.domain.GradeRecord;
@@ -9,6 +10,7 @@ import com.onlinejudge.grd.domain.GradeStatus;
 import com.onlinejudge.grd.domain.PublishStatus;
 import com.onlinejudge.grd.domain.SourceType;
 import com.onlinejudge.grd.repository.JdbcCourseGradeSummaryRepository;
+import com.onlinejudge.grd.repository.JdbcGradeAnalysisSnapshotRepository;
 import com.onlinejudge.grd.repository.JdbcGradeChangeLogRepository;
 import com.onlinejudge.grd.repository.JdbcGradeItemRepository;
 import com.onlinejudge.grd.repository.JdbcGradeRecordRepository;
@@ -33,6 +35,7 @@ import static org.assertj.core.api.Assertions.assertThat;
         JdbcGradeItemRepository.class,
         JdbcGradeRecordRepository.class,
         JdbcCourseGradeSummaryRepository.class,
+        JdbcGradeAnalysisSnapshotRepository.class,
         JdbcGradeChangeLogRepository.class
 })
 @Sql(scripts = "file:../database/migrations/20260525_01_create_grd_grade_item.sql")
@@ -40,6 +43,7 @@ class GradeItemMigrationTest {
     private final JdbcGradeItemRepository repository;
     private final JdbcGradeRecordRepository gradeRecordRepository;
     private final JdbcCourseGradeSummaryRepository courseGradeSummaryRepository;
+    private final JdbcGradeAnalysisSnapshotRepository gradeAnalysisSnapshotRepository;
     private final JdbcGradeChangeLogRepository gradeChangeLogRepository;
 
     @Autowired
@@ -47,11 +51,13 @@ class GradeItemMigrationTest {
             JdbcGradeItemRepository repository,
             JdbcGradeRecordRepository gradeRecordRepository,
             JdbcCourseGradeSummaryRepository courseGradeSummaryRepository,
+            JdbcGradeAnalysisSnapshotRepository gradeAnalysisSnapshotRepository,
             JdbcGradeChangeLogRepository gradeChangeLogRepository
     ) {
         this.repository = repository;
         this.gradeRecordRepository = gradeRecordRepository;
         this.courseGradeSummaryRepository = courseGradeSummaryRepository;
+        this.gradeAnalysisSnapshotRepository = gradeAnalysisSnapshotRepository;
         this.gradeChangeLogRepository = gradeChangeLogRepository;
     }
 
@@ -197,5 +203,46 @@ class GradeItemMigrationTest {
                             .isLessThanOrEqualTo(Duration.ofNanos(1_000));
                 });
         assertThat(gradeChangeLogRepository.countByCourseId(404L, 601L, null)).isEqualTo(1);
+    }
+
+    @Test
+    void gradeAnalysisMigrationSupportsSnapshotPersistence() {
+        LocalDateTime now = LocalDateTime.now();
+        GradeAnalysisSnapshot saved = gradeAnalysisSnapshotRepository.save(new GradeAnalysisSnapshot(
+                0L,
+                505L,
+                "COURSE_TOTAL",
+                null,
+                now.minusMinutes(1),
+                new BigDecimal("78.00"),
+                new BigDecimal("92.00"),
+                new BigDecimal("58.00"),
+                new BigDecimal("0.6667"),
+                new BigDecimal("0.7500"),
+                "[{\"label\":\"0-59\",\"count\":1}]",
+                501L,
+                now
+        ));
+
+        assertThat(saved.id()).isPositive();
+        assertThat(gradeAnalysisSnapshotRepository.findLatest(505L, "COURSE_TOTAL", null))
+                .get()
+                .satisfies(snapshot -> {
+                    assertThat(snapshot.id()).isEqualTo(saved.id());
+                    assertThat(snapshot.courseId()).isEqualTo(saved.courseId());
+                    assertThat(snapshot.targetType()).isEqualTo(saved.targetType());
+                    assertThat(snapshot.gradeItemId()).isNull();
+                    assertThat(snapshot.averageScore()).isEqualByComparingTo(saved.averageScore());
+                    assertThat(snapshot.maxScore()).isEqualByComparingTo(saved.maxScore());
+                    assertThat(snapshot.minScore()).isEqualByComparingTo(saved.minScore());
+                    assertThat(snapshot.passRate()).isEqualByComparingTo(saved.passRate());
+                    assertThat(snapshot.completionRate()).isEqualByComparingTo(saved.completionRate());
+                    assertThat(snapshot.distributionJson()).isEqualTo(saved.distributionJson());
+                    assertThat(snapshot.generatedBy()).isEqualTo(saved.generatedBy());
+                    assertThat(Duration.between(saved.sourceDataTime(), snapshot.sourceDataTime()).abs())
+                            .isLessThanOrEqualTo(Duration.ofNanos(1_000));
+                    assertThat(Duration.between(saved.generatedAt(), snapshot.generatedAt()).abs())
+                            .isLessThanOrEqualTo(Duration.ofNanos(1_000));
+                });
     }
 }

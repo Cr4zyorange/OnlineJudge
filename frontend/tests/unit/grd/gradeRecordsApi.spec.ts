@@ -4,6 +4,7 @@ import {
   configureGradeRecordAuthContext,
   adjustGradeRecord,
   adjustCourseFinalScore,
+  getCourseGradeAnalysis,
   listGradeChangeLogs,
   listCourseGrades,
   listGradePublishRecords,
@@ -131,6 +132,34 @@ describe('gradeRecords API client', () => {
     }));
     expect(fetchMock).toHaveBeenNthCalledWith(2, '/api/v1/courses/101/grade-publish-records?page=1&size=20', expect.objectContaining({
       method: 'GET'
+    }));
+  });
+
+  it('calls documented grade analysis endpoint with target filters', async () => {
+    writeAuthStorage('onlinejudge.authToken', 'teacher-token');
+    configureGradeRecordAuthContext(() => ({
+      userId: 501,
+      userRole: 'TEACHER',
+      manageableCourseIds: [101]
+    }));
+    const fetchMock = vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(jsonResponse({
+        targetType: 'GRADE_ITEM',
+        gradeItemId: 2,
+        averageScore: '80.00',
+        distribution: []
+      }));
+
+    await getCourseGradeAnalysis(101, {
+      targetType: 'GRADE_ITEM',
+      gradeItemId: 2
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/courses/101/grade-analysis?targetType=GRADE_ITEM&gradeItemId=2', expect.objectContaining({
+      method: 'GET',
+      headers: expect.objectContaining({
+        Authorization: 'Bearer teacher-token'
+      })
     }));
   });
 });

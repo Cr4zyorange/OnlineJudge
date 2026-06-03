@@ -68,6 +68,72 @@
       <p v-if="errorMessage" class="grade-table__error">{{ errorMessage }}</p>
     </section>
 
+    <section class="grade-table__analysis" data-testid="grade-analysis-panel" aria-label="教学分析">
+      <div class="grade-table__detail-heading">
+        <h2>教学分析</h2>
+        <form class="grade-table__analysis-form" data-testid="analysis-form" @submit.prevent="refreshAnalysis">
+          <label>
+            统计目标
+            <select v-model="analysisTargetType" data-testid="analysis-target-type">
+              <option value="COURSE_TOTAL">课程总评</option>
+              <option value="GRADE_ITEM">成绩项</option>
+            </select>
+          </label>
+          <label v-if="analysisTargetType === 'GRADE_ITEM'">
+            成绩项 ID
+            <input
+              v-model.trim="analysisGradeItemIdInput"
+              data-testid="analysis-grade-item-id"
+              inputmode="numeric"
+              min="1"
+              required
+              type="number"
+            />
+          </label>
+          <button type="submit" :disabled="analysisLoading">刷新</button>
+        </form>
+      </div>
+      <p v-if="analysisLoading">加载中</p>
+      <p v-else-if="analysisError" class="grade-table__error">{{ analysisError }}</p>
+      <template v-else-if="analysis">
+        <p class="grade-table__analysis-target">
+          {{ analysis.targetType === 'COURSE_TOTAL' ? '课程总评' : `成绩项 ${analysis.gradeItemId}` }}
+        </p>
+        <dl class="grade-table__metrics">
+          <div>
+            <dt>均分</dt>
+            <dd>{{ analysis.averageScore ?? '-' }}</dd>
+          </div>
+          <div>
+            <dt>最高分</dt>
+            <dd>{{ analysis.maxScore ?? '-' }}</dd>
+          </div>
+          <div>
+            <dt>最低分</dt>
+            <dd>{{ analysis.minScore ?? '-' }}</dd>
+          </div>
+          <div>
+            <dt>及格率</dt>
+            <dd>{{ formatRate(analysis.passRate) }}</dd>
+          </div>
+          <div>
+            <dt>完成率</dt>
+            <dd>{{ formatRate(analysis.completionRate) }}</dd>
+          </div>
+        </dl>
+        <p class="grade-table__analysis-counts">
+          共 {{ analysis.totalStudentCount }} 人，已完成 {{ analysis.completedCount }}，缺失 {{ analysis.missingCount }}，未提交 {{ analysis.unsubmittedCount }}，待评分 {{ analysis.ungradedCount }}
+        </p>
+        <ul class="grade-table__distribution">
+          <li v-for="bucket in analysis.distribution" :key="bucket.label">
+            {{ bucket.label }}：{{ bucket.count }}
+          </li>
+        </ul>
+        <p class="grade-table__timestamp">数据时间点 {{ analysis.sourceDataTime }}</p>
+      </template>
+      <p v-else>暂无统计结果</p>
+    </section>
+
     <section class="grade-table__list" aria-label="课程成绩总表">
       <p v-if="loading">加载中</p>
       <p v-else-if="rows.length === 0">暂无成绩记录</p>
@@ -260,6 +326,7 @@ import { computed, onMounted, ref } from 'vue';
 import {
   adjustGradeRecord,
   adjustCourseFinalScore,
+  getCourseGradeAnalysis,
   type GradeTableQuery,
   listGradePublishRecords,
   listGradeChangeLogs,
@@ -268,7 +335,16 @@ import {
   recalculateCourseGrades,
   syncSourceGrades
 } from '../../api/grd/gradeRecords';
-import type { CourseGradeRow, GradeChangeLog, GradePublishRecord, GradeRecord, GradeStatus, PublishStatus } from '../../types/grd';
+import type {
+  CourseGradeRow,
+  GradeAnalysisResult,
+  GradeAnalysisTargetType,
+  GradeChangeLog,
+  GradePublishRecord,
+  GradeRecord,
+  GradeStatus,
+  PublishStatus
+} from '../../types/grd';
 
 const props = defineProps<{
   courseId: number;
@@ -296,11 +372,16 @@ const changeLogs = ref<GradeChangeLog[]>([]);
 const logsLoading = ref(false);
 const publishRecords = ref<GradePublishRecord[]>([]);
 const publishRecordsLoading = ref(false);
+const analysis = ref<GradeAnalysisResult | null>(null);
+const analysisLoading = ref(false);
+const analysisError = ref('');
+const analysisTargetType = ref<GradeAnalysisTargetType>('COURSE_TOTAL');
+const analysisGradeItemIdInput = ref('');
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / size.value)));
 const selectedRecord = computed(() => selectedRow.value?.records.find((record) => record.id === selectedRecordId.value) ?? null);
 
 onMounted(async () => {
-  await Promise.all([loadRows(), refreshPublishRecords()]);
+  await Promise.all([loadRows(), refreshPublishRecords(), refreshAnalysis()]);
 });
 
 async function loadRows() {
@@ -328,7 +409,7 @@ async function syncGrades() {
     const result = await syncSourceGrades(props.courseId);
     feedback.value = `同步完成：${result.syncedCount} 条有效成绩，${result.ungradedCount} 条未评分，${result.missingCount} 条缺失`;
     page.value = 1;
-    await loadRows();
+    await Promise.all([loadRows(), refreshAnalysis()]);
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '来源成绩同步失败';
   } finally {
@@ -344,7 +425,7 @@ async function recalculate() {
     const result = await recalculateCourseGrades(props.courseId);
     feedback.value = `重新计算完成：${result.affectedCount} 名学生`;
     page.value = 1;
-    await loadRows();
+    await Promise.all([loadRows(), refreshAnalysis()]);
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '课程总评计算失败';
   } finally {
@@ -489,6 +570,26 @@ async function refreshPublishRecords() {
   }
 }
 
+async function refreshAnalysis() {
+  analysisLoading.value = true;
+  analysisError.value = '';
+  try {
+    const query = analysisTargetType.value === 'GRADE_ITEM'
+      ? {
+          targetType: analysisTargetType.value,
+          gradeItemId: Number(analysisGradeItemIdInput.value)
+        }
+      : {
+          targetType: analysisTargetType.value
+        };
+    analysis.value = await getCourseGradeAnalysis(props.courseId, query);
+  } catch (error) {
+    analysisError.value = error instanceof Error ? error.message : '教学分析加载失败';
+  } finally {
+    analysisLoading.value = false;
+  }
+}
+
 function refreshSelectedRow() {
   if (!selectedRow.value) {
     return;
@@ -515,6 +616,17 @@ function normalizeScoreInput(score: string | number) {
     return numericScore.toFixed(2);
   }
   return String(score);
+}
+
+function formatRate(value: string | null) {
+  if (value === null) {
+    return '-';
+  }
+  const numericValue = Number(value);
+  if (!Number.isFinite(numericValue)) {
+    return value;
+  }
+  return `${(numericValue * 100).toFixed(2)}%`;
 }
 
 function currentQuery() {
@@ -555,7 +667,8 @@ function currentQuery() {
 
 .grade-table__panel,
 .grade-table__list,
-.grade-table__detail {
+.grade-table__detail,
+.grade-table__analysis {
   background: #ffffff;
   border: 1px solid #d8dee9;
   border-radius: 8px;
@@ -657,6 +770,7 @@ td {
   align-items: baseline;
   display: flex;
   gap: 12px;
+  justify-content: space-between;
 }
 
 .grade-table__detail-heading h2,
@@ -664,6 +778,73 @@ td {
 .grade-table__list h2 {
   font-size: 16px;
   margin: 0;
+}
+
+.grade-table__analysis {
+  display: grid;
+  gap: 12px;
+}
+
+.grade-table__analysis-form {
+  align-items: end;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.grade-table__analysis-target,
+.grade-table__timestamp {
+  color: #475569;
+  font-size: 14px;
+  margin: 0;
+}
+
+.grade-table__metrics {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  margin: 0;
+}
+
+.grade-table__metrics div {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 10px;
+}
+
+.grade-table__metrics dt {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.grade-table__metrics dd {
+  color: #0f172a;
+  font-size: 20px;
+  font-weight: 700;
+  margin: 4px 0 0;
+}
+
+.grade-table__analysis-counts {
+  color: #334155;
+  font-size: 14px;
+  margin: 0;
+}
+
+.grade-table__distribution {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.grade-table__distribution li {
+  background: #eef2ff;
+  border-radius: 6px;
+  color: #3730a3;
+  font-size: 13px;
+  padding: 6px 10px;
 }
 
 .grade-table__adjustment {
