@@ -13,6 +13,7 @@ import com.onlinejudge.lab.domain.LabReportSubmitStatus;
 import com.onlinejudge.lab.domain.LabReportSummaryView;
 import com.onlinejudge.lab.domain.LabSubmission;
 import com.onlinejudge.lab.domain.LabSubmissionRepository;
+import com.onlinejudge.lab.domain.ScoreLabReportCommand;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -26,6 +27,7 @@ import java.util.Optional;
 @Service
 public class LabReportService {
     private static final long MAX_REPORT_SIZE_BYTES = 10L * 1024L * 1024L;
+    private static final int MAX_REPORT_COMMENT_LENGTH = 1000;
     private static final Map<String, LabReportFileType> SUPPORTED_REPORT_EXTENSIONS = Map.of(
             "pdf", LabReportFileType.PDF,
             "docx", LabReportFileType.DOCX,
@@ -69,9 +71,7 @@ public class LabReportService {
                 .map(existing -> existing.version() + 1)
                 .orElse(1);
         LabReportFileType fileType = resolveFileType(reportFile.getOriginalFilename());
-        LabReportSubmitStatus submitStatus = now.isAfter(experiment.deadline())
-                ? LabReportSubmitStatus.LATE
-                : LabReportSubmitStatus.SUBMITTED;
+        LabReportSubmitStatus submitStatus = LabReportSubmitStatus.SUBMITTED;
 
         LabReport saved = labReportRepository.save(new LabReport(
                 0L,
@@ -129,6 +129,43 @@ public class LabReportService {
         return fileStorageService.load(report.fileId());
     }
 
+    @Transactional
+    public LabReportSummaryView scoreReport(long labId, long reportId, long teacherId, ScoreLabReportCommand command) {
+        LabExperiment experiment = findExistingExperiment(labId);
+        if (!coursePermissionClient.canManageCourse(experiment.courseId(), teacherId)) {
+            throw new LabPermissionException("无课程管理权限");
+        }
+        LabReport report = labReportRepository.findById(reportId)
+                .orElseThrow(() -> new LabNotFoundException("实验报告不存在"));
+        if (report.labId() != labId) {
+            throw new LabNotFoundException("实验报告不存在");
+        }
+
+        int score = validateReportScore(command, experiment.maxScore());
+        String comment = normalizeReportComment(command == null ? null : command.comment());
+        LocalDateTime scoredAt = LocalDateTime.now();
+        LabReport updated = labReportRepository.updateScore(new LabReport(
+                report.id(),
+                report.labId(),
+                report.studentId(),
+                report.submissionId(),
+                report.fileId(),
+                report.fileName(),
+                report.fileType(),
+                report.fileSize(),
+                report.version(),
+                report.submitStatus(),
+                score,
+                comment,
+                report.submittedAt(),
+                teacherId,
+                scoredAt,
+                report.createdAt(),
+                scoredAt
+        ));
+        return LabReportSummaryView.from(updated, buildDownloadUrl(labId, updated.id()));
+    }
+
     private LabExperiment findExistingExperiment(long labId) {
         return labExperimentRepository.findById(labId)
                 .filter(item -> !item.deleted())
@@ -141,6 +178,9 @@ public class LabReportService {
         }
         if (experiment.status() != LabExperimentStatus.PUBLISHED) {
             throw new LabStateException("当前实验状态不允许提交报告");
+        }
+        if (!experiment.deadline().isAfter(LocalDateTime.now())) {
+            throw new LabStateException("实验已截止，当前不允许提交报告");
         }
     }
 
@@ -166,6 +206,28 @@ public class LabReportService {
             throw new LabSubmissionValidationException("LAB-400-06", "报告文件大小超过系统限制");
         }
         resolveFileType(reportFile.getOriginalFilename());
+    }
+
+    private int validateReportScore(ScoreLabReportCommand command, int maxScore) {
+        if (command == null || command.score() == null) {
+            throw new LabSubmissionValidationException("LAB-400-06", "报告评分不能为空");
+        }
+        int score = command.score();
+        if (score < 0 || score > maxScore) {
+            throw new LabSubmissionValidationException("LAB-400-06", "报告评分必须在 0 到 " + maxScore + " 之间");
+        }
+        return score;
+    }
+
+    private String normalizeReportComment(String comment) {
+        if (comment == null) {
+            return null;
+        }
+        String normalized = comment.trim();
+        if (normalized.length() > MAX_REPORT_COMMENT_LENGTH) {
+            throw new LabSubmissionValidationException("LAB-400-06", "报告评语不能超过 1000 字");
+        }
+        return normalized.isEmpty() ? null : normalized;
     }
 
     private LabReportFileType resolveFileType(String originalFilename) {

@@ -9,6 +9,7 @@ import com.onlinejudge.lab.domain.LabExperiment;
 import com.onlinejudge.lab.domain.LabExperimentStatus;
 import com.onlinejudge.lab.domain.LabSubmissionQuery;
 import com.onlinejudge.lab.domain.LabSubmitStatus;
+import com.onlinejudge.lab.domain.ScoreLabReportCommand;
 import com.onlinejudge.lab.service.LabExperimentService;
 import com.onlinejudge.lab.service.LabPermissionException;
 import com.onlinejudge.lab.service.LabReportService;
@@ -191,6 +192,22 @@ public class LabExperimentController {
                         .build()
                         .toString())
                 .body(storedFile.resource());
+    }
+
+    @PutMapping("/labs/{labId}/reports/{reportId}/score")
+    public ApiResponse<LabReportResponse> scoreReport(
+            @PathVariable long labId,
+            @PathVariable long reportId,
+            CurrentUser currentUser,
+            @RequestBody ScoreLabReportRequest request
+    ) {
+        requireTeacher(currentUser);
+        ScoreLabReportCommand command = request == null
+                ? new ScoreLabReportCommand(null, null)
+                : request.toCommand();
+        return ApiResponse.ok(LabReportResponse.from(
+                labReportService.scoreReport(labId, reportId, currentUser.id(), command)
+        ));
     }
 
     @GetMapping("/labs/{labId}/submissions")

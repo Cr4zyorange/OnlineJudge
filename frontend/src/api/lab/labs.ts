@@ -1,5 +1,6 @@
 import type {
   LabReportDetail,
+  LabReportScorePayload,
   LabReportUploadPayload,
   LabReportSummary,
   LabSubmissionResult,
@@ -141,6 +142,17 @@ export async function getLabReportDetail(labId: number, reportId: number): Promi
 
 export function downloadLabReport(labId: number, reportId: number) {
   return requestBlob(`/api/v1/labs/${labId}/reports/${reportId}/download`);
+}
+
+export async function scoreLabReport(
+  labId: number,
+  reportId: number,
+  payload: LabReportScorePayload
+): Promise<LabReportSummary> {
+  return request<LabReportSummary>(`/api/v1/labs/${labId}/reports/${reportId}/score`, {
+    method: 'PUT',
+    body: JSON.stringify(payload)
+  });
 }
 
 export async function getLabSubmissionResult(labId: number, submissionId: number): Promise<LabSubmissionResult> {

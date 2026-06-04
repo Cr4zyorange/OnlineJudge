@@ -95,6 +95,11 @@ export interface LabReportSummary {
 
 export interface LabReportDetail extends LabReportSummary {}
 
+export interface LabReportScorePayload {
+  score: number;
+  comment: string;
+}
+
 export interface LabSubmissionSummary {
   submissionId: number;
   labId: number;

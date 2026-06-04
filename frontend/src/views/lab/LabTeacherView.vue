@@ -247,6 +247,7 @@
           <p v-else-if="submissionDetailErrorMessage" class="labs__error">{{ submissionDetailErrorMessage }}</p>
           <p v-else-if="submissionDetail === null">请选择一个提交版本查看详情</p>
           <template v-else>
+            <p v-if="submissionDetailFeedbackMessage" class="labs__feedback">{{ submissionDetailFeedbackMessage }}</p>
             <h3>提交详情</h3>
             <p>学生 ID：{{ submissionDetail.studentId }}</p>
             <p>版本：{{ submissionDetail.version }}</p>
@@ -269,6 +270,24 @@
                 <p>报告评分：{{ submissionDetail.latestReport.score ?? '未评分' }}</p>
                 <p>报告评语：{{ submissionDetail.latestReport.comment ?? '暂无评语' }}</p>
                 <button type="button" @click="downloadSubmissionReport">下载报告</button>
+                <form class="labs__report-score-form" @submit.prevent="saveReportScore">
+                  <label>
+                    <span>报告评分</span>
+                    <input v-model="reportScoreForm.score" name="reportScore" type="number" min="0" />
+                  </label>
+                  <label>
+                    <span>报告评语</span>
+                    <textarea v-model="reportScoreForm.comment" name="reportComment" rows="3" />
+                  </label>
+                  <button
+                    data-action="score-report"
+                    type="button"
+                    :disabled="reportScoreSaving"
+                    @click="saveReportScore"
+                  >
+                    保存报告评分
+                  </button>
+                </form>
               </div>
             </template>
             <p v-else>暂无实验报告</p>
@@ -292,6 +311,7 @@ import {
   listLabSubmissions,
   listLabs,
   publishLab,
+  scoreLabReport,
   updateLab
 } from '../../api/lab/labs';
 import type {
@@ -325,11 +345,17 @@ const submissionErrorMessage = ref('');
 const submissionDetail = ref<LabSubmissionDetail | null>(null);
 const submissionDetailLoading = ref(false);
 const submissionDetailErrorMessage = ref('');
+const submissionDetailFeedbackMessage = ref('');
+const reportScoreSaving = ref(false);
 const submissionFilters = reactive({
   studentId: '',
   submitStatus: '',
   evaluationStatus: '',
   overdue: ''
+});
+const reportScoreForm = reactive({
+  score: '',
+  comment: ''
 });
 
 const form = reactive({
@@ -461,6 +487,7 @@ async function openSubmissionPanel(labId: number, title: string) {
   selectedSubmissionLabTitle.value = title;
   submissionDetail.value = null;
   submissionDetailErrorMessage.value = '';
+  submissionDetailFeedbackMessage.value = '';
   await loadSubmissions();
 }
 
@@ -489,12 +516,49 @@ async function openSubmissionDetail(submissionId: number) {
   }
   submissionDetailLoading.value = true;
   submissionDetailErrorMessage.value = '';
+  submissionDetailFeedbackMessage.value = '';
   try {
     submissionDetail.value = await getLabSubmissionDetail(selectedSubmissionLabId.value, submissionId);
+    syncReportScoreForm();
   } catch (error) {
     submissionDetailErrorMessage.value = error instanceof Error ? error.message : '提交详情加载失败';
   } finally {
     submissionDetailLoading.value = false;
+  }
+}
+
+async function saveReportScore() {
+  if (selectedSubmissionLabId.value === null || !submissionDetail.value?.latestReport) {
+    return;
+  }
+  const score = Number(reportScoreForm.score);
+  if (!Number.isFinite(score) || score < 0) {
+    submissionDetailErrorMessage.value = '报告评分不能为负数';
+    return;
+  }
+
+  reportScoreSaving.value = true;
+  submissionDetailErrorMessage.value = '';
+  submissionDetailFeedbackMessage.value = '';
+  try {
+    const updatedReport = await scoreLabReport(
+      selectedSubmissionLabId.value,
+      submissionDetail.value.latestReport.reportId,
+      {
+        score,
+        comment: reportScoreForm.comment.trim()
+      }
+    );
+    submissionDetail.value = {
+      ...submissionDetail.value,
+      latestReport: updatedReport
+    };
+    syncReportScoreForm();
+    submissionDetailFeedbackMessage.value = '报告评分已保存';
+  } catch (error) {
+    submissionDetailErrorMessage.value = error instanceof Error ? error.message : '报告评分保存失败';
+  } finally {
+    reportScoreSaving.value = false;
   }
 }
 
@@ -519,6 +583,12 @@ async function downloadSubmissionReport() {
   } catch (error) {
     submissionDetailErrorMessage.value = error instanceof Error ? error.message : '实验报告下载失败';
   }
+}
+
+function syncReportScoreForm() {
+  const latestReport = submissionDetail.value?.latestReport;
+  reportScoreForm.score = latestReport?.score == null ? '' : String(latestReport.score);
+  reportScoreForm.comment = latestReport?.comment ?? '';
 }
 
 function addTestcase() {

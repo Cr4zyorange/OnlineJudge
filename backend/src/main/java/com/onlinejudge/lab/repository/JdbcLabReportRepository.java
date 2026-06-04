@@ -76,6 +76,27 @@ public class JdbcLabReportRepository implements LabReportRepository {
     }
 
     @Override
+    public LabReport updateScore(LabReport report) {
+        jdbcTemplate.update("""
+                        UPDATE lab_report
+                        SET score = ?,
+                            comment = ?,
+                            scored_by = ?,
+                            scored_at = ?,
+                            updated_at = ?
+                        WHERE id = ?
+                        """,
+                report.score(),
+                report.comment(),
+                report.scoredBy(),
+                report.scoredAt() == null ? null : Timestamp.valueOf(report.scoredAt()),
+                Timestamp.valueOf(report.updatedAt()),
+                report.id()
+        );
+        return findById(report.id()).orElseThrow(() -> new IllegalStateException("更新报告评分后无法读取记录"));
+    }
+
+    @Override
     public Optional<LabReport> findById(long reportId) {
         return jdbcTemplate.query("""
                         SELECT id, lab_id, student_id, submission_id, file_id, file_name, file_type, file_size,
