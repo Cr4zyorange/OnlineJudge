@@ -12,6 +12,7 @@ import com.onlinejudge.lab.domain.LabEvaluationResultView;
 import com.onlinejudge.lab.domain.CreateLabSubmissionCommand;
 import com.onlinejudge.lab.domain.LabExperiment;
 import com.onlinejudge.lab.domain.LabExperimentRepository;
+import com.onlinejudge.lab.domain.LabReportSummaryView;
 import com.onlinejudge.lab.domain.LabExperimentStatus;
 import com.onlinejudge.lab.domain.LabSubmission;
 import com.onlinejudge.lab.domain.LabSubmissionDetailView;
@@ -67,6 +68,7 @@ public class LabSubmissionService {
     private final LabEvaluationRepository labEvaluationRepository;
     private final LabEvaluationResultRepository labEvaluationResultRepository;
     private final LabEvaluationService labEvaluationService;
+    private final LabReportService labReportService;
     private final CoursePermissionClient coursePermissionClient;
     private final FileStorageService fileStorageService;
 
@@ -76,6 +78,7 @@ public class LabSubmissionService {
             LabEvaluationRepository labEvaluationRepository,
             LabEvaluationResultRepository labEvaluationResultRepository,
             LabEvaluationService labEvaluationService,
+            LabReportService labReportService,
             CoursePermissionClient coursePermissionClient,
             FileStorageService fileStorageService
     ) {
@@ -83,6 +86,7 @@ public class LabSubmissionService {
         this.labSubmissionRepository = labSubmissionRepository;
         this.labEvaluationRepository = labEvaluationRepository;
         this.labEvaluationService = labEvaluationService;
+        this.labReportService = labReportService;
         this.coursePermissionClient = coursePermissionClient;
         this.fileStorageService = fileStorageService;
         this.labEvaluationResultRepository = labEvaluationResultRepository;
@@ -472,6 +476,8 @@ public class LabSubmissionService {
             LabSubmission submission,
             SubmissionVersionFlags flags
     ) {
+        LabReportSummaryView latestReport = labReportService.findLatestReportForSubmission(submission.id())
+                .orElse(null);
         return new LabSubmissionDetailView(
                 submission.id(),
                 submission.labId(),
@@ -488,7 +494,8 @@ public class LabSubmissionService {
                 flags.isScoringBasis(),
                 hasFile(submission.fileId()),
                 submission.codeContent(),
-                submission.fileId()
+                submission.fileId(),
+                latestReport
         );
     }
 

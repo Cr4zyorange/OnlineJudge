@@ -61,7 +61,8 @@ describe('LabSubmissionHistoryView', () => {
       isScoringBasis: true,
       hasFile: false,
       code: "print('history detail')",
-      fileId: null
+      fileId: null,
+      latestReport: null
     });
 
     const wrapper = mount(LabSubmissionHistoryView, {

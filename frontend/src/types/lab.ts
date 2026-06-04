@@ -75,6 +75,31 @@ export interface LabSubmissionPayload {
   file?: File;
 }
 
+export interface LabReportUploadPayload {
+  submissionId?: number;
+  reportFile: File;
+}
+
+export interface LabReportSummary {
+  reportId: number;
+  submissionId: number | null;
+  fileName: string;
+  fileType: 'PDF' | 'DOCX' | 'ZIP';
+  fileSize: number;
+  version: number;
+  score: number | null;
+  comment: string | null;
+  submittedAt: string;
+  downloadUrl: string;
+}
+
+export interface LabReportDetail extends LabReportSummary {}
+
+export interface LabReportScorePayload {
+  score: number;
+  comment: string;
+}
+
 export interface LabSubmissionSummary {
   submissionId: number;
   labId: number;
@@ -115,6 +140,7 @@ export interface LabSubmissionHistoryItem {
 export interface LabSubmissionDetail extends LabSubmissionHistoryItem {
   code: string | null;
   fileId: string | null;
+  latestReport: LabReportSummary | null;
 }
 
 export interface LabEvaluationCaseResult {

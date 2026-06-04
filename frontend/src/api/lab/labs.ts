@@ -1,4 +1,8 @@
 import type {
+  LabReportDetail,
+  LabReportScorePayload,
+  LabReportUploadPayload,
+  LabReportSummary,
   LabSubmissionResult,
   LabSubmissionDetail,
   LabSubmissionHistoryItem,
@@ -10,7 +14,7 @@ import type {
   LabSubmissionPayload,
   LabSubmissionSummary
 } from '../../types/lab';
-import { configureAuthContext, request } from '../http';
+import { configureAuthContext, request, requestBlob } from '../http';
 
 export interface LabAuthContext {
   userId: number | string;
@@ -118,6 +122,37 @@ export async function listLabSubmissions(
 
 export async function getLabSubmissionDetail(labId: number, submissionId: number): Promise<LabSubmissionDetail> {
   return request<LabSubmissionDetail>(`/api/v1/labs/${labId}/submissions/${submissionId}`);
+}
+
+export async function uploadLabReport(labId: number, payload: LabReportUploadPayload): Promise<LabReportSummary> {
+  const formData = new FormData();
+  if (payload.submissionId !== undefined) {
+    formData.append('submissionId', String(payload.submissionId));
+  }
+  formData.append('reportFile', payload.reportFile);
+  return request<LabReportSummary>(`/api/v1/labs/${labId}/reports`, {
+    method: 'POST',
+    body: formData
+  });
+}
+
+export async function getLabReportDetail(labId: number, reportId: number): Promise<LabReportDetail> {
+  return request<LabReportDetail>(`/api/v1/labs/${labId}/reports/${reportId}`);
+}
+
+export function downloadLabReport(labId: number, reportId: number) {
+  return requestBlob(`/api/v1/labs/${labId}/reports/${reportId}/download`);
+}
+
+export async function scoreLabReport(
+  labId: number,
+  reportId: number,
+  payload: LabReportScorePayload
+): Promise<LabReportSummary> {
+  return request<LabReportSummary>(`/api/v1/labs/${labId}/reports/${reportId}/score`, {
+    method: 'PUT',
+    body: JSON.stringify(payload)
+  });
 }
 
 export async function getLabSubmissionResult(labId: number, submissionId: number): Promise<LabSubmissionResult> {

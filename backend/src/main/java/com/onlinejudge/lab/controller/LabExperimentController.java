@@ -9,12 +9,17 @@ import com.onlinejudge.lab.domain.LabExperiment;
 import com.onlinejudge.lab.domain.LabExperimentStatus;
 import com.onlinejudge.lab.domain.LabSubmissionQuery;
 import com.onlinejudge.lab.domain.LabSubmitStatus;
+import com.onlinejudge.lab.domain.ScoreLabReportCommand;
 import com.onlinejudge.lab.service.LabExperimentService;
 import com.onlinejudge.lab.service.LabPermissionException;
+import com.onlinejudge.lab.service.LabReportService;
 import com.onlinejudge.lab.service.LabSubmissionService;
 import jakarta.validation.Valid;
+import org.springframework.core.io.Resource;
+import org.springframework.http.ContentDisposition;
 import org.springframework.http.MediaType;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -28,6 +33,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 @RestController
@@ -35,15 +41,18 @@ import java.util.List;
 public class LabExperimentController {
     private final LabExperimentService labExperimentService;
     private final LabSubmissionService labSubmissionService;
+    private final LabReportService labReportService;
     private final CoursePermissionClient coursePermissionClient;
 
     public LabExperimentController(
             LabExperimentService labExperimentService,
             LabSubmissionService labSubmissionService,
+            LabReportService labReportService,
             CoursePermissionClient coursePermissionClient
     ) {
         this.labExperimentService = labExperimentService;
         this.labSubmissionService = labSubmissionService;
+        this.labReportService = labReportService;
         this.coursePermissionClient = coursePermissionClient;
     }
 
@@ -141,6 +150,64 @@ public class LabExperimentController {
                 )
         ));
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.ok(submission));
+    }
+
+    @PostMapping(path = "/labs/{labId}/reports", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ApiResponse<LabReportResponse>> uploadReport(
+            @PathVariable long labId,
+            CurrentUser currentUser,
+            @RequestParam(required = false) Long submissionId,
+            @RequestParam MultipartFile reportFile
+    ) throws IOException {
+        requireStudent(currentUser);
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.ok(LabReportResponse.from(
+                labReportService.uploadReport(labId, currentUser.id(), submissionId, reportFile)
+        )));
+    }
+
+    @GetMapping("/labs/{labId}/reports/{reportId}")
+    public ApiResponse<LabReportResponse> getReport(
+            @PathVariable long labId,
+            @PathVariable long reportId,
+            CurrentUser currentUser
+    ) {
+        return ApiResponse.ok(LabReportResponse.from(
+                labReportService.getReport(labId, reportId, currentUser.id())
+        ));
+    }
+
+    @GetMapping("/labs/{labId}/reports/{reportId}/download")
+    public ResponseEntity<Resource> downloadReport(
+            @PathVariable long labId,
+            @PathVariable long reportId,
+            CurrentUser currentUser
+    ) {
+        var report = labReportService.getReport(labId, reportId, currentUser.id());
+        var storedFile = labReportService.loadReportFile(reportId);
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(storedFile.contentType()))
+                .contentLength(storedFile.size())
+                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment()
+                        .filename(report.fileName(), StandardCharsets.UTF_8)
+                        .build()
+                        .toString())
+                .body(storedFile.resource());
+    }
+
+    @PutMapping("/labs/{labId}/reports/{reportId}/score")
+    public ApiResponse<LabReportResponse> scoreReport(
+            @PathVariable long labId,
+            @PathVariable long reportId,
+            CurrentUser currentUser,
+            @RequestBody ScoreLabReportRequest request
+    ) {
+        requireTeacher(currentUser);
+        ScoreLabReportCommand command = request == null
+                ? new ScoreLabReportCommand(null, null)
+                : request.toCommand();
+        return ApiResponse.ok(LabReportResponse.from(
+                labReportService.scoreReport(labId, reportId, currentUser.id(), command)
+        ));
     }
 
     @GetMapping("/labs/{labId}/submissions")

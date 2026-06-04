@@ -5,7 +5,16 @@ import * as labApi from '../../../src/api/lab/labs';
 import * as learningProgressApi from '../../../src/api/lrn/learningProgress';
 import * as learningRecordsApi from '../../../src/api/lrn/learningRecords';
 
-vi.mock('../../../src/api/lab/labs');
+const downloadLabReportMock = vi.hoisted(() => vi.fn());
+
+vi.mock('../../../src/api/lab/labs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../src/api/lab/labs')>();
+  const mockedEntries = Object.fromEntries(Object.keys(actual).map((key) => [key, vi.fn()]));
+  return {
+    ...mockedEntries,
+    downloadLabReport: downloadLabReportMock
+  };
+});
 vi.mock('../../../src/api/lrn/learningProgress');
 vi.mock('../../../src/api/lrn/learningRecords');
 
@@ -42,6 +51,8 @@ describe('LabStudentView', () => {
 
   afterEach(() => {
     vi.useRealTimers();
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
   });
 
   it('loads published lab detail and submits code successfully', async () => {
@@ -517,6 +528,239 @@ describe('LabStudentView', () => {
     expect(wrapper.text()).toContain('部分用例未通过');
     expect(wrapper.text()).toContain('通过用例：1 / 2');
     expect(wrapper.text()).toContain('期望输出 B，实际输出 C');
+  });
+
+  it('shows the report upload panel and uploads a report successfully', async () => {
+    vi.mocked(labApi.getLabDetail).mockResolvedValueOnce({
+      id: 13,
+      courseId: 101,
+      chapterId: null,
+      title: '实验十三',
+      description: '报告上传',
+      status: 'PUBLISHED',
+      deadline: '2026-06-30T23:59:59',
+      maxScore: 100,
+      attachmentIds: [],
+      allowedLanguages: 'python',
+      evaluationMode: 'DOCKER_IO',
+      autoEvaluate: true,
+      reportRequired: true,
+      timeLimitMs: 60000,
+      memoryLimitKb: 262144,
+      deleted: false,
+      testcases: []
+    });
+    vi.mocked(labApi.listLabSubmissions).mockResolvedValueOnce([
+      {
+        submissionId: 130,
+        labId: 13,
+        studentId: 601,
+        language: 'python',
+        submitStatus: 'SUBMITTED',
+        evaluationStatus: 'ACCEPTED',
+        autoScore: 100,
+        finalScore: 100,
+        version: 1,
+        submittedAt: '2026-06-01T12:00:00',
+        isLatest: true,
+        isFinal: true,
+        isScoringBasis: true,
+        hasFile: false
+      }
+    ]);
+    vi.mocked(labApi.getLabSubmissionResult).mockResolvedValueOnce({
+      submissionId: 130,
+      evaluationStatus: 'ACCEPTED',
+      score: 100,
+      passedCases: 1,
+      totalCases: 1,
+      message: '全部用例通过',
+      caseResults: [],
+      submittedAt: '2026-06-01T12:00:00',
+      finishedAt: '2026-06-01T12:00:03'
+    });
+    vi.mocked(labApi.getLabSubmissionDetail).mockResolvedValueOnce({
+      submissionId: 130,
+      labId: 13,
+      studentId: 601,
+      language: 'python',
+      submitStatus: 'SUBMITTED',
+      evaluationStatus: 'ACCEPTED',
+      autoScore: 100,
+      finalScore: 100,
+      version: 1,
+      submittedAt: '2026-06-01T12:00:00',
+      isLatest: true,
+      isFinal: true,
+      isScoringBasis: true,
+      hasFile: false,
+      code: "print('report upload')",
+      fileId: null,
+      latestReport: null
+    });
+    vi.mocked(labApi.uploadLabReport).mockResolvedValueOnce({
+      reportId: 801,
+      submissionId: 130,
+      fileName: 'report-v1.pdf',
+      fileType: 'PDF',
+      fileSize: 2048,
+      version: 1,
+      score: null,
+      comment: null,
+      submittedAt: '2026-06-01T12:10:00',
+      downloadUrl: '/api/v1/labs/13/reports/801/download'
+    });
+
+    const wrapper = mount(LabStudentView, {
+      props: {
+        courseId: 101,
+        labId: 13
+      }
+    });
+    await flushPromises();
+
+    expect(wrapper.text()).toContain('实验报告');
+    expect(wrapper.text()).toContain('暂无实验报告');
+
+    const reportFile = new File(['report'], 'report-v1.pdf', { type: 'application/pdf' });
+    const reportInput = wrapper.get('[name="reportFile"]');
+    Object.defineProperty(reportInput.element, 'files', {
+      value: [reportFile],
+      configurable: true
+    });
+
+    await reportInput.trigger('change');
+    await wrapper.get('.lab-student__report-form').trigger('submit');
+    await flushPromises();
+
+    expect(labApi.uploadLabReport).toHaveBeenCalledWith(13, {
+      submissionId: 130,
+      reportFile
+    });
+    expect(wrapper.text()).toContain('实验报告上传成功');
+    expect(wrapper.text()).toContain('最新报告版本：1');
+    expect(wrapper.text()).toContain('report-v1.pdf');
+  });
+
+  it('downloads the latest report through the lab download action', async () => {
+    const reportBlob = new Blob(['report content'], { type: 'application/pdf' });
+    downloadLabReportMock.mockResolvedValueOnce({
+      blob: reportBlob,
+      filename: 'report-v1.pdf'
+    });
+    vi.stubGlobal('URL', {
+      createObjectURL: vi.fn(() => 'blob:report-v1'),
+      revokeObjectURL: vi.fn()
+    });
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
+
+    vi.mocked(labApi.getLabDetail).mockResolvedValueOnce({
+      id: 13,
+      courseId: 101,
+      chapterId: null,
+      title: '实验十三',
+      description: '报告下载',
+      status: 'PUBLISHED',
+      deadline: '2026-06-30T23:59:59',
+      maxScore: 100,
+      attachmentIds: [],
+      allowedLanguages: 'python',
+      evaluationMode: 'DOCKER_IO',
+      autoEvaluate: true,
+      reportRequired: true,
+      timeLimitMs: 60000,
+      memoryLimitKb: 262144,
+      deleted: false,
+      testcases: []
+    });
+    vi.mocked(labApi.listLabSubmissions).mockResolvedValueOnce([
+      {
+        submissionId: 130,
+        labId: 13,
+        studentId: 601,
+        language: 'python',
+        submitStatus: 'SUBMITTED',
+        evaluationStatus: 'ACCEPTED',
+        autoScore: 100,
+        finalScore: 100,
+        version: 1,
+        submittedAt: '2026-06-01T12:00:00',
+        isLatest: true,
+        isFinal: true,
+        isScoringBasis: true,
+        hasFile: false
+      }
+    ]);
+    vi.mocked(labApi.getLabSubmissionResult).mockResolvedValueOnce({
+      submissionId: 130,
+      evaluationStatus: 'ACCEPTED',
+      score: 100,
+      passedCases: 1,
+      totalCases: 1,
+      message: '全部用例通过',
+      caseResults: [],
+      submittedAt: '2026-06-01T12:00:00',
+      finishedAt: '2026-06-01T12:00:03'
+    });
+    vi.mocked(labApi.getLabSubmissionDetail).mockResolvedValueOnce({
+      submissionId: 130,
+      labId: 13,
+      studentId: 601,
+      language: 'python',
+      submitStatus: 'SUBMITTED',
+      evaluationStatus: 'ACCEPTED',
+      autoScore: 100,
+      finalScore: 100,
+      version: 1,
+      submittedAt: '2026-06-01T12:00:00',
+      isLatest: true,
+      isFinal: true,
+      isScoringBasis: true,
+      hasFile: false,
+      code: "print('report upload')",
+      fileId: null,
+      latestReport: null
+    });
+    vi.mocked(labApi.uploadLabReport).mockResolvedValueOnce({
+      reportId: 801,
+      submissionId: 130,
+      fileName: 'report-v1.pdf',
+      fileType: 'PDF',
+      fileSize: 2048,
+      version: 1,
+      score: null,
+      comment: null,
+      submittedAt: '2026-06-01T12:10:00',
+      downloadUrl: '/api/v1/labs/13/reports/801/download'
+    });
+
+    const wrapper = mount(LabStudentView, {
+      props: {
+        courseId: 101,
+        labId: 13
+      }
+    });
+    await flushPromises();
+
+    const reportFile = new File(['report'], 'report-v1.pdf', { type: 'application/pdf' });
+    const reportInput = wrapper.get('[name="reportFile"]');
+    Object.defineProperty(reportInput.element, 'files', {
+      value: [reportFile],
+      configurable: true
+    });
+    await reportInput.trigger('change');
+    await wrapper.get('.lab-student__report-form').trigger('submit');
+    await flushPromises();
+
+    const downloadButton = wrapper.findAll('button').find((button) => button.text().includes('下载最新报告'));
+    expect(downloadButton).toBeTruthy();
+
+    await downloadButton!.trigger('click');
+    await flushPromises();
+
+    expect(downloadLabReportMock).toHaveBeenCalledWith(13, 801);
+    expect(URL.createObjectURL).toHaveBeenCalledWith(reportBlob);
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:report-v1');
   });
 });
 
