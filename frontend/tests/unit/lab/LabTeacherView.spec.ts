@@ -562,6 +562,108 @@ describe('LabTeacherView', () => {
     expect(URL.createObjectURL).toHaveBeenCalledWith(reportBlob);
     expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:report-v2');
   });
+
+  it('scores a submission report and updates the visible report feedback', async () => {
+    vi.mocked(labApi.listLabs).mockResolvedValueOnce([
+      {
+        id: 12,
+        courseId: 101,
+        title: '实验十二',
+        status: 'PUBLISHED',
+        deadline: '2026-06-25T23:59:59',
+        maxScore: 100,
+        evaluationMode: 'DOCKER_IO',
+        autoEvaluate: true,
+        reportRequired: true,
+        deleted: false
+      }
+    ]);
+    vi.mocked(labApi.listLabSubmissions).mockResolvedValueOnce([
+      {
+        submissionId: 301,
+        labId: 12,
+        studentId: 602,
+        language: 'python',
+        submitStatus: 'SUBMITTED',
+        evaluationStatus: 'ACCEPTED',
+        autoScore: 88,
+        finalScore: 90,
+        version: 2,
+        submittedAt: '2026-06-26T00:10:00',
+        isLatest: true,
+        isFinal: true,
+        isScoringBasis: true,
+        hasFile: true
+      }
+    ]);
+    vi.mocked(labApi.getLabSubmissionDetail).mockResolvedValueOnce({
+      submissionId: 301,
+      labId: 12,
+      studentId: 602,
+      language: 'python',
+      submitStatus: 'SUBMITTED',
+      evaluationStatus: 'ACCEPTED',
+      autoScore: 88,
+      finalScore: 90,
+      version: 2,
+      submittedAt: '2026-06-26T00:10:00',
+      isLatest: true,
+      isFinal: true,
+      isScoringBasis: true,
+      hasFile: true,
+      code: "print('teacher detail')",
+      fileId: 'file-301',
+      latestReport: {
+        reportId: 901,
+        submissionId: 301,
+        fileName: 'report-v2.pdf',
+        fileType: 'PDF',
+        fileSize: 4096,
+        version: 2,
+        score: null,
+        comment: null,
+        submittedAt: '2026-06-26T00:20:00',
+        downloadUrl: '/api/v1/labs/12/reports/901/download'
+      }
+    });
+    vi.mocked(labApi.scoreLabReport).mockResolvedValueOnce({
+      reportId: 901,
+      submissionId: 301,
+      fileName: 'report-v2.pdf',
+      fileType: 'PDF',
+      fileSize: 4096,
+      version: 2,
+      score: 95,
+      comment: '报告完整',
+      submittedAt: '2026-06-26T00:20:00',
+      downloadUrl: '/api/v1/labs/12/reports/901/download'
+    });
+
+    const wrapper = mount(LabTeacherView, {
+      props: {
+        courseId: 101
+      }
+    });
+    await flushPromises();
+
+    await wrapper.findAll('button').find((button) => button.text() === '查看提交')?.trigger('click');
+    await flushPromises();
+    await wrapper.get('[data-submission-id="301"] button').trigger('click');
+    await flushPromises();
+
+    await wrapper.get('[name="reportScore"]').setValue('95');
+    await wrapper.get('[name="reportComment"]').setValue('报告完整');
+    await wrapper.get('[data-action="score-report"]').trigger('click');
+    await flushPromises();
+
+    expect(labApi.scoreLabReport).toHaveBeenCalledWith(12, 901, {
+      score: 95,
+      comment: '报告完整'
+    });
+    expect(wrapper.text()).toContain('报告评分：95');
+    expect(wrapper.text()).toContain('报告评语：报告完整');
+    expect(wrapper.text()).toContain('报告评分已保存');
+  });
 });
 
 async function flushPromises() {

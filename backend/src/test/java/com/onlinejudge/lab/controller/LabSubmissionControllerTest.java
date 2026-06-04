@@ -26,6 +26,7 @@ import static org.hamcrest.Matchers.notNullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -52,6 +53,7 @@ class LabSubmissionControllerTest {
     void cleanTables() {
         deleteIfExists("DELETE FROM lab_evaluation_result");
         deleteIfExists("DELETE FROM lab_evaluation");
+        deleteIfExists("DELETE FROM lab_report");
         deleteIfExists("DELETE FROM lab_submission");
         deleteIfExists("DELETE FROM lab_testcase");
         deleteIfExists("DELETE FROM lab_experiment");
@@ -778,6 +780,101 @@ class LabSubmissionControllerTest {
                 .andExpect(jsonPath("$.code").value("LAB-403-01"));
     }
 
+    @Test
+    void expiredLabRejectsReportUpload() throws Exception {
+        long labId = createPublishedLab(522L, true, LocalDateTime.now().plusDays(1));
+        long submissionId = createCodeSubmission(labId, 601L, "522", "print('before deadline')", "python");
+        jdbcTemplate.update("UPDATE lab_experiment SET deadline = ? WHERE id = ?", java.sql.Timestamp.valueOf(LocalDateTime.now().minusMinutes(1)), labId);
+
+        MockMultipartFile report = new MockMultipartFile(
+                "reportFile",
+                "late-report.pdf",
+                "application/pdf",
+                "late report".getBytes()
+        );
+
+        mockMvc.perform(multipart("/api/v1/labs/{labId}/reports", labId)
+                        .file(report)
+                        .headers(studentHeaders("522"))
+                        .param("submissionId", String.valueOf(submissionId)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("LAB-409-01"))
+                .andExpect(jsonPath("$.message", containsString("实验已截止")));
+    }
+
+    @Test
+    void teacherCanScoreUploadedReport() throws Exception {
+        long labId = createPublishedLab(523L, true, LocalDateTime.now().plusDays(3));
+        long submissionId = createCodeSubmission(labId, 601L, "523", "print('score report')", "python");
+        long reportId = uploadReport(labId, submissionId, "523");
+
+        mockMvc.perform(put("/api/v1/labs/{labId}/reports/{reportId}/score", labId, reportId)
+                        .headers(teacherHeaders("523", "523", "601"))
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "score", 95,
+                                "comment", "报告完整"
+                        ))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"))
+                .andExpect(jsonPath("$.data.reportId").value(reportId))
+                .andExpect(jsonPath("$.data.score").value(95))
+                .andExpect(jsonPath("$.data.comment").value("报告完整"));
+
+        Map<String, Object> scoredRecord = jdbcTemplate.queryForMap(
+                "SELECT score, comment, scored_by, scored_at FROM lab_report WHERE id = ?",
+                reportId
+        );
+        org.assertj.core.api.Assertions.assertThat(scoredRecord.get("SCORE")).isEqualTo(95);
+        org.assertj.core.api.Assertions.assertThat(scoredRecord.get("COMMENT")).isEqualTo("报告完整");
+        org.assertj.core.api.Assertions.assertThat(scoredRecord.get("SCORED_BY")).isEqualTo(501L);
+        org.assertj.core.api.Assertions.assertThat(scoredRecord.get("SCORED_AT")).isNotNull();
+
+        mockMvc.perform(get("/api/v1/labs/{labId}/submissions/{submissionId}", labId, submissionId)
+                        .headers(teacherHeaders("523", "523", "601")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.latestReport.reportId").value(reportId))
+                .andExpect(jsonPath("$.data.latestReport.score").value(95))
+                .andExpect(jsonPath("$.data.latestReport.comment").value("报告完整"));
+    }
+
+    @Test
+    void reportScoreRejectsOutOfRangeAndNonManager() throws Exception {
+        long labId = createPublishedLab(524L, true, LocalDateTime.now().plusDays(3));
+        long submissionId = createCodeSubmission(labId, 601L, "524", "print('score guard')", "python");
+        long reportId = uploadReport(labId, submissionId, "524");
+
+        mockMvc.perform(put("/api/v1/labs/{labId}/reports/{reportId}/score", labId, reportId)
+                        .headers(teacherHeaders("524", "524", "601"))
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "score", 101,
+                                "comment", "超过满分"
+                        ))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("LAB-400-06"))
+                .andExpect(jsonPath("$.message", containsString("评分")));
+
+        mockMvc.perform(put("/api/v1/labs/{labId}/reports/{reportId}/score", labId, reportId)
+                        .headers(teacherHeaders("524", "", "601"))
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "score", 90,
+                                "comment", "无管理权限"
+                        ))))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("LAB-403-01"));
+
+        mockMvc.perform(put("/api/v1/labs/{labId}/reports/{reportId}/score", labId, reportId)
+                        .headers(studentHeaders("524"))
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "score", 90,
+                                "comment", "学生不能评分"
+                        ))))
+                .andExpect(status().isForbidden());
+    }
+
     private long createPublishedLab(long courseId, boolean autoEvaluate, LocalDateTime deadline) throws Exception {
         return createPublishedLab(courseId, autoEvaluate, deadline, List.of());
     }
@@ -839,6 +936,24 @@ class LabSubmissionControllerTest {
                 .getResponse()
                 .getContentAsString();
         return objectMapper.readTree(body).path("data").path("submissionId").asLong();
+    }
+
+    private long uploadReport(long labId, long submissionId, String courseIds) throws Exception {
+        MockMultipartFile report = new MockMultipartFile(
+                "reportFile",
+                "report.pdf",
+                "application/pdf",
+                "report content".getBytes()
+        );
+        String body = mockMvc.perform(multipart("/api/v1/labs/{labId}/reports", labId)
+                        .file(report)
+                        .headers(studentHeaders(courseIds))
+                        .param("submissionId", String.valueOf(submissionId)))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        return objectMapper.readTree(body).path("data").path("reportId").asLong();
     }
 
     private void assertEvaluationStatusOneOf(long labId, long submissionId, HttpHeaders headers, Set<String> statuses) throws Exception {
