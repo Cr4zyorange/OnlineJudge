@@ -1,5 +1,6 @@
 package com.onlinejudge.hwk.domain;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 public record HomeworkReviewLog(
@@ -8,8 +9,8 @@ public record HomeworkReviewLog(
         long homeworkId,
         long studentId,
         HomeworkReviewOperationType operationType,
-        Integer oldScore,
-        Integer newScore,
+        BigDecimal oldScore,
+        BigDecimal newScore,
         String comment,
         long operatorId,
         String reason,

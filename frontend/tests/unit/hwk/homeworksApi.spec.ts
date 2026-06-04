@@ -4,6 +4,7 @@ import {
   createHomework,
   getHomeworkDetail,
   getHomeworkEvaluationLogs,
+  getHomeworkSubmissionReviewLogs,
   getHomeworkSubmissionEvaluation,
   getHomeworkSubmission,
   getHomeworkTestCases,
@@ -12,6 +13,7 @@ import {
   listMyHomeworkSubmissions,
   publishHomework,
   reevaluateHomeworkSubmission,
+  reviewHomeworkSubmission,
   saveHomeworkQuestions,
   saveHomeworkTestCases,
   submitHomework,
@@ -189,6 +191,65 @@ describe('homeworks api', () => {
     ]);
     expect(fetchMock.mock.calls[2][1]).toEqual(expect.objectContaining({
       body: JSON.stringify({ reason: 'teacher requested a fresh judge' })
+    }));
+  });
+
+  it('builds documented HWK05 teacher review and audit log routes', async () => {
+    const reviewedSubmission = {
+      submissionId: 91,
+      homeworkId: 11,
+      studentId: 601,
+      submitType: 'TEXT',
+      answerText: 'Use dynamic programming.',
+      submitStatus: 'SUBMITTED',
+      evaluationStatus: 'NONE',
+      reviewStatus: 'REVIEWED',
+      manualScore: 88,
+      finalScore: 90,
+      comment: 'Clear reasoning.',
+      version: 1,
+      final: true,
+      submittedAt: '2026-06-01T10:00:00'
+    };
+    const reviewLogs = [{
+      id: 701,
+      submissionId: 91,
+      homeworkId: 11,
+      studentId: 601,
+      operationType: 'REVIEW',
+      oldScore: null,
+      newScore: 90,
+      comment: 'Clear reasoning.',
+      operatorId: 501,
+      reason: null,
+      createdAt: '2026-06-01T11:00:00'
+    }];
+    const fetchMock = vi.spyOn(globalThis, 'fetch');
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse(reviewedSubmission))
+      .mockResolvedValueOnce(jsonResponse(reviewLogs));
+
+    await expect(reviewHomeworkSubmission(91, {
+      manualScore: 88,
+      finalScore: 90,
+      comment: 'Clear reasoning.'
+    })).resolves.toEqual(expect.objectContaining({
+      submissionId: 91,
+      reviewStatus: 'REVIEWED',
+      finalScore: 90
+    }));
+    await expect(getHomeworkSubmissionReviewLogs(91)).resolves.toEqual(reviewLogs);
+
+    expect(fetchMock.mock.calls.map((call) => [call[0], (call[1] as RequestInit).method])).toEqual([
+      ['/api/v1/submissions/91/review', 'PUT'],
+      ['/api/v1/submissions/91/review-logs', 'GET']
+    ]);
+    expect(fetchMock.mock.calls[0][1]).toEqual(expect.objectContaining({
+      body: JSON.stringify({
+        manualScore: 88,
+        finalScore: 90,
+        comment: 'Clear reasoning.'
+      })
     }));
   });
 });

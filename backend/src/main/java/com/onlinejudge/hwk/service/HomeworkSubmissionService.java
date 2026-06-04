@@ -31,6 +31,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -96,7 +97,7 @@ public class HomeworkSubmissionService {
         EvaluationStatus evaluationStatus = evaluationStatus(homework, objectiveScore);
         HomeworkReviewStatus reviewStatus = reviewStatus(homework);
         Integer autoScore = objectiveScore == null ? null : objectiveScore.score();
-        Integer finalScore = homework.type() == HomeworkType.OBJECTIVE ? autoScore : null;
+        BigDecimal finalScore = homework.type() == HomeworkType.OBJECTIVE ? scoreToDecimal(autoScore) : null;
         HomeworkSubmission submission = new HomeworkSubmission(
                 0L,
                 homeworkId,
@@ -191,6 +192,50 @@ public class HomeworkSubmissionService {
         return new EvaluationDetail(homework, updated, evaluation, true);
     }
 
+    @Transactional
+    public SubmissionDetail review(long submissionId, long managerId, ReviewCommand command) {
+        ReviewCommand normalized = normalizeReviewCommand(command);
+        HomeworkSubmission submission = submissionRepository.findById(submissionId)
+                .orElseThrow(() -> new HomeworkApiException("HWK_4001", "submission not found", HttpStatus.NOT_FOUND));
+        Homework homework = findExistingHomework(submission.homeworkId());
+        requireManagePermission(homework.courseId(), managerId);
+        requireReviewMutable(homework);
+        validateScore(homework, normalized.manualScore());
+        validateScore(homework, normalized.finalScore());
+
+        LocalDateTime now = LocalDateTime.now();
+        BigDecimal oldScore = submission.finalScore() == null ? scoreToDecimal(submission.autoScore()) : submission.finalScore();
+        HomeworkSubmission updated = submissionRepository.update(submission.withReviewResult(
+                normalized.manualScore(),
+                normalized.finalScore(),
+                normalized.comment(),
+                managerId,
+                now
+        ));
+        reviewLogRepository.save(new HomeworkReviewLog(
+                0L,
+                submission.id(),
+                homework.id(),
+                submission.studentId(),
+                HomeworkReviewOperationType.REVIEW,
+                oldScore,
+                normalized.finalScore(),
+                normalized.comment(),
+                managerId,
+                null,
+                now
+        ));
+        return new SubmissionDetail(homework, updated, true);
+    }
+
+    public ReviewLogDetail reviewLogs(long submissionId, long managerId) {
+        HomeworkSubmission submission = submissionRepository.findById(submissionId)
+                .orElseThrow(() -> new HomeworkApiException("HWK_4001", "submission not found", HttpStatus.NOT_FOUND));
+        Homework homework = findExistingHomework(submission.homeworkId());
+        requireManagePermission(homework.courseId(), managerId);
+        return new ReviewLogDetail(homework, submission, reviewLogRepository.findBySubmissionId(submissionId));
+    }
+
     public EvaluationDetail evaluationLogs(long evaluationId, long managerId) {
         HomeworkEvaluation evaluation = evaluationRepository.findById(evaluationId)
                 .orElseThrow(() -> new HomeworkApiException("HWK_4009", "evaluation result not available", HttpStatus.NOT_FOUND));
@@ -216,6 +261,12 @@ public class HomeworkSubmissionService {
             HomeworkEvaluation evaluation,
             boolean managerView
     ) {
+    }
+
+    public record ReviewCommand(BigDecimal manualScore, BigDecimal finalScore, String comment) {
+    }
+
+    public record ReviewLogDetail(Homework homework, HomeworkSubmission submission, List<HomeworkReviewLog> logs) {
     }
 
     private EvaluationStatus evaluationStatus(Homework homework, ObjectiveScore objectiveScore) {
@@ -527,6 +578,25 @@ public class HomeworkSubmissionService {
         return reason.trim();
     }
 
+    private ReviewCommand normalizeReviewCommand(ReviewCommand command) {
+        if (command == null || command.manualScore() == null || command.finalScore() == null) {
+            throw invalidFormat("manualScore and finalScore are required");
+        }
+        return new ReviewCommand(command.manualScore().stripTrailingZeros(), command.finalScore().stripTrailingZeros(), blankToNull(command.comment()));
+    }
+
+    private void validateScore(Homework homework, BigDecimal score) {
+        if (score.compareTo(BigDecimal.ZERO) < 0 || score.compareTo(BigDecimal.valueOf(homework.totalScore())) > 0) {
+            throw new HomeworkApiException("HWK_4008", "score is outside homework total score", HttpStatus.BAD_REQUEST);
+        }
+    }
+
+    private void requireReviewMutable(Homework homework) {
+        if (homework.status() == HomeworkStatus.ARCHIVED) {
+            throw new HomeworkApiException("HWK_4003", "archived homework cannot be reviewed", HttpStatus.CONFLICT);
+        }
+    }
+
     private void writeRejudgeLog(
             Homework homework,
             HomeworkSubmission submission,
@@ -540,8 +610,8 @@ public class HomeworkSubmissionService {
                 homework.id(),
                 submission.studentId(),
                 HomeworkReviewOperationType.REJUDGE,
-                submission.autoScore(),
-                evaluation.score(),
+                scoreToDecimal(submission.autoScore()),
+                scoreToDecimal(evaluation.score()),
                 null,
                 managerId,
                 reason,
@@ -550,6 +620,10 @@ public class HomeworkSubmissionService {
     }
 
     private record ObjectiveScore(int score, int passedCases, int totalCases, int totalScore) {
+    }
+
+    private BigDecimal scoreToDecimal(Integer score) {
+        return score == null ? null : BigDecimal.valueOf(score);
     }
 
     private record CaseEvaluation(

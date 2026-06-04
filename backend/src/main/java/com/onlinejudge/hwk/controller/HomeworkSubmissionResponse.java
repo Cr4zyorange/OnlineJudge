@@ -10,6 +10,7 @@ import com.onlinejudge.hwk.domain.HomeworkSubmission;
 import com.onlinejudge.hwk.domain.HomeworkSubmitStatus;
 import com.onlinejudge.hwk.domain.HomeworkType;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
@@ -26,8 +27,8 @@ public record HomeworkSubmissionResponse(
         EvaluationStatus evaluationStatus,
         HomeworkReviewStatus reviewStatus,
         Integer autoScore,
-        Integer manualScore,
-        Integer finalScore,
+        BigDecimal manualScore,
+        BigDecimal finalScore,
         String comment,
         int version,
         @JsonProperty("final") boolean finalSubmission,

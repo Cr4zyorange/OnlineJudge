@@ -5,6 +5,8 @@ import type {
   HomeworkEvaluationStatus,
   HomeworkPayload,
   HomeworkQuestionPayload,
+  HomeworkReviewLog,
+  HomeworkReviewPayload,
   HomeworkReviewStatus,
   HomeworkStatus,
   HomeworkSubmissionDetail,
@@ -148,6 +150,20 @@ export function getHomeworkSubmission(submissionId: number): Promise<HomeworkSub
 
 export function getHomeworkSubmissionEvaluation(submissionId: number): Promise<HomeworkEvaluationResult> {
   return request<HomeworkEvaluationResult>(`/api/v1/submissions/${submissionId}/evaluation`);
+}
+
+export function reviewHomeworkSubmission(
+  submissionId: number,
+  payload: HomeworkReviewPayload
+): Promise<HomeworkSubmissionDetail> {
+  return request<HomeworkSubmissionDetail>(`/api/v1/submissions/${submissionId}/review`, {
+    method: 'PUT',
+    body: payload
+  });
+}
+
+export function getHomeworkSubmissionReviewLogs(submissionId: number): Promise<HomeworkReviewLog[]> {
+  return request<HomeworkReviewLog[]>(`/api/v1/submissions/${submissionId}/review-logs`);
 }
 
 export function getHomeworkEvaluationLogs(evaluationId: number): Promise<HomeworkEvaluationResult> {

@@ -2,6 +2,7 @@ package com.onlinejudge.hwk.domain;
 
 import com.onlinejudge.common.evaluation.EvaluationStatus;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 public record HomeworkSubmission(
@@ -17,8 +18,8 @@ public record HomeworkSubmission(
         EvaluationStatus evaluationStatus,
         HomeworkReviewStatus reviewStatus,
         Integer autoScore,
-        Integer manualScore,
-        Integer finalScore,
+        BigDecimal manualScore,
+        BigDecimal finalScore,
         String comment,
         int version,
         boolean isFinal,
@@ -43,7 +44,23 @@ public record HomeworkSubmission(
             LocalDateTime updatedAt
     ) {
         return new HomeworkSubmission(id, homeworkId, studentId, submitType, answerText, answerJson, fileUrl, language,
-                submitStatus, evaluationStatus, reviewStatus, autoScore, manualScore, finalScore, comment, version,
+                submitStatus, evaluationStatus, reviewStatus, autoScore, manualScore, scoreToDecimal(finalScore), comment, version,
                 isFinal, submittedAt, reviewedBy, reviewedAt, createdAt, updatedAt, deleted);
+    }
+
+    public HomeworkSubmission withReviewResult(
+            BigDecimal manualScore,
+            BigDecimal finalScore,
+            String comment,
+            long reviewedBy,
+            LocalDateTime reviewedAt
+    ) {
+        return new HomeworkSubmission(id, homeworkId, studentId, submitType, answerText, answerJson, fileUrl, language,
+                submitStatus, evaluationStatus, HomeworkReviewStatus.REVIEWED, autoScore, manualScore, finalScore,
+                comment, version, isFinal, submittedAt, reviewedBy, reviewedAt, createdAt, reviewedAt, deleted);
+    }
+
+    private static BigDecimal scoreToDecimal(Integer score) {
+        return score == null ? null : BigDecimal.valueOf(score);
     }
 }
