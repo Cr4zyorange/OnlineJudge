@@ -287,6 +287,89 @@ describe('App', () => {
     expect(wrapper.text()).toContain('版本 2');
   });
 
+  it('routes teacher homework submission paths to the HWK review form and review logs', async () => {
+    vi.mocked(homeworkApi.listHomeworkSubmissions).mockResolvedValueOnce({
+      list: [
+        {
+          submissionId: 801,
+          homeworkId: 11,
+          studentId: 601,
+          submitType: 'TEXT',
+          answerText: 'teacher route answer',
+          answerJson: null,
+          fileUrl: null,
+          language: null,
+          submitStatus: 'SUBMITTED',
+          evaluationStatus: 'NONE',
+          reviewStatus: 'UNREVIEWED',
+          autoScore: null,
+          manualScore: null,
+          finalScore: null,
+          comment: null,
+          version: 1,
+          final: true,
+          submittedAt: '2026-06-02T08:00:00'
+        }
+      ],
+      page: 1,
+      size: 20,
+      total: 1
+    });
+    vi.mocked(homeworkApi.getHomeworkSubmission).mockResolvedValueOnce({
+      submissionId: 801,
+      homeworkId: 11,
+      studentId: 601,
+      submitType: 'TEXT',
+      answerText: 'teacher route answer',
+      answerJson: null,
+      fileUrl: null,
+      language: null,
+      submitStatus: 'SUBMITTED',
+      evaluationStatus: 'NONE',
+      reviewStatus: 'UNREVIEWED',
+      autoScore: null,
+      manualScore: null,
+      finalScore: null,
+      comment: null,
+      version: 1,
+      final: true,
+      submittedAt: '2026-06-02T08:00:00'
+    });
+    vi.mocked(homeworkApi.getHomeworkSubmissionReviewLogs).mockResolvedValueOnce([
+      {
+        id: 901,
+        submissionId: 801,
+        homeworkId: 11,
+        studentId: 601,
+        operationType: 'REVIEW',
+        oldScore: null,
+        newScore: 88,
+        comment: 'checked from real course URL',
+        operatorId: 501,
+        reason: null,
+        createdAt: '2026-06-02T09:00:00'
+      }
+    ]);
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: new URL('http://localhost/courses/101/homeworks/11/submissions?role=teacher')
+    });
+
+    const wrapper = mount(App);
+    await flushPromises();
+    await wrapper.get('[data-submission-id="801"] button').trigger('click');
+    await flushPromises();
+
+    expect(homeworkApi.listHomeworkSubmissions).toHaveBeenCalledWith(
+      11,
+      expect.objectContaining({ page: 1, size: 20 })
+    );
+    expect(homeworkApi.getHomeworkSubmission).toHaveBeenCalledWith(801);
+    expect(homeworkApi.getHomeworkSubmissionReviewLogs).toHaveBeenCalledWith(801);
+    expect(wrapper.find('[data-testid="history-review-form"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="history-review-logs"]').text()).toContain('checked from real course URL');
+  });
+
   it('routes logged-in students from homework center paths to the student homework list page', async () => {
     window.localStorage.setItem('onlinejudge.userRole', 'STUDENT');
     vi.mocked(homeworkApi.listHomeworks).mockResolvedValueOnce({
