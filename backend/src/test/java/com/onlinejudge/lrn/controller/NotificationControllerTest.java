@@ -230,6 +230,73 @@ class NotificationControllerTest {
     }
 
     @Test
+    void readAndDeleteActionsRejectInvalidInputAndHideDeletedNotifications() throws Exception {
+        long studentTask = insertNotification(student.id(), 101L, "TASK", "HWK", 501L, "Homework due", false,
+                LocalDateTime.of(2026, 6, 2, 9, 0));
+
+        mockMvc.perform(put("/api/v1/notifications/read")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + student.token())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "notificationIds", List.of(),
+                                "readAll", false
+                        ))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("LRN-400-04"));
+
+        mockMvc.perform(put("/api/v1/notifications/read")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + student.token())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "notificationIds", List.of(studentTask),
+                                "readAll", false
+                        ))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.updatedCount").value(1));
+        mockMvc.perform(put("/api/v1/notifications/read")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + student.token())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "notificationIds", List.of(studentTask),
+                                "readAll", false
+                        ))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.updatedCount").value(0));
+
+        mockMvc.perform(delete("/api/v1/notifications/{notificationId}", studentTask)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + student.token()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.updatedCount").value(1));
+
+        mockMvc.perform(get("/api/v1/notifications")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + student.token()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.records", hasSize(0)))
+                .andExpect(jsonPath("$.data.total").value(0));
+
+        mockMvc.perform(delete("/api/v1/notifications/{notificationId}", studentTask)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + student.token()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("LRN-404-04"));
+
+        Long readLogCount = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*)
+                FROM lrn_notification_status_log
+                WHERE notification_id = ?
+                  AND operation_type = 'MARK_READ'
+                """, Long.class, studentTask);
+        Long deleteLogCount = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*)
+                FROM lrn_notification_status_log
+                WHERE notification_id = ?
+                  AND operation_type = 'DELETE'
+                """, Long.class, studentTask);
+
+        org.assertj.core.api.Assertions.assertThat(readLogCount).isEqualTo(1);
+        org.assertj.core.api.Assertions.assertThat(deleteLogCount).isEqualTo(1);
+    }
+
+    @Test
     void notificationEventRequiresInternalTokenAndValidPayload() throws Exception {
         mockMvc.perform(post("/api/v1/notifications/events")
                         .contentType(MediaType.APPLICATION_JSON)

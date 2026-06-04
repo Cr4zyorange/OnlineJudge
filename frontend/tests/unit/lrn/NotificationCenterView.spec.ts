@@ -150,4 +150,33 @@ describe('NotificationCenterView', () => {
     expect(notificationsApi.deleteNotification).toHaveBeenCalledWith(10);
     expect(wrapper.find('[data-testid="notification-card-10"]').exists()).toBe(false);
   });
+
+  it('marks all unread notifications as read from the bulk action', async () => {
+    const afterReadAllPage: NotificationPage = {
+      ...notificationPage,
+      records: notificationPage.records.map((notification) => ({
+        ...notification,
+        isRead: true,
+        readAt: notification.readAt ?? '2026-06-02 10:06:00'
+      })),
+      unreadCount: 0
+    };
+    vi.mocked(notificationsApi.listNotifications)
+      .mockResolvedValueOnce(notificationPage)
+      .mockResolvedValueOnce(afterReadAllPage);
+    vi.mocked(notificationsApi.markNotificationsRead).mockResolvedValueOnce({ updatedCount: 1 });
+
+    const wrapper = mount(NotificationCenterView);
+    await flushPromises();
+
+    await wrapper.get('[data-testid="mark-all-read"]').trigger('click');
+    await flushPromises();
+
+    expect(notificationsApi.markNotificationsRead).toHaveBeenCalledWith({
+      notificationIds: [],
+      readAll: true
+    });
+    expect(wrapper.text()).toContain('未读 0');
+    expect(wrapper.get('[data-testid="mark-all-read"]').attributes('disabled')).toBeDefined();
+  });
 });
