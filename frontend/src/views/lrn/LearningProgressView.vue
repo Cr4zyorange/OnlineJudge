@@ -1,8 +1,12 @@
 <template>
   <main class="progress-page">
+    <nav class="progress-page__topbar" aria-label="页面导航">
+      <a class="progress-page__home" data-testid="lrn-home-entry" href="/learning/tasks" aria-label="返回学习任务中心">
+        &lt;-
+      </a>
+    </nav>
     <section class="progress-page__shell">
       <aside class="progress-page__summary" aria-label="学习进度概览">
-        <p class="progress-page__eyebrow">UI-LRN-02</p>
         <h1>学习进度</h1>
         <p>按课程和章节查看学习进展，并从上次断点继续。</p>
         <dl>
@@ -20,7 +24,6 @@
       <section class="progress-page__content" aria-label="课程与章节学习进度">
         <header class="progress-page__header">
           <div>
-            <p class="progress-page__eyebrow">API-LRN-02 / API-LRN-03</p>
             <h2>我的课程进度</h2>
           </div>
           <button type="button" :disabled="loading" @click="loadProgress">刷新</button>
@@ -70,7 +73,6 @@
       <section v-if="isTeacher" class="progress-page__content" aria-label="教师课程学习统计">
         <header class="progress-page__header">
           <div>
-            <p class="progress-page__eyebrow">FR-LN-02</p>
             <h2>课程学习统计</h2>
           </div>
           <button type="button" :disabled="teacherLoading" @click="loadTeacherProgress">查询</button>
@@ -171,6 +173,25 @@ async function loadTeacherProgress() {
   background-repeat: no-repeat;
   background-attachment: fixed;
   padding: 24px;
+}
+
+.progress-page__topbar {
+  display: flex;
+  margin: 0 auto 18px;
+  max-width: 1280px;
+}
+
+.progress-page__home {
+  align-items: center;
+  background: #16423c;
+  border: 1px solid #16423c;
+  border-radius: 8px;
+  color: #ffffff;
+  display: inline-flex;
+  font-weight: 800;
+  min-height: 40px;
+  padding: 0 14px;
+  text-decoration: none;
 }
 
 .progress-page__shell {

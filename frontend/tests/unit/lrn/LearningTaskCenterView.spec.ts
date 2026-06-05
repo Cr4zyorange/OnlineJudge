@@ -54,6 +54,11 @@ describe('LearningTaskCenterView', () => {
       order: 'asc'
     }));
     expect(wrapper.text()).toContain('学习任务中心');
+    expect(wrapper.get('[data-testid="lrn-home-entry"]').attributes('href')).toBe('/');
+    expect(wrapper.get('[data-testid="learning-progress-entry"]').attributes('href')).toBe('/learning/progress');
+    expect(wrapper.get('[data-testid="learning-statistics-entry"]').attributes('href')).toBe('/learning/statistics');
+    expect(wrapper.get('[data-testid="learning-reminders-entry"]').attributes('href')).toBe('/learning/reminders');
+    expect(wrapper.text()).not.toContain('UI-LRN-01');
     expect(wrapper.text()).toContain('链表实验');
     expect(wrapper.text()).toContain('已逾期');
     expect(wrapper.text()).toContain('Java作业1');

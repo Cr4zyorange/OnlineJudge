@@ -1,8 +1,12 @@
 <template>
   <main class="statistics-page">
+    <nav class="statistics-page__topbar" aria-label="页面导航">
+      <a class="statistics-page__home" data-testid="lrn-home-entry" href="/learning/tasks" aria-label="返回学习任务中心">
+        &lt;-
+      </a>
+    </nav>
     <section class="statistics-page__shell">
       <aside class="statistics-page__summary" aria-label="学习行为概览">
-        <p class="statistics-page__eyebrow">UI-LRN-03</p>
         <h1>学习行为仪表盘</h1>
         <p>查看近 7 天学习时长、资源访问、任务提交与完成情况。</p>
         <dl>
@@ -24,7 +28,6 @@
       <section class="statistics-page__content" aria-label="近7天学习行为">
         <header class="statistics-page__header">
           <div>
-            <p class="statistics-page__eyebrow">API-LRN-04 / API-LRN-05</p>
             <h2>我的学习趋势</h2>
           </div>
           <button type="button" :disabled="loading" data-testid="retry-statistics" @click="loadStatistics">
@@ -168,6 +171,25 @@ function actionLabel(actionType: LearningRecordActionType) {
   background-repeat: no-repeat;
   background-attachment: fixed;
   padding: 24px;
+}
+
+.statistics-page__topbar {
+  display: flex;
+  margin: 0 auto 18px;
+  max-width: 1280px;
+}
+
+.statistics-page__home {
+  align-items: center;
+  background: #16423c;
+  border: 1px solid #16423c;
+  border-radius: 8px;
+  color: #ffffff;
+  display: inline-flex;
+  font-weight: 800;
+  min-height: 40px;
+  padding: 0 14px;
+  text-decoration: none;
 }
 
 .statistics-page__shell {

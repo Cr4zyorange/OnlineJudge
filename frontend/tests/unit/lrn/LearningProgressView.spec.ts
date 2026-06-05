@@ -63,6 +63,9 @@ describe('LearningProgressView', () => {
 
     expect(learningProgressApi.getLearningProgress).toHaveBeenCalledWith(undefined);
     expect(wrapper.text()).toContain('学习进度');
+    expect(wrapper.get('[data-testid="lrn-home-entry"]').attributes('href')).toBe('/learning/tasks');
+    expect(wrapper.text()).not.toContain('UI-LRN-02');
+    expect(wrapper.text()).not.toContain('API-LRN-02');
     expect(wrapper.text()).toContain('Java Programming');
     expect(wrapper.text()).toContain('65%');
     expect(wrapper.text()).toContain('Variables');

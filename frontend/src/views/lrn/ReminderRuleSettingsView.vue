@@ -1,8 +1,12 @@
 <template>
   <main class="reminder-settings">
+    <nav class="reminder-settings__topbar" aria-label="页面导航">
+      <a class="reminder-settings__home" data-testid="lrn-home-entry" href="/learning/tasks" aria-label="返回学习任务中心">
+        &lt;-
+      </a>
+    </nav>
     <section class="reminder-settings__shell">
       <aside class="reminder-settings__summary" aria-label="提醒规则概览">
-        <p class="reminder-settings__eyebrow">UI-LRN-05</p>
         <h1>提醒规则设置</h1>
         <p>管理任务截止提醒和通知偏好</p>
         <dl>
@@ -21,7 +25,6 @@
       <section class="reminder-settings__content" aria-label="提醒规则表单">
         <header class="reminder-settings__header">
           <div>
-            <p class="reminder-settings__eyebrow">API-LRN-10 / API-LRN-11</p>
             <h2>截止提醒与通知偏好</h2>
           </div>
           <button type="button" :disabled="loading" data-testid="retry-reminder-rules" @click="loadSettings">
@@ -163,11 +166,32 @@ function aheadLabel(minutes: number) {
 <style scoped>
 .reminder-settings {
   min-height: 100vh;
-  padding: 32px;
+  padding: 24px;
   color: #102033;
-  background:
-    linear-gradient(135deg, rgba(229, 244, 255, 0.86), rgba(240, 247, 239, 0.82)),
-    url("../../assets/back.jpg") center / cover fixed;
+  background-image: url("../../assets/back.jpg");
+  background-size: cover;
+  background-position: top center;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+}
+
+.reminder-settings__topbar {
+  display: flex;
+  margin: 0 auto 18px;
+  width: min(1180px, 100%);
+}
+
+.reminder-settings__home {
+  align-items: center;
+  background: #16423c;
+  border: 1px solid #16423c;
+  border-radius: 8px;
+  color: #ffffff;
+  display: inline-flex;
+  font-weight: 800;
+  min-height: 40px;
+  padding: 0 14px;
+  text-decoration: none;
 }
 
 .reminder-settings__shell {
@@ -184,11 +208,12 @@ function aheadLabel(minutes: number) {
 .rule-panel,
 .rule-card,
 .reminder-settings__summary dl div {
-  border: 1px solid rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.62);
-  box-shadow: 0 18px 44px rgba(53, 74, 95, 0.16);
-  backdrop-filter: blur(18px);
+  background: rgba(255, 255, 255, 0.15);
+  box-shadow: 0 8px 32px rgba(31, 38, 135, 0.1);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
 .reminder-settings__summary {
