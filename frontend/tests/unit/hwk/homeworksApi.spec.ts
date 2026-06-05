@@ -6,12 +6,14 @@ import {
   getHomeworkEvaluationLogs,
   getHomeworkSubmissionReviewLogs,
   getHomeworkSubmissionEvaluation,
+  getHomeworkStatistics,
   getHomeworkSubmission,
   getHomeworkTestCases,
   listHomeworks,
   listHomeworkSubmissions,
   listMyHomeworkSubmissions,
   publishHomework,
+  publishHomeworkScores,
   reevaluateHomeworkSubmission,
   reviewHomeworkSubmission,
   saveHomeworkQuestions,
@@ -251,6 +253,37 @@ describe('homeworks api', () => {
         comment: 'Clear reasoning.'
       })
     }));
+  });
+
+  it('builds documented HWK06 score publish and statistics routes', async () => {
+    const statistics = {
+      homeworkId: 11,
+      courseId: 101,
+      totalStudentCount: 3,
+      submittedCount: 2,
+      unsubmittedCount: 1,
+      evaluatedCount: 2,
+      reviewedCount: 2,
+      averageScore: 70,
+      maxScore: 100,
+      minScore: 40,
+      unsubmittedStudentIds: [603]
+    };
+    const fetchMock = vi.spyOn(globalThis, 'fetch');
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse(homeworkDetail({ id: 11, status: 'SCORE_PUBLISHED' })))
+      .mockResolvedValueOnce(jsonResponse(statistics));
+
+    await expect(publishHomeworkScores(11)).resolves.toEqual(expect.objectContaining({
+      id: 11,
+      status: 'SCORE_PUBLISHED'
+    }));
+    await expect(getHomeworkStatistics(11)).resolves.toEqual(statistics);
+
+    expect(fetchMock.mock.calls.map((call) => [call[0], (call[1] as RequestInit).method])).toEqual([
+      ['/api/v1/homeworks/11/scores/publish', 'PUT'],
+      ['/api/v1/homeworks/11/statistics', 'GET']
+    ]);
   });
 });
 

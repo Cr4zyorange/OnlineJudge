@@ -150,6 +150,11 @@ class HomeworkSubmissionServiceTest {
         }
 
         @Override
+        public List<HomeworkSubmission> findFinalByHomeworkId(long homeworkId) {
+            return List.of();
+        }
+
+        @Override
         public List<HomeworkSubmission> findByHomeworkIdAndStudentId(long homeworkId, long studentId) {
             return List.of();
         }
