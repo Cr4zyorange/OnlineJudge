@@ -8,6 +8,7 @@ import type {
   HomeworkReviewLog,
   HomeworkReviewPayload,
   HomeworkReviewStatus,
+  HomeworkStatistics,
   HomeworkStatus,
   HomeworkSubmissionDetail,
   HomeworkSubmissionPayload,
@@ -90,6 +91,16 @@ export function closeHomework(homeworkId: number): Promise<HomeworkDetail> {
   return request<HomeworkDetail>(`/api/v1/homeworks/${homeworkId}/close`, {
     method: 'PUT'
   });
+}
+
+export function publishHomeworkScores(homeworkId: number): Promise<HomeworkDetail> {
+  return request<HomeworkDetail>(`/api/v1/homeworks/${homeworkId}/scores/publish`, {
+    method: 'PUT'
+  });
+}
+
+export function getHomeworkStatistics(homeworkId: number): Promise<HomeworkStatistics> {
+  return request<HomeworkStatistics>(`/api/v1/homeworks/${homeworkId}/statistics`);
 }
 
 export function getHomeworkTestCases(homeworkId: number): Promise<HomeworkTestCase[]> {

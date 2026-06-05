@@ -195,6 +195,19 @@ public class HomeworkController {
         return ApiResponse.ok(HomeworkResponse.fromTeacherView(homeworkService.close(homeworkId, currentUser.id())));
     }
 
+    @PutMapping("/{homeworkId}/scores/publish")
+    public ApiResponse<HomeworkResponse> publishScores(@PathVariable long homeworkId, CurrentUser currentUser) {
+        return ApiResponse.ok(HomeworkResponse.fromTeacherView(homeworkService.publishScores(homeworkId, currentUser.id())));
+    }
+
+    @GetMapping("/{homeworkId}/statistics")
+    public ApiResponse<HomeworkService.HomeworkStatistics> statistics(
+            @PathVariable long homeworkId,
+            CurrentUser currentUser
+    ) {
+        return ApiResponse.ok(homeworkService.statistics(homeworkId, currentUser.id()));
+    }
+
     private PageResponse<HomeworkResponse> mapPage(PageResponse<com.onlinejudge.hwk.domain.Homework> page) {
         return new PageResponse<>(page.list().stream().map(HomeworkResponse::summary).toList(), page.total(), page.page(), page.size());
     }
