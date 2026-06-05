@@ -724,6 +724,103 @@ class HomeworkControllerTest {
     }
 
     @Test
+    void courseManagerReviewsSubmissionAndReadsReviewAuditLogs() throws Exception {
+        long homeworkId = createHomeworkAndReturnId(objectivePayload());
+        mockMvc.perform(put("/api/v1/homeworks/{homeworkId}/publish", homeworkId)
+                        .headers(teacherHeaders("101", "101", "101:601")))
+                .andExpect(status().isOk());
+        long submissionId = submitObjectiveAnswer(homeworkId, "{\"q1\":[\"2\"],\"q2\":[\"false\"]}", studentHeaders("101"));
+
+        mockMvc.perform(put("/api/v1/submissions/{submissionId}/review", submissionId)
+                        .headers(assistantHeaders("101", "101"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "manualScore", new BigDecimal("68.50"),
+                                "finalScore", new BigDecimal("70.25"),
+                                "comment", "Reasoning is mostly correct."
+                        ))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.submissionId").value(submissionId))
+                .andExpect(jsonPath("$.data.reviewStatus").value("REVIEWED"))
+                .andExpect(jsonPath("$.data.manualScore").value(68.50))
+                .andExpect(jsonPath("$.data.finalScore").value(70.25))
+                .andExpect(jsonPath("$.data.comment").value("Reasoning is mostly correct."));
+
+        mockMvc.perform(post("/api/v1/submissions/{submissionId}/reevaluate", submissionId)
+                        .headers(teacherHeaders("101", "101"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of("reason", "verify rubric after manual review"))))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/v1/submissions/{submissionId}/review-logs", submissionId)
+                        .headers(teacherHeaders("101", "101")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data", hasSize(2)))
+                .andExpect(jsonPath("$.data[0].operationType").value("REJUDGE"))
+                .andExpect(jsonPath("$.data[0].reason").value("verify rubric after manual review"))
+                .andExpect(jsonPath("$.data[1].operationType").value("REVIEW"))
+                .andExpect(jsonPath("$.data[1].oldScore").value(40))
+                .andExpect(jsonPath("$.data[1].newScore").value(70.25))
+                .andExpect(jsonPath("$.data[1].comment").value("Reasoning is mostly correct."))
+                .andExpect(jsonPath("$.data[1].operatorId").value(502));
+    }
+
+    @Test
+    void teacherReviewRejectsScoreOutsideHomeworkTotalScore() throws Exception {
+        long homeworkId = createHomeworkAndReturnId(textPayload());
+        mockMvc.perform(put("/api/v1/homeworks/{homeworkId}/publish", homeworkId)
+                        .headers(teacherHeaders("101", "101", "101:601")))
+                .andExpect(status().isOk());
+        long submissionId = submitTextAnswer(homeworkId, "answer awaiting review", studentHeaders("101"));
+
+        mockMvc.perform(put("/api/v1/submissions/{submissionId}/review", submissionId)
+                        .headers(teacherHeaders("101", "101"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "manualScore", 101,
+                                "finalScore", 101,
+                                "comment", "out of range"
+                        ))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("HWK_4008"));
+    }
+
+    @Test
+    void teacherReviewRejectsArchivedHomeworkSubmission() throws Exception {
+        long homeworkId = createHomeworkAndReturnId(textPayload());
+        mockMvc.perform(put("/api/v1/homeworks/{homeworkId}/publish", homeworkId)
+                        .headers(teacherHeaders("101", "101", "101:601")))
+                .andExpect(status().isOk());
+        long submissionId = submitTextAnswer(homeworkId, "answer before archive", studentHeaders("101"));
+        jdbcTemplate.update("UPDATE t_hwk_homework SET status = 'ARCHIVED' WHERE id = ?", homeworkId);
+
+        mockMvc.perform(put("/api/v1/submissions/{submissionId}/review", submissionId)
+                        .headers(teacherHeaders("101", "101"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "manualScore", 80,
+                                "finalScore", 80,
+                                "comment", "late edit"
+                        ))))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("HWK_4003"));
+    }
+
+    @Test
+    void studentCannotReadPrivateReviewLogs() throws Exception {
+        long homeworkId = createHomeworkAndReturnId(textPayload());
+        mockMvc.perform(put("/api/v1/homeworks/{homeworkId}/publish", homeworkId)
+                        .headers(teacherHeaders("101", "101", "101:601")))
+                .andExpect(status().isOk());
+        long submissionId = submitTextAnswer(homeworkId, "private answer", studentHeaders("101"));
+
+        mockMvc.perform(get("/api/v1/submissions/{submissionId}/review-logs", submissionId)
+                        .headers(studentHeaders("101")))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("HWK_4031"));
+    }
+
+    @Test
     void codeHomeworkSubmissionRejectsLanguageOutsideConfiguredAllowlist() throws Exception {
         long homeworkId = createHomeworkAndReturnId(codePayload("[\"python\"]"));
         mockMvc.perform(put("/api/v1/homeworks/{homeworkId}/publish", homeworkId)

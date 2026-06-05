@@ -6,9 +6,13 @@ import com.onlinejudge.hwk.service.HomeworkSubmissionService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.math.BigDecimal;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/submissions")
@@ -46,6 +50,32 @@ public class HomeworkSubmissionController {
         return ApiResponse.ok(HomeworkEvaluationResponse.from(detail));
     }
 
+    @PutMapping("/{submissionId}/review")
+    public ApiResponse<HomeworkSubmissionResponse> review(
+            @PathVariable long submissionId,
+            CurrentUser currentUser,
+            @RequestBody(required = false) HomeworkReviewRequest request
+    ) {
+        HomeworkSubmissionService.SubmissionDetail detail = homeworkSubmissionService.review(
+                submissionId,
+                currentUser.id(),
+                request == null ? null : request.toCommand()
+        );
+        return ApiResponse.ok(HomeworkSubmissionResponse.fromTeacherView(detail.submission()));
+    }
+
+    @GetMapping("/{submissionId}/review-logs")
+    public ApiResponse<List<HomeworkReviewLogResponse>> reviewLogs(
+            @PathVariable long submissionId,
+            CurrentUser currentUser
+    ) {
+        HomeworkSubmissionService.ReviewLogDetail detail = homeworkSubmissionService.reviewLogs(
+                submissionId,
+                currentUser.id()
+        );
+        return ApiResponse.ok(detail.logs().stream().map(HomeworkReviewLogResponse::from).toList());
+    }
+
     @PostMapping("/{submissionId}/reevaluate")
     public ApiResponse<HomeworkEvaluationResponse> reevaluate(
             @PathVariable long submissionId,
@@ -61,5 +91,11 @@ public class HomeworkSubmissionController {
     }
 
     public record HomeworkReevaluationRequest(String reason) {
+    }
+
+    public record HomeworkReviewRequest(BigDecimal manualScore, BigDecimal finalScore, String comment) {
+        HomeworkSubmissionService.ReviewCommand toCommand() {
+            return new HomeworkSubmissionService.ReviewCommand(manualScore, finalScore, comment);
+        }
     }
 }

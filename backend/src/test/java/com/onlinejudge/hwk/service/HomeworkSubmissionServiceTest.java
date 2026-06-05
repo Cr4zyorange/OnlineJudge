@@ -192,5 +192,10 @@ class HomeworkSubmissionServiceTest {
         public HomeworkReviewLog save(HomeworkReviewLog reviewLog) {
             throw new UnsupportedOperationException();
         }
+
+        @Override
+        public List<HomeworkReviewLog> findBySubmissionId(long submissionId) {
+            throw new UnsupportedOperationException();
+        }
     }
 }

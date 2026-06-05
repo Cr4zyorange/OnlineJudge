@@ -2,13 +2,14 @@ import { mount } from '@vue/test-utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import HomeworkSubmissionHistoryView from '../../../src/views/hwk/HomeworkSubmissionHistoryView.vue';
 import * as homeworkApi from '../../../src/api/hwk/homeworks';
-import type { HomeworkSubmissionSummary } from '../../../src/types/hwk';
+import type { HomeworkReviewLog, HomeworkSubmissionSummary } from '../../../src/types/hwk';
 
 vi.mock('../../../src/api/hwk/homeworks');
 
 describe('HomeworkSubmissionHistoryView', () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    vi.mocked(homeworkApi.getHomeworkSubmissionReviewLogs).mockResolvedValue([]);
   });
 
   it('loads student history and marks the current effective submission', async () => {
@@ -92,6 +93,130 @@ describe('HomeworkSubmissionHistoryView', () => {
     expect(wrapper.text()).toContain('学生 602');
   });
 
+  it('lets a teacher review a submission and refreshes review logs', async () => {
+    vi.mocked(homeworkApi.listHomeworkSubmissions).mockResolvedValueOnce({
+      list: [
+        submission({ submissionId: 301, studentId: 601, answerText: 'student 601 answer' })
+      ],
+      page: 1,
+      size: 20,
+      total: 1
+    });
+    vi.mocked(homeworkApi.getHomeworkSubmission).mockResolvedValueOnce(submission({
+      submissionId: 301,
+      studentId: 601,
+      answerText: 'student 601 answer'
+    }));
+    vi.mocked(homeworkApi.getHomeworkSubmissionReviewLogs)
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([reviewLog({ submissionId: 301, newScore: 90, comment: 'Clear reasoning.' })]);
+    vi.mocked(homeworkApi.reviewHomeworkSubmission).mockResolvedValueOnce(submission({
+      submissionId: 301,
+      studentId: 601,
+      answerText: 'student 601 answer',
+      reviewStatus: 'REVIEWED',
+      manualScore: 88,
+      finalScore: 90,
+      comment: 'Clear reasoning.'
+    }));
+
+    const wrapper = mount(HomeworkSubmissionHistoryView, {
+      props: {
+        courseId: 101,
+        homeworkId: 11,
+        role: 'teacher'
+      }
+    });
+    await flushPromises();
+
+    await wrapper.get('[data-submission-id="301"] button').trigger('click');
+    await flushPromises();
+    await wrapper.get('[data-testid="history-review-manual-score"]').setValue('88');
+    await wrapper.get('[data-testid="history-review-final-score"]').setValue('90');
+    await wrapper.get('[data-testid="history-review-comment"]').setValue('Clear reasoning.');
+    await wrapper.get('[data-testid="history-review-form"]').trigger('submit');
+    await flushPromises();
+
+    expect(homeworkApi.reviewHomeworkSubmission).toHaveBeenCalledWith(301, {
+      manualScore: 88,
+      finalScore: 90,
+      comment: 'Clear reasoning.'
+    });
+    expect(homeworkApi.getHomeworkSubmissionReviewLogs).toHaveBeenLastCalledWith(301);
+    expect(wrapper.text()).toContain('REVIEWED');
+    expect(wrapper.text()).toContain('REVIEW');
+    expect(wrapper.text()).toContain('Clear reasoning.');
+  });
+
+  it('lets a teacher trigger reevaluation and refreshes review logs', async () => {
+    vi.mocked(homeworkApi.listHomeworkSubmissions).mockResolvedValueOnce({
+      list: [
+        submission({ submissionId: 301, studentId: 601, submitType: 'CODE', evaluationStatus: 'WRONG_ANSWER' })
+      ],
+      page: 1,
+      size: 20,
+      total: 1
+    });
+    vi.mocked(homeworkApi.getHomeworkSubmission).mockResolvedValueOnce(submission({
+      submissionId: 301,
+      studentId: 601,
+      submitType: 'CODE',
+      evaluationStatus: 'WRONG_ANSWER'
+    }));
+    vi.mocked(homeworkApi.getHomeworkSubmissionReviewLogs)
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([reviewLog({
+        submissionId: 301,
+        operationType: 'REJUDGE',
+        oldScore: 40,
+        newScore: 100,
+        reason: 'judge data fixed',
+        comment: null
+      })]);
+    vi.mocked(homeworkApi.reevaluateHomeworkSubmission).mockResolvedValueOnce({
+      evaluationId: 502,
+      submissionId: 301,
+      evaluationStatus: 'ACCEPTED',
+      score: 100,
+      passedCases: 2,
+      totalCases: 2,
+      feedback: 'accepted',
+      reevaluation: true,
+      startedAt: '2026-06-01T11:00:00',
+      finishedAt: '2026-06-01T11:00:01'
+    });
+    vi.mocked(homeworkApi.getHomeworkSubmission).mockResolvedValueOnce(submission({
+      submissionId: 301,
+      studentId: 601,
+      submitType: 'CODE',
+      evaluationStatus: 'ACCEPTED',
+      autoScore: 100,
+      finalScore: 100
+    }));
+
+    const wrapper = mount(HomeworkSubmissionHistoryView, {
+      props: {
+        courseId: 101,
+        homeworkId: 11,
+        role: 'teacher'
+      }
+    });
+    await flushPromises();
+
+    await wrapper.get('[data-submission-id="301"] button').trigger('click');
+    await flushPromises();
+    await wrapper.get('[data-testid="history-reevaluate-reason"]').setValue('judge data fixed');
+    await wrapper.get('[data-testid="history-reevaluate-form"]').trigger('submit');
+    await flushPromises();
+
+    expect(homeworkApi.reevaluateHomeworkSubmission).toHaveBeenCalledWith(301, 'judge data fixed');
+    expect(homeworkApi.getHomeworkSubmission).toHaveBeenLastCalledWith(301);
+    expect(homeworkApi.getHomeworkSubmissionReviewLogs).toHaveBeenLastCalledWith(301);
+    expect(wrapper.text()).toContain('Reevaluation finished');
+    expect(wrapper.text()).toContain('REJUDGE');
+    expect(wrapper.text()).toContain('judge data fixed');
+  });
+
   it('passes teacher submission filters to the history API', async () => {
     vi.mocked(homeworkApi.listHomeworkSubmissions).mockResolvedValueOnce({
       list: [
@@ -161,6 +286,23 @@ describe('HomeworkSubmissionHistoryView', () => {
 async function flushPromises() {
   await Promise.resolve();
   await Promise.resolve();
+}
+
+function reviewLog(overrides: Partial<HomeworkReviewLog> = {}): HomeworkReviewLog {
+  return {
+    id: 701,
+    submissionId: 201,
+    homeworkId: 11,
+    studentId: 601,
+    operationType: 'REVIEW',
+    oldScore: null,
+    newScore: 90,
+    comment: 'Clear reasoning.',
+    operatorId: 501,
+    reason: null,
+    createdAt: '2026-06-01T11:00:00',
+    ...overrides
+  };
 }
 
 function submission(overrides: Partial<HomeworkSubmissionSummary> = {}): HomeworkSubmissionSummary {

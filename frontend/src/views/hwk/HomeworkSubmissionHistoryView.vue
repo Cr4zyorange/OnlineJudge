@@ -97,6 +97,48 @@
             <p>语言：{{ detail.language ?? '无' }}</p>
             <pre class="hwk-history__answer">{{ detail.answerText || detail.answerJson || '本次提交没有文本内容' }}</pre>
             <p v-if="detail.comment">评语：{{ detail.comment }}</p>
+            <section v-if="isTeacher" class="hwk-history__review" aria-label="teacher review">
+              <form data-testid="history-review-form" @submit.prevent="saveReview">
+                <label>
+                  Manual score
+                  <input v-model.trim="reviewManualScore" data-testid="history-review-manual-score" type="number" min="0" step="0.01" />
+                </label>
+                <label>
+                  Final score
+                  <input v-model.trim="reviewFinalScore" data-testid="history-review-final-score" type="number" min="0" step="0.01" />
+                </label>
+                <label>
+                  Comment
+                  <textarea v-model.trim="reviewComment" data-testid="history-review-comment" rows="3" />
+                </label>
+                <button type="submit" :disabled="reviewSaving" data-testid="history-save-review">Save review</button>
+              </form>
+              <form data-testid="history-reevaluate-form" @submit.prevent="triggerReevaluation">
+                <label>
+                  Reevaluation reason
+                  <textarea v-model.trim="reevaluationReason" data-testid="history-reevaluate-reason" rows="2" />
+                </label>
+                <button type="submit" :disabled="reevaluationSubmitting" data-testid="history-trigger-reevaluate">
+                  Trigger reevaluation
+                </button>
+              </form>
+              <p v-if="reviewFeedback" class="hwk-history__feedback">{{ reviewFeedback }}</p>
+              <p v-if="reviewErrorMessage" class="hwk-history__error">{{ reviewErrorMessage }}</p>
+
+              <div class="hwk-history__logs" data-testid="history-review-logs">
+                <h3>Review logs</h3>
+                <p v-if="reviewLogsLoading">Logs loading</p>
+                <p v-else-if="reviewLogs.length === 0">No review logs</p>
+                <ul v-else>
+                  <li v-for="log in reviewLogs" :key="log.id">
+                    <strong>{{ log.operationType }}</strong>
+                    <span>{{ formatScore(log.oldScore) }} -> {{ formatScore(log.newScore) }}</span>
+                    <span>{{ log.comment || log.reason || '-' }}</span>
+                    <span>{{ formatDateTime(log.createdAt) }}</span>
+                  </li>
+                </ul>
+              </div>
+            </section>
           </template>
         </aside>
       </div>
@@ -108,12 +150,16 @@
 import { computed, onMounted, ref } from 'vue';
 import {
   getHomeworkSubmission,
+  getHomeworkSubmissionReviewLogs,
   listHomeworkSubmissions,
-  listMyHomeworkSubmissions
+  listMyHomeworkSubmissions,
+  reevaluateHomeworkSubmission,
+  reviewHomeworkSubmission
 } from '../../api/hwk/homeworks';
 import type { HomeworkSubmissionListQuery } from '../../api/hwk/homeworks';
 import type {
   HomeworkEvaluationStatus,
+  HomeworkReviewLog,
   HomeworkReviewStatus,
   HomeworkSubmissionDetail,
   HomeworkSubmissionSummary,
@@ -137,6 +183,16 @@ const submissions = ref<HomeworkSubmissionSummary[]>([]);
 const detail = ref<HomeworkSubmissionDetail | null>(null);
 const errorMessage = ref('');
 const detailErrorMessage = ref('');
+const reviewFeedback = ref('');
+const reviewErrorMessage = ref('');
+const reviewSaving = ref(false);
+const reviewLogsLoading = ref(false);
+const reviewManualScore = ref('');
+const reviewFinalScore = ref('');
+const reviewComment = ref('');
+const reevaluationReason = ref('');
+const reevaluationSubmitting = ref(false);
+const reviewLogs = ref<HomeworkReviewLog[]>([]);
 const studentKeyword = ref('');
 const submitStatusFilter = ref<'' | HomeworkSubmitStatus>('');
 const evaluationStatusFilter = ref<'' | HomeworkEvaluationStatus>('');
@@ -201,8 +257,16 @@ async function loadSubmissions() {
 async function openDetail(submissionId: number) {
   detailLoading.value = true;
   detailErrorMessage.value = '';
+  reviewFeedback.value = '';
+  reviewErrorMessage.value = '';
+  reevaluationReason.value = '';
+  reviewLogs.value = [];
   try {
     detail.value = await getHomeworkSubmission(submissionId);
+    resetReviewForm(detail.value);
+    if (isTeacher.value) {
+      await loadReviewLogs(submissionId);
+    }
   } catch (error) {
     detailErrorMessage.value = error instanceof Error ? error.message : '提交详情加载失败';
   } finally {
@@ -221,7 +285,94 @@ async function goToPage(nextPage: number) {
 async function applyFilters() {
   page.value = 1;
   detail.value = null;
+  reviewLogs.value = [];
   await loadSubmissions();
+}
+
+async function saveReview() {
+  if (!detail.value || !isTeacher.value) {
+    return;
+  }
+  reviewSaving.value = true;
+  reviewFeedback.value = '';
+  reviewErrorMessage.value = '';
+  try {
+    const manualScore = parseReviewScore(reviewManualScore.value, 'manualScore');
+    const finalScore = parseReviewScore(reviewFinalScore.value, 'finalScore');
+    const updated = await reviewHomeworkSubmission(detail.value.submissionId, {
+      manualScore,
+      finalScore,
+      comment: reviewComment.value.trim() || null
+    });
+    detail.value = updated;
+    resetReviewForm(updated);
+    submissions.value = submissions.value.map((item) => item.submissionId === updated.submissionId ? updated : item);
+    reviewFeedback.value = 'Review saved';
+    await loadReviewLogs(updated.submissionId);
+  } catch (error) {
+    reviewErrorMessage.value = error instanceof Error ? error.message : 'Review failed';
+  } finally {
+    reviewSaving.value = false;
+  }
+}
+
+async function triggerReevaluation() {
+  if (!detail.value || !isTeacher.value) {
+    return;
+  }
+  const reason = reevaluationReason.value.trim();
+  if (!reason) {
+    reviewErrorMessage.value = 'Reevaluation reason is required';
+    return;
+  }
+  reevaluationSubmitting.value = true;
+  reviewFeedback.value = '';
+  reviewErrorMessage.value = '';
+  try {
+    await reevaluateHomeworkSubmission(detail.value.submissionId, reason);
+    const refreshed = await getHomeworkSubmission(detail.value.submissionId);
+    detail.value = refreshed;
+    resetReviewForm(refreshed);
+    submissions.value = submissions.value.map((item) => item.submissionId === refreshed.submissionId ? refreshed : item);
+    reevaluationReason.value = '';
+    reviewFeedback.value = 'Reevaluation finished';
+    await loadReviewLogs(refreshed.submissionId);
+  } catch (error) {
+    reviewErrorMessage.value = error instanceof Error ? error.message : 'Reevaluation failed';
+  } finally {
+    reevaluationSubmitting.value = false;
+  }
+}
+
+async function loadReviewLogs(submissionId: number) {
+  reviewLogsLoading.value = true;
+  reviewErrorMessage.value = '';
+  try {
+    reviewLogs.value = await getHomeworkSubmissionReviewLogs(submissionId);
+  } catch (error) {
+    reviewLogs.value = [];
+    reviewErrorMessage.value = error instanceof Error ? error.message : 'Review logs failed';
+  } finally {
+    reviewLogsLoading.value = false;
+  }
+}
+
+function resetReviewForm(submission: HomeworkSubmissionDetail) {
+  reviewManualScore.value = submission.manualScore == null ? '' : String(submission.manualScore);
+  reviewFinalScore.value = submission.finalScore == null ? '' : String(submission.finalScore);
+  reviewComment.value = submission.comment ?? '';
+}
+
+function parseReviewScore(value: string, field: string) {
+  const text = String(value).trim();
+  if (!text) {
+    throw new Error(`${field} is required`);
+  }
+  const score = Number(text);
+  if (!Number.isFinite(score)) {
+    throw new Error(`${field} is invalid`);
+  }
+  return score;
 }
 
 function formatDateTime(value: string) {
@@ -340,9 +491,53 @@ const totalPages = computed(() => Math.max(1, Math.ceil(total.value / size.value
   white-space: pre-wrap;
 }
 
+.hwk-history__review,
+.hwk-history__review form,
+.hwk-history__logs,
+.hwk-history__logs ul {
+  display: grid;
+  gap: 10px;
+}
+
+.hwk-history__review {
+  border-top: 1px solid #d7dde8;
+  margin-top: 16px;
+  padding-top: 16px;
+}
+
+.hwk-history__review label {
+  display: grid;
+  gap: 6px;
+}
+
+.hwk-history__review input,
+.hwk-history__review textarea {
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 8px;
+}
+
+.hwk-history__logs ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.hwk-history__logs li {
+  border: 1px solid #d7dde8;
+  border-radius: 6px;
+  display: grid;
+  gap: 4px;
+  padding: 10px;
+}
+
 .hwk-history__back {
   color: #175cd3;
   text-decoration: none;
+}
+
+.hwk-history__feedback {
+  color: #067647;
 }
 
 .hwk-history__error {

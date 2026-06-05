@@ -116,6 +116,12 @@ export interface HomeworkSubmissionPayload {
   language?: string;
 }
 
+export interface HomeworkReviewPayload {
+  manualScore: number;
+  finalScore: number;
+  comment?: string | null;
+}
+
 export interface HomeworkSubmissionSummary {
   submissionId: number;
   homeworkId: number;
@@ -155,6 +161,22 @@ export interface HomeworkEvaluationResult {
   triggeredBy?: number | null;
   startedAt: string;
   finishedAt?: string | null;
+}
+
+export type HomeworkReviewOperationType = 'REVIEW' | 'REJUDGE';
+
+export interface HomeworkReviewLog {
+  id: number;
+  submissionId: number;
+  homeworkId: number;
+  studentId: number;
+  operationType: HomeworkReviewOperationType;
+  oldScore?: number | null;
+  newScore?: number | null;
+  comment?: string | null;
+  operatorId: number;
+  reason?: string | null;
+  createdAt: string;
 }
 
 export interface PageResponse<T> {

@@ -14,6 +14,7 @@ import org.springframework.jdbc.support.GeneratedKeyHolder;
 import org.springframework.jdbc.support.KeyHolder;
 import org.springframework.stereotype.Repository;
 
+import java.math.BigDecimal;
 import java.sql.PreparedStatement;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
@@ -37,8 +38,8 @@ public class JdbcHomeworkSubmissionRepository implements HomeworkSubmissionRepos
             EvaluationStatus.valueOf(resultSet.getString("evaluation_status")),
             HomeworkReviewStatus.valueOf(resultSet.getString("review_status")),
             resultSet.getObject("auto_score", Integer.class),
-            resultSet.getObject("manual_score", Integer.class),
-            resultSet.getObject("final_score", Integer.class),
+            resultSet.getObject("manual_score", BigDecimal.class),
+            resultSet.getObject("final_score", BigDecimal.class),
             resultSet.getString("comment"),
             resultSet.getInt("version"),
             resultSet.getBoolean("is_final"),
