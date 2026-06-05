@@ -151,6 +151,36 @@ class NotificationControllerTest {
     }
 
     @Test
+    void notificationListCapsPageSizeAndUnreadCountIsUserScoped() throws Exception {
+        for (int index = 0; index < 105; index++) {
+            insertNotification(student.id(), 101L, "TASK", "HWK", 1000L + index, "Student notification " + index, false,
+                    LocalDateTime.of(2026, 6, 2, 9, 0).plusMinutes(index));
+        }
+        insertNotification(otherStudent.id(), 102L, "TASK", "HWK", 9901L, "Other user notification", false,
+                LocalDateTime.of(2026, 6, 2, 12, 0));
+
+        mockMvc.perform(get("/api/v1/notifications")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + student.token())
+                        .param("page", "1")
+                        .param("size", "500"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.records", hasSize(100)))
+                .andExpect(jsonPath("$.data.total").value(105))
+                .andExpect(jsonPath("$.data.size").value(100))
+                .andExpect(jsonPath("$.data.unreadCount").value(105));
+
+        mockMvc.perform(get("/api/v1/notifications")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + otherStudent.token())
+                        .param("page", "1")
+                        .param("size", "20"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.records", hasSize(1)))
+                .andExpect(jsonPath("$.data.total").value(1))
+                .andExpect(jsonPath("$.data.unreadCount").value(1))
+                .andExpect(jsonPath("$.data.records[0].title").value("Other user notification"));
+    }
+
+    @Test
     void readAndDeleteActionsAreScopedToCurrentUserAndLogged() throws Exception {
         long studentTask = insertNotification(student.id(), 101L, "TASK", "HWK", 501L, "Homework due", false,
                 LocalDateTime.of(2026, 6, 2, 9, 0));

@@ -58,7 +58,6 @@ public class ReminderRuleService {
         return getOverview(userId);
     }
 
-    @Transactional
     public int scanDeadlineReminders(LocalDateTime now) {
         LocalDateTime scanStartedAt = now == null ? LocalDateTime.now() : now;
         String batchId = "lrn-reminder-" + UUID.randomUUID();
