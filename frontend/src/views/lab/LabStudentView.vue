@@ -108,6 +108,13 @@
           <p>提交状态：{{ latestSubmission.submitStatus }}</p>
           <p>评测状态：{{ latestSubmission.evaluationStatus }}</p>
           <p>提交时间：{{ formatDateTime(latestSubmission.submittedAt) }}</p>
+          <template v-if="latestScore">
+            <p>最终得分：{{ latestScore.finalScore }}</p>
+            <p>人工评分：{{ formatScore(latestScore.manualScore) }}</p>
+            <p>报告评分：{{ formatScore(latestScore.reportScore) }}</p>
+            <p>教师评语：{{ latestScore.comment ?? '暂无评语' }}</p>
+            <p>评分已更新：{{ formatDateTime(latestScore.updatedAt) }}</p>
+          </template>
           <template v-if="latestEvaluationResult">
             <p>自动得分：{{ latestEvaluationResult.score }}</p>
             <p>通过用例：{{ latestEvaluationResult.passedCases }} / {{ latestEvaluationResult.totalCases }}</p>
@@ -120,6 +127,9 @@
                 <span>{{ item.message }}</span>
               </li>
             </ul>
+          </template>
+          <template v-if="latestReport">
+            <p>报告评语：{{ latestReport.comment ?? '暂无评语' }}</p>
           </template>
         </section>
       </template>
@@ -143,6 +153,7 @@ import { reportLearningRecord } from '../../api/lrn/learningRecords';
 import type {
   LabExperimentDetail,
   LabReportSummary,
+  LabScoreSummary,
   LabSubmissionHistoryItem,
   LabSubmissionResult,
   LabSubmissionSummary
@@ -189,6 +200,7 @@ const code = ref('');
 const selectedFile = ref<File | null>(null);
 const selectedReportFile = ref<File | null>(null);
 const latestReport = ref<LabReportSummary | null>(null);
+const latestScore = ref<LabScoreSummary | null>(null);
 const reportSubmitting = ref(false);
 let evaluationPollTimer: number | null = null;
 const openedAt = ref<Date | null>(null);
@@ -235,13 +247,12 @@ async function loadLatestSubmission() {
     latestSubmission.value = history[0] ?? null;
     if (latestSubmission.value) {
       await refreshLatestEvaluationResult(latestSubmission.value.submissionId);
-      if (labDetail.value?.reportRequired) {
-        await refreshLatestReport(latestSubmission.value.submissionId);
-      }
+      await refreshLatestSubmissionDetail(latestSubmission.value.submissionId);
     } else {
       clearEvaluationPoll();
       latestEvaluationResult.value = null;
       latestReport.value = null;
+      latestScore.value = null;
     }
   } catch (error) {
     historyErrorMessage.value = error instanceof Error ? error.message : '提交历史加载失败';
@@ -269,9 +280,8 @@ async function submit() {
     await recordBehavior('SUBMIT', elapsedSeconds());
     code.value = '';
     selectedFile.value = null;
-    if (labDetail.value?.reportRequired) {
-      await refreshLatestReport(latestSubmission.value.submissionId);
-    }
+    latestScore.value = null;
+    await refreshLatestSubmissionDetail(latestSubmission.value.submissionId);
   } catch (error) {
     submitErrorMessage.value = error instanceof Error ? error.message : '实验提交失败';
   } finally {
@@ -317,10 +327,11 @@ async function refreshLatestEvaluationResult(submissionId: number) {
   }
 }
 
-async function refreshLatestReport(submissionId: number) {
+async function refreshLatestSubmissionDetail(submissionId: number) {
   try {
     const detail = await getLabSubmissionDetail(props.labId, submissionId);
     latestReport.value = detail.latestReport;
+    latestScore.value = detail.latestScore ?? null;
   } catch (error) {
     historyErrorMessage.value = error instanceof Error ? error.message : '实验报告加载失败';
   }
@@ -501,6 +512,10 @@ function resetReportForm() {
 
 function formatDateTime(value: string) {
   return value.replace('T', ' ').slice(0, 16);
+}
+
+function formatScore(value: number | null | undefined) {
+  return value ?? '未生成';
 }
 
 function getFileExtension(fileName: string) {

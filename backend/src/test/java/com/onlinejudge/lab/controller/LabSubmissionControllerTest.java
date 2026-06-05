@@ -53,6 +53,8 @@ class LabSubmissionControllerTest {
     void cleanTables() {
         deleteIfExists("DELETE FROM lab_evaluation_result");
         deleteIfExists("DELETE FROM lab_evaluation");
+        deleteIfExists("DELETE FROM lab_score_change_log");
+        deleteIfExists("DELETE FROM lab_score");
         deleteIfExists("DELETE FROM lab_report");
         deleteIfExists("DELETE FROM lab_submission");
         deleteIfExists("DELETE FROM lab_testcase");
@@ -873,6 +875,169 @@ class LabSubmissionControllerTest {
                                 "comment", "学生不能评分"
                         ))))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void teacherCanScoreSubmissionAndPersistScoreRecord() throws Exception {
+        long labId = createPublishedLab(525L, true, LocalDateTime.now().plusDays(3));
+        long submissionId = createCodeSubmission(labId, 601L, "525", "print('score submission')", "python");
+        long reportId = uploadReport(labId, submissionId, "525");
+        jdbcTemplate.update("UPDATE lab_report SET score = ?, comment = ?, scored_by = ?, scored_at = ? WHERE id = ?",
+                30,
+                "报告得分 30",
+                501L,
+                java.sql.Timestamp.valueOf(LocalDateTime.now()),
+                reportId);
+        waitForEvaluationStatus(labId, submissionId, teacherHeaders("525", "525", "601"), "ACCEPTED");
+
+        mockMvc.perform(post("/api/v1/labs/{labId}/submissions/{submissionId}/score", labId, submissionId)
+                        .headers(teacherHeaders("525", "525", "601"))
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "manualScore", 92,
+                                "reportScore", 30,
+                                "finalScore", 95,
+                                "comment", "整体实现稳定"
+                        ))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"))
+                .andExpect(jsonPath("$.data.submissionId").value(submissionId))
+                .andExpect(jsonPath("$.data.manualScore").value(92))
+                .andExpect(jsonPath("$.data.reportScore").value(30))
+                .andExpect(jsonPath("$.data.finalScore").value(95))
+                .andExpect(jsonPath("$.data.comment").value("整体实现稳定"))
+                .andExpect(jsonPath("$.data.hasChangeLogs").value(false));
+
+        Map<String, Object> scoreRecord = jdbcTemplate.queryForMap(
+                "SELECT auto_score, report_score, manual_score, final_score, comment, teacher_id FROM lab_score WHERE submission_id = ?",
+                submissionId
+        );
+        org.assertj.core.api.Assertions.assertThat(scoreRecord.get("AUTO_SCORE")).isEqualTo(100);
+        org.assertj.core.api.Assertions.assertThat(scoreRecord.get("REPORT_SCORE")).isEqualTo(30);
+        org.assertj.core.api.Assertions.assertThat(scoreRecord.get("MANUAL_SCORE")).isEqualTo(92);
+        org.assertj.core.api.Assertions.assertThat(scoreRecord.get("FINAL_SCORE")).isEqualTo(95);
+        org.assertj.core.api.Assertions.assertThat(scoreRecord.get("COMMENT")).isEqualTo("整体实现稳定");
+        org.assertj.core.api.Assertions.assertThat(scoreRecord.get("TEACHER_ID")).isEqualTo(501L);
+
+        mockMvc.perform(get("/api/v1/labs/{labId}/submissions/{submissionId}", labId, submissionId)
+                        .headers(teacherHeaders("525", "525", "601")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.finalScore").value(95))
+                .andExpect(jsonPath("$.data.latestScore.manualScore").value(92))
+                .andExpect(jsonPath("$.data.latestScore.reportScore").value(30))
+                .andExpect(jsonPath("$.data.latestScore.finalScore").value(95))
+                .andExpect(jsonPath("$.data.latestScore.comment").value("整体实现稳定"))
+                .andExpect(jsonPath("$.data.latestScore.hasChangeLogs").value(false));
+    }
+
+    @Test
+    void updatingSubmissionScoreRequiresReasonAndPersistsChangeLog() throws Exception {
+        long labId = createPublishedLab(526L, true, LocalDateTime.now().plusDays(3));
+        long submissionId = createCodeSubmission(labId, 601L, "526", "print('change score')", "python");
+        waitForEvaluationStatus(labId, submissionId, teacherHeaders("526", "526", "601"), "ACCEPTED");
+
+        mockMvc.perform(post("/api/v1/labs/{labId}/submissions/{submissionId}/score", labId, submissionId)
+                        .headers(teacherHeaders("526", "526", "601"))
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "manualScore", 88,
+                                "finalScore", 88,
+                                "comment", "首次评分"
+                        ))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.finalScore").value(88));
+
+        mockMvc.perform(post("/api/v1/labs/{labId}/submissions/{submissionId}/score", labId, submissionId)
+                        .headers(teacherHeaders("526", "526", "601"))
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "manualScore", 90,
+                                "finalScore", 90,
+                                "comment", "缺少修改原因"
+                        ))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("LAB-400-05"))
+                .andExpect(jsonPath("$.message", containsString("修改原因")));
+
+        mockMvc.perform(post("/api/v1/labs/{labId}/submissions/{submissionId}/score", labId, submissionId)
+                        .headers(teacherHeaders("526", "526", "601"))
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "manualScore", 90,
+                                "finalScore", 90,
+                                "comment", "修正边界分",
+                                "changeReason", "核对评分标准后修正"
+                        ))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.finalScore").value(90))
+                .andExpect(jsonPath("$.data.hasChangeLogs").value(true));
+
+        Map<String, Object> scoreRecord = jdbcTemplate.queryForMap(
+                "SELECT final_score, manual_score, comment FROM lab_score WHERE submission_id = ?",
+                submissionId
+        );
+        org.assertj.core.api.Assertions.assertThat(scoreRecord.get("FINAL_SCORE")).isEqualTo(90);
+        org.assertj.core.api.Assertions.assertThat(scoreRecord.get("MANUAL_SCORE")).isEqualTo(90);
+        org.assertj.core.api.Assertions.assertThat(scoreRecord.get("COMMENT")).isEqualTo("修正边界分");
+
+        Map<String, Object> changeLog = jdbcTemplate.queryForMap(
+                "SELECT old_final_score, new_final_score, reason, operator_id FROM lab_score_change_log WHERE score_id = (SELECT id FROM lab_score WHERE submission_id = ?)",
+                submissionId
+        );
+        org.assertj.core.api.Assertions.assertThat(changeLog.get("OLD_FINAL_SCORE")).isEqualTo(88);
+        org.assertj.core.api.Assertions.assertThat(changeLog.get("NEW_FINAL_SCORE")).isEqualTo(90);
+        org.assertj.core.api.Assertions.assertThat(changeLog.get("REASON")).isEqualTo("核对评分标准后修正");
+        org.assertj.core.api.Assertions.assertThat(changeLog.get("OPERATOR_ID")).isEqualTo(501L);
+    }
+
+    @Test
+    void submissionScoreRejectsOutOfRangeAndInvalidAccess() throws Exception {
+        long labId = createPublishedLab(527L, true, LocalDateTime.now().plusDays(3));
+        long submissionId = createCodeSubmission(labId, 601L, "527", "print('invalid score')", "python");
+
+        mockMvc.perform(post("/api/v1/labs/{labId}/submissions/{submissionId}/score", labId, submissionId)
+                        .headers(teacherHeaders("527", "527", "601"))
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "manualScore", 101,
+                                "finalScore", 101,
+                                "comment", "越界"
+                        ))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("LAB-400-05"));
+
+        mockMvc.perform(post("/api/v1/labs/{labId}/submissions/{submissionId}/score", labId, submissionId)
+                        .headers(teacherHeaders("527", "", "601"))
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "manualScore", 80,
+                                "finalScore", 80,
+                                "comment", "无权限"
+                        ))))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("LAB-403-01"));
+
+        mockMvc.perform(post("/api/v1/labs/{labId}/submissions/{submissionId}/score", labId, submissionId)
+                        .headers(studentHeaders("527"))
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "manualScore", 80,
+                                "finalScore", 80,
+                                "comment", "学生不能评分"
+                        ))))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("LAB-403-01"));
+
+        mockMvc.perform(post("/api/v1/labs/{labId}/submissions/{submissionId}/score", labId, submissionId + 999)
+                        .headers(teacherHeaders("527", "527", "601"))
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "manualScore", 80,
+                                "finalScore", 80,
+                                "comment", "不存在"
+                        ))))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("LAB-404-01"));
     }
 
     private long createPublishedLab(long courseId, boolean autoEvaluate, LocalDateTime deadline) throws Exception {

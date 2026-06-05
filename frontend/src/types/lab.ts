@@ -100,6 +100,27 @@ export interface LabReportScorePayload {
   comment: string;
 }
 
+export interface LabScorePayload {
+  manualScore: number;
+  reportScore?: number | null;
+  finalScore: number;
+  comment?: string | null;
+  changeReason?: string | null;
+}
+
+export interface LabScoreSummary {
+  submissionId: number;
+  reportId: number | null;
+  autoScore: number | null;
+  reportScore: number | null;
+  manualScore: number | null;
+  finalScore: number;
+  comment: string | null;
+  hasChangeLogs: boolean;
+  scoredAt: string;
+  updatedAt: string;
+}
+
 export interface LabSubmissionSummary {
   submissionId: number;
   labId: number;
@@ -141,6 +162,7 @@ export interface LabSubmissionDetail extends LabSubmissionHistoryItem {
   code: string | null;
   fileId: string | null;
   latestReport: LabReportSummary | null;
+  latestScore?: LabScoreSummary | null;
 }
 
 export interface LabEvaluationCaseResult {

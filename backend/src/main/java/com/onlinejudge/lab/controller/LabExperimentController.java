@@ -10,9 +10,11 @@ import com.onlinejudge.lab.domain.LabExperimentStatus;
 import com.onlinejudge.lab.domain.LabSubmissionQuery;
 import com.onlinejudge.lab.domain.LabSubmitStatus;
 import com.onlinejudge.lab.domain.ScoreLabReportCommand;
+import com.onlinejudge.lab.domain.ScoreLabSubmissionCommand;
 import com.onlinejudge.lab.service.LabExperimentService;
 import com.onlinejudge.lab.service.LabPermissionException;
 import com.onlinejudge.lab.service.LabReportService;
+import com.onlinejudge.lab.service.LabScoreService;
 import com.onlinejudge.lab.service.LabSubmissionService;
 import jakarta.validation.Valid;
 import org.springframework.core.io.Resource;
@@ -42,17 +44,20 @@ public class LabExperimentController {
     private final LabExperimentService labExperimentService;
     private final LabSubmissionService labSubmissionService;
     private final LabReportService labReportService;
+    private final LabScoreService labScoreService;
     private final CoursePermissionClient coursePermissionClient;
 
     public LabExperimentController(
             LabExperimentService labExperimentService,
             LabSubmissionService labSubmissionService,
             LabReportService labReportService,
+            LabScoreService labScoreService,
             CoursePermissionClient coursePermissionClient
     ) {
         this.labExperimentService = labExperimentService;
         this.labSubmissionService = labSubmissionService;
         this.labReportService = labReportService;
+        this.labScoreService = labScoreService;
         this.coursePermissionClient = coursePermissionClient;
     }
 
@@ -210,6 +215,22 @@ public class LabExperimentController {
         ));
     }
 
+    @PostMapping("/labs/{labId}/submissions/{submissionId}/score")
+    public ApiResponse<LabScoreResponse> scoreSubmission(
+            @PathVariable long labId,
+            @PathVariable long submissionId,
+            CurrentUser currentUser,
+            @RequestBody ScoreLabSubmissionRequest request
+    ) {
+        requireTeacherForScoring(currentUser);
+        ScoreLabSubmissionCommand command = request == null
+                ? new ScoreLabSubmissionCommand(null, null, null, null, null)
+                : request.toCommand();
+        return ApiResponse.ok(LabScoreResponse.from(
+                labScoreService.scoreSubmission(labId, submissionId, currentUser.id(), command)
+        ));
+    }
+
     @GetMapping("/labs/{labId}/submissions")
     public ApiResponse<List<LabSubmissionHistoryItemResponse>> listSubmissions(
             @PathVariable long labId,
@@ -276,6 +297,12 @@ public class LabExperimentController {
     private void requireStudent(CurrentUser currentUser) {
         if (!currentUser.hasRole("STUDENT")) {
             throw new LabPermissionException("仅学生可以提交实验");
+        }
+    }
+
+    private void requireTeacherForScoring(CurrentUser currentUser) {
+        if (!currentUser.hasRole("TEACHER") && !currentUser.hasRole("ADMIN")) {
+            throw new LabPermissionException("无课程管理权限");
         }
     }
 }

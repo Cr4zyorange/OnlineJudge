@@ -21,6 +21,7 @@ public record LabSubmissionDetailView(
         boolean hasFile,
         String code,
         String fileId,
-        LabReportSummaryView latestReport
+        LabReportSummaryView latestReport,
+        LabScoreSummaryView latestScore
 ) {
 }
