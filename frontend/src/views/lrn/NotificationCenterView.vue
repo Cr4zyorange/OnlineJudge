@@ -15,6 +15,9 @@
             <dd>未读 {{ notificationPage?.unreadCount ?? 0 }}</dd>
           </div>
         </dl>
+        <a class="notification-center__settings" data-testid="reminder-settings-entry" href="/learning/reminders">
+          提醒规则设置
+        </a>
       </aside>
 
       <section class="notification-center__content" aria-label="通知列表">
@@ -412,7 +415,8 @@ function typeLabel(type: NotificationItem['type']) {
 select,
 input,
 button,
-.notification-card__link {
+.notification-card__link,
+.notification-center__settings {
   border-radius: 8px;
   min-height: 40px;
 }
@@ -426,7 +430,8 @@ input {
 }
 
 button,
-.notification-card__link {
+.notification-card__link,
+.notification-center__settings {
   background: #16423c;
   border: 1px solid #16423c;
   color: #ffffff;
@@ -434,6 +439,14 @@ button,
   font-weight: 700;
   padding: 0 14px;
   text-decoration: none;
+}
+
+.notification-center__settings {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  margin-top: 18px;
 }
 
 button:disabled {

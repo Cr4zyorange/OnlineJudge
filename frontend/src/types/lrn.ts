@@ -196,3 +196,27 @@ export interface NotificationReadRequest {
 export interface NotificationMutationResult {
   updatedCount: number;
 }
+
+export type ReminderType = 'HOMEWORK_DEADLINE' | 'EXPERIMENT_DEADLINE';
+export type ReminderSourceModule = 'HWK' | 'LAB';
+
+export interface ReminderRuleItem {
+  reminderType: ReminderType;
+  sourceModule: ReminderSourceModule;
+  aheadMinutes: number;
+  enabled: boolean;
+  required: boolean;
+}
+
+export interface NotificationSettingItem {
+  enableExperiment: boolean;
+  enableHomework: boolean;
+  enableGrade: boolean;
+  enableAnnouncement: boolean;
+  enableNonCriticalReminder: boolean;
+}
+
+export interface ReminderRuleOverview {
+  rules: ReminderRuleItem[];
+  settings: NotificationSettingItem;
+}

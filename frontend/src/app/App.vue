@@ -14,6 +14,7 @@
   <LearningTaskCenterView v-else-if="viewMode === 'learning-tasks'" />
   <LearningProgressView v-else-if="viewMode === 'learning-progress'" />
   <LearningStatisticsView v-else-if="viewMode === 'learning-statistics'" />
+  <ReminderRuleSettingsView v-else-if="viewMode === 'learning-reminders'" />
   <NotificationCenterView v-else-if="viewMode === 'notifications'" />
   <LabSubmissionHistoryView
     v-else-if="viewMode === 'lab' && labRole === 'student' && labPage === 'history' && courseId !== null && labId !== null"
@@ -82,6 +83,7 @@ import LearningProgressView from '../views/lrn/LearningProgressView.vue';
 import LearningStatisticsView from '../views/lrn/LearningStatisticsView.vue';
 import LearningTaskCenterView from '../views/lrn/LearningTaskCenterView.vue';
 import NotificationCenterView from '../views/lrn/NotificationCenterView.vue';
+import ReminderRuleSettingsView from '../views/lrn/ReminderRuleSettingsView.vue';
 import StudentGradeView from '../views/grd/StudentGradeView.vue';
 import TeacherGradeTableView from '../views/grd/TeacherGradeTableView.vue';
 
@@ -153,6 +155,9 @@ const viewMode = computed(() => {
   }
   if (pathname.value === '/learning/statistics') {
     return 'learning-statistics';
+  }
+  if (pathname.value === '/learning/reminders') {
+    return 'learning-reminders';
   }
   if (pathname.value === '/notifications') {
     return 'notifications';
