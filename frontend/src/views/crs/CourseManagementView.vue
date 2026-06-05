@@ -59,6 +59,11 @@
               <i class="bi bi-bar-chart-line"></i> 学习仪表盘
             </a>
           </li>
+          <li>
+            <a class="menu-button" data-testid="learning-reminders-entry" href="/learning/reminders">
+              <i class="bi bi-alarm"></i> 提醒设置
+            </a>
+          </li>
         </ul>
 
         <div class="sidebar-card">
