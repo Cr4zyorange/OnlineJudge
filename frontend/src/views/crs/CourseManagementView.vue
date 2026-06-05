@@ -448,7 +448,7 @@
                       <i class="bi bi-box-arrow-in-right"></i> 进入学习
                     </button>
                     <button v-else class="card-btn" type="button" :disabled="joiningCourseId === course.id" @click.stop="joinVisibleCourse(course)">
-                      <i class="bi bi-person-plus"></i> 加入课程
+                      <i class="bi bi-person-plus"></i> {{ joinButtonText(course) }}
                     </button>
                   </div>
                 </div>
@@ -646,7 +646,7 @@
               <i class="bi bi-box-arrow-in-right"></i> 进入学习
             </button>
             <button v-else-if="!selectedCourse.manageable" class="card-btn" type="button" :disabled="joiningCourseId === selectedCourse.id" @click="joinVisibleCourse(selectedCourse)">
-              <i class="bi bi-person-plus"></i> 加入课程
+              <i class="bi bi-person-plus"></i> {{ joinButtonText(selectedCourse) }}
             </button>
             <button v-if="selectedCourse.manageable" class="card-btn" type="button" @click="manageSelectedCourseChapters">
               <i class="bi bi-list-nested"></i> 管理章节
@@ -1760,6 +1760,16 @@ function enrollmentModeText(mode: Course['enrollmentMode']) {
     REVIEW: '申请审核'
   };
   return map[mode];
+}
+
+function joinButtonText(course: Course) {
+  if (course.enrollmentMode === 'REVIEW') {
+    return '申请加入';
+  }
+  if (course.enrollmentMode === 'INVITE') {
+    return '输入邀请码';
+  }
+  return '直接加入';
 }
 
 function memberRoleText(role: CourseMember['role']) {
