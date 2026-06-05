@@ -632,7 +632,7 @@ describe('CourseManagementView', () => {
     const wrapper = mount(CourseManagementView);
     await flushPromises();
 
-    const joinButton = wrapper.findAll('button.card-btn').find((button) => button.text().includes('加入'));
+    const joinButton = wrapper.findAll('button.card-btn').find((button) => button.text().includes('输入邀请码'));
     expect(joinButton).toBeTruthy();
     await joinButton!.trigger('click');
     await flushPromises();

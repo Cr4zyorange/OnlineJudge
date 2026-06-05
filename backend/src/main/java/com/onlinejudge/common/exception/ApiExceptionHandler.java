@@ -127,9 +127,13 @@ public class ApiExceptionHandler {
                 .distinct()
                 .reduce((left, right) -> left + "；" + right)
                 .orElse("请求参数不合法");
-        String code = exception.getBindingResult().getObjectName().toLowerCase().contains("lab")
-                ? "LAB-400-01"
-                : "ERR-GRD-03";
+        String objectName = exception.getBindingResult().getObjectName().toLowerCase();
+        if (objectName.contains("course") || objectName.contains("chapter")
+                || objectName.contains("resource") || objectName.contains("announcement")) {
+            return ResponseEntity.badRequest()
+                    .body(ApiResponse.error("CRS_400", "参数错误：" + message));
+        }
+        String code = objectName.contains("lab") ? "LAB-400-01" : "ERR-GRD-03";
         return ResponseEntity.badRequest()
                 .body(ApiResponse.error(code, message));
     }

@@ -948,4 +948,151 @@ class CourseControllerTest {
                 .andExpect(jsonPath("$.data.length()", is(1)))
                 .andExpect(jsonPath("$.data[0].title", is("Week 1 updated")));
     }
+
+    @Test
+    void crs07NfrSecurityRejectsUnauthenticatedAndRemovedMemberResourceAccess() throws Exception {
+        mockMvc.perform(get("/api/v1/courses"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code", is("ERR-AUTH-04")));
+
+        String response = mockMvc.perform(post("/api/v1/courses")
+                        .header("X-User-Id", "1001")
+                        .header("X-User-Role", "TEACHER")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"nfr-security-" + System.nanoTime() + "\",\"enrollmentMode\":\"PUBLIC\",\"status\":\"ACTIVE\"}"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        String courseId = response.replaceAll("(?s).*\"id\":(\\d+).*", "$1");
+
+        MockMultipartFile file = new MockMultipartFile(
+                "file",
+                "nfr.pdf",
+                "application/pdf",
+                "nfr resource".getBytes(java.nio.charset.StandardCharsets.UTF_8)
+        );
+        String uploadResponse = mockMvc.perform(multipart("/api/v1/courses/" + courseId + "/resources")
+                        .file(file)
+                        .param("name", "NFR Resource")
+                        .param("resourceType", "DOCUMENT")
+                        .param("visibility", "STUDENT")
+                        .header("X-User-Id", "1001")
+                        .header("X-User-Role", "TEACHER"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        String resourceId = uploadResponse.replaceAll("(?s).*\"id\":(\\d+).*", "$1");
+
+        mockMvc.perform(post("/api/v1/courses/" + courseId + "/join")
+                        .header("X-User-Id", "1002")
+                        .header("X-User-Role", "STUDENT"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(delete("/api/v1/courses/" + courseId + "/members/1002")
+                        .header("X-User-Id", "1001")
+                        .header("X-User-Role", "TEACHER"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/v1/courses/" + courseId + "/resources/" + resourceId + "/download")
+                        .header("X-User-Id", "1002")
+                        .header("X-User-Role", "STUDENT"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.message", is("无权限访问")));
+    }
+
+    @Test
+    void crs07NfrPaginationNormalizesCourseListPageAndSize() throws Exception {
+        for (int i = 0; i < 3; i++) {
+            mockMvc.perform(post("/api/v1/courses")
+                            .header("X-User-Id", "1011")
+                            .header("X-User-Role", "TEACHER")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"name\":\"nfr-page-" + i + "-" + System.nanoTime() + "\",\"status\":\"ACTIVE\"}"))
+                    .andExpect(status().isOk());
+        }
+
+        mockMvc.perform(get("/api/v1/courses?page=0&size=100")
+                        .header("X-User-Id", "1011")
+                        .header("X-User-Role", "TEACHER"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.page", is(1)))
+                .andExpect(jsonPath("$.data.size", is(50)));
+    }
+
+    @Test
+    void crs07NfrUploadRejectsDisguisedExecutableAndKeepsFailureVisible() throws Exception {
+        String response = mockMvc.perform(post("/api/v1/courses")
+                        .header("X-User-Id", "1021")
+                        .header("X-User-Role", "TEACHER")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"nfr-upload-" + System.nanoTime() + "\",\"status\":\"ACTIVE\"}"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        String courseId = response.replaceAll("(?s).*\"id\":(\\d+).*", "$1");
+
+        MockMultipartFile disguised = new MockMultipartFile(
+                "file",
+                "payload.pdf.exe",
+                "application/pdf",
+                "MZ executable".getBytes(java.nio.charset.StandardCharsets.UTF_8)
+        );
+        mockMvc.perform(multipart("/api/v1/courses/" + courseId + "/resources")
+                        .file(disguised)
+                        .param("resourceType", "DOCUMENT")
+                        .param("visibility", "STUDENT")
+                        .header("X-User-Id", "1021")
+                        .header("X-User-Role", "TEACHER"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message", is("不支持的文件类型")));
+
+        mockMvc.perform(get("/api/v1/courses/" + courseId + "/resources")
+                        .header("X-User-Id", "1021")
+                        .header("X-User-Role", "TEACHER"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()", is(0)));
+    }
+
+    @Test
+    void crs07NfrExceptionMatrixMapsNotFoundValidationConflictAndLongAnnouncement() throws Exception {
+        mockMvc.perform(get("/api/v1/courses/999999999")
+                        .header("X-User-Id", "1031")
+                        .header("X-User-Role", "TEACHER"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message", is("课程不存在")));
+
+        mockMvc.perform(post("/api/v1/courses")
+                        .header("X-User-Id", "1031")
+                        .header("X-User-Role", "TEACHER")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message", is("参数错误：课程名称不能为空")));
+
+        String response = mockMvc.perform(post("/api/v1/courses")
+                        .header("X-User-Id", "1031")
+                        .header("X-User-Role", "TEACHER")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"nfr-exception-" + System.nanoTime() + "\",\"enrollmentMode\":\"PUBLIC\",\"status\":\"ACTIVE\"}"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        String courseId = response.replaceAll("(?s).*\"id\":(\\d+).*", "$1");
+
+        mockMvc.perform(post("/api/v1/courses/" + courseId + "/join")
+                        .header("X-User-Id", "1032")
+                        .header("X-User-Role", "STUDENT"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/v1/courses/" + courseId + "/join")
+                        .header("X-User-Id", "1032")
+                        .header("X-User-Role", "STUDENT"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message", is("ALREADY_JOINED")));
+
+        String longContent = "a".repeat(5001);
+        mockMvc.perform(post("/api/v1/courses/" + courseId + "/announcements")
+                        .header("X-User-Id", "1031")
+                        .header("X-User-Role", "TEACHER")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"long\",\"content\":\"" + longContent + "\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message", is("参数错误：公告内容超过最大长度")));
+    }
 }
