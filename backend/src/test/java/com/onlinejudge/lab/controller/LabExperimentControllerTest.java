@@ -12,6 +12,7 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.http.MediaType;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.jdbc.Sql;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -37,6 +38,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 @Sql(
         statements = {
+                "DELETE FROM lab_score_change_log",
+                "DELETE FROM lab_score",
+                "DELETE FROM lab_evaluation_result",
+                "DELETE FROM lab_evaluation",
+                "DELETE FROM lab_report",
+                "DELETE FROM lab_submission",
                 "DELETE FROM lab_testcase",
                 "DELETE FROM lab_experiment"
         },
@@ -60,6 +67,9 @@ class LabExperimentControllerTest {
 
     @Autowired
     private RecordingNotificationEventPublisher notificationEventPublisher;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
 
     @BeforeEach
     void clearNotificationEvents() {
@@ -357,6 +367,85 @@ class LabExperimentControllerTest {
         assertThat(scorePublishedEvent.recipientUserIds()).containsExactly(601L);
         assertThat(scorePublishedEvent.targetId()).isEqualTo(labId);
         assertThat(scorePublishedEvent.linkUrl()).isEqualTo("/courses/206/labs/" + labId);
+    }
+
+    @Test
+    void teacherQueriesLabStatisticsWithUnsubmittedStudentsScoreDistributionAndLateCount() throws Exception {
+        long labId = createLabAndReturnId(207L, teacherHeaders("207", "207"), Map.ofEntries(
+                entry("title", "实验统计"),
+                entry("description", "用于验证实验统计"),
+                entry("deadline", "2026-07-10T23:59:59"),
+                entry("maxScore", 100),
+                entry("attachmentIds", List.of()),
+                entry("allowedLanguages", "java"),
+                entry("evaluationMode", "DOCKER_IO"),
+                entry("autoEvaluate", true),
+                entry("reportRequired", true),
+                entry("timeLimitMs", 60000),
+                entry("memoryLimitKb", 262144),
+                entry("testcases", List.of())
+        ));
+
+        jdbcTemplate.update("""
+                INSERT INTO lab_submission
+                    (lab_id, student_id, code_content, file_id, language, submit_status, evaluation_status,
+                     final_score, auto_score, version, is_final, submitted_at, created_at, updated_at, deleted)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, TIMESTAMP '2026-07-09 08:00:00', TIMESTAMP '2026-07-09 08:00:00', TIMESTAMP '2026-07-09 08:00:00', FALSE)
+                """,
+                labId, 701L, "code-701", null, "java", "SUBMITTED", "ACCEPTED", 95, 90, 1, true
+        );
+        jdbcTemplate.update("""
+                INSERT INTO lab_submission
+                    (lab_id, student_id, code_content, file_id, language, submit_status, evaluation_status,
+                     final_score, auto_score, version, is_final, submitted_at, created_at, updated_at, deleted)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, TIMESTAMP '2026-07-11 09:00:00', TIMESTAMP '2026-07-11 09:00:00', TIMESTAMP '2026-07-11 09:00:00', FALSE)
+                """,
+                labId, 702L, "code-702", null, "java", "LATE", "RUNNING", 68, 65, 1, true
+        );
+
+        mockMvc.perform(get("/api/v1/labs/{labId}/statistics", labId)
+                        .headers(teacherHeaders("207", "207", "207:701,702,703")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"))
+                .andExpect(jsonPath("$.data.labId").value(labId))
+                .andExpect(jsonPath("$.data.courseId").value(207))
+                .andExpect(jsonPath("$.data.totalStudentCount").value(3))
+                .andExpect(jsonPath("$.data.submittedCount").value(2))
+                .andExpect(jsonPath("$.data.unsubmittedCount").value(1))
+                .andExpect(jsonPath("$.data.evaluatedCount").value(1))
+                .andExpect(jsonPath("$.data.evaluationCompletionRate").value(33.33))
+                .andExpect(jsonPath("$.data.averageScore").value(81.50))
+                .andExpect(jsonPath("$.data.lateSubmissionCount").value(1))
+                .andExpect(jsonPath("$.data.unsubmittedStudentIds", hasSize(1)))
+                .andExpect(jsonPath("$.data.unsubmittedStudentIds[0]").value(703))
+                .andExpect(jsonPath("$.data.scoreDistribution['0-59']").value(0))
+                .andExpect(jsonPath("$.data.scoreDistribution['60-69']").value(1))
+                .andExpect(jsonPath("$.data.scoreDistribution['70-79']").value(0))
+                .andExpect(jsonPath("$.data.scoreDistribution['80-89']").value(0))
+                .andExpect(jsonPath("$.data.scoreDistribution['90-100']").value(1))
+                .andExpect(jsonPath("$.data.generatedAt").exists());
+    }
+
+    @Test
+    void studentCannotQueryLabStatistics() throws Exception {
+        long labId = createLabAndReturnId(208L, teacherHeaders("208", "208"), Map.ofEntries(
+                entry("title", "统计权限实验"),
+                entry("description", "学生不能访问统计"),
+                entry("deadline", "2026-07-12T23:59:59"),
+                entry("maxScore", 100),
+                entry("attachmentIds", List.of()),
+                entry("allowedLanguages", "java"),
+                entry("evaluationMode", "DOCKER_IO"),
+                entry("autoEvaluate", true),
+                entry("reportRequired", false),
+                entry("timeLimitMs", 60000),
+                entry("memoryLimitKb", 262144),
+                entry("testcases", List.of())
+        ));
+
+        mockMvc.perform(get("/api/v1/labs/{labId}/statistics", labId)
+                        .headers(studentHeaders("208")))
+                .andExpect(status().isForbidden());
     }
 
     @Test

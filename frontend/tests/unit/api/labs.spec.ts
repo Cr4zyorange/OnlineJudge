@@ -58,4 +58,35 @@ describe('lab api report download', () => {
     });
     expect(result).toBe(response);
   });
+
+  it('loads lab statistics through the documented teacher statistics endpoint', async () => {
+    const response = {
+      labId: 12,
+      courseId: 101,
+      totalStudentCount: 3,
+      submittedCount: 2,
+      unsubmittedCount: 1,
+      evaluatedCount: 1,
+      submissionRate: 66.67,
+      evaluationCompletionRate: 33.33,
+      averageScore: 81.5,
+      lateSubmissionCount: 1,
+      unsubmittedStudentIds: [703],
+      scoreDistribution: {
+        '0-59': 0,
+        '60-69': 1,
+        '70-79': 0,
+        '80-89': 0,
+        '90-100': 1
+      },
+      generatedAt: '2026-06-06T23:00:00'
+    };
+    vi.mocked(request).mockResolvedValueOnce(response);
+
+    const { getLabStatistics } = await import('../../../src/api/lab/labs');
+    const result = await getLabStatistics(12);
+
+    expect(request).toHaveBeenCalledWith('/api/v1/labs/12/statistics');
+    expect(result).toBe(response);
+  });
 });
