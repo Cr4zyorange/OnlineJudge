@@ -232,12 +232,12 @@ function aheadLabel(minutes: number) {
 .reminder-settings__summary p,
 .toggle-row small,
 .reminder-settings__state {
-  color: #5a6b7b;
+  color: #000;
 }
 
 .reminder-settings__eyebrow {
   margin: 0 0 8px;
-  color: #2e7d68;
+  color: #1f5345;
   font-size: 0.78rem;
   font-weight: 700;
 }
@@ -253,7 +253,7 @@ function aheadLabel(minutes: number) {
 }
 
 .reminder-settings__summary dt {
-  color: #627487;
+  color: #000;
   font-size: 0.8rem;
 }
 

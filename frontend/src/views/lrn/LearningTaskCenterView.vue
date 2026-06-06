@@ -328,7 +328,7 @@ function statusLabel(status: LearningTask['status']) {
 
 .task-center__sidebar p,
 .task-card p {
-  color: #52615d;
+  color: #000;
   margin: 0;
 }
 
@@ -365,7 +365,7 @@ function statusLabel(status: LearningTask['status']) {
 
 .task-center__stats dt,
 .task-card__meta dt {
-  color: #66756f;
+  color: #0a0b0b;
   font-size: 13px;
 }
 
@@ -376,9 +376,11 @@ function statusLabel(status: LearningTask['status']) {
 }
 
 .task-center__content {
-  display: grid;
-  gap: 18px;
-  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 30px 12px 16px;
+  align-self: start;
 }
 
 .task-center__header,
@@ -393,6 +395,21 @@ function statusLabel(status: LearningTask['status']) {
 
 .task-center__header {
   grid-template-columns: 1fr auto;
+  min-height: 0;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.task-center__header h2 {
+  line-height: 1;
+  margin: 0;
+}
+
+.task-center__refresh {
+  min-height: 40px;
+  min-width: 70px;
+  padding: 0 10px;
+
 }
 
 .task-center__eyebrow {
@@ -439,7 +456,7 @@ button,
   color: #ffffff;
   cursor: pointer;
   font-weight: 700;
-  padding: 0 14px;
+  padding: 0 16px;
   text-decoration: none;
 }
 
@@ -453,7 +470,7 @@ button:disabled {
   border: 1px dashed #b8c8c2;
   border-radius: 8px;
   margin: 0;
-  padding: 24px;
+  padding: 40px;
 }
 
 .task-center__state--error {

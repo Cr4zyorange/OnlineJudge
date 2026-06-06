@@ -233,7 +233,7 @@ async function loadTeacherProgress() {
 .progress-page__summary p,
 .course-progress p,
 .chapter-progress p {
-  color: #52615d;
+  color: #000;
   margin: 0;
 }
 
@@ -251,7 +251,7 @@ async function loadTeacherProgress() {
 }
 
 .progress-page__summary dt {
-  color: #66756f;
+  color: #070707;
   font-size: 13px;
 }
 
@@ -262,9 +262,11 @@ async function loadTeacherProgress() {
 }
 
 .progress-page__content {
-  display: grid;
-  gap: 18px;
-  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 30px 16px 18px;
+  align-self: start;
 }
 
 .progress-page__header,
@@ -278,6 +280,23 @@ async function loadTeacherProgress() {
 .progress-page__header,
 .course-progress__header {
   grid-template-columns: 1fr auto;
+}
+
+.progress-page__header {
+  min-height: 0;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.progress-page__header h2 {
+  line-height: 1;
+  margin: 0;
+}
+
+.progress-page__header button {
+  min-height: 36px;
+  min-width: 64px;
+  padding: 0 16px;
 }
 
 .progress-page__eyebrow {
@@ -320,7 +339,7 @@ button:disabled {
   border: 1px dashed #b8c8c2;
   border-radius: 8px;
   margin: 0;
-  padding: 24px;
+  padding: 36px;
 }
 
 .progress-page__state--error {

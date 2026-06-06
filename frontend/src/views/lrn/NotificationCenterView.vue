@@ -355,7 +355,7 @@ function typeLabel(type: NotificationItem['type']) {
 
 .notification-center__sidebar p,
 .notification-card p {
-  color: #52615d;
+  color: #000;
   margin: 0;
 }
 
@@ -379,7 +379,7 @@ function typeLabel(type: NotificationItem['type']) {
 
 .notification-center__stats dt,
 .notification-card__meta dt {
-  color: #66756f;
+  color: #000;
   font-size: 13px;
 }
 

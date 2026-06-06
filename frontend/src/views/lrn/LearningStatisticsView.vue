@@ -232,7 +232,7 @@ function actionLabel(actionType: LearningRecordActionType) {
 .statistics-page__summary p,
 .recent-panel p,
 .record-row p {
-  color: #52615d;
+  color: #000;
   margin: 0;
 }
 
@@ -250,18 +250,33 @@ function actionLabel(actionType: LearningRecordActionType) {
   padding: 14px;
 }
 
-.statistics-page__summary dt,
-.metric-card span {
-  color: #66756f;
-  font-size: 13px;
+.metric-card {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
 }
 
-.statistics-page__summary dd,
-.metric-card strong {
+
+.statistics-page__summary dt,
+.metric-card span {
+  color: #000;
+  font-size: 16px;
+  line-height: 1;
+}
+
+.statistics-page__summary dd {
   color: #16423c;
   font-size: 24px;
   font-weight: 700;
+  margin: 6px 0 0;
+}
+
+.metric-card strong {
+  color: #16423c;
+  font-size: 20px;
+  font-weight: 700;
   margin: 4px 0 0;
+  line-height: 1;
 }
 
 .statistics-page__content {
@@ -348,8 +363,8 @@ button:disabled {
 
 .trend-bar {
   align-self: end;
-  background: linear-gradient(180deg, #2f7d6f, #16423c);
-  border-radius: 8px 8px 4px 4px;
+  background: linear-gradient(180deg, #a8bcc9, #7898ab);
+  border-radius: 0;
   min-height: 8px;
   width: 100%;
 }
