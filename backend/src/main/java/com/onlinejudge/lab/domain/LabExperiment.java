@@ -20,6 +20,7 @@ public record LabExperiment(
         int timeLimitMs,
         int memoryLimitKb,
         long createdBy,
+        LocalDateTime publishedAt,
         boolean deleted,
         LocalDateTime createdAt,
         LocalDateTime updatedAt,
@@ -43,6 +44,7 @@ public record LabExperiment(
                 timeLimitMs,
                 memoryLimitKb,
                 createdBy,
+                publishedAt,
                 deleted,
                 createdAt,
                 updatedAt,
@@ -83,6 +85,7 @@ public record LabExperiment(
                 timeLimitMs,
                 memoryLimitKb,
                 createdBy,
+                publishedAt,
                 deleted,
                 createdAt,
                 updatedAt,
@@ -108,6 +111,7 @@ public record LabExperiment(
                 timeLimitMs,
                 memoryLimitKb,
                 createdBy,
+                updatedAt,
                 deleted,
                 createdAt,
                 updatedAt,
@@ -133,9 +137,36 @@ public record LabExperiment(
                 timeLimitMs,
                 memoryLimitKb,
                 createdBy,
+                publishedAt,
                 deleted,
                 createdAt,
                 updatedAt,
+                testcases
+        );
+    }
+
+    public LabExperiment publishScores(LocalDateTime publishedAt) {
+        return new LabExperiment(
+                id,
+                courseId,
+                chapterId,
+                title,
+                description,
+                LabExperimentStatus.SCORE_PUBLISHED,
+                deadline,
+                maxScore,
+                attachmentIds,
+                allowedLanguages,
+                evaluationMode,
+                autoEvaluate,
+                reportRequired,
+                timeLimitMs,
+                memoryLimitKb,
+                createdBy,
+                publishedAt,
+                deleted,
+                createdAt,
+                publishedAt,
                 testcases
         );
     }
@@ -158,6 +189,7 @@ public record LabExperiment(
                 timeLimitMs,
                 memoryLimitKb,
                 createdBy,
+                publishedAt,
                 true,
                 createdAt,
                 updatedAt,

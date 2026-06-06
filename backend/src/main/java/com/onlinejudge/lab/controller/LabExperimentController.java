@@ -134,6 +134,16 @@ public class LabExperimentController {
         return ApiResponse.ok(LabExperimentResponse.fromTeacherView(closed));
     }
 
+    @PutMapping("/labs/{labId}/release-scores")
+    public ApiResponse<LabExperimentResponse> releaseScores(
+            @PathVariable long labId,
+            CurrentUser currentUser
+    ) {
+        requireTeacher(currentUser);
+        LabExperiment released = labExperimentService.releaseScores(labId, currentUser.id());
+        return ApiResponse.ok(LabExperimentResponse.fromTeacherView(released));
+    }
+
     @PostMapping(path = "/labs/{labId}/submissions", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ApiResponse<LabSubmissionResponse>> submitLab(
             @PathVariable long labId,
@@ -266,6 +276,17 @@ public class LabExperimentController {
     ) {
         return ApiResponse.ok(LabEvaluationResultResponse.from(
                 labSubmissionService.getSubmissionResult(labId, submissionId, currentUser.id())
+        ));
+    }
+
+    @GetMapping("/labs/{labId}/results/{studentId}")
+    public ApiResponse<LabResultResponse> getLabResult(
+            @PathVariable long labId,
+            @PathVariable long studentId,
+            CurrentUser currentUser
+    ) {
+        return ApiResponse.ok(LabResultResponse.from(
+                labSubmissionService.getLabResult(labId, studentId, currentUser.id())
         ));
     }
 

@@ -14,6 +14,7 @@ import com.onlinejudge.lab.domain.LabExperiment;
 import com.onlinejudge.lab.domain.LabExperimentRepository;
 import com.onlinejudge.lab.domain.LabReportSummaryView;
 import com.onlinejudge.lab.domain.LabExperimentStatus;
+import com.onlinejudge.lab.domain.LabResultView;
 import com.onlinejudge.lab.domain.LabSubmission;
 import com.onlinejudge.lab.domain.LabSubmissionDetailView;
 import com.onlinejudge.lab.domain.LabSubmissionHistoryItemView;
@@ -226,6 +227,75 @@ public class LabSubmissionService {
                 caseResults,
                 submission.submittedAt(),
                 evaluation.finishedAt() == null ? submission.updatedAt() : evaluation.finishedAt()
+        );
+    }
+
+    public LabResultView getLabResult(long labId, long studentId, long userId) {
+        LabExperiment experiment = findExistingExperiment(labId);
+        boolean canManage = coursePermissionClient.canManageCourse(experiment.courseId(), userId);
+        requireCourseViewPermission(experiment.courseId(), userId);
+        if (!canManage && studentId != userId) {
+            throw new LabPermissionException("无权限查看他人成绩");
+        }
+
+        LabSubmission submission = labSubmissionRepository.findLatestFinalByLabIdAndStudentId(labId, studentId)
+                .orElseThrow(() -> new LabNotFoundException("实验结果不存在"));
+        Map<Long, SubmissionVersionFlags> flagsBySubmissionId = buildSubmissionVersionFlags(
+                labSubmissionRepository.findByLabIdAndStudentId(labId, studentId)
+        );
+        LabSubmissionDetailView rawDetail = toDetail(submission, resolveSubmissionVersionFlags(flagsBySubmissionId, submission));
+        LabEvaluationResultView evaluationResult = getSubmissionResult(labId, submission.id(), canManage ? userId : studentId);
+        boolean scorePublished = experiment.status() == LabExperimentStatus.SCORE_PUBLISHED
+                || experiment.status() == LabExperimentStatus.ARCHIVED;
+
+        LabReportSummaryView visibleReport = rawDetail.latestReport();
+        if (!canManage && !scorePublished && visibleReport != null) {
+            visibleReport = new LabReportSummaryView(
+                    visibleReport.reportId(),
+                    visibleReport.submissionId(),
+                    visibleReport.fileName(),
+                    visibleReport.fileType(),
+                    visibleReport.fileSize(),
+                    visibleReport.version(),
+                    null,
+                    null,
+                    visibleReport.submittedAt(),
+                    visibleReport.downloadUrl()
+            );
+        }
+
+        LabSubmissionDetailView visibleSubmission = canManage || scorePublished
+                ? rawDetail
+                : new LabSubmissionDetailView(
+                rawDetail.submissionId(),
+                rawDetail.labId(),
+                rawDetail.studentId(),
+                rawDetail.language(),
+                rawDetail.submitStatus(),
+                rawDetail.evaluationStatus(),
+                rawDetail.autoScore(),
+                null,
+                rawDetail.version(),
+                rawDetail.submittedAt(),
+                rawDetail.isLatest(),
+                rawDetail.isFinal(),
+                rawDetail.isScoringBasis(),
+                rawDetail.hasFile(),
+                rawDetail.code(),
+                rawDetail.fileId(),
+                visibleReport,
+                null
+        );
+
+        return new LabResultView(
+                labId,
+                studentId,
+                experiment.status(),
+                visibleSubmission,
+                evaluationResult,
+                visibleReport,
+                canManage || scorePublished ? rawDetail.latestScore() : null,
+                scorePublished ? experiment.publishedAt() : null
         );
     }
 

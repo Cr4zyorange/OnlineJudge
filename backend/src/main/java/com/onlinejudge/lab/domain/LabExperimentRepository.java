@@ -8,6 +8,8 @@ public interface LabExperimentRepository {
 
     LabExperiment update(LabExperiment experiment);
 
+    LabExperiment updateLifecycle(LabExperiment experiment);
+
     Optional<LabExperiment> findById(long labId);
 
     List<LabExperiment> findByCourseId(long courseId, LabExperimentStatus status);

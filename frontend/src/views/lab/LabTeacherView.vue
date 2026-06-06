@@ -111,6 +111,7 @@
             <option value="DRAFT">DRAFT</option>
             <option value="PUBLISHED">PUBLISHED</option>
             <option value="CLOSED">CLOSED</option>
+            <option value="SCORE_PUBLISHED">SCORE_PUBLISHED</option>
           </select>
         </label>
       </div>
@@ -137,6 +138,13 @@
               <button v-if="lab.status === 'DRAFT'" type="button" @click="editLab(lab.id)">编辑</button>
               <button v-if="lab.status === 'DRAFT'" type="button" @click="publish(lab.id)">发布</button>
               <button v-if="lab.status === 'PUBLISHED'" type="button" @click="close(lab.id)">截止</button>
+              <button
+                v-if="lab.status === 'PUBLISHED' || lab.status === 'CLOSED'"
+                type="button"
+                @click="releaseScores(lab.id)"
+              >
+                发布成绩
+              </button>
               <button v-if="lab.status === 'DRAFT'" type="button" @click="removeLab(lab.id)">删除草稿</button>
               <button type="button" @click="openSubmissionPanel(lab.id, lab.title)">查看提交</button>
             </td>
@@ -360,6 +368,7 @@ import {
   listLabSubmissions,
   listLabs,
   publishLab,
+  releaseLabScores,
   scoreLabSubmission,
   scoreLabReport,
   updateLab
@@ -522,6 +531,18 @@ async function close(labId: number) {
     await loadLabs();
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '实验截止失败';
+  }
+}
+
+async function releaseScores(labId: number) {
+  feedback.value = '';
+  errorMessage.value = '';
+  try {
+    await releaseLabScores(labId);
+    feedback.value = '成绩发布成功';
+    await loadLabs();
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : '成绩发布失败';
   }
 }
 

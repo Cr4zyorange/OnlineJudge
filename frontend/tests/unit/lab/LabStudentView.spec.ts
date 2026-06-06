@@ -21,6 +21,7 @@ vi.mock('../../../src/api/lrn/learningRecords');
 describe('LabStudentView', () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    installLocalStorageMock();
     window.history.replaceState({}, '', '/courses/101/labs/7?role=student');
     vi.mocked(learningRecordsApi.reportLearningRecord).mockResolvedValue({
       id: 1,
@@ -764,6 +765,7 @@ describe('LabStudentView', () => {
   });
 
   it('shows the latest teacher score and feedback beside evaluation results', async () => {
+    window.localStorage.setItem('onlinejudge.userId', '601');
     vi.mocked(labApi.getLabDetail).mockResolvedValueOnce({
       id: 14,
       courseId: 101,
@@ -854,6 +856,89 @@ describe('LabStudentView', () => {
         updatedAt: '2026-06-01T13:20:00'
       }
     });
+    vi.mocked(labApi.getLabResult).mockResolvedValueOnce({
+      labId: 14,
+      studentId: 601,
+      status: 'SCORE_PUBLISHED',
+      submission: {
+        submissionId: 140,
+        labId: 14,
+        studentId: 601,
+        language: 'python',
+        submitStatus: 'SUBMITTED',
+        evaluationStatus: 'ACCEPTED',
+        autoScore: 88,
+        finalScore: 95,
+        version: 3,
+        submittedAt: '2026-06-01T12:00:00',
+        isLatest: true,
+        isFinal: true,
+        isScoringBasis: true,
+        hasFile: false,
+        code: "print('graded')",
+        fileId: null,
+        latestReport: {
+          reportId: 814,
+          submissionId: 140,
+          fileName: 'report-v3.pdf',
+          fileType: 'PDF',
+          fileSize: 2048,
+          version: 3,
+          score: 30,
+          comment: '报告结构完整',
+          submittedAt: '2026-06-01T12:10:00',
+          downloadUrl: '/api/v1/labs/14/reports/814/download'
+        },
+        latestScore: {
+          submissionId: 140,
+          reportId: 814,
+          autoScore: 88,
+          reportScore: 30,
+          manualScore: 92,
+          finalScore: 95,
+          comment: '整体实现稳定',
+          hasChangeLogs: true,
+          scoredAt: '2026-06-01T13:00:00',
+          updatedAt: '2026-06-01T13:20:00'
+        }
+      },
+      evaluationResult: {
+        submissionId: 140,
+        evaluationStatus: 'ACCEPTED',
+        score: 88,
+        passedCases: 2,
+        totalCases: 2,
+        message: '全部用例通过',
+        caseResults: [],
+        submittedAt: '2026-06-01T12:00:00',
+        finishedAt: '2026-06-01T12:00:03'
+      },
+      latestReport: {
+        reportId: 814,
+        submissionId: 140,
+        fileName: 'report-v3.pdf',
+        fileType: 'PDF',
+        fileSize: 2048,
+        version: 3,
+        score: 30,
+        comment: '报告结构完整',
+        submittedAt: '2026-06-01T12:10:00',
+        downloadUrl: '/api/v1/labs/14/reports/814/download'
+      },
+      latestScore: {
+        submissionId: 140,
+        reportId: 814,
+        autoScore: 88,
+        reportScore: 30,
+        manualScore: 92,
+        finalScore: 95,
+        comment: '整体实现稳定',
+        hasChangeLogs: true,
+        scoredAt: '2026-06-01T13:00:00',
+        updatedAt: '2026-06-01T13:20:00'
+      },
+      publishedAt: '2026-06-01T13:30:00'
+    });
 
     const wrapper = mount(LabStudentView, {
       props: {
@@ -870,7 +955,298 @@ describe('LabStudentView', () => {
     expect(wrapper.text()).toContain('评分已更新');
     expect(wrapper.text()).toContain('报告评语：报告结构完整');
   });
+
+  it('hides unpublished teacher scoring details until lab scores are released', async () => {
+    window.localStorage.setItem('onlinejudge.userId', '601');
+    vi.mocked(labApi.getLabDetail).mockResolvedValueOnce({
+      id: 15,
+      courseId: 101,
+      chapterId: null,
+      title: '实验十五',
+      description: '成绩发布前隐藏教师反馈',
+      status: 'PUBLISHED',
+      deadline: '2026-06-30T23:59:59',
+      maxScore: 100,
+      attachmentIds: [],
+      allowedLanguages: 'python',
+      evaluationMode: 'DOCKER_IO',
+      autoEvaluate: true,
+      reportRequired: true,
+      timeLimitMs: 60000,
+      memoryLimitKb: 262144,
+      deleted: false,
+      testcases: []
+    });
+    vi.mocked(labApi.listLabSubmissions).mockResolvedValueOnce([
+      {
+        submissionId: 150,
+        labId: 15,
+        studentId: 601,
+        language: 'python',
+        submitStatus: 'SUBMITTED',
+        evaluationStatus: 'ACCEPTED',
+        autoScore: 100,
+        finalScore: 95,
+        version: 1,
+        submittedAt: '2026-06-01T12:00:00',
+        isLatest: true,
+        isFinal: true,
+        isScoringBasis: true,
+        hasFile: false
+      }
+    ]);
+    vi.mocked(labApi.getLabSubmissionResult).mockResolvedValueOnce({
+      submissionId: 150,
+      evaluationStatus: 'ACCEPTED',
+      score: 100,
+      passedCases: 1,
+      totalCases: 1,
+      message: '全部用例通过',
+      caseResults: [],
+      submittedAt: '2026-06-01T12:00:00',
+      finishedAt: '2026-06-01T12:00:03'
+    });
+    vi.mocked(labApi.getLabResult).mockResolvedValueOnce({
+      labId: 15,
+      studentId: 601,
+      status: 'PUBLISHED',
+      submission: {
+        submissionId: 150,
+        labId: 15,
+        studentId: 601,
+        language: 'python',
+        submitStatus: 'SUBMITTED',
+        evaluationStatus: 'ACCEPTED',
+        autoScore: 100,
+        finalScore: null,
+        version: 1,
+        submittedAt: '2026-06-01T12:00:00',
+        isLatest: true,
+        isFinal: true,
+        isScoringBasis: true,
+        hasFile: false,
+        code: "print('hidden score')",
+        fileId: null,
+        latestReport: {
+          reportId: 915,
+          submissionId: 150,
+          fileName: 'report-v1.pdf',
+          fileType: 'PDF',
+          fileSize: 2048,
+          version: 1,
+          score: null,
+          comment: null,
+          submittedAt: '2026-06-01T12:10:00',
+          downloadUrl: '/api/v1/labs/15/reports/915/download'
+        },
+        latestScore: null
+      },
+      evaluationResult: {
+        submissionId: 150,
+        evaluationStatus: 'ACCEPTED',
+        score: 100,
+        passedCases: 1,
+        totalCases: 1,
+        message: '全部用例通过',
+        caseResults: [],
+        submittedAt: '2026-06-01T12:00:00',
+        finishedAt: '2026-06-01T12:00:03'
+      },
+      latestReport: {
+        reportId: 915,
+        submissionId: 150,
+        fileName: 'report-v1.pdf',
+        fileType: 'PDF',
+        fileSize: 2048,
+        version: 1,
+        score: null,
+        comment: null,
+        submittedAt: '2026-06-01T12:10:00',
+        downloadUrl: '/api/v1/labs/15/reports/915/download'
+      },
+      latestScore: null,
+      publishedAt: null
+    });
+
+    const wrapper = mount(LabStudentView, {
+      props: {
+        courseId: 101,
+        labId: 15
+      }
+    });
+    await flushPromises();
+
+    expect(labApi.getLabResult).toHaveBeenCalledWith(15, 601);
+    expect(wrapper.text()).toContain('自动得分：100');
+    expect(wrapper.text()).not.toContain('最终得分：95');
+    expect(wrapper.text()).not.toContain('教师评语：');
+    expect(wrapper.text()).not.toContain('报告评分：');
+  });
+
+  it('shows published teacher scoring details from the lab result api', async () => {
+    window.localStorage.setItem('onlinejudge.userId', '601');
+    vi.mocked(labApi.getLabDetail).mockResolvedValueOnce({
+      id: 16,
+      courseId: 101,
+      chapterId: null,
+      title: '实验十六',
+      description: '成绩发布后展示教师反馈',
+      status: 'SCORE_PUBLISHED',
+      deadline: '2026-06-30T23:59:59',
+      maxScore: 100,
+      attachmentIds: [],
+      allowedLanguages: 'python',
+      evaluationMode: 'DOCKER_IO',
+      autoEvaluate: true,
+      reportRequired: true,
+      timeLimitMs: 60000,
+      memoryLimitKb: 262144,
+      deleted: false,
+      testcases: []
+    });
+    vi.mocked(labApi.listLabSubmissions).mockResolvedValueOnce([
+      {
+        submissionId: 160,
+        labId: 16,
+        studentId: 601,
+        language: 'python',
+        submitStatus: 'SUBMITTED',
+        evaluationStatus: 'ACCEPTED',
+        autoScore: 88,
+        finalScore: 95,
+        version: 2,
+        submittedAt: '2026-06-01T12:00:00',
+        isLatest: true,
+        isFinal: true,
+        isScoringBasis: true,
+        hasFile: false
+      }
+    ]);
+    vi.mocked(labApi.getLabSubmissionResult).mockResolvedValueOnce({
+      submissionId: 160,
+      evaluationStatus: 'ACCEPTED',
+      score: 88,
+      passedCases: 2,
+      totalCases: 2,
+      message: '全部用例通过',
+      caseResults: [],
+      submittedAt: '2026-06-01T12:00:00',
+      finishedAt: '2026-06-01T12:00:03'
+    });
+    vi.mocked(labApi.getLabResult).mockResolvedValueOnce({
+      labId: 16,
+      studentId: 601,
+      status: 'SCORE_PUBLISHED',
+      submission: {
+        submissionId: 160,
+        labId: 16,
+        studentId: 601,
+        language: 'python',
+        submitStatus: 'SUBMITTED',
+        evaluationStatus: 'ACCEPTED',
+        autoScore: 88,
+        finalScore: 95,
+        version: 2,
+        submittedAt: '2026-06-01T12:00:00',
+        isLatest: true,
+        isFinal: true,
+        isScoringBasis: true,
+        hasFile: false,
+        code: "print('published score')",
+        fileId: null,
+        latestReport: {
+          reportId: 916,
+          submissionId: 160,
+          fileName: 'report-v2.pdf',
+          fileType: 'PDF',
+          fileSize: 2048,
+          version: 2,
+          score: 30,
+          comment: '报告结构完整',
+          submittedAt: '2026-06-01T12:10:00',
+          downloadUrl: '/api/v1/labs/16/reports/916/download'
+        },
+        latestScore: {
+          submissionId: 160,
+          reportId: 916,
+          autoScore: 88,
+          reportScore: 30,
+          manualScore: 92,
+          finalScore: 95,
+          comment: '整体实现稳定',
+          hasChangeLogs: true,
+          scoredAt: '2026-06-01T13:00:00',
+          updatedAt: '2026-06-01T13:20:00'
+        }
+      },
+      evaluationResult: {
+        submissionId: 160,
+        evaluationStatus: 'ACCEPTED',
+        score: 88,
+        passedCases: 2,
+        totalCases: 2,
+        message: '全部用例通过',
+        caseResults: [],
+        submittedAt: '2026-06-01T12:00:00',
+        finishedAt: '2026-06-01T12:00:03'
+      },
+      latestReport: {
+        reportId: 916,
+        submissionId: 160,
+        fileName: 'report-v2.pdf',
+        fileType: 'PDF',
+        fileSize: 2048,
+        version: 2,
+        score: 30,
+        comment: '报告结构完整',
+        submittedAt: '2026-06-01T12:10:00',
+        downloadUrl: '/api/v1/labs/16/reports/916/download'
+      },
+      latestScore: {
+        submissionId: 160,
+        reportId: 916,
+        autoScore: 88,
+        reportScore: 30,
+        manualScore: 92,
+        finalScore: 95,
+        comment: '整体实现稳定',
+        hasChangeLogs: true,
+        scoredAt: '2026-06-01T13:00:00',
+        updatedAt: '2026-06-01T13:20:00'
+      },
+      publishedAt: '2026-06-01T13:30:00'
+    });
+
+    const wrapper = mount(LabStudentView, {
+      props: {
+        courseId: 101,
+        labId: 16
+      }
+    });
+    await flushPromises();
+
+    expect(labApi.getLabResult).toHaveBeenCalledWith(16, 601);
+    expect(wrapper.text()).toContain('最终得分：95');
+    expect(wrapper.text()).toContain('人工评分：92');
+    expect(wrapper.text()).toContain('报告评分：30');
+    expect(wrapper.text()).toContain('教师评语：整体实现稳定');
+    expect(wrapper.text()).toContain('评分已更新');
+    expect(wrapper.text()).toContain('报告评语：报告结构完整');
+  });
 });
+
+function installLocalStorageMock() {
+  const values = new Map<string, string>();
+  Object.defineProperty(window, 'localStorage', {
+    configurable: true,
+    value: {
+      getItem: vi.fn((key: string) => values.get(key) ?? null),
+      setItem: vi.fn((key: string, value: string) => values.set(key, value)),
+      removeItem: vi.fn((key: string) => values.delete(key)),
+      clear: vi.fn(() => values.clear())
+    }
+  });
+}
 
 async function flushPromises() {
   for (let tick = 0; tick < 12; tick += 1) {

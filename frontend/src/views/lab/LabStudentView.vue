@@ -142,6 +142,7 @@ import { computed, onMounted, onUnmounted, ref } from 'vue';
 import {
   downloadLabReport,
   getLabDetail,
+  getLabResult,
   getLabSubmissionDetail,
   getLabSubmissionResult,
   listLabSubmissions,
@@ -153,6 +154,7 @@ import { reportLearningRecord } from '../../api/lrn/learningRecords';
 import type {
   LabExperimentDetail,
   LabReportSummary,
+  LabResult,
   LabScoreSummary,
   LabSubmissionHistoryItem,
   LabSubmissionResult,
@@ -247,7 +249,9 @@ async function loadLatestSubmission() {
     latestSubmission.value = history[0] ?? null;
     if (latestSubmission.value) {
       await refreshLatestEvaluationResult(latestSubmission.value.submissionId);
-      await refreshLatestSubmissionDetail(latestSubmission.value.submissionId);
+      // Use the latest submission's owner rather than local storage so feedback visibility
+      // stays aligned with the authenticated server-side student identity.
+      await refreshStudentLabResult(latestSubmission.value.studentId);
     } else {
       clearEvaluationPoll();
       latestEvaluationResult.value = null;
@@ -281,7 +285,7 @@ async function submit() {
     code.value = '';
     selectedFile.value = null;
     latestScore.value = null;
-    await refreshLatestSubmissionDetail(latestSubmission.value.submissionId);
+    await refreshStudentLabResult(latestSubmission.value.studentId);
   } catch (error) {
     submitErrorMessage.value = error instanceof Error ? error.message : '实验提交失败';
   } finally {
@@ -335,6 +339,21 @@ async function refreshLatestSubmissionDetail(submissionId: number) {
   } catch (error) {
     historyErrorMessage.value = error instanceof Error ? error.message : '实验报告加载失败';
   }
+}
+
+async function refreshStudentLabResult(studentId: number) {
+  try {
+    applyStudentLabResult(await getLabResult(props.labId, studentId));
+  } catch (error) {
+    historyErrorMessage.value = error instanceof Error ? error.message : '实验结果加载失败';
+  }
+}
+
+function applyStudentLabResult(result: LabResult) {
+  latestSubmission.value = result.submission;
+  latestEvaluationResult.value = result.evaluationResult;
+  latestReport.value = result.latestReport;
+  latestScore.value = result.latestScore ?? null;
 }
 
 async function downloadLatestReport() {

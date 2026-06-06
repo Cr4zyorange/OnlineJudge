@@ -20,16 +20,18 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @JdbcTest(properties = {
-        "spring.datasource.url=jdbc:h2:mem:lab_experiment_repository;MODE=MySQL;DATABASE_TO_LOWER=TRUE;CASE_INSENSITIVE_IDENTIFIERS=TRUE;DB_CLOSE_DELAY=-1"
+        "spring.datasource.url=jdbc:h2:mem:lab_experiment_repository;MODE=MySQL;DATABASE_TO_LOWER=TRUE;CASE_INSENSITIVE_IDENTIFIERS=TRUE;DB_CLOSE_DELAY=-1",
+        "spring.sql.init.mode=never"
 })
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Import(JdbcLabExperimentRepository.class)
 @Sql(scripts = {
         "file:../database/migrations/20260525_02_create_lab_experiment.sql",
+        "file:../database/migrations/20260606_01_add_lab_published_at.sql",
         "file:../database/migrations/20260526_01_create_lab_submission.sql",
         "file:../database/migrations/20260604_01_create_lab_report.sql",
         "file:../database/migrations/20260605_02_create_lab_score.sql"
-})
+}, executionPhase = Sql.ExecutionPhase.BEFORE_TEST_CLASS)
 class LabExperimentMigrationTest {
     private final LabExperimentRepository repository;
     private final JdbcTemplate jdbcTemplate;
@@ -60,6 +62,7 @@ class LabExperimentMigrationTest {
                 60000,
                 262144,
                 501L,
+                now,
                 false,
                 now,
                 now,
@@ -95,6 +98,7 @@ class LabExperimentMigrationTest {
                 60000,
                 262144,
                 501L,
+                now,
                 false,
                 now,
                 now,
@@ -119,6 +123,7 @@ class LabExperimentMigrationTest {
                 60000,
                 262144,
                 501L,
+                now.plusMinutes(2),
                 false,
                 now.plusMinutes(2),
                 now.plusMinutes(2),
@@ -150,6 +155,7 @@ class LabExperimentMigrationTest {
                 60000,
                 262144,
                 501L,
+                null,
                 false,
                 now,
                 now,
@@ -255,6 +261,7 @@ class LabExperimentMigrationTest {
                 60000,
                 262144,
                 501L,
+                null,
                 false,
                 now,
                 now,

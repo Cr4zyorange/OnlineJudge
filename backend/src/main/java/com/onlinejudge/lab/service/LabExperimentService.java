@@ -56,6 +56,7 @@ public class LabExperimentService {
                 command.timeLimitMs(),
                 command.memoryLimitKb(),
                 teacherId,
+                null,
                 false,
                 now,
                 now,
@@ -123,7 +124,7 @@ public class LabExperimentService {
         if (existing.status() != LabExperimentStatus.DRAFT) {
             throw new LabStateException("仅草稿实验允许删除");
         }
-        return repository.update(existing.delete(LocalDateTime.now()));
+        return repository.updateLifecycle(existing.delete(LocalDateTime.now()));
     }
 
     @Transactional
@@ -133,7 +134,7 @@ public class LabExperimentService {
         if (existing.status() != LabExperimentStatus.DRAFT) {
             throw new LabStateException("当前实验状态不允许发布");
         }
-        LabExperiment published = repository.update(existing.publish(LocalDateTime.now()));
+        LabExperiment published = repository.updateLifecycle(existing.publish(LocalDateTime.now()));
         List<Long> recipientUserIds = coursePermissionClient.listCourseStudentIds(published.courseId());
         notificationEventPublisher.publish(new NotificationEvent(
                 "lab-published-" + published.id() + "-" + published.updatedAt(),
@@ -157,7 +158,31 @@ public class LabExperimentService {
         if (existing.status() != LabExperimentStatus.PUBLISHED) {
             throw new LabStateException("当前实验状态不允许截止");
         }
-        return repository.update(existing.close(LocalDateTime.now()));
+        return repository.updateLifecycle(existing.close(LocalDateTime.now()));
+    }
+
+    @Transactional
+    public LabExperiment releaseScores(long labId, long teacherId) {
+        LabExperiment existing = findExisting(labId);
+        requireManagePermission(existing.courseId(), teacherId);
+        if (existing.status() != LabExperimentStatus.PUBLISHED && existing.status() != LabExperimentStatus.CLOSED) {
+            throw new LabStateException("当前实验状态不允许发布成绩");
+        }
+        LabExperiment scorePublished = repository.updateLifecycle(existing.publishScores(LocalDateTime.now()));
+        List<Long> recipientUserIds = coursePermissionClient.listCourseStudentIds(scorePublished.courseId());
+        notificationEventPublisher.publish(new NotificationEvent(
+                "lab-score-published-" + scorePublished.id() + "-" + scorePublished.publishedAt(),
+                "EXPERIMENT_SCORE_PUBLISHED",
+                scorePublished.courseId(),
+                recipientUserIds,
+                "实验成绩已发布",
+                "实验《" + scorePublished.title() + "》成绩已发布，可查看最终成绩和教师反馈",
+                "LAB",
+                scorePublished.id(),
+                "/courses/" + scorePublished.courseId() + "/labs/" + scorePublished.id(),
+                scorePublished.publishedAt()
+        ));
+        return scorePublished;
     }
 
     private LabExperiment findExisting(long labId) {
