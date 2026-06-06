@@ -7,6 +7,8 @@ import com.onlinejudge.common.evaluation.EvaluationTask;
 import com.onlinejudge.common.evaluation.Evaluator;
 import com.onlinejudge.common.event.NotificationEvent;
 import com.onlinejudge.common.event.NotificationEventPublisher;
+import com.onlinejudge.integration.grade.SourceGradeClient;
+import com.onlinejudge.integration.grade.SourceGradeType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -100,6 +102,9 @@ class HomeworkControllerTest {
 
     @Autowired
     private RecordingNotificationEventPublisher notificationEventPublisher;
+
+    @Autowired
+    private SourceGradeClient sourceGradeClient;
 
     @BeforeEach
     void clearNotificationEvents() {
@@ -512,6 +517,107 @@ class HomeworkControllerTest {
                 .andExpect(jsonPath("$.data.manualScore").doesNotExist())
                 .andExpect(jsonPath("$.data.finalScore").doesNotExist())
                 .andExpect(jsonPath("$.data.comment").doesNotExist());
+    }
+
+    @Test
+    void scorePublishExposesStudentFeedbackAndHomeworkSourceGrades() throws Exception {
+        long homeworkId = createHomeworkAndReturnId(textPayload());
+        mockMvc.perform(put("/api/v1/homeworks/{homeworkId}/publish", homeworkId)
+                        .headers(teacherHeaders("101", "101", "101:601,602")))
+                .andExpect(status().isOk());
+
+        long firstSubmissionId = submitTextAnswer(homeworkId, "student 601 answer", studentHeaders("101", "601"));
+        long secondSubmissionId = submitTextAnswer(homeworkId, "student 602 answer", studentHeaders("101", "602"));
+        mockMvc.perform(put("/api/v1/submissions/{submissionId}/review", firstSubmissionId)
+                        .headers(teacherHeaders("101", "101"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "manualScore", new BigDecimal("88.00"),
+                                "finalScore", new BigDecimal("90.00"),
+                                "comment", "clear reasoning"
+                        ))))
+                .andExpect(status().isOk());
+        mockMvc.perform(put("/api/v1/submissions/{submissionId}/review", secondSubmissionId)
+                        .headers(teacherHeaders("101", "101"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "manualScore", new BigDecimal("70.00"),
+                                "finalScore", new BigDecimal("72.00"),
+                                "comment", "needs more detail"
+                        ))))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/v1/submissions/{submissionId}", firstSubmissionId)
+                        .headers(studentHeaders("101", "601")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.finalScore").doesNotExist())
+                .andExpect(jsonPath("$.data.comment").doesNotExist());
+
+        mockMvc.perform(put("/api/v1/homeworks/{homeworkId}/scores/publish", homeworkId)
+                        .headers(teacherHeaders("101", "101", "101:601,602")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("SCORE_PUBLISHED"));
+
+        mockMvc.perform(get("/api/v1/submissions/{submissionId}", firstSubmissionId)
+                        .headers(studentHeaders("101", "601")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.finalScore").value(90))
+                .andExpect(jsonPath("$.data.comment").value("clear reasoning"));
+
+        assertThat(notificationEventPublisher.events()).extracting(NotificationEvent::type)
+                .contains("HOMEWORK_SCORE_PUBLISHED");
+        NotificationEvent scoreEvent = notificationEventPublisher.events().stream()
+                .filter(event -> event.type().equals("HOMEWORK_SCORE_PUBLISHED"))
+                .findFirst()
+                .orElseThrow();
+        assertThat(scoreEvent.courseId()).isEqualTo(101L);
+        assertThat(scoreEvent.recipientUserIds()).containsExactly(601L, 602L);
+        assertThat(scoreEvent.targetType()).isEqualTo("HWK");
+        assertThat(scoreEvent.targetId()).isEqualTo(homeworkId);
+
+        assertThat(sourceGradeClient.findSourceGrades(101L, SourceGradeType.HWK, homeworkId))
+                .extracting("studentId", "score", "fullScore", "status")
+                .containsExactlyInAnyOrder(
+                        org.assertj.core.groups.Tuple.tuple(601L, new BigDecimal("90.00"), new BigDecimal("100"), "SCORED"),
+                        org.assertj.core.groups.Tuple.tuple(602L, new BigDecimal("72.00"), new BigDecimal("100"), "SCORED")
+                );
+        assertThat(sourceGradeClient.findSourceGrades(101L, SourceGradeType.HWK, 401L)).isEmpty();
+
+        long scoreEventCount = notificationEventPublisher.events().stream()
+                .filter(event -> event.type().equals("HOMEWORK_SCORE_PUBLISHED"))
+                .count();
+        mockMvc.perform(put("/api/v1/homeworks/{homeworkId}/scores/publish", homeworkId)
+                        .headers(teacherHeaders("101", "101", "101:601,602")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("SCORE_PUBLISHED"));
+        assertThat(notificationEventPublisher.events().stream()
+                .filter(event -> event.type().equals("HOMEWORK_SCORE_PUBLISHED"))
+                .count()).isEqualTo(scoreEventCount);
+    }
+
+    @Test
+    void teacherQueriesHomeworkStatisticsWithUnsubmittedStudentsAndScoreSummary() throws Exception {
+        long homeworkId = createHomeworkAndReturnId(objectivePayload());
+        mockMvc.perform(put("/api/v1/homeworks/{homeworkId}/publish", homeworkId)
+                        .headers(teacherHeaders("101", "101", "101:601,602,603")))
+                .andExpect(status().isOk());
+        submitObjectiveAnswer(homeworkId, "{\"q1\":[\"2\"],\"q2\":[\"true\"]}", studentHeaders("101", "601"));
+        submitObjectiveAnswer(homeworkId, "{\"q1\":[\"2\"],\"q2\":[\"false\"]}", studentHeaders("101", "602"));
+
+        mockMvc.perform(get("/api/v1/homeworks/{homeworkId}/statistics", homeworkId)
+                        .headers(assistantHeaders("101", "101", "101:601,602,603")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.homeworkId").value(homeworkId))
+                .andExpect(jsonPath("$.data.totalStudentCount").value(3))
+                .andExpect(jsonPath("$.data.submittedCount").value(2))
+                .andExpect(jsonPath("$.data.unsubmittedCount").value(1))
+                .andExpect(jsonPath("$.data.evaluatedCount").value(2))
+                .andExpect(jsonPath("$.data.reviewedCount").value(2))
+                .andExpect(jsonPath("$.data.averageScore").value(70.00))
+                .andExpect(jsonPath("$.data.maxScore").value(100))
+                .andExpect(jsonPath("$.data.minScore").value(40))
+                .andExpect(jsonPath("$.data.unsubmittedStudentIds", hasSize(1)))
+                .andExpect(jsonPath("$.data.unsubmittedStudentIds[0]").value(603));
     }
 
     @Test

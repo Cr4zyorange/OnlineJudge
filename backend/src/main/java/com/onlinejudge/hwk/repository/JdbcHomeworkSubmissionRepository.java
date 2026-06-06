@@ -167,6 +167,22 @@ public class JdbcHomeworkSubmissionRepository implements HomeworkSubmissionRepos
     }
 
     @Override
+    public List<HomeworkSubmission> findFinalByHomeworkId(long homeworkId) {
+        return jdbcTemplate.query("""
+                        SELECT id, homework_id, student_id, submit_type, answer_text, answer_json, file_url, language,
+                               submit_status, evaluation_status, review_status, auto_score, manual_score, final_score,
+                               comment, version, is_final, submitted_at, reviewed_by, reviewed_at, created_at,
+                               updated_at, is_deleted
+                        FROM t_hwk_submission
+                        WHERE homework_id = ? AND is_deleted = FALSE AND is_final = TRUE
+                        ORDER BY student_id ASC, submitted_at DESC, id DESC
+                        """,
+                SUBMISSION_ROW_MAPPER,
+                homeworkId
+        );
+    }
+
+    @Override
     public List<HomeworkSubmission> findByHomeworkIdAndStudentId(long homeworkId, long studentId) {
         return jdbcTemplate.query("""
                         SELECT id, homework_id, student_id, submit_type, answer_text, answer_json, file_url, language,

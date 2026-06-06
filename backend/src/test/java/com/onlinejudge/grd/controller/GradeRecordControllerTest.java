@@ -31,7 +31,45 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
                 "DELETE FROM t_grade_publish_record",
                 "DELETE FROM t_grade_record",
                 "DELETE FROM t_grade_item",
-                "DELETE FROM t_grade_calculation_batch"
+                "DELETE FROM t_grade_calculation_batch",
+                "DELETE FROM t_hwk_review_log",
+                "DELETE FROM t_hwk_evaluation",
+                "DELETE FROM t_hwk_submission",
+                "DELETE FROM t_hwk_test_case",
+                "DELETE FROM t_hwk_question",
+                "DELETE FROM t_hwk_judge_config",
+                "DELETE FROM t_hwk_homework",
+                """
+                        INSERT INTO t_hwk_homework (
+                            id, course_id, chapter_id, title, description, type, status, total_score,
+                            deadline, allow_resubmit, allow_late_submit, show_evaluation_before_publish,
+                            judge_config_id, created_by, published_at, is_deleted, created_at, updated_at
+                        ) VALUES (
+                            401, 101, NULL, '作业一', 'GRD source homework', 'TEXT', 'SCORE_PUBLISHED', 100.00,
+                            '2026-06-30 23:59:59', 1, 0, 1, NULL, 501, '2026-06-01 00:00:00',
+                            0, '2026-06-01 00:00:00', '2026-06-01 00:00:00'
+                        );
+                        """,
+                """
+                        INSERT INTO t_hwk_submission (
+                            id, homework_id, student_id, submit_type, answer_text, submit_status,
+                            evaluation_status, review_status, auto_score, manual_score, final_score,
+                            comment, version, is_final, submitted_at, reviewed_by, reviewed_at,
+                            created_at, updated_at, is_deleted
+                        ) VALUES
+                        (
+                            40101, 401, 601, 'TEXT', 'student 601 answer', 'SUBMITTED',
+                            'NONE', 'REVIEWED', NULL, 80.00, 80.00,
+                            'graded', 1, 1, '2026-06-01 00:10:00', 501, '2026-06-01 00:20:00',
+                            '2026-06-01 00:10:00', '2026-06-01 00:20:00', 0
+                        ),
+                        (
+                            40102, 401, 602, 'TEXT', 'student 602 answer', 'SUBMITTED',
+                            'NONE', 'UNREVIEWED', NULL, NULL, NULL,
+                            NULL, 1, 1, '2026-06-01 00:11:00', NULL, NULL,
+                            '2026-06-01 00:11:00', '2026-06-01 00:11:00', 0
+                        );
+                        """
         },
         executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD
 )

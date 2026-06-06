@@ -89,4 +89,10 @@ public record Homework(
                 deadline, allowResubmit, allowLateSubmit, showEvaluationBeforePublish, judgeConfigId, createdBy,
                 publishedAt, deleted, createdAt, updatedAt, questions, testCases, judgeConfig);
     }
+
+    public Homework publishScores(LocalDateTime updatedAt) {
+        return new Homework(id, courseId, chapterId, title, description, type, HomeworkStatus.SCORE_PUBLISHED, totalScore,
+                deadline, allowResubmit, allowLateSubmit, showEvaluationBeforePublish, judgeConfigId, createdBy,
+                publishedAt, deleted, createdAt, updatedAt, questions, testCases, judgeConfig);
+    }
 }

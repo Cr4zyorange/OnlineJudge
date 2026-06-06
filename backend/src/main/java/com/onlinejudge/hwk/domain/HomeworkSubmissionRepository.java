@@ -14,6 +14,8 @@ public interface HomeworkSubmissionRepository {
 
     Optional<HomeworkSubmission> findLatestFinalByHomeworkIdAndStudentId(long homeworkId, long studentId);
 
+    List<HomeworkSubmission> findFinalByHomeworkId(long homeworkId);
+
     List<HomeworkSubmission> findByHomeworkIdAndStudentId(long homeworkId, long studentId);
 
     PageResponse<HomeworkSubmission> findByHomeworkId(

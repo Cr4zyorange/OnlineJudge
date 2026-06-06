@@ -144,6 +144,7 @@
             <option value="DRAFT">DRAFT</option>
             <option value="PUBLISHED">PUBLISHED</option>
             <option value="CLOSED">CLOSED</option>
+            <option value="SCORE_PUBLISHED">SCORE_PUBLISHED</option>
           </select>
         </label>
         <label>
@@ -181,21 +182,85 @@
               >编辑</button>
               <button v-if="homework.status === 'DRAFT'" type="button" @click="publish(homework.id)">发布</button>
               <button v-if="homework.status === 'PUBLISHED'" type="button" @click="close(homework.id)">关闭</button>
+              <button
+                v-if="homework.status === 'PUBLISHED' || homework.status === 'CLOSED'"
+                :data-testid="`publish-homework-scores-${homework.id}`"
+                type="button"
+                @click="publishScores(homework.id)"
+              >发布成绩</button>
+              <button
+                v-if="homework.status !== 'DRAFT'"
+                :data-testid="`homework-statistics-${homework.id}`"
+                type="button"
+                @click="loadStatistics(homework)"
+              >统计</button>
             </td>
           </tr>
         </tbody>
       </table>
+
+      <section v-if="selectedStatistics" class="homeworks__statistics" data-testid="homework-statistics-panel">
+        <header class="homeworks__section-header">
+          <h2>{{ selectedStatisticsTitle }}</h2>
+          <span>{{ statisticsLoading ? '加载中' : '统计' }}</span>
+        </header>
+        <dl>
+          <div>
+            <dt>总人数</dt>
+            <dd>{{ selectedStatistics.totalStudentCount }}</dd>
+          </div>
+          <div>
+            <dt>已提交</dt>
+            <dd>{{ selectedStatistics.submittedCount }}</dd>
+          </div>
+          <div>
+            <dt>未提交</dt>
+            <dd>{{ selectedStatistics.unsubmittedCount }}</dd>
+          </div>
+          <div>
+            <dt>已评测</dt>
+            <dd>{{ selectedStatistics.evaluatedCount }}</dd>
+          </div>
+          <div>
+            <dt>已批阅</dt>
+            <dd>{{ selectedStatistics.reviewedCount }}</dd>
+          </div>
+          <div>
+            <dt>平均分</dt>
+            <dd>{{ formatNullableScore(selectedStatistics.averageScore) }}</dd>
+          </div>
+          <div>
+            <dt>最高分</dt>
+            <dd>{{ formatNullableScore(selectedStatistics.maxScore) }}</dd>
+          </div>
+          <div>
+            <dt>最低分</dt>
+            <dd>{{ formatNullableScore(selectedStatistics.minScore) }}</dd>
+          </div>
+        </dl>
+        <p>未提交：{{ selectedStatistics.unsubmittedStudentIds.length ? selectedStatistics.unsubmittedStudentIds.join(', ') : '-' }}</p>
+      </section>
     </section>
   </main>
 </template>
 
 <script setup lang="ts">
 import { onMounted, reactive, ref, watch } from 'vue';
-import { closeHomework, createHomework, getHomeworkDetail, listHomeworks, publishHomework, updateHomework } from '../../api/hwk/homeworks';
+import {
+  closeHomework,
+  createHomework,
+  getHomeworkDetail,
+  getHomeworkStatistics,
+  listHomeworks,
+  publishHomework,
+  publishHomeworkScores,
+  updateHomework
+} from '../../api/hwk/homeworks';
 import type {
   HomeworkDetail,
   HomeworkPayload,
   HomeworkQuestionPayload,
+  HomeworkStatistics,
   HomeworkStatus,
   HomeworkSummary,
   HomeworkTestCasePayload,
@@ -209,11 +274,14 @@ const props = defineProps<{
 const homeworks = ref<HomeworkSummary[]>([]);
 const loading = ref(false);
 const saving = ref(false);
+const statisticsLoading = ref(false);
 const feedback = ref('');
 const errorMessage = ref('');
 const selectedStatus = ref('');
 const keyword = ref('');
 const editingId = ref<number | null>(null);
+const selectedStatistics = ref<HomeworkStatistics | null>(null);
+const selectedStatisticsTitle = ref('');
 
 const form = reactive({
   title: '',
@@ -314,6 +382,33 @@ async function close(homeworkId: number) {
     await loadHomeworks();
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '作业关闭失败';
+  }
+}
+
+async function publishScores(homeworkId: number) {
+  feedback.value = '';
+  errorMessage.value = '';
+  try {
+    await publishHomeworkScores(homeworkId);
+    feedback.value = '成绩发布成功';
+    selectedStatus.value = 'SCORE_PUBLISHED';
+    await loadHomeworks();
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : '成绩发布失败';
+  }
+}
+
+async function loadStatistics(homework: HomeworkSummary) {
+  feedback.value = '';
+  errorMessage.value = '';
+  statisticsLoading.value = true;
+  selectedStatisticsTitle.value = homework.title;
+  try {
+    selectedStatistics.value = await getHomeworkStatistics(homework.id);
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : '作业统计加载失败';
+  } finally {
+    statisticsLoading.value = false;
   }
 }
 
@@ -490,6 +585,10 @@ function createEmptyTestCase() {
 function formatDeadline(value: string) {
   return value.replace('T', ' ').slice(0, 16);
 }
+
+function formatNullableScore(value: number | null) {
+  return value === null || value === undefined ? '-' : String(value);
+}
 </script>
 
 <style scoped>
@@ -590,6 +689,30 @@ button:disabled {
 table {
   border-collapse: collapse;
   width: 100%;
+}
+
+.homeworks__statistics {
+  border-top: 1px solid #d7dde8;
+  margin-top: 16px;
+  padding-top: 16px;
+}
+
+.homeworks__statistics dl {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  margin: 12px 0;
+}
+
+.homeworks__statistics dt {
+  color: #5f6b7a;
+  font-size: 13px;
+}
+
+.homeworks__statistics dd {
+  font-size: 18px;
+  font-weight: 700;
+  margin: 4px 0 0;
 }
 
 th,

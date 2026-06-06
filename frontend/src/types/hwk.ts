@@ -163,7 +163,21 @@ export interface HomeworkEvaluationResult {
   finishedAt?: string | null;
 }
 
-export type HomeworkReviewOperationType = 'REVIEW' | 'REJUDGE';
+export interface HomeworkStatistics {
+  homeworkId: number;
+  courseId: number;
+  totalStudentCount: number;
+  submittedCount: number;
+  unsubmittedCount: number;
+  evaluatedCount: number;
+  reviewedCount: number;
+  averageScore: number | null;
+  maxScore: number | null;
+  minScore: number | null;
+  unsubmittedStudentIds: number[];
+}
+
+export type HomeworkReviewOperationType = 'REVIEW' | 'REJUDGE' | 'PUBLISH';
 
 export interface HomeworkReviewLog {
   id: number;

@@ -8,7 +8,13 @@ import com.onlinejudge.hwk.domain.Homework;
 import com.onlinejudge.hwk.domain.HomeworkJudgeConfig;
 import com.onlinejudge.hwk.domain.HomeworkQuestion;
 import com.onlinejudge.hwk.domain.HomeworkRepository;
+import com.onlinejudge.hwk.domain.HomeworkReviewLog;
+import com.onlinejudge.hwk.domain.HomeworkReviewLogRepository;
+import com.onlinejudge.hwk.domain.HomeworkReviewOperationType;
+import com.onlinejudge.hwk.domain.HomeworkReviewStatus;
 import com.onlinejudge.hwk.domain.HomeworkStatus;
+import com.onlinejudge.hwk.domain.HomeworkSubmission;
+import com.onlinejudge.hwk.domain.HomeworkSubmissionRepository;
 import com.onlinejudge.hwk.domain.HomeworkTestCase;
 import com.onlinejudge.hwk.domain.HomeworkType;
 import com.onlinejudge.integration.course.CoursePermissionClient;
@@ -18,8 +24,15 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
+import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
 
 @Service
 public class HomeworkService {
@@ -32,15 +45,21 @@ public class HomeworkService {
     );
 
     private final HomeworkRepository repository;
+    private final HomeworkSubmissionRepository submissionRepository;
+    private final HomeworkReviewLogRepository reviewLogRepository;
     private final CoursePermissionClient coursePermissionClient;
     private final NotificationEventPublisher notificationEventPublisher;
 
     public HomeworkService(
             HomeworkRepository repository,
+            HomeworkSubmissionRepository submissionRepository,
+            HomeworkReviewLogRepository reviewLogRepository,
             CoursePermissionClient coursePermissionClient,
             NotificationEventPublisher notificationEventPublisher
     ) {
         this.repository = repository;
+        this.submissionRepository = submissionRepository;
+        this.reviewLogRepository = reviewLogRepository;
         this.coursePermissionClient = coursePermissionClient;
         this.notificationEventPublisher = notificationEventPublisher;
     }
@@ -213,6 +232,113 @@ public class HomeworkService {
         return repository.update(existing.close(LocalDateTime.now()));
     }
 
+    @Transactional
+    public Homework publishScores(long homeworkId, long teacherId) {
+        Homework existing = findExisting(homeworkId);
+        requireManagePermission(existing.courseId(), teacherId);
+        if (existing.status() == HomeworkStatus.SCORE_PUBLISHED) {
+            return existing;
+        }
+        if (existing.status() != HomeworkStatus.PUBLISHED
+                && existing.status() != HomeworkStatus.CLOSED) {
+            throw new HomeworkApiException("HWK_4094", "current homework state cannot publish scores", HttpStatus.CONFLICT);
+        }
+        List<HomeworkSubmission> scoredSubmissions = finalSubmissions(homeworkId).stream()
+                .filter(submission -> effectiveScore(submission).isPresent())
+                .toList();
+        LocalDateTime now = LocalDateTime.now();
+        Homework published = repository.update(existing.publishScores(now));
+        for (HomeworkSubmission submission : scoredSubmissions) {
+            reviewLogRepository.save(new HomeworkReviewLog(
+                    0L,
+                    submission.id(),
+                    homeworkId,
+                    submission.studentId(),
+                    HomeworkReviewOperationType.PUBLISH,
+                    null,
+                    effectiveScore(submission).orElse(null),
+                    submission.comment(),
+                    teacherId,
+                    "homework score published",
+                    now
+            ));
+        }
+        publishScoreNotification(published, scoredSubmissions, now);
+        return published;
+    }
+
+    public HomeworkStatistics statistics(long homeworkId, long managerId) {
+        Homework homework = findExisting(homeworkId);
+        requireManagePermission(homework.courseId(), managerId);
+        List<Long> courseStudentIds = coursePermissionClient.listCourseStudentIds(homework.courseId()).stream()
+                .filter(Objects::nonNull)
+                .distinct()
+                .sorted()
+                .toList();
+        List<HomeworkSubmission> submissions = finalSubmissions(homeworkId);
+        Set<Long> submittedStudentIds = new HashSet<>();
+        submissions.forEach(submission -> submittedStudentIds.add(submission.studentId()));
+        List<Long> unsubmittedStudentIds = courseStudentIds.stream()
+                .filter(studentId -> !submittedStudentIds.contains(studentId))
+                .toList();
+        List<BigDecimal> scores = submissions.stream()
+                .map(this::effectiveScore)
+                .flatMap(Optional::stream)
+                .toList();
+        BigDecimal average = scores.isEmpty() ? null : scores.stream()
+                .reduce(BigDecimal.ZERO, BigDecimal::add)
+                .divide(BigDecimal.valueOf(scores.size()), 2, RoundingMode.HALF_UP);
+        BigDecimal max = scores.stream().max(Comparator.naturalOrder()).orElse(null);
+        BigDecimal min = scores.stream().min(Comparator.naturalOrder()).orElse(null);
+        int evaluatedCount = (int) submissions.stream().filter(this::evaluationCompleted).count();
+        int reviewedCount = (int) submissions.stream()
+                .filter(submission -> submission.reviewStatus() == HomeworkReviewStatus.REVIEWED)
+                .count();
+        int totalStudentCount = courseStudentIds.isEmpty() ? submittedStudentIds.size() : courseStudentIds.size();
+        return new HomeworkStatistics(
+                homework.id(),
+                homework.courseId(),
+                totalStudentCount,
+                submittedStudentIds.size(),
+                Math.max(totalStudentCount - submittedStudentIds.size(), unsubmittedStudentIds.size()),
+                evaluatedCount,
+                reviewedCount,
+                average,
+                max,
+                min,
+                unsubmittedStudentIds
+        );
+    }
+
+    public List<HomeworkSubmission> finalSubmissions(long homeworkId) {
+        return submissionRepository.findFinalByHomeworkId(homeworkId);
+    }
+
+    public Optional<BigDecimal> effectiveScore(HomeworkSubmission submission) {
+        if (submission.finalScore() != null) {
+            return Optional.of(submission.finalScore());
+        }
+        if (submission.autoScore() != null) {
+            return Optional.of(BigDecimal.valueOf(submission.autoScore()));
+        }
+        return Optional.empty();
+    }
+
+    public record HomeworkStatistics(
+            long homeworkId,
+            long courseId,
+            int totalStudentCount,
+            int submittedCount,
+            int unsubmittedCount,
+            int evaluatedCount,
+            int reviewedCount,
+            BigDecimal averageScore,
+            BigDecimal maxScore,
+            BigDecimal minScore,
+            List<Long> unsubmittedStudentIds
+    ) {
+    }
+
     private Homework findExisting(long homeworkId) {
         return repository.findById(homeworkId)
                 .filter(homework -> !homework.deleted())
@@ -228,6 +354,43 @@ public class HomeworkService {
     private void requireViewPermission(long courseId, long userId) {
         if (!coursePermissionClient.canViewCourse(courseId, userId)) {
             throw new HomeworkApiException("HWK_4031", "course access denied", HttpStatus.FORBIDDEN);
+        }
+    }
+
+    private boolean evaluationCompleted(HomeworkSubmission submission) {
+        return submission.evaluationStatus() != com.onlinejudge.common.evaluation.EvaluationStatus.NONE
+                && submission.evaluationStatus() != com.onlinejudge.common.evaluation.EvaluationStatus.PENDING
+                && submission.evaluationStatus() != com.onlinejudge.common.evaluation.EvaluationStatus.RUNNING;
+    }
+
+    private void publishScoreNotification(
+            Homework homework,
+            List<HomeworkSubmission> scoredSubmissions,
+            LocalDateTime occurredAt
+    ) {
+        List<Long> recipients = scoredSubmissions.stream()
+                .map(HomeworkSubmission::studentId)
+                .distinct()
+                .sorted()
+                .toList();
+        if (recipients.isEmpty()) {
+            return;
+        }
+        try {
+            notificationEventPublisher.publish(new NotificationEvent(
+                    "homework-score-published-" + homework.id() + "-" + occurredAt,
+                    "HOMEWORK_SCORE_PUBLISHED",
+                    homework.courseId(),
+                    recipients,
+                    "homework score published",
+                    "Homework score published: " + homework.title(),
+                    "HWK",
+                    homework.id(),
+                    "/courses/" + homework.courseId() + "/homeworks/" + homework.id(),
+                    occurredAt
+            ));
+        } catch (RuntimeException ex) {
+            log.warn("Failed to publish HOMEWORK_SCORE_PUBLISHED event for homework {}: {}", homework.id(), ex.toString());
         }
     }
 

@@ -125,6 +125,64 @@ describe('HomeworkTeacherView', () => {
     expect(wrapper.text()).toContain('关闭成功');
   });
 
+  it('loads homework statistics and publishes scores from the management table', async () => {
+    vi.mocked(homeworkApi.listHomeworks).mockResolvedValueOnce({
+      list: [homeworkSummary({ id: 9, title: 'Reviewed homework', status: 'PUBLISHED' })],
+      page: 1,
+      size: 20,
+      total: 1
+    });
+    vi.mocked(homeworkApi.getHomeworkStatistics).mockResolvedValueOnce({
+      homeworkId: 9,
+      courseId: 101,
+      totalStudentCount: 3,
+      submittedCount: 2,
+      unsubmittedCount: 1,
+      evaluatedCount: 2,
+      reviewedCount: 2,
+      averageScore: 70,
+      maxScore: 100,
+      minScore: 40,
+      unsubmittedStudentIds: [603]
+    });
+    vi.mocked(homeworkApi.publishHomeworkScores).mockResolvedValueOnce(homeworkDetail({
+      id: 9,
+      title: 'Reviewed homework',
+      status: 'SCORE_PUBLISHED'
+    }));
+    vi.mocked(homeworkApi.listHomeworks).mockResolvedValueOnce({
+      list: [homeworkSummary({ id: 9, title: 'Reviewed homework', status: 'SCORE_PUBLISHED' })],
+      page: 1,
+      size: 20,
+      total: 1
+    });
+
+    const wrapper = mount(HomeworkTeacherView, {
+      props: {
+        courseId: 101
+      }
+    });
+    await flushPromises();
+
+    expect(wrapper.findAll('option').map((option) => (option.element as HTMLOptionElement).value))
+      .toContain('SCORE_PUBLISHED');
+
+    await wrapper.get('[data-testid="homework-statistics-9"]').trigger('click');
+    await flushPromises();
+    expect(homeworkApi.getHomeworkStatistics).toHaveBeenCalledWith(9);
+    expect(wrapper.text()).toContain('Reviewed homework');
+    expect(wrapper.text()).toContain('70');
+    expect(wrapper.text()).toContain('603');
+
+    await wrapper.get('[data-testid="publish-homework-scores-9"]').trigger('click');
+    await flushPromises();
+    expect(homeworkApi.publishHomeworkScores).toHaveBeenCalledWith(9);
+    expect(homeworkApi.listHomeworks).toHaveBeenLastCalledWith(expect.objectContaining({
+      status: 'SCORE_PUBLISHED'
+    }));
+    expect(wrapper.text()).toContain('SCORE_PUBLISHED');
+  });
+
   it('loads a draft homework into the form and updates it', async () => {
     vi.mocked(homeworkApi.listHomeworks).mockResolvedValueOnce({
       list: [homeworkSummary({ id: 7, title: 'Draft homework', status: 'DRAFT' })],
