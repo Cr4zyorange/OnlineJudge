@@ -60,6 +60,9 @@ describe('NotificationCenterView', () => {
       size: 20
     }));
     expect(wrapper.text()).toContain('消息通知中心');
+    expect(wrapper.get('[data-testid="lrn-home-entry"]').attributes('href')).toBe('/');
+    expect(wrapper.text()).not.toContain('UI-LRN-04');
+    expect(wrapper.text()).not.toContain('API-LRN-06');
     expect(wrapper.text()).toContain('未读 1');
     expect(wrapper.text()).toContain('任务通知');
     expect(wrapper.text()).toContain('成绩通知');

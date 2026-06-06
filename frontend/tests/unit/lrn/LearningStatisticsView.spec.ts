@@ -52,6 +52,9 @@ describe('LearningStatisticsView', () => {
 
     expect(learningRecordsApi.getLearningStatistics).toHaveBeenCalledWith(undefined);
     expect(wrapper.text()).toContain('学习行为仪表盘');
+    expect(wrapper.get('[data-testid="lrn-home-entry"]').attributes('href')).toBe('/learning/tasks');
+    expect(wrapper.text()).not.toContain('UI-LRN-03');
+    expect(wrapper.text()).not.toContain('API-LRN-04');
     expect(wrapper.text()).toContain('7分钟');
     expect(wrapper.text()).toContain('3');
     expect(wrapper.text()).toContain('1');

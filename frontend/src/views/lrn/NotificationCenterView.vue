@@ -1,8 +1,12 @@
 <template>
   <main class="notification-center">
+    <nav class="notification-center__topbar" aria-label="页面导航">
+      <a class="notification-center__home" data-testid="lrn-home-entry" href="/" aria-label="返回主页面">
+        &lt;-
+      </a>
+    </nav>
     <section class="notification-center__shell">
       <aside class="notification-center__sidebar" aria-label="通知概览">
-        <p class="notification-center__eyebrow">UI-LRN-04</p>
         <h1>消息通知中心</h1>
         <p>按任务、成绩、公告和系统消息分类查看站内通知。</p>
         <dl class="notification-center__stats">
@@ -23,7 +27,6 @@
       <section class="notification-center__content" aria-label="通知列表">
         <header class="notification-center__header">
           <div>
-            <p class="notification-center__eyebrow">API-LRN-06</p>
             <h2>我的通知</h2>
           </div>
           <button type="button" class="notification-center__refresh" :disabled="loading" @click="loadNotifications">
@@ -296,6 +299,25 @@ function typeLabel(type: NotificationItem['type']) {
   padding: 24px;
 }
 
+.notification-center__topbar {
+  display: flex;
+  margin: 0 auto 18px;
+  max-width: 1280px;
+}
+
+.notification-center__home {
+  align-items: center;
+  background: #16423c;
+  border: 1px solid #16423c;
+  border-radius: 8px;
+  color: #ffffff;
+  display: inline-flex;
+  font-weight: 800;
+  min-height: 40px;
+  padding: 0 14px;
+  text-decoration: none;
+}
+
 .notification-center__shell {
   display: grid;
   gap: 24px;
@@ -333,7 +355,7 @@ function typeLabel(type: NotificationItem['type']) {
 
 .notification-center__sidebar p,
 .notification-card p {
-  color: #52615d;
+  color: #000;
   margin: 0;
 }
 
@@ -357,7 +379,7 @@ function typeLabel(type: NotificationItem['type']) {
 
 .notification-center__stats dt,
 .notification-card__meta dt {
-  color: #66756f;
+  color: #000;
   font-size: 13px;
 }
 

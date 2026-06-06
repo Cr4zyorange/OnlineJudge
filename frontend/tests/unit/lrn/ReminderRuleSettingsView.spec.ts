@@ -66,6 +66,9 @@ describe('ReminderRuleSettingsView', () => {
     await flushPromises();
 
     expect(wrapper.text()).toContain('提醒规则设置');
+    expect(wrapper.get('[data-testid="lrn-home-entry"]').attributes('href')).toBe('/learning/tasks');
+    expect(wrapper.text()).not.toContain('UI-LRN-05');
+    expect(wrapper.text()).not.toContain('API-LRN-10');
     expect(wrapper.text()).toContain('作业截止提醒');
     expect(wrapper.text()).toContain('提前 24 小时');
     expect(wrapper.text()).toContain('提前 1 小时');

@@ -1,5 +1,10 @@
 <template>
   <main class="task-center">
+    <nav class="task-center__topbar" aria-label="页面导航">
+      <a class="task-center__home" data-testid="lrn-home-entry" href="/" aria-label="返回主页面">
+        &lt;-
+      </a>
+    </nav>
     <section class="task-center__shell">
       <aside class="task-center__sidebar" aria-label="学习任务概览">
         <h1>学习任务中心</h1>
@@ -18,12 +23,25 @@
             <dd>{{ inProgressCount }}</dd>
           </div>
         </dl>
+        <nav class="task-center__quick-nav" aria-label="学习过程导航">
+          <a data-testid="learning-progress-entry" href="/learning/progress">
+            <i class="bi bi-graph-up-arrow"></i>
+            学习进度
+          </a>
+          <a data-testid="learning-statistics-entry" href="/learning/statistics">
+            <i class="bi bi-bar-chart-line"></i>
+            学习仪表盘
+          </a>
+          <a data-testid="learning-reminders-entry" href="/learning/reminders">
+            <i class="bi bi-alarm"></i>
+            提醒设置
+          </a>
+        </nav>
       </aside>
 
       <section class="task-center__content" aria-label="学习任务列表">
         <header class="task-center__header">
           <div>
-            <p class="task-center__eyebrow">UI-LRN-01</p>
             <h2>我的学习任务</h2>
           </div>
           <button type="button" class="task-center__refresh" :disabled="loading" @click="loadTasks">
@@ -236,6 +254,41 @@ function statusLabel(status: LearningTask['status']) {
   background-position: top center;
   background-repeat: no-repeat;
   background-attachment: fixed;
+  padding: 24px;
+}
+
+.task-center__topbar {
+  display: flex;
+  margin: 0 auto 18px;
+  max-width: 1280px;
+}
+
+.task-center__home {
+  align-items: center;
+  background: #16423c;
+  border: 1px solid #16423c;
+  border-radius: 8px;
+  color: #ffffff;
+  display: inline-flex;
+  font-weight: 800;
+  min-height: 40px;
+  padding: 0 14px;
+  text-decoration: none;
+}
+
+.task-center__quick-nav a {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 8px;
+  color: #16423c;
+  display: inline-flex;
+  font-weight: 800;
+  min-height: 40px;
+  padding: 0 14px;
+  text-decoration: none;
 }
 
 /* 以下所有布局代码 100% 原样保留，未改动任何结构 */
@@ -275,7 +328,7 @@ function statusLabel(status: LearningTask['status']) {
 
 .task-center__sidebar p,
 .task-card p {
-  color: #52615d;
+  color: #000;
   margin: 0;
 }
 
@@ -283,6 +336,17 @@ function statusLabel(status: LearningTask['status']) {
   display: grid;
   gap: 12px;
   margin: 0;
+}
+
+.task-center__quick-nav {
+  display: grid;
+  gap: 10px;
+}
+
+.task-center__quick-nav a {
+  gap: 8px;
+  justify-content: flex-start;
+  width: 100%;
 }
 
 /* 卡片强制生效透明（核心修复） */
@@ -301,7 +365,7 @@ function statusLabel(status: LearningTask['status']) {
 
 .task-center__stats dt,
 .task-card__meta dt {
-  color: #66756f;
+  color: #0a0b0b;
   font-size: 13px;
 }
 
@@ -312,9 +376,11 @@ function statusLabel(status: LearningTask['status']) {
 }
 
 .task-center__content {
-  display: grid;
-  gap: 18px;
-  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 30px 12px 16px;
+  align-self: start;
 }
 
 .task-center__header,
@@ -329,6 +395,21 @@ function statusLabel(status: LearningTask['status']) {
 
 .task-center__header {
   grid-template-columns: 1fr auto;
+  min-height: 0;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.task-center__header h2 {
+  line-height: 1;
+  margin: 0;
+}
+
+.task-center__refresh {
+  min-height: 40px;
+  min-width: 70px;
+  padding: 0 10px;
+
 }
 
 .task-center__eyebrow {
@@ -375,7 +456,7 @@ button,
   color: #ffffff;
   cursor: pointer;
   font-weight: 700;
-  padding: 0 14px;
+  padding: 0 16px;
   text-decoration: none;
 }
 
@@ -389,7 +470,7 @@ button:disabled {
   border: 1px dashed #b8c8c2;
   border-radius: 8px;
   margin: 0;
-  padding: 24px;
+  padding: 40px;
 }
 
 .task-center__state--error {
@@ -486,10 +567,6 @@ button:disabled {
 }
 
 @media (max-width: 980px) {
-  .task-center {
-    padding: 18px;
-  }
-
   .task-center__shell,
   .task-card {
     grid-template-columns: 1fr;
@@ -511,6 +588,10 @@ button:disabled {
 }
 
 @media (max-width: 620px) {
+  .task-center {
+    padding: 18px;
+  }
+
   .task-center__filters,
   .task-center__header,
   .task-card__meta {

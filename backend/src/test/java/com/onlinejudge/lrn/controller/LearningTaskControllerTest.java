@@ -116,6 +116,33 @@ class LearningTaskControllerTest {
     }
 
     @Test
+    void largeTaskListIsPagedAndSizeIsCappedForNfrPerformance() throws Exception {
+        LocalDateTime firstDeadline = LocalDateTime.now().plusHours(1);
+        for (int index = 0; index < 205; index++) {
+            insertTask(student.id(), 101L, "HWK", 9000L + index, "HOMEWORK", "Paged Homework " + index,
+                    firstDeadline.plusMinutes(index), 0, "IN_PROGRESS", "/courses/101/homeworks/" + (9000L + index));
+        }
+
+        mockMvc.perform(get("/api/v1/learning/tasks")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + student.token())
+                        .param("page", "3")
+                        .param("size", "50"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.total").value(209))
+                .andExpect(jsonPath("$.data.page").value(3))
+                .andExpect(jsonPath("$.data.size").value(50))
+                .andExpect(jsonPath("$.data.records", hasSize(50)));
+
+        mockMvc.perform(get("/api/v1/learning/tasks")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + student.token())
+                        .param("page", "1")
+                        .param("size", "500"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.size").value(100))
+                .andExpect(jsonPath("$.data.records", hasSize(100)));
+    }
+
+    @Test
     void studentCanFilterByTypeStatusCourseAndSortByDeadlineDescending() throws Exception {
         mockMvc.perform(get("/api/v1/learning/tasks")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + student.token())

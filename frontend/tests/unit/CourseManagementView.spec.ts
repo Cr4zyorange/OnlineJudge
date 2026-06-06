@@ -198,7 +198,7 @@ describe('CourseManagementView', () => {
     expect(fetchMock.mock.calls.some(([url]) => String(url).includes('/home-summary'))).toBe(false);
   });
 
-  it('exposes only the learning progress entry in the glass style sidebar', async () => {
+  it('keeps LRN secondary entries out of the course sidebar', async () => {
     const page = (list = [course], total = list.length) => ({
       code: '0',
       message: 'success',
@@ -213,11 +213,11 @@ describe('CourseManagementView', () => {
     const wrapper = mount(CourseManagementView);
     await flushPromises();
 
-    expect(wrapper.find('a[data-testid="learning-task-center-entry"]').exists()).toBe(false);
-    const progressEntry = wrapper.get('a[data-testid="learning-progress-entry"]');
-    expect(progressEntry.attributes('href')).toBe('/learning/progress');
-    expect(progressEntry.classes()).toContain('menu-button');
-    expect(progressEntry.text()).toContain('学习进度');
+    expect(wrapper.find('a[data-testid="learning-progress-entry"]').exists()).toBe(false);
+    expect(wrapper.find('a[data-testid="learning-statistics-entry"]').exists()).toBe(false);
+    expect(wrapper.find('a[data-testid="learning-reminders-entry"]').exists()).toBe(false);
+    const learningTaskLink = wrapper.findAll('.navbar-menu a').find((link) => link.text().includes('学习任务'));
+    expect(learningTaskLink?.attributes('href')).toBe('/learning/tasks');
   });
 
   it('loads the mine course scope from the all courses sidebar entry', async () => {

@@ -49,21 +49,6 @@
               <i class="bi bi-archive"></i> 归档记录
             </button>
           </li>
-          <li>
-            <a class="menu-button" data-testid="learning-progress-entry" href="/learning/progress">
-              <i class="bi bi-graph-up-arrow"></i> 学习进度
-            </a>
-          </li>
-          <li>
-            <a class="menu-button" data-testid="learning-statistics-entry" href="/learning/statistics">
-              <i class="bi bi-bar-chart-line"></i> 学习仪表盘
-            </a>
-          </li>
-          <li>
-            <a class="menu-button" data-testid="learning-reminders-entry" href="/learning/reminders">
-              <i class="bi bi-alarm"></i> 提醒设置
-            </a>
-          </li>
         </ul>
 
         <div class="sidebar-card">
