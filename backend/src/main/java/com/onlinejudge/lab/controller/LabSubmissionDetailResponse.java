@@ -23,7 +23,8 @@ public record LabSubmissionDetailResponse(
         boolean hasFile,
         String code,
         String fileId,
-        LabReportResponse latestReport
+        LabReportResponse latestReport,
+        LabScoreResponse latestScore
 ) {
     public static LabSubmissionDetailResponse from(LabSubmissionDetailView detail) {
         return new LabSubmissionDetailResponse(
@@ -43,7 +44,8 @@ public record LabSubmissionDetailResponse(
                 detail.hasFile(),
                 detail.code(),
                 detail.fileId(),
-                detail.latestReport() == null ? null : LabReportResponse.from(detail.latestReport())
+                detail.latestReport() == null ? null : LabReportResponse.from(detail.latestReport()),
+                detail.latestScore() == null ? null : LabScoreResponse.from(detail.latestScore())
         );
     }
 }

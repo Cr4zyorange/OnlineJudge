@@ -762,10 +762,118 @@ describe('LabStudentView', () => {
     expect(URL.createObjectURL).toHaveBeenCalledWith(reportBlob);
     expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:report-v1');
   });
+
+  it('shows the latest teacher score and feedback beside evaluation results', async () => {
+    vi.mocked(labApi.getLabDetail).mockResolvedValueOnce({
+      id: 14,
+      courseId: 101,
+      chapterId: null,
+      title: '实验十四',
+      description: '评分结果展示',
+      status: 'PUBLISHED',
+      deadline: '2026-06-30T23:59:59',
+      maxScore: 100,
+      attachmentIds: [],
+      allowedLanguages: 'python',
+      evaluationMode: 'DOCKER_IO',
+      autoEvaluate: true,
+      reportRequired: true,
+      timeLimitMs: 60000,
+      memoryLimitKb: 262144,
+      deleted: false,
+      testcases: []
+    });
+    vi.mocked(labApi.listLabSubmissions).mockResolvedValueOnce([
+      {
+        submissionId: 140,
+        labId: 14,
+        studentId: 601,
+        language: 'python',
+        submitStatus: 'SUBMITTED',
+        evaluationStatus: 'ACCEPTED',
+        autoScore: 88,
+        finalScore: 95,
+        version: 3,
+        submittedAt: '2026-06-01T12:00:00',
+        isLatest: true,
+        isFinal: true,
+        isScoringBasis: true,
+        hasFile: false
+      }
+    ]);
+    vi.mocked(labApi.getLabSubmissionResult).mockResolvedValueOnce({
+      submissionId: 140,
+      evaluationStatus: 'ACCEPTED',
+      score: 88,
+      passedCases: 2,
+      totalCases: 2,
+      message: '全部用例通过',
+      caseResults: [],
+      submittedAt: '2026-06-01T12:00:00',
+      finishedAt: '2026-06-01T12:00:03'
+    });
+    vi.mocked(labApi.getLabSubmissionDetail).mockResolvedValueOnce({
+      submissionId: 140,
+      labId: 14,
+      studentId: 601,
+      language: 'python',
+      submitStatus: 'SUBMITTED',
+      evaluationStatus: 'ACCEPTED',
+      autoScore: 88,
+      finalScore: 95,
+      version: 3,
+      submittedAt: '2026-06-01T12:00:00',
+      isLatest: true,
+      isFinal: true,
+      isScoringBasis: true,
+      hasFile: false,
+      code: "print('graded')",
+      fileId: null,
+      latestReport: {
+        reportId: 814,
+        submissionId: 140,
+        fileName: 'report-v3.pdf',
+        fileType: 'PDF',
+        fileSize: 2048,
+        version: 3,
+        score: 30,
+        comment: '报告结构完整',
+        submittedAt: '2026-06-01T12:10:00',
+        downloadUrl: '/api/v1/labs/14/reports/814/download'
+      },
+      latestScore: {
+        submissionId: 140,
+        reportId: 814,
+        autoScore: 88,
+        reportScore: 30,
+        manualScore: 92,
+        finalScore: 95,
+        comment: '整体实现稳定',
+        hasChangeLogs: true,
+        scoredAt: '2026-06-01T13:00:00',
+        updatedAt: '2026-06-01T13:20:00'
+      }
+    });
+
+    const wrapper = mount(LabStudentView, {
+      props: {
+        courseId: 101,
+        labId: 14
+      }
+    });
+    await flushPromises();
+
+    expect(wrapper.text()).toContain('最终得分：95');
+    expect(wrapper.text()).toContain('人工评分：92');
+    expect(wrapper.text()).toContain('报告评分：30');
+    expect(wrapper.text()).toContain('教师评语：整体实现稳定');
+    expect(wrapper.text()).toContain('评分已更新');
+    expect(wrapper.text()).toContain('报告评语：报告结构完整');
+  });
 });
 
 async function flushPromises() {
-  for (let tick = 0; tick < 6; tick += 1) {
+  for (let tick = 0; tick < 12; tick += 1) {
     await Promise.resolve();
   }
 }

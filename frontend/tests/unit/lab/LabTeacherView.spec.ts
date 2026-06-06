@@ -2,15 +2,18 @@ import { mount } from '@vue/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import LabTeacherView from '../../../src/views/lab/LabTeacherView.vue';
 import * as labApi from '../../../src/api/lab/labs';
+import type { LabScoreSummary, LabSubmissionDetail } from '../../../src/types/lab';
 
 const downloadLabReportMock = vi.hoisted(() => vi.fn());
+const scoreLabSubmissionMock = vi.hoisted(() => vi.fn());
 
 vi.mock('../../../src/api/lab/labs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../src/api/lab/labs')>();
   const mockedEntries = Object.fromEntries(Object.keys(actual).map((key) => [key, vi.fn()]));
   return {
     ...mockedEntries,
-    downloadLabReport: downloadLabReportMock
+    downloadLabReport: downloadLabReportMock,
+    scoreLabSubmission: scoreLabSubmissionMock
   };
 });
 
@@ -664,9 +667,238 @@ describe('LabTeacherView', () => {
     expect(wrapper.text()).toContain('报告评语：报告完整');
     expect(wrapper.text()).toContain('报告评分已保存');
   });
+
+  it('shows persisted submission scoring data and saves rescoring changes', async () => {
+    vi.mocked(labApi.listLabs).mockResolvedValueOnce([
+      {
+        id: 12,
+        courseId: 101,
+        title: '实验十二',
+        status: 'PUBLISHED',
+        deadline: '2026-06-25T23:59:59',
+        maxScore: 100,
+        evaluationMode: 'DOCKER_IO',
+        autoEvaluate: true,
+        reportRequired: true,
+        deleted: false
+      }
+    ]);
+    vi.mocked(labApi.listLabSubmissions).mockResolvedValueOnce([
+      {
+        submissionId: 301,
+        labId: 12,
+        studentId: 602,
+        language: 'python',
+        submitStatus: 'SUBMITTED',
+        evaluationStatus: 'ACCEPTED',
+        autoScore: 88,
+        finalScore: 95,
+        version: 2,
+        submittedAt: '2026-06-26T00:10:00',
+        isLatest: true,
+        isFinal: true,
+        isScoringBasis: true,
+        hasFile: true
+      }
+    ]);
+    vi.mocked(labApi.getLabSubmissionDetail).mockResolvedValueOnce({
+      submissionId: 301,
+      labId: 12,
+      studentId: 602,
+      language: 'python',
+      submitStatus: 'SUBMITTED',
+      evaluationStatus: 'ACCEPTED',
+      autoScore: 88,
+      finalScore: 95,
+      version: 2,
+      submittedAt: '2026-06-26T00:10:00',
+      isLatest: true,
+      isFinal: true,
+      isScoringBasis: true,
+      hasFile: true,
+      code: "print('teacher detail')",
+      fileId: 'file-301',
+      latestReport: {
+        reportId: 901,
+        submissionId: 301,
+        fileName: 'report-v2.pdf',
+        fileType: 'PDF',
+        fileSize: 4096,
+        version: 2,
+        score: 30,
+        comment: '报告完整',
+        submittedAt: '2026-06-26T00:20:00',
+        downloadUrl: '/api/v1/labs/12/reports/901/download'
+      },
+      latestScore: {
+        submissionId: 301,
+        reportId: 901,
+        autoScore: 88,
+        reportScore: 30,
+        manualScore: 92,
+        finalScore: 95,
+        comment: '整体实现稳定',
+        hasChangeLogs: false,
+        scoredAt: '2026-06-26T01:00:00',
+        updatedAt: '2026-06-26T01:00:00'
+      }
+    });
+    vi.mocked(scoreLabSubmissionMock).mockResolvedValueOnce({
+      submissionId: 301,
+      reportId: 901,
+      autoScore: 88,
+      reportScore: 35,
+      manualScore: 94,
+      finalScore: 97,
+      comment: '补充修正后通过',
+      hasChangeLogs: true,
+      scoredAt: '2026-06-26T01:00:00',
+      updatedAt: '2026-06-26T01:30:00'
+    });
+
+    const wrapper = mount(LabTeacherView, {
+      props: {
+        courseId: 101
+      }
+    });
+    await flushPromises();
+
+    await wrapper.findAll('button').find((button) => button.text() === '查看提交')?.trigger('click');
+    await flushPromises();
+    await wrapper.get('[data-submission-id="301"] button').trigger('click');
+    await flushPromises();
+
+    expect(wrapper.text()).toContain('自动得分：88');
+    expect(wrapper.text()).toContain('人工评分：92');
+    expect(wrapper.text()).toContain('报告评分：30');
+    expect(wrapper.text()).toContain('教师评语：整体实现稳定');
+
+    await wrapper.get('[name="manualScore"]').setValue('94');
+    await wrapper.get('[name="submissionReportScore"]').setValue('35');
+    await wrapper.get('[name="finalScore"]').setValue('97');
+    await wrapper.get('[name="scoreComment"]').setValue('补充修正后通过');
+    await wrapper.get('[name="changeReason"]').setValue('核对评分标准后修正');
+    await wrapper.get('[data-action="score-submission"]').trigger('click');
+    await flushPromises();
+
+    expect(vi.mocked(scoreLabSubmissionMock)).toHaveBeenCalledWith(12, 301, {
+      manualScore: 94,
+      reportScore: 35,
+      finalScore: 97,
+      comment: '补充修正后通过',
+      changeReason: '核对评分标准后修正'
+    });
+    expect(wrapper.text()).toContain('最终得分：97');
+    expect(wrapper.text()).toContain('评分留痕：已记录');
+    expect(wrapper.text()).toContain('提交评分已保存');
+  });
+
+  it('blocks submission score saving when required score fields are empty', async () => {
+    const wrapper = await mountTeacherWithSubmissionDetail();
+
+    await wrapper.get('[name="manualScore"]').setValue('');
+    await wrapper.get('[name="finalScore"]').setValue('');
+    await wrapper.get('[data-action="score-submission"]').trigger('click');
+    await flushPromises();
+
+    expect(vi.mocked(scoreLabSubmissionMock)).not.toHaveBeenCalled();
+    expect(wrapper.text()).toContain('人工评分不能为空');
+    expect(wrapper.text()).not.toContain('提交评分已保存');
+  });
+
+  it('keeps invalid submission score input as page feedback instead of throwing', async () => {
+    const wrapper = await mountTeacherWithSubmissionDetail();
+
+    await wrapper.get('[name="manualScore"]').setValue('-1');
+    await wrapper.get('[data-action="score-submission"]').trigger('click');
+    await flushPromises();
+
+    expect(vi.mocked(scoreLabSubmissionMock)).not.toHaveBeenCalled();
+    expect(wrapper.text()).toContain('人工评分不能为负数');
+  });
 });
 
 async function flushPromises() {
   await Promise.resolve();
   await Promise.resolve();
+}
+
+async function mountTeacherWithSubmissionDetail(detailOverrides: Partial<LabSubmissionDetail> = {}) {
+  vi.mocked(labApi.listLabs).mockResolvedValueOnce([
+    {
+      id: 12,
+      courseId: 101,
+      title: '实验十二',
+      status: 'PUBLISHED',
+      deadline: '2026-06-25T23:59:59',
+      maxScore: 100,
+      evaluationMode: 'DOCKER_IO',
+      autoEvaluate: true,
+      reportRequired: true,
+      deleted: false
+    }
+  ]);
+  vi.mocked(labApi.listLabSubmissions).mockResolvedValueOnce([
+    {
+      submissionId: 301,
+      labId: 12,
+      studentId: 602,
+      language: 'python',
+      submitStatus: 'SUBMITTED',
+      evaluationStatus: 'ACCEPTED',
+      autoScore: 88,
+      finalScore: 90,
+      version: 2,
+      submittedAt: '2026-06-26T00:10:00',
+      isLatest: true,
+      isFinal: true,
+      isScoringBasis: true,
+      hasFile: true
+    }
+  ]);
+  vi.mocked(labApi.getLabSubmissionDetail).mockResolvedValueOnce({
+    submissionId: 301,
+    labId: 12,
+    studentId: 602,
+    language: 'python',
+    submitStatus: 'SUBMITTED',
+    evaluationStatus: 'ACCEPTED',
+    autoScore: 88,
+    finalScore: 90,
+    version: 2,
+    submittedAt: '2026-06-26T00:10:00',
+    isLatest: true,
+    isFinal: true,
+    isScoringBasis: true,
+    hasFile: true,
+    code: "print('teacher detail')",
+    fileId: 'file-301',
+    latestReport: {
+      reportId: 901,
+      submissionId: 301,
+      fileName: 'report-v2.pdf',
+      fileType: 'PDF',
+      fileSize: 4096,
+      version: 2,
+      score: 30,
+      comment: '报告完整',
+      submittedAt: '2026-06-26T00:20:00',
+      downloadUrl: '/api/v1/labs/12/reports/901/download'
+    },
+    ...detailOverrides
+  });
+
+  const wrapper = mount(LabTeacherView, {
+    props: {
+      courseId: 101
+    }
+  });
+  await flushPromises();
+
+  await wrapper.findAll('button').find((button) => button.text() === '查看提交')?.trigger('click');
+  await flushPromises();
+  await wrapper.get('[data-submission-id="301"] button').trigger('click');
+  await flushPromises();
+
+  return wrapper;
 }

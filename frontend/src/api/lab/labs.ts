@@ -3,6 +3,8 @@ import type {
   LabReportScorePayload,
   LabReportUploadPayload,
   LabReportSummary,
+  LabScorePayload,
+  LabScoreSummary,
   LabSubmissionResult,
   LabSubmissionDetail,
   LabSubmissionHistoryItem,
@@ -151,6 +153,17 @@ export async function scoreLabReport(
 ): Promise<LabReportSummary> {
   return request<LabReportSummary>(`/api/v1/labs/${labId}/reports/${reportId}/score`, {
     method: 'PUT',
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function scoreLabSubmission(
+  labId: number,
+  submissionId: number,
+  payload: LabScorePayload
+): Promise<LabScoreSummary> {
+  return request<LabScoreSummary>(`/api/v1/labs/${labId}/submissions/${submissionId}/score`, {
+    method: 'POST',
     body: JSON.stringify(payload)
   });
 }

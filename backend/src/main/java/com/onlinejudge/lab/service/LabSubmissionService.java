@@ -69,6 +69,7 @@ public class LabSubmissionService {
     private final LabEvaluationResultRepository labEvaluationResultRepository;
     private final LabEvaluationService labEvaluationService;
     private final LabReportService labReportService;
+    private final LabScoreService labScoreService;
     private final CoursePermissionClient coursePermissionClient;
     private final FileStorageService fileStorageService;
 
@@ -79,6 +80,7 @@ public class LabSubmissionService {
             LabEvaluationResultRepository labEvaluationResultRepository,
             LabEvaluationService labEvaluationService,
             LabReportService labReportService,
+            LabScoreService labScoreService,
             CoursePermissionClient coursePermissionClient,
             FileStorageService fileStorageService
     ) {
@@ -87,6 +89,7 @@ public class LabSubmissionService {
         this.labEvaluationRepository = labEvaluationRepository;
         this.labEvaluationService = labEvaluationService;
         this.labReportService = labReportService;
+        this.labScoreService = labScoreService;
         this.coursePermissionClient = coursePermissionClient;
         this.fileStorageService = fileStorageService;
         this.labEvaluationResultRepository = labEvaluationResultRepository;
@@ -137,7 +140,11 @@ public class LabSubmissionService {
         );
 
         LabSubmission savedSubmission = labSubmissionRepository.save(submission);
-        if (!experiment.autoEvaluate() || experiment.testcases().isEmpty()) {
+        if (!experiment.autoEvaluate()) {
+            return savedSubmission;
+        }
+        if (experiment.testcases().isEmpty()) {
+            finalizeEmptyAutoEvaluation(savedSubmission, now);
             return savedSubmission;
         }
         markSubmissionPendingEvaluation(savedSubmission, experiment.testcases().size(), now);
@@ -478,6 +485,8 @@ public class LabSubmissionService {
     ) {
         LabReportSummaryView latestReport = labReportService.findLatestReportForSubmission(submission.id())
                 .orElse(null);
+        var latestScore = labScoreService.findLatestScore(submission.id())
+                .orElse(null);
         return new LabSubmissionDetailView(
                 submission.id(),
                 submission.labId(),
@@ -495,7 +504,8 @@ public class LabSubmissionService {
                 hasFile(submission.fileId()),
                 submission.codeContent(),
                 submission.fileId(),
-                latestReport
+                latestReport,
+                latestScore
         );
     }
 
@@ -555,6 +565,27 @@ public class LabSubmissionService {
                 null,
                 now,
                 null,
+                now,
+                now
+        ));
+    }
+
+    private void finalizeEmptyAutoEvaluation(LabSubmission submission, LocalDateTime now) {
+        labSubmissionRepository.update(submission.withEvaluationResult(EvaluationStatus.ACCEPTED, 100, submission.finalScore(), now));
+        labEvaluationRepository.save(new LabEvaluation(
+                0L,
+                submission.id(),
+                EvaluationStatus.ACCEPTED,
+                100,
+                0,
+                0,
+                0,
+                null,
+                "全部用例通过",
+                null,
+                null,
+                now,
+                now,
                 now,
                 now
         ));

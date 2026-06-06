@@ -27,7 +27,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 @Sql(scripts = {
         "file:../database/migrations/20260525_02_create_lab_experiment.sql",
         "file:../database/migrations/20260526_01_create_lab_submission.sql",
-        "file:../database/migrations/20260604_01_create_lab_report.sql"
+        "file:../database/migrations/20260604_01_create_lab_report.sql",
+        "file:../database/migrations/20260605_02_create_lab_score.sql"
 })
 class LabExperimentMigrationTest {
     private final LabExperimentRepository repository;
@@ -232,5 +233,119 @@ class LabExperimentMigrationTest {
         assertThat(reportCount).isEqualTo(1);
         assertThat(storedVersion).isEqualTo(1);
         assertThat(storedType).isEqualTo("PDF");
+    }
+
+    @Test
+    void migrationSupportsPersistingSubmissionScoresAndChangeLogs() {
+        LocalDateTime now = LocalDateTime.now();
+        LabExperiment saved = repository.save(new LabExperiment(
+                0L,
+                404L,
+                null,
+                "评分实验",
+                "验证评分与留痕迁移",
+                LabExperimentStatus.PUBLISHED,
+                now.plusDays(7),
+                100,
+                List.of(),
+                "python",
+                LabEvaluationMode.DOCKER_IO,
+                true,
+                true,
+                60000,
+                262144,
+                501L,
+                false,
+                now,
+                now,
+                List.of()
+        ));
+
+        jdbcTemplate.update(
+                """
+                INSERT INTO lab_submission
+                    (lab_id, student_id, code_content, file_id, language, submit_status, evaluation_status,
+                     final_score, auto_score, version, is_final, submitted_at, created_at, updated_at, deleted)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                saved.id(),
+                601L,
+                "print('lab score')",
+                null,
+                "python",
+                "SUBMITTED",
+                "ACCEPTED",
+                95,
+                100,
+                1,
+                true,
+                java.sql.Timestamp.valueOf(now),
+                java.sql.Timestamp.valueOf(now),
+                java.sql.Timestamp.valueOf(now),
+                false
+        );
+        Long submissionId = jdbcTemplate.queryForObject(
+                "SELECT id FROM lab_submission WHERE lab_id = ? AND student_id = ?",
+                Long.class,
+                saved.id(),
+                601L
+        );
+
+        jdbcTemplate.update(
+                """
+                INSERT INTO lab_score
+                    (submission_id, report_id, teacher_id, auto_score, report_score, manual_score, final_score, comment, scored_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                submissionId,
+                null,
+                501L,
+                100,
+                null,
+                92,
+                95,
+                "评分完成",
+                java.sql.Timestamp.valueOf(now.plusHours(1)),
+                java.sql.Timestamp.valueOf(now.plusHours(1))
+        );
+        Long scoreId = jdbcTemplate.queryForObject(
+                "SELECT id FROM lab_score WHERE submission_id = ?",
+                Long.class,
+                submissionId
+        );
+
+        jdbcTemplate.update(
+                """
+                INSERT INTO lab_score_change_log
+                    (score_id, old_final_score, new_final_score, reason, operator_id, created_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                scoreId,
+                90,
+                95,
+                "核对评分标准后修正",
+                501L,
+                java.sql.Timestamp.valueOf(now.plusHours(2))
+        );
+
+        Integer scoreCount = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM lab_score WHERE submission_id = ?",
+                Integer.class,
+                submissionId
+        );
+        Integer changeLogCount = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM lab_score_change_log WHERE score_id = ?",
+                Integer.class,
+                scoreId
+        );
+        Integer finalScore = jdbcTemplate.queryForObject(
+                "SELECT final_score FROM lab_score WHERE id = ?",
+                Integer.class,
+                scoreId
+        );
+
+        assertThat(scoreCount).isEqualTo(1);
+        assertThat(changeLogCount).isEqualTo(1);
+        assertThat(finalScore).isEqualTo(95);
     }
 }

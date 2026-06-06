@@ -262,6 +262,55 @@
               <span v-if="getSubmissionFlags(submissionDetail).length === 0">无版本标识</span>
             </div>
             <p>文件标识：{{ submissionDetail.fileId ?? '无' }}</p>
+            <section class="labs__submission-score" aria-label="教师评分">
+              <h4>教师评分</h4>
+              <p>自动得分：{{ formatScore(submissionDetail.latestScore?.autoScore ?? submissionDetail.autoScore) }}</p>
+              <p>人工评分：{{ formatScore(submissionDetail.latestScore?.manualScore) }}</p>
+              <p>报告评分：{{ formatScore(submissionDetail.latestScore?.reportScore ?? submissionDetail.latestReport?.score) }}</p>
+              <p>最终得分：{{ formatScore(submissionDetail.latestScore?.finalScore ?? submissionDetail.finalScore) }}</p>
+              <p>教师评语：{{ submissionDetail.latestScore?.comment ?? '暂无评语' }}</p>
+              <p>评分留痕：{{ submissionDetail.latestScore?.hasChangeLogs ? '已记录' : '暂无' }}</p>
+              <form class="labs__submission-score-form" @submit.prevent="saveSubmissionScore">
+                <label>
+                  <span>人工评分</span>
+                  <input v-model="submissionScoreForm.manualScore" name="manualScore" type="number" min="0" />
+                </label>
+                <label>
+                  <span>报告评分</span>
+                  <input
+                    v-model="submissionScoreForm.reportScore"
+                    name="submissionReportScore"
+                    type="number"
+                    min="0"
+                  />
+                </label>
+                <label>
+                  <span>最终得分</span>
+                  <input v-model="submissionScoreForm.finalScore" name="finalScore" type="number" min="0" />
+                </label>
+                <label class="labs__wide">
+                  <span>教师评语</span>
+                  <textarea v-model="submissionScoreForm.comment" name="scoreComment" rows="3" />
+                </label>
+                <label class="labs__wide">
+                  <span>修改原因</span>
+                  <textarea
+                    v-model="submissionScoreForm.changeReason"
+                    name="changeReason"
+                    rows="2"
+                    placeholder="修改已评分记录时必须填写"
+                  />
+                </label>
+                <button
+                  data-action="score-submission"
+                  type="button"
+                  :disabled="submissionScoreSaving"
+                  @click="saveSubmissionScore"
+                >
+                  保存提交评分
+                </button>
+              </form>
+            </section>
             <template v-if="submissionDetail.latestReport">
               <div class="labs__report-detail">
                 <p>报告版本：{{ submissionDetail.latestReport.version }}</p>
@@ -311,6 +360,7 @@ import {
   listLabSubmissions,
   listLabs,
   publishLab,
+  scoreLabSubmission,
   scoreLabReport,
   updateLab
 } from '../../api/lab/labs';
@@ -347,6 +397,7 @@ const submissionDetailLoading = ref(false);
 const submissionDetailErrorMessage = ref('');
 const submissionDetailFeedbackMessage = ref('');
 const reportScoreSaving = ref(false);
+const submissionScoreSaving = ref(false);
 const submissionFilters = reactive({
   studentId: '',
   submitStatus: '',
@@ -356,6 +407,13 @@ const submissionFilters = reactive({
 const reportScoreForm = reactive({
   score: '',
   comment: ''
+});
+const submissionScoreForm = reactive({
+  manualScore: '',
+  reportScore: '',
+  finalScore: '',
+  comment: '',
+  changeReason: ''
 });
 
 const form = reactive({
@@ -520,6 +578,7 @@ async function openSubmissionDetail(submissionId: number) {
   try {
     submissionDetail.value = await getLabSubmissionDetail(selectedSubmissionLabId.value, submissionId);
     syncReportScoreForm();
+    syncSubmissionScoreForm();
   } catch (error) {
     submissionDetailErrorMessage.value = error instanceof Error ? error.message : '提交详情加载失败';
   } finally {
@@ -554,11 +613,79 @@ async function saveReportScore() {
       latestReport: updatedReport
     };
     syncReportScoreForm();
+    syncSubmissionScoreForm();
     submissionDetailFeedbackMessage.value = '报告评分已保存';
   } catch (error) {
     submissionDetailErrorMessage.value = error instanceof Error ? error.message : '报告评分保存失败';
   } finally {
     reportScoreSaving.value = false;
+  }
+}
+
+async function saveSubmissionScore() {
+  if (selectedSubmissionLabId.value === null || submissionDetail.value === null) {
+    return;
+  }
+
+  const currentDetail = submissionDetail.value;
+  let manualScore: number;
+  let reportScore: number | null;
+  let finalScore: number;
+  try {
+    manualScore = parseScoreInput(submissionScoreForm.manualScore, '人工评分');
+    reportScore = parseOptionalScoreInput(submissionScoreForm.reportScore, '报告评分');
+    finalScore = parseScoreInput(submissionScoreForm.finalScore, '最终得分');
+  } catch (error) {
+    submissionDetailErrorMessage.value = error instanceof Error ? error.message : '提交评分保存失败';
+    submissionDetailFeedbackMessage.value = '';
+    return;
+  }
+  const comment = normalizeText(submissionScoreForm.comment);
+  const changeReason = normalizeText(submissionScoreForm.changeReason);
+  const existingScore = currentDetail.latestScore;
+  const changed = existingScore === undefined || existingScore === null
+    ? true
+    : manualScore !== existingScore.manualScore
+      || reportScore !== existingScore.reportScore
+      || finalScore !== existingScore.finalScore
+      || comment !== existingScore.comment;
+
+  if (existingScore && changed && !changeReason) {
+    submissionDetailErrorMessage.value = '修改已评分记录时必须填写修改原因';
+    return;
+  }
+
+  submissionScoreSaving.value = true;
+  submissionDetailErrorMessage.value = '';
+  submissionDetailFeedbackMessage.value = '';
+  try {
+    const updatedScore = await scoreLabSubmission(selectedSubmissionLabId.value, currentDetail.submissionId, {
+      manualScore,
+      reportScore,
+      finalScore,
+      comment,
+      changeReason
+    });
+    submissionDetail.value = {
+      ...currentDetail,
+      finalScore: updatedScore.finalScore,
+      latestReport: updateReportScoreSummary(currentDetail.latestReport, updatedScore.reportScore),
+      latestScore: updatedScore
+    };
+    submissions.value = submissions.value.map((item) => item.submissionId === currentDetail.submissionId
+      ? {
+          ...item,
+          finalScore: updatedScore.finalScore,
+          autoScore: updatedScore.autoScore
+        }
+      : item);
+    syncReportScoreForm();
+    syncSubmissionScoreForm();
+    submissionDetailFeedbackMessage.value = '提交评分已保存';
+  } catch (error) {
+    submissionDetailErrorMessage.value = error instanceof Error ? error.message : '提交评分保存失败';
+  } finally {
+    submissionScoreSaving.value = false;
   }
 }
 
@@ -589,6 +716,24 @@ function syncReportScoreForm() {
   const latestReport = submissionDetail.value?.latestReport;
   reportScoreForm.score = latestReport?.score == null ? '' : String(latestReport.score);
   reportScoreForm.comment = latestReport?.comment ?? '';
+}
+
+function syncSubmissionScoreForm() {
+  const latestScore = submissionDetail.value?.latestScore;
+  const latestReport = submissionDetail.value?.latestReport;
+  submissionScoreForm.manualScore = latestScore?.manualScore == null ? '' : String(latestScore.manualScore);
+  submissionScoreForm.reportScore = latestScore?.reportScore != null
+    ? String(latestScore.reportScore)
+    : latestReport?.score == null
+      ? ''
+      : String(latestReport.score);
+  submissionScoreForm.finalScore = latestScore?.finalScore != null
+    ? String(latestScore.finalScore)
+    : submissionDetail.value?.finalScore == null
+      ? ''
+      : String(submissionDetail.value.finalScore);
+  submissionScoreForm.comment = latestScore?.comment ?? '';
+  submissionScoreForm.changeReason = '';
 }
 
 function addTestcase() {
@@ -752,6 +897,49 @@ function getSubmissionFlags(submission: Pick<LabSubmissionHistoryItem, 'isLatest
   return flags;
 }
 
+function parseScoreInput(value: string, label: string) {
+  const normalized = String(value ?? '').trim();
+  if (!normalized) {
+    throw new Error(`${label}不能为空`);
+  }
+  const score = Number(normalized);
+  if (!Number.isFinite(score) || score < 0) {
+    throw new Error(`${label}不能为负数`);
+  }
+  return score;
+}
+
+function parseOptionalScoreInput(value: string, label: string) {
+  const normalized = String(value ?? '').trim();
+  if (!normalized) {
+    return null;
+  }
+  const score = Number(normalized);
+  if (!Number.isFinite(score) || score < 0) {
+    throw new Error(`${label}不能为负数`);
+  }
+  return score;
+}
+
+function normalizeText(value: string) {
+  const normalized = value.trim();
+  return normalized ? normalized : null;
+}
+
+function updateReportScoreSummary(report: LabSubmissionDetail['latestReport'], reportScore: number | null) {
+  if (!report || reportScore === null) {
+    return report;
+  }
+  return {
+    ...report,
+    score: reportScore
+  };
+}
+
+function formatScore(value: number | null | undefined) {
+  return value ?? '未生成';
+}
+
 function collectActiveTestcases(): LabTestcasePayload[] {
   return form.testcases
     .map((testcase, index) => ({
@@ -864,6 +1052,12 @@ function formatDeadline(value: string) {
 .labs__report-detail {
   display: grid;
   gap: 6px;
+}
+
+.labs__submission-score,
+.labs__submission-score-form {
+  display: grid;
+  gap: 8px;
 }
 
 .labs__submission-flags {
