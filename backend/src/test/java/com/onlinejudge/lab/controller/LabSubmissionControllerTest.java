@@ -1,6 +1,8 @@
 package com.onlinejudge.lab.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.onlinejudge.integration.grade.SourceGradeClient;
+import com.onlinejudge.integration.grade.SourceGradeType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -11,6 +13,7 @@ import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -48,6 +51,9 @@ class LabSubmissionControllerTest {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private SourceGradeClient sourceGradeClient;
 
     @BeforeEach
     void cleanTables() {
@@ -1038,6 +1044,150 @@ class LabSubmissionControllerTest {
                         ))))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("LAB-404-01"));
+    }
+
+    @Test
+    void studentResultViewHidesTeacherScoreUntilLabScoresAreReleased() throws Exception {
+        long labId = createPublishedLab(
+                528L,
+                true,
+                LocalDateTime.now().plusDays(3),
+                List.of(Map.of(
+                        "input", "1 2",
+                        "expectedOutput", "sum:3",
+                        "scoreWeight", 40,
+                        "public", true,
+                        "timeLimitMs", 1000,
+                        "memoryLimitKb", 65536,
+                        "orderNum", 1
+                ), Map.of(
+                        "input", "2 3",
+                        "expectedOutput", "sum:5",
+                        "scoreWeight", 60,
+                        "public", false,
+                        "timeLimitMs", 1000,
+                        "memoryLimitKb", 65536,
+                        "orderNum", 2
+                ))
+        );
+        long submissionId = createCodeSubmission(labId, 601L, "528", """
+                first, second = map(int, input().split())
+                print(f"sum:{first + second}")
+                """, "python");
+        waitForEvaluationStatus(labId, submissionId, teacherHeaders("528", "528", "601"), "ACCEPTED");
+        long reportId = uploadReport(labId, submissionId, "528");
+
+        mockMvc.perform(put("/api/v1/labs/{labId}/reports/{reportId}/score", labId, reportId)
+                        .headers(teacherHeaders("528", "528", "601"))
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "score", 30,
+                                "comment", "报告结构完整"
+                        ))))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/v1/labs/{labId}/submissions/{submissionId}/score", labId, submissionId)
+                        .headers(teacherHeaders("528", "528", "601"))
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "manualScore", 92,
+                                "reportScore", 30,
+                                "finalScore", 95,
+                                "comment", "整体实现稳定"
+                        ))))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/v1/labs/{labId}/results/{studentId}", labId, 601L)
+                        .headers(studentHeaders("528")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"))
+                .andExpect(jsonPath("$.data.studentId").value(601))
+                .andExpect(jsonPath("$.data.labId").value(labId))
+                .andExpect(jsonPath("$.data.status").value("PUBLISHED"))
+                .andExpect(jsonPath("$.data.submission.submissionId").value(submissionId))
+                .andExpect(jsonPath("$.data.submission.finalScore").doesNotExist())
+                .andExpect(jsonPath("$.data.latestScore").doesNotExist())
+                .andExpect(jsonPath("$.data.latestReport.score").doesNotExist())
+                .andExpect(jsonPath("$.data.latestReport.comment").doesNotExist())
+                .andExpect(jsonPath("$.data.evaluationResult.caseResults", hasSize(2)))
+                .andExpect(jsonPath("$.data.evaluationResult.caseResults[0].expectedOutput").value("sum:3"))
+                .andExpect(jsonPath("$.data.evaluationResult.caseResults[1].expectedOutput").doesNotExist())
+                .andExpect(jsonPath("$.data.publishedAt").doesNotExist());
+
+        mockMvc.perform(put("/api/v1/labs/{labId}/release-scores", labId)
+                        .headers(teacherHeaders("528", "528", "601")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("SCORE_PUBLISHED"));
+
+        mockMvc.perform(get("/api/v1/labs/{labId}/results/{studentId}", labId, 601L)
+                        .headers(studentHeaders("528")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"))
+                .andExpect(jsonPath("$.data.status").value("SCORE_PUBLISHED"))
+                .andExpect(jsonPath("$.data.submission.finalScore").value(95))
+                .andExpect(jsonPath("$.data.latestScore.manualScore").value(92))
+                .andExpect(jsonPath("$.data.latestScore.reportScore").value(30))
+                .andExpect(jsonPath("$.data.latestScore.finalScore").value(95))
+                .andExpect(jsonPath("$.data.latestScore.comment").value("整体实现稳定"))
+                .andExpect(jsonPath("$.data.latestReport.score").value(30))
+                .andExpect(jsonPath("$.data.latestReport.comment").value("报告结构完整"))
+                .andExpect(jsonPath("$.data.publishedAt").exists());
+    }
+
+    @Test
+    void releasedLabScoresExposeSourceGradesForGrdSync() throws Exception {
+        long labId = createPublishedLab(530L, true, LocalDateTime.now().plusDays(3));
+        long firstSubmissionId = createCodeSubmission(labId, 601L, "530", "print('student 601')", "python");
+        long secondSubmissionId = createCodeSubmission(labId, 602L, "530", "print('student 602')", "python");
+        waitForEvaluationStatus(labId, firstSubmissionId, teacherHeaders("530", "530", "601,602"), "ACCEPTED");
+        waitForEvaluationStatus(labId, secondSubmissionId, teacherHeaders("530", "530", "601,602"), "ACCEPTED");
+
+        mockMvc.perform(post("/api/v1/labs/{labId}/submissions/{submissionId}/score", labId, firstSubmissionId)
+                        .headers(teacherHeaders("530", "530", "601,602"))
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "manualScore", 92,
+                                "finalScore", 95,
+                                "comment", "整体实现稳定"
+                        ))))
+                .andExpect(status().isOk());
+        mockMvc.perform(post("/api/v1/labs/{labId}/submissions/{submissionId}/score", labId, secondSubmissionId)
+                        .headers(teacherHeaders("530", "530", "601,602"))
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "manualScore", 75,
+                                "finalScore", 78,
+                                "comment", "基础功能完成"
+                        ))))
+                .andExpect(status().isOk());
+
+        org.assertj.core.api.Assertions.assertThat(sourceGradeClient.findSourceGrades(530L, SourceGradeType.LAB, labId))
+                .isEmpty();
+
+        mockMvc.perform(put("/api/v1/labs/{labId}/release-scores", labId)
+                        .headers(teacherHeaders("530", "530", "601,602")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("SCORE_PUBLISHED"));
+
+        org.assertj.core.api.Assertions.assertThat(sourceGradeClient.findSourceGrades(530L, SourceGradeType.LAB, labId))
+                .extracting("studentId", "score", "fullScore", "status")
+                .containsExactlyInAnyOrder(
+                        org.assertj.core.groups.Tuple.tuple(601L, BigDecimal.valueOf(95), BigDecimal.valueOf(100), "SCORED"),
+                        org.assertj.core.groups.Tuple.tuple(602L, BigDecimal.valueOf(78), BigDecimal.valueOf(100), "SCORED")
+                );
+        org.assertj.core.api.Assertions.assertThat(sourceGradeClient.findSourceGrades(530L, SourceGradeType.LAB, labId + 999))
+                .isEmpty();
+    }
+
+    @Test
+    void studentCannotQueryAnotherStudentsLabResult() throws Exception {
+        long labId = createPublishedLab(529L, true, LocalDateTime.now().plusDays(3));
+        createCodeSubmission(labId, 601L, "529", "print('owner')", "python");
+
+        mockMvc.perform(get("/api/v1/labs/{labId}/results/{studentId}", labId, 601L)
+                        .headers(studentHeaders("529", 602L)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("LAB-403-01"));
     }
 
     private long createPublishedLab(long courseId, boolean autoEvaluate, LocalDateTime deadline) throws Exception {

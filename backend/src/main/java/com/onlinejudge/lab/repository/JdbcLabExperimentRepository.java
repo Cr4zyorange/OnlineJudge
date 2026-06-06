@@ -39,6 +39,7 @@ public class JdbcLabExperimentRepository implements LabExperimentRepository {
             resultSet.getInt("time_limit_ms"),
             resultSet.getInt("memory_limit_kb"),
             resultSet.getLong("created_by"),
+            toLocalDateTime(resultSet.getTimestamp("published_at")),
             resultSet.getBoolean("deleted"),
             resultSet.getTimestamp("created_at").toLocalDateTime(),
             resultSet.getTimestamp("updated_at").toLocalDateTime(),
@@ -73,9 +74,9 @@ public class JdbcLabExperimentRepository implements LabExperimentRepository {
             PreparedStatement statement = connection.prepareStatement("""
                     INSERT INTO lab_experiment
                     (course_id, chapter_id, title, description, status, deadline, max_score, attachment_ids,
-                     allowed_languages, evaluation_mode, auto_evaluate, report_required, time_limit_ms,
-                     memory_limit_kb, created_by, deleted, created_at, updated_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    allowed_languages, evaluation_mode, auto_evaluate, report_required, time_limit_ms,
+                     memory_limit_kb, created_by, published_at, deleted, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """, new String[]{"id"});
             bindExperiment(statement, experiment);
             return statement;
@@ -87,46 +88,14 @@ public class JdbcLabExperimentRepository implements LabExperimentRepository {
 
     @Override
     public LabExperiment update(LabExperiment experiment) {
-        int updated = jdbcTemplate.update("""
-                UPDATE lab_experiment
-                SET chapter_id = ?,
-                    title = ?,
-                    description = ?,
-                    status = ?,
-                    deadline = ?,
-                    max_score = ?,
-                    attachment_ids = ?,
-                    allowed_languages = ?,
-                    evaluation_mode = ?,
-                    auto_evaluate = ?,
-                    report_required = ?,
-                    time_limit_ms = ?,
-                    memory_limit_kb = ?,
-                    deleted = ?,
-                    updated_at = ?
-                WHERE id = ?
-                """,
-                experiment.chapterId(),
-                experiment.title(),
-                experiment.description(),
-                experiment.status().name(),
-                Timestamp.valueOf(experiment.deadline()),
-                experiment.maxScore(),
-                formatAttachmentIds(experiment.attachmentIds()),
-                experiment.allowedLanguages(),
-                experiment.evaluationMode().name(),
-                experiment.autoEvaluate(),
-                experiment.reportRequired(),
-                experiment.timeLimitMs(),
-                experiment.memoryLimitKb(),
-                experiment.deleted(),
-                Timestamp.valueOf(experiment.updatedAt()),
-                experiment.id()
-        );
-        if (updated == 0) {
-            throw new IllegalArgumentException("实验不存在");
-        }
+        updateExperimentRow(experiment);
         replaceTestcases(experiment.id(), experiment.testcases(), experiment.updatedAt());
+        return findById(experiment.id()).orElseThrow(() -> new IllegalStateException("更新实验后无法读取记录"));
+    }
+
+    @Override
+    public LabExperiment updateLifecycle(LabExperiment experiment) {
+        updateExperimentRow(experiment);
         return findById(experiment.id()).orElseThrow(() -> new IllegalStateException("更新实验后无法读取记录"));
     }
 
@@ -135,7 +104,7 @@ public class JdbcLabExperimentRepository implements LabExperimentRepository {
         return jdbcTemplate.query("""
                         SELECT id, course_id, chapter_id, title, description, status, deadline, max_score,
                                attachment_ids, allowed_languages, evaluation_mode, auto_evaluate, report_required,
-                               time_limit_ms, memory_limit_kb, created_by, deleted, created_at, updated_at
+                               time_limit_ms, memory_limit_kb, created_by, published_at, deleted, created_at, updated_at
                         FROM lab_experiment
                         WHERE id = ?
                         """,
@@ -149,7 +118,7 @@ public class JdbcLabExperimentRepository implements LabExperimentRepository {
         String sql = """
                 SELECT id, course_id, chapter_id, title, description, status, deadline, max_score,
                        attachment_ids, allowed_languages, evaluation_mode, auto_evaluate, report_required,
-                       time_limit_ms, memory_limit_kb, created_by, deleted, created_at, updated_at
+                       time_limit_ms, memory_limit_kb, created_by, published_at, deleted, created_at, updated_at
                 FROM lab_experiment
                 WHERE course_id = ? AND deleted = FALSE
                 """;
@@ -193,6 +162,7 @@ public class JdbcLabExperimentRepository implements LabExperimentRepository {
                 experiment.timeLimitMs(),
                 experiment.memoryLimitKb(),
                 experiment.createdBy(),
+                experiment.publishedAt(),
                 experiment.deleted(),
                 experiment.createdAt(),
                 experiment.updatedAt(),
@@ -228,6 +198,50 @@ public class JdbcLabExperimentRepository implements LabExperimentRepository {
         );
     }
 
+    private void updateExperimentRow(LabExperiment experiment) {
+        int updated = jdbcTemplate.update("""
+                UPDATE lab_experiment
+                SET chapter_id = ?,
+                    title = ?,
+                    description = ?,
+                    status = ?,
+                    deadline = ?,
+                    max_score = ?,
+                    attachment_ids = ?,
+                    allowed_languages = ?,
+                    evaluation_mode = ?,
+                    auto_evaluate = ?,
+                    report_required = ?,
+                    time_limit_ms = ?,
+                    memory_limit_kb = ?,
+                    published_at = ?,
+                    deleted = ?,
+                    updated_at = ?
+                WHERE id = ?
+                """,
+                experiment.chapterId(),
+                experiment.title(),
+                experiment.description(),
+                experiment.status().name(),
+                Timestamp.valueOf(experiment.deadline()),
+                experiment.maxScore(),
+                formatAttachmentIds(experiment.attachmentIds()),
+                experiment.allowedLanguages(),
+                experiment.evaluationMode().name(),
+                experiment.autoEvaluate(),
+                experiment.reportRequired(),
+                experiment.timeLimitMs(),
+                experiment.memoryLimitKb(),
+                experiment.publishedAt() == null ? null : Timestamp.valueOf(experiment.publishedAt()),
+                experiment.deleted(),
+                Timestamp.valueOf(experiment.updatedAt()),
+                experiment.id()
+        );
+        if (updated == 0) {
+            throw new IllegalArgumentException("实验不存在");
+        }
+    }
+
     private void bindExperiment(PreparedStatement statement, LabExperiment experiment) throws java.sql.SQLException {
         statement.setLong(1, experiment.courseId());
         statement.setObject(2, experiment.chapterId());
@@ -244,9 +258,14 @@ public class JdbcLabExperimentRepository implements LabExperimentRepository {
         statement.setInt(13, experiment.timeLimitMs());
         statement.setInt(14, experiment.memoryLimitKb());
         statement.setLong(15, experiment.createdBy());
-        statement.setBoolean(16, experiment.deleted());
-        statement.setTimestamp(17, Timestamp.valueOf(experiment.createdAt()));
-        statement.setTimestamp(18, Timestamp.valueOf(experiment.updatedAt()));
+        statement.setObject(16, experiment.publishedAt() == null ? null : Timestamp.valueOf(experiment.publishedAt()));
+        statement.setBoolean(17, experiment.deleted());
+        statement.setTimestamp(18, Timestamp.valueOf(experiment.createdAt()));
+        statement.setTimestamp(19, Timestamp.valueOf(experiment.updatedAt()));
+    }
+
+    private static LocalDateTime toLocalDateTime(Timestamp value) {
+        return value == null ? null : value.toLocalDateTime();
     }
 
     private static String formatAttachmentIds(List<Long> attachmentIds) {

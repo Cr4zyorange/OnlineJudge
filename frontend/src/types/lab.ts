@@ -40,6 +40,7 @@ export interface LabExperimentSummary {
   evaluationMode: LabEvaluationMode;
   autoEvaluate: boolean;
   reportRequired: boolean;
+  publishedAt?: string | null;
   deleted: boolean;
 }
 
@@ -193,4 +194,15 @@ export interface LabSubmissionListFilters {
   submitStatus?: LabSubmissionSummary['submitStatus'];
   evaluationStatus?: LabSubmissionSummary['evaluationStatus'];
   overdue?: boolean;
+}
+
+export interface LabResult {
+  labId: number;
+  studentId: number;
+  status: LabExperimentStatus;
+  submission: LabSubmissionDetail;
+  evaluationResult: LabSubmissionResult;
+  latestReport: LabReportSummary | null;
+  latestScore?: LabScoreSummary | null;
+  publishedAt?: string | null;
 }

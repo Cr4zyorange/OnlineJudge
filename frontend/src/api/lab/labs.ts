@@ -5,6 +5,7 @@ import type {
   LabReportSummary,
   LabScorePayload,
   LabScoreSummary,
+  LabResult,
   LabSubmissionResult,
   LabSubmissionDetail,
   LabSubmissionHistoryItem,
@@ -83,6 +84,12 @@ export async function publishLab(labId: number): Promise<LabExperimentSummary> {
 export async function closeLab(labId: number): Promise<LabExperimentSummary> {
   return request<LabExperimentSummary>(`/api/v1/labs/${labId}/close`, {
     method: 'POST'
+  });
+}
+
+export async function releaseLabScores(labId: number): Promise<LabExperimentSummary> {
+  return request<LabExperimentSummary>(`/api/v1/labs/${labId}/release-scores`, {
+    method: 'PUT'
   });
 }
 
@@ -170,6 +177,10 @@ export async function scoreLabSubmission(
 
 export async function getLabSubmissionResult(labId: number, submissionId: number): Promise<LabSubmissionResult> {
   return request<LabSubmissionResult>(`/api/v1/labs/${labId}/submissions/${submissionId}/result`);
+}
+
+export async function getLabResult(labId: number, studentId: number): Promise<LabResult> {
+  return request<LabResult>(`/api/v1/labs/${labId}/results/${studentId}`);
 }
 
 export async function evaluateLabSubmission(labId: number, submissionId: number): Promise<LabSubmissionResult> {

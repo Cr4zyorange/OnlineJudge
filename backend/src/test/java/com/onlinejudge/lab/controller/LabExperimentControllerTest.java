@@ -316,6 +316,50 @@ class LabExperimentControllerTest {
     }
 
     @Test
+    void teacherCanReleaseScoresAfterClosingLab() throws Exception {
+        long labId = createLabAndReturnId(206L, teacherHeaders("206", "206"), Map.ofEntries(
+                entry("title", "实验成绩发布"),
+                entry("description", "用于验证教师发布实验成绩"),
+                entry("deadline", "2026-07-08T23:59:59"),
+                entry("maxScore", 100),
+                entry("attachmentIds", List.of()),
+                entry("allowedLanguages", "python"),
+                entry("evaluationMode", "DOCKER_IO"),
+                entry("autoEvaluate", true),
+                entry("reportRequired", true),
+                entry("timeLimitMs", 60000),
+                entry("memoryLimitKb", 262144),
+                entry("testcases", List.of())
+        ));
+
+        mockMvc.perform(post("/api/v1/labs/{labId}/publish", labId)
+                        .headers(teacherHeaders("206", "206", "601")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("PUBLISHED"));
+
+        mockMvc.perform(post("/api/v1/labs/{labId}/close", labId)
+                        .headers(teacherHeaders("206", "206", "601")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("CLOSED"));
+
+        mockMvc.perform(put("/api/v1/labs/{labId}/release-scores", labId)
+                        .headers(teacherHeaders("206", "206", "601")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"))
+                .andExpect(jsonPath("$.data.status").value("SCORE_PUBLISHED"))
+                .andExpect(jsonPath("$.data.publishedAt").exists());
+
+        NotificationEvent scorePublishedEvent = notificationEventPublisher.events().stream()
+                .filter(event -> "EXPERIMENT_SCORE_PUBLISHED".equals(event.type()))
+                .findFirst()
+                .orElseThrow();
+        assertThat(scorePublishedEvent.courseId()).isEqualTo(206L);
+        assertThat(scorePublishedEvent.recipientUserIds()).containsExactly(601L);
+        assertThat(scorePublishedEvent.targetId()).isEqualTo(labId);
+        assertThat(scorePublishedEvent.linkUrl()).isEqualTo("/courses/206/labs/" + labId);
+    }
+
+    @Test
     void controllerRejectsInvalidPayloadAndPermissionViolations() throws Exception {
         Map<String, Object> invalidPayload = Map.ofEntries(
                 entry("title", ""),

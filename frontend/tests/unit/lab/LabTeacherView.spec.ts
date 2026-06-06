@@ -139,7 +139,7 @@ describe('LabTeacherView', () => {
     expect(wrapper.text()).toContain('满分必须大于 0');
   });
 
-  it('updates publishes closes and deletes draft labs through teacher actions', async () => {
+  it('updates publishes closes releases scores and deletes draft labs through teacher actions', async () => {
     vi.mocked(labApi.listLabs).mockResolvedValueOnce([
       {
         id: 7,
@@ -258,6 +258,34 @@ describe('LabTeacherView', () => {
         deleted: false
       }
     ]);
+    vi.mocked(labApi.releaseLabScores).mockResolvedValueOnce({
+      id: 7,
+      courseId: 101,
+      title: '实验二-修订',
+      status: 'SCORE_PUBLISHED',
+      deadline: '2026-06-25T23:59:59',
+      maxScore: 120,
+      evaluationMode: 'MIXED',
+      autoEvaluate: false,
+      reportRequired: true,
+      publishedAt: '2026-06-26T10:00:00',
+      deleted: false
+    });
+    vi.mocked(labApi.listLabs).mockResolvedValueOnce([
+      {
+        id: 7,
+        courseId: 101,
+        title: '实验二-修订',
+        status: 'SCORE_PUBLISHED',
+        deadline: '2026-06-25T23:59:59',
+        maxScore: 120,
+        evaluationMode: 'MIXED',
+        autoEvaluate: false,
+        reportRequired: true,
+        publishedAt: '2026-06-26T10:00:00',
+        deleted: false
+      }
+    ]);
     vi.mocked(labApi.listLabs).mockResolvedValueOnce([
       {
         id: 9,
@@ -325,6 +353,12 @@ describe('LabTeacherView', () => {
     await flushPromises();
     expect(labApi.closeLab).toHaveBeenCalledWith(7);
     expect(wrapper.text()).toContain('截止成功');
+
+    await wrapper.findAll('button').find((button) => button.text() === '发布成绩')?.trigger('click');
+    await flushPromises();
+    expect(labApi.releaseLabScores).toHaveBeenCalledWith(7);
+    expect(wrapper.text()).toContain('成绩发布成功');
+    expect(wrapper.text()).toContain('SCORE_PUBLISHED');
 
     wrapper.unmount();
 
