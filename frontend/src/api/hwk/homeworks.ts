@@ -99,8 +99,19 @@ export function publishHomeworkScores(homeworkId: number): Promise<HomeworkDetai
   });
 }
 
-export function getHomeworkStatistics(homeworkId: number): Promise<HomeworkStatistics> {
-  return request<HomeworkStatistics>(`/api/v1/homeworks/${homeworkId}/statistics`);
+export function getHomeworkStatistics(
+  homeworkId: number,
+  query: { page?: number; size?: number } = {}
+): Promise<HomeworkStatistics> {
+  const params = new URLSearchParams();
+  if (query.page !== undefined) {
+    params.set('page', String(query.page));
+  }
+  if (query.size !== undefined) {
+    params.set('size', String(query.size));
+  }
+  const suffix = params.toString() ? `?${params.toString()}` : '';
+  return request<HomeworkStatistics>(`/api/v1/homeworks/${homeworkId}/statistics${suffix}`);
 }
 
 export function getHomeworkTestCases(homeworkId: number): Promise<HomeworkTestCase[]> {

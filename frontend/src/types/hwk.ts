@@ -174,6 +174,9 @@ export interface HomeworkStatistics {
   averageScore: number | null;
   maxScore: number | null;
   minScore: number | null;
+  unsubmittedPage: number;
+  unsubmittedSize: number;
+  unsubmittedTotal: number;
   unsubmittedStudentIds: number[];
 }
 

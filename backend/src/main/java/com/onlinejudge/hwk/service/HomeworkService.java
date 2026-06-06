@@ -267,9 +267,11 @@ public class HomeworkService {
         return published;
     }
 
-    public HomeworkStatistics statistics(long homeworkId, long managerId) {
+    public HomeworkStatistics statistics(long homeworkId, long managerId, int page, int size) {
         Homework homework = findExisting(homeworkId);
         requireManagePermission(homework.courseId(), managerId);
+        int normalizedPage = Math.max(page, 1);
+        int normalizedSize = Math.max(1, Math.min(size, 100));
         List<Long> courseStudentIds = coursePermissionClient.listCourseStudentIds(homework.courseId()).stream()
                 .filter(Objects::nonNull)
                 .distinct()
@@ -295,6 +297,11 @@ public class HomeworkService {
                 .filter(submission -> submission.reviewStatus() == HomeworkReviewStatus.REVIEWED)
                 .count();
         int totalStudentCount = courseStudentIds.isEmpty() ? submittedStudentIds.size() : courseStudentIds.size();
+        long unsubmittedOffset = ((long) normalizedPage - 1L) * normalizedSize;
+        int fromIndex = unsubmittedOffset >= unsubmittedStudentIds.size()
+                ? unsubmittedStudentIds.size()
+                : (int) unsubmittedOffset;
+        int toIndex = Math.min(fromIndex + normalizedSize, unsubmittedStudentIds.size());
         return new HomeworkStatistics(
                 homework.id(),
                 homework.courseId(),
@@ -306,7 +313,10 @@ public class HomeworkService {
                 average,
                 max,
                 min,
-                unsubmittedStudentIds
+                normalizedPage,
+                normalizedSize,
+                unsubmittedStudentIds.size(),
+                unsubmittedStudentIds.subList(fromIndex, toIndex)
         );
     }
 
@@ -335,6 +345,9 @@ public class HomeworkService {
             BigDecimal averageScore,
             BigDecimal maxScore,
             BigDecimal minScore,
+            int unsubmittedPage,
+            int unsubmittedSize,
+            int unsubmittedTotal,
             List<Long> unsubmittedStudentIds
     ) {
     }
