@@ -135,15 +135,34 @@ describe('HomeworkTeacherView', () => {
     vi.mocked(homeworkApi.getHomeworkStatistics).mockResolvedValueOnce({
       homeworkId: 9,
       courseId: 101,
-      totalStudentCount: 3,
-      submittedCount: 2,
-      unsubmittedCount: 1,
+      totalStudentCount: 22,
+      submittedCount: 1,
+      unsubmittedCount: 21,
       evaluatedCount: 2,
       reviewedCount: 2,
       averageScore: 70,
       maxScore: 100,
       minScore: 40,
+      unsubmittedPage: 1,
+      unsubmittedSize: 20,
+      unsubmittedTotal: 21,
       unsubmittedStudentIds: [603]
+    });
+    vi.mocked(homeworkApi.getHomeworkStatistics).mockResolvedValueOnce({
+      homeworkId: 9,
+      courseId: 101,
+      totalStudentCount: 22,
+      submittedCount: 1,
+      unsubmittedCount: 21,
+      evaluatedCount: 1,
+      reviewedCount: 1,
+      averageScore: 70,
+      maxScore: 70,
+      minScore: 70,
+      unsubmittedPage: 2,
+      unsubmittedSize: 20,
+      unsubmittedTotal: 21,
+      unsubmittedStudentIds: [604]
     });
     vi.mocked(homeworkApi.publishHomeworkScores).mockResolvedValueOnce(homeworkDetail({
       id: 9,
@@ -169,10 +188,15 @@ describe('HomeworkTeacherView', () => {
 
     await wrapper.get('[data-testid="homework-statistics-9"]').trigger('click');
     await flushPromises();
-    expect(homeworkApi.getHomeworkStatistics).toHaveBeenCalledWith(9);
+    expect(homeworkApi.getHomeworkStatistics).toHaveBeenCalledWith(9, { page: 1, size: 20 });
     expect(wrapper.text()).toContain('Reviewed homework');
     expect(wrapper.text()).toContain('70');
     expect(wrapper.text()).toContain('603');
+
+    await wrapper.get('[data-testid="statistics-next-page"]').trigger('click');
+    await flushPromises();
+    expect(homeworkApi.getHomeworkStatistics).toHaveBeenLastCalledWith(9, { page: 2, size: 20 });
+    expect(wrapper.text()).toContain('604');
 
     await wrapper.get('[data-testid="publish-homework-scores-9"]').trigger('click');
     await flushPromises();
