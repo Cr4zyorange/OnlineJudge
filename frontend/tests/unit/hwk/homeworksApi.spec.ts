@@ -267,6 +267,9 @@ describe('homeworks api', () => {
       averageScore: 70,
       maxScore: 100,
       minScore: 40,
+      unsubmittedPage: 2,
+      unsubmittedSize: 2,
+      unsubmittedTotal: 4,
       unsubmittedStudentIds: [603]
     };
     const fetchMock = vi.spyOn(globalThis, 'fetch');
@@ -278,11 +281,11 @@ describe('homeworks api', () => {
       id: 11,
       status: 'SCORE_PUBLISHED'
     }));
-    await expect(getHomeworkStatistics(11)).resolves.toEqual(statistics);
+    await expect(getHomeworkStatistics(11, { page: 2, size: 2 })).resolves.toEqual(statistics);
 
     expect(fetchMock.mock.calls.map((call) => [call[0], (call[1] as RequestInit).method])).toEqual([
       ['/api/v1/homeworks/11/scores/publish', 'PUT'],
-      ['/api/v1/homeworks/11/statistics', 'GET']
+      ['/api/v1/homeworks/11/statistics?page=2&size=2', 'GET']
     ]);
   });
 });

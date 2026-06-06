@@ -239,6 +239,21 @@
           </div>
         </dl>
         <p>未提交：{{ selectedStatistics.unsubmittedStudentIds.length ? selectedStatistics.unsubmittedStudentIds.join(', ') : '-' }}</p>
+        <div class="homeworks__statistics-pages">
+          <button
+            type="button"
+            data-testid="statistics-previous-page"
+            :disabled="statisticsLoading || selectedStatistics.unsubmittedPage <= 1"
+            @click="loadStatisticsPage(selectedStatistics.unsubmittedPage - 1)"
+          >上一页</button>
+          <span>{{ selectedStatistics.unsubmittedPage }} / {{ Math.max(1, Math.ceil(selectedStatistics.unsubmittedTotal / selectedStatistics.unsubmittedSize)) }}</span>
+          <button
+            type="button"
+            data-testid="statistics-next-page"
+            :disabled="statisticsLoading || selectedStatistics.unsubmittedPage * selectedStatistics.unsubmittedSize >= selectedStatistics.unsubmittedTotal"
+            @click="loadStatisticsPage(selectedStatistics.unsubmittedPage + 1)"
+          >下一页</button>
+        </div>
       </section>
     </section>
   </main>
@@ -282,6 +297,7 @@ const keyword = ref('');
 const editingId = ref<number | null>(null);
 const selectedStatistics = ref<HomeworkStatistics | null>(null);
 const selectedStatisticsTitle = ref('');
+const selectedStatisticsHomework = ref<HomeworkSummary | null>(null);
 
 const form = reactive({
   title: '',
@@ -399,12 +415,20 @@ async function publishScores(homeworkId: number) {
 }
 
 async function loadStatistics(homework: HomeworkSummary) {
+  selectedStatisticsHomework.value = homework;
+  await loadStatisticsPage(1, 20);
+}
+
+async function loadStatisticsPage(page: number, size = selectedStatistics.value?.unsubmittedSize ?? 20) {
+  if (!selectedStatisticsHomework.value) {
+    return;
+  }
   feedback.value = '';
   errorMessage.value = '';
   statisticsLoading.value = true;
-  selectedStatisticsTitle.value = homework.title;
+  selectedStatisticsTitle.value = selectedStatisticsHomework.value.title;
   try {
-    selectedStatistics.value = await getHomeworkStatistics(homework.id);
+    selectedStatistics.value = await getHomeworkStatistics(selectedStatisticsHomework.value.id, { page, size });
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '作业统计加载失败';
   } finally {
@@ -713,6 +737,12 @@ table {
   font-size: 18px;
   font-weight: 700;
   margin: 4px 0 0;
+}
+
+.homeworks__statistics-pages {
+  align-items: center;
+  display: flex;
+  gap: 10px;
 }
 
 th,

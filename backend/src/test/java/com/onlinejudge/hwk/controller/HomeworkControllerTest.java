@@ -616,8 +616,33 @@ class HomeworkControllerTest {
                 .andExpect(jsonPath("$.data.averageScore").value(70.00))
                 .andExpect(jsonPath("$.data.maxScore").value(100))
                 .andExpect(jsonPath("$.data.minScore").value(40))
+                .andExpect(jsonPath("$.data.unsubmittedPage").value(1))
+                .andExpect(jsonPath("$.data.unsubmittedSize").value(20))
+                .andExpect(jsonPath("$.data.unsubmittedTotal").value(1))
                 .andExpect(jsonPath("$.data.unsubmittedStudentIds", hasSize(1)))
                 .andExpect(jsonPath("$.data.unsubmittedStudentIds[0]").value(603));
+    }
+
+    @Test
+    void teacherQueriesHomeworkStatisticsWithPaginatedUnsubmittedStudentsForNfrPerformance() throws Exception {
+        long homeworkId = createHomeworkAndReturnId(objectivePayload());
+        mockMvc.perform(put("/api/v1/homeworks/{homeworkId}/publish", homeworkId)
+                        .headers(teacherHeaders("101", "101", "101:601,602,603,604,605")))
+                .andExpect(status().isOk());
+        submitObjectiveAnswer(homeworkId, "{\"q1\":[\"2\"],\"q2\":[\"true\"]}", studentHeaders("101", "601"));
+
+        mockMvc.perform(get("/api/v1/homeworks/{homeworkId}/statistics?page=2&size=2", homeworkId)
+                        .headers(teacherHeaders("101", "101", "101:601,602,603,604,605")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.totalStudentCount").value(5))
+                .andExpect(jsonPath("$.data.submittedCount").value(1))
+                .andExpect(jsonPath("$.data.unsubmittedCount").value(4))
+                .andExpect(jsonPath("$.data.unsubmittedPage").value(2))
+                .andExpect(jsonPath("$.data.unsubmittedSize").value(2))
+                .andExpect(jsonPath("$.data.unsubmittedTotal").value(4))
+                .andExpect(jsonPath("$.data.unsubmittedStudentIds", hasSize(2)))
+                .andExpect(jsonPath("$.data.unsubmittedStudentIds[0]").value(604))
+                .andExpect(jsonPath("$.data.unsubmittedStudentIds[1]").value(605));
     }
 
     @Test

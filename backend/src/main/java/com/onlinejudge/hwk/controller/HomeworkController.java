@@ -203,9 +203,11 @@ public class HomeworkController {
     @GetMapping("/{homeworkId}/statistics")
     public ApiResponse<HomeworkService.HomeworkStatistics> statistics(
             @PathVariable long homeworkId,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "20") int size,
             CurrentUser currentUser
     ) {
-        return ApiResponse.ok(homeworkService.statistics(homeworkId, currentUser.id()));
+        return ApiResponse.ok(homeworkService.statistics(homeworkId, currentUser.id(), page, size));
     }
 
     private PageResponse<HomeworkResponse> mapPage(PageResponse<com.onlinejudge.hwk.domain.Homework> page) {
