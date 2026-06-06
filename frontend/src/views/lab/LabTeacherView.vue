@@ -146,11 +146,84 @@
                 发布成绩
               </button>
               <button v-if="lab.status === 'DRAFT'" type="button" @click="removeLab(lab.id)">删除草稿</button>
+              <button v-if="lab.status !== 'DRAFT'" type="button" @click="openStatisticsPanel(lab.id, lab.title)">
+                统计
+              </button>
               <button type="button" @click="openSubmissionPanel(lab.id, lab.title)">查看提交</button>
             </td>
           </tr>
         </tbody>
       </table>
+    </section>
+
+    <section class="labs__statistics" aria-label="实验统计概览">
+      <header class="labs__submissions-header">
+        <div>
+          <h2>实验统计概览</h2>
+          <p v-if="selectedStatisticsLabId === null">请选择实验查看统计</p>
+          <p v-else>当前实验：{{ selectedStatisticsLabTitle }}</p>
+          <p v-if="statistics" class="labs__statistics-meta">统计生成时间：{{ formatDateTime(statistics.generatedAt) }}</p>
+        </div>
+      </header>
+
+      <p v-if="selectedStatisticsLabId === null" class="labs__statistics-state">尚未选择统计实验</p>
+      <p v-else-if="statisticsLoading" class="labs__statistics-state">统计加载中...</p>
+      <p v-else-if="statisticsErrorMessage" class="labs__error">{{ statisticsErrorMessage }}</p>
+      <p v-else-if="statistics === null" class="labs__statistics-state">暂无实验统计数据</p>
+      <template v-else>
+        <div class="labs__statistics-grid">
+          <article>
+            <span>总人数</span>
+            <strong>{{ statistics.totalStudentCount }}</strong>
+          </article>
+          <article>
+            <span>已提交</span>
+            <strong>{{ statistics.submittedCount }}</strong>
+          </article>
+          <article>
+            <span>未提交</span>
+            <strong>{{ statistics.unsubmittedCount }}</strong>
+          </article>
+          <article>
+            <span>已评测</span>
+            <strong>{{ statistics.evaluatedCount }}</strong>
+          </article>
+          <article>
+            <span>提交率</span>
+            <strong>{{ formatPercentage(statistics.submissionRate) }}</strong>
+          </article>
+          <article>
+            <span>评测完成率</span>
+            <strong>{{ formatPercentage(statistics.evaluationCompletionRate) }}</strong>
+          </article>
+          <article>
+            <span>平均分</span>
+            <strong>{{ formatStatisticScore(statistics.averageScore) }}</strong>
+          </article>
+          <article>
+            <span>逾期提交数</span>
+            <strong>{{ statistics.lateSubmissionCount }}</strong>
+          </article>
+        </div>
+
+        <div class="labs__statistics-layout">
+          <section class="labs__statistics-card">
+            <h3>未提交名单</h3>
+            <p v-if="statistics.unsubmittedStudentIds.length === 0">当前实验已全部提交</p>
+            <p v-else>{{ statistics.unsubmittedStudentIds.join(', ') }}</p>
+          </section>
+
+          <section class="labs__statistics-card">
+            <h3>分数段分布</h3>
+            <ul class="labs__statistics-distribution">
+              <li v-for="(count, bucket) in statistics.scoreDistribution" :key="bucket">
+                <span>{{ bucket }}</span>
+                <strong>{{ count }} 人</strong>
+              </li>
+            </ul>
+          </section>
+        </div>
+      </template>
     </section>
 
     <section class="labs__submissions" aria-label="提交版本查看">
@@ -364,6 +437,7 @@ import {
   deleteLab,
   downloadLabReport,
   getLabSubmissionDetail,
+  getLabStatistics,
   getLabDetail,
   listLabSubmissions,
   listLabs,
@@ -381,6 +455,7 @@ import type {
   LabExperimentPayload,
   LabExperimentStatus,
   LabExperimentSummary,
+  LabStatistics,
   LabTestcase,
   LabTestcasePayload
 } from '../../types/lab';
@@ -398,6 +473,11 @@ const editingId = ref<number | null>(null);
 const selectedStatus = ref('');
 const selectedSubmissionLabId = ref<number | null>(null);
 const selectedSubmissionLabTitle = ref('');
+const selectedStatisticsLabId = ref<number | null>(null);
+const selectedStatisticsLabTitle = ref('');
+const statistics = ref<LabStatistics | null>(null);
+const statisticsLoading = ref(false);
+const statisticsErrorMessage = ref('');
 const submissions = ref<LabSubmissionHistoryItem[]>([]);
 const submissionLoading = ref(false);
 const submissionErrorMessage = ref('');
@@ -543,6 +623,21 @@ async function releaseScores(labId: number) {
     await loadLabs();
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '成绩发布失败';
+  }
+}
+
+async function openStatisticsPanel(labId: number, title: string) {
+  selectedStatisticsLabId.value = labId;
+  selectedStatisticsLabTitle.value = title;
+  statisticsErrorMessage.value = '';
+  statistics.value = null;
+  statisticsLoading.value = true;
+  try {
+    statistics.value = await getLabStatistics(labId);
+  } catch (error) {
+    statisticsErrorMessage.value = error instanceof Error ? error.message : '实验统计加载失败';
+  } finally {
+    statisticsLoading.value = false;
   }
 }
 
@@ -961,6 +1056,20 @@ function formatScore(value: number | null | undefined) {
   return value ?? '未生成';
 }
 
+function formatPercentage(value: number | null | undefined) {
+  if (value === null || value === undefined) {
+    return '-';
+  }
+  return `${Number(value).toFixed(2)}%`;
+}
+
+function formatStatisticScore(value: number | null | undefined) {
+  if (value === null || value === undefined) {
+    return '-';
+  }
+  return Number(value).toFixed(2);
+}
+
 function collectActiveTestcases(): LabTestcasePayload[] {
   return form.testcases
     .map((testcase, index) => ({
@@ -991,6 +1100,10 @@ function toDateTimeLocal(value: string) {
 function formatDeadline(value: string) {
   return value.replace('T', ' ').slice(0, 16);
 }
+
+function formatDateTime(value: string) {
+  return value.replace('T', ' ').slice(0, 19);
+}
 </script>
 
 <style scoped>
@@ -1005,6 +1118,7 @@ function formatDeadline(value: string) {
 
 .labs__panel,
 .labs__list,
+.labs__statistics,
 .labs__submissions {
   background: #ffffff;
   border: 1px solid #d7dde8;
@@ -1068,6 +1182,67 @@ function formatDeadline(value: string) {
   border: 1px solid #d7dde8;
   border-radius: 8px;
   padding: 12px;
+}
+
+.labs__statistics-state {
+  color: #5f6b7a;
+  margin-top: 12px;
+}
+
+.labs__statistics-meta {
+  color: #5f6b7a;
+  font-size: 13px;
+  margin-top: 4px;
+}
+
+.labs__statistics-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  margin-top: 16px;
+}
+
+.labs__statistics-grid article,
+.labs__statistics-card {
+  background: #f8fafc;
+  border: 1px solid #d7dde8;
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.labs__statistics-grid article span,
+.labs__statistics-card h3 {
+  color: #5f6b7a;
+  display: block;
+  font-size: 13px;
+  margin-bottom: 6px;
+}
+
+.labs__statistics-grid article strong,
+.labs__statistics-card strong {
+  color: #111827;
+  font-size: 20px;
+}
+
+.labs__statistics-layout {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(220px, 1fr) minmax(260px, 1.2fr);
+  margin-top: 16px;
+}
+
+.labs__statistics-distribution {
+  display: grid;
+  gap: 8px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.labs__statistics-distribution li {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
 }
 
 .labs__report-detail {
@@ -1166,6 +1341,7 @@ td {
 }
 
 @media (max-width: 960px) {
+  .labs__statistics-layout,
   .labs__submission-layout {
     grid-template-columns: 1fr;
   }

@@ -15,6 +15,7 @@ import com.onlinejudge.lab.service.LabExperimentService;
 import com.onlinejudge.lab.service.LabPermissionException;
 import com.onlinejudge.lab.service.LabReportService;
 import com.onlinejudge.lab.service.LabScoreService;
+import com.onlinejudge.lab.service.LabStatisticsService;
 import com.onlinejudge.lab.service.LabSubmissionService;
 import jakarta.validation.Valid;
 import org.springframework.core.io.Resource;
@@ -45,6 +46,7 @@ public class LabExperimentController {
     private final LabSubmissionService labSubmissionService;
     private final LabReportService labReportService;
     private final LabScoreService labScoreService;
+    private final LabStatisticsService labStatisticsService;
     private final CoursePermissionClient coursePermissionClient;
 
     public LabExperimentController(
@@ -52,12 +54,14 @@ public class LabExperimentController {
             LabSubmissionService labSubmissionService,
             LabReportService labReportService,
             LabScoreService labScoreService,
+            LabStatisticsService labStatisticsService,
             CoursePermissionClient coursePermissionClient
     ) {
         this.labExperimentService = labExperimentService;
         this.labSubmissionService = labSubmissionService;
         this.labReportService = labReportService;
         this.labScoreService = labScoreService;
+        this.labStatisticsService = labStatisticsService;
         this.coursePermissionClient = coursePermissionClient;
     }
 
@@ -287,6 +291,16 @@ public class LabExperimentController {
     ) {
         return ApiResponse.ok(LabResultResponse.from(
                 labSubmissionService.getLabResult(labId, studentId, currentUser.id())
+        ));
+    }
+
+    @GetMapping("/labs/{labId}/statistics")
+    public ApiResponse<LabStatisticsResponse> getLabStatistics(
+            @PathVariable long labId,
+            CurrentUser currentUser
+    ) {
+        return ApiResponse.ok(LabStatisticsResponse.from(
+                labStatisticsService.getStatistics(labId, currentUser.id())
         ));
     }
 

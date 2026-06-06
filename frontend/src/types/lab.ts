@@ -206,3 +206,19 @@ export interface LabResult {
   latestScore?: LabScoreSummary | null;
   publishedAt?: string | null;
 }
+
+export interface LabStatistics {
+  labId: number;
+  courseId: number;
+  totalStudentCount: number;
+  submittedCount: number;
+  unsubmittedCount: number;
+  evaluatedCount: number;
+  submissionRate: number;
+  evaluationCompletionRate: number;
+  averageScore: number | null;
+  lateSubmissionCount: number;
+  unsubmittedStudentIds: number[];
+  scoreDistribution: Record<string, number>;
+  generatedAt: string;
+}
