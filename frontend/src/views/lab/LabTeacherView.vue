@@ -628,9 +628,18 @@ async function saveSubmissionScore() {
   }
 
   const currentDetail = submissionDetail.value;
-  const manualScore = parseScoreInput(submissionScoreForm.manualScore, '人工评分');
-  const reportScore = parseOptionalScoreInput(submissionScoreForm.reportScore, '报告评分');
-  const finalScore = parseScoreInput(submissionScoreForm.finalScore, '最终得分');
+  let manualScore: number;
+  let reportScore: number | null;
+  let finalScore: number;
+  try {
+    manualScore = parseScoreInput(submissionScoreForm.manualScore, '人工评分');
+    reportScore = parseOptionalScoreInput(submissionScoreForm.reportScore, '报告评分');
+    finalScore = parseScoreInput(submissionScoreForm.finalScore, '最终得分');
+  } catch (error) {
+    submissionDetailErrorMessage.value = error instanceof Error ? error.message : '提交评分保存失败';
+    submissionDetailFeedbackMessage.value = '';
+    return;
+  }
   const comment = normalizeText(submissionScoreForm.comment);
   const changeReason = normalizeText(submissionScoreForm.changeReason);
   const existingScore = currentDetail.latestScore;
@@ -889,7 +898,11 @@ function getSubmissionFlags(submission: Pick<LabSubmissionHistoryItem, 'isLatest
 }
 
 function parseScoreInput(value: string, label: string) {
-  const score = Number(String(value ?? '').trim());
+  const normalized = String(value ?? '').trim();
+  if (!normalized) {
+    throw new Error(`${label}不能为空`);
+  }
+  const score = Number(normalized);
   if (!Number.isFinite(score) || score < 0) {
     throw new Error(`${label}不能为负数`);
   }
