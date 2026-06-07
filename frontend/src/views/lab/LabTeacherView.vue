@@ -215,12 +215,27 @@
 
           <section class="labs__statistics-card">
             <h3>分数段分布</h3>
-            <ul class="labs__statistics-distribution">
-              <li v-for="(count, bucket) in statistics.scoreDistribution" :key="bucket">
-                <span>{{ bucket }}</span>
-                <strong>{{ count }} 人</strong>
-              </li>
-            </ul>
+            <div
+              class="labs__statistics-distribution-chart"
+              data-testid="score-distribution-chart"
+              role="img"
+              :aria-label="`分数分布柱状图：${formatScoreDistributionSummary(statistics.scoreDistribution)}`"
+            >
+              <div
+                v-for="entry in getScoreDistributionEntries(statistics.scoreDistribution)"
+                :key="entry.bucket"
+                class="labs__statistics-distribution-bar"
+                data-testid="score-distribution-bar"
+                :style="{ '--bar-height': `${getDistributionBarHeight(entry.count, statistics.scoreDistribution)}%` }"
+                :aria-label="`${entry.bucket}：${entry.count} 人`"
+              >
+                <strong>{{ entry.count }} 人</strong>
+                <span class="labs__statistics-distribution-track">
+                  <span class="labs__statistics-distribution-fill" aria-hidden="true" />
+                </span>
+                <span>{{ entry.bucket }}</span>
+              </div>
+            </div>
           </section>
         </div>
       </template>
@@ -520,6 +535,7 @@ const form = reactive({
   testcases: [createEmptyTestcase()]
 });
 
+const scoreDistributionBuckets = ['0-59', '60-69', '70-79', '80-89', '90-100'];
 const submitText = computed(() => (editingId.value === null ? '保存' : '更新'));
 
 onMounted(loadLabs);
@@ -1070,6 +1086,27 @@ function formatStatisticScore(value: number | null | undefined) {
   return Number(value).toFixed(2);
 }
 
+function getScoreDistributionEntries(distribution: LabStatistics['scoreDistribution']) {
+  return scoreDistributionBuckets.map((bucket) => ({
+    bucket,
+    count: distribution[bucket] ?? 0
+  }));
+}
+
+function getDistributionBarHeight(count: number, distribution: LabStatistics['scoreDistribution']) {
+  const maxCount = Math.max(...getScoreDistributionEntries(distribution).map((entry) => entry.count));
+  if (maxCount === 0) {
+    return 0;
+  }
+  return Math.round((count / maxCount) * 100);
+}
+
+function formatScoreDistributionSummary(distribution: LabStatistics['scoreDistribution']) {
+  return getScoreDistributionEntries(distribution)
+    .map((entry) => `${entry.bucket} ${entry.count} 人`)
+    .join('，');
+}
+
 function collectActiveTestcases(): LabTestcasePayload[] {
   return form.testcases
     .map((testcase, index) => ({
@@ -1231,18 +1268,56 @@ function formatDateTime(value: string) {
   margin-top: 16px;
 }
 
-.labs__statistics-distribution {
+.labs__statistics-distribution-chart {
+  align-items: end;
+  background: linear-gradient(180deg, #f8fafc, #e8eef7);
+  border: 1px solid #d7dde8;
+  border-radius: 8px;
   display: grid;
-  gap: 8px;
-  list-style: none;
-  margin: 0;
-  padding: 0;
+  gap: 10px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  min-height: 208px;
+  padding: 14px 10px 10px;
 }
 
-.labs__statistics-distribution li {
-  align-items: center;
+.labs__statistics-distribution-bar {
+  color: #334155;
+  display: grid;
+  gap: 8px;
+  grid-template-rows: auto minmax(128px, 1fr) auto;
+  height: 100%;
+  min-width: 0;
+  text-align: center;
+}
+
+.labs__statistics-distribution-bar strong {
+  color: #111827;
+  font-size: 16px;
+  line-height: 1.2;
+}
+
+.labs__statistics-distribution-bar > span:last-child {
+  font-size: 12px;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.labs__statistics-distribution-track {
+  align-items: end;
+  background: #dbe4ef;
+  border-radius: 8px 8px 4px 4px;
   display: flex;
-  justify-content: space-between;
+  min-height: 128px;
+  overflow: hidden;
+}
+
+.labs__statistics-distribution-fill {
+  background: linear-gradient(180deg, #38bdf8, #2563eb);
+  border-radius: 8px 8px 4px 4px;
+  display: block;
+  height: var(--bar-height);
+  min-height: 3px;
+  width: 100%;
 }
 
 .labs__report-detail {

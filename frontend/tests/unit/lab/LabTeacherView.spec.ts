@@ -409,6 +409,13 @@ describe('LabTeacherView', () => {
     expect(wrapper.text()).toContain('703');
     expect(wrapper.text()).toContain('90-100');
     expect(wrapper.text()).toContain('1 人');
+    const distributionChart = wrapper.get('[data-testid="score-distribution-chart"]');
+    const distributionBars = distributionChart.findAll('[data-testid="score-distribution-bar"]');
+    expect(distributionChart.attributes('role')).toBe('img');
+    expect(distributionChart.attributes('aria-label')).toContain('分数分布柱状图');
+    expect(distributionBars).toHaveLength(5);
+    expect(distributionBars[1].attributes('aria-label')).toBe('60-69：1 人');
+    expect(distributionBars[1].attributes('style')).toContain('--bar-height: 100%;');
     expect(wrapper.text()).toContain('统计生成时间：2026-06-06 23:00:00');
   });
 
