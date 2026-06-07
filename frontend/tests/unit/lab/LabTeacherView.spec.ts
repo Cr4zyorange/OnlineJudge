@@ -2,7 +2,7 @@ import { mount } from '@vue/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import LabTeacherView from '../../../src/views/lab/LabTeacherView.vue';
 import * as labApi from '../../../src/api/lab/labs';
-import type { LabScoreSummary, LabSubmissionDetail } from '../../../src/types/lab';
+import type { LabScoreSummary, LabStatistics, LabSubmissionDetail } from '../../../src/types/lab';
 
 const downloadLabReportMock = vi.hoisted(() => vi.fn());
 const scoreLabSubmissionMock = vi.hoisted(() => vi.fn());
@@ -372,6 +372,81 @@ describe('LabTeacherView', () => {
     await flushPromises();
     expect(labApi.deleteLab).toHaveBeenCalledWith(9);
     expect(draftWrapper.text()).toContain('草稿已删除');
+  });
+
+  it('loads lab statistics into the teacher statistics panel', async () => {
+    vi.mocked(labApi.listLabs).mockResolvedValueOnce([
+      {
+        id: 12,
+        courseId: 101,
+        title: '实验十二',
+        status: 'PUBLISHED',
+        deadline: '2026-06-25T23:59:59',
+        maxScore: 100,
+        evaluationMode: 'DOCKER_IO',
+        autoEvaluate: true,
+        reportRequired: true,
+        deleted: false
+      }
+    ]);
+    vi.mocked(labApi.getLabStatistics).mockResolvedValueOnce(labStatisticsFixture());
+
+    const wrapper = mount(LabTeacherView, {
+      props: {
+        courseId: 101
+      }
+    });
+    await flushPromises();
+
+    await wrapper.findAll('button').find((button) => button.text() === '统计')?.trigger('click');
+    await flushPromises();
+
+    expect(labApi.getLabStatistics).toHaveBeenCalledWith(12);
+    expect(wrapper.text()).toContain('实验统计概览');
+    expect(wrapper.text()).toContain('实验十二');
+    expect(wrapper.text()).toContain('66.67%');
+    expect(wrapper.text()).toContain('33.33%');
+    expect(wrapper.text()).toContain('703');
+    expect(wrapper.text()).toContain('90-100');
+    expect(wrapper.text()).toContain('1 人');
+    const distributionChart = wrapper.get('[data-testid="score-distribution-chart"]');
+    const distributionBars = distributionChart.findAll('[data-testid="score-distribution-bar"]');
+    expect(distributionChart.attributes('role')).toBe('img');
+    expect(distributionChart.attributes('aria-label')).toContain('分数分布柱状图');
+    expect(distributionBars).toHaveLength(5);
+    expect(distributionBars[1].attributes('aria-label')).toBe('60-69：1 人');
+    expect(distributionBars[1].attributes('style')).toContain('--bar-height: 100%;');
+    expect(wrapper.text()).toContain('统计生成时间：2026-06-06 23:00:00');
+  });
+
+  it('shows a teacher-facing error when lab statistics loading fails', async () => {
+    vi.mocked(labApi.listLabs).mockResolvedValueOnce([
+      {
+        id: 12,
+        courseId: 101,
+        title: '实验十二',
+        status: 'PUBLISHED',
+        deadline: '2026-06-25T23:59:59',
+        maxScore: 100,
+        evaluationMode: 'DOCKER_IO',
+        autoEvaluate: true,
+        reportRequired: true,
+        deleted: false
+      }
+    ]);
+    vi.mocked(labApi.getLabStatistics).mockRejectedValueOnce(new Error('实验统计加载失败'));
+
+    const wrapper = mount(LabTeacherView, {
+      props: {
+        courseId: 101
+      }
+    });
+    await flushPromises();
+
+    await wrapper.findAll('button').find((button) => button.text() === '统计')?.trigger('click');
+    await flushPromises();
+
+    expect(wrapper.text()).toContain('实验统计加载失败');
   });
 
   it('filters teacher-facing submission history and opens a detail panel', async () => {
@@ -935,4 +1010,29 @@ async function mountTeacherWithSubmissionDetail(detailOverrides: Partial<LabSubm
   await flushPromises();
 
   return wrapper;
+}
+
+function labStatisticsFixture(overrides: Partial<LabStatistics> = {}): LabStatistics {
+  return {
+    labId: 12,
+    courseId: 101,
+    totalStudentCount: 3,
+    submittedCount: 2,
+    unsubmittedCount: 1,
+    evaluatedCount: 1,
+    submissionRate: 66.67,
+    evaluationCompletionRate: 33.33,
+    averageScore: 81.5,
+    lateSubmissionCount: 1,
+    unsubmittedStudentIds: [703],
+    scoreDistribution: {
+      '0-59': 0,
+      '60-69': 1,
+      '70-79': 0,
+      '80-89': 0,
+      '90-100': 1
+    },
+    generatedAt: '2026-06-06T23:00:00',
+    ...overrides
+  };
 }

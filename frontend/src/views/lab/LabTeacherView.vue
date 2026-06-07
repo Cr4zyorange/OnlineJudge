@@ -146,11 +146,99 @@
                 发布成绩
               </button>
               <button v-if="lab.status === 'DRAFT'" type="button" @click="removeLab(lab.id)">删除草稿</button>
+              <button v-if="lab.status !== 'DRAFT'" type="button" @click="openStatisticsPanel(lab.id, lab.title)">
+                统计
+              </button>
               <button type="button" @click="openSubmissionPanel(lab.id, lab.title)">查看提交</button>
             </td>
           </tr>
         </tbody>
       </table>
+    </section>
+
+    <section class="labs__statistics" aria-label="实验统计概览">
+      <header class="labs__submissions-header">
+        <div>
+          <h2>实验统计概览</h2>
+          <p v-if="selectedStatisticsLabId === null">请选择实验查看统计</p>
+          <p v-else>当前实验：{{ selectedStatisticsLabTitle }}</p>
+          <p v-if="statistics" class="labs__statistics-meta">统计生成时间：{{ formatDateTime(statistics.generatedAt) }}</p>
+        </div>
+      </header>
+
+      <p v-if="selectedStatisticsLabId === null" class="labs__statistics-state">尚未选择统计实验</p>
+      <p v-else-if="statisticsLoading" class="labs__statistics-state">统计加载中...</p>
+      <p v-else-if="statisticsErrorMessage" class="labs__error">{{ statisticsErrorMessage }}</p>
+      <p v-else-if="statistics === null" class="labs__statistics-state">暂无实验统计数据</p>
+      <template v-else>
+        <div class="labs__statistics-grid">
+          <article>
+            <span>总人数</span>
+            <strong>{{ statistics.totalStudentCount }}</strong>
+          </article>
+          <article>
+            <span>已提交</span>
+            <strong>{{ statistics.submittedCount }}</strong>
+          </article>
+          <article>
+            <span>未提交</span>
+            <strong>{{ statistics.unsubmittedCount }}</strong>
+          </article>
+          <article>
+            <span>已评测</span>
+            <strong>{{ statistics.evaluatedCount }}</strong>
+          </article>
+          <article>
+            <span>提交率</span>
+            <strong>{{ formatPercentage(statistics.submissionRate) }}</strong>
+          </article>
+          <article>
+            <span>评测完成率</span>
+            <strong>{{ formatPercentage(statistics.evaluationCompletionRate) }}</strong>
+          </article>
+          <article>
+            <span>平均分</span>
+            <strong>{{ formatStatisticScore(statistics.averageScore) }}</strong>
+          </article>
+          <article>
+            <span>逾期提交数</span>
+            <strong>{{ statistics.lateSubmissionCount }}</strong>
+          </article>
+        </div>
+
+        <div class="labs__statistics-layout">
+          <section class="labs__statistics-card">
+            <h3>未提交名单</h3>
+            <p v-if="statistics.unsubmittedStudentIds.length === 0">当前实验已全部提交</p>
+            <p v-else>{{ statistics.unsubmittedStudentIds.join(', ') }}</p>
+          </section>
+
+          <section class="labs__statistics-card">
+            <h3>分数段分布</h3>
+            <div
+              class="labs__statistics-distribution-chart"
+              data-testid="score-distribution-chart"
+              role="img"
+              :aria-label="`分数分布柱状图：${formatScoreDistributionSummary(statistics.scoreDistribution)}`"
+            >
+              <div
+                v-for="entry in getScoreDistributionEntries(statistics.scoreDistribution)"
+                :key="entry.bucket"
+                class="labs__statistics-distribution-bar"
+                data-testid="score-distribution-bar"
+                :style="{ '--bar-height': `${getDistributionBarHeight(entry.count, statistics.scoreDistribution)}%` }"
+                :aria-label="`${entry.bucket}：${entry.count} 人`"
+              >
+                <strong>{{ entry.count }} 人</strong>
+                <span class="labs__statistics-distribution-track">
+                  <span class="labs__statistics-distribution-fill" aria-hidden="true" />
+                </span>
+                <span>{{ entry.bucket }}</span>
+              </div>
+            </div>
+          </section>
+        </div>
+      </template>
     </section>
 
     <section class="labs__submissions" aria-label="提交版本查看">
@@ -364,6 +452,7 @@ import {
   deleteLab,
   downloadLabReport,
   getLabSubmissionDetail,
+  getLabStatistics,
   getLabDetail,
   listLabSubmissions,
   listLabs,
@@ -381,6 +470,7 @@ import type {
   LabExperimentPayload,
   LabExperimentStatus,
   LabExperimentSummary,
+  LabStatistics,
   LabTestcase,
   LabTestcasePayload
 } from '../../types/lab';
@@ -398,6 +488,11 @@ const editingId = ref<number | null>(null);
 const selectedStatus = ref('');
 const selectedSubmissionLabId = ref<number | null>(null);
 const selectedSubmissionLabTitle = ref('');
+const selectedStatisticsLabId = ref<number | null>(null);
+const selectedStatisticsLabTitle = ref('');
+const statistics = ref<LabStatistics | null>(null);
+const statisticsLoading = ref(false);
+const statisticsErrorMessage = ref('');
 const submissions = ref<LabSubmissionHistoryItem[]>([]);
 const submissionLoading = ref(false);
 const submissionErrorMessage = ref('');
@@ -440,6 +535,7 @@ const form = reactive({
   testcases: [createEmptyTestcase()]
 });
 
+const scoreDistributionBuckets = ['0-59', '60-69', '70-79', '80-89', '90-100'];
 const submitText = computed(() => (editingId.value === null ? '保存' : '更新'));
 
 onMounted(loadLabs);
@@ -543,6 +639,21 @@ async function releaseScores(labId: number) {
     await loadLabs();
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '成绩发布失败';
+  }
+}
+
+async function openStatisticsPanel(labId: number, title: string) {
+  selectedStatisticsLabId.value = labId;
+  selectedStatisticsLabTitle.value = title;
+  statisticsErrorMessage.value = '';
+  statistics.value = null;
+  statisticsLoading.value = true;
+  try {
+    statistics.value = await getLabStatistics(labId);
+  } catch (error) {
+    statisticsErrorMessage.value = error instanceof Error ? error.message : '实验统计加载失败';
+  } finally {
+    statisticsLoading.value = false;
   }
 }
 
@@ -961,6 +1072,41 @@ function formatScore(value: number | null | undefined) {
   return value ?? '未生成';
 }
 
+function formatPercentage(value: number | null | undefined) {
+  if (value === null || value === undefined) {
+    return '-';
+  }
+  return `${Number(value).toFixed(2)}%`;
+}
+
+function formatStatisticScore(value: number | null | undefined) {
+  if (value === null || value === undefined) {
+    return '-';
+  }
+  return Number(value).toFixed(2);
+}
+
+function getScoreDistributionEntries(distribution: LabStatistics['scoreDistribution']) {
+  return scoreDistributionBuckets.map((bucket) => ({
+    bucket,
+    count: distribution[bucket] ?? 0
+  }));
+}
+
+function getDistributionBarHeight(count: number, distribution: LabStatistics['scoreDistribution']) {
+  const maxCount = Math.max(...getScoreDistributionEntries(distribution).map((entry) => entry.count));
+  if (maxCount === 0) {
+    return 0;
+  }
+  return Math.round((count / maxCount) * 100);
+}
+
+function formatScoreDistributionSummary(distribution: LabStatistics['scoreDistribution']) {
+  return getScoreDistributionEntries(distribution)
+    .map((entry) => `${entry.bucket} ${entry.count} 人`)
+    .join('，');
+}
+
 function collectActiveTestcases(): LabTestcasePayload[] {
   return form.testcases
     .map((testcase, index) => ({
@@ -991,6 +1137,10 @@ function toDateTimeLocal(value: string) {
 function formatDeadline(value: string) {
   return value.replace('T', ' ').slice(0, 16);
 }
+
+function formatDateTime(value: string) {
+  return value.replace('T', ' ').slice(0, 19);
+}
 </script>
 
 <style scoped>
@@ -1005,6 +1155,7 @@ function formatDeadline(value: string) {
 
 .labs__panel,
 .labs__list,
+.labs__statistics,
 .labs__submissions {
   background: #ffffff;
   border: 1px solid #d7dde8;
@@ -1068,6 +1219,105 @@ function formatDeadline(value: string) {
   border: 1px solid #d7dde8;
   border-radius: 8px;
   padding: 12px;
+}
+
+.labs__statistics-state {
+  color: #5f6b7a;
+  margin-top: 12px;
+}
+
+.labs__statistics-meta {
+  color: #5f6b7a;
+  font-size: 13px;
+  margin-top: 4px;
+}
+
+.labs__statistics-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  margin-top: 16px;
+}
+
+.labs__statistics-grid article,
+.labs__statistics-card {
+  background: #f8fafc;
+  border: 1px solid #d7dde8;
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.labs__statistics-grid article span,
+.labs__statistics-card h3 {
+  color: #5f6b7a;
+  display: block;
+  font-size: 13px;
+  margin-bottom: 6px;
+}
+
+.labs__statistics-grid article strong,
+.labs__statistics-card strong {
+  color: #111827;
+  font-size: 20px;
+}
+
+.labs__statistics-layout {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(220px, 1fr) minmax(260px, 1.2fr);
+  margin-top: 16px;
+}
+
+.labs__statistics-distribution-chart {
+  align-items: end;
+  background: linear-gradient(180deg, #f8fafc, #e8eef7);
+  border: 1px solid #d7dde8;
+  border-radius: 8px;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  min-height: 208px;
+  padding: 14px 10px 10px;
+}
+
+.labs__statistics-distribution-bar {
+  color: #334155;
+  display: grid;
+  gap: 8px;
+  grid-template-rows: auto minmax(128px, 1fr) auto;
+  height: 100%;
+  min-width: 0;
+  text-align: center;
+}
+
+.labs__statistics-distribution-bar strong {
+  color: #111827;
+  font-size: 16px;
+  line-height: 1.2;
+}
+
+.labs__statistics-distribution-bar > span:last-child {
+  font-size: 12px;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.labs__statistics-distribution-track {
+  align-items: end;
+  background: #dbe4ef;
+  border-radius: 8px 8px 4px 4px;
+  display: flex;
+  min-height: 128px;
+  overflow: hidden;
+}
+
+.labs__statistics-distribution-fill {
+  background: linear-gradient(180deg, #38bdf8, #2563eb);
+  border-radius: 8px 8px 4px 4px;
+  display: block;
+  height: var(--bar-height);
+  min-height: 3px;
+  width: 100%;
 }
 
 .labs__report-detail {
@@ -1166,6 +1416,7 @@ td {
 }
 
 @media (max-width: 960px) {
+  .labs__statistics-layout,
   .labs__submission-layout {
     grid-template-columns: 1fr;
   }

@@ -6,6 +6,7 @@ import type {
   LabScorePayload,
   LabScoreSummary,
   LabResult,
+  LabStatistics,
   LabSubmissionResult,
   LabSubmissionDetail,
   LabSubmissionHistoryItem,
@@ -181,6 +182,10 @@ export async function getLabSubmissionResult(labId: number, submissionId: number
 
 export async function getLabResult(labId: number, studentId: number): Promise<LabResult> {
   return request<LabResult>(`/api/v1/labs/${labId}/results/${studentId}`);
+}
+
+export async function getLabStatistics(labId: number): Promise<LabStatistics> {
+  return request<LabStatistics>(`/api/v1/labs/${labId}/statistics`);
 }
 
 export async function evaluateLabSubmission(labId: number, submissionId: number): Promise<LabSubmissionResult> {
