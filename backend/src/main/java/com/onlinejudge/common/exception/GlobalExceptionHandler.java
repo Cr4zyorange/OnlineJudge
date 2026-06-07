@@ -12,6 +12,10 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 public class GlobalExceptionHandler {
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<ApiResponse<Void>> handleBusiness(BusinessException ex) {
+        if (ex.status() == HttpStatus.FORBIDDEN) {
+            return ResponseEntity.status(ex.status())
+                    .body(ApiResponse.error("ERR-AUTH-05", ex.getMessage()));
+        }
         return ResponseEntity.status(ex.status())
                 .body(ApiResponse.error(String.valueOf(ex.status().value()), ex.getMessage()));
     }
