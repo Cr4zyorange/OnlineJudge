@@ -9,14 +9,9 @@ import java.util.List;
 @Component
 public class DefaultSourceGradeClient implements SourceGradeClient {
     private final List<SourceGradeProvider> providers;
-    private final DemoSourceGradeClient fallbackSourceGradeClient;
 
-    public DefaultSourceGradeClient(
-            List<SourceGradeProvider> providers,
-            DemoSourceGradeClient fallbackSourceGradeClient
-    ) {
+    public DefaultSourceGradeClient(List<SourceGradeProvider> providers) {
         this.providers = providers;
-        this.fallbackSourceGradeClient = fallbackSourceGradeClient;
     }
 
     @Override
@@ -30,9 +25,6 @@ public class DefaultSourceGradeClient implements SourceGradeClient {
                 return sourceGrades.get();
             }
         }
-        if (sourceType != SourceGradeType.LAB) {
-            return List.of();
-        }
-        return fallbackSourceGradeClient.findSourceGrades(courseId, sourceType, sourceId);
+        return List.of();
     }
 }
