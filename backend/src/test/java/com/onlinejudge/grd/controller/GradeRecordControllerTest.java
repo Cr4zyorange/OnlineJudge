@@ -39,6 +39,48 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
                 "DELETE FROM t_hwk_question",
                 "DELETE FROM t_hwk_judge_config",
                 "DELETE FROM t_hwk_homework",
+                "DELETE FROM lab_score_change_log",
+                "DELETE FROM lab_score",
+                "DELETE FROM lab_submission",
+                "DELETE FROM lab_testcase",
+                "DELETE FROM lab_report",
+                "DELETE FROM lab_experiment",
+                """
+                        INSERT INTO lab_experiment (
+                            id, course_id, chapter_id, title, description, status, deadline, max_score,
+                            attachment_ids, allowed_languages, evaluation_mode, auto_evaluate, report_required,
+                            time_limit_ms, memory_limit_kb, created_by, published_at, deleted, created_at, updated_at
+                        ) VALUES (
+                            301, 101, NULL, '实验一', 'GRD source lab', 'SCORE_PUBLISHED', '2026-06-30 23:59:59', 100,
+                            NULL, 'python', 'DOCKER_IO', 1, 0, 60000, 262144, 501,
+                            '2026-06-01 00:00:00', 0, '2026-06-01 00:00:00', '2026-06-01 00:00:00'
+                        );
+                        """,
+                """
+                        INSERT INTO lab_submission (
+                            id, lab_id, student_id, code_content, file_id, language, submit_status,
+                            evaluation_status, final_score, auto_score, version, is_final,
+                            submitted_at, created_at, updated_at, deleted
+                        ) VALUES
+                        (
+                            30101, 301, 601, 'print(601)', NULL, 'python', 'SUBMITTED',
+                            'ACCEPTED', 90, 90, 1, 1,
+                            '2026-06-01 00:10:00', '2026-06-01 00:10:00', '2026-06-01 00:20:00', 0
+                        ),
+                        (
+                            30102, 301, 602, 'print(602)', NULL, 'python', 'SUBMITTED',
+                            'ACCEPTED', 78, 78, 1, 1,
+                            '2026-06-01 00:11:00', '2026-06-01 00:11:00', '2026-06-01 00:21:00', 0
+                        );
+                        """,
+                """
+                        INSERT INTO lab_score (
+                            submission_id, report_id, teacher_id, auto_score, report_score,
+                            manual_score, final_score, comment, scored_at, updated_at
+                        ) VALUES
+                        (30101, NULL, 501, 90, NULL, NULL, 90, 'lab graded', '2026-06-01 00:20:00', '2026-06-01 00:20:00'),
+                        (30102, NULL, 501, 78, NULL, NULL, 78, 'lab graded', '2026-06-01 00:21:00', '2026-06-01 00:21:00');
+                        """,
                 """
                         INSERT INTO t_hwk_homework (
                             id, course_id, chapter_id, title, description, type, status, total_score,
@@ -79,6 +121,27 @@ class GradeRecordControllerTest {
 
     @Autowired
     private ObjectMapper objectMapper;
+
+    @Test
+    void teacherSyncsMissingLabSourceAsMissingWithoutDemoFallback() throws Exception {
+        createGradeItem(102L, "实验一", "LAB", 301, "1.00");
+
+        mockMvc.perform(post("/api/v1/courses/102/grades/sync")
+                        .headers(teacherHeaders("102", "102:701,702")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"))
+                .andExpect(jsonPath("$.data.syncedCount").value(0))
+                .andExpect(jsonPath("$.data.ungradedCount").value(0))
+                .andExpect(jsonPath("$.data.missingCount").value(2))
+                .andExpect(jsonPath("$.data.affectedStudentCount").value(2));
+
+        mockMvc.perform(get("/api/v1/courses/102/grades?gradeStatus=MISSING&page=1&size=10")
+                        .headers(teacherHeaders("102", "102:701,702")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.total").value(2))
+                .andExpect(jsonPath("$.data.records[0].records[0].gradeStatus").value("MISSING"))
+                .andExpect(jsonPath("$.data.records[1].records[0].gradeStatus").value("MISSING"));
+    }
 
     @Test
     void teacherSyncsSourceGradesRecalculatesAndQueriesCourseGradeTableThroughApi() throws Exception {
@@ -514,6 +577,10 @@ class GradeRecordControllerTest {
     }
 
     private long createGradeItem(String name, String sourceType, long sourceId, String weight) throws Exception {
+        return createGradeItem(101L, name, sourceType, sourceId, weight);
+    }
+
+    private long createGradeItem(long courseId, String name, String sourceType, long sourceId, String weight) throws Exception {
         Map<String, Object> payload = Map.of(
                 "name", name,
                 "sourceType", sourceType,
@@ -524,8 +591,8 @@ class GradeRecordControllerTest {
                 "sortOrder", sourceId == 301 ? 1 : 2
         );
 
-        String responseJson = mockMvc.perform(post("/api/v1/courses/101/grade-items")
-                        .headers(teacherHeaders("101"))
+        String responseJson = mockMvc.perform(post("/api/v1/courses/{courseId}/grade-items", courseId)
+                        .headers(teacherHeaders(Long.toString(courseId)))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(payload)))
                 .andExpect(status().isCreated())
@@ -536,11 +603,15 @@ class GradeRecordControllerTest {
     }
 
     private org.springframework.http.HttpHeaders teacherHeaders(String manageableCourseIds) {
+        return teacherHeaders(manageableCourseIds, "101:601,602,603");
+    }
+
+    private org.springframework.http.HttpHeaders teacherHeaders(String manageableCourseIds, String courseStudentIds) {
         org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
         headers.add("X-User-Id", "501");
         headers.add("X-User-Role", "TEACHER");
         headers.add("X-Manageable-Course-Ids", manageableCourseIds);
-        headers.add("X-Course-Student-Ids", "101:601,602,603");
+        headers.add("X-Course-Student-Ids", courseStudentIds);
         headers.add("X-Course-Teacher-Ids", "101:501");
         return headers;
     }

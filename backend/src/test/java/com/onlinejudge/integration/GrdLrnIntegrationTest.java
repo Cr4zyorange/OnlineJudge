@@ -52,11 +52,18 @@ class GrdLrnIntegrationTest {
         jdbcTemplate.update("DELETE FROM t_hwk_question");
         jdbcTemplate.update("DELETE FROM t_hwk_judge_config");
         jdbcTemplate.update("DELETE FROM t_hwk_homework");
+        jdbcTemplate.update("DELETE FROM lab_score_change_log");
+        jdbcTemplate.update("DELETE FROM lab_score");
+        jdbcTemplate.update("DELETE FROM lab_submission");
+        jdbcTemplate.update("DELETE FROM lab_testcase");
+        jdbcTemplate.update("DELETE FROM lab_report");
+        jdbcTemplate.update("DELETE FROM lab_experiment");
         jdbcTemplate.update("DELETE FROM crs_course_member");
         jdbcTemplate.update("DELETE FROM crs_chapter");
         jdbcTemplate.update("DELETE FROM crs_course");
 
         insertCourseRoster();
+        insertPublishedLabScore();
         insertPublishedHomeworkScore();
     }
 
@@ -200,6 +207,40 @@ class GrdLrnIntegrationTest {
                     (101, 601, 'STUDENT', 'ACTIVE', CURRENT_TIMESTAMP),
                     (101, 602, 'STUDENT', 'ACTIVE', CURRENT_TIMESTAMP),
                     (101, 603, 'STUDENT', 'ACTIVE', CURRENT_TIMESTAMP)
+                """);
+    }
+
+    private void insertPublishedLabScore() {
+        jdbcTemplate.update("""
+                INSERT INTO lab_experiment (
+                    id, course_id, chapter_id, title, description, status, deadline, max_score,
+                    attachment_ids, allowed_languages, evaluation_mode, auto_evaluate, report_required,
+                    time_limit_ms, memory_limit_kb, created_by, published_at, deleted, created_at, updated_at
+                ) VALUES (
+                    301, 101, NULL, '实验一', 'GRD source lab', 'SCORE_PUBLISHED', '2026-06-30 23:59:59', 100,
+                    NULL, 'python', 'DOCKER_IO', 1, 0, 60000, 262144, 501,
+                    '2026-06-01 00:00:00', 0, '2026-06-01 00:00:00', '2026-06-01 00:00:00'
+                )
+                """);
+        jdbcTemplate.update("""
+                INSERT INTO lab_submission (
+                    id, lab_id, student_id, code_content, file_id, language, submit_status,
+                    evaluation_status, final_score, auto_score, version, is_final,
+                    submitted_at, created_at, updated_at, deleted
+                ) VALUES (
+                    30101, 301, 601, 'print(601)', NULL, 'python', 'SUBMITTED',
+                    'ACCEPTED', 90, 90, 1, 1,
+                    '2026-06-01 00:10:00', '2026-06-01 00:10:00', '2026-06-01 00:20:00', 0
+                )
+                """);
+        jdbcTemplate.update("""
+                INSERT INTO lab_score (
+                    submission_id, report_id, teacher_id, auto_score, report_score,
+                    manual_score, final_score, comment, scored_at, updated_at
+                ) VALUES (
+                    30101, NULL, 501, 90, NULL, NULL, 90, 'lab graded',
+                    '2026-06-01 00:20:00', '2026-06-01 00:20:00'
+                )
                 """);
     }
 
