@@ -6,11 +6,9 @@ import com.onlinejudge.common.evaluation.SandboxExecutionResult;
 import com.onlinejudge.common.evaluation.SandboxExecutor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
 @Component
-@Profile("test")
 @ConditionalOnProperty(prefix = "onlinejudge.evaluation.sandbox", name = "mode", havingValue = "fake")
 public class FakeSandboxExecutor implements SandboxExecutor {
     private final long delayMs;

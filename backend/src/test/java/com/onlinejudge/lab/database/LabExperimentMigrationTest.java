@@ -12,8 +12,12 @@ import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabas
 import org.springframework.boot.test.autoconfigure.jdbc.JdbcTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.context.annotation.Import;
+import org.springframework.core.io.FileSystemResource;
+import org.springframework.jdbc.datasource.init.ResourceDatabasePopulator;
 import org.springframework.test.context.jdbc.Sql;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -27,7 +31,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 @Import(JdbcLabExperimentRepository.class)
 @Sql(scripts = {
         "file:../database/migrations/20260525_02_create_lab_experiment.sql",
-        "file:../database/migrations/20260606_01_add_lab_published_at.sql",
         "file:../database/migrations/20260526_01_create_lab_submission.sql",
         "file:../database/migrations/20260604_01_create_lab_report.sql",
         "file:../database/migrations/20260605_02_create_lab_score.sql"
@@ -40,6 +43,30 @@ class LabExperimentMigrationTest {
     LabExperimentMigrationTest(JdbcLabExperimentRepository repository, JdbcTemplate jdbcTemplate) {
         this.repository = repository;
         this.jdbcTemplate = jdbcTemplate;
+    }
+
+    @Test
+    void labExperimentCreateTableIncludesPublishedAtForFreshSchema() {
+        assertThat(publishedAtColumnCount()).isEqualTo(1);
+    }
+
+    @Test
+    void publishedAtMigrationUpgradesExistingLabTableOnce() {
+        jdbcTemplate.execute("ALTER TABLE lab_experiment DROP COLUMN published_at");
+        assertThat(publishedAtColumnCount()).isZero();
+
+        new ResourceDatabasePopulator(new FileSystemResource("../database/migrations/20260606_01_add_lab_published_at.sql"))
+                .execute(jdbcTemplate.getDataSource());
+
+        assertThat(publishedAtColumnCount()).isEqualTo(1);
+    }
+
+    @Test
+    void publishedAtMigrationUsesMySqlCompatibleAddColumnSyntax() throws Exception {
+        String migration = Files.readString(Path.of("../database/migrations/20260606_01_add_lab_published_at.sql"));
+
+        assertThat(migration).contains("ADD COLUMN published_at");
+        assertThat(migration).doesNotContain("ADD COLUMN IF NOT EXISTS");
     }
 
     @Test
@@ -76,6 +103,15 @@ class LabExperimentMigrationTest {
         assertThat(saved.testcases()).hasSize(2);
         assertThat(saved.testcases()).extracting(LabTestcase::labId).containsOnly(saved.id());
         assertThat(repository.findById(saved.id())).contains(saved);
+    }
+
+    private Integer publishedAtColumnCount() {
+        return jdbcTemplate.queryForObject("""
+                SELECT COUNT(*)
+                  FROM INFORMATION_SCHEMA.COLUMNS
+                 WHERE TABLE_NAME = 'lab_experiment'
+                   AND COLUMN_NAME = 'published_at'
+                """, Integer.class);
     }
 
     @Test

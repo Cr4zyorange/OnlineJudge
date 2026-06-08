@@ -1,0 +1,2 @@
+ALTER TABLE lab_experiment
+    ADD COLUMN IF NOT EXISTS published_at TIMESTAMP NULL;
