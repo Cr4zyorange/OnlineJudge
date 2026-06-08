@@ -125,6 +125,25 @@ describe('HomeworkTeacherView', () => {
     expect(wrapper.text()).toContain('关闭成功');
   });
 
+  it('links published homework to the teacher submission review page', async () => {
+    vi.mocked(homeworkApi.listHomeworks).mockResolvedValueOnce({
+      list: [homeworkSummary({ id: 7, title: 'Published homework', status: 'PUBLISHED' })],
+      page: 1,
+      size: 20,
+      total: 1
+    });
+
+    const wrapper = mount(HomeworkTeacherView, {
+      props: {
+        courseId: 101
+      }
+    });
+    await flushPromises();
+
+    expect(wrapper.get('[data-testid="review-homework-submissions-7"]').attributes('href'))
+      .toBe('/courses/101/homeworks/7/submissions?role=teacher');
+  });
+
   it('loads homework statistics and publishes scores from the management table', async () => {
     vi.mocked(homeworkApi.listHomeworks).mockResolvedValueOnce({
       list: [homeworkSummary({ id: 9, title: 'Reviewed homework', status: 'PUBLISHED' })],

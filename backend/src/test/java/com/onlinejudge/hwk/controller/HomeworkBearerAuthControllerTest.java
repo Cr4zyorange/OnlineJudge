@@ -22,7 +22,10 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.util.Map;
 
 import static java.util.Map.entry;
+import static org.hamcrest.Matchers.hasSize;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -33,6 +36,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 @Sql(
         statements = {
+                "DELETE FROM t_hwk_review_log",
+                "DELETE FROM t_hwk_evaluation",
+                "DELETE FROM t_hwk_submission",
                 "DELETE FROM t_hwk_test_case",
                 "DELETE FROM t_hwk_question",
                 "DELETE FROM t_hwk_judge_config",
@@ -109,6 +115,113 @@ class HomeworkBearerAuthControllerTest {
                 .andExpect(jsonPath("$.data.status").value("DRAFT"));
     }
 
+    @Test
+    void crsHomeworkFlowUsesRealCourseMembershipForVisibilitySubmissionAndReviewPermission() throws Exception {
+        long teacherId = createUserWithRole("teacher-hwk-int", "TEACHER");
+        long enrolledStudentId = createUserWithRole("student-hwk-int", "STUDENT");
+        long nonMemberStudentId = createUserWithRole("outsider-hwk-int", "STUDENT");
+        long otherTeacherId = createUserWithRole("other-teacher-hwk-int", "TEACHER");
+        String teacherToken = sessionTokenService.createSession(teacherId).token();
+        String enrolledStudentToken = sessionTokenService.createSession(enrolledStudentId).token();
+        String nonMemberStudentToken = sessionTokenService.createSession(nonMemberStudentId).token();
+        String otherTeacherToken = sessionTokenService.createSession(otherTeacherId).token();
+        long courseId = courseRepository.insert(new CourseCreateRequest(
+                "CRS HWK integration",
+                "Course membership drives homework access.",
+                "2026 Spring",
+                "Programming",
+                null,
+                EnrollmentMode.PUBLIC,
+                null,
+                null,
+                null,
+                null,
+                CourseStatus.ACTIVE
+        ), teacherId).id();
+        courseRepository.insertMember(courseId, teacherId, CourseMemberRole.TEACHER, CourseMemberStatus.ACTIVE, "CREATED", teacherId);
+        courseRepository.insertMember(courseId, enrolledStudentId, CourseMemberRole.STUDENT, CourseMemberStatus.ACTIVE, "JOINED", teacherId);
+
+        String homeworkBody = mockMvc.perform(post("/api/v1/homeworks")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + teacherToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(textPayload(courseId))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.status").value("DRAFT"))
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        long homeworkId = objectMapper.readTree(homeworkBody).path("data").path("id").asLong();
+
+        mockMvc.perform(put("/api/v1/homeworks/{homeworkId}/publish", homeworkId)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + teacherToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("PUBLISHED"));
+
+        mockMvc.perform(get("/api/v1/homeworks")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + enrolledStudentToken)
+                        .param("courseId", Long.toString(courseId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.list", hasSize(1)))
+                .andExpect(jsonPath("$.data.list[0].id").value(homeworkId));
+
+        String submissionBody = mockMvc.perform(post("/api/v1/homeworks/{homeworkId}/submissions", homeworkId)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + enrolledStudentToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of("answerText", "submitted through real CRS membership"))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.studentId").value(enrolledStudentId))
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        long submissionId = objectMapper.readTree(submissionBody).path("data").path("submissionId").asLong();
+
+        mockMvc.perform(post("/api/v1/homeworks/{homeworkId}/submissions", homeworkId)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + nonMemberStudentToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of("answerText", "not a member"))))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("HWK_4031"));
+
+        mockMvc.perform(put("/api/v1/submissions/{submissionId}/review", submissionId)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + otherTeacherToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "manualScore", 80,
+                                "finalScore", 82,
+                                "comment", "wrong course"
+                        ))))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("HWK_4031"));
+
+        mockMvc.perform(put("/api/v1/submissions/{submissionId}/review", submissionId)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + teacherToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "manualScore", 90,
+                                "finalScore", 92,
+                                "comment", "reviewed by course teacher"
+                        ))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.reviewStatus").value("REVIEWED"))
+                .andExpect(jsonPath("$.data.finalScore").value(92))
+                .andExpect(jsonPath("$.data.comment").value("reviewed by course teacher"));
+    }
+
+    private long createUserWithRole(String username, String roleCode) {
+        long userId = authRepository.createUser(
+                username,
+                roleCode,
+                username,
+                null,
+                username + "@example.com",
+                null,
+                "hash",
+                "salt"
+        );
+        authRepository.assignRole(userId, roleCode, null);
+        return userId;
+    }
+
     private Map<String, Object> objectivePayload(long courseId) {
         return Map.ofEntries(
                 entry("courseId", courseId),
@@ -131,6 +244,21 @@ class HomeworkBearerAuthControllerTest {
                                 "sortOrder", 1
                         )
                 ))
+        );
+    }
+
+    private Map<String, Object> textPayload(long courseId) {
+        return Map.ofEntries(
+                entry("courseId", courseId),
+                entry("chapterId", 11),
+                entry("title", "HWK01 CRS integration text"),
+                entry("description", "Submit a short answer."),
+                entry("type", "TEXT"),
+                entry("deadline", "2026-06-30T23:59:59"),
+                entry("totalScore", 100),
+                entry("allowResubmit", true),
+                entry("allowLateSubmit", false),
+                entry("showEvaluationBeforePublish", true)
         );
     }
 }
