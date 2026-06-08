@@ -6,10 +6,12 @@ import com.onlinejudge.auth.service.AuthService;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.annotation.Order;
 
 @Configuration
 public class AuthSeedDataInitializer {
     @Bean
+    @Order(0)
     ApplicationRunner authSeedData(AuthRepository authRepository, AuthService authService) {
         return args -> {
             authRepository.ensureBaseRolesAndPermissions();
