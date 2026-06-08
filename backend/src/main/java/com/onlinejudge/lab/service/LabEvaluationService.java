@@ -14,6 +14,8 @@ import com.onlinejudge.lab.domain.LabEvaluationResultRepository;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -23,6 +25,8 @@ import java.util.Map;
 
 @Service
 public class LabEvaluationService {
+    private static final Logger log = LoggerFactory.getLogger(LabEvaluationService.class);
+
     private final Evaluator evaluator;
     private final LabSubmissionRepository labSubmissionRepository;
     private final LabEvaluationRepository labEvaluationRepository;
@@ -63,45 +67,99 @@ public class LabEvaluationService {
         labSubmissionRepository.update(submission.withEvaluationResult(EvaluationStatus.RUNNING, null, submission.finalScore(), startedAt));
 
         List<LabEvaluationCaseResult> caseResults = new ArrayList<>();
-        for (LabTestcase testcase : experiment.testcases()) {
-            var task = new EvaluationTask(
-                    submission.id() + "-" + testcase.id(),
-                    "LAB",
-                    experiment.courseId(),
-                    experiment.id(),
-                    submission.id(),
-                    submission.studentId(),
-                    submission.language(),
-                    sourceCode,
-                    Map.of(
-                            "stdin", testcase.input(),
-                            "expectedOutput", testcase.expectedOutput(),
-                            "timeLimitMs", Integer.toString(testcase.timeLimitMs()),
-                            "memoryLimitKb", Integer.toString(testcase.memoryLimitKb())
-                    ),
-                    submission.submittedAt()
-            );
-            var result = evaluator.evaluate(task);
-            boolean passed = result.status() == EvaluationStatus.ACCEPTED;
-            caseResults.add(new LabEvaluationCaseResult(
-                    0L,
-                    submission.id(),
-                    testcase.id(),
-                    testcase.orderNum(),
-                    testcase.isPublic(),
-                    result.status(),
-                    passed,
-                    passed ? testcase.scoreWeight() : 0,
-                    testcase.input(),
-                    testcase.expectedOutput(),
-                    firstCaseResult(result.caseResults()),
-                    result.message(),
-                    result.finishedAt(),
+        LabTestcase currentTestcase = null;
+        try {
+            for (LabTestcase testcase : experiment.testcases()) {
+                currentTestcase = testcase;
+                var task = new EvaluationTask(
+                        submission.id() + "-" + testcase.id(),
+                        "LAB",
+                        experiment.courseId(),
+                        experiment.id(),
+                        submission.id(),
+                        submission.studentId(),
+                        submission.language(),
+                        sourceCode,
+                        Map.of(
+                                "stdin", testcase.input(),
+                                "expectedOutput", testcase.expectedOutput(),
+                                "timeLimitMs", Integer.toString(testcase.timeLimitMs()),
+                                "memoryLimitKb", Integer.toString(testcase.memoryLimitKb())
+                        ),
+                        submission.submittedAt()
+                );
+                var result = evaluator.evaluate(task);
+                boolean passed = result.status() == EvaluationStatus.ACCEPTED;
+                caseResults.add(new LabEvaluationCaseResult(
+                        0L,
+                        submission.id(),
+                        testcase.id(),
+                        testcase.orderNum(),
+                        testcase.isPublic(),
+                        result.status(),
+                        passed,
+                        passed ? testcase.scoreWeight() : 0,
+                        testcase.input(),
+                        testcase.expectedOutput(),
+                        firstCaseResult(result.caseResults()),
+                        result.message(),
+                        result.finishedAt(),
+                        startedAt,
+                        result.finishedAt()
+                ));
+                currentTestcase = null;
+            }
+            return finalizeEvaluation(submission, startedAt, caseResults);
+        } catch (RuntimeException exception) {
+            LocalDateTime failedAt = LocalDateTime.now();
+            String failureMessage = resolveFailureMessage(exception);
+            log.error("LAB evaluation failed for submission {}", submission.id(), exception);
+            if (currentTestcase != null) {
+                caseResults.add(new LabEvaluationCaseResult(
+                        0L,
+                        submission.id(),
+                        currentTestcase.id(),
+                        currentTestcase.orderNum(),
+                        currentTestcase.isPublic(),
+                        EvaluationStatus.SYSTEM_ERROR,
+                        false,
+                        0,
+                        currentTestcase.input(),
+                        currentTestcase.expectedOutput(),
+                        "",
+                        failureMessage,
+                        failedAt,
+                        failedAt,
+                        failedAt
+                ));
+            }
+            labEvaluationResultRepository.replaceSubmissionResults(submission.id(), caseResults);
+            int passedCases = (int) caseResults.stream().filter(LabEvaluationCaseResult::passed).count();
+            int totalCases = experiment.testcases().size();
+            int autoScore = caseResults.stream().mapToInt(LabEvaluationCaseResult::score).sum();
+            upsertEvaluation(
+                    submission,
+                    EvaluationStatus.SYSTEM_ERROR,
+                    autoScore,
+                    passedCases,
+                    totalCases,
+                    resolveEvaluationMessage(EvaluationStatus.SYSTEM_ERROR, passedCases),
+                    null,
+                    failureMessage,
                     startedAt,
-                    result.finishedAt()
-            ));
+                    failedAt
+            );
+            return labSubmissionRepository.update(
+                    submission.withEvaluationResult(EvaluationStatus.SYSTEM_ERROR, autoScore, submission.finalScore(), failedAt)
+            );
         }
+    }
 
+    private LabSubmission finalizeEvaluation(
+            LabSubmission submission,
+            LocalDateTime startedAt,
+            List<LabEvaluationCaseResult> caseResults
+    ) {
         labEvaluationResultRepository.replaceSubmissionResults(submission.id(), caseResults);
 
         int passedCases = (int) caseResults.stream().filter(LabEvaluationCaseResult::passed).count();
@@ -228,5 +286,13 @@ public class LabEvaluationService {
 
     private String firstCaseResult(List<String> caseResults) {
         return caseResults.isEmpty() ? "" : caseResults.get(0);
+    }
+
+    private String resolveFailureMessage(RuntimeException exception) {
+        String message = exception.getMessage();
+        if (message == null || message.isBlank()) {
+            return "评测器内部异常: " + exception.getClass().getSimpleName();
+        }
+        return message;
     }
 }
