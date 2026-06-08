@@ -81,8 +81,52 @@ describe('CourseManagementView', () => {
 
     expect(wrapper.text()).toContain('课程详情');
     expect(wrapper.text()).toContain(longDescription);
-    expect(wrapper.text()).toContain('预留操作区');
+    expect(wrapper.text()).toContain('操作区');
     expect(wrapper.text()).toContain('暂无章节目录');
+  });
+
+  it('opens chapter, resource, and announcement management from the teacher detail action area', async () => {
+    const page = (list = [course], total = list.length) => ({
+      code: '0',
+      message: 'success',
+      data: { list, total, page: 1, size: 20 }
+    });
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('/home-summary')) {
+        return { ok: true, json: async () => homeSummary(course) };
+      }
+      if (url.includes('/chapters') || url.includes('/resources') || url.includes('/announcements') || url.includes('/members')) {
+        return { ok: true, json: async () => ({ code: '0', message: 'success', data: [] }) };
+      }
+      return { ok: true, json: async () => page([course], 1) };
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const wrapper = mount(CourseManagementView);
+    await flushPromises();
+
+    async function openFromDetail(label: string) {
+      await wrapper.get('.course-card').trigger('click');
+      await flushPromises();
+      const button = wrapper.findAll('.modal-actions-placeholder button').find((item) => item.text().includes(label));
+      expect(button).toBeTruthy();
+      await button!.trigger('click');
+      await flushPromises();
+    }
+
+    await openFromDetail('管理章节');
+    expect(wrapper.text()).toContain('创建章节');
+    await wrapper.findAll('button').find((item) => item.text().includes('返回课程'))!.trigger('click');
+    await flushPromises();
+
+    await openFromDetail('管理资源');
+    expect(wrapper.text()).toContain('上传资源');
+    await wrapper.findAll('button').find((item) => item.text().includes('返回课程'))!.trigger('click');
+    await flushPromises();
+
+    await openFromDetail('管理公告');
+    expect(wrapper.text()).toContain('发布公告');
   });
 
   it('shows course announcements in the detail sidebar and lets teachers publish one', async () => {
@@ -534,6 +578,126 @@ describe('CourseManagementView', () => {
     }));
   });
 
+  it('shows unbound resources in the all resources filter for students and lets them download', async () => {
+    window.localStorage.setItem('onlinejudge.authToken', 'student-token');
+    window.localStorage.setItem('onlinejudge.userId', '201');
+    window.localStorage.setItem('onlinejudge.userRole', 'STUDENT');
+    window.localStorage.setItem('onlinejudge.username', 'Student201');
+    const studentCourse = {
+      ...course,
+      member: true,
+      manageable: false
+    };
+    const page = (list = [studentCourse], total = list.length) => ({
+      code: '0',
+      message: 'success',
+      data: { list, total, page: 1, size: 20 }
+    });
+    const chapters = [{
+      id: 11,
+      courseId: 1,
+      parentId: null,
+      chapterName: '课程导论',
+      sortOrder: 1,
+      objective: '',
+      visibleStatus: 1,
+      chapterType: 1,
+      children: [],
+      createdAt: '2026-05-25T00:00:00',
+      updatedAt: '2026-05-25T00:00:00'
+    }];
+    const resources = [{
+      id: 31,
+      courseId: 1,
+      chapterId: null,
+      name: 'Course Syllabus',
+      resourceType: 'DOCUMENT',
+      visibility: 'STUDENT',
+      publishAt: null,
+      originalFilename: 'syllabus.pdf',
+      contentType: 'application/pdf',
+      fileSize: 18,
+      uploadUserId: 101,
+      downloadUrl: '/api/v1/courses/1/resources/31/download',
+      createdAt: '2026-05-25T00:00:00',
+      updatedAt: '2026-05-25T00:00:00'
+    }, {
+      id: 32,
+      courseId: 1,
+      chapterId: 11,
+      name: 'Chapter Lesson',
+      resourceType: 'DOCUMENT',
+      visibility: 'STUDENT',
+      publishAt: null,
+      originalFilename: 'chapter.pdf',
+      contentType: 'application/pdf',
+      fileSize: 22,
+      uploadUserId: 101,
+      downloadUrl: '/api/v1/courses/1/resources/32/download',
+      createdAt: '2026-05-25T00:00:00',
+      updatedAt: '2026-05-25T00:00:00'
+    }];
+    const fileBlob = new Blob(['course syllabus'], { type: 'application/pdf' });
+    vi.stubGlobal('URL', {
+      createObjectURL: vi.fn(() => 'blob:syllabus'),
+      revokeObjectURL: vi.fn()
+    });
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => page([studentCourse], 1) })
+      .mockResolvedValueOnce({ ok: true, json: async () => page([studentCourse], 1) })
+      .mockResolvedValueOnce({ ok: true, json: async () => page([], 0) })
+      .mockResolvedValueOnce({ ok: true, json: async () => page([], 0) })
+      .mockResolvedValueOnce({ ok: true, json: async () => homeSummary(studentCourse) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ code: '0', message: 'success', data: chapters }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ code: '0', message: 'success', data: resources }) })
+      .mockResolvedValueOnce({
+        ok: true,
+        headers: new Headers({ 'Content-Disposition': "attachment; filename*=UTF-8''syllabus.pdf" }),
+        blob: async () => fileBlob
+      })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ code: '0', message: 'success', data: {} }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ code: '0', message: 'success', data: {} }) });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const wrapper = mount(CourseManagementView);
+    await flushPromises();
+
+    await wrapper.get('.course-card').trigger('click');
+    await flushPromises();
+
+    const resourceFilter = wrapper.find('.detail-block .resource-filter select');
+    expect((resourceFilter.element as HTMLSelectElement).value).toBe('all');
+    expect(wrapper.text()).toContain('Course Syllabus');
+    expect(wrapper.text()).toContain('未绑定章节');
+    expect(wrapper.text()).toContain('Chapter Lesson');
+
+    await resourceFilter.setValue('11');
+    await flushPromises();
+    expect(wrapper.text()).not.toContain('Course Syllabus');
+    expect(wrapper.text()).toContain('Chapter Lesson');
+
+    await resourceFilter.setValue('unbound');
+    await flushPromises();
+    expect(wrapper.text()).toContain('Course Syllabus');
+    expect(wrapper.text()).not.toContain('Chapter Lesson');
+
+    await resourceFilter.setValue('all');
+    await flushPromises();
+    const unboundRow = wrapper.findAll('.resource-row').find((row) => row.text().includes('Course Syllabus'));
+    expect(unboundRow).toBeTruthy();
+    await unboundRow!.find('button').trigger('click');
+    await flushPromises();
+
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/courses/1/resources/31/download', expect.objectContaining({
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: 'Bearer student-token'
+      }
+    }));
+  });
+
   it('restores the course chapter context from the resume query', async () => {
     window.history.replaceState({}, '', '/courses/1?chapterId=11&resourceId=21&resume=resourceId%3D21');
     const page = (list = [course], total = list.length) => ({
@@ -901,6 +1065,59 @@ describe('CourseManagementView', () => {
     const roleCall = fetchMock.mock.calls.find(([url, options]) => url === '/api/v1/courses/1/members/602' && options.method === 'PUT');
     expect(roleCall).toBeTruthy();
     expect(JSON.parse(roleCall![1].body)).toEqual({ role: 'ASSISTANT', status: 'ACTIVE' });
+  });
+
+  it('keeps the course detail modal open and refreshes members after last-teacher removal is rejected', async () => {
+    const onlyTeacher = {
+      courseId: 1,
+      userId: 101,
+      role: 'TEACHER',
+      status: 'ACTIVE',
+      joinMethod: 'CREATED',
+      approvedBy: 101,
+      joinedAt: '2026-03-01T08:00:00'
+    };
+    const page = (list = [course], total = list.length) => ({
+      code: '0',
+      message: 'success',
+      data: { list, total, page: 1, size: 20 }
+    });
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => page([course], 1) })
+      .mockResolvedValueOnce({ ok: true, json: async () => page([course], 1) })
+      .mockResolvedValueOnce({ ok: true, json: async () => page([course], 1) })
+      .mockResolvedValueOnce({ ok: true, json: async () => page([], 0) })
+      .mockResolvedValueOnce({ ok: true, json: async () => homeSummary(course) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ code: '0', message: 'success', data: [] }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ code: '0', message: 'success', data: [] }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ code: '0', message: 'success', data: [] }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ code: '0', message: 'success', data: [onlyTeacher] }) })
+      .mockResolvedValueOnce({ ok: false, json: async () => ({ code: '409', message: 'CANNOT_REMOVE_SELF', data: null }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ code: '0', message: 'success', data: course }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ code: '0', message: 'success', data: [] }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ code: '0', message: 'success', data: [onlyTeacher] }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => page([course], 1) })
+      .mockResolvedValueOnce({ ok: true, json: async () => page([course], 1) })
+      .mockResolvedValueOnce({ ok: true, json: async () => page([course], 1) })
+      .mockResolvedValueOnce({ ok: true, json: async () => page([], 0) });
+    vi.stubGlobal('fetch', fetchMock);
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+    const wrapper = mount(CourseManagementView);
+    await flushPromises();
+
+    await wrapper.get('.course-card').trigger('click');
+    await flushPromises();
+
+    const teacherRow = wrapper.findAll('.resource-row').find((row) => row.text().includes('101'));
+    expect(teacherRow).toBeTruthy();
+    await teacherRow!.find('button.card-btn.danger').trigger('click');
+    await flushPromises();
+
+    expect(wrapper.find('.course-modal').exists()).toBe(true);
+    expect(wrapper.text()).toContain('课程详情');
+    expect(wrapper.text()).toContain('CANNOT_REMOVE_SELF');
+    expect(fetchMock.mock.calls.filter(([url]) => url === '/api/v1/courses/1/members')).toHaveLength(2);
   });
 });
 
