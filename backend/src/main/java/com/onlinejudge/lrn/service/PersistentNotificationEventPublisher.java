@@ -30,7 +30,7 @@ public class PersistentNotificationEventPublisher implements NotificationEventPu
                     event.type(),
                     null,
                     event.courseId() > 0 ? event.courseId() : null,
-                    normalizeSourceModule(event.targetType()),
+                    normalizeSourceModule(event),
                     event.targetId(),
                     event.recipientUserIds(),
                     event.title(),
@@ -44,7 +44,12 @@ public class PersistentNotificationEventPublisher implements NotificationEventPu
         }
     }
 
-    private String normalizeSourceModule(String targetType) {
+    private String normalizeSourceModule(NotificationEvent event) {
+        String eventType = event.type() == null ? "" : event.type().trim().toUpperCase();
+        if (eventType.startsWith("GRADE") || eventType.startsWith("GRD")) {
+            return "GRD";
+        }
+        String targetType = event.targetType();
         if (targetType == null || targetType.isBlank()) {
             return "SYS";
         }
