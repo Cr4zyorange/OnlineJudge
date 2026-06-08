@@ -144,7 +144,7 @@ public class IntDemoDataInitializer {
                         is_deleted, created_at, updated_at
                     ) VALUES (
                         ?, '数据结构全流程演示课', '覆盖登录、课程、学习、实验、作业、成绩、通知的验收演示课程。',
-                        ?, '2025-2026-2', '计算机基础', '/assets/back.jpg', 'INVITE_CODE',
+                        ?, '2025-2026-2', '计算机基础', '/assets/back.jpg', 'INVITE',
                         'INT95', 80, DATE '2026-03-01', DATE '2026-07-01', 'ACTIVE',
                         FALSE, TIMESTAMP '2026-06-01 08:00:00', TIMESTAMP '2026-06-01 08:00:00'
                     )
@@ -207,7 +207,7 @@ public class IntDemoDataInitializer {
                     INSERT INTO lrn_learning_record (
                         id, user_id, course_id, source_module, source_id, action_type, duration,
                         started_at, ended_at, created_at
-                    ) VALUES (?, ?, ?, 'CRS', ?, 'VIEW', 1800, TIMESTAMP '2026-06-08 08:40:00',
+                    ) VALUES (?, ?, ?, 'CRS', ?, 'ACCESS', 1800, TIMESTAMP '2026-06-08 08:40:00',
                         TIMESTAMP '2026-06-08 09:10:00', TIMESTAMP '2026-06-08 09:10:00')
                     """, RECORD_RESOURCE_ID, studentId, COURSE_ID, RESOURCE_ID);
             insertIfMissingByCount("SELECT COUNT(*) FROM lrn_notification_setting WHERE user_id = ?",
@@ -321,7 +321,7 @@ public class IntDemoDataInitializer {
                         passed_cases, total_cases, time_used_ms, memory_used_kb, error_message,
                         feedback, log_url, compile_log, run_log, reevaluation, triggered_by,
                         started_at, finished_at, created_at, updated_at
-                    ) VALUES (?, ?, ?, ?, 'MANUAL', 'ACCEPTED', 88.00, 1, 1, NULL, NULL, NULL,
+                    ) VALUES (?, ?, ?, ?, 'OBJECTIVE_AUTO', 'ACCEPTED', 88.00, 1, 1, NULL, NULL, NULL,
                         '教师批阅完成', NULL, NULL, NULL, FALSE, ?, TIMESTAMP '2026-06-08 09:28:00',
                         TIMESTAMP '2026-06-08 09:28:00', TIMESTAMP '2026-06-08 09:28:00',
                         TIMESTAMP '2026-06-08 09:28:00')
@@ -406,13 +406,13 @@ public class IntDemoDataInitializer {
         }
 
         private void seedNotifications(long studentId) {
-            seedNotification(950501L, studentId, "int95-lab-published", "EXPERIMENT", "实验已发布",
+            seedNotification(950501L, studentId, "int95-lab-published", "TASK", "实验已发布",
                     "实验一：线性表操作已发布，请按时提交。", "LAB", LAB_ID,
                     "/courses/9501/labs/950201?role=student", 2);
             seedNotification(950502L, studentId, "int95-lab-score", "GRADE", "实验成绩已发布",
                     "实验一成绩已发布，可查看自动评测结果和教师反馈。", "LAB", LAB_ID,
                     "/courses/9501/labs/950201/submissions?role=student", 3);
-            seedNotification(950503L, studentId, "int95-homework-published", "HOMEWORK", "作业已发布",
+            seedNotification(950503L, studentId, "int95-homework-published", "TASK", "作业已发布",
                     "作业一：线性表复杂度分析已发布。", "HWK", HOMEWORK_ID,
                     "/courses/9501/homeworks/950301?role=student", 2);
             seedNotification(950504L, studentId, "int95-course-grade", "GRADE", "课程成绩已发布",

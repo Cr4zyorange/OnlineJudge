@@ -2,20 +2,31 @@ package com.onlinejudge.integration;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.web.servlet.MockMvc;
 
 import java.math.BigDecimal;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.hasItem;
+import static org.hamcrest.Matchers.is;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest(properties = {
         "spring.datasource.url=jdbc:h2:mem:int_demo_data;MODE=MySQL;DATABASE_TO_LOWER=TRUE;CASE_INSENSITIVE_IDENTIFIERS=TRUE;DB_CLOSE_DELAY=-1",
         "onlinejudge.demo-data.enabled=true"
 })
+@AutoConfigureMockMvc
 class IntDemoDataInitializerTest {
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private MockMvc mockMvc;
 
     @Test
     void intDemoDataCoversLoginCourseLearningLabHomeworkGradeAndNotifications() {
@@ -111,7 +122,7 @@ class IntDemoDataInitializerTest {
                 FROM lrn_notification
                 WHERE user_id = ?
                   AND course_id = 9501
-                  AND type IN ('EXPERIMENT', 'HOMEWORK', 'GRADE')
+                  AND type IN ('TASK', 'GRADE')
                   AND source_module IN ('LAB', 'HWK', 'GRD')
                   AND action_url IS NOT NULL
                 """, studentId)).isGreaterThanOrEqualTo(3);
@@ -124,6 +135,60 @@ class IntDemoDataInitializerTest {
                   AND source_module IN ('LAB', 'HWK')
                   AND status IN ('COMPLETED', 'IN_PROGRESS')
                 """, studentId)).isEqualTo(2);
+    }
+
+    @Test
+    void intDemoDataIsReadableThroughClosedLoopApis() throws Exception {
+        Long studentId = userId("student001");
+        Long teacherId = userId("teacher001");
+
+        mockMvc.perform(get("/api/v1/courses?scope=all&page=1&size=10")
+                        .header("X-User-Id", studentId)
+                        .header("X-User-Role", "STUDENT")
+                        .header("X-Username", "student001"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.list[?(@.id == 9501)].enrollmentMode", hasItem("INVITE")))
+                .andExpect(jsonPath("$.data.list[?(@.id == 9501)].member", hasItem(true)));
+
+        mockMvc.perform(get("/api/v1/submissions/950303/evaluation")
+                        .header("X-User-Id", studentId)
+                        .header("X-User-Role", "STUDENT")
+                        .header("X-Username", "student001"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.submissionId", is(950303)))
+                .andExpect(jsonPath("$.data.evaluationStatus", is("ACCEPTED")))
+                .andExpect(jsonPath("$.data.score", is(88)));
+
+        mockMvc.perform(get("/api/v1/learning/statistics?courseId=9501")
+                        .header("X-User-Id", studentId)
+                        .header("X-User-Role", "STUDENT")
+                        .header("X-Username", "student001"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.summary.resourceAccessCount", is(1)))
+                .andExpect(jsonPath("$.data.recentRecords[0].actionType", is("ACCESS")));
+
+        mockMvc.perform(get("/api/v1/notifications?type=TASK&page=1&size=10")
+                        .header("X-User-Id", studentId)
+                        .header("X-User-Role", "STUDENT")
+                        .header("X-Username", "student001"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.total", is(2)))
+                .andExpect(jsonPath("$.data.records[*].sourceModule", hasItem("LAB")))
+                .andExpect(jsonPath("$.data.records[*].sourceModule", hasItem("HWK")));
+
+        mockMvc.perform(get("/api/v1/notifications?type=GRADE&page=1&size=10")
+                        .header("X-User-Id", studentId)
+                        .header("X-User-Role", "STUDENT")
+                        .header("X-Username", "student001"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.total", is(2)));
+
+        mockMvc.perform(get("/api/v1/courses/9501/grades")
+                        .header("X-User-Id", teacherId)
+                        .header("X-User-Role", "TEACHER")
+                        .header("X-Username", "teacher001"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.records[0].summary.finalScore", is(89.6)));
     }
 
     private Long userId(String username) {
