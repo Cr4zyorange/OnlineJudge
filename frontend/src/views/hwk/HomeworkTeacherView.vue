@@ -194,6 +194,11 @@
                 type="button"
                 @click="loadStatistics(homework)"
               >统计</button>
+              <a
+                v-if="homework.status !== 'DRAFT'"
+                :data-testid="`review-homework-submissions-${homework.id}`"
+                :href="`/courses/${props.courseId}/homeworks/${homework.id}/submissions?role=teacher`"
+              >查看提交</a>
             </td>
           </tr>
         </tbody>
@@ -698,6 +703,14 @@ button {
 
 button:disabled {
   color: #697386;
+}
+
+.homeworks__row-actions a {
+  border: 1px solid #aeb8c8;
+  color: #175cd3;
+  min-height: 36px;
+  padding: 7px 12px;
+  text-decoration: none;
 }
 
 .homeworks__feedback {
