@@ -225,7 +225,8 @@
               <label class="resource-filter">
                 <span>按章节查看资源</span>
                 <select v-model="selectedDetailChapterValue">
-                  <option value="">全部章节</option>
+                  <option value="all">全部资源</option>
+                  <option value="unbound">未绑定章节</option>
                   <option v-for="item in flatDetailChapters" :key="item.chapter.id" :value="String(item.chapter.id)">
                     {{ item.prefix }}{{ item.chapter.chapterName }}
                   </option>
@@ -544,7 +545,8 @@
           <label class="resource-filter">
             <span>章节</span>
             <select v-model="selectedDetailChapterValue">
-              <option value="">全部章节</option>
+              <option value="all">全部资源</option>
+              <option value="unbound">未绑定章节</option>
               <option v-for="item in flatDetailChapters" :key="item.chapter.id" :value="String(item.chapter.id)">
                 {{ item.prefix }}{{ item.chapter.chapterName }}
               </option>
@@ -625,7 +627,7 @@
         </div>
 
         <div class="modal-actions-placeholder">
-          <span>预留操作区</span>
+          <span>操作区</span>
           <div class="placeholder-actions">
             <button v-if="!selectedCourse.manageable && selectedCourse.member" class="card-btn" type="button" @click="enterCourse(selectedCourse)">
               <i class="bi bi-box-arrow-in-right"></i> 进入学习
@@ -635,6 +637,12 @@
             </button>
             <button v-if="selectedCourse.manageable" class="card-btn" type="button" @click="manageSelectedCourseChapters">
               <i class="bi bi-list-nested"></i> 管理章节
+            </button>
+            <button v-if="selectedCourse.manageable" class="card-btn" type="button" @click="manageSelectedCourseResources">
+              <i class="bi bi-folder2-open"></i> 管理资源
+            </button>
+            <button v-if="selectedCourse.manageable" class="card-btn" type="button" @click="manageSelectedCourseAnnouncements">
+              <i class="bi bi-megaphone"></i> 管理公告
             </button>
           </div>
         </div>
@@ -809,7 +817,7 @@ const detailResources = ref<CourseResource[]>([]);
 const announcements = ref<CourseAnnouncement[]>([]);
 const recentTasks = ref<CourseRecentTask[]>([]);
 const keyword = ref('');
-const selectedDetailChapterValue = ref('');
+const selectedDetailChapterValue = ref('all');
 const loading = ref(false);
 const submitting = ref(false);
 const chapterLoading = ref(false);
@@ -916,10 +924,16 @@ const visibleCourses = computed(() => {
 const flatChapters = computed(() => flattenChapters(chapters.value));
 const flatDetailChapters = computed(() => flattenChapters(detailChapters.value));
 const filteredDetailResources = computed(() => {
-  if (!selectedDetailChapterValue.value) {
+  if (isAllResourceFilter(selectedDetailChapterValue.value)) {
     return detailResources.value;
   }
+  if (selectedDetailChapterValue.value === 'unbound') {
+    return detailResources.value.filter((resource) => isUnboundResourceChapter(resource.chapterId));
+  }
   const chapterId = Number(selectedDetailChapterValue.value);
+  if (!Number.isFinite(chapterId)) {
+    return detailResources.value;
+  }
   return detailResources.value.filter((resource) => resource.chapterId === chapterId);
 });
 const pendingMembers = ref<CourseMember[]>([]);
@@ -1039,7 +1053,7 @@ async function openCourseDetail(course: Course) {
     return;
   }
   selectedCourse.value = course;
-  selectedDetailChapterValue.value = '';
+  selectedDetailChapterValue.value = 'all';
   detailChapters.value = [];
   detailResources.value = [];
   announcements.value = [];
@@ -1108,7 +1122,7 @@ async function openResourceManagement(course: Course) {
   announcementCourse.value = null;
   closeCourseDetail();
   resetResourceForm();
-  selectedDetailChapterValue.value = '';
+  selectedDetailChapterValue.value = 'all';
   await loadResourceWorkspace();
 }
 
@@ -1245,7 +1259,9 @@ async function changeMemberRole(member: CourseMember, role: CourseMember['role']
     });
     await Promise.all([loadCourseMembers(member.courseId), loadCourses(), loadStats()]);
   } catch (error) {
-    memberManageError.value = error instanceof Error ? error.message : '成员角色调整失败';
+    const message = error instanceof Error ? error.message : '成员角色调整失败';
+    await refreshSelectedCourseMembers(member.courseId);
+    memberManageError.value = message;
   } finally {
     memberActionUserId.value = null;
   }
@@ -1261,10 +1277,29 @@ async function removeActiveMember(member: CourseMember) {
     await removeCourseMember(member.courseId, member.userId);
     await Promise.all([loadCourseMembers(member.courseId), loadCourses(), loadStats()]);
   } catch (error) {
-    memberManageError.value = error instanceof Error ? error.message : '成员移除失败';
+    const message = error instanceof Error ? error.message : '成员移除失败';
+    await refreshSelectedCourseMembers(member.courseId);
+    memberManageError.value = message;
   } finally {
     memberActionUserId.value = null;
   }
+}
+
+async function refreshSelectedCourseMembers(courseId: number) {
+  if (!selectedCourse.value || selectedCourse.value.id !== courseId) {
+    return;
+  }
+  try {
+    selectedCourse.value = await getCourse(courseId);
+  } catch {
+    // Keep the current modal open even if the summary refresh fails.
+  }
+  await Promise.all([
+    loadPendingMembers(courseId),
+    loadCourseMembers(courseId),
+    loadCourses(),
+    loadStats()
+  ]);
 }
 
 function closeChapterManagement() {
@@ -1277,7 +1312,7 @@ function closeResourceManagement() {
   resourceCourse.value = null;
   detailChapters.value = [];
   detailResources.value = [];
-  selectedDetailChapterValue.value = '';
+  selectedDetailChapterValue.value = 'all';
   resetResourceForm();
 }
 
@@ -1581,6 +1616,14 @@ function normalizeResourcePayload(): ResourcePayload {
   };
 }
 
+function isAllResourceFilter(value: string) {
+  return value === '' || value === 'all';
+}
+
+function isUnboundResourceChapter(chapterId: CourseResource['chapterId'] | '') {
+  return chapterId == null || chapterId === '';
+}
+
 async function loadAnnouncements(courseId: number) {
   announcementLoading.value = true;
   announcementLoadError.value = '';
@@ -1693,6 +1736,12 @@ function normalizeAnnouncementPayload(): AnnouncementPayload {
 async function manageSelectedCourseChapters() {
   if (selectedCourse.value) {
     await openChapterManagement(selectedCourse.value);
+  }
+}
+
+async function manageSelectedCourseResources() {
+  if (selectedCourse.value) {
+    await openResourceManagement(selectedCourse.value);
   }
 }
 
@@ -1997,10 +2046,19 @@ onMounted(async () => {
 }
 
 .checkbox-line {
-  display: inline-flex;
+  display: inline-flex !important;
   align-items: center;
   flex-direction: row;
   gap: 8px;
+  justify-content: flex-start;
+  justify-self: flex-start;
+}
+
+.checkbox-line input[type='checkbox'] {
+  width: auto;
+  min-width: 16px;
+  margin: 0;
+  padding: 0;
 }
 
 .form-context {

@@ -805,6 +805,57 @@ class CourseControllerTest {
     }
 
     @Test
+    void studentCanListAndDownloadResourceWithoutChapterBinding() throws Exception {
+        String response = mockMvc.perform(post("/api/v1/courses")
+                        .header("X-User-Id", "806")
+                        .header("X-User-Role", "TEACHER")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"unbound-resource-course-" + System.nanoTime() + "\",\"enrollmentMode\":\"PUBLIC\",\"status\":\"ACTIVE\"}"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        String courseId = response.replaceAll("(?s).*\"id\":(\\d+).*", "$1");
+
+        MockMultipartFile file = new MockMultipartFile(
+                "file",
+                "syllabus.pdf",
+                "application/pdf",
+                "course syllabus".getBytes(java.nio.charset.StandardCharsets.UTF_8)
+        );
+        String uploadResponse = mockMvc.perform(multipart("/api/v1/courses/" + courseId + "/resources")
+                        .file(file)
+                        .param("name", "Course Syllabus")
+                        .param("resourceType", "DOCUMENT")
+                        .param("visibility", "STUDENT")
+                        .header("X-User-Id", "806")
+                        .header("X-User-Role", "TEACHER"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.name", is("Course Syllabus")))
+                .andExpect(jsonPath("$.data.chapterId").doesNotExist())
+                .andReturn().getResponse().getContentAsString();
+        String resourceId = uploadResponse.replaceAll("(?s).*\"id\":(\\d+).*", "$1");
+
+        mockMvc.perform(post("/api/v1/courses/" + courseId + "/join")
+                        .header("X-User-Id", "807")
+                        .header("X-User-Role", "STUDENT"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/v1/courses/" + courseId + "/resources")
+                        .header("X-User-Id", "807")
+                        .header("X-User-Role", "STUDENT"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()", is(1)))
+                .andExpect(jsonPath("$.data[0].name", is("Course Syllabus")))
+                .andExpect(jsonPath("$.data[0].chapterId").doesNotExist())
+                .andExpect(jsonPath("$.data[0].downloadUrl", is("/api/v1/courses/" + courseId + "/resources/" + resourceId + "/download")));
+
+        mockMvc.perform(get("/api/v1/courses/" + courseId + "/resources/" + resourceId + "/download")
+                        .header("X-User-Id", "807")
+                        .header("X-User-Role", "STUDENT"))
+                .andExpect(status().isOk())
+                .andExpect(content().bytes("course syllabus".getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+    }
+
+    @Test
     void resourceUploadRejectsUnsupportedTypeAndOversizedFile() throws Exception {
         String response = mockMvc.perform(post("/api/v1/courses")
                         .header("X-User-Id", "811")
@@ -1015,6 +1066,67 @@ class CourseControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.page", is(1)))
                 .andExpect(jsonPath("$.data.size", is(50)));
+    }
+
+    @Test
+    void crs07NfrListsCoursesAndResourcesWithinBasicScale() throws Exception {
+        long teacherId = 1041L;
+        String perfMarker = "nfr-scale-" + System.nanoTime();
+        String targetCourseId = null;
+        for (int i = 0; i < 105; i++) {
+            String response = mockMvc.perform(post("/api/v1/courses")
+                            .header("X-User-Id", String.valueOf(teacherId))
+                            .header("X-User-Role", "TEACHER")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"name\":\"" + perfMarker + "-course-" + i + "\",\"enrollmentMode\":\"PUBLIC\",\"status\":\"ACTIVE\"}"))
+                    .andExpect(status().isOk())
+                    .andReturn().getResponse().getContentAsString();
+            if (targetCourseId == null) {
+                targetCourseId = response.replaceAll("(?s).*\"id\":(\\d+).*", "$1");
+            }
+        }
+
+        long courseListStart = System.nanoTime();
+        mockMvc.perform(get("/api/v1/courses?page=1&size=50&keyword=" + perfMarker)
+                        .header("X-User-Id", String.valueOf(teacherId))
+                        .header("X-User-Role", "TEACHER"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.page", is(1)))
+                .andExpect(jsonPath("$.data.size", is(50)))
+                .andExpect(jsonPath("$.data.total", is(105)))
+                .andExpect(jsonPath("$.data.list.length()", is(50)));
+        long courseListElapsedMs = (System.nanoTime() - courseListStart) / 1_000_000;
+
+        for (int i = 0; i < 105; i++) {
+            MockMultipartFile file = new MockMultipartFile(
+                    "file",
+                    "perf-" + i + ".pdf",
+                    "application/pdf",
+                    ("perf resource " + i).getBytes(java.nio.charset.StandardCharsets.UTF_8)
+            );
+            mockMvc.perform(multipart("/api/v1/courses/" + targetCourseId + "/resources")
+                            .file(file)
+                            .param("name", perfMarker + "-resource-" + i)
+                            .param("resourceType", "DOCUMENT")
+                            .param("visibility", "STUDENT")
+                            .header("X-User-Id", String.valueOf(teacherId))
+                            .header("X-User-Role", "TEACHER"))
+                    .andExpect(status().isOk());
+        }
+
+        long resourceListStart = System.nanoTime();
+        mockMvc.perform(get("/api/v1/courses/" + targetCourseId + "/resources")
+                        .header("X-User-Id", String.valueOf(teacherId))
+                        .header("X-User-Role", "TEACHER"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()", is(105)));
+        long resourceListElapsedMs = (System.nanoTime() - resourceListStart) / 1_000_000;
+
+        System.out.printf(
+                "CRS_PERF courseListMs=%d resourceListMs=%d courses=105 resources=105%n",
+                courseListElapsedMs,
+                resourceListElapsedMs
+        );
     }
 
     @Test
