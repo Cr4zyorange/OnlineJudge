@@ -1,9 +1,33 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
+:root {
+  --oj-bg-image: url("./back.jpg");
+  --oj-ink: #172b35;
+  --oj-ink-soft: #38535c;
+  --oj-muted: #5d7177;
+  --oj-brand: #16423c;
+  --oj-brand-strong: #0f2f2b;
+  --oj-brand-soft: rgba(22, 66, 60, 0.12);
+  --oj-surface: rgba(239, 247, 250, 0.2);
+  --oj-surface-strong: rgba(247, 251, 252, 0.28);
+  --oj-surface-solid: rgba(248, 251, 252, 0.88);
+  --oj-line: rgba(255, 255, 255, 0.28);
+  --oj-line-strong: rgba(22, 66, 60, 0.2);
+  --oj-shadow: 0 18px 52px rgba(23, 43, 53, 0.18);
+  --oj-shadow-soft: 0 8px 32px rgba(31, 38, 135, 0.1);
+  --oj-radius: 8px;
+  --oj-blur: blur(14px);
+}
+
 * {
   box-sizing: border-box;
   border: none;
   outline: none;
+}
+
+html {
+  min-height: 100%;
+  background: #dce8ed;
 }
 
 body {
@@ -11,11 +35,12 @@ body {
   min-height: 100vh;
   overflow-x: hidden;
   font-family: Inter, "Microsoft YaHei", sans-serif;
-  background: linear-gradient(rgba(246, 249, 247, 0.72), rgba(228, 237, 233, 0.88)),
-    url("../../../docs/过程/UI设计参考/img/back.jpg");
+  background: var(--oj-bg-image);
   background-size: cover;
   background-position: top center;
-  color: #2c3e50;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+  color: var(--oj-ink);
 }
 
 
@@ -97,11 +122,6 @@ button:disabled {
 .navbar-menu a:hover {
   background-color: #16423c;
   color: #fff;
-}
-
-.navbar-menu a.disabled {
-  opacity: 0.55;
-  pointer-events: none;
 }
 
 .navbar-user {
@@ -827,5 +847,533 @@ button:disabled {
 
   .resource-row {
     grid-template-columns: 1fr;
+  }
+}
+
+/* Unified glass UI layer, aligned to LearningTaskCenterView. */
+#app {
+  min-height: 100vh;
+}
+
+.app-frame {
+  min-height: 100vh;
+  padding-top: 72px;
+}
+
+a {
+  color: var(--oj-brand);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+a:hover {
+  color: var(--oj-brand-strong);
+}
+
+:where(
+  .auth-page,
+  .auth-admin-page,
+  .profile-page,
+  .auth-status-shell,
+  .task-center,
+  .progress-page,
+  .statistics-page,
+  .notification-center,
+  .reminder-settings,
+  .lab-student,
+  .lab-history,
+  .labs,
+  .homework-student,
+  .lab-student-list,
+  .homework-student-list,
+  .hwk-history,
+  .homeworks,
+  .grade-items,
+  .grade-table,
+  .student-grade
+) {
+  min-height: 100vh !important;
+  padding: 24px !important;
+  background-image: var(--oj-bg-image) !important;
+  background-size: cover !important;
+  background-position: top center !important;
+  background-repeat: no-repeat !important;
+  background-attachment: fixed !important;
+  color: var(--oj-ink) !important;
+}
+
+:where(.page-shell) {
+  min-height: 100vh;
+  background-image: var(--oj-bg-image);
+  background-size: cover;
+  background-position: top center;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+}
+
+:where(
+  .auth-panel,
+  .profile-shell,
+  .status-panel,
+  .auth-admin-page .admin-panel,
+  .auth-admin-page .assignment-block,
+  .sidebar,
+  .sidebar-card,
+  .course-form,
+  .course-panel,
+  .course-card,
+  .state-card,
+  .course-modal,
+  .task-center__sidebar,
+  .task-center__content,
+  .task-center__stats div,
+  .task-card,
+  .progress-page__summary,
+  .progress-page__content,
+  .course-progress,
+  .chapter-progress,
+  .statistics-page__summary,
+  .statistics-page__content,
+  .metric-grid > *,
+  .trend-panel,
+  .recent-panel,
+  .notification-center__summary,
+  .notification-center__content,
+  .notification-card,
+  .reminder-settings__summary,
+  .reminder-settings__content,
+  .preference-panel,
+  .rule-panel,
+  .labs__panel,
+  .labs__list,
+  .labs__statistics,
+  .labs__submissions,
+  .labs__config-card,
+  .labs__submission-card,
+  .lab-student__panel,
+  .lab-student-list__panel,
+  .lab-student__cases,
+  .lab-student__form,
+  .lab-student__report,
+  .lab-student__submission,
+  .lab-history__panel,
+  .lab-history__card,
+  .homeworks__panel,
+  .homeworks__list,
+  .homeworks__config,
+  .homeworks__config-card,
+  .homeworks__statistics,
+  .homework-student__panel,
+  .homework-student__block,
+  .homework-student__form,
+  .homework-student__submission,
+  .homework-student-list__panel,
+  .hwk-history__panel,
+  .hwk-history__item,
+  .hwk-history__logs,
+  .grade-items__panel,
+  .grade-items__list,
+  .grade-table__panel,
+  .grade-table__analysis,
+  .grade-table__list,
+  .grade-table__detail,
+  .student-grade__summary,
+  .student-grade__content
+) {
+  min-width: 0 !important;
+  border: 1px solid var(--oj-line) !important;
+  border-radius: var(--oj-radius) !important;
+  background: var(--oj-surface) !important;
+  box-shadow: var(--oj-shadow-soft) !important;
+  backdrop-filter: var(--oj-blur) !important;
+  -webkit-backdrop-filter: var(--oj-blur) !important;
+  color: var(--oj-ink) !important;
+}
+
+:where(
+  .task-center__stats div,
+  .metric-grid > *,
+  .grade-table__metrics div,
+  .student-grade__score,
+  .student-grade__summary dl > div,
+  .lab-student__meta div,
+  .lab-student-list__items li,
+  .homework-student__meta div,
+  .labs__statistics-grid > *,
+  .homeworks__statistics dl > div,
+  .detail-item,
+  .detail-block,
+  .chapter-row,
+  .resource-row,
+  .announcement-card,
+  .recent-task-card,
+  .notification-center__actions,
+  .preference-grid label,
+  .rule-panel label
+) {
+  border: 1px solid rgba(255, 255, 255, 0.24) !important;
+  border-radius: var(--oj-radius) !important;
+  background: rgba(255, 255, 255, 0.16) !important;
+  box-shadow: none !important;
+}
+
+:where(h1, h2, h3, h4) {
+  color: var(--oj-ink) !important;
+  letter-spacing: 0 !important;
+}
+
+:where(p, dt, dd, li, span, label, small, td, th) {
+  letter-spacing: 0 !important;
+}
+
+:where(
+  .auth-copy p:last-child,
+  .page-header p,
+  .task-center__sidebar p,
+  .task-card p,
+  .progress-page__summary p,
+  .course-progress p,
+  .statistics-page__summary p,
+  .recent-panel p,
+  .notification-center__summary p,
+  .notification-card p,
+  .reminder-settings__summary p,
+  .lab-student__header p,
+  .homework-student__header p,
+  .card-desc
+) {
+  color: var(--oj-ink-soft) !important;
+}
+
+.modal-backdrop {
+  background: rgba(18, 43, 48, 0.22) !important;
+  backdrop-filter: blur(5px) !important;
+  -webkit-backdrop-filter: blur(5px) !important;
+}
+
+.course-modal {
+  border-color: rgba(255, 255, 255, 0.44) !important;
+  background: rgba(246, 251, 252, 0.9) !important;
+  box-shadow: 0 24px 64px rgba(23, 43, 53, 0.22) !important;
+}
+
+.course-modal .detail-item,
+.course-modal .detail-block,
+.course-modal .modal-section,
+.course-modal .modal-actions-placeholder,
+.course-modal .resource-row,
+.course-modal .chapter-row {
+  border-color: rgba(22, 66, 60, 0.12) !important;
+  background: rgba(255, 255, 255, 0.42) !important;
+}
+
+:where(
+  button,
+  .btn,
+  .primary-action,
+  .landing-link,
+  .task-center__home,
+  .progress-page__home,
+  .statistics-page__home,
+  .notification-center__home,
+  .reminder-settings__home,
+  .task-center__refresh,
+  .task-card__link,
+  .course-progress__continue,
+  .notification-card__link,
+  .card-btn,
+  .text-button
+) {
+  min-height: 40px;
+  border-radius: var(--oj-radius) !important;
+  font-weight: 700 !important;
+  letter-spacing: 0 !important;
+}
+
+:where(
+  .btn,
+  .primary-action,
+  .landing-link,
+  .task-center__home,
+  .progress-page__home,
+  .statistics-page__home,
+  .notification-center__home,
+  .reminder-settings__home,
+  .task-center__refresh,
+  .task-card__link,
+  .course-progress__continue,
+  .notification-card__link,
+  button[type="submit"]
+) {
+  border: 1px solid var(--oj-brand) !important;
+  background: var(--oj-brand) !important;
+  color: #fff !important;
+  box-shadow: 0 10px 24px rgba(22, 66, 60, 0.16);
+}
+
+:where(
+  .btn:hover,
+  .primary-action:hover,
+  .landing-link:hover,
+  .task-center__home:hover,
+  .progress-page__home:hover,
+  .statistics-page__home:hover,
+  .notification-center__home:hover,
+  .reminder-settings__home:hover,
+  .task-center__refresh:hover,
+  .task-card__link:hover,
+  .course-progress__continue:hover,
+  .notification-card__link:hover,
+  button[type="submit"]:hover
+) {
+  background: var(--oj-brand-strong) !important;
+  color: #fff !important;
+  transform: translateY(-1px);
+}
+
+:where(
+  .btn-secondary,
+  .auth-tabs button,
+  .menu-button,
+  .card-btn,
+  .text-button,
+  .task-center__quick-nav a,
+  .notification-center__actions button,
+  .grade-table__actions button,
+  .grade-table__pagination button,
+  .homeworks__row-actions button,
+  .homeworks__row-actions a,
+  .labs__row-actions button,
+  .labs__row-actions a,
+  .hwk-history__pagination button
+) {
+  border: 1px solid rgba(255, 255, 255, 0.28) !important;
+  background: rgba(255, 255, 255, 0.18) !important;
+  color: var(--oj-brand) !important;
+}
+
+:where(
+  .auth-tabs button.active,
+  .menu-button.active,
+  .menu-button:hover,
+  .navbar-menu a.active,
+  .navbar-menu a:hover,
+  .card-btn:hover,
+  .task-center__quick-nav a:hover
+) {
+  background: var(--oj-brand) !important;
+  border-color: var(--oj-brand) !important;
+  color: #fff !important;
+}
+
+:where(input, select, textarea) {
+  border: 1px solid rgba(255, 255, 255, 0.34) !important;
+  border-radius: var(--oj-radius) !important;
+  background: rgba(255, 255, 255, 0.72) !important;
+  color: #20302c !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.42);
+}
+
+:where(input:focus, select:focus, textarea:focus) {
+  border-color: rgba(22, 66, 60, 0.55) !important;
+  box-shadow: 0 0 0 3px rgba(22, 66, 60, 0.12) !important;
+}
+
+:where(label > span, .task-center__filters span, .notification-center__filters span) {
+  color: var(--oj-ink-soft) !important;
+  font-weight: 700 !important;
+}
+
+:where(table) {
+  width: 100%;
+  border-collapse: collapse;
+  overflow: hidden;
+  border-radius: var(--oj-radius);
+  background: rgba(255, 255, 255, 0.14) !important;
+}
+
+:where(th) {
+  background: rgba(22, 66, 60, 0.12) !important;
+  color: var(--oj-brand) !important;
+  font-size: 0.82rem !important;
+  font-weight: 800 !important;
+  text-align: left;
+}
+
+:where(td, th) {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.22) !important;
+  padding: 12px 14px !important;
+}
+
+:where(tbody tr:hover) {
+  background: rgba(255, 255, 255, 0.16) !important;
+}
+
+:where(
+  .card-tag,
+  .status-pill,
+  .task-card__badges span,
+  .notification-card__badges span,
+  .lab-history__tags span,
+  .hwk-history__tags span,
+  .homeworks__statistics-pages span,
+  .grade-table__analysis-target
+) {
+  border-radius: 6px !important;
+  background: var(--oj-brand-soft) !important;
+  color: var(--oj-brand) !important;
+  font-size: 0.78rem !important;
+  font-weight: 800 !important;
+}
+
+:where(
+  .message.error,
+  .state-card.error,
+  .task-center__state--error,
+  .progress-page__state--error,
+  .notification-center__state--error,
+  .lab-student__error,
+  .labs__error,
+  .homeworks__error,
+  .homework-student__error,
+  .hwk-history__error,
+  .grade-table__error,
+  .grade-items__error
+) {
+  border: 1px solid rgba(157, 47, 34, 0.18) !important;
+  background: rgba(190, 49, 49, 0.12) !important;
+  color: #8f2d24 !important;
+}
+
+:where(
+  .message.success,
+  .state-card.success,
+  .auth-feedback.success,
+  .lab-student__feedback,
+  .labs__feedback,
+  .homeworks__feedback,
+  .homework-student__feedback,
+  .grade-table__feedback,
+  .grade-items__feedback
+) {
+  border: 1px solid rgba(22, 66, 60, 0.18) !important;
+  background: rgba(22, 66, 60, 0.12) !important;
+  color: var(--oj-brand) !important;
+}
+
+:where(.navbar, .container, .task-center__shell, .progress-page__shell, .statistics-page__shell, .notification-center__shell, .reminder-settings__shell) {
+  max-width: 1280px !important;
+}
+
+.navbar {
+  border: 1px solid var(--oj-line) !important;
+  border-top: 0 !important;
+  background: rgba(239, 247, 250, 0.22) !important;
+  box-shadow: var(--oj-shadow-soft) !important;
+}
+
+.course-card:hover,
+.task-card:hover,
+.notification-card:hover,
+.course-progress:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--oj-shadow) !important;
+}
+
+@media (max-width: 900px) {
+  .app-frame {
+    padding-top: 176px;
+  }
+
+  :where(
+    .auth-page,
+    .auth-admin-page,
+    .profile-page,
+    .auth-status-shell,
+    .task-center,
+    .progress-page,
+    .statistics-page,
+    .notification-center,
+    .reminder-settings,
+    .lab-student,
+    .lab-history,
+    .labs,
+    .homework-student,
+    .homework-student-list,
+    .hwk-history,
+    .homeworks,
+    .grade-items,
+    .grade-table,
+    .student-grade
+  ) {
+    padding: 16px !important;
+  }
+
+  :where(
+    .task-center__shell,
+    .progress-page__shell,
+    .statistics-page__shell,
+    .notification-center__shell,
+    .reminder-settings__shell,
+    .homeworks,
+    .labs,
+    .grade-table
+  ) {
+    grid-template-columns: 1fr !important;
+  }
+
+  :where(table) {
+    display: block !important;
+    max-width: 100% !important;
+    overflow-x: auto !important;
+    white-space: nowrap !important;
+  }
+
+  :where(
+    .homeworks__row-actions,
+    .labs__row-actions,
+    .grade-table__actions,
+    .grade-table__pagination,
+    .homeworks__toolbar,
+    .labs__toolbar,
+    .labs__submission-filters,
+    .grade-table__filters,
+    .grade-table__analysis-form
+  ) {
+    flex-wrap: wrap !important;
+  }
+
+  :where(
+    .homeworks__form,
+    .homeworks__config-card,
+    .labs__form,
+    .labs__config-card,
+    .labs__statistics-grid,
+    .grade-table__filters,
+    .grade-table__metrics,
+    .grade-table__analysis-form
+  ) {
+    grid-template-columns: 1fr !important;
+  }
+
+  :where(
+    .homeworks__panel,
+    .homeworks__list,
+    .labs__panel,
+    .labs__list,
+    .grade-table__panel,
+    .grade-table__analysis,
+    .grade-table__list,
+    .grade-table__detail
+  ) {
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow: hidden !important;
+  }
+}
+
+@media (max-width: 520px) {
+  .app-frame {
+    padding-top: 220px;
   }
 }

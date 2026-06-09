@@ -8,6 +8,7 @@ import * as homeworkApi from '../../../src/api/hwk/homeworks';
 import * as labApi from '../../../src/api/lab/labs';
 import * as learningProgressApi from '../../../src/api/lrn/learningProgress';
 import * as learningRecordsApi from '../../../src/api/lrn/learningRecords';
+import * as learningTasksApi from '../../../src/api/lrn/learningTasks';
 
 vi.mock('../../../src/api/grd/gradeItems');
 vi.mock('../../../src/api/grd/gradeRecords');
@@ -16,6 +17,7 @@ vi.mock('../../../src/api/hwk/homeworks');
 vi.mock('../../../src/api/lab/labs');
 vi.mock('../../../src/api/lrn/learningProgress');
 vi.mock('../../../src/api/lrn/learningRecords');
+vi.mock('../../../src/api/lrn/learningTasks');
 
 describe('App', () => {
   const originalLocation = window.location;
@@ -61,6 +63,149 @@ describe('App', () => {
     });
   });
 
+  it('keeps the root route on the course center while rendering the global notch navigation', async () => {
+    vi.mocked(courseApi.listCourses).mockResolvedValue({ list: [], total: 0, page: 1, size: 20 });
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: new URL('http://localhost/')
+    });
+
+    const wrapper = mount(App);
+    await flushPromises();
+
+    expect(wrapper.findAll('[data-testid="platform-navigation"]')).toHaveLength(1);
+    expect(wrapper.get('[data-testid="platform-nav-courses"]').attributes('href')).toBe('/courses');
+    expect(wrapper.get('[data-testid="platform-nav-learning"]').attributes('href')).toBe('/learning/tasks');
+    expect(wrapper.find('[data-testid="platform-nav-labs"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="platform-nav-homeworks"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="platform-nav-grades"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="course-context-navigation"]').exists()).toBe(false);
+    expect(wrapper.text()).toContain('全部课程');
+    expect(wrapper.text()).not.toContain('平台导航');
+    expect(courseApi.listCourses).toHaveBeenCalledWith('', 'all');
+  });
+
+  it('keeps course modules out of the global navigation on the course overview', async () => {
+    window.localStorage.setItem('onlinejudge.currentCourseId', '808');
+    vi.mocked(courseApi.listCourses).mockResolvedValue({ list: [], total: 0, page: 1, size: 20 });
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: new URL('http://localhost/courses')
+    });
+
+    const wrapper = mount(App);
+    await flushPromises();
+
+    expect(wrapper.find('[data-testid="platform-nav-labs"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="platform-nav-homeworks"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="platform-nav-grades"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="course-context-navigation"]').exists()).toBe(false);
+  });
+
+  it('renders course module navigation only after entering a concrete course', async () => {
+    vi.mocked(courseApi.listCourses).mockResolvedValue({ list: [], total: 0, page: 1, size: 20 });
+    vi.mocked(courseApi.getCourse).mockResolvedValueOnce({
+      id: 808,
+      name: '课程 808',
+      description: '课程内模块导航',
+      teacherId: 2,
+      teacherName: '教师2',
+      semester: '2026 Spring',
+      category: 'SE',
+      coverUrl: undefined,
+      enrollmentMode: 'PUBLIC',
+      inviteCode: undefined,
+      maxStudents: undefined,
+      startDate: undefined,
+      endDate: undefined,
+      status: 'ACTIVE',
+      memberCount: 3,
+      member: true,
+      manageable: false,
+      createdAt: '2026-06-01T08:00:00',
+      updatedAt: '2026-06-01T08:00:00'
+    });
+    vi.mocked(courseApi.listChapters).mockResolvedValueOnce([]);
+    vi.mocked(courseApi.listResources).mockResolvedValueOnce([]);
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: new URL('http://localhost/courses/808')
+    });
+
+    const wrapper = mount(App);
+    await flushPromises();
+
+    expect(wrapper.find('[data-testid="platform-nav-labs"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="course-context-navigation"]').exists()).toBe(true);
+    expect(wrapper.find('.modal-backdrop').exists()).toBe(false);
+    expect(wrapper.find('.course-modal').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="course-detail-page"]').exists()).toBe(true);
+    expect(wrapper.find('.course-home').exists()).toBe(true);
+    expect(wrapper.find('.course-home__summary').exists()).toBe(true);
+    expect(wrapper.get('[data-testid="course-nav-home"]').attributes('href')).toBe('/courses/808');
+    expect(wrapper.get('[data-testid="course-nav-labs"]').attributes('href')).toBe('/courses/808/labs?role=teacher');
+    expect(wrapper.get('[data-testid="course-nav-homeworks"]').attributes('href')).toBe('/courses/808/homeworks?role=teacher');
+    expect(wrapper.get('[data-testid="course-nav-grades"]').attributes('href')).toBe('/courses/808/grd/grade-items?role=teacher');
+  });
+
+  it('routes student grade module navigation to the student grade analysis page', async () => {
+    window.localStorage.setItem('onlinejudge.userRole', 'STUDENT');
+    vi.mocked(gradeRecordsApi.getMyPublishedGrades).mockResolvedValueOnce({
+      studentId: 101,
+      records: [],
+      summary: null
+    });
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: new URL('http://localhost/courses/808/grades?role=student')
+    });
+
+    const wrapper = mount(App);
+    await flushPromises();
+
+    expect(wrapper.get('[data-testid="course-nav-grades"]').attributes('href')).toBe('/courses/808/grades?role=student');
+    expect(wrapper.get('[data-testid="course-nav-grades"]').classes()).toContain('active');
+  });
+
+  it('guides users to pick a course when module navigation has no active course context', async () => {
+    vi.mocked(courseApi.listCourses).mockResolvedValue({
+      list: [{
+        id: 909,
+        name: '实验课程',
+        description: '进入实验模块前先选择课程',
+        teacherId: 2,
+        teacherName: '教师2',
+        semester: '2026 Spring',
+        category: 'SE',
+        coverUrl: undefined,
+        enrollmentMode: 'PUBLIC',
+        inviteCode: undefined,
+        maxStudents: undefined,
+        startDate: undefined,
+        endDate: undefined,
+        status: 'ACTIVE',
+        memberCount: 3,
+        member: true,
+        manageable: false,
+        createdAt: '2026-06-01T08:00:00',
+        updatedAt: '2026-06-01T08:00:00'
+      }],
+      total: 1,
+      page: 1,
+      size: 20
+    });
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: new URL('http://localhost/courses?target=labs')
+    });
+
+    const wrapper = mount(App);
+    await flushPromises();
+
+    expect(wrapper.text()).toContain('选择课程进入实训模块');
+    expect(wrapper.text()).toContain('进入实训模块');
+  });
+
   it('renders the merged course management page on the course route', async () => {
     vi.mocked(courseApi.listCourses).mockResolvedValueOnce({ list: [], total: 0, page: 1, size: 20 });
     vi.mocked(courseApi.listCourses).mockResolvedValueOnce({ list: [], total: 0, page: 1, size: 20 });
@@ -74,8 +219,30 @@ describe('App', () => {
     const wrapper = mount(App);
     await flushPromises();
 
+    expect(wrapper.findAll('[data-testid="platform-navigation"]')).toHaveLength(1);
     expect(courseApi.listCourses).toHaveBeenCalledWith('', 'all');
     expect(wrapper.text()).toContain('全部课程');
+  });
+
+  it('retains the global notch navigation on the learning task route', async () => {
+    vi.mocked(learningTasksApi.listLearningTasks).mockResolvedValueOnce({
+      records: [],
+      total: 0,
+      page: 1,
+      size: 20
+    });
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: new URL('http://localhost/learning/tasks')
+    });
+
+    const wrapper = mount(App);
+    await flushPromises();
+
+    expect(wrapper.findAll('[data-testid="platform-navigation"]')).toHaveLength(1);
+    expect(wrapper.get('[data-testid="platform-nav-courses"]').attributes('href')).toBe('/courses');
+    expect(wrapper.get('[data-testid="platform-nav-learning"]').attributes('href')).toBe('/learning/tasks');
+    expect(wrapper.text()).toContain('学习任务中心');
   });
 
   it('passes course id from route query into the grade item configuration page', async () => {
@@ -102,6 +269,7 @@ describe('App', () => {
     await flushPromises();
 
     expect(gradeItemApi.listGradeItems).toHaveBeenCalledWith(404);
+    expect(window.localStorage.setItem).toHaveBeenCalledWith('onlinejudge.currentCourseId', '404');
   });
 
   it('routes course grade table paths to the teacher grade table page', async () => {
@@ -176,6 +344,36 @@ describe('App', () => {
     expect(labApi.getLabDetail).toHaveBeenCalledWith(7);
     expect(labApi.listLabs).not.toHaveBeenCalled();
     expect(wrapper.text()).toContain('学生实验详情');
+  });
+
+  it('routes logged-in students from lab center paths to the student lab list page', async () => {
+    window.localStorage.setItem('onlinejudge.userRole', 'STUDENT');
+    vi.mocked(labApi.listLabs).mockResolvedValueOnce([
+      {
+        id: 17,
+        courseId: 101,
+        title: '学生可见实验',
+        status: 'PUBLISHED',
+        deadline: '2026-06-30T23:59:59',
+        maxScore: 100,
+        evaluationMode: 'DOCKER_IO',
+        autoEvaluate: true,
+        reportRequired: false,
+        deleted: false
+      }
+    ]);
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: new URL('http://localhost/courses/101/labs?role=student')
+    });
+
+    const wrapper = mount(App);
+    await flushPromises();
+
+    expect(labApi.listLabs).toHaveBeenCalledWith(101);
+    expect(gradeItemApi.listGradeItems).not.toHaveBeenCalled();
+    expect(wrapper.text()).toContain('学生可见实验');
+    expect(wrapper.get('[data-testid="open-lab-17"]').attributes('href')).toBe('/courses/101/labs/17?role=student');
   });
 
   it('routes student history paths to the lab submission history page', async () => {
@@ -505,7 +703,8 @@ describe('App', () => {
     await flushPromises();
 
     expect(wrapper.text()).toContain('无权限访问');
-    expect(wrapper.text()).toContain('返回课程首页');
+    expect(wrapper.text()).toContain('返回首页');
+    expect(wrapper.get('.primary-action').attributes('href')).toBe('/');
   });
 
   it('renders the expired session page and clears local auth state', async () => {

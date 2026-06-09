@@ -29,7 +29,7 @@ public class CourseRepository {
             rs.getString("semester"),
             rs.getString("category"),
             rs.getString("cover_url"),
-            EnrollmentMode.valueOf(rs.getString("enrollment_mode")),
+            enrollmentMode(rs.getString("enrollment_mode")),
             rs.getString("invite_code"),
             (Integer) rs.getObject("max_students"),
             nullableDate(rs.getObject("start_date")),
@@ -329,6 +329,16 @@ public class CourseRepository {
 
     private EnrollmentMode defaultEnrollmentMode(EnrollmentMode value) {
         return value == null ? EnrollmentMode.PUBLIC : value;
+    }
+
+    private EnrollmentMode enrollmentMode(String value) {
+        if (value == null || value.isBlank()) {
+            return EnrollmentMode.PUBLIC;
+        }
+        if ("INVITE_CODE".equalsIgnoreCase(value.trim())) {
+            return EnrollmentMode.INVITE;
+        }
+        return EnrollmentMode.valueOf(value.trim());
     }
 
     private CourseStatus defaultStatus(CourseStatus value) {

@@ -47,7 +47,7 @@ describe('CourseManagementView', () => {
     window.history.replaceState({}, '', '/courses');
   });
 
-  it('truncates long descriptions and opens a detail modal from the all courses view', async () => {
+  it('truncates long descriptions and enters the course home page from the all courses view', async () => {
     const page = (list = [course], total = list.length) => ({
       code: '0',
       message: 'success',
@@ -70,15 +70,20 @@ describe('CourseManagementView', () => {
 
     expect(wrapper.get('.card-desc').text().length).toBeLessThan(longDescription.length);
     const learningTaskLink = wrapper.findAll('.navbar-menu a').find((link) => link.text().includes('学习任务'));
-    expect(learningTaskLink?.attributes('href')).toBe('/learning/tasks');
+    expect(learningTaskLink).toBeUndefined();
     const learningProgressLink = wrapper.findAll('.navbar-menu a').find((link) => link.attributes('href') === '/learning/progress');
     expect(learningProgressLink).toBeUndefined();
     const gradeLink = wrapper.findAll('.navbar-menu a').find((link) => link.text().includes('成绩分析'));
-    expect(gradeLink?.attributes('href')).toBe('/courses/1/grd/grade-items');
+    expect(gradeLink).toBeUndefined();
 
     await wrapper.get('.course-card').trigger('click');
     await flushPromises();
 
+    expect(window.location.pathname).toBe('/courses/1');
+    expect(wrapper.find('.modal-backdrop').exists()).toBe(false);
+    expect(wrapper.find('.course-modal').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="course-detail-page"]').exists()).toBe(true);
+    expect(wrapper.find('.course-home').exists()).toBe(true);
     expect(wrapper.text()).toContain('课程详情');
     expect(wrapper.text()).toContain(longDescription);
     expect(wrapper.text()).toContain('操作区');
@@ -107,6 +112,9 @@ describe('CourseManagementView', () => {
     await flushPromises();
 
     async function openFromDetail(label: string) {
+      window.history.replaceState({}, '', '/courses');
+      window.dispatchEvent(new Event('onlinejudge:navigation'));
+      await flushPromises();
       await wrapper.get('.course-card').trigger('click');
       await flushPromises();
       const button = wrapper.findAll('.modal-actions-placeholder button').find((item) => item.text().includes(label));
@@ -234,7 +242,11 @@ describe('CourseManagementView', () => {
     await wrapper.get('.course-card').trigger('click');
     await flushPromises();
 
-    expect(wrapper.get('.course-modal').classes()).not.toContain('course-modal-expanded');
+    expect(window.location.pathname).toBe('/courses/81');
+    expect(wrapper.find('.modal-backdrop').exists()).toBe(false);
+    expect(wrapper.find('.course-modal').exists()).toBe(false);
+    expect(wrapper.find('.course-home').exists()).toBe(true);
+    expect(wrapper.find('.course-home').classes()).not.toContain('course-home-expanded');
     expect(wrapper.find('[data-testid="course-announcement-sidebar"]').exists()).toBe(false);
     expect(fetchMock.mock.calls.some(([url]) => String(url).includes('/chapters'))).toBe(false);
     expect(fetchMock.mock.calls.some(([url]) => String(url).includes('/resources'))).toBe(false);
@@ -261,7 +273,7 @@ describe('CourseManagementView', () => {
     expect(wrapper.find('a[data-testid="learning-statistics-entry"]').exists()).toBe(false);
     expect(wrapper.find('a[data-testid="learning-reminders-entry"]').exists()).toBe(false);
     const learningTaskLink = wrapper.findAll('.navbar-menu a').find((link) => link.text().includes('学习任务'));
-    expect(learningTaskLink?.attributes('href')).toBe('/learning/tasks');
+    expect(learningTaskLink).toBeUndefined();
   });
 
   it('loads the mine course scope from the all courses sidebar entry', async () => {
@@ -1114,7 +1126,8 @@ describe('CourseManagementView', () => {
     await teacherRow!.find('button.card-btn.danger').trigger('click');
     await flushPromises();
 
-    expect(wrapper.find('.course-modal').exists()).toBe(true);
+    expect(wrapper.find('.course-home').exists()).toBe(true);
+    expect(wrapper.find('.course-modal').exists()).toBe(false);
     expect(wrapper.text()).toContain('课程详情');
     expect(wrapper.text()).toContain('CANNOT_REMOVE_SELF');
     expect(fetchMock.mock.calls.filter(([url]) => url === '/api/v1/courses/1/members')).toHaveLength(2);

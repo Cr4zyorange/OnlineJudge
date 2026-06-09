@@ -301,8 +301,8 @@ function statusLabel(status: LearningTask['status']) {
 }
 
 /* 穿透优先级，强制生效毛玻璃 + 透明度（唯一修改的样式） */
-::v-deep .task-center__sidebar,
-::v-deep .task-center__content {
+:deep(.task-center__sidebar),
+:deep(.task-center__content) {
   background: rgba(255, 255, 255, 0.15) !important;
   backdrop-filter: blur(12px) !important;
   -webkit-backdrop-filter: blur(12px) !important;
@@ -350,8 +350,8 @@ function statusLabel(status: LearningTask['status']) {
 }
 
 /* 卡片强制生效透明（核心修复） */
-::v-deep .task-center__stats div,
-::v-deep .task-center__list .task-card {
+:deep(.task-center__stats div),
+:deep(.task-center__list .task-card) {
   background: rgba(255, 255, 255, 0.15) !important;
   backdrop-filter: blur(12px) !important;
   -webkit-backdrop-filter: blur(12px) !important;
