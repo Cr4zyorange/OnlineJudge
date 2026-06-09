@@ -1,29 +1,6 @@
 <template>
   <div class="page-shell">
-    <header class="navbar-container">
-      <nav class="navbar">
-        <div class="navbar-logo">
-          <h2><i class="bi bi-book-half"></i> 学知实训平台</h2>
-        </div>
-        <div class="navbar-menu">
-          <a class="active" href="/courses">课程中心</a>
-          <a href="/learning/tasks">学习任务</a>
-          <a>实训模块</a>
-          <a>作业评测</a>
-          <a :class="{ disabled: !gradeAnalysisHref }" :href="gradeAnalysisHref || undefined" :aria-disabled="!gradeAnalysisHref">
-            成绩分析
-          </a>
-        </div>
-        <div class="navbar-user">
-          <a href="/notifications" data-testid="notification-center-entry" title="消息通知中心" aria-label="消息通知中心">
-            <i class="bi bi-bell"></i>
-          </a>
-          <span class="avatar">T</span>
-        </div>
-      </nav>
-    </header>
-
-    <div class="container">
+    <div v-if="!isConcreteCoursePage || hasManagementWorkspace" class="container">
       <aside class="sidebar">
         <div class="sidebar-title">
           <h3>课程管理</h3>
@@ -395,7 +372,7 @@
                 :key="course.id"
                 class="course-card"
                 :class="{ interactive: canOpenCourseDetail }"
-                @click="openCourseDetail(course)"
+                @click="enterCourse(course)"
               >
                 <div class="card-content">
                   <div class="card-topline">
@@ -427,11 +404,14 @@
                     </button>
                   </div>
                   <div v-else class="card-actions">
-                    <button v-if="course.manageable" class="card-btn" type="button" @click.stop="openCourseDetail(course)">
+                    <button v-if="course.manageable && targetModule" class="card-btn" type="button" @click.stop="enterTargetModule(course)">
+                      <i class="bi bi-box-arrow-in-right"></i> {{ targetModuleActionText }}
+                    </button>
+                    <button v-else-if="course.manageable" class="card-btn" type="button" @click.stop="enterCourse(course)">
                       <i class="bi bi-kanban"></i> 管理课程
                     </button>
-                    <button v-else-if="course.member" class="card-btn" type="button" @click.stop="enterCourse(course)">
-                      <i class="bi bi-box-arrow-in-right"></i> 进入学习
+                    <button v-else-if="course.member" class="card-btn" type="button" @click.stop="enterCourseOrTargetModule(course)">
+                      <i class="bi bi-box-arrow-in-right"></i> {{ targetModuleActionText || '进入学习' }}
                     </button>
                     <button v-else class="card-btn" type="button" :disabled="joiningCourseId === course.id" @click.stop="joinVisibleCourse(course)">
                       <i class="bi bi-person-plus"></i> {{ joinButtonText(course) }}
@@ -445,15 +425,43 @@
       </main>
     </div>
 
-    <div v-if="selectedCourse" class="modal-backdrop" @click.self="closeCourseDetail">
-      <section class="course-modal" :class="{ 'course-modal-expanded': canViewCourseContent(selectedCourse) }" role="dialog" aria-modal="true" aria-label="课程详情">
+    <main v-if="isConcreteCoursePage && !selectedCourse && !hasManagementWorkspace" class="course-detail-page">
+      <section class="course-home course-home__summary" aria-label="课程详情加载中">
+        <p>课程加载中...</p>
+      </section>
+    </main>
+
+    <div
+      v-if="selectedCourse"
+      :class="isConcreteCoursePage ? 'course-detail-page' : 'modal-backdrop'"
+      :data-testid="isConcreteCoursePage ? 'course-detail-page' : undefined"
+      @click.self="closeFloatingCourseDetail"
+    >
+      <CourseContextNavigation
+        v-if="isConcreteCoursePage && canViewCourseContent(selectedCourse)"
+        class="course-home-nav"
+        :course-id="selectedCourse.id"
+        :current-path="currentPath"
+      />
+      <section
+        :class="[
+          isConcreteCoursePage ? 'course-home course-home__summary' : 'course-modal',
+          {
+            'course-home-expanded': isConcreteCoursePage && canViewCourseContent(selectedCourse),
+            'course-modal-expanded': !isConcreteCoursePage && canViewCourseContent(selectedCourse)
+          }
+        ]"
+        :role="isConcreteCoursePage ? undefined : 'dialog'"
+        :aria-modal="isConcreteCoursePage ? undefined : 'true'"
+        aria-label="课程详情"
+      >
         <div class="modal-header">
           <div>
             <p class="modal-label">课程详情</p>
             <p class="modal-eyebrow">{{ selectedCourse.category || '未分类' }}</p>
             <h3>{{ selectedCourse.name }}</h3>
           </div>
-          <button class="modal-close" type="button" title="关闭详情" @click="closeCourseDetail">
+          <button v-if="!isConcreteCoursePage" class="modal-close" type="button" title="关闭详情" @click="closeCourseDetail">
             <i class="bi bi-x-lg"></i>
           </button>
         </div>
@@ -462,6 +470,13 @@
           <span class="card-tag">{{ enrollmentModeText(selectedCourse.enrollmentMode) }}</span>
           <span class="status-pill">{{ statusText(selectedCourse.status) }}</span>
         </div>
+
+        <CourseContextNavigation
+          v-if="canViewCourseContent(selectedCourse) && !isConcreteCoursePage"
+          class="modal-module-nav"
+          :course-id="selectedCourse.id"
+          :current-path="currentPath"
+        />
 
         <aside v-if="canViewCourseContent(selectedCourse)" class="announcement-sidebar" data-testid="course-announcement-sidebar">
           <div class="sidebar-section-title">
@@ -652,8 +667,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed, defineComponent, h, onMounted, reactive, ref } from 'vue';
+import { computed, defineComponent, h, onMounted, onUnmounted, reactive, ref } from 'vue';
 import type { Component, VNode } from 'vue';
+import CourseContextNavigation from '../../components/CourseContextNavigation.vue';
 import {
   archiveCourse,
   createChapter,
@@ -862,6 +878,34 @@ const stats = reactive<Record<CourseScope, number>>({
   managed: 0,
   archived: 0
 });
+const currentPath = ref(window.location.pathname);
+const currentSearch = ref(window.location.search);
+const isConcreteCoursePage = computed(() => /^\/courses\/\d+\/?$/.test(currentPath.value));
+const hasManagementWorkspace = computed(() => !!chapterCourse.value || !!resourceCourse.value || !!announcementCourse.value);
+
+type TargetModule = 'labs' | 'homeworks' | 'grades';
+
+const targetModule = computed<TargetModule | null>(() => {
+  const value = new URLSearchParams(currentSearch.value).get('target');
+  return value === 'labs' || value === 'homeworks' || value === 'grades' ? value : null;
+});
+
+const targetModuleLabel = computed(() => {
+  switch (targetModule.value) {
+    case 'labs':
+      return '实训模块';
+    case 'homeworks':
+      return '作业评测';
+    case 'grades':
+      return '成绩分析';
+    default:
+      return '';
+  }
+});
+
+const targetModuleActionText = computed(() => (
+  targetModuleLabel.value ? `进入${targetModuleLabel.value}` : ''
+));
 
 const pageTitle = computed(() => {
   if (chapterCourse.value) {
@@ -878,6 +922,9 @@ const pageTitle = computed(() => {
   }
   if (activeTab.value === 'archived') {
     return '归档记录';
+  }
+  if (targetModuleLabel.value) {
+    return `选择课程进入${targetModuleLabel.value}`;
   }
   return '全部课程';
 });
@@ -898,6 +945,9 @@ const pageSubtitle = computed(() => {
   if (activeTab.value === 'archived') {
     return '查看已经归档的课程，保留历史课程信息。';
   }
+  if (targetModuleLabel.value) {
+    return '先选择一门已加入或可管理课程，再进入对应业务模块。';
+  }
   return '师生共用课程列表，可按课程名称、学期或分类搜索。';
 });
 
@@ -910,6 +960,9 @@ const emptyText = computed(() => {
   }
   if (activeTab.value === 'archived') {
     return '暂无归档课程。';
+  }
+  if (targetModuleLabel.value) {
+    return `暂无可进入${targetModuleLabel.value}的课程。`;
   }
   return '暂无课程。';
 });
@@ -942,11 +995,6 @@ const memberLoading = ref(false);
 const memberManageError = ref('');
 const memberActionUserId = ref<number | null>(null);
 const canOpenCourseDetail = computed(() => activeTab.value === 'all' || activeTab.value === 'mine' || activeTab.value === 'archived');
-const gradeAnalysisCourse = computed(() => editingCourse.value ?? selectedCourse.value ?? chapterCourse.value ?? visibleCourses.value.find((course) => course.manageable) ?? visibleCourses.value[0] ?? null);
-const gradeAnalysisHref = computed(() => {
-  const course = gradeAnalysisCourse.value;
-  return course ? `/courses/${course.id}/grd/grade-items` : '';
-});
 const activeMembers = computed(() => members.value.filter((member) => member.status === 'ACTIVE'));
 
 function canViewCourseContent(course: Course) {
@@ -1107,6 +1155,12 @@ function closeCourseDetail() {
   resetResourceForm();
 }
 
+function closeFloatingCourseDetail() {
+  if (!isConcreteCoursePage.value) {
+    closeCourseDetail();
+  }
+}
+
 async function openChapterManagement(course: Course) {
   chapterCourse.value = course;
   resourceCourse.value = null;
@@ -1136,8 +1190,68 @@ async function openAnnouncementManagement(course: Course) {
 }
 
 async function enterCourse(course: Course) {
+  rememberCourseContext(course.id);
   window.history.pushState({}, '', `/courses/${course.id}`);
+  syncCourseLocation();
+  scrollToPageTop();
+  window.dispatchEvent(new Event('onlinejudge:navigation'));
   await openCourseDetail(course);
+}
+
+async function enterCourseOrTargetModule(course: Course) {
+  if (!targetModule.value) {
+    await enterCourse(course);
+    return;
+  }
+  enterTargetModule(course);
+}
+
+function enterTargetModule(course: Course) {
+  rememberCourseContext(course.id);
+  window.history.pushState({}, '', targetModuleUrl(course));
+  syncCourseLocation();
+  scrollToPageTop();
+  window.dispatchEvent(new Event('onlinejudge:navigation'));
+}
+
+function targetModuleUrl(course: Course) {
+  const role = course.manageable ? 'teacher' : currentCourseRole();
+  if (targetModule.value === 'labs') {
+    return `/courses/${course.id}/labs?role=${role}`;
+  }
+  if (targetModule.value === 'homeworks') {
+    return `/courses/${course.id}/homeworks?role=${role}`;
+  }
+  if (targetModule.value === 'grades') {
+    return role === 'student'
+      ? `/courses/${course.id}/grades?role=student`
+      : `/courses/${course.id}/grd/grade-items?role=teacher`;
+  }
+  return `/courses/${course.id}`;
+}
+
+function currentCourseRole() {
+  const storedRole = window.localStorage.getItem('onlinejudge.userRole')
+    ?? window.localStorage.getItem('onlinejudge.role');
+  return storedRole === 'STUDENT' ? 'student' : 'teacher';
+}
+
+function rememberCourseContext(courseId: number) {
+  window.localStorage.setItem('onlinejudge.currentCourseId', String(courseId));
+}
+
+function scrollToPageTop() {
+  if (window.navigator.userAgent.includes('jsdom')) {
+    return;
+  }
+  if (typeof window.scrollTo !== 'function') {
+    return;
+  }
+  try {
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+  } catch {
+    window.scrollTo(0, 0);
+  }
 }
 
 async function joinVisibleCourse(course: Course) {
@@ -1168,7 +1282,7 @@ async function joinVisibleCourse(course: Course) {
     if (index >= 0) {
       courses.value[index] = joinedCourse;
     }
-    await openCourseDetail(joinedCourse);
+    await enterCourse(joinedCourse);
   } catch (error) {
     loadError.value = error instanceof Error ? error.message : '加入课程失败';
   } finally {
@@ -1927,6 +2041,9 @@ function flattenChapters(items: Chapter[], depth = 0): Array<{ chapter: Chapter;
 }
 
 onMounted(async () => {
+  syncCourseLocation();
+  window.addEventListener('popstate', syncCourseLocation);
+  window.addEventListener('onlinejudge:navigation', syncCourseLocation);
   await Promise.all([loadCourses(), loadStats()]);
   const courseId = Number(window.location.pathname.match(/\/courses\/(\d+)(?:\/|$)/)?.[1]);
   if (Number.isFinite(courseId) && courseId > 0) {
@@ -1937,10 +2054,21 @@ onMounted(async () => {
     }
   }
 });
+
+onUnmounted(() => {
+  window.removeEventListener('popstate', syncCourseLocation);
+  window.removeEventListener('onlinejudge:navigation', syncCourseLocation);
+});
+
+function syncCourseLocation() {
+  currentPath.value = window.location.pathname;
+  currentSearch.value = window.location.search;
+}
 </script>
 
 <style scoped>
-.course-modal.course-modal-expanded {
+.course-modal.course-modal-expanded,
+.course-home.course-home-expanded {
   display: grid;
   width: min(1120px, calc(100vw - 40px));
   grid-template-columns: minmax(640px, 720px) 360px;
@@ -1948,12 +2076,37 @@ onMounted(async () => {
   gap: 18px 24px;
 }
 
+.course-detail-page {
+  width: min(1120px, calc(100vw - 40px));
+  margin: 0 auto;
+  padding: 24px 0 48px;
+}
+
+.course-home {
+  width: 100%;
+  min-width: 0;
+  padding: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.32);
+  border-radius: 8px;
+  background: rgba(239, 247, 250, 0.3);
+  box-shadow: 0 8px 32px rgba(31, 38, 135, 0.1);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+.course-home.course-home-expanded > .modal-header,
+.course-home.course-home-expanded > .modal-status-row,
+.course-home.course-home-expanded > .modal-actions-placeholder,
 .course-modal.course-modal-expanded > .modal-header,
 .course-modal.course-modal-expanded > .modal-status-row,
+.course-modal.course-modal-expanded > .modal-module-nav,
 .course-modal.course-modal-expanded > .modal-actions-placeholder {
   grid-column: 1;
 }
 
+.course-home.course-home-expanded > .modal-grid,
+.course-home.course-home-expanded > .detail-block,
+.course-home.course-home-expanded > .modal-section,
 .course-modal.course-modal-expanded > .modal-grid,
 .course-modal.course-modal-expanded > .detail-block,
 .course-modal.course-modal-expanded > .modal-section {
@@ -1968,9 +2121,20 @@ onMounted(async () => {
   width: auto;
   margin: 0;
   padding: 16px;
-  border: 1px solid rgba(15, 23, 42, 0.12);
+  border: 1px solid rgba(22, 66, 60, 0.14);
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.92);
+  background: rgba(232, 244, 246, 0.58);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28);
+}
+
+.modal-module-nav {
+  width: 100%;
+  margin: 0 0 16px;
+}
+
+.course-home-nav {
+  width: 100%;
+  margin: 0 0 16px;
 }
 
 .sidebar-section-title {
@@ -1994,13 +2158,14 @@ onMounted(async () => {
 }
 
 .announcement-card {
-  padding-bottom: 12px;
-  border-bottom: 1px solid rgba(15, 23, 42, 0.1);
+  padding: 12px;
+  border: 1px solid rgba(22, 66, 60, 0.1) !important;
+  border-bottom: 1px solid rgba(22, 66, 60, 0.1);
+  background: rgba(255, 255, 255, 0.28) !important;
 }
 
 .announcement-card:last-child {
-  border-bottom: 0;
-  padding-bottom: 0;
+  border-bottom: 1px solid rgba(22, 66, 60, 0.1);
 }
 
 .recent-task-panel {
@@ -2019,13 +2184,14 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding-bottom: 12px;
-  border-bottom: 1px solid rgba(15, 23, 42, 0.1);
+  padding: 12px;
+  border: 1px solid rgba(22, 66, 60, 0.1) !important;
+  border-bottom: 1px solid rgba(22, 66, 60, 0.1);
+  background: rgba(255, 255, 255, 0.24) !important;
 }
 
 .recent-task-card:last-child {
-  border-bottom: 0;
-  padding-bottom: 0;
+  border-bottom: 1px solid rgba(22, 66, 60, 0.1);
 }
 
 .task-link {
@@ -2072,8 +2238,13 @@ onMounted(async () => {
 }
 
 @media (max-width: 1100px) {
-  .course-modal.course-modal-expanded {
+  .course-modal.course-modal-expanded,
+  .course-home.course-home-expanded {
     display: block;
+    width: min(720px, calc(100vw - 40px));
+  }
+
+  .course-detail-page {
     width: min(720px, calc(100vw - 40px));
   }
 

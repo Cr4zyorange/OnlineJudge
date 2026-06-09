@@ -48,9 +48,9 @@ const content = computed(() => {
   return {
     kicker: 'ACCESS DENIED',
     title: '无权限访问',
-    message: '当前账号没有访问该页面或资源的权限。请返回课程首页，或联系管理员调整角色权限。',
-    primaryAction: '返回课程首页',
-    primaryHref: '/courses',
+    message: '当前账号没有访问该页面或资源的权限。请返回首页，或联系管理员调整角色权限。',
+    primaryAction: '返回首页',
+    primaryHref: '/',
     secondaryAction: '重新登录',
     secondaryHref: '/login'
   };

@@ -1,71 +1,85 @@
 <template>
-  <AuthView v-if="viewMode === 'auth'" :initial-mode="authMode" />
-  <AuthStatusView v-else-if="viewMode === 'forbidden'" kind="forbidden" />
-  <AuthStatusView v-else-if="viewMode === 'session-expired'" kind="expired" />
-  <AuthStatusView v-else-if="viewMode === 'account-disabled'" kind="account-disabled" />
-  <AuthProfileView v-else-if="viewMode === 'profile'" />
-  <AuthAdminView v-else-if="viewMode === 'auth-admin' && adminGate === 'allowed'" />
-  <main v-else-if="viewMode === 'auth-admin'" class="app-empty-state">
-    <p v-if="adminGate === 'checking'">正在校验登录状态</p>
-    <p v-else-if="adminGate === 'expired'">登录已失效，请重新登录</p>
-    <p v-else>无权限访问</p>
-  </main>
-  <CourseManagementView v-else-if="viewMode === 'courses'" />
-  <LearningTaskCenterView v-else-if="viewMode === 'learning-tasks'" />
-  <LearningProgressView v-else-if="viewMode === 'learning-progress'" />
-  <LearningStatisticsView v-else-if="viewMode === 'learning-statistics'" />
-  <ReminderRuleSettingsView v-else-if="viewMode === 'learning-reminders'" />
-  <NotificationCenterView v-else-if="viewMode === 'notifications'" />
-  <LabSubmissionHistoryView
-    v-else-if="viewMode === 'lab' && labRole === 'student' && labPage === 'history' && courseId !== null && labId !== null"
-    :course-id="courseId"
-    :lab-id="labId"
-  />
-  <LabTeacherView
-    v-else-if="viewMode === 'lab' && labRole === 'teacher' && courseId !== null"
-    :course-id="courseId"
-  />
-  <LabStudentView
-    v-else-if="viewMode === 'lab' && labRole === 'student' && labPage === 'detail' && courseId !== null && labId !== null"
-    :course-id="courseId"
-    :lab-id="labId"
-  />
-  <HomeworkSubmissionHistoryView
-    v-else-if="viewMode === 'homework' && homeworkPage === 'history' && courseId !== null && homeworkId !== null"
-    :course-id="courseId"
-    :homework-id="homeworkId"
-    :role="homeworkRole"
-  />
-  <HomeworkStudentView
-    v-else-if="viewMode === 'homework' && homeworkRole === 'student' && homeworkPage === 'detail' && courseId !== null && homeworkId !== null"
-    :course-id="courseId"
-    :homework-id="homeworkId"
-  />
-  <HomeworkStudentListView
-    v-else-if="viewMode === 'homework' && homeworkRole === 'student' && courseId !== null"
-    :course-id="courseId"
-  />
-  <HomeworkTeacherView
-    v-else-if="viewMode === 'homework' && homeworkRole === 'teacher' && courseId !== null"
-    :course-id="courseId"
-  />
-  <StudentGradeView
-    v-else-if="courseId !== null && page === 'grades' && gradeRole === 'student'"
-    :course-id="courseId"
-  />
-  <TeacherGradeTableView
-    v-else-if="courseId !== null && page === 'grades'"
-    :course-id="courseId"
-  />
-  <GradeItemConfigView v-else-if="courseId !== null" :course-id="courseId" />
-  <main v-else class="app-empty-state">
-    <p>缺少课程上下文</p>
-  </main>
+  <div class="app-frame">
+    <PlatformNavigationBar :current-path="pathname" />
+    <CourseContextNavigation
+      v-if="courseId !== null && showCourseContextNavigation"
+      :course-id="courseId"
+      :current-path="pathname"
+    />
+    <AuthView v-if="viewMode === 'auth'" :initial-mode="authMode" />
+    <AuthStatusView v-else-if="viewMode === 'forbidden'" kind="forbidden" />
+    <AuthStatusView v-else-if="viewMode === 'session-expired'" kind="expired" />
+    <AuthStatusView v-else-if="viewMode === 'account-disabled'" kind="account-disabled" />
+    <AuthProfileView v-else-if="viewMode === 'profile'" />
+    <AuthAdminView v-else-if="viewMode === 'auth-admin' && adminGate === 'allowed'" />
+    <main v-else-if="viewMode === 'auth-admin'" class="app-empty-state">
+      <p v-if="adminGate === 'checking'">正在校验登录状态</p>
+      <p v-else-if="adminGate === 'expired'">登录已失效，请重新登录</p>
+      <p v-else>无权限访问</p>
+    </main>
+    <CourseManagementView v-else-if="viewMode === 'courses'" />
+    <LearningTaskCenterView v-else-if="viewMode === 'learning-tasks'" />
+    <LearningProgressView v-else-if="viewMode === 'learning-progress'" />
+    <LearningStatisticsView v-else-if="viewMode === 'learning-statistics'" />
+    <ReminderRuleSettingsView v-else-if="viewMode === 'learning-reminders'" />
+    <NotificationCenterView v-else-if="viewMode === 'notifications'" />
+    <LabSubmissionHistoryView
+      v-else-if="viewMode === 'lab' && labRole === 'student' && labPage === 'history' && courseId !== null && labId !== null"
+      :course-id="courseId"
+      :lab-id="labId"
+    />
+    <LabTeacherView
+      v-else-if="viewMode === 'lab' && labRole === 'teacher' && courseId !== null"
+      :course-id="courseId"
+    />
+    <LabStudentView
+      v-else-if="viewMode === 'lab' && labRole === 'student' && labPage === 'detail' && courseId !== null && labId !== null"
+      :course-id="courseId"
+      :lab-id="labId"
+    />
+    <LabStudentListView
+      v-else-if="viewMode === 'lab' && labRole === 'student' && courseId !== null"
+      :course-id="courseId"
+    />
+    <HomeworkSubmissionHistoryView
+      v-else-if="viewMode === 'homework' && homeworkPage === 'history' && courseId !== null && homeworkId !== null"
+      :course-id="courseId"
+      :homework-id="homeworkId"
+      :role="homeworkRole"
+    />
+    <HomeworkStudentView
+      v-else-if="viewMode === 'homework' && homeworkRole === 'student' && homeworkPage === 'detail' && courseId !== null && homeworkId !== null"
+      :course-id="courseId"
+      :homework-id="homeworkId"
+    />
+    <HomeworkStudentListView
+      v-else-if="viewMode === 'homework' && homeworkRole === 'student' && courseId !== null"
+      :course-id="courseId"
+    />
+    <HomeworkTeacherView
+      v-else-if="viewMode === 'homework' && homeworkRole === 'teacher' && courseId !== null"
+      :course-id="courseId"
+    />
+    <StudentGradeView
+      v-else-if="courseId !== null && page === 'grades' && gradeRole === 'student'"
+      :course-id="courseId"
+    />
+    <TeacherGradeTableView
+      v-else-if="courseId !== null && page === 'grades'"
+      :course-id="courseId"
+    />
+    <GradeItemConfigView v-else-if="courseId !== null" :course-id="courseId" />
+    <main v-else class="app-empty-state">
+      <p>缺少课程上下文</p>
+    </main>
+  </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { getCurrentUser } from '../api/auth/auth';
+import CourseContextNavigation from '../components/CourseContextNavigation.vue';
+import PlatformNavigationBar from '../components/PlatformNavigationBar.vue';
 import AuthProfileView from '../views/auth/AuthProfileView.vue';
 import AuthStatusView from '../views/auth/AuthStatusView.vue';
 import AuthView from '../views/auth/AuthView.vue';
@@ -77,6 +91,7 @@ import HomeworkStudentListView from '../views/hwk/HomeworkStudentListView.vue';
 import HomeworkStudentView from '../views/hwk/HomeworkStudentView.vue';
 import HomeworkTeacherView from '../views/hwk/HomeworkTeacherView.vue';
 import LabSubmissionHistoryView from '../views/lab/LabSubmissionHistoryView.vue';
+import LabStudentListView from '../views/lab/LabStudentListView.vue';
 import LabStudentView from '../views/lab/LabStudentView.vue';
 import LabTeacherView from '../views/lab/LabTeacherView.vue';
 import LearningProgressView from '../views/lrn/LearningProgressView.vue';
@@ -173,6 +188,15 @@ const viewMode = computed(() => {
 
 const authMode = computed(() => pathname.value === '/register' ? 'register' : 'login');
 
+const showCourseContextNavigation = computed(() => (
+  viewMode.value !== 'auth'
+  && viewMode.value !== 'courses'
+  && viewMode.value !== 'forbidden'
+  && viewMode.value !== 'session-expired'
+  && viewMode.value !== 'account-disabled'
+  && viewMode.value !== 'auth-admin'
+));
+
 const labRole = computed(() => {
   const queryRole = searchParams.value.get('role')?.toLowerCase();
   if (queryRole === 'student' || queryRole === 'teacher') {
@@ -211,6 +235,12 @@ const courseId = computed(() => {
   const pathCourseId = pathname.value.match(/\/courses\/(\d+)(?:\/|$)/)?.[1] ?? null;
   return parseCourseId(pathCourseId);
 });
+
+watch(courseId, (activeCourseId) => {
+  if (activeCourseId !== null) {
+    window.localStorage.setItem('onlinejudge.currentCourseId', String(activeCourseId));
+  }
+}, { immediate: true });
 
 const labId = computed(() => {
   const queryLabId = parseCourseId(searchParams.value.get('labId'));

@@ -586,6 +586,23 @@ class CourseControllerTest {
     }
 
     @Test
+    void listCoursesNormalizesLegacyInviteCodeEnrollmentMode() throws Exception {
+        String courseName = "legacy-invite-code-" + System.nanoTime();
+        jdbcTemplate.update("""
+                INSERT INTO crs_course (course_name, description, teacher_id, enrollment_mode, invite_code, status)
+                VALUES (?, 'legacy enum compatibility', 431, 'INVITE_CODE', 'LEGACY1', 'ACTIVE')
+                """, courseName);
+
+        mockMvc.perform(get("/api/v1/courses?scope=all&keyword=" + courseName)
+                        .header("X-User-Id", "432")
+                        .header("X-User-Role", "STUDENT"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.total", is(1)))
+                .andExpect(jsonPath("$.data.list[0].name", is(courseName)))
+                .andExpect(jsonPath("$.data.list[0].enrollmentMode", is("INVITE")));
+    }
+
+    @Test
     void teacherManagesNestedChapterTreeAndStudentCanOnlyReadIt() throws Exception {
         String response = mockMvc.perform(post("/api/v1/courses")
                         .header("X-User-Id", "701")
