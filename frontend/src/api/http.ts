@@ -107,7 +107,7 @@ function isSuccessCode(code: string | number | undefined) {
 }
 
 async function unwrap<T>(response: Response): Promise<T> {
-  const body = (await response.json()) as ApiResponse<T>;
+  const body = await readApiResponse<T>(response);
   if (!response.ok || !isSuccessCode(body.code)) {
     handleAuthFailure(body.code);
     throw new Error(body.message || '接口请求失败');
@@ -117,12 +117,35 @@ async function unwrap<T>(response: Response): Promise<T> {
 
 async function errorMessage(response: Response) {
   try {
-    const body = (await response.json()) as Partial<ApiResponse<unknown>>;
+    const body = await readApiResponse<unknown>(response);
     handleAuthFailure(body.code);
     return body.message || '接口请求失败';
   } catch {
     return response.statusText || '接口请求失败';
   }
+}
+
+async function readApiResponse<T>(response: Response): Promise<ApiResponse<T>> {
+  if (typeof response.text === 'function') {
+    const text = await response.text();
+    if (!text.trim()) {
+      return {
+        code: response.ok ? '0' : response.status,
+        message: response.statusText,
+        data: undefined as T
+      };
+    }
+    try {
+      return JSON.parse(text) as ApiResponse<T>;
+    } catch {
+      return {
+        code: response.status,
+        message: text,
+        data: undefined as T
+      };
+    }
+  }
+  return (await response.json()) as ApiResponse<T>;
 }
 
 function filenameFromDisposition(disposition: string | null) {

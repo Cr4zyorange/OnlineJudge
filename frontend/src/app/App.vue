@@ -101,6 +101,7 @@ import NotificationCenterView from '../views/lrn/NotificationCenterView.vue';
 import ReminderRuleSettingsView from '../views/lrn/ReminderRuleSettingsView.vue';
 import StudentGradeView from '../views/grd/StudentGradeView.vue';
 import TeacherGradeTableView from '../views/grd/TeacherGradeTableView.vue';
+import { readLocalStorage, writeLocalStorage } from '../utils/browserStorage';
 
 const NAVIGATION_EVENT = 'onlinejudge:navigation';
 
@@ -202,8 +203,8 @@ const labRole = computed(() => {
   if (queryRole === 'student' || queryRole === 'teacher') {
     return queryRole;
   }
-  const storedRole = window.localStorage.getItem('onlinejudge.userRole')
-    ?? window.localStorage.getItem('onlinejudge.role');
+  const storedRole = readLocalStorage('onlinejudge.userRole')
+    ?? readLocalStorage('onlinejudge.role');
   return storedRole === 'STUDENT' ? 'student' : 'teacher';
 });
 
@@ -212,8 +213,8 @@ const homeworkRole = computed(() => {
   if (queryRole === 'student' || queryRole === 'teacher') {
     return queryRole;
   }
-  const storedRole = window.localStorage.getItem('onlinejudge.userRole')
-    ?? window.localStorage.getItem('onlinejudge.role');
+  const storedRole = readLocalStorage('onlinejudge.userRole')
+    ?? readLocalStorage('onlinejudge.role');
   return storedRole === 'STUDENT' ? 'student' : 'teacher';
 });
 
@@ -222,8 +223,8 @@ const gradeRole = computed(() => {
   if (queryRole === 'student' || queryRole === 'teacher') {
     return queryRole;
   }
-  const storedRole = window.localStorage.getItem('onlinejudge.userRole')
-    ?? window.localStorage.getItem('onlinejudge.role');
+  const storedRole = readLocalStorage('onlinejudge.userRole')
+    ?? readLocalStorage('onlinejudge.role');
   return storedRole === 'STUDENT' ? 'student' : 'teacher';
 });
 
@@ -238,7 +239,7 @@ const courseId = computed(() => {
 
 watch(courseId, (activeCourseId) => {
   if (activeCourseId !== null) {
-    window.localStorage.setItem('onlinejudge.currentCourseId', String(activeCourseId));
+    writeLocalStorage('onlinejudge.currentCourseId', String(activeCourseId));
   }
 }, { immediate: true });
 

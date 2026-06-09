@@ -33,6 +33,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
+import { readLocalStorage } from '../utils/browserStorage';
 
 const props = defineProps<{
   courseId: number;
@@ -40,8 +41,8 @@ const props = defineProps<{
 }>();
 
 const role = computed(() => {
-  const storedRole = window.localStorage.getItem('onlinejudge.userRole')
-    ?? window.localStorage.getItem('onlinejudge.role');
+  const storedRole = readLocalStorage('onlinejudge.userRole')
+    ?? readLocalStorage('onlinejudge.role');
   return storedRole === 'STUDENT' ? 'student' : 'teacher';
 });
 

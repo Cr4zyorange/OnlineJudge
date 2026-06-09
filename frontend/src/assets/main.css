@@ -1,7 +1,7 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
 :root {
-  --oj-bg-image: url("./back.jpg");
+  --oj-bg-image: url("./back1.jpg");
   --oj-ink: #172b35;
   --oj-ink-soft: #38535c;
   --oj-muted: #5d7177;
@@ -43,6 +43,9 @@ body {
   color: var(--oj-ink);
 }
 
+body.oj-video-background {
+  background: transparent;
+}
 
 button,
 input,
@@ -75,10 +78,10 @@ button:disabled {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 2rem;
-  width: 90%;
-  max-width: 980px;
-  padding: 10px 25px;
+  gap: 1rem;
+  width: auto;
+  max-width: calc(100vw - 32px);
+  padding: 10px 16px;
   background-color: rgba(255, 255, 255, 0.2);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
@@ -100,16 +103,16 @@ button:disabled {
 
 .navbar-menu {
   display: flex;
-  gap: 10px;
+  gap: 4px;
 }
 
 .navbar-menu a {
-  width: 110px;
-  padding: 8px 0;
-  border-bottom-left-radius: 20px;
-  border-bottom-right-radius: 20px;
+  width: auto;
+  min-width: 0;
+  padding: 7px 12px;
+  border-radius: 8px;
   color: rgb(53, 53, 53);
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 500;
   letter-spacing: 0;
   text-align: center;
@@ -856,8 +859,15 @@ button:disabled {
 }
 
 .app-frame {
+  position: relative;
+  isolation: isolate;
   min-height: 100vh;
-  padding-top: 72px;
+  padding-top: 0;
+}
+
+.app-frame > :not(.live-background-video) {
+  position: relative;
+  z-index: 1;
 }
 
 a {
@@ -909,6 +919,34 @@ a:hover {
   background-position: top center;
   background-repeat: no-repeat;
   background-attachment: fixed;
+}
+
+body.oj-video-background :where(
+  .auth-page,
+  .auth-admin-page,
+  .profile-page,
+  .auth-status-shell,
+  .course-management,
+  .task-center,
+  .progress-page,
+  .statistics-page,
+  .notification-center,
+  .reminder-settings,
+  .lab-student,
+  .lab-history,
+  .labs,
+  .homework-student,
+  .lab-student-list,
+  .homework-student-list,
+  .hwk-history,
+  .homeworks,
+  .grade-items,
+  .grade-table,
+  .student-grade,
+  .page-shell
+) {
+  background-color: transparent !important;
+  background-image: none !important;
 }
 
 :where(
@@ -1282,7 +1320,7 @@ a:hover {
 
 @media (max-width: 900px) {
   .app-frame {
-    padding-top: 176px;
+    padding-top: 0;
   }
 
   :where(
@@ -1374,6 +1412,6 @@ a:hover {
 
 @media (max-width: 520px) {
   .app-frame {
-    padding-top: 220px;
+    padding-top: 0;
   }
 }

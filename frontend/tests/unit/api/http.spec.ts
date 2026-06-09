@@ -151,6 +151,20 @@ describe('shared API request client', () => {
     await expect(request('/api/v1/forbidden')).rejects.toThrow('无权限访问');
   });
 
+  it('reports plain-text server errors without leaking json parse failures', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
+      ok: false,
+      statusText: 'Forbidden',
+      text: async () => 'Invalid CORS request'
+    } as Response);
+
+    await expect(request('/api/v1/auth/login', {
+      method: 'POST',
+      auth: false,
+      body: { account: 'student', password: 'pass' }
+    })).rejects.toThrow('Invalid CORS request');
+  });
+
   it('routes unauthorized responses to the expired session page and clears local auth state', async () => {
     writeAuthStorage('onlinejudge.authToken', 'expired-token');
     writeAuthStorage('onlinejudge.userId', '601');

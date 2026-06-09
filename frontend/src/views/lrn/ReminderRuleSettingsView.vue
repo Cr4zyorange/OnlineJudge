@@ -168,7 +168,7 @@ function aheadLabel(minutes: number) {
   min-height: 100vh;
   padding: 24px;
   color: #102033;
-  background-image: url("../../assets/back.jpg");
+  background-image: url("../../assets/back1.jpg");
   background-size: cover;
   background-position: top center;
   background-repeat: no-repeat;
