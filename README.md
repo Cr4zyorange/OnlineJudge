@@ -1,5 +1,53 @@
 # OnlineJudgeForSE
 
+## 本地启动
+
+本地开发需要分别启动后端和前端。后端默认监听 `8080`，前端 Vite 默认监听 `5173`，前端已通过 `frontend/vite.config.ts` 将 `/api` 代理到 `http://127.0.0.1:8080`。
+
+### 1. 启动后端
+
+```bash
+cd backend
+mvn spring-boot:run
+```
+
+后端默认使用本地 H2 数据库文件 `backend/data/onlinejudge`，并执行 `backend/src/main/resources/application.properties` 中配置的初始化脚本。演示数据初始化默认开启。
+
+### 2. 启动前端
+
+另开一个终端：
+
+```bash
+cd frontend
+npm install
+npm run dev -- --host 127.0.0.1
+```
+
+启动完成后访问：
+
+```text
+http://127.0.0.1:5173/
+```
+
+### 3. 演示账号
+
+| 角色 | 账号 | 密码 |
+| --- | --- | --- |
+| 学生 | `student001` | `Student001@pass` |
+| 教师 | `teacher001` | `Teacher001@pass` |
+| 管理员 | `admin001` | `Admin001@pass` |
+
+### 4. 快速验证
+
+```bash
+curl -i http://127.0.0.1:5173/
+curl -i -X POST http://127.0.0.1:5173/api/v1/auth/login \
+  -H 'Content-Type: application/json' \
+  --data '{"account":"student001","password":"Student001@pass"}'
+```
+
+第一个请求应返回前端页面，第二个请求应返回 `code: "0"` 和登录 token。
+
 ## 代码目录组织结构
 
 本目录结构基于 `docs/最终提交/软件详细设计说明书.md` 中的系统设计建立：系统采用前后端分离架构，前端为 Vue3 + TypeScript，后端为 Spring Boot，数据库为 MySQL；实现边界按 AUTH、CRS、LRN、LAB、HWK、GRD 六个子系统拆分，跨模块复用能力集中放在 `common` 和 `integration` 下。
