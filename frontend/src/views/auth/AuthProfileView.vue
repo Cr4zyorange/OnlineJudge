@@ -2,7 +2,6 @@
   <main class="profile-page">
     <section class="profile-shell">
       <header class="profile-header">
-        <p class="profile-eyebrow">AUTH-04</p>
         <h1>账号信息与密码安全</h1>
         <p v-if="profile">{{ profile.username }} · {{ roleLabel }}</p>
       </header>
@@ -197,13 +196,6 @@ function applyProfile(nextProfile: AuthUser) {
   margin-bottom: 22px;
 }
 
-.profile-eyebrow {
-  margin: 0 0 8px;
-  color: #16423c;
-  font-size: 0.82rem;
-  font-weight: 800;
-}
-
 .profile-header h1 {
   margin: 0;
   color: #1f2f2c;
@@ -223,11 +215,12 @@ function applyProfile(nextProfile: AuthUser) {
 
 .profile-form,
 .state-block {
-  border: 1px solid rgba(22, 66, 60, 0.12);
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.72);
-  box-shadow: 0 10px 28px rgba(31, 38, 135, 0.09);
-  backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.15);
+  box-shadow: 0 8px 32px rgba(31, 38, 135, 0.1);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
 .profile-form {
