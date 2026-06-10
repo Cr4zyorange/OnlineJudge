@@ -1,0 +1,237 @@
+# TST-DOC-07 GRD 成绩评价与教学分析测试文档
+
+| 文档编号 | TST-DOC-07 |
+| --- | --- |
+| 文档名称 | GRD 成绩评价与教学分析测试文档 |
+| 项目名称 | 在线教学与实训平台 |
+| 所属阶段 | 系统测试与验收测试 |
+| 报告版本 | V1.0 |
+| 编写日期 | 2026-06-10 |
+| 编写人 | GRD 模块负责人 |
+| 对应 issue | #158 TST-DOC-07 GRD 成绩评价与教学分析测试文档编写 |
+| 测试范围 | GRD 成绩项配置、来源成绩同步、总评计算、教师成绩管理、成绩发布、学生成绩查询、教学分析、成绩异议复核、权限、安全、跨模块成绩来源与通知 |
+| 测试结论 | 自动化测试通过；真实浏览器端完整手工验收、LAB/HWK/LRN 统一测试环境联调和生产级性能压测仍需测试负责人整合确认 |
+
+## 1 文档控制
+
+### 1.1 修订记录
+
+| 版本 | 日期 | 修订人 | 修订说明 |
+| --- | --- | --- | --- |
+| V1.0 | 2026-06-10 | GRD 模块负责人 | 按 #152 统一结构整理 GRD 测试范围、测试数据、用例追踪、自动化执行日志、手工验收点和残余风险 |
+
+### 1.2 审批记录
+
+| 角色 | 姓名/负责人 | 审批意见 | 日期 |
+| --- | --- | --- | --- |
+| 项目负责人 | 待填写 | 待审批 | 2026-06-10 |
+| 测试负责人 | @MontesquieuE | 待整合确认 | 2026-06-10 |
+| GRD 模块负责人 | GRD 负责人 | 待确认 | 2026-06-10 |
+
+## 2 测试概述
+
+本文件用于记录 GRD 成绩评价与教学分析模块在当前版本下的测试依据、测试环境、测试数据、测试用例、执行结果、手工验收清单、缺陷风险和验收结论。覆盖范围对齐 `FR-GR-01 ~ FR-GR-07`、`NFR-GR-01 ~ NFR-GR-05`、`UI-GRD-01 ~ UI-GRD-10`、`API-GRD-01 ~ API-GRD-21`、`DB-GRD-01 ~ DB-GRD-08`、`TC-GR-01 ~ TC-GR-12`。
+
+当前已执行 GRD 后端 Spring Boot 自动化测试和前端 Vue/Vitest 单元测试。自动化覆盖了成绩项配置、规则校验、来源成绩同步、总评计算、教师成绩总表、学生明细、成绩调整、发布记录、学生端已发布成绩查询、教学分析、完成情况统计、成绩异议申请与处理、课程权限、学生本人过滤、未发布不可见、发布幂等、事务边界、变更留痕和统计快照。真实浏览器端到端、LAB/HWK 真实来源成绩、LRN 通知中心联调和生产级性能压测仍列为手工或集成验收项。
+
+## 3 测试依据
+
+| 序号 | 文档/代码依据 | 用途 |
+| --- | --- | --- |
+| 1 | `docs/开发/GRD-成绩评价与教学分析模块开发流程.md` | GRD 主流程、P0 闭环、权限、来源成绩和跨模块通知要求 |
+| 2 | `docs/最终提交/软件需求规格说明书.md` | FR-GR、NFR-GR 需求和验收来源 |
+| 3 | `docs/最终提交/软件概要设计说明书.md` | 模块边界、跨模块依赖和系统结构来源 |
+| 4 | `docs/最终提交/软件详细设计说明书.md` | UI、API、数据库、异常、状态机、测试编号和追踪矩阵来源 |
+| 5 | `docs/过程/需求/成绩评价与教学分析模块.md` | GRD 过程需求补充 |
+| 6 | `docs/过程/概要/成绩评价与教学分析模块概要设计提交稿（grd）.md` | GRD 过程概要设计、非功能和页面/API 补充 |
+| 7 | `docs/过程/详细设计/GRD-成绩评价与教学分析-详细设计提交稿.md` | GRD 详细流程、状态、异常和测试关注点补充 |
+| 8 | `backend/src/test/java/com/onlinejudge/grd` | GRD 后端自动化测试实现 |
+| 9 | `frontend/tests/unit/grd`、`frontend/src/views/grd/StudentGradeView.spec.ts` | GRD 前端 API、路由和页面单元测试实现 |
+| 10 | `database/migrations/20260525_01_create_grd_grade_item.sql` | GRD 数据表和迁移约束依据 |
+
+## 4 测试范围
+
+### 4.1 功能与非功能范围
+
+| 编号 | 测试对象 | 主要验证点 | 当前覆盖状态 |
+| --- | --- | --- | --- |
+| FR-GR-01 | 成绩项配置与计算规则 | 成绩项查询、创建、修改、停用、规则校验、权重和来源合法性 | 后端和前端自动化已覆盖 |
+| FR-GR-02 | 成绩汇总与总评生成 | 同步 LAB/HWK 来源成绩、缺失/未评分状态、加权分和总评计算 | 后端和前端自动化已覆盖；真实 LAB/HWK 环境联调待确认 |
+| FR-GR-03 | 教师成绩管理 | 教师总表、学生明细、单项成绩调整、总评调整、变更记录 | 后端和前端自动化已覆盖 |
+| FR-GR-04 | 成绩发布与状态控制 | 发布前检查、发布记录、发布后学生可见、重复发布幂等、发布后调整留痕 | 后端和前端自动化已覆盖 |
+| FR-GR-05 | 学生成绩查询与结果展示 | 学生只查看本人已发布成绩、未发布不可见、来源和反馈展示 | 后端和前端自动化已覆盖 |
+| FR-GR-06 | 班级成绩统计与教学分析 | 课程总评和成绩项均分、最高分、最低分、及格率、完成率、分布和快照 | 后端和前端自动化已覆盖；大规模性能待专项确认 |
+| FR-GR-07 | 成绩异议与复核申请 | 学生提交异议、重复申请拦截、教师同意/驳回、复用调整留痕和通知 | 后端和前端自动化已覆盖 |
+| NFR-GR-01 | 可靠性 | 来源同步、重算、发布、通知失败和事务边界保持数据一致 | 自动化覆盖核心分支 |
+| NFR-GR-02 | 性能 | 成绩总表、学生个人成绩、教学分析分页和基础统计响应 | 自动化覆盖基础样本；生产规模压测待补充 |
+| NFR-GR-03 | 可追踪性 | 计算批次、发布记录、变更记录、复核记录、统计快照 | 自动化覆盖 |
+| NFR-GR-04 | 安全性 | 教师课程权限、学生本人过滤、未发布不可见、无权限复核拒绝 | 自动化覆盖 |
+| NFR-GR-05 | 可测试性 | 关键功能、异常、状态流转和跨模块契约可重复验证 | 自动化覆盖 |
+
+### 4.2 页面、接口、数据表覆盖
+
+| 类别 | 编号范围 | 覆盖说明 |
+| --- | --- | --- |
+| 页面 | UI-GRD-01 ~ UI-GRD-10 | 前端测试覆盖教师成绩项配置、教师成绩总表、学生明细、调整、发布、教学分析、变更记录、学生个人成绩、学生异议、教师复核；真实浏览器视觉和端到端流程待手工验收 |
+| 接口 | API-GRD-01 ~ API-GRD-21 | 后端 MockMvc 和前端 API wrapper 覆盖主要路由、请求方法、请求体、分页参数、权限、错误码和响应数据 |
+| 数据表 | DB-GRD-01 ~ DB-GRD-08 | 迁移测试覆盖成绩项、成绩记录、课程总评、发布记录、计算批次、异议申请、变更日志、统计快照的可执行持久化和关键约束 |
+| 跨模块 | AUTH、CRS、LAB、HWK、LRN | AUTH/CRS 权限通过测试上下文覆盖；LAB/HWK 来源成绩通过 `SourceGradeDTO` 样本覆盖；LRN 通知事件在发布、调整、异议流程中有事件样本，完整环境联调待确认 |
+
+### 4.3 不在本次自动化确认范围
+
+| 范围项 | 说明 | 处理方式 |
+| --- | --- | --- |
+| 真实浏览器端到端验收 | 当前未执行从登录、进入课程、配置成绩项、同步来源、发布、学生查看和提交异议的完整浏览器流程 | 作为手工验收用例 MAN-GRD-001 ~ MAN-GRD-007 |
+| LAB/HWK 真实来源成绩联调 | 自动化使用符合 `SourceGradeDTO` 的测试来源，未在统一环境读取真实 LAB/HWK 评分结果 | 作为跨模块联调用例 MAN-GRD-008 |
+| LRN 通知中心联调 | 后端事件已覆盖，未在真实通知中心页面确认成绩发布和复核通知展示 | 作为跨模块联调用例 MAN-GRD-009 |
+| 生产级性能压测 | 自动化覆盖基础样本和分页，不包含生产规模课程、学生和成绩项压测 | 作为专项性能测试 MAN-GRD-010 |
+
+## 5 测试环境
+
+| 环境项 | 内容 |
+| --- | --- |
+| 操作系统 | macOS |
+| 后端运行环境 | Java 25，Spring Boot 3.4.5，Maven 3.9.11，JUnit 5，MockMvc，H2 |
+| 前端运行环境 | Node.js，Vue 3.5，Vite 6.3，Vitest 3.2，jsdom |
+| 数据库 | 自动化测试使用 H2 内存库；迁移脚本按 MySQL 兼容约束编写 |
+| 鉴权方式 | 后端测试使用 `X-User-Id`、`X-User-Role` 或测试认证上下文；前端测试 mock API wrapper 和路由上下文 |
+| 执行日期 | 2026-06-10 |
+
+## 6 测试数据
+
+| 数据类别 | 数据说明 | 使用模块 |
+| --- | --- | --- |
+| 教师用户 | `X-User-Id=501` 等课程管理者；无权限教师用于课程权限拒绝验证 | GRD、AUTH、CRS |
+| 学生用户 | `X-User-Id=101`、`201` 等课程成员；非成员学生用于无权限和本人过滤验证 | GRD、AUTH、CRS |
+| 课程数据 | `courseId=101` 等测试课程，包含教师授权、学生名单、非成员和大班发布范围样本 | GRD、CRS |
+| 成绩项数据 | LAB/HWK 来源成绩项、总评计入项、禁用项、重复名称、非法权重、非法满分、非法来源编号 | GRD、LAB、HWK |
+| 来源成绩数据 | 实验成绩、作业成绩，包含 SCORED、MISSING、UNSUBMITTED、UNGRADED 等状态和更新时间 | GRD、LAB、HWK |
+| 成绩记录数据 | rawScore、weightedScore、publishStatus、comment、sourceUpdatedAt、calculatedAt | GRD |
+| 总评数据 | finalScore、finalStatus、publishStatus、calculationBatchId、publishedAt | GRD |
+| 发布和变更数据 | 发布范围、发布数量、通知状态、单项成绩调整、总评调整、调整原因、操作人 | GRD、LRN |
+| 异议数据 | GRADE_ITEM/FINAL_SCORE 目标、PENDING/APPROVED/REJECTED 状态、处理说明、调整后分数 | GRD、LRN |
+| 统计数据 | 课程总评和单项成绩的平均分、最高分、最低分、及格率、完成率、分数段分布、来源时间点 | GRD |
+
+## 7 测试用例汇总
+
+### 7.1 自动化执行结果
+
+| 测试类别 | 命令 | 执行结果 |
+| --- | --- | --- |
+| 后端 GRD 相关测试 | `mvn test -Dtest=GradeItemControllerTest,GradeRecordControllerTest,GradeItemMigrationTest,GradeAnalysisServiceTest,GradeItemServiceTest,GradeRecordServiceTest,GradeReviewServiceTest` | 7 个测试类通过，49 条通过，0 失败，0 错误，0 跳过 |
+| 前端 GRD 单元测试 | `node node_modules/vitest/vitest.mjs run tests/unit/grd/gradeItemsApi.spec.ts tests/unit/grd/gradeRecordsApi.spec.ts tests/unit/grd/GradeItemConfigView.spec.ts tests/unit/grd/TeacherGradeTableView.spec.ts tests/unit/grd/App.spec.ts src/views/grd/StudentGradeView.spec.ts --pool=threads` | 6 个测试文件通过，49 条测试通过 |
+
+说明：前端测试运行时 Node 输出 `--localstorage-file` 未提供有效路径的警告，测试断言全部通过；该警告不影响 GRD 页面、路由和 API 用例结果。
+
+### 7.2 GRD 核心用例表
+
+| 用例编号 | 对应需求 | 覆盖对象 | 前置条件/测试数据 | 操作步骤 | 预期结果 | 实际结果 | 通过状态 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| TC-GR-01 | FR-GR-01 | UI-GRD-01；API-GRD-01 ~ 05、07；DB-GRD-01、05 | 教师具备课程管理权限；准备 LAB/HWK 来源任务、满分、权重、排序数据 | 查询、创建、修改、停用成绩项，执行规则校验 | 合法规则保存成功；非法权重、重复名称、非法来源被拒绝 | `GradeItemControllerTest`、`GradeItemServiceTest`、`GradeItemConfigView.spec.ts`、`gradeItemsApi.spec.ts` 通过 | 通过 |
+| TC-GR-02 | FR-GR-02 | UI-GRD-02；API-GRD-06 ~ 09；DB-GRD-02、03、05 | 课程内有学生名单；LAB/HWK 来源成绩含已评分、缺失、未提交、未评分状态 | 教师同步来源成绩并查询成绩总表和学生明细 | 生成成绩记录、计算加权分和总评，缺失状态可见 | `teacherSyncsLabAndHomeworkSourceGradesThenCalculatesFinalScores`、`TeacherGradeTableView.spec.ts` 同步用例通过 | 通过 |
+| TC-GR-03 | FR-GR-03 | UI-GRD-02、03、04、08；API-GRD-08 ~ 14；DB-GRD-02、03、07 | 已有成绩记录和课程总评；教师填写调整原因 | 查询总表、进入学生明细、调整单项成绩和总评、查询变更记录 | 分数更新，已发布成绩不回退未发布，变更记录保存旧值、新值、原因和操作人 | `teacherAdjustsGradeRecordWithReasonAndQueriesChangeLogsThroughApi`、`teacherAdjustsCourseFinalScoreWithReasonAndKeepsChangeLog`、前端明细调整用例通过 | 通过 |
+| TC-GR-04 | FR-GR-04 | UI-GRD-05；API-GRD-12 ~ 14；DB-GRD-02、03、04、07 | 成绩已计算且可发布；存在选中学生范围 | 教师发布成绩，重复执行同一范围发布，查询发布记录 | 发布后学生可见，记录发布批次，重复发布幂等，不重复通知 | `teacherPublishesSelectedGradesAndEmitsGradePublishedEvent`、`repeatedPublishUsesRangeIdempotencyKeyAndDoesNotNotifyAgain`、前端发布记录用例通过 | 通过 |
+| TC-GR-05 | FR-GR-05 | UI-GRD-06；API-GRD-15；DB-GRD-02、03 | 学生为课程成员；存在已发布和未发布成绩 | 学生查询我的课程成绩 | 只返回本人已发布成绩；未发布成绩不泄露分数字段 | `teacherPublishesSelectedStudentGradesThenStudentCanQueryPublishedResultThroughApi`、`StudentGradeView.spec.ts` 通过 | 通过 |
+| TC-GR-06 | FR-GR-06 | UI-GRD-07；API-GRD-16、17；DB-GRD-08、02、03 | 成绩记录包含多分数段、缺失、未评分、未提交样本 | 教师查询课程总评分析和成绩项完成情况 | 返回均分、最高分、最低分、及格率、完成率、分布和来源时间点 | `GradeAnalysisServiceTest`、`teacherQueriesCourseGradeAnalysisThroughApi`、`teacherQueriesGradeItemCompletionThroughApi`、前端分析用例通过 | 通过 |
+| TC-GR-07 | FR-GR-07 | UI-GRD-09、10；API-GRD-18 ~ 21；DB-GRD-06、07 | 学生已有已发布成绩；教师具备课程权限 | 学生提交异议，教师筛选并处理，同意修改或驳回 | 申请状态流转，重复 PENDING 申请被拒绝，同意修改写入变更记录并通知学生 | `GradeReviewServiceTest`、`studentSubmitsGradeReviewAndTeacherProcessesItThroughApi`、前端复核处理用例通过 | 通过 |
+| TC-GR-08 | NFR-GR-01 | API-GRD-06、07、12；DB-GRD-02 ~ 05 | 模拟来源刷新、发布、重复发布和大班发布范围 | 同步、重算、发布、重复发布 | 数据事务边界稳定，发布幂等，发布范围摘要有长度边界 | `syncSourceGradesDeclaresTransactionalBoundaryForSyncAndRecalculation`、发布幂等和大班发布用例通过 | 通过 |
+| TC-GR-09 | NFR-GR-02 | UI-GRD-02、06、07；API-GRD-08、15、16；DB-GRD-02、03、08 | 准备分页和基础统计样本 | 查询教师总表、学生个人成绩、教学分析 | 接口支持分页和筛选，基础统计可返回 | 后端查询用例和前端分页/分析用例通过；生产规模压测待补充 | 有条件通过 |
+| TC-GR-10 | NFR-GR-03 | UI-GRD-08；API-GRD-06、12、13、14、21；DB-GRD-04 ~ 08 | 存在同步、发布、调整、复核、统计流程 | 查询批次、发布记录、变更记录、复核记录和快照 | 关键操作可追踪，统计快照记录来源时间点 | 迁移、服务和控制器日志/快照用例通过 | 通过 |
+| TC-GR-11 | NFR-GR-04 | 全部 GRD 页面；全部 GRD API；DB-GRD-02、03、06 | 准备无权限教师、非成员学生、教师访问学生接口、未发布成绩 | 执行越权访问或敏感查询 | 返回受控错误，不泄露他人成绩、全班明细、未发布成绩或无权限复核 | 权限控制器/服务测试和前端未发布状态用例通过 | 通过 |
+| TC-GR-12 | NFR-GR-05 | 全部 GRD 流程 | 稳定测试数据、MockMvc、Vitest、H2 迁移 | 重复执行自动化测试 | 核心流程、异常和状态流转可重复验证 | 本文第 8 章命令已通过 | 通过 |
+
+### 7.3 前端 GRD 用例摘要
+
+| 测试文件 | 覆盖内容 | 结果 |
+| --- | --- | --- |
+| `frontend/tests/unit/grd/gradeItemsApi.spec.ts` | API-GRD-01 ~ 05 路由构造、请求方法、认证上下文缺失失败 | 2 条通过 |
+| `frontend/tests/unit/grd/gradeRecordsApi.spec.ts` | API-GRD-06 ~ 21 同步、重算、表格、调整、发布、分析、完成情况、异议接口 | 6 条通过 |
+| `frontend/tests/unit/grd/GradeItemConfigView.spec.ts` | 成绩项创建、列表刷新、规则校验、来源编号校验、修改、停用、规则验证 | 4 条通过 |
+| `frontend/tests/unit/grd/TeacherGradeTableView.spec.ts` | 来源同步、总表筛选分页、学生明细、单项/总评调整、发布记录、教学分析、异议筛选和处理 | 9 条通过 |
+| `frontend/src/views/grd/StudentGradeView.spec.ts` | 学生已发布成绩展示、未发布状态不泄露分数、提交总评异议并展示 PENDING 状态 | 3 条通过 |
+| `frontend/tests/unit/grd/App.spec.ts` | GRD 课程导航、教师/学生成绩路由、课程上下文缺失提示、全局路由安全状态 | 25 条通过 |
+
+## 8 测试执行日志
+
+### 8.1 后端 GRD 执行日志
+
+| 日志编号 | 时间 | 命令/测试类 | 执行内容 | 结果 |
+| --- | --- | --- | --- | --- |
+| GRD-LOG-001 | 2026-06-10 15:51 | `GradeItemMigrationTest` | GRD 迁移、成绩项/记录/总评/变更日志/统计快照持久化约束 | 5 条通过 |
+| GRD-LOG-002 | 2026-06-10 15:51 | `GradeRecordControllerTest` | 来源同步、总表、调整、发布、学生查询、分析、完成情况、权限和异议 API | 13 条通过 |
+| GRD-LOG-003 | 2026-06-10 15:51 | `GradeItemControllerTest` | 成绩项查询、创建、修改、停用、规则校验和权限错误 | 7 条通过 |
+| GRD-LOG-004 | 2026-06-10 15:51 | `GradeItemServiceTest` | 成绩项业务规则、课程权限、权重上限、重复名称和来源编号校验 | 7 条通过 |
+| GRD-LOG-005 | 2026-06-10 15:51 | `GradeReviewServiceTest` | 学生异议申请、重复申请拦截、教师同意复核和通知 | 3 条通过 |
+| GRD-LOG-006 | 2026-06-10 15:51 | `GradeAnalysisServiceTest` | 课程总评分析、成绩项分析、完成情况、权限校验和统计快照 | 4 条通过 |
+| GRD-LOG-007 | 2026-06-10 15:51 | `GradeRecordServiceTest` | 来源同步、总评计算、发布、幂等、发布后重算、变更通知、事务边界 | 10 条通过 |
+| GRD-LOG-008 | 2026-06-10 15:51 | Maven 汇总 | `Tests run: 49, Failures: 0, Errors: 0, Skipped: 0` | 构建成功 |
+
+### 8.2 前端 GRD 执行日志
+
+| 日志编号 | 时间 | 命令/测试文件 | 执行内容 | 结果 |
+| --- | --- | --- | --- | --- |
+| GRD-LOG-009 | 2026-06-10 15:51 | `gradeItemsApi.spec.ts` | GRD 成绩项 API wrapper 路由、方法和认证上下文 | 2 条通过 |
+| GRD-LOG-010 | 2026-06-10 15:51 | `gradeRecordsApi.spec.ts` | GRD 成绩同步、重算、表格、调整、发布、分析和异议 API wrapper | 6 条通过 |
+| GRD-LOG-011 | 2026-06-10 15:51 | `StudentGradeView.spec.ts` | 学生已发布成绩、未发布提示、成绩异议申请状态 | 3 条通过 |
+| GRD-LOG-012 | 2026-06-10 15:51 | `GradeItemConfigView.spec.ts` | 教师成绩项配置页创建、校验、更新和停用交互 | 4 条通过 |
+| GRD-LOG-013 | 2026-06-10 15:51 | `TeacherGradeTableView.spec.ts` | 教师成绩总表、同步、分页、明细、调整、发布、分析、复核处理 | 9 条通过 |
+| GRD-LOG-014 | 2026-06-10 15:51 | `App.spec.ts` | GRD 导航与路由、教师/学生成绩入口、课程上下文和权限状态 | 25 条通过 |
+| GRD-LOG-015 | 2026-06-10 15:51 | Vitest 汇总 | `Test Files 6 passed (6)`、`Tests 49 passed (49)` | 构建成功 |
+
+## 9 手工测试与联调确认
+
+| 手测编号 | 模块 | 场景 | 操作要点 | 预期结果 | 当前结果 |
+| --- | --- | --- | --- | --- | --- |
+| MAN-GRD-001 | GRD/AUTH/CRS | 教师配置成绩项 | 浏览器登录教师账号，进入课程成绩项配置页，创建 LAB/HWK 来源成绩项并校验权重 | 成绩项保存成功，非法权重和非法来源提示明确 | 待手工验收 |
+| MAN-GRD-002 | GRD/LAB/HWK | 同步来源成绩并计算总评 | 准备真实实验/作业评分，教师触发同步和重算 | 成绩记录、加权分、缺失状态、总评与 LAB/HWK 来源一致 | 待联调确认 |
+| MAN-GRD-003 | GRD | 教师成绩总表与学生明细 | 教师筛选分页查看成绩总表，打开学生明细，查看来源任务和状态 | 总表分页、筛选、明细、缺失状态和来源信息正确 | 待手工验收 |
+| MAN-GRD-004 | GRD/LRN | 成绩发布与学生可见 | 教师发布成绩，学生刷新个人成绩页，通知中心查看成绩发布通知 | 发布记录保存，学生只能看到本人已发布成绩，LRN 通知可见 | 待联调确认 |
+| MAN-GRD-005 | GRD | 成绩调整与变更记录 | 教师对已发布单项成绩或总评进行带原因调整 | 分数更新，变更记录显示旧值、新值、原因、操作人和时间 | 待手工验收 |
+| MAN-GRD-006 | GRD | 教学分析 | 教师查看课程总评分析和单项成绩完成情况 | 均分、最高分、最低分、及格率、完成率、分布和来源时间点正确 | 待手工验收 |
+| MAN-GRD-007 | GRD/LRN | 成绩异议复核 | 学生对已发布成绩提交异议，教师处理同意或驳回，学生查看结果 | 申请状态流转正确，重复申请被拦截，处理结果通知可见 | 待联调确认 |
+| MAN-GRD-008 | GRD/AUTH/CRS | 权限边界 | 非课程教师、非成员学生、学生访问教师接口、教师访问学生个人接口 | 页面提示权限不足，接口返回受控错误，不泄露成绩数据 | 待手工验收 |
+| MAN-GRD-009 | GRD | 页面状态 | 制造加载中、空成绩项、无成绩记录、接口失败、会话过期 | 页面有清晰提示，按钮禁用或引导正确 | 待手工验收 |
+| MAN-GRD-010 | GRD | 基础性能 | 准备大批量学生、成绩项和成绩记录，查询总表、个人成绩和分析 | 分页正常，响应时间满足测试负责人设定阈值 | 待专项测试 |
+
+## 10 缺陷、风险与处理建议
+
+| 风险编号 | 风险说明 | 影响范围 | 建议处理 |
+| --- | --- | --- | --- |
+| R-GRD-001 | 当前未执行真实浏览器端到端验收 | UI-GRD-01 ~ UI-GRD-10 | 测试负责人整合后按 MAN-GRD-001、003、005、006、008、009 补跑 |
+| R-GRD-002 | LAB/HWK 真实来源成绩在统一测试环境中的同步结果尚未记录 | FR-GR-02、FR-GR-04、FR-GR-06 | 使用真实实验和作业评分数据补跑 MAN-GRD-002，核对 `SourceGradeDTO` 字段和来源更新时间 |
+| R-GRD-003 | LRN 成绩发布、成绩变更、异议申请和复核通知尚未完成真实页面联调记录 | FR-GR-04、FR-GR-07、NFR-GR-01 | 在统一测试环境执行发布和复核闭环，确认通知中心内容、跳转地址和状态 |
+| R-GRD-004 | 生产规模性能压测未执行 | NFR-GR-02 | 准备大班课程、多个成绩项和批量成绩记录，补充总表、个人成绩和分析接口响应时间 |
+| R-GRD-005 | 前端测试运行存在 Node `--localstorage-file` 警告 | 本地验证流程 | 当前不影响断言结果；如测试负责人要求无警告日志，可后续统一调整 Vitest/Node 启动参数 |
+
+## 11 验收结论
+
+| 验收项 | 结论 | 说明 |
+| --- | --- | --- |
+| 功能覆盖 | 有条件通过 | FR-GR-01 ~ FR-GR-07 均有自动化覆盖，真实浏览器闭环待补充 |
+| 接口覆盖 | 通过 | API-GRD-01 ~ API-GRD-21 的主路由、权限、错误分支和响应结构由后端/前端自动化覆盖 |
+| 页面覆盖 | 有条件通过 | Vue 单测覆盖主要页面状态和交互，视觉与端到端流程待手工确认 |
+| 数据一致性 | 通过 | DB-GRD-01 ~ DB-GRD-08 的关键持久化、状态、日志和快照由迁移/服务测试覆盖 |
+| 权限与安全 | 通过 | 教师课程权限、学生本人过滤、未发布不可见、无权限复核等分支均有自动化覆盖 |
+| 非功能 | 有条件通过 | 可靠性、可追踪性、安全性、可测试性已覆盖；生产规模性能和跨模块真实联调待补充 |
+| 最终结论 | 有条件通过 | 当前文档可交给测试负责人整合；需补充 MAN-GRD-001 ~ MAN-GRD-010 的统一验收记录 |
+
+## 12 附录
+
+### 12.1 执行命令
+
+```bash
+cd /Users/xigma/Library/CloudStorage/OneDrive-个人/github/OnlineJudge/backend
+mvn test -Dtest=GradeItemControllerTest,GradeRecordControllerTest,GradeItemMigrationTest,GradeAnalysisServiceTest,GradeItemServiceTest,GradeRecordServiceTest,GradeReviewServiceTest
+
+cd /Users/xigma/Library/CloudStorage/OneDrive-个人/github/OnlineJudge/frontend
+node node_modules/vitest/vitest.mjs run tests/unit/grd/gradeItemsApi.spec.ts tests/unit/grd/gradeRecordsApi.spec.ts tests/unit/grd/GradeItemConfigView.spec.ts tests/unit/grd/TeacherGradeTableView.spec.ts tests/unit/grd/App.spec.ts src/views/grd/StudentGradeView.spec.ts --pool=threads
+```
+
+### 12.2 本次执行摘要
+
+| 项目 | 摘要 |
+| --- | --- |
+| 后端 GRD 自动化测试 | 7 个测试类，49 passed / 0 failed / 0 errors / 0 skipped |
+| 前端 GRD 自动化测试 | 6 files passed / 49 tests passed |
+| 自动化覆盖 | 成绩项、规则校验、来源同步、总评计算、成绩调整、发布、学生查询、教学分析、异议复核、权限、安全、日志、快照 |
+| 手工/联调状态 | 待测试负责人整合后补充真实浏览器、LAB/HWK 来源成绩、LRN 通知中心和生产规模性能记录 |
