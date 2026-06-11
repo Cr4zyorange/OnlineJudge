@@ -2,9 +2,25 @@
 
 ## 本地启动
 
-本地开发需要分别启动后端和前端。后端默认监听 `8080`，前端 Vite 默认监听 `5173`，前端已通过 `frontend/vite.config.ts` 将 `/api` 代理到 `http://127.0.0.1:8080`。
+后端默认监听 `8080`，前端 Vite 默认监听 `5173`，前端已通过 `frontend/vite.config.ts` 将 `/api` 代理到 `http://127.0.0.1:8080`。
 
-### 1. 启动后端
+### 1. 一键启动
+
+仓库提供本地开发一键启动脚本，会同时启动 Spring Boot 后端和 Vite 前端；首次运行时如果 `frontend/node_modules` 不存在，会先执行前端依赖安装。
+
+```bash
+./scripts/dev/start-dev.sh
+```
+
+启动完成后访问：
+
+```text
+http://127.0.0.1:5173/
+```
+
+在脚本所在终端按 `Ctrl+C` 会同时停止前端和后端子进程。
+
+### 2. 手动启动后端
 
 ```bash
 cd backend
@@ -13,7 +29,7 @@ mvn spring-boot:run
 
 后端默认使用本地 H2 数据库文件 `backend/data/onlinejudge`，并执行 `backend/src/main/resources/application.properties` 中配置的初始化脚本。演示数据初始化默认开启。
 
-### 2. 启动前端
+### 3. 手动启动前端
 
 另开一个终端：
 
@@ -29,7 +45,7 @@ npm run dev -- --host 127.0.0.1
 http://127.0.0.1:5173/
 ```
 
-### 3. 演示账号
+### 4. 演示账号
 
 | 角色 | 账号 | 密码 |
 | --- | --- | --- |
@@ -37,7 +53,7 @@ http://127.0.0.1:5173/
 | 教师 | `teacher001` | `Teacher001@pass` |
 | 管理员 | `admin001` | `Admin001@pass` |
 
-### 4. 快速验证
+### 5. 快速验证
 
 ```bash
 curl -i http://127.0.0.1:5173/
