@@ -1,4 +1,5 @@
 import { flushPromises, mount } from '@vue/test-utils';
+import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import AuthProfileView from '../../../src/views/auth/AuthProfileView.vue';
 
@@ -100,6 +101,26 @@ describe('AuthProfileView', () => {
 
     expect(wrapper.text()).toContain('两次输入的新密码不一致');
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('presents the account security page without development markers and uses the shared glass style', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(jsonResponse({
+      id: 50,
+      username: 'student50',
+      userType: 'STUDENT',
+      displayName: '学生50',
+      roles: ['STUDENT'],
+      permissions: ['course:view']
+    }));
+
+    const wrapper = mount(AuthProfileView);
+    await flushPromises();
+
+    expect(wrapper.text()).not.toContain('AUTH-04');
+
+    const source = readFileSync('src/views/auth/AuthProfileView.vue', 'utf8');
+    expect(source).toContain('background: rgba(255, 255, 255, 0.15);');
+    expect(source).not.toContain('background: rgba(255, 255, 255, 0.72);');
   });
 });
 
