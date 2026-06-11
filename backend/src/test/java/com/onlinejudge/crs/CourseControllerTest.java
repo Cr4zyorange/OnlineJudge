@@ -990,8 +990,10 @@ class CourseControllerTest {
                 INSERT INTO lrn_learning_task
                     (user_id, course_id, source_module, source_id, task_type, title, deadline, progress, status, action_url)
                 VALUES
-                    (?, ?, 'HWK', 77, 'HOMEWORK', 'Submit homework 1', '2026-06-10 23:59:00', 20, 'IN_PROGRESS', ?)
-                """, 902L, Long.parseLong(courseId), "/courses/" + courseId + "/homeworks/77");
+                    (?, ?, 'HWK', 77, 'HOMEWORK', 'Submit homework 1', ?, 20, 'IN_PROGRESS', ?)
+                """, 902L, Long.parseLong(courseId),
+                java.sql.Timestamp.valueOf(java.time.LocalDateTime.now().plusDays(3)),
+                "/courses/" + courseId + "/homeworks/77");
 
         mockMvc.perform(get("/api/v1/courses/" + courseId + "/home-summary")
                         .header("X-User-Id", "902")
