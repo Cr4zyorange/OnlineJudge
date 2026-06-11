@@ -249,7 +249,7 @@ function statusLabel(status: LearningTask['status']) {
 /* 背景：纯清晰图，无模糊渐变（和style.css一致） */
 .task-center {
   min-height: 100vh;
-  background-image: url("../../assets/back.jpg");
+  background-image: url("../../assets/back1.jpg");
   background-size: cover;
   background-position: top center;
   background-repeat: no-repeat;

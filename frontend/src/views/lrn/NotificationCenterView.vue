@@ -291,7 +291,7 @@ function typeLabel(type: NotificationItem['type']) {
 <style scoped>
 .notification-center {
   background-attachment: fixed;
-  background-image: url("../../assets/back.jpg");
+  background-image: url("../../assets/back1.jpg");
   background-position: top center;
   background-repeat: no-repeat;
   background-size: cover;
