@@ -9,7 +9,7 @@ Docker Compose 教学部署与本地开发是两条不同链路：
 - 本地开发：`Vite + Spring Boot + H2`
 - Docker 部署：`Nginx + Spring Boot + MySQL`
 
-如果你要验证 issue `DEP-01` 对应的一键部署方案，请直接阅读 [deploy/README.md](deploy/README.md)。
+如果你要验证 issue `DEP-01` 对应的一键部署方案，请直接阅读 [docs/最终提交/部署文档.md](docs/最终提交/部署文档.md)。
 
 ### 1. 一键启动
 
