@@ -4,6 +4,13 @@
 
 后端默认监听 `8080`，前端 Vite 默认监听 `5173`，前端已通过 `frontend/vite.config.ts` 将 `/api` 代理到 `http://127.0.0.1:8080`。
 
+Docker Compose 教学部署与本地开发是两条不同链路：
+
+- 本地开发：`Vite + Spring Boot + H2`
+- Docker 部署：`Nginx + Spring Boot + MySQL`
+
+如果你要验证 issue `DEP-01` 对应的一键部署方案，请直接阅读 [deploy/README.md](deploy/README.md)。
+
 ### 1. 一键启动
 
 仓库提供本地开发一键启动脚本，会同时启动 Spring Boot 后端和 Vite 前端；首次运行时如果 `frontend/node_modules` 不存在，会先执行前端依赖安装。

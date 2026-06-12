@@ -1,0 +1,11 @@
+services:
+  backend:
+    environment:
+      ONLINEJUDGE_EVALUATION_SANDBOX_MODE: docker
+      ONLINEJUDGE_EVALUATION_DOCKER_COMMAND: docker
+    volumes:
+      - app-data:/opt/onlinejudge/data
+      - /var/run/docker.sock:/var/run/docker.sock
+
+volumes:
+  app-data:
