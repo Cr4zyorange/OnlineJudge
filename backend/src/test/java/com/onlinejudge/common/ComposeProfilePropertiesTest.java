@@ -10,7 +10,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class ComposeProfilePropertiesTest {
     @Test
-    void composeProfileUsesMysqlWithoutH2OnlySchemaBootstrap() throws IOException {
+    void composeProfileUsesMysqlAndLeavesBootstrapToMysqlContainer() throws IOException {
         Properties properties = new Properties();
         try (InputStream inputStream = getClass().getResourceAsStream("/application-compose.properties")) {
             assertThat(inputStream).as("application-compose.properties should exist").isNotNull();
@@ -19,10 +19,10 @@ class ComposeProfilePropertiesTest {
 
         assertThat(properties.getProperty("spring.datasource.url")).startsWith("jdbc:mysql://");
         assertThat(properties.getProperty("spring.datasource.driver-class-name")).isEqualTo("com.mysql.cj.jdbc.Driver");
-        assertThat(properties.getProperty("spring.sql.init.schema-locations"))
-                .doesNotContain("schema.sql")
-                .doesNotContain("h2-lab-published-at.sql")
-                .doesNotContain("20260606_01_add_lab_published_at.sql");
+        assertThat(properties.getProperty("spring.sql.init.mode")).isEqualTo("never");
+        assertThat(properties).doesNotContainKey("spring.sql.init.schema-locations");
+        assertThat(properties.getProperty("spring.datasource.hikari.initialization-fail-timeout")).isEqualTo("60000");
+        assertThat(properties.getProperty("onlinejudge.course.schema-initializer.enabled")).isEqualTo("false");
         assertThat(properties.getProperty("onlinejudge.storage.local-root")).isEqualTo("/opt/onlinejudge/data/uploads");
     }
 }

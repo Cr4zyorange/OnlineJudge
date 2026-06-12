@@ -20,8 +20,28 @@ class DockerComposeContractTest {
         assertThat(compose).contains("backend:");
         assertThat(compose).contains("frontend:");
         assertThat(compose).contains("mysql-data:/var/lib/mysql");
+        assertThat(compose).contains("../../database/mysql/compose-schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro");
         assertThat(compose).contains("${OJ_HTTP_PORT:-8088}:80");
         assertThat(compose).contains("/api/v1/system/health");
+    }
+
+    @Test
+    void backendBuildProducesExecutableSpringBootJar() throws IOException {
+        Path pomFile = Path.of("pom.xml");
+        String pom = Files.readString(pomFile);
+
+        assertThat(pom).contains("<artifactId>spring-boot-maven-plugin</artifactId>");
+    }
+
+    @Test
+    void mysqlBootstrapScriptAvoidsUnsupportedIndexIfNotExistsSyntax() throws IOException {
+        Path bootstrapFile = Path.of("..", "database", "mysql", "compose-schema.sql");
+        String bootstrap = Files.readString(bootstrapFile);
+
+        assertThat(bootstrap).contains("CREATE TABLE IF NOT EXISTS t_auth_user");
+        assertThat(bootstrap).contains("CREATE INDEX idx_auth_user_type");
+        assertThat(bootstrap).doesNotContain("CREATE INDEX IF NOT EXISTS");
+        assertThat(bootstrap).doesNotContain("CREATE UNIQUE INDEX IF NOT EXISTS");
     }
 
     @Test
@@ -51,5 +71,14 @@ class DockerComposeContractTest {
         String backendDockerfile = Files.readString(dockerfile);
 
         assertThat(backendDockerfile).contains("apt-get install -y --no-install-recommends wget");
+    }
+
+    @Test
+    void backendImageBuildSkipsTestClasspathAndCachesMavenArtifacts() throws IOException {
+        Path dockerfile = Path.of("..", "deploy", "docker", "backend.Dockerfile");
+        String backendDockerfile = Files.readString(dockerfile);
+
+        assertThat(backendDockerfile).contains("--mount=type=cache,target=/root/.m2");
+        assertThat(backendDockerfile).contains("-Dmaven.test.skip=true package");
     }
 }

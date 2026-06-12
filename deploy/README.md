@@ -6,7 +6,7 @@
 
 - `frontend`：Nginx 托管前端静态资源，并将 `/api/` 反向代理到后端。
 - `backend`：Spring Boot 后端服务，容器内监听 `8080`。
-- `mysql`：MySQL 8 数据库，容器内监听 `3306`。
+- `mysql`：MySQL 8 数据库，容器内监听 `3306`，首次创建 `mysql-data` 卷时执行 `database/mysql/compose-schema.sql` 初始化表结构。
 
 默认外部入口：
 
@@ -60,6 +60,8 @@ docker compose -f deploy/docker/compose.yml ps
 onlinejudge_mysql-data
 onlinejudge_app-data
 ```
+
+首次启动时，MySQL 会从 `database/mysql/compose-schema.sql` 初始化 schema。后端 Compose profile 不重复执行 `spring.sql.init`，因此保留数据卷重启时不会重复创建索引或覆盖已有数据。
 
 查看日志：
 
@@ -200,6 +202,7 @@ docker compose \
 
 - 本地开发默认是 `Vite + Spring Boot + H2`。
 - Docker 部署默认是 `Nginx + Spring Boot + MySQL`。
+- Docker 部署的 MySQL schema 由数据库容器首次初始化；本地开发和自动化测试仍使用 Spring Boot/H2 的测试 schema。
 - 自动化测试继续使用 H2；教学部署运行时改用 MySQL。
 
 ## 8. 常见问题
