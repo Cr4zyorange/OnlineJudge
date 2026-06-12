@@ -939,4 +939,3 @@ CREATE TABLE IF NOT EXISTS lab_score_change_log (
     CONSTRAINT fk_lab_score_change_log_score
         FOREIGN KEY (score_id) REFERENCES lab_score(id) ON DELETE CASCADE
 );
-
