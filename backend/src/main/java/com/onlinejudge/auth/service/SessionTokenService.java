@@ -64,8 +64,12 @@ public class SessionTokenService {
 
     public void revoke(String token) {
         if (token != null && !token.isBlank()) {
-            authRepository.revokeSession(digest(token.trim()), LocalDateTime.now(clock));
+            authRepository.revokeSession(tokenId(token), LocalDateTime.now(clock));
         }
+    }
+
+    public String tokenId(String token) {
+        return digest(token.trim());
     }
 
     private String digest(String token) {

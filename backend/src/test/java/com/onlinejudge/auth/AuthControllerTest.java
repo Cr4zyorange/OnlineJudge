@@ -113,6 +113,10 @@ class AuthControllerTest {
                 .andExpect(jsonPath("$.code").value("0"));
 
         assertThat(auditCount("LOGOUT", "SUCCESS")).isEqualTo(1);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT target_id FROM t_auth_audit_log WHERE operation_type = 'LOGOUT'",
+                String.class
+        )).matches("[0-9a-f]{64}");
 
         mockMvc.perform(get("/api/v1/auth/me")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
@@ -142,6 +146,19 @@ class AuthControllerTest {
         mockMvc.perform(post("/api/v1/auth/logout"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("ERR-AUTH-04"));
+    }
+
+    @Test
+    void logoutRejectsForgedBearerTokenWithoutLeakingToken() throws Exception {
+        String forgedToken = "forged.token.value";
+
+        mockMvc.perform(post("/api/v1/auth/logout")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + forgedToken))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("ERR-AUTH-04"))
+                .andExpect(jsonPath("$.message").value("登录已失效，请重新登录"))
+                .andExpect(result -> assertThat(result.getResponse().getContentAsString())
+                        .doesNotContain(forgedToken));
     }
 
     @Test
