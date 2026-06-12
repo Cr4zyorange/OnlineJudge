@@ -2,15 +2,23 @@ import { mount } from '@vue/test-utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import PlatformNavigationBar from '../../../src/components/PlatformNavigationBar.vue';
 import { BACKGROUND_STORAGE_KEY } from '../../../src/backgroundOptions';
+import { logout } from '../../../src/api/auth/auth';
+
+vi.mock('../../../src/api/auth/auth', () => ({
+  logout: vi.fn()
+}));
 
 describe('PlatformNavigationBar', () => {
   beforeEach(() => {
     installLocalStorageMock();
+    vi.mocked(logout).mockReset();
     window.localStorage.setItem('onlinejudge.username', 'Teacher101');
+    window.localStorage.setItem('onlinejudge.authToken', 'teacher-token');
     document.documentElement.style.removeProperty('--oj-bg-image');
     document.body.classList.remove('oj-live-background');
     document.body.classList.remove('oj-video-background');
     document.querySelectorAll('.background-picker__menu').forEach((menu) => menu.remove());
+    window.history.pushState({}, '', '/courses');
   });
 
   it('lets users pick a background image from the fixed image set', async () => {
@@ -78,6 +86,34 @@ describe('PlatformNavigationBar', () => {
 
     expect(wrapper.find('[data-testid="platform-navigation"]').exists()).toBe(true);
     expect(wrapper.get('[data-testid="platform-nav-profile"]').text()).toBe('T');
+  });
+
+  it('logs out from the global navigation once, clears the route, and returns to login', async () => {
+    let resolveLogout: () => void = () => {};
+    vi.mocked(logout).mockReturnValue(new Promise<void>((resolve) => {
+      resolveLogout = resolve;
+    }));
+    const navigationListener = vi.fn();
+    window.addEventListener('onlinejudge:navigation', navigationListener);
+
+    const wrapper = mount(PlatformNavigationBar, {
+      props: {
+        currentPath: '/courses'
+      }
+    });
+
+    await wrapper.get('[data-testid="platform-nav-logout"]').trigger('click');
+    await wrapper.get('[data-testid="platform-nav-logout"]').trigger('click');
+
+    expect(logout).toHaveBeenCalledTimes(1);
+    expect(wrapper.get('[data-testid="platform-nav-logout"]').attributes('disabled')).toBeDefined();
+
+    resolveLogout();
+    await flushPromises();
+
+    expect(window.location.pathname).toBe('/login');
+    expect(navigationListener).toHaveBeenCalledTimes(1);
+    window.removeEventListener('onlinejudge:navigation', navigationListener);
   });
 
   it('renders the theme menu as a dropdown grid', async () => {
@@ -177,4 +213,10 @@ function installUnavailableLocalStorage() {
       throw new Error('localStorage is unavailable');
     }
   });
+}
+
+async function flushPromises() {
+  for (let tick = 0; tick < 4; tick += 1) {
+    await Promise.resolve();
+  }
 }

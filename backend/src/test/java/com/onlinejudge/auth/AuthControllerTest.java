@@ -113,6 +113,10 @@ class AuthControllerTest {
                 .andExpect(jsonPath("$.code").value("0"));
 
         assertThat(auditCount("LOGOUT", "SUCCESS")).isEqualTo(1);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT target_id FROM t_auth_audit_log WHERE operation_type = 'LOGOUT'",
+                String.class
+        )).matches("[0-9a-f]{64}");
 
         mockMvc.perform(get("/api/v1/auth/me")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))

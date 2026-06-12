@@ -58,6 +58,17 @@
         <a class="avatar" href="/profile" data-testid="platform-nav-profile" aria-label="个人中心">
           {{ avatarText }}
         </a>
+        <button
+          v-if="hasActiveSession"
+          class="logout-button"
+          type="button"
+          data-testid="platform-nav-logout"
+          :disabled="logoutPending"
+          :aria-busy="logoutPending"
+          @click="handleLogout"
+        >
+          {{ logoutPending ? '退出中' : '退出' }}
+        </button>
       </div>
     </nav>
   </header>
@@ -98,6 +109,7 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref } from 'vue';
+import { logout } from '../api/auth/auth';
 import {
   BACKGROUND_STORAGE_KEY,
   applyBackgroundOption,
@@ -116,6 +128,8 @@ const backgroundToggle = ref<HTMLElement | null>(null);
 const backgroundMenuStyle = ref<Record<string, string>>({});
 const selectedBackgroundId = ref(backgroundOptions[0].id);
 const selectedBackground = computed(() => findBackgroundOption(selectedBackgroundId.value));
+const logoutPending = ref(false);
+const hasActiveSession = ref(Boolean(readLocalStorage('onlinejudge.authToken')));
 
 const avatarText = computed(() => {
   const username = readLocalStorage('onlinejudge.username') ?? '';
@@ -162,6 +176,29 @@ async function toggleBackgroundMenu() {
   backgroundMenuOpen.value = true;
   await nextTick();
   updateBackgroundMenuPosition();
+}
+
+async function handleLogout() {
+  if (logoutPending.value) {
+    return;
+  }
+  logoutPending.value = true;
+  try {
+    await logout();
+  } catch {
+    // logout() clears local auth state even when the server already expired the session.
+  } finally {
+    hasActiveSession.value = false;
+    logoutPending.value = false;
+    redirectToLogin();
+  }
+}
+
+function redirectToLogin() {
+  if (window.location.pathname !== '/login') {
+    window.history.pushState({}, '', '/login');
+  }
+  window.dispatchEvent(new Event('onlinejudge:navigation'));
 }
 
 function updateBackgroundMenuPosition() {
@@ -218,6 +255,29 @@ function previewStyle(option: BackgroundOption) {
 
 .navbar-user a.active {
   color: var(--oj-brand);
+}
+
+.logout-button {
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid rgba(220, 38, 38, 0.22);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.2);
+  color: #9f1239;
+  cursor: pointer;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.logout-button:hover:not(:disabled),
+.logout-button:focus-visible {
+  border-color: rgba(220, 38, 38, 0.38);
+  background: rgba(255, 255, 255, 0.34);
+}
+
+.logout-button:disabled {
+  cursor: wait;
+  opacity: 0.68;
 }
 
 .background-picker {
@@ -359,6 +419,18 @@ function previewStyle(option: BackgroundOption) {
   .navbar-user {
     justify-self: end;
     gap: 0.5rem;
+  }
+
+  .logout-button {
+    width: 34px;
+    padding: 0;
+    overflow: hidden;
+    font-size: 0;
+  }
+
+  .logout-button::before {
+    content: "退";
+    font-size: 0.82rem;
   }
 
   .background-picker__toggle {

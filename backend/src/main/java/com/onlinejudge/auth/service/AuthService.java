@@ -164,8 +164,9 @@ public class AuthService {
     }
 
     public void logout(long userId, String token) {
+        String tokenId = sessionTokenService.tokenId(token);
         sessionTokenService.revoke(token);
-        authAuditService.record(userId, "LOGOUT", "AUTH_SESSION", null, "SUCCESS", null);
+        authAuditService.record(userId, "LOGOUT", "AUTH_SESSION", tokenId, "SUCCESS", null);
     }
 
     private void ensureLoginAllowed(AuthUser user, LocalDateTime now) {
