@@ -32,7 +32,7 @@
 
 本报告用于记录在线教学与实训平台在当前版本下的测试范围、测试依据、测试环境、测试用例覆盖、各模块执行日志和验收结论。报告结构按照模板中的文档控制、范围说明、环境说明、用例表、执行记录、缺陷风险和验收结论组织。
 
-本次自动化验证已覆盖后端 Spring Boot 单元/集成测试、前端 Vue/Vitest 单元测试，以及各模块的接口、权限、数据一致性、前后端调用链路和基础非功能场景。2026-06-12 已补跑后端 `mvn test` 和前端 `npm run test:unit` 完整自动化测试，后端 251 条测试执行、0 失败、0 错误、1 跳过，前端 33 个测试文件、185 条测试通过；同日补跑本地性能/压力相关后端批次，154 条测试执行、0 失败、0 错误、0 跳过；Docker daemon 启动后补跑真实 Docker 沙箱专项样本，执行器 smoke、AC、编译错误、运行错误、超时清理、内存限制和 4 并发样本通过。当前各模块自动化测试与文档材料已完成整合；CRS 已补充本地 DEV 手工联调记录，本地可执行压测、真实服务闭环探针、本地安全探针、真实 Docker 沙箱基础专项和本地 DEV 浏览器手工矩阵已补充。本地 DEV 浏览器矩阵覆盖注册/资料/管理员、学生学习任务/通知/提醒、教师实验/作业/成绩、学生提交、教师评分批阅、成绩同步、成绩异议复核等链路。生产级安全扫描、生产实流量长稳验证和最终人工审批仍需最终验收环境确认。
+本次自动化验证已覆盖后端 Spring Boot 单元/集成测试、前端 Vue/Vitest 单元测试，以及各模块的接口、权限、数据一致性、前后端调用链路和基础非功能场景。2026-06-12 已补跑后端 `mvn test` 和前端 `npm run test:unit` 完整自动化测试，最新复跑结果为后端 252 条测试执行、0 失败、0 错误、1 跳过，前端 33 个测试文件、186 条测试通过；同日补跑本地性能/压力相关后端批次，154 条测试执行、0 失败、0 错误、0 跳过；Docker daemon 启动后补跑真实 Docker 沙箱专项样本，执行器 smoke、AC、编译错误、运行错误、超时清理、内存限制和 4 并发样本通过。当前各模块自动化测试与文档材料已完成整合；CRS 已补充本地 DEV 手工联调记录，本地可执行压测、真实服务闭环探针、本地安全探针、真实 Docker 沙箱基础专项和本地 DEV 浏览器手工矩阵已补充。本地 DEV 浏览器矩阵覆盖注册/资料/管理员、学生学习任务/通知/提醒、教师实验/作业/成绩、学生提交、教师评分批阅、成绩同步、成绩异议复核等链路。生产级安全扫描、生产实流量长稳验证和最终人工审批仍需最终验收环境确认。
 
 ## 3 测试依据
 
@@ -377,7 +377,7 @@
 | 后端 HWK 相关测试 | `mvn test "-Dtest=HomeworkControllerTest,HomeworkBearerAuthControllerTest,HomeworkMigrationTest,HomeworkSubmissionServiceTest"` | 44 条通过，0 失败，0 错误，0 跳过 |
 | 前端 HWK 单元测试 | `node node_modules/vitest/vitest.mjs run tests/unit/hwk/homeworksApi.spec.ts tests/unit/hwk/HomeworkStudentListView.spec.ts tests/unit/hwk/HomeworkStudentView.spec.ts tests/unit/hwk/HomeworkSubmissionHistoryView.spec.ts tests/unit/hwk/HomeworkTeacherView.spec.ts --pool=threads` | 5 个测试文件通过，28 条测试通过 |
 
-说明：后端测试首次在普通沙箱下因 `backend/target/classes/schema.sql` 写入受限失败，提权后同一命令通过；前端测试首次因 esbuild 子进程 `spawn EPERM` 失败，提权后同一命令通过。
+说明：早期记录中后端曾因 `backend/target/classes/schema.sql` 写入受限失败、前端曾因 esbuild 子进程 `spawn EPERM` 失败；2026-06-12 14:20 ~ 14:21 已在当前本机环境复跑同一组 HWK 目标命令，后端 44 条通过，前端 5 个测试文件 28 条通过。
 
 #### 7.5.2 HWK 核心用例表
 
@@ -465,25 +465,25 @@
 
 | 日志编号 | 时间 | 命令/测试类 | 执行内容 | 结果 |
 | --- | --- | --- | --- | --- |
-| AUTH-LOG-001 | 2026-06-10 16:35 | 直接执行 `mvn` | 尝试运行 AUTH 后端目标测试 | 本机未配置全局 Maven，未进入测试断言；相关联调已通过 |
-| AUTH-LOG-002 | 2026-06-10 16:37 | 仓库 Maven + 默认 JDK 15 | 尝试运行 AUTH 后端目标测试 | Java 运行时版本过低，无法运行 Java 21 class file，未进入测试断言；相关联调已通过 |
-| AUTH-LOG-003 | 2026-06-10 16:38 | `AuthAdminControllerTest` | 管理员用户、角色、权限、账号状态和审计日志管理 | 9 条通过 |
-| AUTH-LOG-004 | 2026-06-10 16:38 | `AuthControllerTest` | 注册、登录、退出、当前用户、权限校验、异常、资料、密码、锁定 | 19 条通过 |
-| AUTH-LOG-005 | 2026-06-10 16:38 | `AuthMigrationScriptTest` | AUTH 迁移 MySQL 兼容自增和时间戳语法 | 1 条通过 |
-| AUTH-LOG-006 | 2026-06-10 16:38 | `HeaderCurrentUserProviderTest` | 兼容 Header 当前用户上下文解析和缺失鉴权失败 | 3 条通过 |
-| AUTH-LOG-007 | 2026-06-10 16:38 | `AuthCrsIntegrationTest` | AUTH Bearer 登录态与 CRS 课程成员联动 | 2 条通过 |
-| AUTH-LOG-008 | 2026-06-10 16:38 | Maven 汇总 | `Tests run: 34, Failures: 0, Errors: 0, Skipped: 0` | 构建成功 |
+| AUTH-LOG-001 | 2026-06-12 14:20 | `mvn test -Dtest=AuthControllerTest,AuthAdminControllerTest,AuthMigrationScriptTest,HeaderCurrentUserProviderTest,AuthCrsIntegrationTest` | 使用本机 Maven 3.9.11 与 Java 25 复跑 AUTH 后端目标测试 | 构建成功，进入断言并全部通过 |
+| AUTH-LOG-002 | 2026-06-12 14:20 | Maven + Java 25 当前环境 | 复核旧 JDK 版本阻塞项 | Java 运行时满足项目要求，未复现 class file 版本错误 |
+| AUTH-LOG-003 | 2026-06-12 14:20 | `AuthAdminControllerTest` | 管理员用户、角色、权限、账号状态和审计日志管理 | 9 条通过 |
+| AUTH-LOG-004 | 2026-06-12 14:20 | `AuthControllerTest` | 注册、登录、退出、当前用户、权限校验、异常、资料、密码、锁定 | 21 条通过 |
+| AUTH-LOG-005 | 2026-06-12 14:20 | `AuthMigrationScriptTest` | AUTH 迁移 MySQL 兼容自增和时间戳语法 | 1 条通过 |
+| AUTH-LOG-006 | 2026-06-12 14:20 | `HeaderCurrentUserProviderTest` | 兼容 Header 当前用户上下文解析和缺失鉴权失败 | 3 条通过 |
+| AUTH-LOG-007 | 2026-06-12 14:20 | `AuthCrsIntegrationTest` | AUTH Bearer 登录态与 CRS 课程成员联动 | 2 条通过 |
+| AUTH-LOG-008 | 2026-06-12 14:20 | Maven 汇总 | AUTH 目标测试 5 个测试类共 36 条通过；同批 AUTH/HWK 后端目标命令共 `Tests run: 80, Failures: 0, Errors: 0, Skipped: 0` | 构建成功 |
 
 #### 8.1.2 前端 AUTH 执行日志
 
 | 日志编号 | 时间 | 命令/测试文件 | 执行内容 | 结果 |
 | --- | --- | --- | --- | --- |
-| AUTH-LOG-009 | 2026-06-10 16:35 | `authApi.spec.ts` | AUTH API wrapper 路由、Bearer、存储、管理接口、审计日志、权限校验 | 7 条通过 |
-| AUTH-LOG-010 | 2026-06-10 16:35 | `http.spec.ts` | 共享 HTTP 鉴权、401/403/账号异常跳转和敏感 header 策略 | 10 条通过 |
-| AUTH-LOG-011 | 2026-06-10 16:35 | `AuthProfileView.spec.ts` | 资料加载、资料修改、密码修改和确认校验 | 2 条通过 |
-| AUTH-LOG-012 | 2026-06-10 16:35 | `AuthView.spec.ts` | 登录、角色入口、注册和错误反馈 | 2 条通过 |
-| AUTH-LOG-013 | 2026-06-10 16:35 | `AuthAdminView.spec.ts` | 管理员用户角色和角色权限管理页面状态 | 1 条通过 |
-| AUTH-LOG-014 | 2026-06-10 16:35 | Vitest 汇总 | `Test Files 5 passed (5)`、`Tests 22 passed (22)` | 构建成功 |
+| AUTH-LOG-009 | 2026-06-12 14:21 | `authApi.spec.ts` | AUTH API wrapper 路由、Bearer、存储、管理接口、审计日志、权限校验 | 7 条通过 |
+| AUTH-LOG-010 | 2026-06-12 14:21 | `http.spec.ts` | 共享 HTTP 鉴权、401/403/账号异常跳转和敏感 header 策略 | 11 条通过 |
+| AUTH-LOG-011 | 2026-06-12 14:21 | `AuthProfileView.spec.ts` | 资料加载、资料修改、密码修改和确认校验 | 3 条通过 |
+| AUTH-LOG-012 | 2026-06-12 14:21 | `AuthView.spec.ts` | 登录、角色入口、注册和错误反馈 | 2 条通过 |
+| AUTH-LOG-013 | 2026-06-12 14:21 | `AuthAdminView.spec.ts` | 管理员用户角色和角色权限管理页面状态 | 1 条通过 |
+| AUTH-LOG-014 | 2026-06-12 14:21 | Vitest 汇总 | AUTH 目标测试 5 个文件共 24 条通过；同批 AUTH/HWK 前端目标命令共 `Test Files 10 passed (10)`、`Tests 52 passed (52)` | 构建成功 |
 
 ### 8.2 CRS 测试执行日志
 
@@ -573,24 +573,24 @@
 
 | 日志编号 | 时间 | 命令/测试类 | 执行内容 | 结果 |
 | --- | --- | --- | --- | --- |
-| HWK-LOG-001 | 2026-06-09 16:30 | Maven 目标测试 | 普通沙箱执行 HWK 后端目标测试 | 因 `backend/target/classes/schema.sql` 写入受限失败，未进入断言阶段 |
-| HWK-LOG-002 | 2026-06-09 16:31 | `HomeworkBearerAuthControllerTest` | Bearer 登录态、AUTH/CRS 成员联动、作业可见性、提交和批阅权限 | 2 条通过 |
-| HWK-LOG-003 | 2026-06-09 16:31 | `HomeworkControllerTest` | HWK 控制器主流程、异常、权限、评测、批阅、统计、通知和成绩来源 | 35 条通过 |
-| HWK-LOG-004 | 2026-06-09 16:31 | `HomeworkMigrationTest` | HWK 迁移语法、外键、唯一约束、提交/评测/批阅日志表契约 | 6 条通过 |
-| HWK-LOG-005 | 2026-06-09 16:31 | `HomeworkSubmissionServiceTest` | 重复提交版本冲突返回受控业务错误 | 1 条通过 |
-| HWK-LOG-006 | 2026-06-09 16:31 | Maven 汇总 | `Tests run: 44, Failures: 0, Errors: 0, Skipped: 0` | 构建成功 |
+| HWK-LOG-001 | 2026-06-12 14:20 | `mvn test -Dtest=HomeworkControllerTest,HomeworkBearerAuthControllerTest,HomeworkMigrationTest,HomeworkSubmissionServiceTest` | 使用本机 Maven 3.9.11 与 Java 25 复跑 HWK 后端目标测试 | 构建成功，未复现 `schema.sql` 写入受限，进入断言并全部通过 |
+| HWK-LOG-002 | 2026-06-12 14:20 | `HomeworkBearerAuthControllerTest` | Bearer 登录态、AUTH/CRS 成员联动、作业可见性、提交和批阅权限 | 2 条通过 |
+| HWK-LOG-003 | 2026-06-12 14:20 | `HomeworkControllerTest` | HWK 控制器主流程、异常、权限、评测、批阅、统计、通知和成绩来源 | 35 条通过 |
+| HWK-LOG-004 | 2026-06-12 14:20 | `HomeworkMigrationTest` | HWK 迁移语法、外键、唯一约束、提交/评测/批阅日志表契约 | 6 条通过 |
+| HWK-LOG-005 | 2026-06-12 14:20 | `HomeworkSubmissionServiceTest` | 重复提交版本冲突返回受控业务错误 | 1 条通过 |
+| HWK-LOG-006 | 2026-06-12 14:20 | Maven 汇总 | HWK 目标测试 4 个测试类共 `Tests run: 44, Failures: 0, Errors: 0, Skipped: 0`；同批 AUTH/HWK 后端目标命令共 `Tests run: 80, Failures: 0, Errors: 0, Skipped: 0` | 构建成功 |
 
 #### 8.5.2 前端 HWK 执行日志
 
 | 日志编号 | 时间 | 命令/测试文件 | 执行内容 | 结果 |
 | --- | --- | --- | --- | --- |
-| HWK-LOG-007 | 2026-06-09 16:31 | Vitest 目标测试 | 普通沙箱执行 HWK 前端单测 | 因 esbuild 子进程 `spawn EPERM` 启动失败，未进入断言阶段 |
-| HWK-LOG-008 | 2026-06-09 16:31 | `homeworksApi.spec.ts` | HWK API wrapper 路由、方法、参数和响应处理 | 6 条通过 |
-| HWK-LOG-009 | 2026-06-09 16:31 | `HomeworkStudentListView.spec.ts` | 学生作业列表和空状态 | 2 条通过 |
-| HWK-LOG-010 | 2026-06-09 16:31 | `HomeworkStudentView.spec.ts` | 学生作业详情、提交、校验、代码评测、学习记录 | 7 条通过 |
-| HWK-LOG-011 | 2026-06-09 16:31 | `HomeworkSubmissionHistoryView.spec.ts` | 提交历史、教师筛选、批阅、重评、日志刷新 | 6 条通过 |
-| HWK-LOG-012 | 2026-06-09 16:31 | `HomeworkTeacherView.spec.ts` | 教师创建/编辑、发布/关闭、统计、成绩发布 | 7 条通过 |
-| HWK-LOG-013 | 2026-06-09 16:31 | Vitest 汇总 | `Test Files 5 passed (5)`、`Tests 28 passed (28)` | 构建成功 |
+| HWK-LOG-007 | 2026-06-12 14:21 | `node node_modules/vitest/vitest.mjs run ... --pool=threads` | 使用当前本机 Node/Vitest 复跑 HWK 前端目标单测 | 构建成功，未复现 esbuild `spawn EPERM`，进入断言并全部通过 |
+| HWK-LOG-008 | 2026-06-12 14:21 | `homeworksApi.spec.ts` | HWK API wrapper 路由、方法、参数和响应处理 | 6 条通过 |
+| HWK-LOG-009 | 2026-06-12 14:21 | `HomeworkStudentListView.spec.ts` | 学生作业列表和空状态 | 2 条通过 |
+| HWK-LOG-010 | 2026-06-12 14:21 | `HomeworkStudentView.spec.ts` | 学生作业详情、提交、校验、代码评测、学习记录 | 7 条通过 |
+| HWK-LOG-011 | 2026-06-12 14:21 | `HomeworkSubmissionHistoryView.spec.ts` | 提交历史、教师筛选、批阅、重评、日志刷新 | 6 条通过 |
+| HWK-LOG-012 | 2026-06-12 14:21 | `HomeworkTeacherView.spec.ts` | 教师创建/编辑、发布/关闭、统计、成绩发布 | 7 条通过 |
+| HWK-LOG-013 | 2026-06-12 14:21 | Vitest 汇总 | HWK 目标测试 5 个文件共 `Test Files 5 passed (5)`、`Tests 28 passed (28)`；同批 AUTH/HWK 前端目标命令共 `Test Files 10 passed (10)`、`Tests 52 passed (52)` | 构建成功 |
 
 ### 8.6 GRD 测试执行日志
 
@@ -815,22 +815,20 @@
 
 #### 12.1.1 执行命令
 
-```powershell
-cd C:\Code\SE\OnlineJudge\backend
-$env:JAVA_HOME='C:\Program Files\Java\jdk-25'
-$env:Path="$env:JAVA_HOME\bin;$env:Path"
-& 'C:\Code\SE\.codex-tools\apache-maven-3.9.9\bin\mvn.cmd' "-Dtest=AuthControllerTest,AuthAdminControllerTest,AuthMigrationScriptTest,HeaderCurrentUserProviderTest,AuthCrsIntegrationTest" test
+```bash
+cd /Users/xigma/Library/CloudStorage/OneDrive-个人/github/OnlineJudge/backend
+mvn test -Dtest=AuthControllerTest,AuthAdminControllerTest,AuthMigrationScriptTest,HeaderCurrentUserProviderTest,AuthCrsIntegrationTest
 
-cd C:\Code\SE\OnlineJudge\frontend
-npm run test:unit -- tests/unit/auth/AuthView.spec.ts tests/unit/auth/AuthProfileView.spec.ts tests/unit/auth/AuthAdminView.spec.ts tests/unit/auth/authApi.spec.ts tests/unit/api/http.spec.ts --pool=threads
+cd /Users/xigma/Library/CloudStorage/OneDrive-个人/github/OnlineJudge/frontend
+node node_modules/vitest/vitest.mjs run tests/unit/auth/authApi.spec.ts tests/unit/api/http.spec.ts tests/unit/auth/AuthProfileView.spec.ts tests/unit/auth/AuthView.spec.ts tests/unit/auth/AuthAdminView.spec.ts --pool=threads
 ```
 
 #### 12.1.2 本次执行摘要
 
 | 项目 | 摘要 |
 | --- | --- |
-| 后端 AUTH 自动化测试 | 5 个测试类，34 passed / 0 failed / 0 errors / 0 skipped |
-| 前端 AUTH/API 自动化测试 | 5 files passed / 22 tests passed |
+| 后端 AUTH 自动化测试 | 5 个测试类，36 passed / 0 failed / 0 errors / 0 skipped |
+| 前端 AUTH/API 自动化测试 | 5 files passed / 24 tests passed |
 | 自动化覆盖 | 注册登录、会话、当前用户、退出、角色权限、账号状态、资料密码、失败锁定、审计日志、迁移约束、Bearer 鉴权、AUTH/CRS 联动 |
 | 手工/联调状态 | 自动化、本地 HTTP 安全探针、本地浏览器 smoke 和 2026-06-12 本地 DEV 手工矩阵已补充；生产级安全扫描、生产长稳和 FAT/UAT 留痕待补 |
 
@@ -907,12 +905,12 @@ git diff --check
 
 #### 12.5.1 执行命令
 
-```powershell
-cd D:\repos\OnlineJudge\backend
-& 'D:\Program Files\apache-maven-3.9.16\bin\mvn.cmd' test '-Dtest=HomeworkControllerTest,HomeworkBearerAuthControllerTest,HomeworkMigrationTest,HomeworkSubmissionServiceTest'
+```bash
+cd /Users/xigma/Library/CloudStorage/OneDrive-个人/github/OnlineJudge/backend
+mvn test -Dtest=HomeworkControllerTest,HomeworkBearerAuthControllerTest,HomeworkMigrationTest,HomeworkSubmissionServiceTest
 
-cd D:\repos\OnlineJudge\frontend
-& 'D:\Program Files\nodejs\node.exe' '.\node_modules\vitest\vitest.mjs' run tests/unit/hwk/homeworksApi.spec.ts tests/unit/hwk/HomeworkStudentListView.spec.ts tests/unit/hwk/HomeworkStudentView.spec.ts tests/unit/hwk/HomeworkSubmissionHistoryView.spec.ts tests/unit/hwk/HomeworkTeacherView.spec.ts --pool=threads
+cd /Users/xigma/Library/CloudStorage/OneDrive-个人/github/OnlineJudge/frontend
+node node_modules/vitest/vitest.mjs run tests/unit/hwk/homeworksApi.spec.ts tests/unit/hwk/HomeworkStudentListView.spec.ts tests/unit/hwk/HomeworkStudentView.spec.ts tests/unit/hwk/HomeworkSubmissionHistoryView.spec.ts tests/unit/hwk/HomeworkTeacherView.spec.ts --pool=threads
 ```
 
 #### 12.5.2 本次执行摘要
@@ -980,6 +978,10 @@ node node_modules/vitest/vitest.mjs run tests/unit/grd/gradeItemsApi.spec.ts tes
 | TST08-AUTO-002 | 2026-06-12 00:10 | 前端完整单元测试 | `cd frontend; npm run test:unit` | `Test Files 33 passed (33)`，`Tests 185 passed (185)` | 通过 |
 | TST08-AUTO-003 | 2026-06-12 12:44 | 后端完整自动化测试复跑 | `cd backend && mvn test` | `Tests run: 251, Failures: 0, Errors: 0, Skipped: 1`，构建成功 | 通过 |
 | TST08-AUTO-004 | 2026-06-12 12:44 | 前端完整单元测试复跑 | `cd frontend && npm run test:unit` | `Test Files 33 passed (33)`，`Tests 185 passed (185)` | 通过 |
+| TST08-AUTO-005 | 2026-06-12 14:20 | AUTH/HWK 后端目标测试复跑 | `cd backend && mvn test -Dtest=AuthControllerTest,AuthAdminControllerTest,AuthMigrationScriptTest,HeaderCurrentUserProviderTest,AuthCrsIntegrationTest,HomeworkControllerTest,HomeworkBearerAuthControllerTest,HomeworkMigrationTest,HomeworkSubmissionServiceTest` | `Tests run: 80, Failures: 0, Errors: 0, Skipped: 0`，构建成功；覆盖旧 `AUTH-LOG-001`、`AUTH-LOG-002`、`HWK-LOG-001` | 通过 |
+| TST08-AUTO-006 | 2026-06-12 14:21 | AUTH/HWK 前端目标测试复跑 | `cd frontend && node node_modules/vitest/vitest.mjs run tests/unit/auth/authApi.spec.ts tests/unit/api/http.spec.ts tests/unit/auth/AuthProfileView.spec.ts tests/unit/auth/AuthView.spec.ts tests/unit/auth/AuthAdminView.spec.ts tests/unit/hwk/homeworksApi.spec.ts tests/unit/hwk/HomeworkStudentListView.spec.ts tests/unit/hwk/HomeworkStudentView.spec.ts tests/unit/hwk/HomeworkSubmissionHistoryView.spec.ts tests/unit/hwk/HomeworkTeacherView.spec.ts --pool=threads` | `Test Files 10 passed (10)`，`Tests 52 passed (52)`；覆盖旧 `HWK-LOG-007` | 通过 |
+| TST08-AUTO-007 | 2026-06-12 14:21 | 后端完整自动化测试复跑 | `cd backend && mvn test` | `Tests run: 252, Failures: 0, Errors: 0, Skipped: 1`，构建成功 | 通过 |
+| TST08-AUTO-008 | 2026-06-12 14:21 | 前端完整单元测试复跑 | `cd frontend && npm run test:unit` | `Test Files 33 passed (33)`，`Tests 186 passed (186)` | 通过 |
 
 说明：后端完整自动化中的 1 条跳过项来自真实 Docker 沙箱环境保护开关；Docker daemon 启动后已在第 13.5 节使用 `OJ_DOCKER_SANDBOX_TEST=true` 单独补跑该用例。
 
@@ -1011,6 +1013,7 @@ node node_modules/vitest/vitest.mjs run tests/unit/grd/gradeItemsApi.spec.ts tes
 | TST08-DOCKER-008 | 2026-06-12 00:31 | 并发样本 | 4 个 Docker 容器并发执行 Python 求和 | 输出 `2/4/6/8`，`JOB1_EXIT=0`、`JOB2_EXIT=0`、`JOB3_EXIT=0`、`JOB4_EXIT=0` | 通过 |
 | TST08-DOCKER-009 | 2026-06-12 00:32 | 超时清理样本 | 长跑 Python 容器运行 3 秒后按测试时限清理 | 输出 `TLE_TIMEOUT_ENFORCED=True`，测试容器清理后无残留 | 通过 |
 | TST08-DOCKER-010 | 2026-06-12 12:45 | Docker 执行器真实容器复跑 | `OJ_DOCKER_SANDBOX_TEST=true mvn -Dtest=DockerSandboxExecutorTest test` | `Tests run: 2, Failures: 0, Errors: 0, Skipped: 0`，构建成功 | 通过 |
+| TST08-DOCKER-011 | 2026-06-12 14:24 | Docker 执行器真实容器复跑 | `OJ_DOCKER_SANDBOX_TEST=true mvn -Dtest=DockerSandboxExecutorTest test` | `Tests run: 2, Failures: 0, Errors: 0, Skipped: 0`，构建成功，耗时 4.212s | 通过 |
 
 说明：本节补齐真实 Docker 沙箱基础专项，覆盖执行器真实容器 AC smoke、编译错误、运行错误、内存限制、超时清理和并发启动。当前 Docker 执行器配置镜像为 `python:3.12-alpine`，因此本次自动化专项覆盖 Python。
 
