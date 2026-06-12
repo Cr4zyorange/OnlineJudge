@@ -143,8 +143,10 @@ describe('HomeworkSubmissionHistoryView', () => {
       comment: 'Clear reasoning.'
     });
     expect(homeworkApi.getHomeworkSubmissionReviewLogs).toHaveBeenLastCalledWith(301);
-    expect(wrapper.text()).toContain('REVIEWED');
-    expect(wrapper.text()).toContain('REVIEW');
+    expect(wrapper.text()).toContain('已批阅');
+    expect(wrapper.text()).toContain('批阅');
+    expect(wrapper.text()).not.toContain('REVIEWED');
+    expect(wrapper.text()).not.toContain('REVIEW');
     expect(wrapper.text()).toContain('Clear reasoning.');
   });
 
@@ -212,8 +214,10 @@ describe('HomeworkSubmissionHistoryView', () => {
     expect(homeworkApi.reevaluateHomeworkSubmission).toHaveBeenCalledWith(301, 'judge data fixed');
     expect(homeworkApi.getHomeworkSubmission).toHaveBeenLastCalledWith(301);
     expect(homeworkApi.getHomeworkSubmissionReviewLogs).toHaveBeenLastCalledWith(301);
-    expect(wrapper.text()).toContain('Reevaluation finished');
-    expect(wrapper.text()).toContain('REJUDGE');
+    expect(wrapper.text()).toContain('重评完成');
+    expect(wrapper.text()).toContain('重评');
+    expect(wrapper.text()).not.toContain('Reevaluation finished');
+    expect(wrapper.text()).not.toContain('REJUDGE');
     expect(wrapper.text()).toContain('judge data fixed');
   });
 
@@ -265,6 +269,53 @@ describe('HomeworkSubmissionHistoryView', () => {
       reviewStatus: 'NEED_REVIEW'
     });
     expect(wrapper.text()).toContain('学生 602');
+    expect(wrapper.text()).toContain('提交状态：逾期提交');
+    expect(wrapper.text()).toContain('评测状态：等待评测');
+    expect(wrapper.text()).toContain('复核状态：需批阅');
+    expect(wrapper.text()).not.toContain('LATE');
+    expect(wrapper.text()).not.toContain('PENDING');
+    expect(wrapper.text()).not.toContain('NEED_REVIEW');
+  });
+
+  it('renders history filters and detail statuses with business labels', async () => {
+    vi.mocked(homeworkApi.listHomeworkSubmissions).mockResolvedValueOnce({
+      list: [
+        submission({ submissionId: 301, studentId: 601, submitType: 'CODE', evaluationStatus: 'WRONG_ANSWER' })
+      ],
+      page: 1,
+      size: 20,
+      total: 1
+    });
+    vi.mocked(homeworkApi.getHomeworkSubmission).mockResolvedValueOnce(submission({
+      submissionId: 301,
+      studentId: 601,
+      submitType: 'CODE',
+      evaluationStatus: 'WRONG_ANSWER'
+    }));
+
+    const wrapper = mount(HomeworkSubmissionHistoryView, {
+      props: {
+        courseId: 101,
+        homeworkId: 11,
+        role: 'teacher'
+      }
+    });
+    await flushPromises();
+
+    const optionLabels = wrapper.findAll('option').map((option) => option.text());
+    expect(optionLabels).toEqual(expect.arrayContaining(['已提交', '逾期提交', '等待评测', '答案错误', '需批阅']));
+    expect(optionLabels).not.toEqual(expect.arrayContaining(['SUBMITTED', 'LATE', 'PENDING', 'WRONG_ANSWER', 'NEED_REVIEW']));
+
+    await wrapper.get('[data-submission-id="301"] button').trigger('click');
+    await flushPromises();
+
+    expect(wrapper.text()).toContain('作业类型：代码作业');
+    expect(wrapper.text()).toContain('提交状态：已提交');
+    expect(wrapper.text()).toContain('评测状态：答案错误');
+    expect(wrapper.text()).toContain('复核状态：待批阅');
+    expect(wrapper.text()).not.toContain('CODE');
+    expect(wrapper.text()).not.toContain('WRONG_ANSWER');
+    expect(wrapper.text()).not.toContain('UNREVIEWED');
   });
 
   it('shows an empty state when there is no submission history', async () => {

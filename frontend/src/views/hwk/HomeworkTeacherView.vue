@@ -9,9 +9,9 @@
         <label>
           <span>作业类型</span>
           <select v-model="form.type" name="type">
-            <option value="OBJECTIVE">OBJECTIVE</option>
-            <option value="FILE">FILE</option>
-            <option value="CODE">CODE</option>
+            <option value="OBJECTIVE">客观题作业</option>
+            <option value="FILE">附件作业</option>
+            <option value="CODE">代码作业</option>
           </select>
         </label>
         <label class="homeworks__wide">
@@ -41,45 +41,45 @@
 
         <section v-if="form.type === 'OBJECTIVE'" class="homeworks__wide homeworks__config" aria-label="客观题配置">
           <header class="homeworks__section-header">
-            <h2>客观题</h2>
+            <h2>客观题配置</h2>
             <button type="button" @click="addQuestion">新增题目</button>
           </header>
           <div v-for="(question, index) in form.questions" :key="`question-${index}`" class="homeworks__config-card">
-            <label>
+            <label class="homeworks__field--type">
               <span>题型</span>
               <select v-model="question.questionType" :name="`question-type-${index}`">
-                <option value="SINGLE_CHOICE">SINGLE_CHOICE</option>
-                <option value="MULTIPLE_CHOICE">MULTIPLE_CHOICE</option>
-                <option value="JUDGE">JUDGE</option>
+                <option value="SINGLE_CHOICE">单选题</option>
+                <option value="MULTIPLE_CHOICE">多选题</option>
+                <option value="JUDGE">判断题</option>
               </select>
             </label>
             <label class="homeworks__wide">
               <span>题干</span>
               <textarea v-model="question.stem" :name="`question-stem-${index}`" rows="2" />
             </label>
-            <label>
-              <span>选项 JSON</span>
-              <input v-model="question.optionsJson" :name="`question-options-${index}`" type="text" />
+            <label class="homeworks__field--options">
+              <span>选项配置</span>
+              <input v-model="question.optionsJson" :name="`question-options-${index}`" type="text" placeholder='["选项 A","选项 B"]' />
             </label>
-            <label>
-              <span>答案 JSON</span>
-              <input v-model="question.answerJson" :name="`question-answer-${index}`" type="text" />
+            <label class="homeworks__field--answer">
+              <span>正确答案</span>
+              <input v-model="question.answerJson" :name="`question-answer-${index}`" type="text" placeholder='["选项 A"]' />
             </label>
-            <label>
+            <label class="homeworks__field--score">
               <span>分值</span>
               <input v-model="question.score" :name="`question-score-${index}`" type="number" min="1" />
             </label>
-            <button type="button" @click="removeQuestion(index)">删除题目</button>
+            <button class="homeworks__config-remove" type="button" @click="removeQuestion(index)">删除题目</button>
           </div>
         </section>
 
         <section v-if="form.type === 'CODE'" class="homeworks__wide homeworks__config" aria-label="代码题配置">
           <header class="homeworks__section-header">
-            <h2>测试用例</h2>
+            <h2>测试用例配置</h2>
             <button type="button" @click="addTestCase">新增用例</button>
           </header>
           <label>
-            <span>语言限制 JSON</span>
+            <span>语言限制</span>
             <input v-model="form.languageLimitJson" name="languageLimitJson" type="text" />
           </label>
           <label>
@@ -93,16 +93,16 @@
           <label>
             <span>输出比较</span>
             <select v-model="form.outputCompareMode" name="outputCompareMode">
-              <option value="EXACT">EXACT</option>
-              <option value="TRIM">TRIM</option>
+              <option value="EXACT">严格匹配</option>
+              <option value="TRIM">忽略首尾空白</option>
             </select>
           </label>
           <div v-for="(testCase, index) in form.testCases" :key="`test-case-${index}`" class="homeworks__config-card">
-            <label>
+            <label class="homeworks__field--half">
               <span>输入</span>
               <textarea v-model="testCase.inputData" :name="`testcase-input-${index}`" rows="2" />
             </label>
-            <label>
+            <label class="homeworks__field--half">
               <span>期望输出</span>
               <textarea v-model="testCase.expectedOutput" :name="`testcase-output-${index}`" rows="2" />
             </label>
@@ -122,7 +122,7 @@
               <input v-model="testCase.hidden" :name="`testcase-hidden-${index}`" type="checkbox" />
               <span>隐藏用例</span>
             </label>
-            <button type="button" @click="removeTestCase(index)">删除用例</button>
+            <button class="homeworks__config-remove" type="button" @click="removeTestCase(index)">删除用例</button>
           </div>
         </section>
 
@@ -141,10 +141,10 @@
           <span>状态筛选</span>
           <select v-model="selectedStatus" @change="loadHomeworks">
             <option value="">全部</option>
-            <option value="DRAFT">DRAFT</option>
-            <option value="PUBLISHED">PUBLISHED</option>
-            <option value="CLOSED">CLOSED</option>
-            <option value="SCORE_PUBLISHED">SCORE_PUBLISHED</option>
+            <option value="DRAFT">草稿</option>
+            <option value="PUBLISHED">已发布</option>
+            <option value="CLOSED">已关闭</option>
+            <option value="SCORE_PUBLISHED">成绩已发布</option>
           </select>
         </label>
         <label>
@@ -169,8 +169,8 @@
         <tbody>
           <tr v-for="homework in homeworks" :key="homework.id">
             <td>{{ homework.title }}</td>
-            <td>{{ homework.type }}</td>
-            <td>{{ homework.status }}</td>
+            <td>{{ formatHomeworkType(homework.type) }}</td>
+            <td>{{ formatHomeworkStatus(homework.status) }}</td>
             <td>{{ formatDeadline(homework.deadline) }}</td>
             <td>{{ homework.totalScore }}</td>
             <td class="homeworks__row-actions">
@@ -286,6 +286,7 @@ import type {
   HomeworkTestCasePayload,
   HomeworkType
 } from '../../types/hwk';
+import { formatHomeworkStatus, formatHomeworkType } from './hwkDisplay';
 
 const props = defineProps<{
   courseId: number;
@@ -640,8 +641,9 @@ function formatNullableScore(value: number | null) {
 
 .homeworks__form {
   display: grid;
-  gap: 14px;
-  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  align-items: start;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
 }
 
 .homeworks__wide {
@@ -650,6 +652,9 @@ function formatNullableScore(value: number | null) {
 
 .homeworks__config {
   border-top: 1px solid #d7dde8;
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   margin-top: 6px;
   padding-top: 14px;
 }
@@ -664,8 +669,27 @@ function formatNullableScore(value: number | null) {
   gap: 8px;
 }
 
+.homeworks__checkbox input[type="checkbox"] {
+  accent-color: #16423c;
+  box-shadow: none !important;
+  flex: 0 0 18px;
+  height: 18px;
+  margin: 0;
+  min-height: 18px;
+  min-width: 18px;
+  padding: 0;
+  width: 18px;
+}
+
 .homeworks__section-header {
+  grid-column: 1 / -1;
   justify-content: space-between;
+}
+
+.homeworks__section-header h2 {
+  font-size: 20px;
+  line-height: 1.35;
+  margin: 0;
 }
 
 .homeworks__config-card {
@@ -673,14 +697,44 @@ function formatNullableScore(value: number | null) {
   border-radius: 8px;
   display: grid;
   gap: 12px;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
   margin-top: 12px;
   padding: 12px;
 }
 
+.homeworks__config-card .homeworks__wide {
+  grid-column: 1 / -1;
+}
+
+.homeworks__field--type,
+.homeworks__field--score {
+  grid-column: span 2;
+}
+
+.homeworks__field--options,
+.homeworks__field--answer,
+.homeworks__field--half {
+  grid-column: span 5;
+}
+
+.homeworks__config-remove {
+  align-self: end;
+  grid-column: span 2;
+  justify-self: start;
+  min-width: 112px;
+}
+
 label {
   display: grid;
-  gap: 6px;
+  gap: 8px;
+  min-width: 0;
+}
+
+label > span {
+  color: #344e49;
+  font-weight: 700;
+  line-height: 1.35;
 }
 
 input,
@@ -691,6 +745,7 @@ textarea {
   color: #111827;
   min-height: 36px;
   padding: 6px 8px;
+  width: 100%;
 }
 
 button {
@@ -699,6 +754,7 @@ button {
   color: #111827;
   min-height: 36px;
   padding: 6px 12px;
+  white-space: nowrap;
 }
 
 button:disabled {
@@ -763,5 +819,17 @@ td {
   border-bottom: 1px solid #d7dde8;
   padding: 10px;
   text-align: left;
+}
+
+@media (max-width: 900px) {
+  .homeworks__config-card,
+  .homeworks__field--type,
+  .homeworks__field--score,
+  .homeworks__field--options,
+  .homeworks__field--answer,
+  .homeworks__field--half,
+  .homeworks__config-remove {
+    grid-column: 1 / -1;
+  }
 }
 </style>

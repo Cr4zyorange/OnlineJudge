@@ -66,7 +66,10 @@ describe('HomeworkStudentView', () => {
     expect(homeworkApi.getHomeworkDetail).toHaveBeenCalledWith(11);
     expect(wrapper.text()).toContain('HWK02 text homework');
     expect(wrapper.text()).toContain('Explain your algorithm.');
-    expect(wrapper.text()).toContain('TEXT');
+    expect(wrapper.text()).toContain('文本作业');
+    expect(wrapper.text()).toContain('已发布');
+    expect(wrapper.text()).not.toContain('TEXT');
+    expect(wrapper.text()).not.toContain('PUBLISHED');
     expect(learningRecordsApi.reportLearningRecord).toHaveBeenCalledWith(expect.objectContaining({
       courseId: 101,
       sourceModule: 'HWK',
@@ -95,9 +98,13 @@ describe('HomeworkStudentView', () => {
       sourceId: 11,
       actionType: 'SUBMIT'
     }));
-    expect(wrapper.text()).toContain('Submission 91');
-    expect(wrapper.text()).toContain('SUBMITTED');
-    expect(wrapper.text()).toContain('UNREVIEWED');
+    expect(wrapper.text()).toContain('提交编号 91');
+    expect(wrapper.text()).toContain('提交状态：已提交');
+    expect(wrapper.text()).toContain('评测状态：未评测');
+    expect(wrapper.text()).toContain('批阅状态：待批阅');
+    expect(wrapper.text()).not.toContain('Submission');
+    expect(wrapper.text()).not.toContain('SUBMITTED');
+    expect(wrapper.text()).not.toContain('UNREVIEWED');
   });
 
   it('shows validation errors before sending an empty text submission', async () => {
@@ -115,7 +122,65 @@ describe('HomeworkStudentView', () => {
     await flushPromises();
 
     expect(homeworkApi.submitHomework).not.toHaveBeenCalled();
-    expect(wrapper.text()).toContain('Answer content is required');
+    expect(wrapper.text()).toContain('请填写文本答案或附件编号');
+    expect(wrapper.text()).not.toContain('附件 ID');
+    expect(wrapper.text()).not.toContain('Answer content is required');
+  });
+
+  it('renders score published homework metadata with localized labels', async () => {
+    vi.mocked(homeworkApi.getHomeworkDetail).mockResolvedValueOnce(homeworkDetail({
+      status: 'SCORE_PUBLISHED'
+    }));
+
+    const wrapper = mount(HomeworkStudentView, {
+      props: {
+        courseId: 101,
+        homeworkId: 11
+      }
+    });
+    await flushPromises();
+
+    expect(wrapper.text()).toContain('文本作业');
+    expect(wrapper.text()).toContain('成绩已发布');
+    expect(wrapper.text()).not.toContain('TEXT');
+    expect(wrapper.text()).not.toContain('SCORE_PUBLISHED');
+  });
+
+  it('renders objective homework options and submission fields without implementation labels', async () => {
+    vi.mocked(homeworkApi.getHomeworkDetail).mockResolvedValueOnce(homeworkDetail({
+      title: 'HWK02 objective homework',
+      type: 'OBJECTIVE',
+      questions: [{
+        id: 301,
+        homeworkId: 11,
+        questionType: 'SINGLE_CHOICE',
+        stem: 'Which operation is O(1)?',
+        optionsJson: '["A. stack push","B. full table scan"]',
+        score: 100,
+        sortOrder: 1
+      }]
+    }));
+
+    const wrapper = mount(HomeworkStudentView, {
+      props: {
+        courseId: 101,
+        homeworkId: 11
+      }
+    });
+    await flushPromises();
+
+    expect(wrapper.text()).toContain('A. stack push');
+    expect(wrapper.text()).toContain('B. full table scan');
+    expect(wrapper.text()).toContain('客观题答案');
+    expect(wrapper.text()).not.toContain('客观题答案 JSON');
+    expect(wrapper.text()).not.toContain('["A. stack push","B. full table scan"]');
+
+    await wrapper.get('form').trigger('submit');
+    await flushPromises();
+
+    expect(homeworkApi.submitHomework).not.toHaveBeenCalled();
+    expect(wrapper.text()).toContain('请填写客观题答案');
+    expect(wrapper.text()).not.toContain('请填写客观题答案 JSON');
   });
 
   it('renders configured code languages and submits only the selected language', async () => {
@@ -168,8 +233,10 @@ describe('HomeworkStudentView', () => {
       codeText: 'public class Main {}',
       language: 'java'
     }));
-    expect(wrapper.text()).toContain('PENDING');
-    expect(wrapper.text()).toContain('NEED_REVIEW');
+    expect(wrapper.text()).toContain('评测状态：等待评测');
+    expect(wrapper.text()).toContain('批阅状态：需批阅');
+    expect(wrapper.text()).not.toContain('PENDING');
+    expect(wrapper.text()).not.toContain('NEED_REVIEW');
   });
 
   it('loads and displays the evaluation result after submitting code homework', async () => {
@@ -231,10 +298,13 @@ describe('HomeworkStudentView', () => {
     await flushPromises();
 
     expect(homeworkApi.getHomeworkSubmissionEvaluation).toHaveBeenCalledWith(94);
-    expect(wrapper.text()).toContain('ACCEPTED');
+    expect(wrapper.text()).toContain('评测结果');
+    expect(wrapper.text()).toContain('通过');
     expect(wrapper.text()).toContain('100');
-    expect(wrapper.text()).toContain('1 / 1');
+    expect(wrapper.text()).toContain('通过用例 1 / 1');
     expect(wrapper.text()).toContain('accepted');
+    expect(wrapper.text()).not.toContain('Evaluation result');
+    expect(wrapper.text()).not.toContain('ACCEPTED');
   });
 
   it('submits the default language when code homework has a single configured language', async () => {
@@ -285,7 +355,8 @@ describe('HomeworkStudentView', () => {
       codeText: 'print(input())',
       language: 'python'
     }));
-    expect(wrapper.text()).toContain('PENDING');
+    expect(wrapper.text()).toContain('评测状态：等待评测');
+    expect(wrapper.text()).not.toContain('PENDING');
   });
 
   it('records homework progress when a student opens and completes homework', async () => {

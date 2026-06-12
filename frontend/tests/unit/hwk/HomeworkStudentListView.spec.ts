@@ -32,6 +32,15 @@ describe('HomeworkStudentListView', () => {
     expect(homeworkApi.listHomeworks).toHaveBeenCalledWith({ courseId: 101, page: 1, size: 20 });
     expect(wrapper.text()).toContain('HWK02 published homework');
     expect(wrapper.text()).toContain('HWK02 closed homework');
+    expect(wrapper.text()).toContain('文本作业');
+    expect(wrapper.text()).toContain('已发布');
+    expect(wrapper.text()).toContain('已关闭');
+    expect(wrapper.text()).toContain('截止 2026-06-30 23:59');
+    expect(wrapper.text()).not.toContain('TEXT');
+    expect(wrapper.text()).not.toContain('PUBLISHED');
+    expect(wrapper.text()).not.toContain('CLOSED');
+    expect(wrapper.text()).not.toContain('due');
+    expect(wrapper.get('[data-testid="open-homework-11"]').text()).toBe('查看');
     expect(wrapper.get('[data-testid="open-homework-11"]').attributes('href'))
       .toBe('/courses/101/homeworks/11?role=student');
   });
@@ -46,7 +55,8 @@ describe('HomeworkStudentListView', () => {
     });
     await flushPromises();
 
-    expect(wrapper.text()).toContain('No visible homework');
+    expect(wrapper.text()).toContain('暂无可见作业');
+    expect(wrapper.text()).not.toContain('No visible homework');
   });
 });
 
