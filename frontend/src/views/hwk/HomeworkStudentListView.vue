@@ -2,23 +2,23 @@
   <main class="homework-student-list">
     <section class="homework-student-list__panel" aria-label="student homework list">
       <header class="homework-student-list__header">
-        <h1>Homework</h1>
+        <h1>作业</h1>
       </header>
 
-      <p v-if="loading">Loading</p>
+      <p v-if="loading">加载中</p>
       <p v-else-if="errorMessage" class="homework-student-list__error">{{ errorMessage }}</p>
-      <p v-else-if="homeworks.length === 0">No visible homework</p>
+      <p v-else-if="homeworks.length === 0">暂无可见作业</p>
       <ul v-else class="homework-student-list__items">
         <li v-for="homework in homeworks" :key="homework.id">
           <div>
             <h2>{{ homework.title }}</h2>
             <p>{{ homework.description }}</p>
-            <p>{{ homework.type }} · {{ homework.status }} · due {{ formatDateTime(homework.deadline) }}</p>
+            <p>{{ formatHomeworkType(homework.type) }} · {{ formatHomeworkStatus(homework.status) }} · 截止 {{ formatDateTime(homework.deadline) }}</p>
           </div>
           <a
             :data-testid="`open-homework-${homework.id}`"
             :href="`/courses/${props.courseId}/homeworks/${homework.id}?role=student`"
-          >Open</a>
+          >查看</a>
         </li>
       </ul>
     </section>
@@ -29,6 +29,7 @@
 import { onMounted, ref } from 'vue';
 import { listHomeworks } from '../../api/hwk/homeworks';
 import type { HomeworkSummary } from '../../types/hwk';
+import { formatHomeworkStatus, formatHomeworkType } from './hwkDisplay';
 
 const props = defineProps<{
   courseId: number;
@@ -47,7 +48,7 @@ async function loadHomeworks() {
     const page = await listHomeworks({ courseId: props.courseId, page: 1, size: 20 });
     homeworks.value = page.list;
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : 'Homework list failed to load';
+    errorMessage.value = error instanceof Error ? error.message : '作业列表加载失败';
   } finally {
     loading.value = false;
   }

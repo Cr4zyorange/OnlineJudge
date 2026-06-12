@@ -61,7 +61,8 @@ describe('HomeworkTeacherView', () => {
     }));
     expect(wrapper.text()).toContain('保存成功');
     expect(wrapper.text()).toContain('HWK01 objective draft');
-    expect(wrapper.text()).toContain('DRAFT');
+    expect(wrapper.text()).toContain('草稿');
+    expect(wrapper.text()).not.toContain('DRAFT');
   });
 
   it('validates code homework test cases before sending create requests', async () => {
@@ -202,8 +203,9 @@ describe('HomeworkTeacherView', () => {
     });
     await flushPromises();
 
-    expect(wrapper.findAll('option').map((option) => (option.element as HTMLOptionElement).value))
-      .toContain('SCORE_PUBLISHED');
+    const statusOption = wrapper.findAll('option')
+      .find((option) => (option.element as HTMLOptionElement).value === 'SCORE_PUBLISHED');
+    expect(statusOption?.text()).toBe('成绩已发布');
 
     await wrapper.get('[data-testid="homework-statistics-9"]').trigger('click');
     await flushPromises();
@@ -223,7 +225,44 @@ describe('HomeworkTeacherView', () => {
     expect(homeworkApi.listHomeworks).toHaveBeenLastCalledWith(expect.objectContaining({
       status: 'SCORE_PUBLISHED'
     }));
-    expect(wrapper.text()).toContain('SCORE_PUBLISHED');
+    expect(wrapper.text()).toContain('成绩已发布');
+    expect(wrapper.text()).not.toContain('SCORE_PUBLISHED');
+  });
+
+  it('renders teacher form options and table metadata with localized labels', async () => {
+    vi.mocked(homeworkApi.listHomeworks).mockResolvedValueOnce({
+      list: [homeworkSummary({ id: 8, title: 'Code draft', status: 'DRAFT', type: 'CODE' })],
+      page: 1,
+      size: 20,
+      total: 1
+    });
+
+    const wrapper = mount(HomeworkTeacherView, {
+      props: {
+        courseId: 101
+      }
+    });
+    await flushPromises();
+
+    const objectiveOptionLabels = wrapper.findAll('option').map((option) => option.text());
+    expect(objectiveOptionLabels).toEqual(expect.arrayContaining(['客观题作业', '附件作业', '代码作业', '单选题', '多选题', '判断题']));
+    expect(objectiveOptionLabels).not.toEqual(expect.arrayContaining(['OBJECTIVE', 'FILE', 'CODE', 'SINGLE_CHOICE']));
+    expect(wrapper.text()).toContain('选项配置');
+    expect(wrapper.text()).toContain('正确答案');
+    expect(wrapper.text()).not.toContain('选项 JSON');
+    expect(wrapper.text()).not.toContain('答案 JSON');
+
+    await wrapper.get('[name="type"]').setValue('CODE');
+
+    const optionLabels = wrapper.findAll('option').map((option) => option.text());
+    expect(optionLabels).toEqual(expect.arrayContaining(['客观题作业', '附件作业', '代码作业', '严格匹配', '忽略首尾空白']));
+    expect(optionLabels).not.toEqual(expect.arrayContaining(['OBJECTIVE', 'FILE', 'CODE', 'EXACT', 'TRIM']));
+    expect(wrapper.text()).toContain('语言限制');
+    expect(wrapper.text()).not.toContain('语言限制 JSON');
+    expect(wrapper.text()).toContain('代码作业');
+    expect(wrapper.text()).toContain('草稿');
+    expect(wrapper.text()).not.toContain('CODE');
+    expect(wrapper.text()).not.toContain('DRAFT');
   });
 
   it('loads a draft homework into the form and updates it', async () => {
