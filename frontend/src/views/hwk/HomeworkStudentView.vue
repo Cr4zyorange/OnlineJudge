@@ -14,11 +14,11 @@
         <dl class="homework-student__meta">
           <div>
             <dt>作业类型</dt>
-            <dd>{{ homework.type }}</dd>
+            <dd>{{ formatHomeworkType(homework.type) }}</dd>
           </div>
           <div>
             <dt>状态</dt>
-            <dd>{{ homework.status }}</dd>
+            <dd>{{ formatHomeworkStatus(homework.status) }}</dd>
           </div>
           <div>
             <dt>截止时间</dt>
@@ -41,7 +41,9 @@
         <section v-if="homework.questions.length > 0" class="homework-student__block" aria-label="题目">
           <article v-for="question in homework.questions" :key="question.id">
             <strong>{{ question.sortOrder }}. {{ question.stem }}</strong>
-            <p v-if="question.optionsJson">{{ question.optionsJson }}</p>
+            <ul v-if="formatQuestionOptions(question.optionsJson).length > 0" class="homework-student__options">
+              <li v-for="option in formatQuestionOptions(question.optionsJson)" :key="option">{{ option }}</li>
+            </ul>
           </article>
         </section>
 
@@ -55,7 +57,7 @@
 
         <form class="homework-student__form" @submit.prevent="submit">
           <label v-if="homework.type === 'OBJECTIVE'">
-            <span>客观题答案 JSON</span>
+            <span>客观题答案</span>
             <textarea v-model="answerJson" name="answerJson" rows="5" />
           </label>
 
@@ -65,7 +67,7 @@
           </label>
 
           <label v-if="homework.type === 'FILE' || homework.type === 'TEXT'">
-            <span>附件 ID</span>
+            <span>附件编号</span>
             <input v-model="fileIdsInput" name="fileIds" type="text" />
           </label>
 
@@ -104,21 +106,21 @@
 
         <section v-if="latestSubmission" class="homework-student__submission" aria-label="最新提交">
           <h2>最新提交</h2>
-          <p>Submission {{ latestSubmission.submissionId }}</p>
-          <p>{{ latestSubmission.submitStatus }}</p>
-          <p>{{ latestSubmission.evaluationStatus }}</p>
-          <p>{{ latestSubmission.reviewStatus }}</p>
+          <p>提交编号 {{ latestSubmission.submissionId }}</p>
+          <p>提交状态：{{ formatSubmitStatus(latestSubmission.submitStatus) }}</p>
+          <p>评测状态：{{ formatEvaluationStatus(latestSubmission.evaluationStatus) }}</p>
+          <p>批阅状态：{{ formatReviewStatus(latestSubmission.reviewStatus) }}</p>
           <p v-if="latestSubmission.finalScore !== null && latestSubmission.finalScore !== undefined">
             得分 {{ latestSubmission.finalScore }}
           </p>
           <p>{{ formatDateTime(latestSubmission.submittedAt) }}</p>
         </section>
 
-        <section v-if="latestEvaluationResult" class="homework-student__submission" aria-label="evaluation result">
-          <h2>Evaluation result</h2>
-          <p>{{ latestEvaluationResult.evaluationStatus }}</p>
-          <p>Score {{ latestEvaluationResult.score }}</p>
-          <p>Passed cases {{ latestEvaluationResult.passedCases }} / {{ latestEvaluationResult.totalCases }}</p>
+        <section v-if="latestEvaluationResult" class="homework-student__submission" aria-label="评测结果">
+          <h2>评测结果</h2>
+          <p>评测状态：{{ formatEvaluationStatus(latestEvaluationResult.evaluationStatus) }}</p>
+          <p>得分 {{ latestEvaluationResult.score }}</p>
+          <p>通过用例 {{ latestEvaluationResult.passedCases }} / {{ latestEvaluationResult.totalCases }}</p>
           <p v-if="latestEvaluationResult.feedback">{{ latestEvaluationResult.feedback }}</p>
           <p v-if="latestEvaluationResult.errorMessage" class="homework-student__error">
             {{ latestEvaluationResult.errorMessage }}
@@ -135,6 +137,13 @@ import { getHomeworkDetail, getHomeworkSubmissionEvaluation, submitHomework } fr
 import { saveLearningProgress } from '../../api/lrn/learningProgress';
 import { reportLearningRecord } from '../../api/lrn/learningRecords';
 import type { HomeworkDetail, HomeworkEvaluationResult, HomeworkSubmissionSummary } from '../../types/hwk';
+import {
+  formatEvaluationStatus,
+  formatHomeworkStatus,
+  formatHomeworkType,
+  formatReviewStatus,
+  formatSubmitStatus
+} from './hwkDisplay';
 
 const props = defineProps<{
   courseId: number;
@@ -196,11 +205,11 @@ async function submit() {
     });
     await recordProgress(100, `homeworkId=${props.homeworkId};submitted=${latestSubmission.value.submissionId}`);
     await recordBehavior('SUBMIT', elapsedSeconds());
-    feedbackMessage.value = `Submission ${latestSubmission.value.submissionId} ${latestSubmission.value.submitStatus}`;
+    feedbackMessage.value = `提交 ${latestSubmission.value.submissionId} ${formatSubmitStatus(latestSubmission.value.submitStatus)}`;
     await refreshLatestEvaluationResult(latestSubmission.value.submissionId);
     resetForm();
   } catch (error) {
-    submitErrorMessage.value = error instanceof Error ? error.message : 'Homework submission failed';
+    submitErrorMessage.value = error instanceof Error ? error.message : '作业提交失败';
   } finally {
     submitting.value = false;
   }
@@ -278,26 +287,26 @@ function elapsedSeconds() {
 
 function validateForm() {
   if (!homework.value) {
-    return 'Homework detail is not loaded';
+    return '作业详情尚未加载';
   }
   if (homework.value.type === 'OBJECTIVE' && !answerJson.value.trim()) {
-    return 'Answer JSON is required';
+    return '请填写客观题答案';
   }
   if (homework.value.type === 'TEXT' && !answerText.value.trim() && parseFileIds().length === 0) {
-    return 'Answer content is required';
+    return '请填写文本答案或附件编号';
   }
   if (homework.value.type === 'FILE' && parseFileIds().length === 0) {
-    return 'Attachment IDs are required';
+    return '请填写附件编号';
   }
   if (homework.value.type === 'CODE' && (!codeText.value.trim() || !language.value.trim())) {
-    return 'Code and language are required';
+    return '请填写代码和语言';
   }
   if (
     homework.value.type === 'CODE'
     && allowedCodeLanguages.value.length > 0
     && !allowedCodeLanguages.value.includes(language.value.trim())
   ) {
-    return 'Language is not allowed for this homework';
+    return '当前作业不允许使用该语言';
   }
   return '';
 }
@@ -314,6 +323,26 @@ function parseLanguageLimit(value: string | null | undefined) {
   } catch {
     return [];
   }
+}
+
+function formatQuestionOptions(value: string | null | undefined) {
+  if (!value) {
+    return [];
+  }
+  try {
+    const parsed: unknown = JSON.parse(value);
+    if (Array.isArray(parsed)) {
+      return parsed.map((item) => String(item).trim()).filter(Boolean);
+    }
+    if (parsed && typeof parsed === 'object') {
+      return Object.entries(parsed)
+        .map(([key, item]) => `${key}. ${String(item).trim()}`)
+        .filter((item) => item.trim());
+    }
+  } catch {
+    return [value];
+  }
+  return [];
 }
 
 function parseFileIds() {
@@ -396,6 +425,17 @@ function formatDateTime(value: string) {
   padding: 12px;
 }
 
+.homework-student__meta dt {
+  color: #475569;
+}
+
+.homework-student__meta dd {
+  font-weight: 700;
+  line-height: 1.35;
+  margin: 4px 0 0;
+  overflow-wrap: anywhere;
+}
+
 .homework-student__eyebrow {
   color: #64748b;
   font-size: 12px;
@@ -409,9 +449,23 @@ function formatDateTime(value: string) {
   gap: 8px;
 }
 
-label {
+.homework-student__options {
   display: grid;
   gap: 6px;
+  list-style-position: inside;
+  margin: 8px 0 0;
+  padding: 0;
+}
+
+label {
+  display: grid;
+  gap: 8px;
+}
+
+label > span {
+  font-weight: 700;
+  line-height: 1.4;
+  padding-left: 2px;
 }
 
 input,

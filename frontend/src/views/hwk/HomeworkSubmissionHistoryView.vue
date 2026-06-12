@@ -19,21 +19,21 @@
           提交状态
           <select v-model="submitStatusFilter" data-testid="history-submit-status">
             <option value="">全部</option>
-            <option v-for="status in submitStatusOptions" :key="status" :value="status">{{ status }}</option>
+            <option v-for="status in submitStatusOptions" :key="status" :value="status">{{ formatSubmitStatus(status) }}</option>
           </select>
         </label>
         <label>
           评测状态
           <select v-model="evaluationStatusFilter" data-testid="history-evaluation-status">
             <option value="">全部</option>
-            <option v-for="status in evaluationStatusOptions" :key="status" :value="status">{{ status }}</option>
+            <option v-for="status in evaluationStatusOptions" :key="status" :value="status">{{ formatEvaluationStatus(status) }}</option>
           </select>
         </label>
         <label>
           批阅状态
           <select v-model="reviewStatusFilter" data-testid="history-review-status">
             <option value="">全部</option>
-            <option v-for="status in reviewStatusOptions" :key="status" :value="status">{{ status }}</option>
+            <option v-for="status in reviewStatusOptions" :key="status" :value="status">{{ formatReviewStatus(status) }}</option>
           </select>
         </label>
         <button type="submit" data-testid="history-apply-filters">筛选</button>
@@ -55,9 +55,9 @@
               <button type="button" @click="openDetail(item.submissionId)">查看详情</button>
             </div>
             <p v-if="isTeacher">学生 {{ item.studentId }}</p>
-            <p>提交状态：{{ item.submitStatus }}</p>
-            <p>评测状态：{{ item.evaluationStatus }}</p>
-            <p>复核状态：{{ item.reviewStatus }}</p>
+            <p>提交状态：{{ formatSubmitStatus(item.submitStatus) }}</p>
+            <p>评测状态：{{ formatEvaluationStatus(item.evaluationStatus) }}</p>
+            <p>复核状态：{{ formatReviewStatus(item.reviewStatus) }}</p>
             <p>最终得分：{{ formatScore(item.finalScore) }}</p>
             <p>提交时间：{{ formatDateTime(item.submittedAt) }}</p>
             <div class="hwk-history__tags">
@@ -89,10 +89,10 @@
           <template v-else>
             <h2>版本 {{ detail.version }}</h2>
             <p>学生 {{ detail.studentId }}</p>
-            <p>作业类型：{{ detail.submitType ?? 'UNKNOWN' }}</p>
-            <p>提交状态：{{ detail.submitStatus }}</p>
-            <p>评测状态：{{ detail.evaluationStatus }}</p>
-            <p>复核状态：{{ detail.reviewStatus }}</p>
+            <p>作业类型：{{ formatHomeworkType(detail.submitType) }}</p>
+            <p>提交状态：{{ formatSubmitStatus(detail.submitStatus) }}</p>
+            <p>评测状态：{{ formatEvaluationStatus(detail.evaluationStatus) }}</p>
+            <p>复核状态：{{ formatReviewStatus(detail.reviewStatus) }}</p>
             <p>附件：{{ detail.fileUrl ?? '无' }}</p>
             <p>语言：{{ detail.language ?? '无' }}</p>
             <pre class="hwk-history__answer">{{ detail.answerText || detail.answerJson || '本次提交没有文本内容' }}</pre>
@@ -100,38 +100,38 @@
             <section v-if="isTeacher" class="hwk-history__review" aria-label="teacher review">
               <form data-testid="history-review-form" @submit.prevent="saveReview">
                 <label>
-                  Manual score
+                  人工分
                   <input v-model.trim="reviewManualScore" data-testid="history-review-manual-score" type="number" min="0" step="0.01" />
                 </label>
                 <label>
-                  Final score
+                  最终分
                   <input v-model.trim="reviewFinalScore" data-testid="history-review-final-score" type="number" min="0" step="0.01" />
                 </label>
                 <label>
-                  Comment
+                  评语
                   <textarea v-model.trim="reviewComment" data-testid="history-review-comment" rows="3" />
                 </label>
-                <button type="submit" :disabled="reviewSaving" data-testid="history-save-review">Save review</button>
+                <button type="submit" :disabled="reviewSaving" data-testid="history-save-review">保存批阅</button>
               </form>
               <form data-testid="history-reevaluate-form" @submit.prevent="triggerReevaluation">
                 <label>
-                  Reevaluation reason
+                  重评原因
                   <textarea v-model.trim="reevaluationReason" data-testid="history-reevaluate-reason" rows="2" />
                 </label>
                 <button type="submit" :disabled="reevaluationSubmitting" data-testid="history-trigger-reevaluate">
-                  Trigger reevaluation
+                  触发重评
                 </button>
               </form>
               <p v-if="reviewFeedback" class="hwk-history__feedback">{{ reviewFeedback }}</p>
               <p v-if="reviewErrorMessage" class="hwk-history__error">{{ reviewErrorMessage }}</p>
 
               <div class="hwk-history__logs" data-testid="history-review-logs">
-                <h3>Review logs</h3>
-                <p v-if="reviewLogsLoading">Logs loading</p>
-                <p v-else-if="reviewLogs.length === 0">No review logs</p>
+                <h3>批阅日志</h3>
+                <p v-if="reviewLogsLoading">日志加载中</p>
+                <p v-else-if="reviewLogs.length === 0">暂无批阅日志</p>
                 <ul v-else>
                   <li v-for="log in reviewLogs" :key="log.id">
-                    <strong>{{ log.operationType }}</strong>
+                    <strong>{{ formatReviewOperation(log.operationType) }}</strong>
                     <span>{{ formatScore(log.oldScore) }} -> {{ formatScore(log.newScore) }}</span>
                     <span>{{ log.comment || log.reason || '-' }}</span>
                     <span>{{ formatDateTime(log.createdAt) }}</span>
@@ -165,6 +165,13 @@ import type {
   HomeworkSubmissionSummary,
   HomeworkSubmitStatus
 } from '../../types/hwk';
+import {
+  formatEvaluationStatus,
+  formatHomeworkType,
+  formatReviewOperation,
+  formatReviewStatus,
+  formatSubmitStatus
+} from './hwkDisplay';
 
 const props = withDefaults(defineProps<{
   courseId: number;
@@ -307,10 +314,10 @@ async function saveReview() {
     detail.value = updated;
     resetReviewForm(updated);
     submissions.value = submissions.value.map((item) => item.submissionId === updated.submissionId ? updated : item);
-    reviewFeedback.value = 'Review saved';
+    reviewFeedback.value = '批阅已保存';
     await loadReviewLogs(updated.submissionId);
   } catch (error) {
-    reviewErrorMessage.value = error instanceof Error ? error.message : 'Review failed';
+    reviewErrorMessage.value = error instanceof Error ? error.message : '批阅失败';
   } finally {
     reviewSaving.value = false;
   }
@@ -322,7 +329,7 @@ async function triggerReevaluation() {
   }
   const reason = reevaluationReason.value.trim();
   if (!reason) {
-    reviewErrorMessage.value = 'Reevaluation reason is required';
+    reviewErrorMessage.value = '请填写重评原因';
     return;
   }
   reevaluationSubmitting.value = true;
@@ -335,10 +342,10 @@ async function triggerReevaluation() {
     resetReviewForm(refreshed);
     submissions.value = submissions.value.map((item) => item.submissionId === refreshed.submissionId ? refreshed : item);
     reevaluationReason.value = '';
-    reviewFeedback.value = 'Reevaluation finished';
+    reviewFeedback.value = '重评完成';
     await loadReviewLogs(refreshed.submissionId);
   } catch (error) {
-    reviewErrorMessage.value = error instanceof Error ? error.message : 'Reevaluation failed';
+    reviewErrorMessage.value = error instanceof Error ? error.message : '重评失败';
   } finally {
     reevaluationSubmitting.value = false;
   }
@@ -351,7 +358,7 @@ async function loadReviewLogs(submissionId: number) {
     reviewLogs.value = await getHomeworkSubmissionReviewLogs(submissionId);
   } catch (error) {
     reviewLogs.value = [];
-    reviewErrorMessage.value = error instanceof Error ? error.message : 'Review logs failed';
+    reviewErrorMessage.value = error instanceof Error ? error.message : '批阅日志加载失败';
   } finally {
     reviewLogsLoading.value = false;
   }
@@ -366,11 +373,11 @@ function resetReviewForm(submission: HomeworkSubmissionDetail) {
 function parseReviewScore(value: string, field: string) {
   const text = String(value).trim();
   if (!text) {
-    throw new Error(`${field} is required`);
+    throw new Error(`${field === 'manualScore' ? '人工分' : '最终分'}不能为空`);
   }
   const score = Number(text);
   if (!Number.isFinite(score)) {
-    throw new Error(`${field} is invalid`);
+    throw new Error(`${field === 'manualScore' ? '人工分' : '最终分'}格式不正确`);
   }
   return score;
 }
@@ -459,8 +466,9 @@ const totalPages = computed(() => Math.max(1, Math.ceil(total.value / size.value
 .hwk-history__filters {
   align-items: end;
   display: grid;
-  gap: 12px;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  column-gap: 18px;
+  row-gap: 12px;
+  grid-template-columns: minmax(180px, 1fr) repeat(3, minmax(190px, 1fr)) minmax(120px, 0.7fr);
 }
 
 .hwk-history__filters label {
