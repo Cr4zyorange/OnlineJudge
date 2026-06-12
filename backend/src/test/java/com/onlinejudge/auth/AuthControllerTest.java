@@ -149,6 +149,19 @@ class AuthControllerTest {
     }
 
     @Test
+    void logoutRejectsForgedBearerTokenWithoutLeakingToken() throws Exception {
+        String forgedToken = "forged.token.value";
+
+        mockMvc.perform(post("/api/v1/auth/logout")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + forgedToken))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("ERR-AUTH-04"))
+                .andExpect(jsonPath("$.message").value("登录已失效，请重新登录"))
+                .andExpect(result -> assertThat(result.getResponse().getContentAsString())
+                        .doesNotContain(forgedToken));
+    }
+
+    @Test
     void currentUserRequiresBearerSessionInsteadOfHeaderOnlyIdentity() throws Exception {
         mockMvc.perform(get("/api/v1/auth/me")
                         .header("X-User-Id", "45")

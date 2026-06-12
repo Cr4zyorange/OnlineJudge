@@ -91,8 +91,11 @@ describe('AUTH API client', () => {
     const result = await login({ account: 'student45', password: 'Student45@pass' });
     expect(result.token).toBe('token-45');
     expect(window.localStorage.getItem('onlinejudge.authToken')).toBe('token-45');
+    expect(window.localStorage.getItem('onlinejudge.authExpiresAt')).toBe('2026-05-28T18:00:00');
     expect(window.localStorage.getItem('onlinejudge.userId')).toBe('45');
+    expect(window.localStorage.getItem('onlinejudge.username')).toBe('student45');
     expect(window.localStorage.getItem('onlinejudge.userRole')).toBe('STUDENT');
+    expect(window.localStorage.getItem('onlinejudge.role')).toBe('STUDENT');
     expect(window.localStorage.getItem('onlinejudge.permissions')).toBe('course:view');
 
     await getCurrentUser();
@@ -105,7 +108,17 @@ describe('AUTH API client', () => {
       method: 'POST',
       headers: expect.objectContaining({ Authorization: 'Bearer token-45' })
     }));
-    expect(window.localStorage.getItem('onlinejudge.authToken')).toBeNull();
+    [
+      'onlinejudge.authToken',
+      'onlinejudge.authExpiresAt',
+      'onlinejudge.userId',
+      'onlinejudge.username',
+      'onlinejudge.userRole',
+      'onlinejudge.role',
+      'onlinejudge.permissions'
+    ].forEach((key) => {
+      expect(window.localStorage.getItem(key)).toBeNull();
+    });
   });
 
   it('keeps auth calls stable when browser storage methods are unavailable in tests', async () => {
