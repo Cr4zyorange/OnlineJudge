@@ -1,0 +1,10 @@
+.git
+.vscode
+
+backend/target
+backend/data
+
+frontend/node_modules
+frontend/dist
+
+deploy/docker/.env

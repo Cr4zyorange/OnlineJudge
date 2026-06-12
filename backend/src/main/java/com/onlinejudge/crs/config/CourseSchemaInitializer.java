@@ -2,11 +2,13 @@ package com.onlinejudge.crs.config;
 
 import jakarta.annotation.PostConstruct;
 import javax.sql.DataSource;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.jdbc.datasource.init.ResourceDatabasePopulator;
 
 @Configuration
+@ConditionalOnProperty(name = "onlinejudge.course.schema-initializer.enabled", havingValue = "true", matchIfMissing = true)
 public class CourseSchemaInitializer {
     private final DataSource dataSource;
 
