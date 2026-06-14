@@ -1,0 +1,4 @@
+interface:
+  display_name: "OnlineJudge HWK Workflow"
+  short_description: "HWK issue delivery with TDD, contracts, and PR gates"
+  default_prompt: "Use $onlinejudge-hwk-development-workflow to implement or repair an OnlineJudge HWK issue: load the relevant references, map traceability IDs, write the red test first, keep backend/frontend contracts aligned, verify permissions, and run the review checklist."
