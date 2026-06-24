@@ -63,17 +63,17 @@
 <path fill="none" stroke="#475569" d="M471.14,-191.5C506.47,-191.5 550.62,-191.5 589.29,-191.5"/>
 <text text-anchor="middle" x="527.5" y="-183.2" font-family="Noto Sans CJK SC" font-size="11.00">1..* 包含</text>
 </g>
-<!-- assignment -->
+<!-- homework -->
 <g id="node6" class="node">
-<title>assignment</title>
+<title>homework</title>
 <path fill="#fefce8" stroke="#64748b" d="M601,-240.5C601,-240.5 761,-240.5 761,-240.5 767,-240.5 773,-246.5 773,-252.5 773,-252.5 773,-275.5 773,-275.5 773,-281.5 767,-287.5 761,-287.5 761,-287.5 601,-287.5 601,-287.5 595,-287.5 589,-281.5 589,-275.5 589,-275.5 589,-252.5 589,-252.5 589,-246.5 595,-240.5 601,-240.5"/>
-<text text-anchor="middle" x="630" y="-260.9" font-family="Noto Sans CJK SC" font-size="12.00">Assignment</text>
+<text text-anchor="middle" x="630" y="-260.9" font-family="Noto Sans CJK SC" font-size="12.00">Homework</text>
 <polyline fill="none" stroke="#64748b" points="671,-240.5 671,-287.5 "/>
-<text text-anchor="start" x="679" y="-273.9" font-family="Noto Sans CJK SC" font-size="12.00">+ assignmentId</text>
+<text text-anchor="start" x="679" y="-273.9" font-family="Noto Sans CJK SC" font-size="12.00">+ homeworkId</text>
 <text text-anchor="start" x="679" y="-260.9" font-family="Noto Sans CJK SC" font-size="12.00">+ type</text>
 <text text-anchor="start" x="679" y="-247.9" font-family="Noto Sans CJK SC" font-size="12.00">+ deadline</text>
 </g>
-<!-- course&#45;&gt;assignment -->
+<!-- course&#45;&gt;homework -->
 <g id="edge8" class="edge">
 <title>course&#45;&gt;assignment</title>
 <path fill="none" stroke="#475569" d="M471.28,-170.5C508.23,-170.5 547,-170.5 547,-170.5 547,-170.5 547,-264 547,-264 547,-264 565.45,-264 588.66,-264"/>
@@ -143,7 +143,7 @@
 <path fill="none" stroke="#475569" d="M681,-207.58C681,-216.14 681,-223.75 681,-223.75 681,-223.75 802.11,-223.75 890.81,-223.75"/>
 <text text-anchor="middle" x="834.5" y="-203.2" font-family="Noto Sans CJK SC" font-size="11.00">1..* 产生</text>
 </g>
-<!-- assignment&#45;&gt;submission -->
+<!-- homework&#45;&gt;submission -->
 <g id="edge10" class="edge">
 <title>assignment&#45;&gt;submission</title>
 <path fill="none" stroke="#475569" d="M773.1,-248C810.5,-248 853.62,-248 890.97,-248"/>

@@ -73,7 +73,7 @@ curl -i -X POST http://127.0.0.1:5173/api/v1/auth/login \
 
 ## 代码目录组织结构
 
-本目录结构基于 `docs/最终提交/软件详细设计说明书.md` 中的系统设计建立：系统采用前后端分离架构，前端为 Vue3 + TypeScript，后端为 Spring Boot，数据库为 MySQL；实现边界按 AUTH、CRS、LRN、LAB、HWK、GRD 六个子系统拆分，跨模块复用能力集中放在 `common` 和 `integration` 下。
+本目录结构基于 `docs/最终提交/软件详细设计说明书.md` 和 `docs/最终提交/软件实现说明书.md` 中的系统设计建立：系统采用前后端分离架构，前端为 Vue 3 + Vite + TypeScript，后端为 Spring Boot + Spring JDBC，数据库在本地开发使用 H2、Docker 部署使用 MySQL；实现边界按 AUTH、CRS、LRN、LAB、HWK、GRD 六个子系统拆分，跨模块复用能力集中放在 `common` 和 `integration` 下。
 
 正式开发前先阅读 `docs/开发/00-基础设施开发约定.md`。该文档说明了当前仓库已提供的统一登录态、课程权限客户端、评测/通知/来源成绩/文件存储契约，以及前端统一请求层；各模块不要重复定义这些基础对象。
 
@@ -86,35 +86,40 @@ curl -i -X POST http://127.0.0.1:5173/api/v1/auth/login \
 │       │   │   ├── auth/                        # AUTH 用户权限与平台安全模块
 │       │   │   │   ├── controller/              # 登录、注册、用户、角色、权限、审计等 REST API 入口
 │       │   │   │   ├── service/                 # AuthService、UserService、RoleService、PermissionService 等业务服务
-│       │   │   │   ├── mapper/                  # AUTH 模块数据访问接口
+│       │   │   │   ├── repository/              # AUTH JDBC Repository/DAO
+│       │   │   │   ├── mapper/                  # AUTH 数据访问接口或占位目录
 │       │   │   │   └── domain/                  # 用户、角色、权限、会话、审计日志等实体、DTO、VO、枚举
 │       │   │   ├── crs/                         # CRS 课程与教学资源模块
 │       │   │   │   ├── controller/              # 课程、章节、资源、成员、公告等 REST API 入口
 │       │   │   │   ├── service/                 # CourseService、ChapterService、ResourceService、MemberService 等业务服务
-│       │   │   │   ├── mapper/                  # CRS 模块数据访问接口
+│       │   │   │   ├── mapper/                  # CRS JDBC Repository/DAO 接口
 │       │   │   │   └── domain/                  # 课程、章节、资源、课程成员、公告等实体、DTO、VO、枚举
 │       │   │   ├── lrn/                         # LRN 学习过程与通知提醒模块
 │       │   │   │   ├── controller/              # 学习任务、学习进度、学习行为、通知、提醒规则 API 入口
 │       │   │   │   ├── service/                 # LearningTaskService、NotificationService、ReminderRuleService 等业务服务
-│       │   │   │   ├── mapper/                  # LRN 模块数据访问接口
+│       │   │   │   ├── repository/              # LRN JDBC Repository/DAO 实现
+│       │   │   │   ├── mapper/                  # LRN 数据访问接口或占位目录
 │       │   │   │   └── domain/                  # 学习任务、进度、记录、通知、提醒规则等实体、DTO、VO、枚举
 │       │   │   ├── lab/                         # LAB 实训实验模块
 │       │   │   │   ├── controller/              # 实验、提交、评测、报告、评分、统计、测试用例 API 入口
 │       │   │   │   ├── service/                 # LabExperimentService、LabEvaluationService、LabScoreService 等业务服务
-│       │   │   │   ├── mapper/                  # LAB 模块数据访问接口
+│       │   │   │   ├── repository/              # LAB JDBC Repository/DAO 实现
+│       │   │   │   ├── mapper/                  # LAB 数据访问接口或占位目录
 │       │   │   │   └── domain/                  # 实验、测试用例、提交、评测、报告、评分等实体、DTO、VO、枚举
 │       │   │   ├── hwk/                         # HWK 作业与自动评测模块
 │       │   │   │   ├── controller/              # 作业、题目、提交、评测、批阅、统计 API 入口
 │       │   │   │   ├── service/                 # HomeworkService、HomeworkEvaluationService、HomeworkReviewService 等业务服务
-│       │   │   │   ├── mapper/                  # HWK 模块数据访问接口
+│       │   │   │   ├── repository/              # HWK JDBC Repository/DAO 实现
+│       │   │   │   ├── mapper/                  # HWK 数据访问接口或占位目录
 │       │   │   │   └── domain/                  # 作业、题目、测试用例、提交、评测、批阅日志等实体、DTO、VO、枚举
 │       │   │   ├── grd/                         # GRD 成绩评价与教学分析模块
 │       │   │   │   ├── controller/              # 成绩项、成绩同步、成绩发布、异议复核、教学分析 API 入口
 │       │   │   │   ├── service/                 # GradeItemService、GradeCalculationService、GradeAnalysisService 等业务服务
-│       │   │   │   ├── mapper/                  # GRD 模块数据访问接口
+│       │   │   │   ├── repository/              # GRD JDBC Repository/DAO 实现
+│       │   │   │   ├── mapper/                  # GRD 数据访问接口或占位目录
 │       │   │   │   └── domain/                  # 成绩项、成绩记录、总评、发布记录、复核申请、分析快照等实体、DTO、VO、枚举
 │       │   │   ├── common/                      # 全局复用基础设施
-│       │   │   │   ├── config/                  # Spring、MyBatis、跨域、异步任务、对象存储等公共配置
+│       │   │   │   ├── config/                  # Spring、JDBC、跨域、异步任务、对象存储等公共配置
 │       │   │   │   ├── security/                # 认证上下文、JWT/会话解析、统一权限拦截和安全工具
 │       │   │   │   ├── web/                     # 统一响应结构、分页参数、请求上下文和通用 Controller 支撑
 │       │   │   │   ├── exception/               # 统一异常、错误码、异常处理器和错误响应转换
@@ -128,12 +133,12 @@ curl -i -X POST http://127.0.0.1:5173/api/v1/auth/login \
 │       │   │       └── grade/                   # 调用 GRD 来源成绩同步接口的客户端
 │       │   └── resources/
 │       │       ├── mapper/
-│       │       │   ├── auth/                    # AUTH MyBatis XML 映射
-│       │       │   ├── crs/                     # CRS MyBatis XML 映射
-│       │       │   ├── lrn/                     # LRN MyBatis XML 映射
-│       │       │   ├── lab/                     # LAB MyBatis XML 映射
-│       │       │   ├── hwk/                     # HWK MyBatis XML 映射
-│       │       │   └── grd/                     # GRD MyBatis XML 映射
+│       │       │   ├── auth/                    # AUTH 数据访问资源占位
+│       │       │   ├── crs/                     # CRS 数据访问资源占位
+│       │       │   ├── lrn/                     # LRN 数据访问资源占位
+│       │       │   ├── lab/                     # LAB 数据访问资源占位
+│       │       │   ├── hwk/                     # HWK 数据访问资源占位
+│       │       │   └── grd/                     # GRD 数据访问资源占位
 │       │       ├── static/                      # 后端静态资源占位
 │       │       └── templates/                   # 后端模板资源占位
 │       └── test/java/com/onlinejudge/
@@ -143,15 +148,15 @@ curl -i -X POST http://127.0.0.1:5173/api/v1/auth/login \
 │           ├── lab/                             # LAB 单元测试、评测与文件服务 Mock 测试
 │           ├── hwk/                             # HWK 单元测试、自动评测与批阅测试
 │           └── grd/                             # GRD 单元测试、成绩计算和发布复核测试
-├── frontend/                                    # Vue3 + TypeScript 前端工程
+├── frontend/                                    # Vue 3 + Vite + TypeScript 前端工程
 │   ├── src/
-│   │   ├── app/                                 # 应用入口、全局 Provider、根组件挂载
+│   │   ├── app/                                 # 应用入口、根组件挂载和页面导航组合
 │   │   ├── assets/                              # 图片、样式、字体等静态资源
 │   │   ├── components/
 │   │   │   ├── common/                          # 表格、表单、上传、分页、状态标签等通用组件
 │   │   │   └── layout/                          # 登录后框架、侧边栏、顶部导航、角色菜单布局
-│   │   ├── router/                              # Vue Router 路由、鉴权守卫和模块页面注册
-│   │   ├── stores/                              # Pinia 状态管理，保存用户、权限、课程上下文、通知状态等
+│   │   ├── router/                              # 轻量页面导航配置占位
+│   │   ├── stores/                              # 本地存储辅助和页面局部状态约定占位
 │   │   ├── api/
 │   │   │   ├── auth/                            # AUTH 接口封装
 │   │   │   ├── crs/                             # CRS 接口封装
@@ -169,7 +174,7 @@ curl -i -X POST http://127.0.0.1:5173/api/v1/auth/login \
 │   │   ├── types/                               # 前端共享 TypeScript 类型，保持 API、状态枚举与后端约定一致
 │   │   └── utils/                               # 请求封装、权限判断、时间格式化、文件处理等工具函数
 │   └── tests/
-│       ├── unit/                                # 前端组件、工具函数和状态管理单元测试
+│       ├── unit/                                # 前端组件、API 封装、工具函数和页面状态单元测试
 │       └── e2e/                                 # 学生端、教师端、管理端关键流程端到端测试
 ├── database/
 │   ├── migrations/                              # MySQL 表结构迁移脚本，按 DB-AUTH/CRS/LRN/LAB/HWK/GRD 编号组织
