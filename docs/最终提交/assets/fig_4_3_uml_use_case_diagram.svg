@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="UTF-8"?>
+﻿<?xml version="1.0" encoding="UTF-8"?>
 <svg width="1320" height="760" viewBox="0 0 1320 760" xmlns="http://www.w3.org/2000/svg">
   <defs>
     <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
@@ -95,11 +95,11 @@
   <text class="uc-label" x="650" y="397" text-anchor="middle">提交实验并查看评测</text>
 
   <ellipse class="uc teacher" cx="650" cy="494" rx="112" ry="42"/>
-  <text class="uc-label" x="650" y="489" text-anchor="middle">UC-HW-02</text>
+  <text class="uc-label" x="650" y="489" text-anchor="middle">UC-HWK-02</text>
   <text class="uc-label" x="650" y="509" text-anchor="middle">发布作业</text>
 
   <ellipse class="uc student" cx="650" cy="606" rx="126" ry="42"/>
-  <text class="uc-label" x="650" y="601" text-anchor="middle">UC-HW-01</text>
+  <text class="uc-label" x="650" y="601" text-anchor="middle">UC-HWK-01</text>
   <text class="uc-label" x="650" y="621" text-anchor="middle">提交作业并触发评测</text>
 
   <ellipse class="uc grade" cx="915" cy="245" rx="118" ry="42"/>

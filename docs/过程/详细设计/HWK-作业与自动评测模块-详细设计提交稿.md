@@ -1,4 +1,4 @@
-# HWK-作业与自动评测模块-详细设计提交稿
+﻿# HWK-作业与自动评测模块-详细设计提交稿
 
 课程名称：软件工程基础  
 项目名称：在线教学与实训平台  
@@ -59,13 +59,13 @@ HWK 模块不负责：
 | 模块名称 | 作业与自动评测模块 |
 | 模块缩写 | HWK |
 | 主责人 | 作业与自动评测模块负责人 |
-| 对应需求 | FR-HW-01 ~ FR-HW-06 / NFR-HW-01 ~ NFR-HW-05 |
+| 对应需求 | FR-HWK-01 ~ FR-HWK-06 / NFR-HWK-01 ~ NFR-HWK-05 |
 | 主要使用角色 | 学生、教师、助教 |
 | 依赖模块 | AUTH、CRS、LRN |
 | 协作模块 | LAB、GRD |
 | 主要页面 | 作业列表页、作业详情页、作业发布页、作业提交页、批阅页、反馈页 |
 | 主要数据表 | 作业表、客观题题目表、测试用例表、提交表、评测记录表、批阅日志表 |
-| 测试编号前缀 | TC-HW |
+| 测试编号前缀 | TC-HWK |
 
 ---
 
@@ -154,27 +154,27 @@ graph TD
 
 | 接口编号 | 接口名称 | 方法 | 路径 | 权限要求 | 对应需求 |
 | --- | --- | --- | --- | --- | --- |
-| API-HWK-01 | 创建作业 | POST | /api/v1/homeworks | 教师/助教，且具备课程管理权限 | FR-HW-01 |
-| API-HWK-02 | 修改作业 | PUT | /api/v1/homeworks/{homeworkId} | 教师/助教，且为作业所属课程管理者 | FR-HW-01 |
-| API-HWK-03 | 发布作业 | PUT | /api/v1/homeworks/{homeworkId}/publish | 教师/助教，且为作业所属课程管理者 | FR-HW-01 |
-| API-HWK-04 | 关闭作业 | PUT | /api/v1/homeworks/{homeworkId}/close | 教师/助教，且为作业所属课程管理者 | FR-HW-01 |
-| API-HWK-05 | 查询作业列表 | GET | /api/v1/homeworks | 已登录，按角色过滤数据 | FR-HW-01、FR-HW-02、FR-HW-06 |
-| API-HWK-06 | 查询作业详情 | GET | /api/v1/homeworks/{homeworkId} | 已登录，学生需为课程成员，教师需有课程权限 | FR-HW-02、FR-HW-06 |
-| API-HWK-07 | 提交作业 | POST | /api/v1/homeworks/{homeworkId}/submissions | 学生，且为课程成员 | FR-HW-02、FR-HW-04 |
-| API-HWK-08 | 查询我的提交历史 | GET | /api/v1/homeworks/{homeworkId}/my-submissions | 学生，且为课程成员 | FR-HW-03 |
-| API-HWK-09 | 查询作业提交列表 | GET | /api/v1/homeworks/{homeworkId}/submissions | 教师/助教，且有课程管理权限 | FR-HW-03、FR-HW-05 |
-| API-HWK-10 | 查询提交详情 | GET | /api/v1/submissions/{submissionId} | 学生仅本人；教师/助教需有课程管理权限 | FR-HW-03、FR-HW-05、FR-HW-06 |
-| API-HWK-11 | 查询评测结果 | GET | /api/v1/submissions/{submissionId}/evaluation | 学生仅本人；教师/助教需有课程管理权限 | FR-HW-04、FR-HW-06 |
-| API-HWK-12 | 触发重评 | POST | /api/v1/submissions/{submissionId}/reevaluate | 教师/助教，且有课程管理权限 | FR-HW-04、FR-HW-05 |
-| API-HWK-13 | 教师批阅提交 | PUT | /api/v1/submissions/{submissionId}/review | 教师/助教，且有课程管理权限 | FR-HW-05、FR-HW-06 |
-| API-HWK-14 | 批量发布作业成绩 | PUT | /api/v1/homeworks/{homeworkId}/scores/publish | 教师/助教，且有课程管理权限 | FR-HW-05、FR-HW-06 |
-| API-HWK-15 | 查询作业统计 | GET | /api/v1/homeworks/{homeworkId}/statistics | 教师/助教，且有课程管理权限 | FR-HW-06 |
-| API-HWK-16 | 保存客观题题目 | PUT | /api/v1/homeworks/{homeworkId}/questions | 教师/助教，且有课程管理权限 | FR-HW-01、FR-HW-04 |
-| API-HWK-17 | 查询客观题题目 | GET | /api/v1/homeworks/{homeworkId}/questions | 教师/助教；学生端不返回标准答案 | FR-HW-02、FR-HW-04 |
-| API-HWK-18 | 保存代码题测试用例 | PUT | /api/v1/homeworks/{homeworkId}/test-cases | 教师/助教，且有课程管理权限 | FR-HW-01、FR-HW-04 |
-| API-HWK-19 | 查询代码题测试用例 | GET | /api/v1/homeworks/{homeworkId}/test-cases | 教师/助教，且有课程管理权限 | FR-HW-04、FR-HW-05 |
-| API-HWK-20 | 查询评测日志 | GET | /api/v1/evaluations/{evaluationId}/logs | 教师/助教，且有课程管理权限 | FR-HW-04、FR-HW-05 |
-| API-HWK-21 | 查询批阅日志 | GET | /api/v1/submissions/{submissionId}/review-logs | 教师/助教，且有课程管理权限 | FR-HW-05 |
+| API-HWK-01 | 创建作业 | POST | /api/v1/homeworks | 教师/助教，且具备课程管理权限 | FR-HWK-01 |
+| API-HWK-02 | 修改作业 | PUT | /api/v1/homeworks/{homeworkId} | 教师/助教，且为作业所属课程管理者 | FR-HWK-01 |
+| API-HWK-03 | 发布作业 | PUT | /api/v1/homeworks/{homeworkId}/publish | 教师/助教，且为作业所属课程管理者 | FR-HWK-01 |
+| API-HWK-04 | 关闭作业 | PUT | /api/v1/homeworks/{homeworkId}/close | 教师/助教，且为作业所属课程管理者 | FR-HWK-01 |
+| API-HWK-05 | 查询作业列表 | GET | /api/v1/homeworks | 已登录，按角色过滤数据 | FR-HWK-01、FR-HWK-02、FR-HWK-06 |
+| API-HWK-06 | 查询作业详情 | GET | /api/v1/homeworks/{homeworkId} | 已登录，学生需为课程成员，教师需有课程权限 | FR-HWK-02、FR-HWK-06 |
+| API-HWK-07 | 提交作业 | POST | /api/v1/homeworks/{homeworkId}/submissions | 学生，且为课程成员 | FR-HWK-02、FR-HWK-04 |
+| API-HWK-08 | 查询我的提交历史 | GET | /api/v1/homeworks/{homeworkId}/my-submissions | 学生，且为课程成员 | FR-HWK-03 |
+| API-HWK-09 | 查询作业提交列表 | GET | /api/v1/homeworks/{homeworkId}/submissions | 教师/助教，且有课程管理权限 | FR-HWK-03、FR-HWK-05 |
+| API-HWK-10 | 查询提交详情 | GET | /api/v1/submissions/{submissionId} | 学生仅本人；教师/助教需有课程管理权限 | FR-HWK-03、FR-HWK-05、FR-HWK-06 |
+| API-HWK-11 | 查询评测结果 | GET | /api/v1/submissions/{submissionId}/evaluation | 学生仅本人；教师/助教需有课程管理权限 | FR-HWK-04、FR-HWK-06 |
+| API-HWK-12 | 触发重评 | POST | /api/v1/submissions/{submissionId}/reevaluate | 教师/助教，且有课程管理权限 | FR-HWK-04、FR-HWK-05 |
+| API-HWK-13 | 教师批阅提交 | PUT | /api/v1/submissions/{submissionId}/review | 教师/助教，且有课程管理权限 | FR-HWK-05、FR-HWK-06 |
+| API-HWK-14 | 批量发布作业成绩 | PUT | /api/v1/homeworks/{homeworkId}/scores/publish | 教师/助教，且有课程管理权限 | FR-HWK-05、FR-HWK-06 |
+| API-HWK-15 | 查询作业统计 | GET | /api/v1/homeworks/{homeworkId}/statistics | 教师/助教，且有课程管理权限 | FR-HWK-06 |
+| API-HWK-16 | 保存客观题题目 | PUT | /api/v1/homeworks/{homeworkId}/questions | 教师/助教，且有课程管理权限 | FR-HWK-01、FR-HWK-04 |
+| API-HWK-17 | 查询客观题题目 | GET | /api/v1/homeworks/{homeworkId}/questions | 教师/助教；学生端不返回标准答案 | FR-HWK-02、FR-HWK-04 |
+| API-HWK-18 | 保存代码题测试用例 | PUT | /api/v1/homeworks/{homeworkId}/test-cases | 教师/助教，且有课程管理权限 | FR-HWK-01、FR-HWK-04 |
+| API-HWK-19 | 查询代码题测试用例 | GET | /api/v1/homeworks/{homeworkId}/test-cases | 教师/助教，且有课程管理权限 | FR-HWK-04、FR-HWK-05 |
+| API-HWK-20 | 查询评测日志 | GET | /api/v1/evaluations/{evaluationId}/logs | 教师/助教，且有课程管理权限 | FR-HWK-04、FR-HWK-05 |
+| API-HWK-21 | 查询批阅日志 | GET | /api/v1/submissions/{submissionId}/review-logs | 教师/助教，且有课程管理权限 | FR-HWK-05 |
 
 ### 4.2 主要接口说明
 
@@ -723,41 +723,41 @@ stateDiagram-v2
 
 | 需求编号 | 详细设计编号 | 页面编号 | API 编号 | 数据表编号 | 测试编号 |
 | --- | --- | --- | --- | --- | --- |
-| FR-HW-01 作业创建与发布 | DS-HWK-01 | UI-HWK-01、UI-HWK-02、UI-HWK-03 | API-HWK-01、API-HWK-02、API-HWK-03、API-HWK-04、API-HWK-16、API-HWK-18 | DB-HWK-01、DB-HWK-02、DB-HWK-03、DB-HWK-07 | TC-HW-01、TC-HW-02、TC-HW-03 |
-| FR-HW-02 学生作业查看与提交 | DS-HWK-02 | UI-HWK-04、UI-HWK-05 | API-HWK-05、API-HWK-06、API-HWK-07、API-HWK-17 | DB-HWK-01、DB-HWK-02、DB-HWK-04 | TC-HW-04、TC-HW-05、TC-HW-06 |
-| FR-HW-03 提交历史管理 | DS-HWK-03 | UI-HWK-06 | API-HWK-08、API-HWK-09、API-HWK-10 | DB-HWK-04 | TC-HW-07、TC-HW-08 |
-| FR-HW-04 自动评测 | DS-HWK-04 | UI-HWK-05、UI-HWK-07、UI-HWK-08 | API-HWK-07、API-HWK-11、API-HWK-12、API-HWK-18、API-HWK-19、API-HWK-20 | DB-HWK-03、DB-HWK-04、DB-HWK-05 | TC-HW-09、TC-HW-10、TC-HW-11、TC-HW-12 |
-| FR-HW-05 教师批阅与重评 | DS-HWK-05 | UI-HWK-08、UI-HWK-09 | API-HWK-09、API-HWK-10、API-HWK-12、API-HWK-13、API-HWK-21 | DB-HWK-04、DB-HWK-05、DB-HWK-06 | TC-HW-13、TC-HW-14、TC-HW-15 |
-| FR-HW-06 作业反馈与结果展示 | DS-HWK-06 | UI-HWK-01、UI-HWK-04、UI-HWK-07、UI-HWK-09 | API-HWK-05、API-HWK-06、API-HWK-11、API-HWK-14、API-HWK-15 | DB-HWK-04、DB-HWK-05、DB-HWK-06 | TC-HW-16、TC-HW-17、TC-HW-18 |
-| NFR-HW-01 可靠性 | DS-HWK-N01 | UI-HWK-05、UI-HWK-08 | API-HWK-07、API-HWK-11、API-HWK-13 | DB-HWK-04、DB-HWK-05、DB-HWK-06 | TC-HW-N01 |
-| NFR-HW-02 性能 | DS-HWK-N02 | UI-HWK-01、UI-HWK-06、UI-HWK-09 | API-HWK-05、API-HWK-09、API-HWK-15 | DB-HWK-01、DB-HWK-04、DB-HWK-05 | TC-HW-N02 |
-| NFR-HW-03 可追踪性 | DS-HWK-N03 | UI-HWK-06、UI-HWK-08 | API-HWK-10、API-HWK-20、API-HWK-21 | DB-HWK-04、DB-HWK-05、DB-HWK-06 | TC-HW-N03 |
-| NFR-HW-04 安全性 | DS-HWK-N04 | 全部 HWK 页面 | 全部 HWK 接口 | DB-HWK-02、DB-HWK-03、DB-HWK-04、DB-HWK-05 | TC-HW-N04 |
-| NFR-HW-05 可测试性 | DS-HWK-N05 | 全部 HWK 页面 | 全部 HWK 接口 | 全部 HWK 数据表 | TC-HW-N05 |
+| FR-HWK-01 作业创建与发布 | DS-HWK-01 | UI-HWK-01、UI-HWK-02、UI-HWK-03 | API-HWK-01、API-HWK-02、API-HWK-03、API-HWK-04、API-HWK-16、API-HWK-18 | DB-HWK-01、DB-HWK-02、DB-HWK-03、DB-HWK-07 | TC-HWK-01、TC-HWK-02、TC-HWK-03 |
+| FR-HWK-02 学生作业查看与提交 | DS-HWK-02 | UI-HWK-04、UI-HWK-05 | API-HWK-05、API-HWK-06、API-HWK-07、API-HWK-17 | DB-HWK-01、DB-HWK-02、DB-HWK-04 | TC-HWK-04、TC-HWK-05、TC-HWK-06 |
+| FR-HWK-03 提交历史管理 | DS-HWK-03 | UI-HWK-06 | API-HWK-08、API-HWK-09、API-HWK-10 | DB-HWK-04 | TC-HWK-07、TC-HWK-08 |
+| FR-HWK-04 自动评测 | DS-HWK-04 | UI-HWK-05、UI-HWK-07、UI-HWK-08 | API-HWK-07、API-HWK-11、API-HWK-12、API-HWK-18、API-HWK-19、API-HWK-20 | DB-HWK-03、DB-HWK-04、DB-HWK-05 | TC-HWK-09、TC-HWK-10、TC-HWK-11、TC-HWK-12 |
+| FR-HWK-05 教师批阅与重评 | DS-HWK-05 | UI-HWK-08、UI-HWK-09 | API-HWK-09、API-HWK-10、API-HWK-12、API-HWK-13、API-HWK-21 | DB-HWK-04、DB-HWK-05、DB-HWK-06 | TC-HWK-13、TC-HWK-14、TC-HWK-15 |
+| FR-HWK-06 作业反馈与结果展示 | DS-HWK-06 | UI-HWK-01、UI-HWK-04、UI-HWK-07、UI-HWK-09 | API-HWK-05、API-HWK-06、API-HWK-11、API-HWK-14、API-HWK-15 | DB-HWK-04、DB-HWK-05、DB-HWK-06 | TC-HWK-16、TC-HWK-17、TC-HWK-18 |
+| NFR-HWK-01 可靠性 | DS-HWK-N01 | UI-HWK-05、UI-HWK-08 | API-HWK-07、API-HWK-11、API-HWK-13 | DB-HWK-04、DB-HWK-05、DB-HWK-06 | TC-HWK-N01 |
+| NFR-HWK-02 性能 | DS-HWK-N02 | UI-HWK-01、UI-HWK-06、UI-HWK-09 | API-HWK-05、API-HWK-09、API-HWK-15 | DB-HWK-01、DB-HWK-04、DB-HWK-05 | TC-HWK-N02 |
+| NFR-HWK-03 可追踪性 | DS-HWK-N03 | UI-HWK-06、UI-HWK-08 | API-HWK-10、API-HWK-20、API-HWK-21 | DB-HWK-04、DB-HWK-05、DB-HWK-06 | TC-HWK-N03 |
+| NFR-HWK-04 安全性 | DS-HWK-N04 | 全部 HWK 页面 | 全部 HWK 接口 | DB-HWK-02、DB-HWK-03、DB-HWK-04、DB-HWK-05 | TC-HWK-N04 |
+| NFR-HWK-05 可测试性 | DS-HWK-N05 | 全部 HWK 页面 | 全部 HWK 接口 | 全部 HWK 数据表 | TC-HWK-N05 |
 
 ### 11.2 测试关注点
 
 | 测试编号 | 测试目标 | 测试内容 | 预期结果 |
 | --- | --- | --- | --- |
-| TC-HW-01 | 作业创建 | 教师创建客观题、文件题、代码题作业 | 作业保存为 DRAFT，字段正确落库 |
-| TC-HW-02 | 作业发布 | 教师发布配置完整的作业 | 状态变为 PUBLISHED，学生可见，发送通知事件 |
-| TC-HW-03 | 发布异常 | 代码题未配置测试用例即发布 | 返回配置错误，不允许发布 |
-| TC-HW-04 | 学生查看作业 | 学生进入已发布作业详情页 | 正常显示说明和提交要求，不显示答案和隐藏用例 |
-| TC-HW-05 | 学生提交作业 | 学生提交合法内容 | 生成提交记录，返回提交成功和提交时间 |
-| TC-HW-06 | 截止后提交 | 不允许逾期时学生超时提交 | 返回截止错误，不生成有效提交 |
-| TC-HW-07 | 提交历史 | 允许多次提交时学生提交多次 | 历史记录完整，最新提交 is_final=1 |
-| TC-HW-08 | 教师查看提交 | 教师查看全班提交列表 | 可分页筛选提交状态、评测状态和批阅状态 |
-| TC-HW-09 | 客观题自动评分 | 学生提交客观题答案 | 系统自动计算分数并生成评测记录 |
-| TC-HW-10 | 代码题自动评测 | 学生提交代码 | 先返回 PENDING，评测结束后返回通过用例数和得分 |
-| TC-HW-11 | 评测失败 | 模拟编译错误、运行错误、超时 | 评测状态正确记录，提交记录不丢失 |
-| TC-HW-12 | 重评 | 教师触发重评 | 新增评测记录，不删除旧评测记录 |
-| TC-HW-13 | 人工批阅 | 教师填写分数和评语 | 更新 manualScore、finalScore、comment，并写入批阅日志 |
-| TC-HW-14 | 分数范围校验 | 教师填写超出总分的分数 | 返回分数错误，不更新成绩 |
-| TC-HW-15 | 批阅日志 | 教师评分、重评、发布成绩 | 日志中记录操作人、时间、原因和分数变化 |
-| TC-HW-16 | 反馈展示 | 学生查看自己的反馈 | 根据配置展示评测摘要、成绩和教师评语 |
-| TC-HW-17 | 未发布成绩控制 | 学生成绩发布前查看结果 | 不显示未公开最终分数 |
-| TC-HW-18 | 作业统计 | 教师查看作业统计页 | 展示提交人数、未提交人数、平均分等统计信息 |
-| TC-HW-N04 | 权限安全 | 学生尝试查看他人提交或隐藏用例 | 返回无权限，不泄露敏感数据 |
+| TC-HWK-01 | 作业创建 | 教师创建客观题、文件题、代码题作业 | 作业保存为 DRAFT，字段正确落库 |
+| TC-HWK-02 | 作业发布 | 教师发布配置完整的作业 | 状态变为 PUBLISHED，学生可见，发送通知事件 |
+| TC-HWK-03 | 发布异常 | 代码题未配置测试用例即发布 | 返回配置错误，不允许发布 |
+| TC-HWK-04 | 学生查看作业 | 学生进入已发布作业详情页 | 正常显示说明和提交要求，不显示答案和隐藏用例 |
+| TC-HWK-05 | 学生提交作业 | 学生提交合法内容 | 生成提交记录，返回提交成功和提交时间 |
+| TC-HWK-06 | 截止后提交 | 不允许逾期时学生超时提交 | 返回截止错误，不生成有效提交 |
+| TC-HWK-07 | 提交历史 | 允许多次提交时学生提交多次 | 历史记录完整，最新提交 is_final=1 |
+| TC-HWK-08 | 教师查看提交 | 教师查看全班提交列表 | 可分页筛选提交状态、评测状态和批阅状态 |
+| TC-HWK-09 | 客观题自动评分 | 学生提交客观题答案 | 系统自动计算分数并生成评测记录 |
+| TC-HWK-10 | 代码题自动评测 | 学生提交代码 | 先返回 PENDING，评测结束后返回通过用例数和得分 |
+| TC-HWK-11 | 评测失败 | 模拟编译错误、运行错误、超时 | 评测状态正确记录，提交记录不丢失 |
+| TC-HWK-12 | 重评 | 教师触发重评 | 新增评测记录，不删除旧评测记录 |
+| TC-HWK-13 | 人工批阅 | 教师填写分数和评语 | 更新 manualScore、finalScore、comment，并写入批阅日志 |
+| TC-HWK-14 | 分数范围校验 | 教师填写超出总分的分数 | 返回分数错误，不更新成绩 |
+| TC-HWK-15 | 批阅日志 | 教师评分、重评、发布成绩 | 日志中记录操作人、时间、原因和分数变化 |
+| TC-HWK-16 | 反馈展示 | 学生查看自己的反馈 | 根据配置展示评测摘要、成绩和教师评语 |
+| TC-HWK-17 | 未发布成绩控制 | 学生成绩发布前查看结果 | 不显示未公开最终分数 |
+| TC-HWK-18 | 作业统计 | 教师查看作业统计页 | 展示提交人数、未提交人数、平均分等统计信息 |
+| TC-HWK-N04 | 权限安全 | 学生尝试查看他人提交或隐藏用例 | 返回无权限，不泄露敏感数据 |
 
 ---
 

@@ -1,4 +1,4 @@
-# HWK 作业与自动评测模块开发流程
+﻿# HWK 作业与自动评测模块开发流程
 
 ## 1. 开发定位
 
@@ -18,7 +18,7 @@ HWK 与 LAB 共享评测抽象。评测状态枚举、`EvaluationResult`、错�
 ## 3. 统一开发顺序
 
 ```text
-1. 读 HWK 详细设计章节，确认 UI-HWK / API-HWK / SVC-HWK / DB-HWK / TC-HW 编号
+1. 读 HWK 详细设计章节，确认 UI-HWK / API-HWK / SVC-HWK / DB-HWK / TC-HWK 编号
 2. 建作业、客观题、测试用例、提交、评测、批阅日志表
 3. 写作业创建、编辑、草稿、发布、截止时间和评分方式 API
 4. 写作业 Service、提交 Service、评测 Service、批阅 Service

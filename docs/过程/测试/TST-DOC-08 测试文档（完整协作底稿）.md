@@ -1,4 +1,4 @@
-# TST-DOC-08 测试文档（完整协作底稿）
+﻿# TST-DOC-08 测试文档（完整协作底稿）
 
 | 文档编号 | TST-DOC-08 |
 | --- | --- |
@@ -383,29 +383,29 @@
 
 | 用例编号 | 对应需求 | 覆盖对象 | 前置条件/测试数据 | 操作步骤 | 预期结果 | 实际结果 | 通过状态 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| TC-HW-01 | FR-HW-01 | UI-HWK-02；API-HWK-01、02、16；DB-HWK-01、02 | 教师/助教具备课程管理权限；准备客观题作业和题目数据 | 创建草稿，保存题目，读取详情 | 作业为 DRAFT，字段和题目正确落库 | `teacherCreatesObjectiveHomeworkDraftAndSavesQuestions`、前端教师创建/编辑用例通过 | 通过 |
-| TC-HW-02 | FR-HW-01 | UI-HWK-03；API-HWK-03、05；LRN 事件 | 已有配置完整作业 | 教师发布作业，学生查询列表/详情 | 状态变为 PUBLISHED，学生可见，发送 HOMEWORK_PUBLISHED | `teacherPublishesConfiguredHomeworkAndNotificationIsEmitted`、前端发布用例通过 | 通过 |
-| TC-HW-03 | FR-HW-01 | API-HWK-18；DB-HWK-03、07 | 代码题未配置测试用例 | 执行发布 | 返回 `HWK_4007`，状态不变 | `codeHomeworkWithoutTestCasesIsRejectedWhenPublishing`、前端代码题校验用例通过 | 通过 |
-| TC-HW-04 | FR-HW-02 | UI-HWK-04；API-HWK-06、17；DB-HWK-02、03 | 已发布客观题/代码题，包含标准答案和隐藏用例 | 学生打开作业详情 | 显示说明和提交要求，不泄露答案、隐藏用例输出 | `studentPublishedHomeworkListAndDetailDoNotExposeAnswersOrHiddenTestCaseOutput` 通过 | 通过 |
-| TC-HW-05 | FR-HW-02 | UI-HWK-05；API-HWK-07；DB-HWK-04 | 学生为课程成员；作业已发布且未截止 | 提交文本、客观题或代码答案 | 生成提交记录，返回提交编号、时间和初始评测/批阅状态 | `studentSubmitsPublishedTextHomeworkAndReceivesSubmissionReceipt`、前端学生提交用例通过 | 通过 |
-| TC-HW-06 | FR-HW-02 | API-HWK-07；错误码 `HWK_4004` | 作业已超过截止时间且不允许迟交 | 学生提交作业 | 返回截止错误，不生成有效提交 | `studentCannotSubmitAfterDeadlineWhenLateSubmitIsDisabled` 通过 | 通过 |
-| TC-HW-07 | FR-HW-03 | UI-HWK-06；API-HWK-08；DB-HWK-04 | 作业允许重复提交，学生提交多次 | 查询我的提交历史 | 历史完整，仅最新提交 `is_final=1` | `studentSubmissionHistoryKeepsPreviousVersionsAndMarksOnlyLatestFinal`、前端历史用例通过 | 通过 |
-| TC-HW-08 | FR-HW-03 | UI-HWK-06；API-HWK-09、10；DB-HWK-04 | 教师/助教有课程管理权限；存在多名学生提交 | 查询提交列表，按学生和状态筛选，读取详情 | 支持分页、筛选、详情读取 | `courseManagerListsSubmissionsWithPaginationAndReadsSubmissionDetail`、`courseManagerFiltersSubmissionsByStudentAndStatuses` 通过 | 通过 |
-| TC-HW-09 | FR-HW-04 | API-HWK-07、11；DB-HWK-05 | 客观题作业配置标准答案和分值 | 学生提交客观题答案，查询评测结果 | 自动计算分数，生成评测记录 | `objectiveHomeworkSubmissionCreatesEvaluationRecordAndResultView` 通过 | 通过 |
-| TC-HW-10 | FR-HW-04 | UI-HWK-05、07；API-HWK-07、11；DB-HWK-03、05 | 代码题配置 IO 用例和语言白名单 | 学生提交代码，查询评测结果 | 返回评测状态、通过用例数和分数 | `codeHomeworkSubmissionEvaluatesIoCasesAndTeacherCanReevaluate`、前端代码评测展示用例通过 | 通过 |
-| TC-HW-11 | FR-HW-04；NFR-HW-01 | API-HWK-11；DB-HWK-04、05 | 代码提交触发错误结果 | 查询评测结果和提交详情 | 评测状态记录失败，提交记录不丢失 | `codeHomeworkEvaluationFailurePreservesSubmissionAndRecordsFailedStatus` 通过 | 通过 |
-| TC-HW-12 | FR-HW-04、05 | UI-HWK-08；API-HWK-12；DB-HWK-05、06 | 已有提交和评测记录；教师提供重评理由 | 教师触发重评 | 新增评测记录，保留旧记录，写入重评日志 | `codeHomeworkSubmissionEvaluatesIoCasesAndTeacherCanReevaluate`、`objectiveReevaluationUpdatesSubmissionSummary` 通过 | 通过 |
-| TC-HW-13 | FR-HW-05 | UI-HWK-08；API-HWK-13；DB-HWK-04、06 | 教师/助教有课程管理权限；存在待批阅提交 | 填写人工分数和评语 | 更新 manualScore、finalScore、comment，写入日志 | `courseManagerReviewsSubmissionAndReadsReviewAuditLogs`、前端教师批阅用例通过 | 通过 |
-| TC-HW-14 | FR-HW-05 | API-HWK-13；错误码 `HWK_4008` | 作业总分 100，教师填写超出总分的分数 | 提交批阅 | 返回分数范围错误，不更新成绩 | `teacherReviewRejectsScoreOutsideHomeworkTotalScore` 通过 | 通过 |
-| TC-HW-15 | FR-HW-05；NFR-HW-03 | API-HWK-12、13、21；DB-HWK-06 | 存在批阅、重评和发布成绩操作 | 查询批阅日志 | 日志记录操作人、时间、原因和分数变化 | `courseManagerReviewsSubmissionAndReadsReviewAuditLogs`、`studentCannotReadPrivateReviewLogs` 通过 | 通过 |
-| TC-HW-16 | FR-HW-06 | UI-HWK-07；API-HWK-10、11、14 | 学生成绩已发布 | 学生查询详情和反馈 | 展示允许公开的评测摘要、成绩和教师评语 | `scorePublishExposesStudentFeedbackAndHomeworkSourceGrades` 通过 | 通过 |
-| TC-HW-17 | FR-HW-06；NFR-HW-04 | API-HWK-08、10、11 | 学生成绩未发布 | 学生查询历史、详情和评测结果 | 不显示未公开最终分和教师评语 | `studentHistoryAndDetailHideUnpublishedScoresAndTeacherComment`、`objectiveHomeworkSubmissionShowsEvaluationButHidesUnpublishedFinalScore` 通过 | 通过 |
-| TC-HW-18 | FR-HW-06；NFR-HW-02 | UI-HWK-09；API-HWK-15；DB-HWK-04、05 | 多名学生提交和未提交 | 教师查询统计和未提交名单分页 | 展示提交数、未提交数、平均分等统计 | `teacherQueriesHomeworkStatisticsWithUnsubmittedStudentsAndScoreSummary`、`teacherQueriesHomeworkStatisticsWithPaginatedUnsubmittedStudentsForNfrPerformance` 通过 | 通过 |
-| TC-HW-N01 | NFR-HW-01 | API-HWK-03、07、11、13 | 模拟通知投递失败、评测失败、重复提交冲突 | 执行发布、提交、查询和批阅 | 主数据保持一致，错误以受控响应返回 | `publishKeepsHomeworkPublishedWhenNotificationDeliveryFails`、`submitReturnsControlledConflictWhenSubmissionVersionIsAlreadyUsed` 通过 | 通过 |
-| TC-HW-N02 | NFR-HW-02 | API-HWK-05、09、15；索引 | 作业列表、提交列表、统计使用分页参数和基础规模样本 | 查询列表和统计 | 返回分页结构，响应受控 | 后端分页统计用例、前端 API route 用例和 2026-06-12 本地压测批次通过 | 通过 |
-| TC-HW-N03 | NFR-HW-03 | API-HWK-10、20、21；DB-HWK-04、05、06 | 存在多次提交、评测、重评、批阅 | 查询详情、评测日志、批阅日志 | 提交和日志可追溯 | 迁移测试和控制器日志用例通过 | 通过 |
-| TC-HW-N04 | NFR-HW-04 | 全部 HWK 接口；DB-HWK-02、03、04、05 | 非成员、他人提交、隐藏用例、私有日志 | 越权访问或查询敏感数据 | 返回 `HWK_4031` 或隐藏敏感字段 | `studentCannotReadAnotherStudentsSubmission`、`nonMemberStudentCannotSubmitHomework`、隐藏用例/日志用例通过 | 通过 |
-| TC-HW-N05 | NFR-HW-05 | 全部 HWK 流程 | 稳定测试数据、MockMvc、Vitest、H2 迁移 | 重复执行自动化测试 | 核心流程可重复验证 | 本文第 8 章命令已通过 | 通过 |
+| TC-HWK-01 | FR-HWK-01 | UI-HWK-02；API-HWK-01、02、16；DB-HWK-01、02 | 教师/助教具备课程管理权限；准备客观题作业和题目数据 | 创建草稿，保存题目，读取详情 | 作业为 DRAFT，字段和题目正确落库 | `teacherCreatesObjectiveHomeworkDraftAndSavesQuestions`、前端教师创建/编辑用例通过 | 通过 |
+| TC-HWK-02 | FR-HWK-01 | UI-HWK-03；API-HWK-03、05；LRN 事件 | 已有配置完整作业 | 教师发布作业，学生查询列表/详情 | 状态变为 PUBLISHED，学生可见，发送 HOMEWORK_PUBLISHED | `teacherPublishesConfiguredHomeworkAndNotificationIsEmitted`、前端发布用例通过 | 通过 |
+| TC-HWK-03 | FR-HWK-01 | API-HWK-18；DB-HWK-03、07 | 代码题未配置测试用例 | 执行发布 | 返回 `HWK_4007`，状态不变 | `codeHomeworkWithoutTestCasesIsRejectedWhenPublishing`、前端代码题校验用例通过 | 通过 |
+| TC-HWK-04 | FR-HWK-02 | UI-HWK-04；API-HWK-06、17；DB-HWK-02、03 | 已发布客观题/代码题，包含标准答案和隐藏用例 | 学生打开作业详情 | 显示说明和提交要求，不泄露答案、隐藏用例输出 | `studentPublishedHomeworkListAndDetailDoNotExposeAnswersOrHiddenTestCaseOutput` 通过 | 通过 |
+| TC-HWK-05 | FR-HWK-02 | UI-HWK-05；API-HWK-07；DB-HWK-04 | 学生为课程成员；作业已发布且未截止 | 提交文本、客观题或代码答案 | 生成提交记录，返回提交编号、时间和初始评测/批阅状态 | `studentSubmitsPublishedTextHomeworkAndReceivesSubmissionReceipt`、前端学生提交用例通过 | 通过 |
+| TC-HWK-06 | FR-HWK-02 | API-HWK-07；错误码 `HWK_4004` | 作业已超过截止时间且不允许迟交 | 学生提交作业 | 返回截止错误，不生成有效提交 | `studentCannotSubmitAfterDeadlineWhenLateSubmitIsDisabled` 通过 | 通过 |
+| TC-HWK-07 | FR-HWK-03 | UI-HWK-06；API-HWK-08；DB-HWK-04 | 作业允许重复提交，学生提交多次 | 查询我的提交历史 | 历史完整，仅最新提交 `is_final=1` | `studentSubmissionHistoryKeepsPreviousVersionsAndMarksOnlyLatestFinal`、前端历史用例通过 | 通过 |
+| TC-HWK-08 | FR-HWK-03 | UI-HWK-06；API-HWK-09、10；DB-HWK-04 | 教师/助教有课程管理权限；存在多名学生提交 | 查询提交列表，按学生和状态筛选，读取详情 | 支持分页、筛选、详情读取 | `courseManagerListsSubmissionsWithPaginationAndReadsSubmissionDetail`、`courseManagerFiltersSubmissionsByStudentAndStatuses` 通过 | 通过 |
+| TC-HWK-09 | FR-HWK-04 | API-HWK-07、11；DB-HWK-05 | 客观题作业配置标准答案和分值 | 学生提交客观题答案，查询评测结果 | 自动计算分数，生成评测记录 | `objectiveHomeworkSubmissionCreatesEvaluationRecordAndResultView` 通过 | 通过 |
+| TC-HWK-10 | FR-HWK-04 | UI-HWK-05、07；API-HWK-07、11；DB-HWK-03、05 | 代码题配置 IO 用例和语言白名单 | 学生提交代码，查询评测结果 | 返回评测状态、通过用例数和分数 | `codeHomeworkSubmissionEvaluatesIoCasesAndTeacherCanReevaluate`、前端代码评测展示用例通过 | 通过 |
+| TC-HWK-11 | FR-HWK-04；NFR-HWK-01 | API-HWK-11；DB-HWK-04、05 | 代码提交触发错误结果 | 查询评测结果和提交详情 | 评测状态记录失败，提交记录不丢失 | `codeHomeworkEvaluationFailurePreservesSubmissionAndRecordsFailedStatus` 通过 | 通过 |
+| TC-HWK-12 | FR-HWK-04、05 | UI-HWK-08；API-HWK-12；DB-HWK-05、06 | 已有提交和评测记录；教师提供重评理由 | 教师触发重评 | 新增评测记录，保留旧记录，写入重评日志 | `codeHomeworkSubmissionEvaluatesIoCasesAndTeacherCanReevaluate`、`objectiveReevaluationUpdatesSubmissionSummary` 通过 | 通过 |
+| TC-HWK-13 | FR-HWK-05 | UI-HWK-08；API-HWK-13；DB-HWK-04、06 | 教师/助教有课程管理权限；存在待批阅提交 | 填写人工分数和评语 | 更新 manualScore、finalScore、comment，写入日志 | `courseManagerReviewsSubmissionAndReadsReviewAuditLogs`、前端教师批阅用例通过 | 通过 |
+| TC-HWK-14 | FR-HWK-05 | API-HWK-13；错误码 `HWK_4008` | 作业总分 100，教师填写超出总分的分数 | 提交批阅 | 返回分数范围错误，不更新成绩 | `teacherReviewRejectsScoreOutsideHomeworkTotalScore` 通过 | 通过 |
+| TC-HWK-15 | FR-HWK-05；NFR-HWK-03 | API-HWK-12、13、21；DB-HWK-06 | 存在批阅、重评和发布成绩操作 | 查询批阅日志 | 日志记录操作人、时间、原因和分数变化 | `courseManagerReviewsSubmissionAndReadsReviewAuditLogs`、`studentCannotReadPrivateReviewLogs` 通过 | 通过 |
+| TC-HWK-16 | FR-HWK-06 | UI-HWK-07；API-HWK-10、11、14 | 学生成绩已发布 | 学生查询详情和反馈 | 展示允许公开的评测摘要、成绩和教师评语 | `scorePublishExposesStudentFeedbackAndHomeworkSourceGrades` 通过 | 通过 |
+| TC-HWK-17 | FR-HWK-06；NFR-HWK-04 | API-HWK-08、10、11 | 学生成绩未发布 | 学生查询历史、详情和评测结果 | 不显示未公开最终分和教师评语 | `studentHistoryAndDetailHideUnpublishedScoresAndTeacherComment`、`objectiveHomeworkSubmissionShowsEvaluationButHidesUnpublishedFinalScore` 通过 | 通过 |
+| TC-HWK-18 | FR-HWK-06；NFR-HWK-02 | UI-HWK-09；API-HWK-15；DB-HWK-04、05 | 多名学生提交和未提交 | 教师查询统计和未提交名单分页 | 展示提交数、未提交数、平均分等统计 | `teacherQueriesHomeworkStatisticsWithUnsubmittedStudentsAndScoreSummary`、`teacherQueriesHomeworkStatisticsWithPaginatedUnsubmittedStudentsForNfrPerformance` 通过 | 通过 |
+| TC-HWK-N01 | NFR-HWK-01 | API-HWK-03、07、11、13 | 模拟通知投递失败、评测失败、重复提交冲突 | 执行发布、提交、查询和批阅 | 主数据保持一致，错误以受控响应返回 | `publishKeepsHomeworkPublishedWhenNotificationDeliveryFails`、`submitReturnsControlledConflictWhenSubmissionVersionIsAlreadyUsed` 通过 | 通过 |
+| TC-HWK-N02 | NFR-HWK-02 | API-HWK-05、09、15；索引 | 作业列表、提交列表、统计使用分页参数和基础规模样本 | 查询列表和统计 | 返回分页结构，响应受控 | 后端分页统计用例、前端 API route 用例和 2026-06-12 本地压测批次通过 | 通过 |
+| TC-HWK-N03 | NFR-HWK-03 | API-HWK-10、20、21；DB-HWK-04、05、06 | 存在多次提交、评测、重评、批阅 | 查询详情、评测日志、批阅日志 | 提交和日志可追溯 | 迁移测试和控制器日志用例通过 | 通过 |
+| TC-HWK-N04 | NFR-HWK-04 | 全部 HWK 接口；DB-HWK-02、03、04、05 | 非成员、他人提交、隐藏用例、私有日志 | 越权访问或查询敏感数据 | 返回 `HWK_4031` 或隐藏敏感字段 | `studentCannotReadAnotherStudentsSubmission`、`nonMemberStudentCannotSubmitHomework`、隐藏用例/日志用例通过 | 通过 |
+| TC-HWK-N05 | NFR-HWK-05 | 全部 HWK 流程 | 稳定测试数据、MockMvc、Vitest、H2 迁移 | 重复执行自动化测试 | 核心流程可重复验证 | 本文第 8 章命令已通过 | 通过 |
 
 #### 7.5.3 前端 HWK 用例摘要
 
@@ -788,7 +788,7 @@
 
 | 验收项 | 结论 | 说明 |
 | --- | --- | --- |
-| 功能覆盖 | 通过 | FR-HW-01 ~ FR-HW-06 均有自动化覆盖，2026-06-12 本地 DEV 浏览器补充作业创建、发布、提交、批阅和发布成绩 |
+| 功能覆盖 | 通过 | FR-HWK-01 ~ FR-HWK-06 均有自动化覆盖，2026-06-12 本地 DEV 浏览器补充作业创建、发布、提交、批阅和发布成绩 |
 | 接口覆盖 | 通过 | API-HWK-01 ~ API-HWK-21 的主路由、权限和错误分支由后端/前端自动化覆盖 |
 | 页面覆盖 | 通过 | Vue 单测覆盖主要页面状态和交互，2026-06-12 本地 DEV 浏览器补充教师/学生页面流程 |
 | 数据一致性 | 通过 | DB-HWK-01 ~ DB-HWK-07 关键约束、提交版本、评测和日志记录已由迁移测试覆盖 |
@@ -950,11 +950,11 @@ node node_modules/vitest/vitest.mjs run tests/unit/grd/gradeItemsApi.spec.ts tes
 | 检查项 | 检查结论 | 说明 |
 | --- | --- | --- |
 | 文档结构 | 通过 | 按 TST-DOC-01 骨架组织，6 至 13 章按测试数据、用例、日志、手工、风险、验收、附录、整合记录依次编号 |
-| 需求编号 | 通过 | 六个模块分别使用 FR-UA/CR/LN/LAB/HW/GR 与 NFR 前缀，未发现跨模块冲突 |
+| 需求编号 | 通过 | 六个模块分别使用 FR-UA/CR/LN/LAB/HWK/GR 与 NFR 前缀，未发现跨模块冲突 |
 | 页面编号 | 通过 | UI-AUTH、UI-CRS、UI-LRN、UI-LAB、UI-HWK、UI-GRD 均在模块测试文档中建立用例映射 |
 | 接口编号 | 通过 | API-AUTH、API-CRS、API-LRN、API-LAB、API-HWK、API-GRD 均由后端或前端 API 测试覆盖 |
 | 数据库编号 | 通过 | DB-AUTH、DB-CRS、DB-LRN、DB-LAB、DB-HWK、DB-GRD 均有迁移脚本或持久化测试依据 |
-| 测试用例编号 | 通过 | TC-UA、TC-CR、TC-LN、TC-LAB、TC-HW、TC-GR 与手工 MAN 编号均已汇总 |
+| 测试用例编号 | 通过 | TC-UA、TC-CR、TC-LN、TC-LAB、TC-HWK、TC-GR 与手工 MAN 编号均已汇总 |
 | 设计编号 | 通过 | 已明确列出 DSD 编号 |
 | 状态口径 | 通过 | 本底稿统一使用“通过 / 有条件通过 / 本地通过，待验收环境复核 / 待专项测试 / 待验收环境复核 / 待审批” |
 
