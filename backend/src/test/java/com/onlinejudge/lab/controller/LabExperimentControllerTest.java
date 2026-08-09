@@ -16,6 +16,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.jdbc.Sql;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -81,7 +82,7 @@ class LabExperimentControllerTest {
         Map<String, Object> payload = Map.ofEntries(
                 entry("title", "实验一"),
                 entry("description", "实现链表基本操作"),
-                entry("deadline", "2026-06-30T23:59:59"),
+                entry("deadline", futureDeadline()),
                 entry("maxScore", 100),
                 entry("attachmentIds", List.of(11, 12)),
                 entry("allowedLanguages", "java,python"),
@@ -149,7 +150,7 @@ class LabExperimentControllerTest {
         long labId = createLabAndReturnId(404L, teacherHeaders("404", "404"), Map.ofEntries(
                 entry("title", "学生可见实验"),
                 entry("description", "用于验证学生侧读取"),
-                entry("deadline", "2026-07-05T23:59:59"),
+                entry("deadline", futureDeadline()),
                 entry("maxScore", 100),
                 entry("attachmentIds", List.of(31, 32)),
                 entry("allowedLanguages", "java,python"),
@@ -207,7 +208,7 @@ class LabExperimentControllerTest {
         long labId = createLabAndReturnId(405L, teacherHeaders("405", "405"), Map.ofEntries(
                 entry("title", "草稿实验"),
                 entry("description", "学生不应看到"),
-                entry("deadline", "2026-07-05T23:59:59"),
+                entry("deadline", futureDeadline()),
                 entry("maxScore", 100),
                 entry("attachmentIds", List.of()),
                 entry("allowedLanguages", "java"),
@@ -235,7 +236,7 @@ class LabExperimentControllerTest {
         Map<String, Object> payload = Map.ofEntries(
                 entry("title", "实验二"),
                 entry("description", "初版"),
-                entry("deadline", "2026-06-20T23:59:59"),
+                entry("deadline", futureDeadline()),
                 entry("maxScore", 100),
                 entry("attachmentIds", List.of()),
                 entry("allowedLanguages", "java"),
@@ -260,7 +261,7 @@ class LabExperimentControllerTest {
         Map<String, Object> updatePayload = Map.ofEntries(
                 entry("title", "实验二-修订"),
                 entry("description", "更新后的说明"),
-                entry("deadline", "2026-06-25T23:59:59"),
+                entry("deadline", futureDeadline()),
                 entry("maxScore", 120),
                 entry("attachmentIds", List.of(21)),
                 entry("allowedLanguages", "java,cpp"),
@@ -330,7 +331,7 @@ class LabExperimentControllerTest {
         long labId = createLabAndReturnId(206L, teacherHeaders("206", "206"), Map.ofEntries(
                 entry("title", "实验成绩发布"),
                 entry("description", "用于验证教师发布实验成绩"),
-                entry("deadline", "2026-07-08T23:59:59"),
+                entry("deadline", futureDeadline()),
                 entry("maxScore", 100),
                 entry("attachmentIds", List.of()),
                 entry("allowedLanguages", "python"),
@@ -374,7 +375,7 @@ class LabExperimentControllerTest {
         long labId = createLabAndReturnId(207L, teacherHeaders("207", "207"), Map.ofEntries(
                 entry("title", "实验统计"),
                 entry("description", "用于验证实验统计"),
-                entry("deadline", "2026-07-10T23:59:59"),
+                entry("deadline", futureDeadline()),
                 entry("maxScore", 100),
                 entry("attachmentIds", List.of()),
                 entry("allowedLanguages", "java"),
@@ -431,7 +432,7 @@ class LabExperimentControllerTest {
         long labId = createLabAndReturnId(208L, teacherHeaders("208", "208"), Map.ofEntries(
                 entry("title", "统计权限实验"),
                 entry("description", "学生不能访问统计"),
-                entry("deadline", "2026-07-12T23:59:59"),
+                entry("deadline", futureDeadline()),
                 entry("maxScore", 100),
                 entry("attachmentIds", List.of()),
                 entry("allowedLanguages", "java"),
@@ -474,7 +475,7 @@ class LabExperimentControllerTest {
         Map<String, Object> validPayload = Map.ofEntries(
                 entry("title", "实验三"),
                 entry("description", "权限测试"),
-                entry("deadline", "2026-07-01T23:59:59"),
+                entry("deadline", futureDeadline()),
                 entry("maxScore", 100),
                 entry("attachmentIds", List.of()),
                 entry("allowedLanguages", "java"),
@@ -513,6 +514,10 @@ class LabExperimentControllerTest {
                 .getResponse()
                 .getContentAsString();
         return objectMapper.readTree(body).path("data").path("id").asLong();
+    }
+
+    private String futureDeadline() {
+        return LocalDateTime.now().plusDays(30).withNano(0).toString();
     }
 
     private org.springframework.http.HttpHeaders teacherHeaders(String courseIds, String manageableCourseIds) {

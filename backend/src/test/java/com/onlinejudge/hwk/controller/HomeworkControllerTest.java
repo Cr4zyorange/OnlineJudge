@@ -249,7 +249,7 @@ class HomeworkControllerTest {
                 entry("title", "HWK01 code with hidden case"),
                 entry("description", "Implement addition."),
                 entry("type", "CODE"),
-                entry("deadline", "2026-06-30T23:59:59"),
+                entry("deadline", futureDeadline()),
                 entry("totalScore", 100),
                 entry("allowResubmit", true),
                 entry("allowLateSubmit", false),
@@ -1088,7 +1088,7 @@ class HomeworkControllerTest {
                 entry("title", "HWK01 code draft"),
                 entry("description", "Implement addition."),
                 entry("type", "CODE"),
-                entry("deadline", "2026-06-30T23:59:59"),
+                entry("deadline", futureDeadline()),
                 entry("totalScore", 100),
                 entry("allowResubmit", true),
                 entry("allowLateSubmit", false),
@@ -1115,7 +1115,7 @@ class HomeworkControllerTest {
                 entry("title", "HWK01 code configured"),
                 entry("description", "Implement addition."),
                 entry("type", "CODE"),
-                entry("deadline", "2026-06-30T23:59:59"),
+                entry("deadline", futureDeadline()),
                 entry("totalScore", 100),
                 entry("allowResubmit", true),
                 entry("allowLateSubmit", false),
@@ -1228,7 +1228,7 @@ class HomeworkControllerTest {
                 entry("title", "HWK01 objective draft"),
                 entry("description", "Answer the basics."),
                 entry("type", "OBJECTIVE"),
-                entry("deadline", "2026-06-30T23:59:59"),
+                entry("deadline", futureDeadline()),
                 entry("totalScore", 100),
                 entry("allowResubmit", true),
                 entry("allowLateSubmit", false),
@@ -1265,7 +1265,7 @@ class HomeworkControllerTest {
                 entry("title", "HWK02 text homework"),
                 entry("description", "Explain your algorithm."),
                 entry("type", "TEXT"),
-                entry("deadline", "2026-06-30T23:59:59"),
+                entry("deadline", futureDeadline()),
                 entry("totalScore", 100),
                 entry("allowResubmit", allowResubmit),
                 entry("allowLateSubmit", allowLateSubmit),
@@ -1282,7 +1282,7 @@ class HomeworkControllerTest {
                 entry("title", "HWK02 code homework"),
                 entry("description", "Implement addition."),
                 entry("type", "CODE"),
-                entry("deadline", "2026-06-30T23:59:59"),
+                entry("deadline", futureDeadline()),
                 entry("totalScore", 100),
                 entry("allowResubmit", true),
                 entry("allowLateSubmit", false),
@@ -1312,7 +1312,7 @@ class HomeworkControllerTest {
                 entry("title", "HWK04 code hidden evaluation"),
                 entry("description", "Implement addition."),
                 entry("type", "CODE"),
-                entry("deadline", "2026-06-30T23:59:59"),
+                entry("deadline", futureDeadline()),
                 entry("totalScore", 100),
                 entry("allowResubmit", true),
                 entry("allowLateSubmit", false),
@@ -1342,6 +1342,10 @@ class HomeworkControllerTest {
                         )
                 ))
         );
+    }
+
+    private String futureDeadline() {
+        return LocalDateTime.now().plusDays(30).withNano(0).toString();
     }
 
     private org.springframework.http.HttpHeaders teacherHeaders(String courseIds, String manageableCourseIds) {
