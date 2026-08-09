@@ -19,6 +19,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.jdbc.Sql;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.time.LocalDateTime;
 import java.util.Map;
 
 import static java.util.Map.entry;
@@ -229,7 +230,7 @@ class HomeworkBearerAuthControllerTest {
                 entry("title", "HWK01 bearer draft"),
                 entry("description", "Answer the basics."),
                 entry("type", "OBJECTIVE"),
-                entry("deadline", "2026-06-30T23:59:59"),
+                entry("deadline", futureDeadline()),
                 entry("totalScore", 100),
                 entry("allowResubmit", true),
                 entry("allowLateSubmit", false),
@@ -254,11 +255,15 @@ class HomeworkBearerAuthControllerTest {
                 entry("title", "HWK01 CRS integration text"),
                 entry("description", "Submit a short answer."),
                 entry("type", "TEXT"),
-                entry("deadline", "2026-06-30T23:59:59"),
+                entry("deadline", futureDeadline()),
                 entry("totalScore", 100),
                 entry("allowResubmit", true),
                 entry("allowLateSubmit", false),
                 entry("showEvaluationBeforePublish", true)
         );
+    }
+
+    private String futureDeadline() {
+        return LocalDateTime.now().plusDays(30).withNano(0).toString();
     }
 }

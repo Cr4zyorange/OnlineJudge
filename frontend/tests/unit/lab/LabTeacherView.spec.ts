@@ -20,6 +20,7 @@ vi.mock('../../../src/api/lab/labs', async (importOriginal) => {
 describe('LabTeacherView', () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    vi.spyOn(Date, 'now').mockReturnValue(new Date('2026-06-01T00:00:00Z').getTime());
   });
 
   afterEach(() => {

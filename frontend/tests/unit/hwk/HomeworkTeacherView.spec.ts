@@ -1,5 +1,5 @@
 import { mount } from '@vue/test-utils';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import HomeworkTeacherView from '../../../src/views/hwk/HomeworkTeacherView.vue';
 import * as homeworkApi from '../../../src/api/hwk/homeworks';
 import type { HomeworkDetail, HomeworkStatus, HomeworkSummary, HomeworkType } from '../../../src/types/hwk';
@@ -9,6 +9,11 @@ vi.mock('../../../src/api/hwk/homeworks');
 describe('HomeworkTeacherView', () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    vi.spyOn(Date, 'now').mockReturnValue(new Date('2026-06-01T00:00:00Z').getTime());
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   it('creates a draft objective homework and refreshes the teacher list', async () => {

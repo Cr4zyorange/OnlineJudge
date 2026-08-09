@@ -11,6 +11,7 @@ import org.springframework.boot.ApplicationRunner;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -210,6 +211,7 @@ public class IntDemoDataInitializer {
                     ) VALUES (?, ?, ?, 'CRS', ?, 'ACCESS', 1800, TIMESTAMP '2026-06-08 08:40:00',
                         TIMESTAMP '2026-06-08 09:10:00', TIMESTAMP '2026-06-08 09:10:00')
                     """, RECORD_RESOURCE_ID, studentId, COURSE_ID, RESOURCE_ID);
+            ensureRecentDemoAccess(studentId);
             insertIfMissingByCount("SELECT COUNT(*) FROM lrn_notification_setting WHERE user_id = ?",
                     new Object[]{studentId}, """
                             INSERT INTO lrn_notification_setting (
@@ -218,6 +220,30 @@ public class IntDemoDataInitializer {
                             ) VALUES (?, TRUE, TRUE, TRUE, TRUE, TRUE,
                                 TIMESTAMP '2026-06-01 08:30:00', TIMESTAMP '2026-06-01 08:30:00')
                             """, studentId);
+        }
+
+        private void ensureRecentDemoAccess(long studentId) {
+            LocalDateTime endedAt = LocalDateTime.now().withNano(0);
+            LocalDateTime startedAt = endedAt.minusMinutes(30);
+            LocalDateTime since = endedAt.toLocalDate().minusDays(6).atStartOfDay();
+            jdbcTemplate.update("""
+                    INSERT INTO lrn_learning_record (
+                        user_id, course_id, source_module, source_id, action_type, duration,
+                        started_at, ended_at, created_at
+                    )
+                    SELECT ?, ?, 'CRS', ?, 'ACCESS', 1800, ?, ?, ?
+                    FROM (SELECT 1 AS marker) seed
+                    LEFT JOIN lrn_learning_record existing
+                      ON existing.user_id = ?
+                     AND existing.course_id = ?
+                     AND existing.source_module = 'CRS'
+                     AND existing.source_id = ?
+                     AND existing.action_type = 'ACCESS'
+                     AND existing.started_at >= ?
+                    WHERE existing.id IS NULL
+                    """,
+                    studentId, COURSE_ID, RESOURCE_ID, startedAt, endedAt, endedAt,
+                    studentId, COURSE_ID, RESOURCE_ID, since);
         }
 
         private void seedLab(long teacherId, long studentId) {

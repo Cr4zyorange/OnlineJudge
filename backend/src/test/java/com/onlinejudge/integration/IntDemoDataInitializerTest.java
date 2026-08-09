@@ -2,15 +2,21 @@ package com.onlinejudge.integration;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.boot.ApplicationRunner;
+import org.springframework.boot.DefaultApplicationArguments;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasItem;
+import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -27,6 +33,10 @@ class IntDemoDataInitializerTest {
 
     @Autowired
     private MockMvc mockMvc;
+
+    @Autowired
+    @Qualifier("intDemoData")
+    private ApplicationRunner intDemoData;
 
     @Test
     void intDemoDataCoversLoginCourseLearningLabHomeworkGradeAndNotifications() {
@@ -165,6 +175,7 @@ class IntDemoDataInitializerTest {
                         .header("X-Username", "student001"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.summary.resourceAccessCount", is(1)))
+                .andExpect(jsonPath("$.data.trends", hasSize(7)))
                 .andExpect(jsonPath("$.data.recentRecords[0].actionType", is("ACCESS")));
 
         mockMvc.perform(get("/api/v1/notifications?type=TASK&page=1&size=10")
@@ -191,6 +202,47 @@ class IntDemoDataInitializerTest {
                 .andExpect(jsonPath("$.data.records[0].summary.finalScore", is(89.6)));
     }
 
+    @Test
+    @Transactional
+    void rerunningInitializerAddsAtMostOneRecentDemoAccessWithoutRewritingHistory() throws Exception {
+        Long studentId = userId("student001");
+        LocalDateTime historicalStartedAt = jdbcTemplate.queryForObject("""
+                SELECT started_at
+                FROM lrn_learning_record
+                WHERE id = 950604
+                """, LocalDateTime.class);
+        LocalDateTime staleTime = LocalDateTime.now().minusDays(8).withNano(0);
+
+        jdbcTemplate.update("""
+                UPDATE lrn_learning_record
+                SET started_at = ?, ended_at = ?, created_at = ?
+                WHERE user_id = ?
+                  AND course_id = 9501
+                  AND source_module = 'CRS'
+                  AND source_id = 950102
+                  AND action_type = 'ACCESS'
+                  AND id <> 950604
+                """, staleTime.minusMinutes(30), staleTime, staleTime, studentId);
+
+        int totalBeforeRerun = demoAccessCount(studentId);
+        assertThat(recentDemoAccessCount(studentId)).isZero();
+
+        intDemoData.run(new DefaultApplicationArguments(new String[0]));
+
+        assertThat(demoAccessCount(studentId)).isEqualTo(totalBeforeRerun + 1);
+        assertThat(recentDemoAccessCount(studentId)).isEqualTo(1);
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT started_at
+                FROM lrn_learning_record
+                WHERE id = 950604
+                """, LocalDateTime.class)).isEqualTo(historicalStartedAt);
+
+        intDemoData.run(new DefaultApplicationArguments(new String[0]));
+
+        assertThat(demoAccessCount(studentId)).isEqualTo(totalBeforeRerun + 1);
+        assertThat(recentDemoAccessCount(studentId)).isEqualTo(1);
+    }
+
     private Long userId(String username) {
         return jdbcTemplate.queryForObject("SELECT user_id FROM t_auth_user WHERE username = ?", Long.class, username);
     }
@@ -198,5 +250,30 @@ class IntDemoDataInitializerTest {
     private int count(String sql, Object... args) {
         Integer count = jdbcTemplate.queryForObject(sql, Integer.class, args);
         return count == null ? 0 : count;
+    }
+
+    private int demoAccessCount(Long studentId) {
+        return count("""
+                SELECT COUNT(*)
+                FROM lrn_learning_record
+                WHERE user_id = ?
+                  AND course_id = 9501
+                  AND source_module = 'CRS'
+                  AND source_id = 950102
+                  AND action_type = 'ACCESS'
+                """, studentId);
+    }
+
+    private int recentDemoAccessCount(Long studentId) {
+        return count("""
+                SELECT COUNT(*)
+                FROM lrn_learning_record
+                WHERE user_id = ?
+                  AND course_id = 9501
+                  AND source_module = 'CRS'
+                  AND source_id = 950102
+                  AND action_type = 'ACCESS'
+                  AND started_at >= ?
+                """, studentId, LocalDateTime.now().minusDays(6).toLocalDate().atStartOfDay());
     }
 }
