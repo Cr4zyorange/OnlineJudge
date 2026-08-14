@@ -12,6 +12,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -144,7 +145,64 @@ class IntDemoDataInitializerTest {
                   AND course_id = 9501
                   AND source_module IN ('LAB', 'HWK')
                   AND status IN ('COMPLETED', 'IN_PROGRESS')
-                """, studentId)).isEqualTo(2);
+                """, studentId)).isEqualTo(4);
+    }
+
+    @Test
+    void rollingDemoWindowKeepsCourseAndOpenTasksUsableWithoutChangingCompletedExamples() {
+        LocalDate today = LocalDate.now();
+        LocalDateTime now = LocalDateTime.now();
+
+        LocalDate courseStart = jdbcTemplate.queryForObject(
+                "SELECT start_date FROM crs_course WHERE id = 9501", LocalDate.class);
+        LocalDate courseEnd = jdbcTemplate.queryForObject(
+                "SELECT end_date FROM crs_course WHERE id = 9501", LocalDate.class);
+        assertThat(courseStart).isBeforeOrEqualTo(today);
+        assertThat(courseEnd).isAfterOrEqualTo(today.plusDays(60));
+
+        LocalDateTime openLabDeadline = jdbcTemplate.queryForObject("""
+                SELECT deadline
+                FROM lab_experiment
+                WHERE id = 950211
+                  AND course_id = 9501
+                  AND status = 'PUBLISHED'
+                  AND deleted = FALSE
+                """, LocalDateTime.class);
+        assertThat(openLabDeadline).isAfter(now.plusDays(20));
+        assertThat(openLabDeadline).isBefore(now.plusDays(31));
+
+        LocalDateTime openHomeworkDeadline = jdbcTemplate.queryForObject("""
+                SELECT deadline
+                FROM t_hwk_homework
+                WHERE id = 950311
+                  AND course_id = 9501
+                  AND status = 'PUBLISHED'
+                  AND is_deleted = FALSE
+                """, LocalDateTime.class);
+        assertThat(openHomeworkDeadline).isAfter(now.plusDays(20));
+        assertThat(openHomeworkDeadline).isBefore(now.plusDays(31));
+
+        assertThat(count("""
+                SELECT COUNT(*)
+                FROM lrn_learning_task
+                WHERE id IN (950611, 950612)
+                  AND course_id = 9501
+                  AND status = 'IN_PROGRESS'
+                  AND deadline > ?
+                """, now.plusDays(20))).isEqualTo(2);
+
+        assertThat(count("""
+                SELECT COUNT(*)
+                FROM lab_experiment
+                WHERE id = 950201
+                  AND status = 'SCORE_PUBLISHED'
+                """)).isEqualTo(1);
+        assertThat(count("""
+                SELECT COUNT(*)
+                FROM t_hwk_homework
+                WHERE id = 950301
+                  AND status = 'SCORE_PUBLISHED'
+                """)).isEqualTo(1);
     }
 
     @Test
@@ -159,6 +217,20 @@ class IntDemoDataInitializerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.list[?(@.id == 9501)].enrollmentMode", hasItem("INVITE")))
                 .andExpect(jsonPath("$.data.list[?(@.id == 9501)].member", hasItem(true)));
+
+        mockMvc.perform(get("/api/v1/courses/9501/labs")
+                        .header("X-User-Id", studentId)
+                        .header("X-User-Role", "STUDENT")
+                        .header("X-Username", "student001"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[?(@.id == 950211)].status", hasItem("PUBLISHED")));
+
+        mockMvc.perform(get("/api/v1/homeworks?courseId=9501&page=1&size=20")
+                        .header("X-User-Id", studentId)
+                        .header("X-User-Role", "STUDENT")
+                        .header("X-Username", "student001"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.list[?(@.id == 950311)].status", hasItem("PUBLISHED")));
 
         mockMvc.perform(get("/api/v1/submissions/950303/evaluation")
                         .header("X-User-Id", studentId)
@@ -225,12 +297,18 @@ class IntDemoDataInitializerTest {
                 """, staleTime.minusMinutes(30), staleTime, staleTime, studentId);
 
         int totalBeforeRerun = demoAccessCount(studentId);
+        int openLabCountBeforeRerun = count("SELECT COUNT(*) FROM lab_experiment WHERE id = 950211");
+        int openHomeworkCountBeforeRerun = count("SELECT COUNT(*) FROM t_hwk_homework WHERE id = 950311");
         assertThat(recentDemoAccessCount(studentId)).isZero();
 
         intDemoData.run(new DefaultApplicationArguments(new String[0]));
 
         assertThat(demoAccessCount(studentId)).isEqualTo(totalBeforeRerun + 1);
         assertThat(recentDemoAccessCount(studentId)).isEqualTo(1);
+        assertThat(count("SELECT COUNT(*) FROM lab_experiment WHERE id = 950211"))
+                .isEqualTo(openLabCountBeforeRerun);
+        assertThat(count("SELECT COUNT(*) FROM t_hwk_homework WHERE id = 950311"))
+                .isEqualTo(openHomeworkCountBeforeRerun);
         assertThat(jdbcTemplate.queryForObject("""
                 SELECT started_at
                 FROM lrn_learning_record
