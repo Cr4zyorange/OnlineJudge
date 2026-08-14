@@ -11,6 +11,7 @@ import org.springframework.boot.ApplicationRunner;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -27,11 +28,15 @@ public class IntDemoDataInitializer {
     private static final long LAB_EVALUATION_ID = 950204L;
     private static final long LAB_EVALUATION_RESULT_ID = 950205L;
     private static final long LAB_SCORE_ID = 950206L;
+    private static final long OPEN_LAB_ID = 950211L;
+    private static final long OPEN_LAB_TESTCASE_ID = 950212L;
     private static final long HOMEWORK_ID = 950301L;
     private static final long HOMEWORK_QUESTION_ID = 950302L;
     private static final long HOMEWORK_SUBMISSION_ID = 950303L;
     private static final long HOMEWORK_EVALUATION_ID = 950304L;
     private static final long HOMEWORK_REVIEW_LOG_ID = 950305L;
+    private static final long OPEN_HOMEWORK_ID = 950311L;
+    private static final long OPEN_HOMEWORK_QUESTION_ID = 950312L;
     private static final long GRADE_ITEM_LAB_ID = 950401L;
     private static final long GRADE_ITEM_HOMEWORK_ID = 950402L;
     private static final long GRADE_RECORD_LAB_ID = 950411L;
@@ -41,6 +46,8 @@ public class IntDemoDataInitializer {
     private static final long GRADE_BATCH_ID = 950441L;
     private static final long TASK_LAB_ID = 950601L;
     private static final long TASK_HOMEWORK_ID = 950602L;
+    private static final long TASK_OPEN_LAB_ID = 950611L;
+    private static final long TASK_OPEN_HOMEWORK_ID = 950612L;
     private static final long PROGRESS_RESOURCE_ID = 950603L;
     private static final long RECORD_RESOURCE_ID = 950604L;
 
@@ -102,10 +109,11 @@ public class IntDemoDataInitializer {
 
             long teacher = teacherId.get();
             long student = studentId.get();
-            seedCourse(teacher, student);
+            DemoWindow demoWindow = DemoWindow.current();
+            seedCourse(teacher, student, demoWindow);
             seedLearning(student);
-            seedLab(teacher, student);
-            seedHomework(teacher, student);
+            seedLab(teacher, student, demoWindow);
+            seedHomework(teacher, student, demoWindow);
             seedGrades(teacher, student);
             seedNotifications(student);
         }
@@ -137,7 +145,7 @@ public class IntDemoDataInitializer {
             return ids.stream().findFirst();
         }
 
-        private void seedCourse(long teacherId, long studentId) {
+        private void seedCourse(long teacherId, long studentId, DemoWindow demoWindow) {
             insertIfMissing("crs_course", COURSE_ID, """
                     INSERT INTO crs_course (
                         id, course_name, description, teacher_id, semester, category, cover_url,
@@ -146,10 +154,15 @@ public class IntDemoDataInitializer {
                     ) VALUES (
                         ?, '数据结构全流程演示课', '覆盖登录、课程、学习、实验、作业、成绩、通知的验收演示课程。',
                         ?, '2025-2026-2', '计算机基础', '/assets/back.jpg', 'INVITE',
-                        'INT95', 80, DATE '2026-03-01', DATE '2026-07-01', 'ACTIVE',
-                        FALSE, TIMESTAMP '2026-06-01 08:00:00', TIMESTAMP '2026-06-01 08:00:00'
+                        'INT95', 80, ?, ?, 'ACTIVE', FALSE, ?, ?
                     )
-                    """, COURSE_ID, teacherId);
+                    """, COURSE_ID, teacherId, demoWindow.courseStart(), demoWindow.courseEnd(),
+                    demoWindow.publishedAt(), demoWindow.publishedAt());
+            jdbcTemplate.update("""
+                    UPDATE crs_course
+                    SET start_date = ?, end_date = ?, status = 'ACTIVE', updated_at = ?
+                    WHERE id = ? AND is_deleted = FALSE
+                    """, demoWindow.courseStart(), demoWindow.courseEnd(), demoWindow.publishedAt(), COURSE_ID);
             insertIfMissingByCount("SELECT COUNT(*) FROM crs_course_member WHERE course_id = ? AND user_id = ?",
                     new Object[]{COURSE_ID, teacherId}, """
                             INSERT INTO crs_course_member (
@@ -246,7 +259,7 @@ public class IntDemoDataInitializer {
                     studentId, COURSE_ID, RESOURCE_ID, since);
         }
 
-        private void seedLab(long teacherId, long studentId) {
+        private void seedLab(long teacherId, long studentId, DemoWindow demoWindow) {
             insertIfMissing("lab_experiment", LAB_ID, """
                     INSERT INTO lab_experiment (
                         id, course_id, chapter_id, title, description, status, deadline, max_score,
@@ -308,9 +321,44 @@ public class IntDemoDataInitializer {
                         TIMESTAMP '2026-06-08 09:20:00', TIMESTAMP '2026-06-01 09:00:00',
                         TIMESTAMP '2026-06-08 09:20:00')
                     """, TASK_LAB_ID, studentId, COURSE_ID, LAB_ID);
+            seedOpenLab(teacherId, studentId, demoWindow);
         }
 
-        private void seedHomework(long teacherId, long studentId) {
+        private void seedOpenLab(long teacherId, long studentId, DemoWindow demoWindow) {
+            insertIfMissing("lab_experiment", OPEN_LAB_ID, """
+                    INSERT INTO lab_experiment (
+                        id, course_id, chapter_id, title, description, status, deadline, max_score,
+                        attachment_ids, allowed_languages, evaluation_mode, auto_evaluate, report_required,
+                        time_limit_ms, memory_limit_kb, created_by, published_at, deleted, created_at, updated_at
+                    ) VALUES (?, ?, ?, '回归实验：线性表边界操作',
+                        '开放期回归样例。提交可复现实验受理、自动评测、历史与教师处理流程。',
+                        'PUBLISHED', ?, 100, NULL, 'python', 'DOCKER_IO', TRUE, FALSE,
+                        60000, 262144, ?, ?, FALSE, ?, ?)
+                    """, OPEN_LAB_ID, COURSE_ID, CHAPTER_ID, demoWindow.deadline(), teacherId,
+                    demoWindow.publishedAt(), demoWindow.publishedAt(), demoWindow.publishedAt());
+            insertIfMissing("lab_testcase", OPEN_LAB_TESTCASE_ID, """
+                    INSERT INTO lab_testcase (
+                        id, lab_id, input, expected_output, score_weight, is_public, time_limit_ms,
+                        memory_limit_kb, order_num, deleted, created_at, updated_at
+                    ) VALUES (?, ?, '0\n', 'EMPTY\n', 100, TRUE, 60000, 262144, 1, FALSE, ?, ?)
+                    """, OPEN_LAB_TESTCASE_ID, OPEN_LAB_ID, demoWindow.publishedAt(), demoWindow.publishedAt());
+            insertIfMissing("lrn_learning_task", TASK_OPEN_LAB_ID, """
+                    INSERT INTO lrn_learning_task (
+                        id, user_id, course_id, source_module, source_id, task_type, title, deadline,
+                        progress, status, action_url, snapshot_at, created_at, updated_at
+                    ) VALUES (?, ?, ?, 'LAB', ?, 'EXPERIMENT', '回归实验：线性表边界操作', ?,
+                        0, 'IN_PROGRESS', '/courses/9501/labs/950211?role=student', ?, ?, ?)
+                    """, TASK_OPEN_LAB_ID, studentId, COURSE_ID, OPEN_LAB_ID, demoWindow.deadline(),
+                    demoWindow.publishedAt(), demoWindow.publishedAt(), demoWindow.publishedAt());
+            jdbcTemplate.update("""
+                    UPDATE lab_experiment
+                    SET status = 'PUBLISHED', deadline = ?, published_at = ?, updated_at = ?
+                    WHERE id = ? AND deleted = FALSE
+                    """, demoWindow.deadline(), demoWindow.publishedAt(), demoWindow.publishedAt(), OPEN_LAB_ID);
+            refreshOpenTask(TASK_OPEN_LAB_ID, demoWindow);
+        }
+
+        private void seedHomework(long teacherId, long studentId, DemoWindow demoWindow) {
             insertIfMissing("t_hwk_homework", HOMEWORK_ID, """
                     INSERT INTO t_hwk_homework (
                         id, course_id, chapter_id, title, description, type, status, total_score,
@@ -370,6 +418,50 @@ public class IntDemoDataInitializer {
                         TIMESTAMP '2026-06-08 09:30:00', TIMESTAMP '2026-06-01 09:30:00',
                         TIMESTAMP '2026-06-08 09:30:00')
                     """, TASK_HOMEWORK_ID, studentId, COURSE_ID, HOMEWORK_ID);
+            seedOpenHomework(teacherId, studentId, demoWindow);
+        }
+
+        private void seedOpenHomework(long teacherId, long studentId, DemoWindow demoWindow) {
+            insertIfMissing("t_hwk_homework", OPEN_HOMEWORK_ID, """
+                    INSERT INTO t_hwk_homework (
+                        id, course_id, chapter_id, title, description, type, status, total_score,
+                        deadline, allow_resubmit, allow_late_submit, show_evaluation_before_publish,
+                        judge_config_id, created_by, published_at, is_deleted, created_at, updated_at
+                    ) VALUES (?, ?, ?, '回归作业：复杂度说明',
+                        '开放期回归样例。用于复现文本提交、提交历史、教师批阅与反馈流程。',
+                        'TEXT', 'PUBLISHED', 100.00, ?, TRUE, FALSE, TRUE, NULL, ?, ?, FALSE, ?, ?)
+                    """, OPEN_HOMEWORK_ID, COURSE_ID, CHAPTER_ID, demoWindow.deadline(), teacherId,
+                    demoWindow.publishedAt(), demoWindow.publishedAt(), demoWindow.publishedAt());
+            insertIfMissing("t_hwk_question", OPEN_HOMEWORK_QUESTION_ID, """
+                    INSERT INTO t_hwk_question (
+                        id, homework_id, question_type, stem, options_json, answer_json, score,
+                        sort_order, created_at, updated_at
+                    ) VALUES (?, ?, 'TEXT', '说明空顺序表插入首个元素的时间复杂度。', NULL,
+                        '{"reference":"O(1)"}', 100.00, 1, ?, ?)
+                    """, OPEN_HOMEWORK_QUESTION_ID, OPEN_HOMEWORK_ID,
+                    demoWindow.publishedAt(), demoWindow.publishedAt());
+            insertIfMissing("lrn_learning_task", TASK_OPEN_HOMEWORK_ID, """
+                    INSERT INTO lrn_learning_task (
+                        id, user_id, course_id, source_module, source_id, task_type, title, deadline,
+                        progress, status, action_url, snapshot_at, created_at, updated_at
+                    ) VALUES (?, ?, ?, 'HWK', ?, 'HOMEWORK', '回归作业：复杂度说明', ?,
+                        0, 'IN_PROGRESS', '/courses/9501/homeworks/950311?role=student', ?, ?, ?)
+                    """, TASK_OPEN_HOMEWORK_ID, studentId, COURSE_ID, OPEN_HOMEWORK_ID, demoWindow.deadline(),
+                    demoWindow.publishedAt(), demoWindow.publishedAt(), demoWindow.publishedAt());
+            jdbcTemplate.update("""
+                    UPDATE t_hwk_homework
+                    SET status = 'PUBLISHED', deadline = ?, published_at = ?, updated_at = ?
+                    WHERE id = ? AND is_deleted = FALSE
+                    """, demoWindow.deadline(), demoWindow.publishedAt(), demoWindow.publishedAt(), OPEN_HOMEWORK_ID);
+            refreshOpenTask(TASK_OPEN_HOMEWORK_ID, demoWindow);
+        }
+
+        private void refreshOpenTask(long taskId, DemoWindow demoWindow) {
+            jdbcTemplate.update("""
+                    UPDATE lrn_learning_task
+                    SET deadline = ?, progress = 0, status = 'IN_PROGRESS', snapshot_at = ?, updated_at = ?
+                    WHERE id = ?
+                    """, demoWindow.deadline(), demoWindow.publishedAt(), demoWindow.publishedAt(), taskId);
         }
 
         private void seedGrades(long teacherId, long studentId) {
@@ -493,6 +585,23 @@ public class IntDemoDataInitializer {
                 return;
             }
             jdbcTemplate.update(insertSql, insertArgs);
+        }
+
+        private record DemoWindow(
+                LocalDate courseStart,
+                LocalDate courseEnd,
+                LocalDateTime publishedAt,
+                LocalDateTime deadline
+        ) {
+            private static DemoWindow current() {
+                LocalDate today = LocalDate.now();
+                return new DemoWindow(
+                        today.minusDays(7),
+                        today.plusDays(90),
+                        today.minusDays(1).atTime(9, 0),
+                        today.plusDays(30).atTime(23, 59, 59)
+                );
+            }
         }
     }
 }
