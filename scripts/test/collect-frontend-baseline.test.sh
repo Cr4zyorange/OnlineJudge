@@ -3,15 +3,24 @@
 set -euo pipefail
 
 repo_root="$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"
-collector="$repo_root/scripts/test/collect-frontend-baseline.sh"
+source_collector="$repo_root/scripts/test/collect-frontend-baseline.sh"
 fixture_root="$(mktemp -d "${TMPDIR:-/tmp}/onlinejudge-baseline-test.XXXXXX")"
+fixture_repo="$fixture_root/repo"
+collector="$fixture_repo/scripts/test/collect-frontend-baseline.sh"
 
 cleanup() {
   rm -rf -- "$fixture_root"
 }
 trap cleanup EXIT INT TERM
 
-mkdir -p "$fixture_root/bin" "$fixture_root/dist/assets"
+mkdir -p "$fixture_root/bin" "$fixture_root/dist/assets" "$fixture_repo/scripts/test"
+cp "$source_collector" "$collector"
+chmod +x "$collector"
+git -C "$fixture_repo" init -q
+git -C "$fixture_repo" config user.name 'Baseline Test'
+git -C "$fixture_repo" config user.email 'baseline-test@example.invalid'
+git -C "$fixture_repo" add scripts/test/collect-frontend-baseline.sh
+git -C "$fixture_repo" commit -qm 'test fixture'
 
 cat > "$fixture_root/bin/curl" <<'EOF'
 #!/usr/bin/env bash
@@ -130,6 +139,23 @@ initial_bytes="$(awk -F '\t' '$1 == "summary" && $2 == "initial_direct_uncompres
 full_bytes="$(awk -F '\t' '$1 == "summary" && $2 == "full_dist_uncompressed_total" {print $3}' "$fixture_root/output/frontend-assets.tsv")"
 [[ "$initial_bytes" -lt "$full_bytes" ]] || {
   printf 'expected direct initial assets (%s) to exclude lazy dist bytes (%s)\n' "$initial_bytes" "$full_bytes" >&2
+  exit 1
+}
+
+printf 'uncommitted fixture change\n' > "$fixture_repo/dirty.txt"
+if OUTPUT_DIR="$fixture_root/dirty-output" \
+FRONTEND_DIST_DIR="$fixture_root/dist" \
+SKIP_FRONTEND_BUILD=1 \
+CURL_BIN="$fixture_root/bin/curl" \
+BASE_URL="http://offline.test" \
+FRONTEND_URL="http://offline.test" \
+SAMPLES=2 \
+  "$collector" >"$fixture_root/dirty-stdout.txt" 2>"$fixture_root/dirty-stderr.txt"; then
+  printf 'expected collector to reject a dirty worktree\n' >&2
+  exit 1
+fi
+grep -q 'worktree is dirty' "$fixture_root/dirty-stderr.txt" || {
+  printf 'dirty-worktree rejection did not explain the failure\n' >&2
   exit 1
 }
 
