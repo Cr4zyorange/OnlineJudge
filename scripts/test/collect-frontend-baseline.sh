@@ -78,6 +78,9 @@ if [[ "$SKIP_FRONTEND_BUILD" == "0" ]]; then
   command -v npm >/dev/null 2>&1 || fail "npm is required unless SKIP_FRONTEND_BUILD=1"
 fi
 
+[[ -z "$(git -C "$repo_root" status --porcelain)" ]] || \
+  fail "worktree is dirty; commit or stash changes before collecting a baseline"
+
 BASE_URL="${BASE_URL%/}"
 FRONTEND_URL="${FRONTEND_URL%/}"
 [[ -n "$BASE_URL" ]] || fail "BASE_URL cannot be empty"
