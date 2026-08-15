@@ -19,10 +19,21 @@ import { computed, onMounted } from 'vue';
 import { clearAuthSession } from '../../api/auth/auth';
 
 const props = defineProps<{
-  kind: 'forbidden' | 'expired' | 'account-disabled';
+  kind: 'forbidden' | 'expired' | 'account-disabled' | 'not-found';
 }>();
 
 const content = computed(() => {
+  if (props.kind === 'not-found') {
+    return {
+      kicker: 'PAGE NOT FOUND',
+      title: '页面不存在',
+      message: '链接可能已失效，或页面已移动。请返回课程中心继续操作。',
+      primaryAction: '返回课程中心',
+      primaryHref: '/courses',
+      secondaryAction: '',
+      secondaryHref: ''
+    };
+  }
   if (props.kind === 'account-disabled') {
     return {
       kicker: 'ACCOUNT LOCKED',

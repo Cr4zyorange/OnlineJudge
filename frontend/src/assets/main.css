@@ -3,25 +3,41 @@
 :root {
   --oj-bg-image: url("./back1.jpg");
   --oj-ink: #172b35;
-  --oj-ink-soft: #38535c;
+  --oj-ink-soft: #5d7177;
   --oj-muted: #5d7177;
   --oj-brand: #16423c;
   --oj-brand-strong: #0f2f2b;
   --oj-brand-soft: rgba(22, 66, 60, 0.12);
-  --oj-surface: rgba(239, 247, 250, 0.2);
-  --oj-surface-strong: rgba(247, 251, 252, 0.28);
-  --oj-surface-solid: rgba(248, 251, 252, 0.88);
-  --oj-line: rgba(255, 255, 255, 0.28);
+  --oj-surface: rgba(248, 251, 252, 0.92);
+  --oj-surface-strong: rgba(248, 251, 252, 0.96);
+  --oj-surface-solid: #f8fbfc;
+  --oj-line: rgba(255, 255, 255, 0.55);
   --oj-line-strong: rgba(22, 66, 60, 0.2);
   --oj-shadow: 0 18px 52px rgba(23, 43, 53, 0.18);
   --oj-shadow-soft: 0 8px 32px rgba(31, 38, 135, 0.1);
-  --oj-radius: 8px;
-  --oj-blur: blur(14px);
+  --oj-radius: 12px;
+  --oj-radius-control: 8px;
+  --oj-blur: blur(12px);
+  --oj-space-1: 4px;
+  --oj-space-2: 8px;
+  --oj-space-3: 12px;
+  --oj-space-4: 16px;
+  --oj-space-6: 24px;
+  --oj-space-8: 32px;
+  --oj-space-12: 48px;
 }
 
 * {
   box-sizing: border-box;
   border: none;
+}
+
+:where(a, button, input, select, textarea):focus-visible {
+  outline: 3px solid #2b7a70;
+  outline-offset: 2px;
+}
+
+h1[tabindex='-1']:focus {
   outline: none;
 }
 

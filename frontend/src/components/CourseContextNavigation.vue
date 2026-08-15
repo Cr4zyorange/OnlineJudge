@@ -33,26 +33,28 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { readLocalStorage } from '../utils/browserStorage';
 
 const props = defineProps<{
   courseId: number;
   currentPath: string;
+  manageable: boolean;
 }>();
 
-const role = computed(() => {
-  const storedRole = readLocalStorage('onlinejudge.userRole')
-    ?? readLocalStorage('onlinejudge.role');
-  return storedRole === 'STUDENT' ? 'student' : 'teacher';
-});
-
 const courseHomeHref = computed(() => `/courses/${props.courseId}`);
-const labHref = computed(() => `/courses/${props.courseId}/labs?role=${role.value}`);
-const homeworkHref = computed(() => `/courses/${props.courseId}/homeworks?role=${role.value}`);
+const labHref = computed(() => (
+  props.manageable
+    ? `/courses/${props.courseId}/labs/manage`
+    : `/courses/${props.courseId}/labs`
+));
+const homeworkHref = computed(() => (
+  props.manageable
+    ? `/courses/${props.courseId}/homeworks/manage`
+    : `/courses/${props.courseId}/homeworks`
+));
 const gradeHref = computed(() => (
-  role.value === 'student'
-    ? `/courses/${props.courseId}/grades?role=student`
-    : `/courses/${props.courseId}/grd/grade-items?role=teacher`
+  props.manageable
+    ? `/courses/${props.courseId}/grades/manage/table`
+    : `/courses/${props.courseId}/grades`
 ));
 
 const activeSection = computed(() => {
