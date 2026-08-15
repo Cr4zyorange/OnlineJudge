@@ -14,6 +14,7 @@ describe('HomeworkStudentView', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     window.history.replaceState({}, '', '/courses/101/homeworks/11?role=student');
+    vi.mocked(homeworkApi.listMyHomeworkSubmissions).mockResolvedValue([]);
     vi.mocked(learningRecordsApi.reportLearningRecord).mockResolvedValue({
       id: 1,
       courseId: 101,
@@ -105,6 +106,150 @@ describe('HomeworkStudentView', () => {
     expect(wrapper.text()).not.toContain('Submission');
     expect(wrapper.text()).not.toContain('SUBMITTED');
     expect(wrapper.text()).not.toContain('UNREVIEWED');
+  });
+
+  it('restores the latest submission and visible evaluation when reopening the homework', async () => {
+    vi.mocked(homeworkApi.getHomeworkDetail).mockResolvedValueOnce(homeworkDetail({
+      title: '数据结构第二次作业',
+      type: 'CODE',
+      languageLimitJson: '["python"]'
+    }));
+    vi.mocked(homeworkApi.listMyHomeworkSubmissions).mockResolvedValueOnce([
+      {
+        submissionId: 95,
+        homeworkId: 11,
+        studentId: 601,
+        submitStatus: 'SUBMITTED',
+        evaluationStatus: 'WRONG_ANSWER',
+        reviewStatus: 'UNREVIEWED',
+        version: 2,
+        final: false,
+        submittedAt: '2026-06-01T09:00:00'
+      },
+      {
+        submissionId: 96,
+        homeworkId: 11,
+        studentId: 601,
+        submitStatus: 'SUBMITTED',
+        evaluationStatus: 'ACCEPTED',
+        reviewStatus: 'REVIEWED',
+        finalScore: 98,
+        version: 3,
+        final: true,
+        submittedAt: '2026-06-01T10:00:00'
+      }
+    ]);
+    vi.mocked(homeworkApi.getHomeworkSubmissionEvaluation).mockResolvedValueOnce({
+      evaluationId: 802,
+      submissionId: 96,
+      evaluationStatus: 'ACCEPTED',
+      score: 98,
+      passedCases: 8,
+      totalCases: 8,
+      durationMs: 42,
+      feedback: '全部测试通过',
+      reevaluation: false,
+      startedAt: '2026-06-01T10:00:00',
+      finishedAt: '2026-06-01T10:00:01'
+    });
+
+    const wrapper = mount(HomeworkStudentView, {
+      props: {
+        courseId: 101,
+        homeworkId: 11
+      }
+    });
+    await flushPromises();
+
+    expect(homeworkApi.listMyHomeworkSubmissions).toHaveBeenCalledWith(11);
+    expect(homeworkApi.getHomeworkSubmissionEvaluation).toHaveBeenCalledWith(96);
+    expect(wrapper.get('[data-testid="homework-status-summary"]').text()).toContain('已发布');
+    expect(wrapper.get('[data-testid="homework-deadline-summary"]').text()).toContain('截止时间');
+    expect(wrapper.get('[data-testid="homework-submission-summary"]').text()).toContain('版本 3');
+    expect(wrapper.get('[data-testid="homework-submission-summary"]').text()).toContain('已提交');
+    expect(wrapper.get('[data-testid="homework-submission-summary"]').text()).toContain('通过');
+    expect(wrapper.get('[data-testid="homework-history-link"]').attributes('href'))
+      .toBe('/courses/101/homeworks/11/submissions');
+    expect(wrapper.find('.homework-student__workspace').exists()).toBe(true);
+    expect(wrapper.find('.homework-student__submission-pane').exists()).toBe(true);
+    expect(wrapper.get('[aria-label="评测结果"]').text()).toContain('全部测试通过');
+  });
+
+  it('keeps evaluation and scores hidden until the homework permits result visibility', async () => {
+    vi.mocked(homeworkApi.getHomeworkDetail).mockResolvedValueOnce(homeworkDetail({
+      showEvaluationBeforePublish: false
+    }));
+    vi.mocked(homeworkApi.listMyHomeworkSubmissions).mockResolvedValueOnce([{
+      submissionId: 97,
+      homeworkId: 11,
+      studentId: 601,
+      submitStatus: 'SUBMITTED',
+      evaluationStatus: 'ACCEPTED',
+      reviewStatus: 'REVIEWED',
+      finalScore: 99,
+      version: 1,
+      final: true,
+      submittedAt: '2026-06-01T10:00:00'
+    }]);
+
+    const wrapper = mount(HomeworkStudentView, {
+      props: {
+        courseId: 101,
+        homeworkId: 11
+      }
+    });
+    await flushPromises();
+
+    expect(homeworkApi.getHomeworkSubmissionEvaluation).not.toHaveBeenCalled();
+    expect(wrapper.get('[data-testid="homework-submission-summary"]').text()).toContain('评测结果待发布');
+    expect(wrapper.find('[aria-label="评测结果"]').exists()).toBe(false);
+    expect(wrapper.get('[data-testid="homework-latest-submission"]').text()).not.toContain('得分 99');
+  });
+
+  it('blocks submission after the deadline when late submission is disabled', async () => {
+    vi.mocked(homeworkApi.getHomeworkDetail).mockResolvedValueOnce(homeworkDetail({
+      deadline: '2020-06-30T23:59:59',
+      allowLateSubmit: false
+    }));
+
+    const wrapper = mount(HomeworkStudentView, {
+      props: {
+        courseId: 101,
+        homeworkId: 11
+      }
+    });
+    await flushPromises();
+
+    expect(wrapper.get('[data-testid="homework-status-summary"]').text()).toContain('已截止');
+    expect(wrapper.text()).toContain('已超过截止时间，当前不允许提交');
+    expect(wrapper.get('[data-testid="homework-primary-submit"]').attributes('disabled')).toBeDefined();
+
+    await wrapper.get('form').trigger('submit');
+    await flushPromises();
+
+    expect(homeworkApi.submitHomework).not.toHaveBeenCalled();
+    expect(wrapper.text()).toContain('已超过截止时间，当前不允许提交');
+  });
+
+  it('renders localized page loading and failure states', async () => {
+    let rejectDetail: ((reason?: unknown) => void) | undefined;
+    vi.mocked(homeworkApi.getHomeworkDetail).mockImplementationOnce(() => new Promise((_, reject) => {
+      rejectDetail = reject;
+    }));
+
+    const wrapper = mount(HomeworkStudentView, {
+      props: {
+        courseId: 101,
+        homeworkId: 11
+      }
+    });
+
+    expect(wrapper.get('[data-testid="homework-page-loading"]').text()).toContain('正在加载作业');
+
+    rejectDetail?.(null);
+    await flushPromises();
+
+    expect(wrapper.get('[data-testid="homework-page-error"]').text()).toContain('作业详情加载失败');
   });
 
   it('shows validation errors before sending an empty text submission', async () => {
@@ -434,7 +579,7 @@ function homeworkDetail(overrides: Partial<HomeworkDetail> = {}): HomeworkDetail
     description: 'Explain your algorithm.',
     type: 'TEXT',
     status: 'PUBLISHED',
-    deadline: '2026-06-30T23:59:59',
+    deadline: '2099-06-30T23:59:59',
     totalScore: 100,
     allowResubmit: true,
     allowLateSubmit: false,

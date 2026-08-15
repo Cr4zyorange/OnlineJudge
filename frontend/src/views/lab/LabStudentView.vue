@@ -215,7 +215,7 @@ const languageOptions = computed(() => {
   }
   return raw.split(',').map((item) => item.trim()).filter(Boolean);
 });
-const historyHref = computed(() => `/courses/${props.courseId}/labs/${props.labId}/submissions?role=student`);
+const historyHref = computed(() => `/courses/${props.courseId}/labs/${props.labId}/submissions`);
 
 onMounted(loadLabDetail);
 onUnmounted(clearEvaluationPoll);

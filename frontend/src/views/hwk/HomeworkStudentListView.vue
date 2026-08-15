@@ -17,7 +17,7 @@
           </div>
           <a
             :data-testid="`open-homework-${homework.id}`"
-            :href="`/courses/${props.courseId}/homeworks/${homework.id}?role=student`"
+            :href="`/courses/${props.courseId}/homeworks/${homework.id}`"
           >查看</a>
         </li>
       </ul>

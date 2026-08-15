@@ -147,7 +147,7 @@ describe('HomeworkTeacherView', () => {
     await flushPromises();
 
     expect(wrapper.get('[data-testid="review-homework-submissions-7"]').attributes('href'))
-      .toBe('/courses/101/homeworks/7/submissions?role=teacher');
+      .toBe('/courses/101/homeworks/7/manage/submissions');
   });
 
   it('loads homework statistics and publishes scores from the management table', async () => {

@@ -42,7 +42,7 @@ describe('HomeworkStudentListView', () => {
     expect(wrapper.text()).not.toContain('due');
     expect(wrapper.get('[data-testid="open-homework-11"]').text()).toBe('查看');
     expect(wrapper.get('[data-testid="open-homework-11"]').attributes('href'))
-      .toBe('/courses/101/homeworks/11?role=student');
+      .toBe('/courses/101/homeworks/11');
   });
 
   it('renders an empty state when no homework is visible', async () => {
