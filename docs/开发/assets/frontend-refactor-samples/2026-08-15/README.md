@@ -59,7 +59,7 @@ Vue Router 4 使用 HTML5 history 和懒加载 route records；`App.vue` 只承�
 
 | 验证 | 结果 |
 | --- | --- |
-| `npm run test:unit` | 38 个文件、201 项测试全部通过 |
+| `npm run test:unit` | 38 个文件、204 项测试全部通过 |
 | `npm run typecheck` | 通过 |
 | `npm run build` | 144 个模块，通过 |
 | `git diff --check` | 通过 |
