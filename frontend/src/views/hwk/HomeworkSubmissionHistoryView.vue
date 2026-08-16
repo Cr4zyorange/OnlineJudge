@@ -220,7 +220,9 @@ const evaluationStatusOptions: HomeworkEvaluationStatus[] = [
 const reviewStatusOptions: HomeworkReviewStatus[] = ['UNREVIEWED', 'REVIEWED', 'NEED_REVIEW'];
 
 const isTeacher = computed(() => props.role === 'teacher');
-const backHref = computed(() => `/courses/${props.courseId}/homeworks/${props.homeworkId}?role=${props.role}`);
+const backHref = computed(() => isTeacher.value
+  ? `/courses/${props.courseId}/homeworks/manage`
+  : `/courses/${props.courseId}/homeworks/${props.homeworkId}`);
 
 onMounted(loadSubmissions);
 

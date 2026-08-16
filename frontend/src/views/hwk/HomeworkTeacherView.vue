@@ -197,7 +197,7 @@
               <a
                 v-if="homework.status !== 'DRAFT'"
                 :data-testid="`review-homework-submissions-${homework.id}`"
-                :href="`/courses/${props.courseId}/homeworks/${homework.id}/submissions?role=teacher`"
+                :href="`/courses/${props.courseId}/homeworks/${homework.id}/manage/submissions`"
               >查看提交</a>
             </td>
           </tr>

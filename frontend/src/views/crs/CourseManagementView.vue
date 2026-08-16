@@ -437,12 +437,6 @@
       :data-testid="isConcreteCoursePage ? 'course-detail-page' : undefined"
       @click.self="closeFloatingCourseDetail"
     >
-      <CourseContextNavigation
-        v-if="isConcreteCoursePage && canViewCourseContent(selectedCourse)"
-        class="course-home-nav"
-        :course-id="selectedCourse.id"
-        :current-path="currentPath"
-      />
       <section
         :class="[
           isConcreteCoursePage ? 'course-home course-home__summary' : 'course-modal',
@@ -476,6 +470,7 @@
           class="modal-module-nav"
           :course-id="selectedCourse.id"
           :current-path="currentPath"
+          :manageable="selectedCourse.manageable"
         />
 
         <aside v-if="canViewCourseContent(selectedCourse)" class="announcement-sidebar" data-testid="course-announcement-sidebar">
@@ -667,8 +662,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed, defineComponent, h, onMounted, onUnmounted, reactive, ref } from 'vue';
+import { computed, defineComponent, h, inject, onMounted, onUnmounted, reactive, ref } from 'vue';
 import type { Component, VNode } from 'vue';
+import { routerKey } from 'vue-router';
 import CourseContextNavigation from '../../components/CourseContextNavigation.vue';
 import {
   archiveCourse,
@@ -700,6 +696,8 @@ import { saveLearningProgress } from '../../api/lrn/learningProgress';
 import { reportLearningRecord } from '../../api/lrn/learningRecords';
 import type { CourseScope } from '../../api/crs/courses';
 import type { AnnouncementPayload, Chapter, ChapterPayload, Course, CourseAnnouncement, CourseMember, CoursePayload, CourseRecentTask, CourseResource, ResourcePayload } from '../../types/crs';
+
+const appRouter = inject(routerKey, null);
 
 const ChapterNode: Component = defineComponent({
   name: 'ChapterNode',
@@ -1191,6 +1189,10 @@ async function openAnnouncementManagement(course: Course) {
 
 async function enterCourse(course: Course) {
   rememberCourseContext(course.id);
+  if (appRouter) {
+    await appRouter.push(`/courses/${course.id}`);
+    return;
+  }
   window.history.pushState({}, '', `/courses/${course.id}`);
   syncCourseLocation();
   scrollToPageTop();
@@ -1203,37 +1205,39 @@ async function enterCourseOrTargetModule(course: Course) {
     await enterCourse(course);
     return;
   }
-  enterTargetModule(course);
+  await enterTargetModule(course);
 }
 
-function enterTargetModule(course: Course) {
+async function enterTargetModule(course: Course) {
   rememberCourseContext(course.id);
-  window.history.pushState({}, '', targetModuleUrl(course));
+  const destination = targetModuleUrl(course);
+  if (appRouter) {
+    await appRouter.push(destination);
+    return;
+  }
+  window.history.pushState({}, '', destination);
   syncCourseLocation();
   scrollToPageTop();
   window.dispatchEvent(new Event('onlinejudge:navigation'));
 }
 
 function targetModuleUrl(course: Course) {
-  const role = course.manageable ? 'teacher' : currentCourseRole();
   if (targetModule.value === 'labs') {
-    return `/courses/${course.id}/labs?role=${role}`;
+    return course.manageable
+      ? `/courses/${course.id}/labs/manage`
+      : `/courses/${course.id}/labs`;
   }
   if (targetModule.value === 'homeworks') {
-    return `/courses/${course.id}/homeworks?role=${role}`;
+    return course.manageable
+      ? `/courses/${course.id}/homeworks/manage`
+      : `/courses/${course.id}/homeworks`;
   }
   if (targetModule.value === 'grades') {
-    return role === 'student'
-      ? `/courses/${course.id}/grades?role=student`
-      : `/courses/${course.id}/grd/grade-items?role=teacher`;
+    return course.manageable
+      ? `/courses/${course.id}/grades/manage/table`
+      : `/courses/${course.id}/grades`;
   }
   return `/courses/${course.id}`;
-}
-
-function currentCourseRole() {
-  const storedRole = window.localStorage.getItem('onlinejudge.userRole')
-    ?? window.localStorage.getItem('onlinejudge.role');
-  return storedRole === 'STUDENT' ? 'student' : 'teacher';
 }
 
 function rememberCourseContext(courseId: number) {

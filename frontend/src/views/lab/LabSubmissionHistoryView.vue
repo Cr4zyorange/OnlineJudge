@@ -73,7 +73,7 @@ const detail = ref<LabSubmissionDetail | null>(null);
 const errorMessage = ref('');
 const detailErrorMessage = ref('');
 
-const backHref = computed(() => `/courses/${props.courseId}/labs/${props.labId}?role=student`);
+const backHref = computed(() => `/courses/${props.courseId}/labs/${props.labId}`);
 
 onMounted(loadHistory);
 

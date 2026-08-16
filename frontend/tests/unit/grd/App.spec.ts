@@ -1,764 +1,148 @@
-import { mount } from '@vue/test-utils';
+import { flushPromises, mount, type VueWrapper } from '@vue/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { createMemoryHistory, type Router } from 'vue-router';
 import App from '../../../src/app/App.vue';
+import { createAppRouter } from '../../../src/app/router';
+import * as authApi from '../../../src/api/auth/auth';
 import * as courseApi from '../../../src/api/crs/courses';
-import * as gradeItemApi from '../../../src/api/grd/gradeItems';
-import * as gradeRecordsApi from '../../../src/api/grd/gradeRecords';
-import * as homeworkApi from '../../../src/api/hwk/homeworks';
 import * as labApi from '../../../src/api/lab/labs';
-import * as learningProgressApi from '../../../src/api/lrn/learningProgress';
-import * as learningRecordsApi from '../../../src/api/lrn/learningRecords';
-import * as learningTasksApi from '../../../src/api/lrn/learningTasks';
+import type { AuthUser } from '../../../src/api/auth/auth';
+import type { Course } from '../../../src/types/crs';
 
-vi.mock('../../../src/api/grd/gradeItems');
-vi.mock('../../../src/api/grd/gradeRecords');
+vi.mock('../../../src/api/auth/auth');
 vi.mock('../../../src/api/crs/courses');
-vi.mock('../../../src/api/hwk/homeworks');
 vi.mock('../../../src/api/lab/labs');
-vi.mock('../../../src/api/lrn/learningProgress');
-vi.mock('../../../src/api/lrn/learningRecords');
-vi.mock('../../../src/api/lrn/learningTasks');
 
-describe('App', () => {
-  const originalLocation = window.location;
+describe('App routed shell integration', () => {
+  let wrapper: VueWrapper | null = null;
 
   beforeEach(() => {
-    installLocalStorageMock();
-    window.localStorage.setItem('onlinejudge.authToken', 'teacher-token');
-    window.localStorage.setItem('onlinejudge.userId', '101');
-    window.localStorage.setItem('onlinejudge.userRole', 'TEACHER');
-    window.localStorage.setItem('onlinejudge.username', 'Teacher101');
-    vi.mocked(learningProgressApi.saveLearningProgress).mockResolvedValue({
-      progressId: 1,
-      courseId: 101,
-      courseName: 'Course 101',
-      chapterId: null,
-      chapterName: null,
-      sourceModule: 'LAB',
-      sourceId: 7,
-      progressPercent: 10,
-      status: 'IN_PROGRESS',
-      lastPosition: 'labId=7',
-      continueUrl: '/courses/101/labs/7',
-      updatedAt: '2026-06-02T08:00:00'
-    });
-    vi.mocked(learningRecordsApi.reportLearningRecord).mockResolvedValue({
-      id: 1,
-      courseId: 101,
-      courseName: 'Course 101',
-      sourceModule: 'LAB',
-      sourceId: 7,
-      actionType: 'ACCESS',
-      durationSeconds: 0,
-      startedAt: '2026-06-02T08:00:00',
-      endedAt: '2026-06-02T08:00:00'
-    });
+    vi.resetAllMocks();
+    vi.mocked(authApi.getCurrentUser).mockResolvedValue(user('STUDENT'));
+    vi.mocked(courseApi.listCourses).mockResolvedValue({ list: [], total: 0, page: 1, size: 20 });
+    vi.mocked(courseApi.getCourse).mockResolvedValue(course());
+    vi.mocked(labApi.listLabs).mockResolvedValue([]);
+    vi.mocked(labApi.listLabSubmissions).mockResolvedValue([]);
   });
 
   afterEach(() => {
-    vi.resetAllMocks();
-    Object.defineProperty(window, 'location', {
-      configurable: true,
-      value: originalLocation
-    });
+    wrapper?.unmount();
+    wrapper = null;
   });
 
-  it('keeps the root route on the course center while rendering the global notch navigation', async () => {
-    vi.mocked(courseApi.listCourses).mockResolvedValue({ list: [], total: 0, page: 1, size: 20 });
-    Object.defineProperty(window, 'location', {
-      configurable: true,
-      value: new URL('http://localhost/')
-    });
+  it('renders the platform shell and course center on the root route', async () => {
+    const mounted = await mountAt('/');
 
-    const wrapper = mount(App);
+    expect(mounted.router.currentRoute.value.name).toBe('courses');
+    expect(mounted.wrapper.get('[data-testid="skip-to-content"]').attributes('href')).toBe('#main-content');
+    expect(mounted.wrapper.find('#main-content').exists()).toBe(true);
+    expect(mounted.wrapper.findAll('[data-testid="platform-navigation"]')).toHaveLength(1);
+    expect(mounted.wrapper.get('[data-testid="platform-nav-courses"]').attributes('href')).toBe('/courses');
+    expect(mounted.wrapper.get('[data-testid="platform-nav-learning"]').attributes('href')).toBe('/learning/tasks');
+    expect(mounted.wrapper.find('[data-testid="course-context-navigation"]').exists()).toBe(false);
+    expect(mounted.wrapper.text()).toContain('全部课程');
+    expect(authApi.getCurrentUser).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders a role-free course shell and the student LAB task list from CRS access', async () => {
+    vi.mocked(courseApi.getCourse).mockResolvedValue(course({ manageable: false }));
+
+    const mounted = await mountAt('/courses/42/labs?role=teacher');
+
+    expect(mounted.router.currentRoute.value.fullPath).toBe('/courses/42/labs');
+    expect(mounted.wrapper.findAll('[data-testid="platform-navigation"]')).toHaveLength(1);
+    expect(mounted.wrapper.findAll('[data-testid="course-context-navigation"]')).toHaveLength(1);
+    expect(mounted.wrapper.get('[data-testid="course-nav-labs"]').attributes('href')).toBe('/courses/42/labs');
+    expect(mounted.wrapper.get('[data-testid="course-nav-homeworks"]').attributes('href')).toBe('/courses/42/homeworks');
+    expect(mounted.wrapper.get('[data-testid="course-nav-grades"]').attributes('href')).toBe('/courses/42/grades');
+    expect(mounted.wrapper.text()).toContain('课程实验');
+    expect(mounted.wrapper.text()).toContain('当前筛选下没有实验');
+    expect(courseApi.getCourse).toHaveBeenCalledWith(42);
+  });
+
+  it('renders the dedicated teacher LAB submission workspace for a CRS manager', async () => {
+    vi.mocked(authApi.getCurrentUser).mockResolvedValue(user('TEACHER'));
+    vi.mocked(courseApi.getCourse).mockResolvedValue(course({ manageable: true }));
+
+    const mounted = await mountAt('/courses/42/labs/9/manage/submissions');
+
+    expect(mounted.router.currentRoute.value.name).toBe('lab-submission-workspace');
+    expect(mounted.wrapper.get('[data-testid="course-nav-labs"]').attributes('href')).toBe('/courses/42/labs/manage');
+    expect(mounted.wrapper.text()).toContain('实验提交工作台');
+    expect(mounted.wrapper.text()).toContain('暂无符合条件的提交');
+    expect(labApi.listLabSubmissions).toHaveBeenCalledWith(9, {});
+  });
+
+  it('renders 403 instead of a teacher workspace for a course member without manage access', async () => {
+    vi.mocked(courseApi.getCourse).mockResolvedValue(course({ manageable: false }));
+
+    const mounted = await mountAt('/courses/42/labs/9/manage/submissions');
+
+    expect(mounted.router.currentRoute.value.name).toBe('forbidden');
+    expect(mounted.wrapper.text()).toContain('无权限访问');
+    expect(mounted.wrapper.text()).not.toContain('实验提交工作台');
+  });
+
+  it('renders an explicit not-found page for unknown URLs', async () => {
+    const mounted = await mountAt('/does/not/exist');
+
+    expect(mounted.router.currentRoute.value.name).toBe('not-found');
+    expect(mounted.wrapper.text()).toContain('页面不存在');
+    expect(authApi.getCurrentUser).not.toHaveBeenCalled();
+  });
+
+  it('lets API auth failures hand navigation back to Vue Router', async () => {
+    const mounted = await mountAt('/courses');
+    window.history.replaceState({}, '', '/403');
+
+    window.dispatchEvent(new Event('onlinejudge:navigation'));
     await flushPromises();
 
-    expect(wrapper.findAll('[data-testid="platform-navigation"]')).toHaveLength(1);
-    expect(wrapper.get('[data-testid="platform-nav-courses"]').attributes('href')).toBe('/courses');
-    expect(wrapper.get('[data-testid="platform-nav-learning"]').attributes('href')).toBe('/learning/tasks');
-    expect(wrapper.find('[data-testid="platform-nav-labs"]').exists()).toBe(false);
-    expect(wrapper.find('[data-testid="platform-nav-homeworks"]').exists()).toBe(false);
-    expect(wrapper.find('[data-testid="platform-nav-grades"]').exists()).toBe(false);
-    expect(wrapper.find('[data-testid="course-context-navigation"]').exists()).toBe(false);
-    expect(wrapper.text()).toContain('全部课程');
-    expect(wrapper.text()).not.toContain('平台导航');
-    expect(courseApi.listCourses).toHaveBeenCalledWith('', 'all');
+    expect(mounted.router.currentRoute.value.name).toBe('forbidden');
+    expect(mounted.wrapper.text()).toContain('无权限访问');
   });
 
-  it('keeps course modules out of the global navigation on the course overview', async () => {
-    window.localStorage.setItem('onlinejudge.currentCourseId', '808');
-    vi.mocked(courseApi.listCourses).mockResolvedValue({ list: [], total: 0, page: 1, size: 20 });
-    Object.defineProperty(window, 'location', {
-      configurable: true,
-      value: new URL('http://localhost/courses')
-    });
-
-    const wrapper = mount(App);
-    await flushPromises();
-
-    expect(wrapper.find('[data-testid="platform-nav-labs"]').exists()).toBe(false);
-    expect(wrapper.find('[data-testid="platform-nav-homeworks"]').exists()).toBe(false);
-    expect(wrapper.find('[data-testid="platform-nav-grades"]').exists()).toBe(false);
-    expect(wrapper.find('[data-testid="course-context-navigation"]').exists()).toBe(false);
-  });
-
-  it('renders course module navigation only after entering a concrete course', async () => {
-    vi.mocked(courseApi.listCourses).mockResolvedValue({ list: [], total: 0, page: 1, size: 20 });
-    vi.mocked(courseApi.getCourse).mockResolvedValueOnce({
-      id: 808,
-      name: '课程 808',
-      description: '课程内模块导航',
-      teacherId: 2,
-      teacherName: '教师2',
-      semester: '2026 Spring',
-      category: 'SE',
-      coverUrl: undefined,
-      enrollmentMode: 'PUBLIC',
-      inviteCode: undefined,
-      maxStudents: undefined,
-      startDate: undefined,
-      endDate: undefined,
-      status: 'ACTIVE',
-      memberCount: 3,
-      member: true,
-      manageable: false,
-      createdAt: '2026-06-01T08:00:00',
-      updatedAt: '2026-06-01T08:00:00'
-    });
-    vi.mocked(courseApi.listChapters).mockResolvedValueOnce([]);
-    vi.mocked(courseApi.listResources).mockResolvedValueOnce([]);
-    Object.defineProperty(window, 'location', {
-      configurable: true,
-      value: new URL('http://localhost/courses/808')
-    });
-
-    const wrapper = mount(App);
-    await flushPromises();
-
-    expect(wrapper.find('[data-testid="platform-nav-labs"]').exists()).toBe(false);
-    expect(wrapper.find('[data-testid="course-context-navigation"]').exists()).toBe(true);
-    expect(wrapper.find('.modal-backdrop').exists()).toBe(false);
-    expect(wrapper.find('.course-modal').exists()).toBe(false);
-    expect(wrapper.find('[data-testid="course-detail-page"]').exists()).toBe(true);
-    expect(wrapper.find('.course-home').exists()).toBe(true);
-    expect(wrapper.find('.course-home__summary').exists()).toBe(true);
-    expect(wrapper.get('[data-testid="course-nav-home"]').attributes('href')).toBe('/courses/808');
-    expect(wrapper.get('[data-testid="course-nav-labs"]').attributes('href')).toBe('/courses/808/labs?role=teacher');
-    expect(wrapper.get('[data-testid="course-nav-homeworks"]').attributes('href')).toBe('/courses/808/homeworks?role=teacher');
-    expect(wrapper.get('[data-testid="course-nav-grades"]').attributes('href')).toBe('/courses/808/grd/grade-items?role=teacher');
-  });
-
-  it('routes student grade module navigation to the student grade analysis page', async () => {
-    window.localStorage.setItem('onlinejudge.userRole', 'STUDENT');
-    vi.mocked(gradeRecordsApi.getMyPublishedGrades).mockResolvedValueOnce({
-      studentId: 101,
-      records: [],
-      summary: null
-    });
-    Object.defineProperty(window, 'location', {
-      configurable: true,
-      value: new URL('http://localhost/courses/808/grades?role=student')
-    });
-
-    const wrapper = mount(App);
-    await flushPromises();
-
-    expect(wrapper.get('[data-testid="course-nav-grades"]').attributes('href')).toBe('/courses/808/grades?role=student');
-    expect(wrapper.get('[data-testid="course-nav-grades"]').classes()).toContain('active');
-  });
-
-  it('guides users to pick a course when module navigation has no active course context', async () => {
-    vi.mocked(courseApi.listCourses).mockResolvedValue({
-      list: [{
-        id: 909,
-        name: '实验课程',
-        description: '进入实验模块前先选择课程',
-        teacherId: 2,
-        teacherName: '教师2',
-        semester: '2026 Spring',
-        category: 'SE',
-        coverUrl: undefined,
-        enrollmentMode: 'PUBLIC',
-        inviteCode: undefined,
-        maxStudents: undefined,
-        startDate: undefined,
-        endDate: undefined,
-        status: 'ACTIVE',
-        memberCount: 3,
-        member: true,
-        manageable: false,
-        createdAt: '2026-06-01T08:00:00',
-        updatedAt: '2026-06-01T08:00:00'
-      }],
-      total: 1,
-      page: 1,
-      size: 20
-    });
-    Object.defineProperty(window, 'location', {
-      configurable: true,
-      value: new URL('http://localhost/courses?target=labs')
-    });
-
-    const wrapper = mount(App);
-    await flushPromises();
-
-    expect(wrapper.text()).toContain('选择课程进入实训模块');
-    expect(wrapper.text()).toContain('进入实训模块');
-  });
-
-  it('renders the merged course management page on the course route', async () => {
-    vi.mocked(courseApi.listCourses).mockResolvedValueOnce({ list: [], total: 0, page: 1, size: 20 });
-    vi.mocked(courseApi.listCourses).mockResolvedValueOnce({ list: [], total: 0, page: 1, size: 20 });
-    vi.mocked(courseApi.listCourses).mockResolvedValueOnce({ list: [], total: 0, page: 1, size: 20 });
-    vi.mocked(courseApi.listCourses).mockResolvedValueOnce({ list: [], total: 0, page: 1, size: 20 });
-    Object.defineProperty(window, 'location', {
-      configurable: true,
-      value: new URL('http://localhost/courses')
-    });
-
-    const wrapper = mount(App);
-    await flushPromises();
-
-    expect(wrapper.findAll('[data-testid="platform-navigation"]')).toHaveLength(1);
-    expect(courseApi.listCourses).toHaveBeenCalledWith('', 'all');
-    expect(wrapper.text()).toContain('全部课程');
-  });
-
-  it('retains the global notch navigation on the learning task route', async () => {
-    vi.mocked(learningTasksApi.listLearningTasks).mockResolvedValueOnce({
-      records: [],
-      total: 0,
-      page: 1,
-      size: 20
-    });
-    Object.defineProperty(window, 'location', {
-      configurable: true,
-      value: new URL('http://localhost/learning/tasks')
-    });
-
-    const wrapper = mount(App);
-    await flushPromises();
-
-    expect(wrapper.findAll('[data-testid="platform-navigation"]')).toHaveLength(1);
-    expect(wrapper.get('[data-testid="platform-nav-courses"]').attributes('href')).toBe('/courses');
-    expect(wrapper.get('[data-testid="platform-nav-learning"]').attributes('href')).toBe('/learning/tasks');
-    expect(wrapper.text()).toContain('学习任务中心');
-  });
-
-  it('passes course id from route query into the grade item configuration page', async () => {
-    vi.mocked(gradeItemApi.listGradeItems).mockResolvedValueOnce([]);
-    Object.defineProperty(window, 'location', {
-      configurable: true,
-      value: new URL('http://localhost/grd/grade-items?courseId=303')
-    });
-
-    mount(App);
-    await flushPromises();
-
-    expect(gradeItemApi.listGradeItems).toHaveBeenCalledWith(303);
-  });
-
-  it('passes course id from course route path into the grade item configuration page', async () => {
-    vi.mocked(gradeItemApi.listGradeItems).mockResolvedValueOnce([]);
-    Object.defineProperty(window, 'location', {
-      configurable: true,
-      value: new URL('http://localhost/courses/404/grd/grade-items')
-    });
-
-    mount(App);
-    await flushPromises();
-
-    expect(gradeItemApi.listGradeItems).toHaveBeenCalledWith(404);
-    expect(window.localStorage.setItem).toHaveBeenCalledWith('onlinejudge.currentCourseId', '404');
-  });
-
-  it('routes course grade table paths to the teacher grade table page', async () => {
-    vi.mocked(gradeRecordsApi.listCourseGrades).mockResolvedValueOnce({
-      records: [],
-      total: 0,
-      page: 1,
-      size: 20
-    });
-    Object.defineProperty(window, 'location', {
-      configurable: true,
-      value: new URL('http://localhost/courses/505/grd/grades')
-    });
-
-    mount(App);
-    await flushPromises();
-
-    expect(gradeRecordsApi.listCourseGrades).toHaveBeenCalledWith(505, { page: 1, size: 20 });
-    expect(gradeItemApi.listGradeItems).not.toHaveBeenCalled();
-  });
-
-  it('keeps the student grade page on course grade paths when role is student', async () => {
-    window.localStorage.setItem('onlinejudge.userRole', 'STUDENT');
-    vi.mocked(gradeRecordsApi.getMyPublishedGrades).mockResolvedValueOnce({
-      studentId: 101,
-      records: [],
-      summary: null
-    });
-    Object.defineProperty(window, 'location', {
-      configurable: true,
-      value: new URL('http://localhost/courses/505/grades?role=student')
-    });
-
-    const wrapper = mount(App);
-    await flushPromises();
-
-    expect(gradeRecordsApi.getMyPublishedGrades).toHaveBeenCalledWith(505);
-    expect(gradeRecordsApi.listCourseGrades).not.toHaveBeenCalled();
-    expect(wrapper.find('[data-testid="final-score"]').exists()).toBe(true);
-  });
-
-  it('routes logged-in students from the lab detail path to the student lab page', async () => {
-    window.localStorage.setItem('onlinejudge.userRole', 'STUDENT');
-    vi.mocked(labApi.getLabDetail).mockResolvedValueOnce({
-      id: 7,
-      courseId: 101,
-      chapterId: null,
-      title: '学生实验详情',
-      description: '从登录角色进入学生提交页',
-      status: 'PUBLISHED',
-      deadline: '2026-06-30T23:59:59',
-      maxScore: 100,
-      attachmentIds: [],
-      allowedLanguages: 'java,python',
-      evaluationMode: 'DOCKER_IO',
-      autoEvaluate: true,
-      reportRequired: false,
-      timeLimitMs: 60000,
-      memoryLimitKb: 262144,
-      deleted: false,
-      testcases: []
-    });
-    vi.mocked(labApi.listLabSubmissions).mockResolvedValueOnce([]);
-    Object.defineProperty(window, 'location', {
-      configurable: true,
-      value: new URL('http://localhost/courses/101/labs/7')
-    });
-
-    const wrapper = mount(App);
-    await flushPromises();
-
-    expect(labApi.getLabDetail).toHaveBeenCalledWith(7);
-    expect(labApi.listLabs).not.toHaveBeenCalled();
-    expect(wrapper.text()).toContain('学生实验详情');
-  });
-
-  it('routes logged-in students from lab center paths to the student lab list page', async () => {
-    window.localStorage.setItem('onlinejudge.userRole', 'STUDENT');
-    vi.mocked(labApi.listLabs).mockResolvedValueOnce([
-      {
-        id: 17,
-        courseId: 101,
-        title: '学生可见实验',
-        status: 'PUBLISHED',
-        deadline: '2026-06-30T23:59:59',
-        maxScore: 100,
-        evaluationMode: 'DOCKER_IO',
-        autoEvaluate: true,
-        reportRequired: false,
-        deleted: false
+  async function mountAt(path: string) {
+    const router = createAppRouter({
+      history: createMemoryHistory(),
+      services: {
+        loadCurrentUser: authApi.getCurrentUser,
+        loadCourse: courseApi.getCourse
       }
-    ]);
-    Object.defineProperty(window, 'location', {
-      configurable: true,
-      value: new URL('http://localhost/courses/101/labs?role=student')
     });
-
-    const wrapper = mount(App);
+    await router.push(path);
+    await router.isReady();
+    wrapper = mount(App, { global: { plugins: [router] } });
     await flushPromises();
-
-    expect(labApi.listLabs).toHaveBeenCalledWith(101);
-    expect(gradeItemApi.listGradeItems).not.toHaveBeenCalled();
-    expect(wrapper.text()).toContain('学生可见实验');
-    expect(wrapper.get('[data-testid="open-lab-17"]').attributes('href')).toBe('/courses/101/labs/17?role=student');
-  });
-
-  it('routes student history paths to the lab submission history page', async () => {
-    window.localStorage.setItem('onlinejudge.userRole', 'STUDENT');
-    vi.mocked(labApi.listLabSubmissions).mockResolvedValueOnce([
-      {
-        submissionId: 401,
-        labId: 7,
-        studentId: 601,
-        language: 'python',
-        submitStatus: 'SUBMITTED',
-        evaluationStatus: 'ACCEPTED',
-        autoScore: 98,
-        finalScore: 99,
-        version: 3,
-        submittedAt: '2026-06-02T08:00:00',
-        isLatest: true,
-        isFinal: true,
-        isScoringBasis: true,
-        hasFile: false
-      }
-    ]);
-    Object.defineProperty(window, 'location', {
-      configurable: true,
-      value: new URL('http://localhost/courses/101/labs/7/submissions?role=student')
-    });
-
-    const wrapper = mount(App);
-    await flushPromises();
-
-    expect(labApi.listLabSubmissions).toHaveBeenCalledWith(7);
-    expect(labApi.getLabDetail).not.toHaveBeenCalled();
-    expect(wrapper.text()).toContain('提交历史');
-    expect(wrapper.text()).toContain('版本 3');
-  });
-
-  it('routes logged-in students from homework detail paths to the student homework page', async () => {
-    window.localStorage.setItem('onlinejudge.userRole', 'STUDENT');
-    vi.mocked(homeworkApi.getHomeworkDetail).mockResolvedValueOnce({
-      id: 11,
-      courseId: 101,
-      chapterId: null,
-      title: 'HWK02 text homework',
-      description: 'Explain your algorithm.',
-      type: 'TEXT',
-      status: 'PUBLISHED',
-      deadline: '2026-06-30T23:59:59',
-      totalScore: 100,
-      allowResubmit: true,
-      allowLateSubmit: false,
-      showEvaluationBeforePublish: true,
-      judgeConfigId: null,
-      createdBy: 501,
-      publishedAt: '2026-06-01T09:00:00',
-      deleted: false,
-      createdAt: '2026-05-30T12:00:00',
-      updatedAt: '2026-06-01T09:00:00',
-      questions: [],
-      testCases: []
-    });
-    Object.defineProperty(window, 'location', {
-      configurable: true,
-      value: new URL('http://localhost/courses/101/homeworks/11?role=student')
-    });
-
-    const wrapper = mount(App);
-    await flushPromises();
-
-    expect(homeworkApi.getHomeworkDetail).toHaveBeenCalledWith(11);
-    expect(homeworkApi.listHomeworks).not.toHaveBeenCalled();
-    expect(wrapper.text()).toContain('HWK02 text homework');
-  });
-
-  it('routes student homework submission paths to the HWK submission history page', async () => {
-    window.localStorage.setItem('onlinejudge.userRole', 'STUDENT');
-    vi.mocked(homeworkApi.listMyHomeworkSubmissions).mockResolvedValueOnce([
-      {
-        submissionId: 701,
-        homeworkId: 11,
-        studentId: 601,
-        submitType: 'TEXT',
-        answerText: 'history answer',
-        answerJson: null,
-        fileUrl: null,
-        language: null,
-        submitStatus: 'SUBMITTED',
-        evaluationStatus: 'NONE',
-        reviewStatus: 'UNREVIEWED',
-        autoScore: null,
-        manualScore: null,
-        finalScore: null,
-        comment: null,
-        version: 2,
-        final: true,
-        submittedAt: '2026-06-02T08:00:00'
-      }
-    ]);
-    Object.defineProperty(window, 'location', {
-      configurable: true,
-      value: new URL('http://localhost/courses/101/homeworks/11/submissions?role=student')
-    });
-
-    const wrapper = mount(App);
-    await flushPromises();
-
-    expect(homeworkApi.listMyHomeworkSubmissions).toHaveBeenCalledWith(11);
-    expect(homeworkApi.getHomeworkDetail).not.toHaveBeenCalled();
-    expect(wrapper.text()).toContain('提交历史');
-    expect(wrapper.text()).toContain('版本 2');
-  });
-
-  it('routes teacher homework submission paths to the HWK review form and review logs', async () => {
-    vi.mocked(homeworkApi.listHomeworkSubmissions).mockResolvedValueOnce({
-      list: [
-        {
-          submissionId: 801,
-          homeworkId: 11,
-          studentId: 601,
-          submitType: 'TEXT',
-          answerText: 'teacher route answer',
-          answerJson: null,
-          fileUrl: null,
-          language: null,
-          submitStatus: 'SUBMITTED',
-          evaluationStatus: 'NONE',
-          reviewStatus: 'UNREVIEWED',
-          autoScore: null,
-          manualScore: null,
-          finalScore: null,
-          comment: null,
-          version: 1,
-          final: true,
-          submittedAt: '2026-06-02T08:00:00'
-        }
-      ],
-      page: 1,
-      size: 20,
-      total: 1
-    });
-    vi.mocked(homeworkApi.getHomeworkSubmission).mockResolvedValueOnce({
-      submissionId: 801,
-      homeworkId: 11,
-      studentId: 601,
-      submitType: 'TEXT',
-      answerText: 'teacher route answer',
-      answerJson: null,
-      fileUrl: null,
-      language: null,
-      submitStatus: 'SUBMITTED',
-      evaluationStatus: 'NONE',
-      reviewStatus: 'UNREVIEWED',
-      autoScore: null,
-      manualScore: null,
-      finalScore: null,
-      comment: null,
-      version: 1,
-      final: true,
-      submittedAt: '2026-06-02T08:00:00'
-    });
-    vi.mocked(homeworkApi.getHomeworkSubmissionReviewLogs).mockResolvedValueOnce([
-      {
-        id: 901,
-        submissionId: 801,
-        homeworkId: 11,
-        studentId: 601,
-        operationType: 'REVIEW',
-        oldScore: null,
-        newScore: 88,
-        comment: 'checked from real course URL',
-        operatorId: 501,
-        reason: null,
-        createdAt: '2026-06-02T09:00:00'
-      }
-    ]);
-    Object.defineProperty(window, 'location', {
-      configurable: true,
-      value: new URL('http://localhost/courses/101/homeworks/11/submissions?role=teacher')
-    });
-
-    const wrapper = mount(App);
-    await flushPromises();
-    await wrapper.get('[data-submission-id="801"] button').trigger('click');
-    await flushPromises();
-
-    expect(homeworkApi.listHomeworkSubmissions).toHaveBeenCalledWith(
-      11,
-      expect.objectContaining({ page: 1, size: 20 })
-    );
-    expect(homeworkApi.getHomeworkSubmission).toHaveBeenCalledWith(801);
-    expect(homeworkApi.getHomeworkSubmissionReviewLogs).toHaveBeenCalledWith(801);
-    expect(wrapper.find('[data-testid="history-review-form"]').exists()).toBe(true);
-    expect(wrapper.find('[data-testid="history-review-logs"]').text()).toContain('checked from real course URL');
-  });
-
-  it('routes logged-in students from homework center paths to the student homework list page', async () => {
-    window.localStorage.setItem('onlinejudge.userRole', 'STUDENT');
-    vi.mocked(homeworkApi.listHomeworks).mockResolvedValueOnce({
-      list: [
-        {
-          id: 11,
-          courseId: 101,
-          title: 'HWK02 visible homework',
-          description: 'Read and submit.',
-          type: 'TEXT',
-          status: 'PUBLISHED',
-          deadline: '2026-06-30T23:59:59',
-          totalScore: 100,
-          allowResubmit: true,
-          allowLateSubmit: false,
-          showEvaluationBeforePublish: true,
-          deleted: false
-        }
-      ],
-      page: 1,
-      size: 20,
-      total: 1
-    });
-    Object.defineProperty(window, 'location', {
-      configurable: true,
-      value: new URL('http://localhost/courses/101/homeworks?role=student')
-    });
-
-    const wrapper = mount(App);
-    await flushPromises();
-
-    expect(homeworkApi.listHomeworks).toHaveBeenCalledWith({ courseId: 101, page: 1, size: 20 });
-    expect(gradeItemApi.listGradeItems).not.toHaveBeenCalled();
-    expect(wrapper.text()).toContain('HWK02 visible homework');
-  });
-
-  it('does not load grade items without an active course context', async () => {
-    Object.defineProperty(window, 'location', {
-      configurable: true,
-      value: new URL('http://localhost/grd/grade-items')
-    });
-
-    const wrapper = mount(App);
-    await flushPromises();
-
-    expect(gradeItemApi.listGradeItems).not.toHaveBeenCalled();
-    expect(wrapper.text()).toContain('缺少课程上下文');
-  });
-
-  it('checks the current user before rendering the administrator AUTH page', async () => {
-    window.localStorage.setItem('onlinejudge.authToken', 'admin-token');
-    const fetchMock = vi.spyOn(globalThis, 'fetch')
-      .mockResolvedValueOnce(jsonResponse({
-        id: 1,
-        username: 'admin',
-        userType: 'ADMIN',
-        displayName: '管理员',
-        roles: ['ADMIN'],
-        permissions: ['auth:manage']
-      }))
-      .mockResolvedValueOnce(jsonResponse({ records: [], total: 0 }))
-      .mockResolvedValueOnce(jsonResponse([]))
-      .mockResolvedValueOnce(jsonResponse([]));
-    Object.defineProperty(window, 'location', {
-      configurable: true,
-      value: new URL('http://localhost/admin/auth')
-    });
-
-    const wrapper = mount(App);
-    await flushPromises();
-
-    expect(fetchMock).toHaveBeenNthCalledWith(1, '/api/v1/auth/me', expect.objectContaining({
-      headers: expect.objectContaining({ Authorization: 'Bearer admin-token' })
-    }));
-    expect(wrapper.text()).toContain('用户权限管理');
-  });
-
-  it('shows a 403 state instead of the administrator AUTH page for non-admin users', async () => {
-    window.localStorage.setItem('onlinejudge.authToken', 'teacher-token');
-    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(jsonResponse({
-      id: 2,
-      username: 'teacher',
-      userType: 'TEACHER',
-      displayName: '教师',
-      roles: ['TEACHER'],
-      permissions: ['course:manage']
-    }));
-    Object.defineProperty(window, 'location', {
-      configurable: true,
-      value: new URL('http://localhost/admin/auth')
-    });
-
-    const wrapper = mount(App);
-    await flushPromises();
-
-    expect(wrapper.text()).toContain('无权限访问');
-    expect(wrapper.text()).not.toContain('用户权限管理');
-  });
-
-  it('switches the mounted administrator page to the expired session view when the request is rejected', async () => {
-    window.localStorage.setItem('onlinejudge.authToken', 'expired-token');
-    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(errorResponse('ERR-AUTH-04', '登录已失效，请重新登录'));
-    window.history.pushState({}, '', '/admin/auth');
-
-    const wrapper = mount(App);
-    await flushPromises();
-
-    expect(wrapper.find('[data-status-kind="expired"]').exists()).toBe(true);
-    expect(wrapper.text()).toContain('登录状态已失效');
-    expect(window.localStorage.getItem('onlinejudge.authToken')).toBeNull();
-  });
-
-  it('switches the mounted administrator page to the account status view when the account is disabled', async () => {
-    window.localStorage.setItem('onlinejudge.authToken', 'locked-token');
-    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(errorResponse('ERR-AUTH-03', '账号已被禁用、冻结或锁定'));
-    window.history.pushState({}, '', '/admin/auth');
-
-    const wrapper = mount(App);
-    await flushPromises();
-
-    expect(wrapper.find('[data-status-kind="account-disabled"]').exists()).toBe(true);
-    expect(wrapper.text()).toContain('账号状态异常');
-    expect(window.localStorage.getItem('onlinejudge.authToken')).toBeNull();
-  });
-
-  it('renders the forbidden access page for unauthorized routes', async () => {
-    Object.defineProperty(window, 'location', {
-      configurable: true,
-      value: new URL('http://localhost/403')
-    });
-
-    const wrapper = mount(App);
-    await flushPromises();
-
-    expect(wrapper.text()).toContain('无权限访问');
-    expect(wrapper.text()).toContain('返回首页');
-    expect(wrapper.get('.primary-action').attributes('href')).toBe('/');
-  });
-
-  it('renders the expired session page and clears local auth state', async () => {
-    Object.defineProperty(window, 'location', {
-      configurable: true,
-      value: new URL('http://localhost/session-expired')
-    });
-
-    const wrapper = mount(App);
-    await flushPromises();
-
-    expect(wrapper.text()).toContain('登录状态已失效');
-    expect(wrapper.text()).toContain('重新登录');
-    expect(window.localStorage.getItem('onlinejudge.authToken')).toBeNull();
-  });
+    return { wrapper, router } as { wrapper: VueWrapper; router: Router };
+  }
 });
 
-async function flushPromises() {
-  for (let tick = 0; tick < 6; tick += 1) {
-    await Promise.resolve();
-  }
-}
-
-function installLocalStorageMock() {
-  const values = new Map<string, string>();
-  Object.defineProperty(window, 'localStorage', {
-    configurable: true,
-    value: {
-      getItem: vi.fn((key: string) => values.get(key) ?? null),
-      setItem: vi.fn((key: string, value: string) => values.set(key, value)),
-      removeItem: vi.fn((key: string) => values.delete(key)),
-      clear: vi.fn(() => values.clear())
-    }
-  });
-}
-
-function jsonResponse<T>(data: T) {
+function user(userType: string): AuthUser {
   return {
-    ok: true,
-    json: async () => ({
-      code: '0',
-      message: 'success',
-      data
-    })
-  } as Response;
+    id: 7,
+    username: 'app-user',
+    userType,
+    displayName: userType === 'TEACHER' ? '测试教师' : '测试学生',
+    roles: [userType],
+    permissions: []
+  };
 }
 
-function errorResponse(code: string, message: string) {
+function course(overrides: Partial<Course> = {}): Course {
   return {
-    ok: false,
-    json: async () => ({
-      code,
-      message,
-      data: null
-    })
-  } as Response;
+    id: 42,
+    name: '软件工程实践',
+    description: 'App 路由集成测试课程',
+    teacherId: 3,
+    teacherName: '教师',
+    enrollmentMode: 'PUBLIC',
+    status: 'ACTIVE',
+    memberCount: 20,
+    member: true,
+    manageable: false,
+    createdAt: '2026-08-01T08:00:00',
+    updatedAt: '2026-08-15T08:00:00',
+    ...overrides
+  };
 }

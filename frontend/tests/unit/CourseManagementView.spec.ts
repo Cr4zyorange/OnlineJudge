@@ -1,5 +1,6 @@
 import { flushPromises, mount } from '@vue/test-utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { routerKey, type Router } from 'vue-router';
 import CourseManagementView from '../../src/views/crs/CourseManagementView.vue';
 
 const longDescription = '课程创建与管理主流程，覆盖教师建课、信息维护、学生加入、教学资源组织与后续课程运维需求，保证课程展示卡片不会因为简介过长而影响排版，同时为后续加入课程、成员管理、公告发布、成绩联动等操作预留足够清晰的展示空间。';
@@ -88,6 +89,30 @@ describe('CourseManagementView', () => {
     expect(wrapper.text()).toContain(longDescription);
     expect(wrapper.text()).toContain('操作区');
     expect(wrapper.text()).toContain('暂无章节目录');
+  });
+
+  it('delegates course entry to Vue Router when mounted in the routed application', async () => {
+    const page = {
+      code: '0',
+      message: 'success',
+      data: { list: [course], total: 1, page: 1, size: 20 }
+    };
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => page }));
+    const push = vi.fn().mockResolvedValue(undefined);
+
+    const wrapper = mount(CourseManagementView, {
+      global: {
+        provide: {
+          [routerKey as symbol]: { push } as unknown as Router
+        }
+      }
+    });
+    await flushPromises();
+
+    await wrapper.get('.course-card').trigger('click');
+    await flushPromises();
+
+    expect(push).toHaveBeenCalledWith('/courses/1');
   });
 
   it('opens chapter, resource, and announcement management from the teacher detail action area', async () => {
