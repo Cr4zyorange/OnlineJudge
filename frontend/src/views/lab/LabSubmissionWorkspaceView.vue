@@ -287,7 +287,7 @@
             <div class="score-form__numbers">
               <label class="field">
                 <span>人工评分</span>
-                <input v-model.trim="scoreForm.manualScore" name="manualScore" type="number" min="0" step="0.01">
+                <input v-model.trim="scoreForm.manualScore" name="manualScore" type="number" min="0" step="1">
               </label>
               <label class="field">
                 <span>报告评分</span>
@@ -296,13 +296,13 @@
                   name="reportScore"
                   type="number"
                   min="0"
-                  step="0.01"
+                  step="1"
                   placeholder="选填"
                 >
               </label>
               <label class="field">
                 <span>最终得分</span>
-                <input v-model.trim="scoreForm.finalScore" name="finalScore" type="number" min="0" step="0.01">
+                <input v-model.trim="scoreForm.finalScore" name="finalScore" type="number" min="0" step="1">
               </label>
             </div>
 
@@ -534,7 +534,13 @@ async function saveScore() {
   scoreSaving.value = true;
   try {
     const result = await scoreLabSubmission(props.labId, currentDetail.submissionId, payload);
-    submissionDetail.value = {
+    submissions.value = submissions.value.map((submission) => submission.submissionId === currentDetail.submissionId
+      ? { ...submission, autoScore: result.autoScore, finalScore: result.finalScore }
+      : submission);
+    if (!isCurrentScoreTarget(currentDetail.submissionId)) {
+      return;
+    }
+    const updatedDetail: LabSubmissionDetail = {
       ...currentDetail,
       autoScore: result.autoScore,
       finalScore: result.finalScore,
@@ -543,16 +549,21 @@ async function saveScore() {
         : currentDetail.latestReport,
       latestScore: result
     };
-    submissions.value = submissions.value.map((submission) => submission.submissionId === currentDetail.submissionId
-      ? { ...submission, autoScore: result.autoScore, finalScore: result.finalScore }
-      : submission);
-    syncScoreForm(submissionDetail.value);
+    submissionDetail.value = updatedDetail;
+    syncScoreForm(updatedDetail);
     scoreFeedback.value = '评分已保存';
   } catch (error) {
-    scoreError.value = errorMessage(error, '评分保存失败');
+    if (isCurrentScoreTarget(currentDetail.submissionId)) {
+      scoreError.value = errorMessage(error, '评分保存失败');
+    }
   } finally {
     scoreSaving.value = false;
   }
+}
+
+function isCurrentScoreTarget(submissionId: number) {
+  return selectedSubmissionId.value === submissionId
+    && submissionDetail.value?.submissionId === submissionId;
 }
 
 function scoreWasChanged(detail: LabSubmissionDetail, payload: LabScorePayload) {
@@ -609,6 +620,9 @@ function requiredScore(value: string | number, label: string) {
   const score = Number(value);
   if (!Number.isFinite(score) || score < 0) {
     throw new Error(`${label}必须是大于或等于 0 的数字`);
+  }
+  if (!Number.isInteger(score)) {
+    throw new Error(`${label}必须是整数`);
   }
   return score;
 }

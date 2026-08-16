@@ -251,6 +251,69 @@ describe('LabSubmissionWorkspaceView', () => {
     expect((wrapper.get('[name="finalScore"]').element as HTMLInputElement).value).toBe('90');
   });
 
+  it('accepts only integer scores required by the LAB API contract', async () => {
+    vi.mocked(labApi.listLabSubmissions).mockResolvedValueOnce([submissions[0]]);
+    vi.mocked(labApi.getLabSubmissionDetail).mockResolvedValueOnce({
+      ...detail,
+      latestScore: null,
+      finalScore: null
+    });
+
+    const wrapper = mount(LabSubmissionWorkspaceView, {
+      props: { courseId: 101, labId: 7 }
+    });
+    await flushPromises();
+
+    expect(wrapper.get('[name="manualScore"]').attributes('step')).toBe('1');
+    expect(wrapper.get('[name="reportScore"]').attributes('step')).toBe('1');
+    expect(wrapper.get('[name="finalScore"]').attributes('step')).toBe('1');
+
+    await wrapper.get('[name="manualScore"]').setValue('88.5');
+    await wrapper.get('[name="finalScore"]').setValue('90');
+    await wrapper.get('[data-action="score-submission"]').trigger('submit');
+    await flushPromises();
+
+    expect(labApi.scoreLabSubmission).not.toHaveBeenCalled();
+    expect(wrapper.get('[data-testid="score-error"]').text()).toContain('人工评分必须是整数');
+  });
+
+  it('does not let a completed score request replace a newly selected submission', async () => {
+    const secondDetail: LabSubmissionDetail = {
+      ...submissions[1],
+      code: 'public class SecondSubmission {}',
+      fileId: null,
+      latestReport: null,
+      latestScore: null
+    };
+    const scoreRequest = deferred<LabScoreSummary>();
+    vi.mocked(labApi.listLabSubmissions).mockResolvedValueOnce(submissions.slice(0, 2));
+    vi.mocked(labApi.getLabSubmissionDetail)
+      .mockResolvedValueOnce(detail)
+      .mockResolvedValueOnce(secondDetail);
+    vi.mocked(labApi.scoreLabSubmission).mockReturnValueOnce(scoreRequest.promise);
+
+    const wrapper = mount(LabSubmissionWorkspaceView, {
+      props: { courseId: 101, labId: 7 }
+    });
+    await flushPromises();
+
+    await wrapper.get('[data-action="score-submission"]').trigger('submit');
+    await wrapper.get('[data-submission-id="302"] button').trigger('click');
+    await flushPromises();
+    expect(wrapper.text()).toContain('public class SecondSubmission {}');
+
+    scoreRequest.resolve({
+      ...detail.latestScore!,
+      finalScore: 99,
+      updatedAt: '2026-06-03T12:00:00'
+    });
+    await flushPromises();
+
+    expect(wrapper.text()).toContain('public class SecondSubmission {}');
+    expect(wrapper.get('[data-testid="selected-final-score"]').text()).not.toContain('99');
+    expect(wrapper.get('[data-submission-id="302"] button').attributes('aria-pressed')).toBe('true');
+  });
+
   it('uses a card queue and collapses the workspace to one column at phone width', () => {
     const source = readFileSync('src/views/lab/LabSubmissionWorkspaceView.vue', 'utf8');
 
@@ -269,4 +332,14 @@ async function flushPromises() {
   await Promise.resolve();
   await Promise.resolve();
   await Promise.resolve();
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject };
 }

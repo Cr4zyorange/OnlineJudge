@@ -472,6 +472,9 @@ function hasPlatformRole(user: AuthUser | null, accepted: string[]) {
 }
 
 function authFailureRoute() {
+  if (typeof window !== 'undefined' && window.location.pathname === '/login') {
+    return { name: 'login', replace: true };
+  }
   if (typeof window !== 'undefined' && window.location.pathname === '/account-disabled') {
     return { name: 'account-disabled', replace: true };
   }

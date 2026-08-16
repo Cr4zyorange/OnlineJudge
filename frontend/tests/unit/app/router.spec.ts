@@ -83,6 +83,27 @@ describe('application router access contract', () => {
     expect(unknown.currentRoute.value.name).toBe('not-found');
   });
 
+  it('preserves the HTTP login redirect for a first-time visitor without a token', async () => {
+    window.history.replaceState({}, '', '/');
+    const router = createAppRouter({
+      history: createMemoryHistory(),
+      services: {
+        loadCurrentUser: vi.fn().mockImplementation(async () => {
+          window.history.pushState({}, '', '/login');
+          throw new Error('当前登录态缺失，无法访问接口');
+        }),
+        loadCourse: vi.fn()
+      }
+    });
+
+    try {
+      await router.push('/learning/tasks');
+      expect(router.currentRoute.value.name).toBe('login');
+    } finally {
+      window.history.replaceState({}, '', '/');
+    }
+  });
+
   it('redirects legacy grade links into the formal route tree and drops role', async () => {
     const router = createAppRouter({
       history: createMemoryHistory(),
