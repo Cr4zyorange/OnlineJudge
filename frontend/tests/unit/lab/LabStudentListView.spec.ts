@@ -19,7 +19,22 @@ describe('LabStudentListView visual task-list contract', () => {
       lab(950299, '未发布草稿', 'DRAFT', '2026-08-20T20:00:00')
     ]);
     vi.mocked(labApi.listLabSubmissions)
-      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{
+        submissionId: 82,
+        labId: 950211,
+        studentId: 7,
+        language: 'java',
+        submitStatus: 'SUBMITTED',
+        evaluationStatus: 'ACCEPTED',
+        autoScore: 87,
+        finalScore: 88,
+        version: 1,
+        submittedAt: '2026-08-15T10:00:00',
+        isLatest: true,
+        isFinal: true,
+        isScoringBasis: true,
+        hasFile: false
+      }])
       .mockResolvedValueOnce([{
         submissionId: 81,
         labId: 950201,
@@ -44,6 +59,7 @@ describe('LabStudentListView visual task-list contract', () => {
     expect(wrapper.text()).toContain('进行中');
     expect(wrapper.text()).toContain('成绩已发布');
     expect(wrapper.text()).toContain('最终成绩 95 分');
+    expect(wrapper.text()).not.toContain('最终成绩 88 分');
     expect(wrapper.text()).not.toContain('PUBLISHED');
     expect(wrapper.text()).not.toContain('SCORE_PUBLISHED');
     expect(wrapper.text()).not.toContain('DOCKER_IO');

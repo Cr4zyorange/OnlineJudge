@@ -191,7 +191,7 @@ async function loadLabs() {
 
 function toTaskCard(lab: LabExperimentSummary, sequence: number, submissions: LabSubmissionHistoryItem[]): LabTaskCard {
   const latest = submissions.find((item) => item.isLatest) ?? submissions[0];
-  const finalScore = latest?.finalScore ?? null;
+  const finalScore = lab.status === 'SCORE_PUBLISHED' ? latest?.finalScore ?? null : null;
   const overdue = new Date(lab.deadline).getTime() < Date.now();
   if (lab.status === 'SCORE_PUBLISHED') {
     return task(lab, sequence, 'graded', '成绩已发布', 'success', latest ? '已提交' : '未找到提交', latest ? `第 ${latest.version} 版作为评分依据` : '如有疑问请联系教师', '提交阶段已结束', '查看成绩', '查看评测反馈', finalScore);
