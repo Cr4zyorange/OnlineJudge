@@ -310,6 +310,14 @@ const routes: RouteRecordRaw[] = [
             name: 'homework-latest-result',
             component: () => import('../views/hwk/HomeworkSubmissionResultView.vue'),
             props: numericProps('courseId', 'homeworkId'),
+            beforeEnter: (to) =>
+              currentCourse.value?.manageable
+                ? {
+                    name: 'homework-submission-manage',
+                    params: { courseId: to.params.courseId, homeworkId: to.params.homeworkId },
+                    replace: true
+                  }
+                : true,
             meta: {
               title: '作业评测结果',
               shell: 'course',
