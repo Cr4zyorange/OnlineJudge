@@ -1,4 +1,4 @@
-import { createMemoryHistory } from 'vue-router';
+import { createMemoryHistory, type RouteLocationNormalized } from 'vue-router';
 import { describe, expect, it, vi } from 'vitest';
 import type { AuthUser } from '../../../src/api/auth/auth';
 import { createAppRouter } from '../../../src/app/router';
@@ -138,7 +138,56 @@ describe('application router access contract', () => {
     await refreshed.push(router.currentRoute.value.fullPath);
     expect(refreshed.currentRoute.value.fullPath).toBe('/courses/42/homeworks');
   });
+
+  it('keeps the current page title when an unsaved-draft guard cancels navigation', async () => {
+    const router = createAppRouter({ history: createMemoryHistory() });
+    await router.push('/login');
+    expect(document.title).toBe('登录｜学知实训平台');
+
+    router.beforeEach((to) => to.path !== '/register');
+    await router.push('/register');
+
+    expect(router.currentRoute.value.fullPath).toBe('/login');
+    expect(document.title).toBe('登录｜学知实训平台');
+  });
+
+  it('exposes distinct homework detail, submit, latest-result and historic-result route contracts', async () => {
+    const router = createAppRouter({
+      history: createMemoryHistory(),
+      services: {
+        loadCurrentUser: vi.fn().mockResolvedValue(user('STUDENT')),
+        loadCourse: vi.fn().mockResolvedValue(course({ manageable: false }))
+      }
+    });
+
+    await router.push('/courses/42/homeworks/9');
+    expect(router.currentRoute.value.name).toBe('homework-detail');
+    expect(resolveDefaultProps(router.currentRoute.value)).toEqual({ courseId: 42, homeworkId: 9, mode: 'detail' });
+
+    await router.push('/courses/42/homeworks/9/submit');
+    expect(router.currentRoute.value.name).toBe('homework-submit');
+    expect(resolveDefaultProps(router.currentRoute.value)).toEqual({ courseId: 42, homeworkId: 9, mode: 'submit' });
+
+    await router.push('/courses/42/homeworks/9/result');
+    expect(router.currentRoute.value.name).toBe('homework-latest-result');
+    expect(router.currentRoute.value.meta.uiIds).toEqual(['UI-HWK-07']);
+    expect(resolveDefaultProps(router.currentRoute.value)).toEqual({ courseId: 42, homeworkId: 9 });
+
+    await router.push('/courses/42/homeworks/9/submissions/55/result');
+    expect(router.currentRoute.value.name).toBe('homework-submission-result');
+    expect(router.currentRoute.value.meta.uiIds).toEqual(['UI-HWK-07']);
+    expect(resolveDefaultProps(router.currentRoute.value)).toEqual({
+      courseId: 42,
+      homeworkId: 9,
+      submissionId: 55
+    });
+  });
 });
+
+function resolveDefaultProps(route: RouteLocationNormalized) {
+  const propContract = route.matched.at(-1)?.props.default;
+  return typeof propContract === 'function' ? propContract(route) : propContract;
+}
 
 function user(userType: string): AuthUser {
   return {
