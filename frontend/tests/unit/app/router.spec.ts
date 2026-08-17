@@ -182,6 +182,21 @@ describe('application router access contract', () => {
       submissionId: 55
     });
   });
+
+  it('redirects a course manager from the student latest-result route to submission management', async () => {
+    const router = createAppRouter({
+      history: createMemoryHistory(),
+      services: {
+        loadCurrentUser: vi.fn().mockResolvedValue(user('STUDENT')),
+        loadCourse: vi.fn().mockResolvedValue(course({ manageable: true }))
+      }
+    });
+
+    await router.push('/courses/42/homeworks/9/result');
+
+    expect(router.currentRoute.value.name).toBe('homework-submission-manage');
+    expect(router.currentRoute.value.fullPath).toBe('/courses/42/homeworks/9/manage/submissions');
+  });
 });
 
 function resolveDefaultProps(route: RouteLocationNormalized) {
