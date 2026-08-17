@@ -270,7 +270,7 @@ const routes: RouteRecordRaw[] = [
             path: 'homeworks/:homeworkId',
             name: 'homework-detail',
             component: () => import('../views/hwk/HomeworkStudentView.vue'),
-            props: numericProps('courseId', 'homeworkId'),
+            props: (route) => ({ ...numberParams(route, 'courseId', 'homeworkId'), mode: 'detail' }),
             meta: {
               title: '作业详情',
               shell: 'course',
@@ -283,7 +283,7 @@ const routes: RouteRecordRaw[] = [
             path: 'homeworks/:homeworkId/submit',
             name: 'homework-submit',
             component: () => import('../views/hwk/HomeworkStudentView.vue'),
-            props: numericProps('courseId', 'homeworkId'),
+            props: (route) => ({ ...numberParams(route, 'courseId', 'homeworkId'), mode: 'submit' }),
             meta: {
               title: '提交作业',
               shell: 'course',
@@ -303,6 +303,40 @@ const routes: RouteRecordRaw[] = [
               requiresAuth: true,
               courseAccess: 'member',
               uiIds: ['UI-HWK-06']
+            }
+          },
+          {
+            path: 'homeworks/:homeworkId/result',
+            name: 'homework-latest-result',
+            component: () => import('../views/hwk/HomeworkSubmissionResultView.vue'),
+            props: numericProps('courseId', 'homeworkId'),
+            beforeEnter: (to) =>
+              currentCourse.value?.manageable
+                ? {
+                    name: 'homework-submission-manage',
+                    params: { courseId: to.params.courseId, homeworkId: to.params.homeworkId },
+                    replace: true
+                  }
+                : true,
+            meta: {
+              title: '作业评测结果',
+              shell: 'course',
+              requiresAuth: true,
+              courseAccess: 'member',
+              uiIds: ['UI-HWK-07']
+            }
+          },
+          {
+            path: 'homeworks/:homeworkId/submissions/:submissionId/result',
+            name: 'homework-submission-result',
+            component: () => import('../views/hwk/HomeworkSubmissionResultView.vue'),
+            props: numericProps('courseId', 'homeworkId', 'submissionId'),
+            meta: {
+              title: '作业评测结果',
+              shell: 'course',
+              requiresAuth: true,
+              courseAccess: 'member',
+              uiIds: ['UI-HWK-07']
             }
           },
           {
@@ -436,7 +470,10 @@ export function createAppRouter(options: AppRouterOptions = {}) {
     return true;
   });
 
-  router.afterEach((to) => {
+  router.afterEach((to, _from, failure) => {
+    if (failure) {
+      return;
+    }
     document.title = `${to.meta.title}｜学知实训平台`;
     void nextTick(() => {
       const heading = document.querySelector<HTMLElement>('h1');

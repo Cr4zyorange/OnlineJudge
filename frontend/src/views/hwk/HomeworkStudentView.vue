@@ -27,19 +27,32 @@
           <p class="homework-student__eyebrow">加载失败</p>
           <h1>作业详情加载失败</h1>
           <p>{{ errorMessage }}</p>
+          <button
+            type="button"
+            class="homework-student__primary-action"
+            data-testid="homework-load-retry"
+            @click="loadHomework"
+          >
+            重新加载
+          </button>
         </div>
       </section>
 
       <template v-else-if="homework">
-        <header class="homework-student__header">
-          <div class="homework-student__heading-copy">
-            <p class="homework-student__eyebrow">学生作业台 · HWK</p>
-            <h1>{{ homework.title }}</h1>
-            <p class="homework-student__lede">{{ homework.description }}</p>
-            <p v-if="resumeMessage" class="homework-student__feedback">{{ resumeMessage }}</p>
-          </div>
-          <span class="homework-student__type-chip">{{ formatHomeworkType(homework.type) }}</span>
-        </header>
+        <PageHeader
+          :title="homework.title"
+          :subtitle="homework.description"
+          :eyebrow="mode === 'detail' ? '学生作业详情 · HWK' : '学生作业提交 · HWK'"
+        >
+          <template #meta>
+            <span>{{ formatDateTime(homework.deadline) }} 截止</span>
+            <span v-if="resumeMessage" class="homework-student__feedback">{{ resumeMessage }}</span>
+          </template>
+          <template #actions>
+            <StatusBadge :label="formatHomeworkType(homework.type)" tone="brand" />
+            <StatusBadge :label="homeworkStatusSummary" :tone="homeworkStatusTone" />
+          </template>
+        </PageHeader>
 
         <dl class="homework-student__summary" aria-label="作业概览">
           <div data-testid="homework-status-summary">
@@ -180,19 +193,24 @@
             </section>
           </div>
 
-          <aside class="homework-student__submission-pane" aria-label="提交工作区">
+          <aside
+            v-if="mode === 'submit'"
+            class="homework-student__submission-pane"
+            aria-label="提交工作区"
+          >
             <div class="homework-student__submission-heading">
               <div>
                 <p class="homework-student__eyebrow">当前作答</p>
                 <h2>提交作业</h2>
               </div>
-              <a
+              <RouterLink
+                :to="historyHref"
                 :href="historyHref"
                 class="homework-student__history-link"
                 data-testid="homework-history-link"
               >
                 查看提交历史
-              </a>
+              </RouterLink>
             </div>
 
             <p v-if="submissionLoading" class="homework-student__inline-state" role="status" aria-live="polite">
@@ -210,18 +228,42 @@
             <p v-if="evaluationErrorMessage" class="homework-student__warning" role="alert">
               {{ evaluationErrorMessage }}
             </p>
+            <p
+              v-if="draftStatusMessage"
+              class="homework-student__draft-status"
+              data-testid="homework-draft-status"
+              role="status"
+              aria-live="polite"
+            >
+              {{ draftStatusMessage }}
+            </p>
 
             <form class="homework-student__submission-form" @submit.prevent="submit">
-              <label v-if="homework.type === 'OBJECTIVE'">
-                <span>客观题答案</span>
-                <textarea
-                  v-model="answerJson"
-                  name="answerJson"
-                  rows="6"
-                  :disabled="submitting || !canSubmit"
-                  placeholder="按题号填写答案"
-                />
-              </label>
+              <div v-if="homework.type === 'OBJECTIVE'" class="homework-student__objective-editor">
+                <p class="homework-student__field-label">客观题答案</p>
+                <fieldset
+                  v-for="question in homework.questions"
+                  :key="question.id"
+                  class="homework-student__objective-question"
+                >
+                  <legend>{{ question.sortOrder }}. {{ question.stem }}</legend>
+                  <label
+                    v-for="option in objectiveOptions(question)"
+                    :key="option.value"
+                    class="homework-student__objective-option"
+                  >
+                    <input
+                      :name="`objective-${question.id}`"
+                      :type="isMultipleChoice(question) ? 'checkbox' : 'radio'"
+                      :value="option.value"
+                      :checked="objectiveAnswerValues(question).includes(option.value)"
+                      :disabled="submitting || !canSubmit"
+                      @change="updateObjectiveAnswer(question, option.value, $event)"
+                    />
+                    <span>{{ option.label }}</span>
+                  </label>
+                </fieldset>
+              </div>
 
               <label v-if="homework.type === 'TEXT'">
                 <span>文本答案</span>
@@ -234,16 +276,24 @@
                 />
               </label>
 
-              <label v-if="homework.type === 'FILE' || homework.type === 'TEXT'">
-                <span>附件编号</span>
+              <label v-if="homework.type === 'FILE'">
+                <span>作业附件</span>
                 <input
-                  v-model="fileIdsInput"
-                  name="fileIds"
-                  type="text"
-                  :disabled="submitting || !canSubmit"
-                  placeholder="多个编号请用逗号分隔"
+                  name="homeworkFile"
+                  type="file"
+                  :disabled="submitting"
+                  @change="selectHomeworkFile"
                 />
+                <small v-if="selectedFileName">已选择：{{ selectedFileName }}</small>
               </label>
+              <p
+                v-if="homework.type === 'FILE'"
+                class="homework-student__warning"
+                data-testid="homework-file-blocker"
+                role="alert"
+              >
+                附件上传通道尚未提供，已阻止文件作业提交，不会用本地文件名或伪造附件编号代替上传。
+              </p>
 
               <template v-if="homework.type === 'CODE'">
                 <label>
@@ -281,6 +331,15 @@
               <p v-if="feedbackMessage" class="homework-student__feedback" role="status" aria-live="polite">
                 {{ feedbackMessage }}
               </p>
+              <RouterLink
+                v-if="latestSubmission"
+                :to="resultHref"
+                :href="resultHref"
+                class="homework-student__history-link"
+                data-testid="homework-result-link"
+              >
+                查看最新提交结果
+              </RouterLink>
               <p v-if="submitErrorMessage" class="homework-student__error" role="alert">
                 {{ submitErrorMessage }}
               </p>
@@ -306,6 +365,44 @@
               </div>
             </form>
           </aside>
+
+          <aside v-else class="homework-student__submission-pane" aria-label="作业下一步">
+            <div class="homework-student__submission-heading">
+              <div>
+                <p class="homework-student__eyebrow">下一步</p>
+                <h2>完成这份作业</h2>
+              </div>
+            </div>
+            <p v-if="submissionBlockedReason" class="homework-student__warning">
+              {{ submissionBlockedReason }}
+            </p>
+            <nav class="homework-student__flow-actions" aria-label="作业任务流程">
+              <RouterLink
+                :to="submitHref"
+                :href="submitHref"
+                class="homework-student__primary-action"
+                data-testid="homework-submit-link"
+              >
+                {{ latestSubmission ? '再次提交' : '去提交' }}
+              </RouterLink>
+              <RouterLink
+                :to="historyHref"
+                :href="historyHref"
+                class="homework-student__history-link"
+                data-testid="homework-history-link"
+              >
+                查看提交历史
+              </RouterLink>
+              <RouterLink
+                :to="resultHref"
+                :href="resultHref"
+                class="homework-student__history-link"
+                data-testid="homework-result-link"
+              >
+                查看最新结果
+              </RouterLink>
+            </nav>
+          </aside>
         </div>
       </template>
     </section>
@@ -313,7 +410,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, inject, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { matchedRouteKey, onBeforeRouteLeave, RouterLink } from 'vue-router';
 import {
   getHomeworkDetail,
   getHomeworkSubmissionEvaluation,
@@ -322,7 +420,15 @@ import {
 } from '../../api/hwk/homeworks';
 import { saveLearningProgress } from '../../api/lrn/learningProgress';
 import { reportLearningRecord } from '../../api/lrn/learningRecords';
-import type { HomeworkDetail, HomeworkEvaluationResult, HomeworkSubmissionSummary } from '../../types/hwk';
+import { currentUser } from '../../app/runtimeContext';
+import PageHeader from '../../components/foundation/PageHeader.vue';
+import StatusBadge from '../../components/foundation/StatusBadge.vue';
+import type {
+  HomeworkDetail,
+  HomeworkEvaluationResult,
+  HomeworkQuestion,
+  HomeworkSubmissionSummary
+} from '../../types/hwk';
 import {
   formatEvaluationStatus,
   formatHomeworkStatus,
@@ -331,10 +437,13 @@ import {
   formatSubmitStatus
 } from './hwkDisplay';
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   courseId: number;
   homeworkId: number;
-}>();
+  mode?: 'detail' | 'submit';
+}>(), {
+  mode: 'submit'
+});
 
 const homework = ref<HomeworkDetail | null>(null);
 const latestSubmission = ref<HomeworkSubmissionSummary | null>(null);
@@ -350,13 +459,37 @@ const submitErrorMessage = ref('');
 const feedbackMessage = ref('');
 const resumeMessage = ref('');
 const answerText = ref('');
-const answerJson = ref('');
-const fileIdsInput = ref('');
+const objectiveAnswers = ref<Record<string, string[]>>({});
 const codeText = ref('');
 const language = ref('');
+const selectedFileName = ref('');
+const draftStatusMessage = ref('');
 const openedAt = ref<Date | null>(null);
+let draftTimer: ReturnType<typeof setTimeout> | undefined;
+let beforeUnloadRegistered = false;
+let draftWatchSuspended = false;
+let loadGeneration = 0;
+let submissionEditorGeneration = 0;
+
+interface HomeworkDraft {
+  version: 1;
+  savedAt: number;
+  homeworkType: HomeworkDetail['type'];
+  answerText: string;
+  objectiveAnswers: Record<string, string[]>;
+  codeText: string;
+  language: string;
+}
+
+interface ObjectiveOption {
+  value: string;
+  label: string;
+}
 
 const allowedCodeLanguages = computed(() => parseLanguageLimit(homework.value?.languageLimitJson));
+const draftKey = computed(() => (
+  draftStorageKey(props.courseId, props.homeworkId)
+));
 const isPastDeadline = computed(() => {
   if (!homework.value) {
     return false;
@@ -366,16 +499,23 @@ const isPastDeadline = computed(() => {
 });
 const canViewEvaluation = computed(() => Boolean(
   homework.value
-  && (homework.value.showEvaluationBeforePublish || homework.value.status === 'SCORE_PUBLISHED')
+  && (
+    homework.value.showEvaluationBeforePublish
+    || homework.value.status === 'SCORE_PUBLISHED'
+    || homework.value.status === 'ARCHIVED'
+  )
 ));
 const showFinalScore = computed(() => Boolean(
-  homework.value?.status === 'SCORE_PUBLISHED'
+  (homework.value?.status === 'SCORE_PUBLISHED' || homework.value?.status === 'ARCHIVED')
   && latestSubmission.value?.finalScore !== null
   && latestSubmission.value?.finalScore !== undefined
 ));
 const submissionBlockedReason = computed(() => {
   if (!homework.value) {
     return '作业详情尚未加载';
+  }
+  if (homework.value.type === 'FILE') {
+    return '附件上传通道尚未提供，当前不能提交文件作业';
   }
   if (homework.value.status !== 'PUBLISHED') {
     return `作业当前为${formatHomeworkStatus(homework.value.status)}，暂不可提交`;
@@ -394,6 +534,15 @@ const homeworkStatusSummary = computed(() => {
     return '已截止';
   }
   return homework.value ? formatHomeworkStatus(homework.value.status) : '';
+});
+const homeworkStatusTone = computed<'neutral' | 'brand' | 'success' | 'warning' | 'danger'>(() => {
+  if (homework.value?.status === 'SCORE_PUBLISHED') {
+    return 'success';
+  }
+  if (homework.value?.status === 'CLOSED' || homework.value?.status === 'ARCHIVED' || isPastDeadline.value) {
+    return 'warning';
+  }
+  return homework.value?.status === 'PUBLISHED' ? 'brand' : 'neutral';
 });
 const submitAvailabilitySummary = computed(() => {
   if (submissionBlockedReason.value) {
@@ -432,42 +581,136 @@ const submitActionLabel = computed(() => {
 const historyHref = computed(() => (
   `/courses/${props.courseId}/homeworks/${props.homeworkId}/submissions`
 ));
+const submitHref = computed(() => (
+  `/courses/${props.courseId}/homeworks/${props.homeworkId}/submit`
+));
+const resultHref = computed(() => (
+  `/courses/${props.courseId}/homeworks/${props.homeworkId}/result`
+));
 
-onMounted(loadHomework);
+watch(
+  [answerText, objectiveAnswers, codeText, language],
+  () => {
+    if (!draftWatchSuspended) {
+      scheduleDraftSave();
+    }
+  },
+  { deep: true }
+);
+
+watch(() => props.mode, (mode, previousMode) => {
+  submissionEditorGeneration += 1;
+  submitting.value = false;
+  if (previousMode === 'submit' && mode !== 'submit') {
+    saveDraftNow();
+    unregisterBeforeUnload();
+  }
+  if (mode === 'submit' && previousMode !== 'submit') {
+    registerBeforeUnload();
+    restoreDraft();
+  }
+});
+
+watch(
+  [() => props.courseId, () => props.homeworkId],
+  ([,], [previousCourseId, previousHomeworkId]) => {
+    if (props.mode === 'submit' && homework.value) {
+      saveDraftNow(draftStorageKey(previousCourseId, previousHomeworkId));
+    }
+    cancelScheduledDraftSave();
+    resetEditorState();
+    submissionEditorGeneration += 1;
+    submitting.value = false;
+    void loadHomework();
+  }
+);
+
+onMounted(() => {
+  if (props.mode === 'submit') {
+    registerBeforeUnload();
+  }
+  void loadHomework();
+});
+
+onBeforeUnmount(() => {
+  if (props.mode === 'submit') {
+    saveDraftNow();
+  }
+  unregisterBeforeUnload();
+  cancelScheduledDraftSave();
+  loadGeneration += 1;
+  submissionEditorGeneration += 1;
+});
+
+if (inject(matchedRouteKey, null)) {
+  onBeforeRouteLeave(() => {
+    if (props.mode !== 'submit' || !hasUnsavedAnswer()) {
+      return true;
+    }
+    saveDraftNow();
+    return window.confirm('当前作答已自动保存。确认离开提交页吗？');
+  });
+}
 
 async function loadHomework() {
+  const generation = ++loadGeneration;
+  const requestedHomeworkId = props.homeworkId;
   loading.value = true;
   errorMessage.value = '';
+  submissionLoadError.value = '';
+  latestSubmission.value = null;
+  latestEvaluationResult.value = null;
   try {
-    homework.value = await getHomeworkDetail(props.homeworkId);
+    const loadedHomework = await getHomeworkDetail(requestedHomeworkId);
+    if (!isCurrentLoad(generation)) {
+      return;
+    }
+    homework.value = loadedHomework;
     openedAt.value = new Date();
     syncDefaultCodeLanguage();
+    if (props.mode === 'submit') {
+      restoreDraft();
+    }
     restoreResume();
-    await loadLatestSubmission();
-    await recordProgress(20, `homeworkId=${props.homeworkId}`);
+    await loadLatestSubmission(requestedHomeworkId, generation);
+    if (!isCurrentLoad(generation)) {
+      return;
+    }
+    await recordProgress(20, `homeworkId=${requestedHomeworkId}`);
     await recordBehavior('ACCESS', 0);
   } catch (error) {
-    errorMessage.value = localizedError(error, '请稍后重试，或返回作业列表。');
+    if (isCurrentLoad(generation)) {
+      errorMessage.value = localizedError(error, '请稍后重试，或返回作业列表。');
+    }
   } finally {
-    loading.value = false;
+    if (isCurrentLoad(generation)) {
+      loading.value = false;
+    }
   }
 }
 
-async function loadLatestSubmission() {
+async function loadLatestSubmission(homeworkId: number, generation: number) {
   submissionLoading.value = true;
   submissionLoadError.value = '';
   latestEvaluationResult.value = null;
   evaluationErrorMessage.value = '';
   try {
-    const submissions = await listMyHomeworkSubmissions(props.homeworkId);
+    const submissions = await listMyHomeworkSubmissions(homeworkId);
+    if (!isCurrentLoad(generation)) {
+      return;
+    }
     latestSubmission.value = selectCurrentSubmission(submissions);
     if (latestSubmission.value && latestSubmission.value.evaluationStatus !== 'NONE') {
-      await refreshLatestEvaluationResult(latestSubmission.value.submissionId);
+      await refreshLatestEvaluationResult(latestSubmission.value.submissionId, generation);
     }
   } catch (error) {
-    submissionLoadError.value = localizedError(error, '最近提交加载失败，仍可继续完成作业。');
+    if (isCurrentLoad(generation)) {
+      submissionLoadError.value = localizedError(error, '最近提交加载失败，仍可继续完成作业。');
+    }
   } finally {
-    submissionLoading.value = false;
+    if (isCurrentLoad(generation)) {
+      submissionLoading.value = false;
+    }
   }
 }
 
@@ -478,28 +721,56 @@ async function submit() {
     return;
   }
 
+  const generation = loadGeneration;
+  const editorGeneration = ++submissionEditorGeneration;
+  const requestedHomeworkId = props.homeworkId;
   submitting.value = true;
   try {
-    latestSubmission.value = await submitHomework(props.homeworkId, {
+    const submitted = await submitHomework(requestedHomeworkId, {
       answerText: answerText.value.trim() || undefined,
-      answerJson: answerJson.value.trim() || undefined,
-      fileIds: parseFileIds(),
+      answerJson: homework.value?.type === 'OBJECTIVE' ? serializeObjectiveAnswers() : undefined,
       codeText: codeText.value.trim() || undefined,
       language: language.value.trim() || undefined
     });
-    await recordProgress(100, `homeworkId=${props.homeworkId};submitted=${latestSubmission.value.submissionId}`);
+    if (
+      submitted.homeworkId !== requestedHomeworkId
+      || !isCurrentSubmissionRequest(generation, editorGeneration, requestedHomeworkId)
+    ) {
+      return;
+    }
+    latestSubmission.value = submitted;
+    await recordProgress(100, `homeworkId=${requestedHomeworkId};submitted=${submitted.submissionId}`);
+    if (!isCurrentSubmissionRequest(generation, editorGeneration, requestedHomeworkId, submitted.submissionId)) {
+      return;
+    }
     await recordBehavior('SUBMIT', elapsedSeconds());
-    feedbackMessage.value = `提交 ${latestSubmission.value.submissionId} ${formatSubmitStatus(latestSubmission.value.submitStatus)}`;
-    await refreshLatestEvaluationResult(latestSubmission.value.submissionId);
+    if (!isCurrentSubmissionRequest(generation, editorGeneration, requestedHomeworkId, submitted.submissionId)) {
+      return;
+    }
+    feedbackMessage.value = `提交 ${submitted.submissionId} ${formatSubmitStatus(submitted.submitStatus)}`;
+    if (submitted.evaluationStatus !== 'NONE') {
+      await refreshLatestEvaluationResult(submitted.submissionId, generation);
+      if (!isCurrentSubmissionRequest(generation, editorGeneration, requestedHomeworkId, submitted.submissionId)) {
+        return;
+      }
+    }
+    clearDraft();
     resetForm();
   } catch (error) {
-    submitErrorMessage.value = localizedError(error, '作业提交失败，请检查内容后重试。');
+    if (isCurrentSubmissionRequest(generation, editorGeneration, requestedHomeworkId)) {
+      submitErrorMessage.value = localizedError(error, '作业提交失败，请检查内容后重试。');
+    }
   } finally {
-    submitting.value = false;
+    if (isCurrentSubmissionRequest(generation, editorGeneration, requestedHomeworkId)) {
+      submitting.value = false;
+    }
   }
 }
 
-async function refreshLatestEvaluationResult(submissionId: number) {
+async function refreshLatestEvaluationResult(submissionId: number, generation = loadGeneration) {
+  if (!isCurrentEvaluationRequest(generation, submissionId)) {
+    return;
+  }
   latestEvaluationResult.value = null;
   evaluationErrorMessage.value = '';
   if (!canViewEvaluation.value) {
@@ -507,7 +778,11 @@ async function refreshLatestEvaluationResult(submissionId: number) {
   }
   try {
     const result = await getHomeworkSubmissionEvaluation(submissionId);
-    if (!result) {
+    if (
+      !result
+      || result.submissionId !== submissionId
+      || !isCurrentEvaluationRequest(generation, submissionId)
+    ) {
       return;
     }
     latestEvaluationResult.value = result;
@@ -519,7 +794,9 @@ async function refreshLatestEvaluationResult(submissionId: number) {
       };
     }
   } catch (error) {
-    evaluationErrorMessage.value = localizedError(error, '评测结果暂时无法加载，请稍后在提交历史中查看。');
+    if (isCurrentEvaluationRequest(generation, submissionId)) {
+      evaluationErrorMessage.value = localizedError(error, '评测结果暂时无法加载，请稍后在提交历史中查看。');
+    }
   }
 }
 
@@ -598,14 +875,17 @@ function validateForm() {
   if (!homework.value) {
     return '作业详情尚未加载';
   }
-  if (homework.value.type === 'OBJECTIVE' && !answerJson.value.trim()) {
-    return '请填写客观题答案';
+  if (
+    homework.value.type === 'OBJECTIVE'
+    && homework.value.questions.some((question) => objectiveAnswerValues(question).length === 0)
+  ) {
+    return '请填写客观题答案：请完成所有题目';
   }
-  if (homework.value.type === 'TEXT' && !answerText.value.trim() && parseFileIds().length === 0) {
-    return '请填写文本答案或附件编号';
+  if (homework.value.type === 'TEXT' && !answerText.value.trim()) {
+    return '请填写文本答案';
   }
-  if (homework.value.type === 'FILE' && parseFileIds().length === 0) {
-    return '请填写附件编号';
+  if (homework.value.type === 'FILE') {
+    return '附件上传通道尚未提供，当前不能提交文件作业';
   }
   if (homework.value.type === 'CODE' && (!codeText.value.trim() || !language.value.trim())) {
     return '请填写代码和语言';
@@ -634,41 +914,123 @@ function parseLanguageLimit(value: string | null | undefined) {
   }
 }
 
-function formatQuestionOptions(value: string | null | undefined) {
+function parseQuestionOptions(value: string | null | undefined): ObjectiveOption[] {
   if (!value) {
     return [];
   }
   try {
     const parsed: unknown = JSON.parse(value);
     if (Array.isArray(parsed)) {
-      return parsed.map((item) => String(item).trim()).filter(Boolean);
+      return parsed
+        .map((item) => String(item).trim())
+        .filter(Boolean)
+        .map((item) => ({ value: item, label: item }));
     }
     if (parsed && typeof parsed === 'object') {
       return Object.entries(parsed)
-        .map(([key, item]) => `${key}. ${String(item).trim()}`)
-        .filter((item) => item.trim());
+        .map(([key, item]) => ({ value: key, label: `${key}. ${String(item).trim()}` }))
+        .filter((item) => item.label.trim());
     }
   } catch {
-    return [value];
+    return [{ value, label: value }];
   }
   return [];
 }
 
-function parseFileIds() {
-  return fileIdsInput.value
-    .split(',')
-    .map((value) => value.trim())
-    .filter(Boolean);
+function formatQuestionOptions(value: string | null | undefined) {
+  return parseQuestionOptions(value).map((option) => option.label);
+}
+
+function objectiveOptions(question: HomeworkQuestion) {
+  const configured = parseQuestionOptions(question.optionsJson);
+  if (configured.length > 0) {
+    return configured;
+  }
+  const questionType = question.questionType.toUpperCase();
+  if (questionType.includes('JUDGE') || questionType.includes('TRUE_FALSE')) {
+    return [
+      { value: 'true', label: '正确' },
+      { value: 'false', label: '错误' }
+    ];
+  }
+  return [];
+}
+
+function objectiveAnswerKey(question: HomeworkQuestion) {
+  return `q${question.sortOrder}`;
+}
+
+function objectiveAnswerValues(question: HomeworkQuestion) {
+  return objectiveAnswers.value[objectiveAnswerKey(question)] ?? [];
+}
+
+function isMultipleChoice(question: HomeworkQuestion) {
+  return question.questionType.toUpperCase().includes('MULTIPLE');
+}
+
+function updateObjectiveAnswer(question: HomeworkQuestion, value: string, event: Event) {
+  const input = event.target as HTMLInputElement;
+  const key = objectiveAnswerKey(question);
+  if (!isMultipleChoice(question)) {
+    objectiveAnswers.value = {
+      ...objectiveAnswers.value,
+      [key]: input.checked ? [value] : []
+    };
+    return;
+  }
+
+  const current = objectiveAnswers.value[key] ?? [];
+  const next = input.checked
+    ? [...new Set([...current, value])]
+    : current.filter((item) => item !== value);
+  objectiveAnswers.value = { ...objectiveAnswers.value, [key]: next };
+}
+
+function serializeObjectiveAnswers() {
+  if (!homework.value) {
+    return undefined;
+  }
+  const serialized = Object.fromEntries(
+    [...homework.value.questions]
+      .sort((left, right) => left.sortOrder - right.sortOrder)
+      .map((question) => [objectiveAnswerKey(question), serializedObjectiveAnswerValues(question)])
+  );
+  return JSON.stringify(serialized);
+}
+
+function serializedObjectiveAnswerValues(question: HomeworkQuestion) {
+  const selected = objectiveAnswerValues(question);
+  if (!isMultipleChoice(question)) {
+    return selected;
+  }
+  const selectedValues = new Set(selected);
+  return objectiveOptions(question)
+    .map((option) => option.value)
+    .filter((value) => selectedValues.has(value));
+}
+
+function selectHomeworkFile(event: Event) {
+  const input = event.target as HTMLInputElement;
+  selectedFileName.value = input.files?.[0]?.name ?? '';
 }
 
 function resetForm() {
+  resetEditorState();
+  submitErrorMessage.value = '';
+}
+
+function resetEditorState() {
+  draftWatchSuspended = true;
   answerText.value = '';
-  answerJson.value = '';
-  fileIdsInput.value = '';
+  objectiveAnswers.value = {};
   codeText.value = '';
   language.value = '';
+  selectedFileName.value = '';
   syncDefaultCodeLanguage();
-  submitErrorMessage.value = '';
+  draftStatusMessage.value = '';
+  void nextTick(() => {
+    draftWatchSuspended = false;
+  });
 }
 
 function syncDefaultCodeLanguage() {
@@ -678,6 +1040,167 @@ function syncDefaultCodeLanguage() {
   if (allowedCodeLanguages.value.length > 0 && !allowedCodeLanguages.value.includes(language.value.trim())) {
     language.value = allowedCodeLanguages.value[0];
   }
+}
+
+function scheduleDraftSave() {
+  if (props.mode !== 'submit' || !homework.value) {
+    return;
+  }
+  cancelScheduledDraftSave();
+  draftStatusMessage.value = '草稿待保存';
+  draftTimer = setTimeout(() => {
+    saveDraftNow();
+    draftTimer = undefined;
+  }, 500);
+}
+
+function saveDraftNow(storageKey = draftKey.value) {
+  if (!homework.value || homework.value.type === 'FILE') {
+    return;
+  }
+  const draft: HomeworkDraft = {
+    version: 1,
+    savedAt: Date.now(),
+    homeworkType: homework.value.type,
+    answerText: answerText.value,
+    objectiveAnswers: objectiveAnswers.value,
+    codeText: codeText.value,
+    language: language.value
+  };
+  const hasContent = Boolean(
+    draft.answerText.trim()
+    || draft.codeText.trim()
+    || Object.values(draft.objectiveAnswers).some((answers) => answers.length > 0)
+  );
+  if (!hasContent) {
+    window.sessionStorage.removeItem(storageKey);
+    draftStatusMessage.value = '';
+    return;
+  }
+  try {
+    window.sessionStorage.setItem(storageKey, JSON.stringify(draft));
+    draftStatusMessage.value = '草稿已自动保存';
+  } catch {
+    draftStatusMessage.value = '草稿暂时无法保存，请不要关闭页面';
+  }
+}
+
+function restoreDraft() {
+  if (!homework.value || homework.value.type === 'FILE') {
+    return;
+  }
+  let parsed: HomeworkDraft | undefined;
+  try {
+    const stored = window.sessionStorage.getItem(draftKey.value);
+    parsed = stored ? JSON.parse(stored) as HomeworkDraft : undefined;
+  } catch {
+    window.sessionStorage.removeItem(draftKey.value);
+    return;
+  }
+  const freshUntil = parsed ? parsed.savedAt + 24 * 60 * 60 * 1000 : 0;
+  if (
+    !parsed
+    || parsed.version !== 1
+    || parsed.homeworkType !== homework.value.type
+    || !Number.isFinite(parsed.savedAt)
+    || Date.now() > freshUntil
+  ) {
+    window.sessionStorage.removeItem(draftKey.value);
+    return;
+  }
+  draftWatchSuspended = true;
+  answerText.value = typeof parsed.answerText === 'string' ? parsed.answerText : '';
+  codeText.value = typeof parsed.codeText === 'string' ? parsed.codeText : '';
+  language.value = typeof parsed.language === 'string' ? parsed.language : language.value;
+  objectiveAnswers.value = sanitizeObjectiveAnswers(parsed.objectiveAnswers);
+  syncDefaultCodeLanguage();
+  draftStatusMessage.value = '已恢复 24 小时内的自动草稿';
+  void nextTick(() => {
+    draftWatchSuspended = false;
+  });
+}
+
+function sanitizeObjectiveAnswers(value: unknown) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return {};
+  }
+  return Object.fromEntries(
+    Object.entries(value)
+      .filter(([, answers]) => Array.isArray(answers))
+      .map(([key, answers]) => [key, (answers as unknown[]).map(String)])
+  );
+}
+
+function clearDraft() {
+  cancelScheduledDraftSave();
+  window.sessionStorage.removeItem(draftKey.value);
+  draftStatusMessage.value = '';
+}
+
+function protectUnsavedDraft(event: BeforeUnloadEvent) {
+  if (!hasUnsavedAnswer()) {
+    return;
+  }
+  saveDraftNow();
+  event.preventDefault();
+  event.returnValue = '';
+}
+
+function hasUnsavedAnswer() {
+  return Boolean(
+    answerText.value.trim()
+    || codeText.value.trim()
+    || Object.values(objectiveAnswers.value).some((answers) => answers.length > 0)
+  );
+}
+
+function cancelScheduledDraftSave() {
+  if (draftTimer) {
+    clearTimeout(draftTimer);
+    draftTimer = undefined;
+  }
+}
+
+function registerBeforeUnload() {
+  if (beforeUnloadRegistered) {
+    return;
+  }
+  window.addEventListener('beforeunload', protectUnsavedDraft);
+  beforeUnloadRegistered = true;
+}
+
+function unregisterBeforeUnload() {
+  if (!beforeUnloadRegistered) {
+    return;
+  }
+  window.removeEventListener('beforeunload', protectUnsavedDraft);
+  beforeUnloadRegistered = false;
+}
+
+function draftStorageKey(courseId: number, homeworkId: number) {
+  return `oj:draft:v1:${currentUser.value?.id ?? 'anonymous'}:${courseId}:HWK:${homeworkId}`;
+}
+
+function isCurrentLoad(generation: number) {
+  return generation === loadGeneration;
+}
+
+function isCurrentEvaluationRequest(generation: number, submissionId: number) {
+  return isCurrentLoad(generation) && latestSubmission.value?.submissionId === submissionId;
+}
+
+function isCurrentSubmissionRequest(
+  generation: number,
+  editorGeneration: number,
+  homeworkId: number,
+  submissionId?: number
+) {
+  return isCurrentLoad(generation)
+    && editorGeneration === submissionEditorGeneration
+    && props.mode === 'submit'
+    && props.homeworkId === homeworkId
+    && homework.value?.id === homeworkId
+    && (submissionId === undefined || latestSubmission.value?.submissionId === submissionId);
 }
 
 function restoreResume() {
@@ -987,6 +1510,88 @@ function formatDateTime(value: string) {
   min-width: 0;
 }
 
+.homework-student__objective-editor,
+.homework-student__flow-actions {
+  display: grid;
+  gap: 12px;
+}
+
+.homework-student__field-label,
+.homework-student__objective-question legend {
+  color: var(--oj-ink, #172033);
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+.homework-student__field-label {
+  margin: 0;
+}
+
+.homework-student__objective-question {
+  border: 1px solid var(--oj-line, #d8deea);
+  border-radius: 12px;
+  display: grid;
+  gap: 9px;
+  margin: 0;
+  min-width: 0;
+  padding: 13px;
+}
+
+.homework-student__objective-question legend {
+  line-height: 1.5;
+  padding: 0 4px;
+}
+
+.homework-student__submission-form .homework-student__objective-option {
+  align-items: flex-start;
+  background: color-mix(in srgb, var(--oj-brand, #2563eb) 4%, transparent);
+  border: 1px solid transparent;
+  border-radius: 9px;
+  cursor: pointer;
+  display: flex;
+  gap: 9px;
+  padding: 9px 10px;
+}
+
+.homework-student__submission-form .homework-student__objective-option:focus-within {
+  border-color: var(--oj-brand, #2563eb);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--oj-brand, #2563eb) 16%, transparent);
+}
+
+.homework-student__submission-form .homework-student__objective-option input {
+  flex: 0 0 auto;
+  min-height: 0;
+  margin: 3px 0 0;
+  padding: 0;
+  width: 17px;
+  height: 17px;
+}
+
+.homework-student__draft-status {
+  color: var(--oj-muted, #667085);
+  font-size: 0.78rem;
+  margin: 0;
+}
+
+.homework-student__flow-actions a {
+  align-items: center;
+  border: 1px solid var(--oj-line-strong, #b8c2d2);
+  border-radius: 10px;
+  display: inline-flex;
+  justify-content: center;
+  min-height: 42px;
+  padding: 8px 13px;
+  text-align: center;
+  text-decoration: none;
+}
+
+.homework-student__flow-actions .homework-student__primary-action {
+  background: var(--oj-brand, #2563eb);
+  border-color: var(--oj-brand, #2563eb);
+  color: #fff;
+  font-weight: 800;
+}
+
 .homework-student__submission-form label {
   display: grid;
   gap: 7px;
@@ -1032,7 +1637,8 @@ function formatDateTime(value: string) {
 .homework-student__inline-state,
 .homework-student__warning,
 .homework-student__feedback,
-.homework-student__error {
+.homework-student__error,
+.homework-student__draft-status {
   border-radius: 10px;
   line-height: 1.45;
   margin: 0;
