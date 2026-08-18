@@ -97,7 +97,7 @@
               </div>
               <div>
                 <dt>任务附件</dt>
-                <dd>{{ labDetail.attachmentIds.length ? `${labDetail.attachmentIds.length} 个可用附件` : '无附件' }}</dd>
+                <dd>{{ labDetail.attachmentIds.length ? `已配置 ${labDetail.attachmentIds.length} 个附件` : '无附件' }}</dd>
               </div>
               <div>
                 <dt>公开用例</dt>
@@ -105,6 +105,13 @@
               </div>
             </dl>
           </section>
+
+          <LabStudentAttachments
+            class="work-surface"
+            :course-id="courseId"
+            :lab-id="labId"
+            :attachment-ids="labDetail.attachmentIds"
+          />
 
           <section class="work-surface lab-student__cases" aria-labelledby="public-case-title">
             <div class="section-heading section-heading--compact">
@@ -406,6 +413,7 @@ import PageHeader from '../../components/foundation/PageHeader.vue';
 import PageState from '../../components/foundation/PageState.vue';
 import StatusBadge from '../../components/foundation/StatusBadge.vue';
 import SummaryStrip, { type SummaryStripItem } from '../../components/foundation/SummaryStrip.vue';
+import LabStudentAttachments from './LabStudentAttachments.vue';
 import type {
   LabExperimentDetail,
   LabReportSummary,
