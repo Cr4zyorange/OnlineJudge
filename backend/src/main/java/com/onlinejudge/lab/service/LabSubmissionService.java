@@ -59,7 +59,7 @@ public class LabSubmissionService {
     );
     private static final Map<String, Set<String>> SOURCE_FILE_CONTENT_TYPES = Map.of(
             "java", Set.of("text/x-java-source", "text/java", "application/java", "application/x-java"),
-            "python", Set.of("text/x-python", "application/x-python-code"),
+            "python", Set.of("text/x-python", "text/x-python-script", "application/x-python-code"),
             "cpp", Set.of("text/x-c++src", "text/x-c++source", "application/x-c++src"),
             "c", Set.of("text/x-csrc", "text/x-c")
     );
@@ -162,7 +162,11 @@ public class LabSubmissionService {
 
         LabSubmissionQuery effectiveQuery = canManage ? query : sanitizeStudentQuery(query, userId);
         Map<Long, SubmissionVersionFlags> flagsBySubmissionId = buildSubmissionVersionFlags(submissions);
-        return toHistoryItems(applyFilters(submissions, experiment, effectiveQuery), flagsBySubmissionId);
+        return toHistoryItems(
+                applyFilters(submissions, experiment, effectiveQuery),
+                flagsBySubmissionId,
+                canManage || areScoresPublished(experiment)
+        );
     }
 
     public LabSubmissionDetailView getSubmissionDetail(long labId, long submissionId, long userId) {
@@ -186,18 +190,26 @@ public class LabSubmissionService {
         Map<Long, SubmissionVersionFlags> flagsBySubmissionId = buildSubmissionVersionFlags(
                 labSubmissionRepository.findByLabIdAndStudentId(labId, submission.studentId())
         );
-        return toDetail(submission, resolveSubmissionVersionFlags(flagsBySubmissionId, submission));
+        LabSubmissionDetailView rawDetail = toDetail(
+                submission,
+                resolveSubmissionVersionFlags(flagsBySubmissionId, submission)
+        );
+        return toVisibleSubmissionDetail(rawDetail, canManage, areScoresPublished(experiment));
     }
 
     public LabEvaluationResultView getSubmissionResult(long labId, long submissionId, long userId) {
         SubmissionAccess access = verifySubmissionAccess(labId, submissionId, userId);
         LabSubmission submission = access.submission();
-        List<LabEvaluationCaseResult> caseResults = labEvaluationResultRepository.findBySubmissionId(submissionId);
+        List<LabEvaluationCaseResult> allCaseResults = labEvaluationResultRepository.findBySubmissionId(submissionId);
+        List<LabEvaluationCaseResult> visibleCaseResults = allCaseResults;
         if (!access.canManage()) {
-            caseResults = caseResults.stream().map(LabEvaluationCaseResult::hideSensitiveContent).toList();
+            visibleCaseResults = allCaseResults.stream()
+                    .filter(LabEvaluationCaseResult::isPublic)
+                    .map(LabEvaluationCaseResult::hideSensitiveContent)
+                    .toList();
         }
-        int passedCases = (int) caseResults.stream().filter(LabEvaluationCaseResult::passed).count();
-        int totalCases = caseResults.size();
+        int passedCases = (int) allCaseResults.stream().filter(LabEvaluationCaseResult::passed).count();
+        int totalCases = allCaseResults.size();
         String fallbackMessage = resolveEvaluationMessage(submission.evaluationStatus(), passedCases, totalCases);
         LabEvaluation evaluation = labEvaluationRepository.findLatestBySubmissionId(submissionId)
                 .orElseGet(() -> new LabEvaluation(
@@ -224,7 +236,7 @@ public class LabSubmissionService {
                 evaluation.passedCases(),
                 evaluation.totalCases(),
                 evaluation.feedback(),
-                caseResults,
+                visibleCaseResults,
                 submission.submittedAt(),
                 evaluation.finishedAt() == null ? submission.updatedAt() : evaluation.finishedAt()
         );
@@ -245,47 +257,9 @@ public class LabSubmissionService {
         );
         LabSubmissionDetailView rawDetail = toDetail(submission, resolveSubmissionVersionFlags(flagsBySubmissionId, submission));
         LabEvaluationResultView evaluationResult = getSubmissionResult(labId, submission.id(), canManage ? userId : studentId);
-        boolean scorePublished = experiment.status() == LabExperimentStatus.SCORE_PUBLISHED
-                || experiment.status() == LabExperimentStatus.ARCHIVED;
-
-        LabReportSummaryView visibleReport = rawDetail.latestReport();
-        if (!canManage && !scorePublished && visibleReport != null) {
-            visibleReport = new LabReportSummaryView(
-                    visibleReport.reportId(),
-                    visibleReport.submissionId(),
-                    visibleReport.fileName(),
-                    visibleReport.fileType(),
-                    visibleReport.fileSize(),
-                    visibleReport.version(),
-                    null,
-                    null,
-                    visibleReport.submittedAt(),
-                    visibleReport.downloadUrl()
-            );
-        }
-
-        LabSubmissionDetailView visibleSubmission = canManage || scorePublished
-                ? rawDetail
-                : new LabSubmissionDetailView(
-                rawDetail.submissionId(),
-                rawDetail.labId(),
-                rawDetail.studentId(),
-                rawDetail.language(),
-                rawDetail.submitStatus(),
-                rawDetail.evaluationStatus(),
-                rawDetail.autoScore(),
-                null,
-                rawDetail.version(),
-                rawDetail.submittedAt(),
-                rawDetail.isLatest(),
-                rawDetail.isFinal(),
-                rawDetail.isScoringBasis(),
-                rawDetail.hasFile(),
-                rawDetail.code(),
-                rawDetail.fileId(),
-                visibleReport,
-                null
-        );
+        boolean scorePublished = areScoresPublished(experiment);
+        LabSubmissionDetailView visibleSubmission = toVisibleSubmissionDetail(rawDetail, canManage, scorePublished);
+        LabReportSummaryView visibleReport = visibleSubmission.latestReport();
 
         return new LabResultView(
                 labId,
@@ -294,7 +268,7 @@ public class LabSubmissionService {
                 visibleSubmission,
                 evaluationResult,
                 visibleReport,
-                canManage || scorePublished ? rawDetail.latestScore() : null,
+                visibleSubmission.latestScore(),
                 scorePublished ? experiment.publishedAt() : null
         );
     }
@@ -520,16 +494,22 @@ public class LabSubmissionService {
 
     private List<LabSubmissionHistoryItemView> toHistoryItems(
             List<LabSubmission> submissions,
-            Map<Long, SubmissionVersionFlags> flagsBySubmissionId
+            Map<Long, SubmissionVersionFlags> flagsBySubmissionId,
+            boolean scoresVisible
     ) {
         return submissions.stream()
-                .map(submission -> toHistoryItem(submission, resolveSubmissionVersionFlags(flagsBySubmissionId, submission)))
+                .map(submission -> toHistoryItem(
+                        submission,
+                        resolveSubmissionVersionFlags(flagsBySubmissionId, submission),
+                        scoresVisible
+                ))
                 .toList();
     }
 
     private LabSubmissionHistoryItemView toHistoryItem(
             LabSubmission submission,
-            SubmissionVersionFlags flags
+            SubmissionVersionFlags flags,
+            boolean scoresVisible
     ) {
         return new LabSubmissionHistoryItemView(
                 submission.id(),
@@ -539,7 +519,7 @@ public class LabSubmissionService {
                 submission.submitStatus(),
                 submission.evaluationStatus(),
                 submission.autoScore(),
-                submission.finalScore(),
+                scoresVisible ? submission.finalScore() : null,
                 submission.version(),
                 submission.submittedAt(),
                 flags.isLatest(),
@@ -577,6 +557,62 @@ public class LabSubmissionService {
                 latestReport,
                 latestScore
         );
+    }
+
+    private LabSubmissionDetailView toVisibleSubmissionDetail(
+            LabSubmissionDetailView detail,
+            boolean canManage,
+            boolean scoresPublished
+    ) {
+        if (canManage) {
+            return detail;
+        }
+        LabReportSummaryView visibleReport = scoresPublished
+                ? detail.latestReport()
+                : hideReportScore(detail.latestReport());
+        return new LabSubmissionDetailView(
+                detail.submissionId(),
+                detail.labId(),
+                detail.studentId(),
+                detail.language(),
+                detail.submitStatus(),
+                detail.evaluationStatus(),
+                detail.autoScore(),
+                scoresPublished ? detail.finalScore() : null,
+                detail.version(),
+                detail.submittedAt(),
+                detail.isLatest(),
+                detail.isFinal(),
+                detail.isScoringBasis(),
+                detail.hasFile(),
+                detail.code(),
+                null,
+                visibleReport,
+                scoresPublished ? detail.latestScore() : null
+        );
+    }
+
+    private LabReportSummaryView hideReportScore(LabReportSummaryView report) {
+        if (report == null) {
+            return null;
+        }
+        return new LabReportSummaryView(
+                report.reportId(),
+                report.submissionId(),
+                report.fileName(),
+                report.fileType(),
+                report.fileSize(),
+                report.version(),
+                null,
+                null,
+                report.submittedAt(),
+                report.downloadUrl()
+        );
+    }
+
+    private boolean areScoresPublished(LabExperiment experiment) {
+        return experiment.status() == LabExperimentStatus.SCORE_PUBLISHED
+                || experiment.status() == LabExperimentStatus.ARCHIVED;
     }
 
     private boolean hasFile(String fileId) {

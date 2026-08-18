@@ -3,6 +3,7 @@ package com.onlinejudge.lab.controller;
 import com.onlinejudge.lab.domain.LabExperiment;
 import com.onlinejudge.lab.domain.LabEvaluationMode;
 import com.onlinejudge.lab.domain.LabExperimentStatus;
+import com.onlinejudge.lab.domain.LabTestcase;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -81,6 +82,7 @@ public record LabExperimentResponse(
                 experiment.createdAt(),
                 experiment.updatedAt(),
                 experiment.testcases().stream()
+                        .filter(LabTestcase::isPublic)
                         .map(LabTestcaseResponse::fromStudentView)
                         .toList()
         );
