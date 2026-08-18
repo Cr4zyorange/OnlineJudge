@@ -2,7 +2,7 @@
   <main class="lab-task-list" data-testid="lab-task-list">
     <PageHeader
       title="课程实验"
-      :eyebrow="`UI-LAB-01 · 课程 #${courseId}`"
+      eyebrow="学生实验任务"
       subtitle="按截止时间查看当前课程的实验、提交进度与成绩状态。"
     >
       <template #actions>
@@ -107,13 +107,15 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { listLabs, listLabSubmissions } from '../../api/lab/labs';
+import { currentUser } from '../../app/runtimeContext';
 import PageHeader from '../../components/foundation/PageHeader.vue';
 import PageState from '../../components/foundation/PageState.vue';
 import StatusBadge, { type StatusBadgeTone } from '../../components/foundation/StatusBadge.vue';
 import SummaryStrip, { type SummaryStripItem } from '../../components/foundation/SummaryStrip.vue';
 import type { LabExperimentSummary, LabSubmissionHistoryItem } from '../../types/lab';
+import { formatLabEvaluationMode, localizedLabError } from './labDisplay';
 
 interface LabTaskCard {
   lab: LabExperimentSummary;
@@ -138,9 +140,10 @@ const keyword = ref('');
 const statusFilter = ref('all');
 const page = ref(1);
 const pageSize = 6;
+let loadGeneration = 0;
 
 const availableLabs = computed(() => labs.value.filter((lab) => (
-  !lab.deleted && ['PUBLISHED', 'CLOSED', 'SCORE_PUBLISHED'].includes(lab.status)
+  !lab.deleted && ['PUBLISHED', 'CLOSED', 'SCORE_PUBLISHED', 'ARCHIVED'].includes(lab.status)
 )));
 const taskCards = computed<LabTaskCard[]>(() => availableLabs.value
   .map((lab, index) => toTaskCard(lab, index + 1, submissionByLab.value.get(lab.id) ?? []))
@@ -158,7 +161,9 @@ const dueSoonCount = computed(() => taskCards.value.filter((task) => {
   const remaining = new Date(task.lab.deadline).getTime() - Date.now();
   return remaining > 0 && remaining <= 72 * 60 * 60 * 1000;
 }).length);
-const submittedCount = computed(() => taskCards.value.filter((task) => ['submitted', 'graded'].includes(task.statusKey)).length);
+const submittedCount = computed(() => taskCards.value.filter((task) => (
+  (submissionByLab.value.get(task.lab.id)?.length ?? 0) > 0
+)).length);
 const gradedCount = computed(() => taskCards.value.filter((task) => task.statusKey === 'graded').length);
 const summaryItems = computed<SummaryStripItem[]>(() => [
   { key: 'available', label: '可进入实验', value: taskCards.value.length, hint: `${taskCards.value.length} 个可进入实验`, tone: 'brand' },
@@ -167,43 +172,87 @@ const summaryItems = computed<SummaryStripItem[]>(() => [
   { key: 'graded', label: '成绩可查看', value: gradedCount.value, hint: '以发布状态为准', tone: 'success' }
 ]);
 
-onMounted(loadLabs);
+watch(
+  () => props.courseId,
+  () => {
+    page.value = 1;
+    labs.value = [];
+    submissionByLab.value = new Map();
+    void loadLabs();
+  },
+  { immediate: true }
+);
+onBeforeUnmount(() => { loadGeneration += 1; });
 
 async function loadLabs() {
+  const generation = ++loadGeneration;
+  const requestedCourseId = props.courseId;
+  const requestedStudentId = currentUser.value?.id;
   loading.value = true;
   errorMessage.value = '';
   try {
-    labs.value = await listLabs(props.courseId);
-    const visible = labs.value.filter((lab) => !lab.deleted && ['PUBLISHED', 'CLOSED', 'SCORE_PUBLISHED'].includes(lab.status));
+    if (requestedStudentId === undefined || requestedStudentId === null) {
+      throw new Error('无法确认当前学生身份，请重新登录后重试。');
+    }
+    const loadedLabs = await listLabs(requestedCourseId);
+    if (!isCurrentLoad(generation, requestedCourseId)) return;
+    if (loadedLabs.some((lab) => lab.courseId !== requestedCourseId)) {
+      throw new Error('实验列表与当前课程不匹配，请重新加载。');
+    }
+    labs.value = loadedLabs;
+    const visible = loadedLabs.filter((lab) => (
+      !lab.deleted && ['PUBLISHED', 'CLOSED', 'SCORE_PUBLISHED', 'ARCHIVED'].includes(lab.status)
+    ));
     const histories = await Promise.allSettled(visible.map((lab) => listLabSubmissions(lab.id)));
+    if (!isCurrentLoad(generation, requestedCourseId)) return;
+    if (histories.some((history) => history.status === 'rejected')) {
+      throw new Error('提交记录同步失败，请重新加载后重试。');
+    }
+    if (currentUser.value?.id !== requestedStudentId
+      || visible.some((lab, index) => {
+        const history = histories[index];
+        return history.status === 'fulfilled'
+          && history.value.some((item) => item.labId !== lab.id || item.studentId !== requestedStudentId);
+      })) {
+      throw new Error('提交记录与当前实验或学生不匹配，请重新加载。');
+    }
     submissionByLab.value = new Map(visible.map((lab, index) => {
       const history = histories[index];
       return [lab.id, history.status === 'fulfilled' ? history.value : []];
     }));
   } catch (error) {
+    if (!isCurrentLoad(generation, requestedCourseId)) return;
     labs.value = [];
     submissionByLab.value = new Map();
-    errorMessage.value = error instanceof Error ? error.message : '请稍后重试';
+    errorMessage.value = localizedLabError(error, '实验列表加载失败，请稍后重试。');
   } finally {
-    loading.value = false;
+    if (isCurrentLoad(generation, requestedCourseId)) loading.value = false;
   }
 }
 
 function toTaskCard(lab: LabExperimentSummary, sequence: number, submissions: LabSubmissionHistoryItem[]): LabTaskCard {
   const latest = submissions.find((item) => item.isLatest) ?? submissions[0];
-  const finalScore = lab.status === 'SCORE_PUBLISHED' ? latest?.finalScore ?? null : null;
+  const scoringBasis = submissions.find((item) => item.isScoringBasis)
+    ?? submissions.find((item) => item.isFinal)
+    ?? latest;
+  const scoresPublished = lab.status === 'SCORE_PUBLISHED' || lab.status === 'ARCHIVED';
+  const finalScore = scoresPublished ? scoringBasis?.finalScore ?? null : null;
   const overdue = new Date(lab.deadline).getTime() < Date.now();
-  if (lab.status === 'SCORE_PUBLISHED') {
-    return task(lab, sequence, 'graded', '成绩已发布', 'success', latest ? '已提交' : '未找到提交', latest ? `第 ${latest.version} 版作为评分依据` : '如有疑问请联系教师', '提交阶段已结束', '查看成绩', '查看评测反馈', finalScore);
+  if (scoresPublished) {
+    return task(lab, sequence, 'graded', lab.status === 'ARCHIVED' ? '已归档' : '成绩已发布', 'success', scoringBasis ? '已提交' : '未找到提交', scoringBasis ? `第 ${scoringBasis.version} 版作为评分依据` : '如有疑问请联系教师', '提交阶段已结束', '查看成绩', '查看评测反馈', finalScore);
   }
   if (lab.status === 'CLOSED' || overdue) {
     return task(lab, sequence, 'closed', overdue ? '已逾期' : '已截止', 'warning', latest ? '已提交' : '未提交', latest ? `最近为第 ${latest.version} 版` : '当前不可继续提交', '截止时间已过', latest ? '查看提交' : '查看说明', latest ? '等待成绩发布' : '提交入口已关闭', finalScore);
   }
   if (latest) {
     const evaluating = ['PENDING', 'RUNNING'].includes(latest.evaluationStatus);
-    return task(lab, sequence, 'submitted', evaluating ? '评测中' : '已有提交', 'info', evaluating ? '等待评测' : '已提交', `最近为第 ${latest.version} 版`, remainingTime(lab.deadline), '继续实验', lab.reportRequired && !latest.hasFile ? '下一步：补交实验报告' : '可在截止前更新版本', finalScore);
+    return task(lab, sequence, 'submitted', evaluating ? '评测中' : '已有提交', 'info', evaluating ? '等待评测' : '已提交', `最近为第 ${latest.version} 版`, remainingTime(lab.deadline), '继续实验', lab.reportRequired ? '请在实验详情核对报告状态' : '可在截止前更新版本', finalScore);
   }
   return task(lab, sequence, 'active', '进行中', 'info', '尚未提交', '进入实验后开始作答', remainingTime(lab.deadline), '开始实验', '下一步：阅读说明并提交', null);
+}
+
+function isCurrentLoad(generation: number, courseId: number) {
+  return generation === loadGeneration && courseId === props.courseId;
 }
 
 function task(lab: LabExperimentSummary, sequence: number, statusKey: LabTaskCard['statusKey'], statusLabel: string, tone: StatusBadgeTone, progressLabel: string, submissionHint: string, deadlineHint: string, actionLabel: string, nextStep: string, finalScore: number | null): LabTaskCard {
@@ -216,7 +265,7 @@ function remainingTime(value: string) {
 }
 
 function evaluationLabel(lab: LabExperimentSummary) {
-  return lab.evaluationMode === 'MIXED' ? '自动评测 + 教师评分' : '自动评测';
+  return formatLabEvaluationMode(lab.evaluationMode);
 }
 
 function formatDateTime(value: string) {

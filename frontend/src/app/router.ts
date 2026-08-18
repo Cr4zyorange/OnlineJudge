@@ -205,9 +205,22 @@ const routes: RouteRecordRaw[] = [
             path: 'labs/:labId',
             name: 'lab-detail',
             component: () => import('../views/lab/LabStudentView.vue'),
-            props: numericProps('courseId', 'labId'),
+            props: (route) => ({ ...numberParams(route, 'courseId', 'labId'), mode: 'detail' }),
             meta: {
-              title: '实验详情与提交',
+              title: '实验详情',
+              shell: 'course',
+              requiresAuth: true,
+              courseAccess: 'member',
+              uiIds: ['UI-LAB-02']
+            }
+          },
+          {
+            path: 'labs/:labId/submit',
+            name: 'lab-submit',
+            component: () => import('../views/lab/LabStudentView.vue'),
+            props: (route) => ({ ...numberParams(route, 'courseId', 'labId'), mode: 'submit' }),
+            meta: {
+              title: '提交实验',
               shell: 'course',
               requiresAuth: true,
               courseAccess: 'member',
@@ -225,6 +238,40 @@ const routes: RouteRecordRaw[] = [
               requiresAuth: true,
               courseAccess: 'member',
               uiIds: ['UI-LAB-05']
+            }
+          },
+          {
+            path: 'labs/:labId/result',
+            name: 'lab-latest-result',
+            component: () => import('../views/lab/LabSubmissionResultView.vue'),
+            props: numericProps('courseId', 'labId'),
+            beforeEnter: (to) =>
+              currentCourse.value?.manageable
+                ? {
+                    name: 'lab-submission-workspace',
+                    params: { courseId: to.params.courseId, labId: to.params.labId },
+                    replace: true
+                  }
+                : true,
+            meta: {
+              title: '实验评测结果',
+              shell: 'course',
+              requiresAuth: true,
+              courseAccess: 'member',
+              uiIds: ['UI-LAB-07']
+            }
+          },
+          {
+            path: 'labs/:labId/submissions/:submissionId/result',
+            name: 'lab-submission-result',
+            component: () => import('../views/lab/LabSubmissionResultView.vue'),
+            props: numericProps('courseId', 'labId', 'submissionId'),
+            meta: {
+              title: '实验评测结果',
+              shell: 'course',
+              requiresAuth: true,
+              courseAccess: 'member',
+              uiIds: ['UI-LAB-07']
             }
           },
           {

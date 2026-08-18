@@ -4,6 +4,7 @@ import LabStudentView from '../../../src/views/lab/LabStudentView.vue';
 import * as labApi from '../../../src/api/lab/labs';
 import * as learningProgressApi from '../../../src/api/lrn/learningProgress';
 import * as learningRecordsApi from '../../../src/api/lrn/learningRecords';
+import { currentUser, resetRuntimeContext } from '../../../src/app/runtimeContext';
 
 const downloadLabReportMock = vi.hoisted(() => vi.fn());
 
@@ -21,8 +22,19 @@ vi.mock('../../../src/api/lrn/learningRecords');
 describe('LabStudentView', () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date('2026-06-01T08:00:00+08:00'));
     installLocalStorageMock();
     window.history.replaceState({}, '', '/courses/101/labs/7?role=student');
+    resetRuntimeContext();
+    currentUser.value = {
+      id: 601,
+      username: 'lab-student',
+      displayName: '实验学生',
+      userType: 'STUDENT',
+      roles: ['STUDENT'],
+      permissions: []
+    };
     vi.mocked(learningRecordsApi.reportLearningRecord).mockResolvedValue({
       id: 1,
       courseId: 101,
@@ -52,12 +64,12 @@ describe('LabStudentView', () => {
 
   afterEach(() => {
     vi.useRealTimers();
+    resetRuntimeContext();
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
   });
 
   it('loads published lab detail and submits code successfully', async () => {
-    vi.useFakeTimers();
     vi.mocked(labApi.getLabDetail).mockResolvedValueOnce({
       id: 7,
       courseId: 101,
@@ -183,12 +195,12 @@ describe('LabStudentView', () => {
 
     expect(wrapper.text()).toContain('实验七');
     expect(wrapper.text()).toContain('完成基础排序实现');
-    expect(wrapper.text()).toContain('java,python');
+    expect(wrapper.text()).toContain('Java、Python');
     expect(labApi.listLabSubmissions).toHaveBeenCalledWith(7);
     expect(labApi.getLabSubmissionResult).toHaveBeenCalledWith(7, 88);
     expect(wrapper.text()).toContain('查看提交历史');
     expect(wrapper.text()).toContain('版本 2');
-    expect(wrapper.text()).toContain('ACCEPTED');
+    expect(wrapper.text()).toContain('评测状态：通过');
     expect(wrapper.text()).toContain('全部用例通过');
     expect(wrapper.text()).toContain('92');
     expect(learningProgressApi.saveLearningProgress).toHaveBeenCalledWith(expect.objectContaining({
@@ -237,7 +249,7 @@ describe('LabStudentView', () => {
     }));
     expect(wrapper.text()).toContain('提交成功');
     expect(wrapper.text()).toContain('版本 1');
-    expect(wrapper.text()).toContain('RUNNING');
+    expect(wrapper.text()).toContain('评测中');
     expect(wrapper.text()).toContain('评测进行中');
 
     await vi.advanceTimersByTimeAsync(1000);
@@ -525,7 +537,7 @@ describe('LabStudentView', () => {
     });
     await flushPromises();
 
-    expect(wrapper.text()).toContain('WRONG_ANSWER');
+    expect(wrapper.text()).toContain('答案错误');
     expect(wrapper.text()).toContain('部分用例未通过');
     expect(wrapper.text()).toContain('通过用例：1 / 2');
     expect(wrapper.text()).toContain('期望输出 B，实际输出 C');
@@ -772,7 +784,7 @@ describe('LabStudentView', () => {
       chapterId: null,
       title: '实验十四',
       description: '评分结果展示',
-      status: 'PUBLISHED',
+      status: 'SCORE_PUBLISHED',
       deadline: '2026-06-30T23:59:59',
       maxScore: 100,
       attachmentIds: [],

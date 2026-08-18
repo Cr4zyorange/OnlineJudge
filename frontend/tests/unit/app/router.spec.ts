@@ -183,6 +183,51 @@ describe('application router access contract', () => {
     });
   });
 
+  it.each([
+    {
+      label: 'detail',
+      path: '/courses/42/labs/9',
+      routeName: 'lab-detail',
+      uiIds: ['UI-LAB-02'],
+      props: { courseId: 42, labId: 9, mode: 'detail' }
+    },
+    {
+      label: 'submit',
+      path: '/courses/42/labs/9/submit',
+      routeName: 'lab-submit',
+      uiIds: ['UI-LAB-02'],
+      props: { courseId: 42, labId: 9, mode: 'submit' }
+    },
+    {
+      label: 'latest result',
+      path: '/courses/42/labs/9/result',
+      routeName: 'lab-latest-result',
+      uiIds: ['UI-LAB-07'],
+      props: { courseId: 42, labId: 9 }
+    },
+    {
+      label: 'historic result',
+      path: '/courses/42/labs/9/submissions/55/result',
+      routeName: 'lab-submission-result',
+      uiIds: ['UI-LAB-07'],
+      props: { courseId: 42, labId: 9, submissionId: 55 }
+    }
+  ])('exposes the $label LAB student route contract', async ({ path, routeName, uiIds, props }) => {
+    const router = createAppRouter({
+      history: createMemoryHistory(),
+      services: {
+        loadCurrentUser: vi.fn().mockResolvedValue(user('STUDENT')),
+        loadCourse: vi.fn().mockResolvedValue(course({ manageable: false }))
+      }
+    });
+
+    await router.push(path);
+
+    expect(router.currentRoute.value.name).toBe(routeName);
+    expect(router.currentRoute.value.meta.uiIds).toEqual(uiIds);
+    expect(resolveDefaultProps(router.currentRoute.value)).toEqual(props);
+  });
+
   it('redirects a course manager from the student latest-result route to submission management', async () => {
     const router = createAppRouter({
       history: createMemoryHistory(),
@@ -196,6 +241,21 @@ describe('application router access contract', () => {
 
     expect(router.currentRoute.value.name).toBe('homework-submission-manage');
     expect(router.currentRoute.value.fullPath).toBe('/courses/42/homeworks/9/manage/submissions');
+  });
+
+  it('redirects a course manager from the latest LAB student-result route to the submission workspace', async () => {
+    const router = createAppRouter({
+      history: createMemoryHistory(),
+      services: {
+        loadCurrentUser: vi.fn().mockResolvedValue(user('TEACHER')),
+        loadCourse: vi.fn().mockResolvedValue(course({ manageable: true }))
+      }
+    });
+
+    await router.push('/courses/42/labs/9/result');
+
+    expect(router.currentRoute.value.name).toBe('lab-submission-workspace');
+    expect(router.currentRoute.value.fullPath).toBe('/courses/42/labs/9/manage/submissions');
   });
 });
 

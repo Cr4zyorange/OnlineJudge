@@ -110,7 +110,11 @@ public class LabReportService {
                 throw new LabPermissionException("无权限查看他人实验报告");
             }
         }
-        return LabReportSummaryView.from(report, buildDownloadUrl(labId, report.id()));
+        LabReportSummaryView view = LabReportSummaryView.from(report, buildDownloadUrl(labId, report.id()));
+        if (canManage || areScoresPublished(experiment)) {
+            return view;
+        }
+        return hideReportScore(view);
     }
 
     public Optional<LabReportSummaryView> findLatestReport(long labId, long studentId) {
@@ -259,6 +263,26 @@ public class LabReportService {
 
     private String buildDownloadUrl(long labId, long reportId) {
         return "/api/v1/labs/" + labId + "/reports/" + reportId + "/download";
+    }
+
+    private boolean areScoresPublished(LabExperiment experiment) {
+        return experiment.status() == LabExperimentStatus.SCORE_PUBLISHED
+                || experiment.status() == LabExperimentStatus.ARCHIVED;
+    }
+
+    private LabReportSummaryView hideReportScore(LabReportSummaryView report) {
+        return new LabReportSummaryView(
+                report.reportId(),
+                report.submissionId(),
+                report.fileName(),
+                report.fileType(),
+                report.fileSize(),
+                report.version(),
+                null,
+                null,
+                report.submittedAt(),
+                report.downloadUrl()
+        );
     }
 
     private void requireCourseViewPermission(long courseId, long userId) {
