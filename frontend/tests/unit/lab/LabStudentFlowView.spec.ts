@@ -1,6 +1,7 @@
 import { flushPromises, mount } from '@vue/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createMemoryHistory, createRouter, RouterView } from 'vue-router';
+import * as crsApi from '../../../src/api/crs/courses';
 import * as labApi from '../../../src/api/lab/labs';
 import * as learningProgressApi from '../../../src/api/lrn/learningProgress';
 import * as learningRecordsApi from '../../../src/api/lrn/learningRecords';
@@ -18,6 +19,7 @@ import type {
 import LabStudentView from '../../../src/views/lab/LabStudentView.vue';
 
 vi.mock('../../../src/api/lab/labs');
+vi.mock('../../../src/api/crs/courses');
 vi.mock('../../../src/api/lrn/learningProgress');
 vi.mock('../../../src/api/lrn/learningRecords');
 
@@ -37,6 +39,7 @@ describe('LabStudentView task-flow contract', () => {
       roles: ['STUDENT'],
       permissions: []
     };
+    vi.mocked(crsApi.listResources).mockResolvedValue([]);
     vi.mocked(learningProgressApi.saveLearningProgress).mockResolvedValue({
       progressId: 1,
       courseId: 101,
@@ -81,6 +84,7 @@ describe('LabStudentView task-flow contract', () => {
     await flushPromises();
 
     expect(wrapper.find('[data-testid="lab-detail-page"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="lab-student-attachments"]').exists()).toBe(true);
     expect(wrapper.find('[data-action="submit-lab"]').exists()).toBe(false);
     expect(wrapper.get('[data-testid="lab-submit-link"]').attributes('href'))
       .toBe('/courses/101/labs/7/submit');
