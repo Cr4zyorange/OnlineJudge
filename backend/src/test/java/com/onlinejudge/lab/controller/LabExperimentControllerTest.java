@@ -146,7 +146,7 @@ class LabExperimentControllerTest {
     }
 
     @Test
-    void studentCourseMemberCanReadPublishedLabsButCannotSeeHiddenExpectedOutput() throws Exception {
+    void studentCourseMemberCanReadPublishedLabsButCannotSeeHiddenTestcases() throws Exception {
         long labId = createLabAndReturnId(404L, teacherHeaders("404", "404"), Map.ofEntries(
                 entry("title", "学生可见实验"),
                 entry("description", "用于验证学生侧读取"),
@@ -197,10 +197,11 @@ class LabExperimentControllerTest {
                         .headers(studentHeaders("404")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.id").value(labId))
-                .andExpect(jsonPath("$.data.testcases", hasSize(2)))
+                .andExpect(jsonPath("$.data.testcases", hasSize(1)))
+                .andExpect(jsonPath("$.data.testcases[0].public").value(true))
+                .andExpect(jsonPath("$.data.testcases[0].input").value("1 1"))
                 .andExpect(jsonPath("$.data.testcases[0].expectedOutput").value("2"))
-                .andExpect(jsonPath("$.data.testcases[1].public").value(false))
-                .andExpect(jsonPath("$.data.testcases[1].expectedOutput").doesNotExist());
+                .andExpect(jsonPath("$.data.testcases[1]").doesNotExist());
     }
 
     @Test

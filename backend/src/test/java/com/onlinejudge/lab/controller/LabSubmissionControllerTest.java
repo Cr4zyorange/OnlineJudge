@@ -114,7 +114,7 @@ class LabSubmissionControllerTest {
         MockMultipartFile sourceFile = new MockMultipartFile(
                 "file",
                 "main.py",
-                "text/x-python",
+                "text/x-python-script",
                 "print('from file')".getBytes()
         );
 
@@ -245,12 +245,29 @@ class LabSubmissionControllerTest {
                 .andExpect(jsonPath("$.data[0].isFinal").value(true))
                 .andExpect(jsonPath("$.data[0].isScoringBasis").value(true))
                 .andExpect(jsonPath("$.data[0].autoScore").value(95))
-                .andExpect(jsonPath("$.data[0].finalScore").value(98))
+                .andExpect(jsonPath("$.data[0].finalScore").doesNotExist())
                 .andExpect(jsonPath("$.data[0].hasFile").value(false))
                 .andExpect(jsonPath("$.data[1].version").value(1))
                 .andExpect(jsonPath("$.data[1].isLatest").value(false))
                 .andExpect(jsonPath("$.data[1].isFinal").value(false))
                 .andExpect(jsonPath("$.data[1].isScoringBasis").value(false));
+
+        mockMvc.perform(get("/api/v1/labs/{labId}/submissions", labId)
+                        .headers(teacherHeaders("508", "508", "601")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].finalScore").value(98));
+
+        mockMvc.perform(post("/api/v1/labs/{labId}/close", labId)
+                        .headers(teacherHeaders("508", "508", "601")))
+                .andExpect(status().isOk());
+        mockMvc.perform(put("/api/v1/labs/{labId}/release-scores", labId)
+                        .headers(teacherHeaders("508", "508", "601")))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/v1/labs/{labId}/submissions", labId)
+                        .headers(studentHeaders("508", 601L)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].finalScore").value(98));
     }
 
     @Test
@@ -351,14 +368,19 @@ class LabSubmissionControllerTest {
                 .andExpect(jsonPath("$.data.score").value(100))
                 .andExpect(jsonPath("$.data.passedCases").value(2))
                 .andExpect(jsonPath("$.data.totalCases").value(2))
-                .andExpect(jsonPath("$.data.caseResults", hasSize(2)))
-                .andExpect(jsonPath("$.data.caseResults[1].input").doesNotExist())
-                .andExpect(jsonPath("$.data.caseResults[1].expectedOutput").doesNotExist());
+                .andExpect(jsonPath("$.data.caseResults", hasSize(1)))
+                .andExpect(jsonPath("$.data.caseResults[0].input").value("1 2"))
+                .andExpect(jsonPath("$.data.caseResults[0].expectedOutput").value("sum:3"))
+                .andExpect(jsonPath("$.data.caseResults[1]").doesNotExist());
 
         mockMvc.perform(get("/api/v1/labs/{labId}/submissions/{submissionId}/result", labId, submissionId)
                         .headers(teacherHeaders("513", "513")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.evaluationStatus").value("ACCEPTED"))
+                .andExpect(jsonPath("$.data.score").value(100))
+                .andExpect(jsonPath("$.data.passedCases").value(2))
+                .andExpect(jsonPath("$.data.totalCases").value(2))
+                .andExpect(jsonPath("$.data.caseResults", hasSize(2)))
                 .andExpect(jsonPath("$.data.caseResults[1].input").value("2 3"))
                 .andExpect(jsonPath("$.data.caseResults[1].expectedOutput").value("sum:5"));
 
@@ -368,6 +390,15 @@ class LabSubmissionControllerTest {
                 submissionId
         );
         org.assertj.core.api.Assertions.assertThat(aggregateRows).isEqualTo(1);
+
+        jdbcTemplate.update("DELETE FROM lab_evaluation WHERE submission_id = ?", submissionId);
+        mockMvc.perform(get("/api/v1/labs/{labId}/submissions/{submissionId}/result", labId, submissionId)
+                        .headers(studentHeaders("513")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.score").value(100))
+                .andExpect(jsonPath("$.data.passedCases").value(2))
+                .andExpect(jsonPath("$.data.totalCases").value(2))
+                .andExpect(jsonPath("$.data.caseResults", hasSize(1)));
     }
 
     @Test
@@ -838,12 +869,38 @@ class LabSubmissionControllerTest {
         org.assertj.core.api.Assertions.assertThat(scoredRecord.get("SCORED_BY")).isEqualTo(501L);
         org.assertj.core.api.Assertions.assertThat(scoredRecord.get("SCORED_AT")).isNotNull();
 
+        mockMvc.perform(get("/api/v1/labs/{labId}/reports/{reportId}", labId, reportId)
+                        .headers(studentHeaders("523", 601L)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.reportId").value(reportId))
+                .andExpect(jsonPath("$.data.score").doesNotExist())
+                .andExpect(jsonPath("$.data.comment").doesNotExist());
+
+        mockMvc.perform(get("/api/v1/labs/{labId}/reports/{reportId}", labId, reportId)
+                        .headers(teacherHeaders("523", "523", "601")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.score").value(95))
+                .andExpect(jsonPath("$.data.comment").value("报告完整"));
+
         mockMvc.perform(get("/api/v1/labs/{labId}/submissions/{submissionId}", labId, submissionId)
                         .headers(teacherHeaders("523", "523", "601")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.latestReport.reportId").value(reportId))
                 .andExpect(jsonPath("$.data.latestReport.score").value(95))
                 .andExpect(jsonPath("$.data.latestReport.comment").value("报告完整"));
+
+        mockMvc.perform(post("/api/v1/labs/{labId}/close", labId)
+                        .headers(teacherHeaders("523", "523", "601")))
+                .andExpect(status().isOk());
+        mockMvc.perform(put("/api/v1/labs/{labId}/release-scores", labId)
+                        .headers(teacherHeaders("523", "523", "601")))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/v1/labs/{labId}/reports/{reportId}", labId, reportId)
+                        .headers(studentHeaders("523", 601L)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.score").value(95))
+                .andExpect(jsonPath("$.data.comment").value("报告完整"));
     }
 
     @Test
@@ -887,6 +944,8 @@ class LabSubmissionControllerTest {
     void teacherCanScoreSubmissionAndPersistScoreRecord() throws Exception {
         long labId = createPublishedLab(525L, true, LocalDateTime.now().plusDays(3));
         long submissionId = createCodeSubmission(labId, 601L, "525", "print('score submission')", "python");
+        String internalFileId = "internal/lab/submissions/" + submissionId + "/main.py";
+        jdbcTemplate.update("UPDATE lab_submission SET file_id = ? WHERE id = ?", internalFileId, submissionId);
         long reportId = uploadReport(labId, submissionId, "525");
         jdbcTemplate.update("UPDATE lab_report SET score = ?, comment = ?, scored_by = ?, scored_at = ? WHERE id = ?",
                 30,
@@ -933,7 +992,38 @@ class LabSubmissionControllerTest {
                 .andExpect(jsonPath("$.data.latestScore.reportScore").value(30))
                 .andExpect(jsonPath("$.data.latestScore.finalScore").value(95))
                 .andExpect(jsonPath("$.data.latestScore.comment").value("整体实现稳定"))
-                .andExpect(jsonPath("$.data.latestScore.hasChangeLogs").value(false));
+                .andExpect(jsonPath("$.data.latestScore.hasChangeLogs").value(false))
+                .andExpect(jsonPath("$.data.fileId").value(internalFileId));
+
+        mockMvc.perform(get("/api/v1/labs/{labId}/submissions/{submissionId}", labId, submissionId)
+                        .headers(studentHeaders("525", 601L)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.code").value("print('score submission')"))
+                .andExpect(jsonPath("$.data.hasFile").value(true))
+                .andExpect(jsonPath("$.data.fileId").doesNotExist())
+                .andExpect(jsonPath("$.data.finalScore").doesNotExist())
+                .andExpect(jsonPath("$.data.latestReport.score").doesNotExist())
+                .andExpect(jsonPath("$.data.latestReport.comment").doesNotExist())
+                .andExpect(jsonPath("$.data.latestScore").doesNotExist());
+
+        mockMvc.perform(post("/api/v1/labs/{labId}/close", labId)
+                        .headers(teacherHeaders("525", "525", "601")))
+                .andExpect(status().isOk());
+        mockMvc.perform(put("/api/v1/labs/{labId}/release-scores", labId)
+                        .headers(teacherHeaders("525", "525", "601")))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/v1/labs/{labId}/submissions/{submissionId}", labId, submissionId)
+                        .headers(studentHeaders("525", 601L)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.fileId").doesNotExist())
+                .andExpect(jsonPath("$.data.finalScore").value(95))
+                .andExpect(jsonPath("$.data.latestReport.score").value(30))
+                .andExpect(jsonPath("$.data.latestReport.comment").value("报告得分 30"))
+                .andExpect(jsonPath("$.data.latestScore.manualScore").value(92))
+                .andExpect(jsonPath("$.data.latestScore.reportScore").value(30))
+                .andExpect(jsonPath("$.data.latestScore.finalScore").value(95))
+                .andExpect(jsonPath("$.data.latestScore.comment").value("整体实现稳定"));
     }
 
     @Test
@@ -1109,9 +1199,12 @@ class LabSubmissionControllerTest {
                 .andExpect(jsonPath("$.data.latestScore").doesNotExist())
                 .andExpect(jsonPath("$.data.latestReport.score").doesNotExist())
                 .andExpect(jsonPath("$.data.latestReport.comment").doesNotExist())
-                .andExpect(jsonPath("$.data.evaluationResult.caseResults", hasSize(2)))
+                .andExpect(jsonPath("$.data.evaluationResult.score").value(100))
+                .andExpect(jsonPath("$.data.evaluationResult.passedCases").value(2))
+                .andExpect(jsonPath("$.data.evaluationResult.totalCases").value(2))
+                .andExpect(jsonPath("$.data.evaluationResult.caseResults", hasSize(1)))
                 .andExpect(jsonPath("$.data.evaluationResult.caseResults[0].expectedOutput").value("sum:3"))
-                .andExpect(jsonPath("$.data.evaluationResult.caseResults[1].expectedOutput").doesNotExist())
+                .andExpect(jsonPath("$.data.evaluationResult.caseResults[1]").doesNotExist())
                 .andExpect(jsonPath("$.data.publishedAt").doesNotExist());
 
         mockMvc.perform(put("/api/v1/labs/{labId}/release-scores", labId)
