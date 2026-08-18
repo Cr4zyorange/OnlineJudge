@@ -6,7 +6,7 @@ export type LabExperimentStatus =
   | 'SCORE_PUBLISHED'
   | 'ARCHIVED';
 
-export type LabEvaluationMode = 'DOCKER_IO' | 'MIXED';
+export type LabEvaluationMode = 'DOCKER_IO' | 'MIXED' | 'MANUAL';
 
 export interface LabTestcase {
   id: number;
