@@ -1,6 +1,7 @@
 import { mount } from '@vue/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import LabStudentView from '../../../src/views/lab/LabStudentView.vue';
+import * as crsApi from '../../../src/api/crs/courses';
 import * as labApi from '../../../src/api/lab/labs';
 import * as learningProgressApi from '../../../src/api/lrn/learningProgress';
 import * as learningRecordsApi from '../../../src/api/lrn/learningRecords';
@@ -16,6 +17,7 @@ vi.mock('../../../src/api/lab/labs', async (importOriginal) => {
     downloadLabReport: downloadLabReportMock
   };
 });
+vi.mock('../../../src/api/crs/courses');
 vi.mock('../../../src/api/lrn/learningProgress');
 vi.mock('../../../src/api/lrn/learningRecords');
 
@@ -35,6 +37,7 @@ describe('LabStudentView', () => {
       roles: ['STUDENT'],
       permissions: []
     };
+    vi.mocked(crsApi.listResources).mockResolvedValue([]);
     vi.mocked(learningRecordsApi.reportLearningRecord).mockResolvedValue({
       id: 1,
       courseId: 101,

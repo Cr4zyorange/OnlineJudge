@@ -873,6 +873,150 @@ class CourseControllerTest {
     }
 
     @Test
+    void studentResourceListAndDownloadEnforcePublishDeletionAndCourseScope() throws Exception {
+        String courseResponse = mockMvc.perform(post("/api/v1/courses")
+                        .header("X-User-Id", "808")
+                        .header("X-User-Role", "TEACHER")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"resource-security-" + System.nanoTime()
+                                + "\",\"enrollmentMode\":\"PUBLIC\",\"status\":\"ACTIVE\"}"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        String courseId = courseResponse.replaceAll("(?s).*\"id\":(\\d+).*", "$1");
+
+        String otherCourseResponse = mockMvc.perform(post("/api/v1/courses")
+                        .header("X-User-Id", "809")
+                        .header("X-User-Role", "TEACHER")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"resource-security-other-" + System.nanoTime()
+                                + "\",\"enrollmentMode\":\"PUBLIC\",\"status\":\"ACTIVE\"}"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        String otherCourseId = otherCourseResponse.replaceAll("(?s).*\"id\":(\\d+).*", "$1");
+
+        String visibleUploadResponse = mockMvc.perform(multipart("/api/v1/courses/" + courseId + "/resources")
+                        .file(new MockMultipartFile(
+                                "file",
+                                "visible.pdf",
+                                "application/pdf",
+                                "visible resource".getBytes(java.nio.charset.StandardCharsets.UTF_8)
+                        ))
+                        .param("name", "Visible Resource")
+                        .param("resourceType", "DOCUMENT")
+                        .param("visibility", "STUDENT")
+                        .header("X-User-Id", "808")
+                        .header("X-User-Role", "TEACHER"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        String visibleResourceId = visibleUploadResponse.replaceAll("(?s).*\"id\":(\\d+).*", "$1");
+
+        String futureUploadResponse = mockMvc.perform(multipart("/api/v1/courses/" + courseId + "/resources")
+                        .file(new MockMultipartFile(
+                                "file",
+                                "future.pdf",
+                                "application/pdf",
+                                "future resource".getBytes(java.nio.charset.StandardCharsets.UTF_8)
+                        ))
+                        .param("name", "Future Resource")
+                        .param("resourceType", "DOCUMENT")
+                        .param("visibility", "STUDENT")
+                        .param("publishAt", java.time.LocalDateTime.now().plusDays(1).withNano(0).toString())
+                        .header("X-User-Id", "808")
+                        .header("X-User-Role", "TEACHER"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        String futureResourceId = futureUploadResponse.replaceAll("(?s).*\"id\":(\\d+).*", "$1");
+
+        mockMvc.perform(multipart("/api/v1/courses/" + courseId + "/resources")
+                        .file(new MockMultipartFile(
+                                "file",
+                                "teacher-only.pdf",
+                                "application/pdf",
+                                "teacher resource".getBytes(java.nio.charset.StandardCharsets.UTF_8)
+                        ))
+                        .param("name", "Teacher Resource")
+                        .param("resourceType", "DOCUMENT")
+                        .param("visibility", "TEACHER")
+                        .header("X-User-Id", "808")
+                        .header("X-User-Role", "TEACHER"))
+                .andExpect(status().isOk());
+
+        String deletedUploadResponse = mockMvc.perform(multipart("/api/v1/courses/" + courseId + "/resources")
+                        .file(new MockMultipartFile(
+                                "file",
+                                "deleted.pdf",
+                                "application/pdf",
+                                "deleted resource".getBytes(java.nio.charset.StandardCharsets.UTF_8)
+                        ))
+                        .param("name", "Deleted Resource")
+                        .param("resourceType", "DOCUMENT")
+                        .param("visibility", "STUDENT")
+                        .header("X-User-Id", "808")
+                        .header("X-User-Role", "TEACHER"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        String deletedResourceId = deletedUploadResponse.replaceAll("(?s).*\"id\":(\\d+).*", "$1");
+
+        String otherCourseUploadResponse = mockMvc.perform(multipart("/api/v1/courses/" + otherCourseId + "/resources")
+                        .file(new MockMultipartFile(
+                                "file",
+                                "other-course.pdf",
+                                "application/pdf",
+                                "other course resource".getBytes(java.nio.charset.StandardCharsets.UTF_8)
+                        ))
+                        .param("name", "Other Course Resource")
+                        .param("resourceType", "DOCUMENT")
+                        .param("visibility", "STUDENT")
+                        .header("X-User-Id", "809")
+                        .header("X-User-Role", "TEACHER"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        String otherCourseResourceId = otherCourseUploadResponse.replaceAll("(?s).*\"id\":(\\d+).*", "$1");
+
+        mockMvc.perform(delete("/api/v1/courses/" + courseId + "/resources/" + deletedResourceId)
+                        .header("X-User-Id", "808")
+                        .header("X-User-Role", "TEACHER"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/v1/courses/" + courseId + "/join")
+                        .header("X-User-Id", "810")
+                        .header("X-User-Role", "STUDENT"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/v1/courses/" + courseId + "/resources")
+                        .header("X-User-Id", "810")
+                        .header("X-User-Role", "STUDENT"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()", is(1)))
+                .andExpect(jsonPath("$.data[0].id", is(Integer.parseInt(visibleResourceId))))
+                .andExpect(jsonPath("$.data[0].name", is("Visible Resource")));
+
+        mockMvc.perform(get("/api/v1/courses/" + courseId + "/resources/" + visibleResourceId + "/download")
+                        .header("X-User-Id", "810")
+                        .header("X-User-Role", "STUDENT"))
+                .andExpect(status().isOk())
+                .andExpect(content().bytes("visible resource".getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+
+        mockMvc.perform(get("/api/v1/courses/" + courseId + "/resources/" + futureResourceId + "/download")
+                        .header("X-User-Id", "810")
+                        .header("X-User-Role", "STUDENT"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.message", is("无权限访问")));
+
+        mockMvc.perform(get("/api/v1/courses/" + courseId + "/resources/" + deletedResourceId + "/download")
+                        .header("X-User-Id", "810")
+                        .header("X-User-Role", "STUDENT"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message", is("资源不存在")));
+
+        mockMvc.perform(get("/api/v1/courses/" + courseId + "/resources/" + otherCourseResourceId + "/download")
+                        .header("X-User-Id", "810")
+                        .header("X-User-Role", "STUDENT"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message", is("资源不存在")));
+    }
+
+    @Test
     void resourceUploadRejectsUnsupportedTypeAndOversizedFile() throws Exception {
         String response = mockMvc.perform(post("/api/v1/courses")
                         .header("X-User-Id", "811")
