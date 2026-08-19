@@ -6,12 +6,15 @@ import { createAppRouter } from '../../../src/app/router';
 import * as authApi from '../../../src/api/auth/auth';
 import * as courseApi from '../../../src/api/crs/courses';
 import * as labApi from '../../../src/api/lab/labs';
+import * as learningProgressApi from '../../../src/api/lrn/learningProgress';
 import type { AuthUser } from '../../../src/api/auth/auth';
 import type { Course } from '../../../src/types/crs';
+import type { LabExperimentDetail } from '../../../src/types/lab';
 
 vi.mock('../../../src/api/auth/auth');
 vi.mock('../../../src/api/crs/courses');
 vi.mock('../../../src/api/lab/labs');
+vi.mock('../../../src/api/lrn/learningProgress');
 
 describe('App routed shell integration', () => {
   let wrapper: VueWrapper | null = null;
@@ -23,6 +26,14 @@ describe('App routed shell integration', () => {
     vi.mocked(courseApi.getCourse).mockResolvedValue(course());
     vi.mocked(labApi.listLabs).mockResolvedValue([]);
     vi.mocked(labApi.listLabSubmissions).mockResolvedValue([]);
+    vi.mocked(labApi.getLabDetail).mockResolvedValue(labDetail());
+    vi.mocked(learningProgressApi.getTeacherLearningProgress).mockResolvedValue({
+      courseId: 42,
+      courseName: '软件工程实践',
+      studentCount: 0,
+      averageProgressPercent: 0,
+      students: []
+    });
   });
 
   afterEach(() => {
@@ -68,7 +79,7 @@ describe('App routed shell integration', () => {
 
     expect(mounted.router.currentRoute.value.name).toBe('lab-submission-workspace');
     expect(mounted.wrapper.get('[data-testid="course-nav-labs"]').attributes('href')).toBe('/courses/42/labs/manage');
-    expect(mounted.wrapper.text()).toContain('实验提交工作台');
+    expect(mounted.wrapper.text()).toContain('提交队列');
     expect(mounted.wrapper.text()).toContain('暂无符合条件的提交');
     expect(labApi.listLabSubmissions).toHaveBeenCalledWith(9, {});
   });
@@ -80,7 +91,7 @@ describe('App routed shell integration', () => {
 
     expect(mounted.router.currentRoute.value.name).toBe('forbidden');
     expect(mounted.wrapper.text()).toContain('无权限访问');
-    expect(mounted.wrapper.text()).not.toContain('实验提交工作台');
+    expect(mounted.wrapper.text()).not.toContain('提交队列');
   });
 
   it('renders an explicit not-found page for unknown URLs', async () => {
@@ -143,6 +154,30 @@ function course(overrides: Partial<Course> = {}): Course {
     manageable: false,
     createdAt: '2026-08-01T08:00:00',
     updatedAt: '2026-08-15T08:00:00',
+    ...overrides
+  };
+}
+
+function labDetail(overrides: Partial<LabExperimentDetail> = {}): LabExperimentDetail {
+  return {
+    id: 9,
+    courseId: 42,
+    chapterId: null,
+    title: '实验',
+    description: 'App 路由集成测试实验',
+    status: 'PUBLISHED',
+    deadline: '2026-08-25T23:59:00',
+    maxScore: 100,
+    attachmentIds: [],
+    allowedLanguages: 'python',
+    evaluationMode: 'DOCKER_IO',
+    autoEvaluate: true,
+    reportRequired: false,
+    timeLimitMs: 1000,
+    memoryLimitKb: 65536,
+    testcases: [],
+    publishedAt: '2026-08-19T08:00:00',
+    deleted: false,
     ...overrides
   };
 }

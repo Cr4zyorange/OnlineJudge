@@ -2,24 +2,91 @@
   <main class="lab-workspace" aria-labelledby="lab-workspace-title">
     <header class="lab-workspace__hero">
       <div>
-        <p class="lab-workspace__eyebrow">课程 #{{ courseId }} · 实验 #{{ labId }}</p>
-        <h1 id="lab-workspace-title">实验提交工作台</h1>
-        <p class="lab-workspace__intro">筛选提交、核对评测结果，并在同一处完成最终评分。</p>
+        <p class="lab-workspace__eyebrow">{{ courseContextLabel }}</p>
+        <h1 id="lab-workspace-title">{{ labContextLabel }} · 提交队列</h1>
+        <p class="lab-workspace__intro">按学生姓名和处理状态筛选提交，再进入独立批阅页完成评测核对与评分。</p>
       </div>
-      <button
-        class="button button--secondary lab-workspace__refresh"
-        type="button"
-        :disabled="queueLoading"
-        @click="loadSubmissions"
-      >
-        {{ queueLoading ? '正在刷新…' : '刷新队列' }}
-      </button>
+      <nav class="lab-workspace__actions" aria-label="实验管理快捷入口">
+        <RouterLink
+          class="button button--quiet"
+          :to="{ name: 'lab-manage-detail', params: { courseId, labId } }"
+        >返回实验详情</RouterLink>
+        <RouterLink
+          class="button button--secondary"
+          :to="{ name: 'lab-statistics', params: { courseId, labId } }"
+        >查看统计</RouterLink>
+        <button
+          class="button button--secondary"
+          type="button"
+          :disabled="queueLoading"
+          @click="loadSubmissions"
+        >
+          {{ queueLoading ? '正在刷新…' : '刷新队列' }}
+        </button>
+      </nav>
     </header>
+
+    <section
+      v-if="fatalError"
+      class="state-panel state-panel--error workspace-fatal-error"
+      data-testid="workspace-fatal-error"
+      role="alert"
+    >
+      <strong>提交队列数据无法安全展示</strong>
+      <p>{{ fatalError }}</p>
+      <button
+        class="button button--secondary"
+        data-action="retry-workspace"
+        type="button"
+        @click="loadWorkspace"
+      >重新加载</button>
+    </section>
+
+    <template v-else>
+    <div
+      v-if="contextLoading"
+      class="context-state"
+      data-testid="context-loading"
+      role="status"
+    >
+      正在加载实验与学生姓名…
+    </div>
+
+    <div
+      v-if="labContextError"
+      class="context-state context-state--error"
+      data-testid="context-error"
+      role="alert"
+    >
+      <span>{{ labContextError }}</span>
+      <button
+        class="button button--quiet button--small"
+        data-action="retry-context"
+        type="button"
+        @click="loadLabContext"
+      >重新加载实验</button>
+    </div>
+
+    <div
+      v-if="studentNameWarning"
+      class="context-state context-state--warning"
+      data-testid="student-name-warning"
+      role="status"
+    >
+      <span>{{ studentNameWarning }}；队列仍可查看，学生姓名将暂时隐藏。</span>
+      <button
+        class="button button--quiet button--small"
+        data-action="retry-student-names"
+        type="button"
+        :disabled="studentNamesLoading"
+        @click="loadStudentNames"
+      >{{ studentNamesLoading ? '正在重试…' : '重试姓名服务' }}</button>
+    </div>
 
     <section class="summary-grid" aria-label="提交摘要">
       <article class="summary-card" data-testid="summary-total">
         <span>当前结果</span>
-        <strong>{{ submissions.length }}</strong>
+        <strong>{{ visibleSubmissions.length }}</strong>
         <small>份提交</small>
       </article>
       <article class="summary-card" data-testid="summary-evaluation-pending">
@@ -45,23 +112,27 @@
           <p class="section-heading__kicker">QUEUE FILTER</p>
           <h2 id="submission-filter-title">筛选提交</h2>
         </div>
-        <button class="button button--quiet" type="button" @click="resetFilters">清除筛选</button>
+        <button
+          class="button button--quiet"
+          data-action="reset-filters"
+          type="button"
+          @click="resetFilters"
+        >清除筛选</button>
       </div>
 
       <form
         class="filter-form"
         data-action="filter-submissions"
-        @submit.prevent="loadSubmissions"
+        @submit.prevent="applyFilters"
       >
         <label class="field">
-          <span>学生编号</span>
+          <span>学生姓名</span>
           <input
-            v-model.trim="filters.studentId"
-            name="studentId"
-            type="number"
-            min="1"
-            inputmode="numeric"
-            placeholder="例如 602"
+            v-model="filters.keyword"
+            name="keyword"
+            type="search"
+            autocomplete="off"
+            placeholder="输入姓名关键词"
           >
         </label>
 
@@ -102,257 +173,111 @@
       </form>
     </section>
 
-    <div class="lab-workspace__columns">
-      <section class="work-surface queue-panel" aria-labelledby="submission-queue-title">
-        <div class="section-heading section-heading--compact">
-          <div>
-            <p class="section-heading__kicker">SUBMISSION QUEUE</p>
-            <h2 id="submission-queue-title">提交队列</h2>
-          </div>
-          <div class="queue-panel__tools">
-            <a
-              class="queue-filter-link"
-              data-action="jump-to-submission-filters"
-              href="#submission-filter-title"
-            >筛选</a>
-            <span class="count-chip">{{ submissions.length }} 份</span>
-          </div>
+    <section class="work-surface queue-panel" aria-labelledby="submission-queue-title">
+      <div class="section-heading section-heading--compact">
+        <div>
+          <p class="section-heading__kicker">SUBMISSION QUEUE</p>
+          <h2 id="submission-queue-title">提交队列</h2>
         </div>
-
-        <div v-if="queueLoading" class="state-panel" aria-live="polite">
-          <p>正在加载提交队列…</p>
+        <div class="queue-panel__tools">
+          <a
+            class="queue-filter-link"
+            data-action="jump-to-submission-filters"
+            href="#submission-filter-title"
+          >筛选</a>
+          <span class="count-chip">{{ visibleSubmissions.length }} 份</span>
         </div>
+      </div>
 
-        <div v-else-if="queueError" class="state-panel state-panel--error" role="alert">
-          <strong>提交队列暂时无法加载</strong>
-          <p>{{ queueError }}</p>
-          <button
-            class="button button--secondary"
-            data-action="retry-submissions"
-            type="button"
-            @click="loadSubmissions"
+      <div
+        v-if="queueLoading"
+        class="state-panel"
+        data-testid="queue-loading"
+        aria-live="polite"
+      >
+        <p>正在加载提交队列…</p>
+      </div>
+
+      <div
+        v-else-if="queueError"
+        class="state-panel state-panel--error"
+        data-testid="queue-error"
+        role="alert"
+      >
+        <strong>提交队列暂时无法加载</strong>
+        <p>{{ queueError }}</p>
+        <button
+          class="button button--secondary"
+          data-action="retry-submissions"
+          type="button"
+          @click="loadSubmissions"
+        >重新加载</button>
+      </div>
+
+      <div
+        v-else-if="visibleSubmissions.length === 0"
+        class="state-panel state-panel--empty"
+        data-testid="queue-empty"
+      >
+        <strong>暂无符合条件的提交</strong>
+        <p>调整学生姓名或状态筛选后重新查询，或等待学生提交实验。</p>
+      </div>
+
+      <ul v-else class="submission-list" aria-label="实验提交列表">
+        <li
+          v-for="submission in visibleSubmissions"
+          :key="submission.submissionId"
+          :data-submission-id="submission.submissionId"
+        >
+          <RouterLink
+            class="submission-card"
+            :to="reviewRoute(submission.submissionId)"
+            :aria-label="`批阅${studentDisplayName(submission.studentId)}的第 ${submission.version} 版提交`"
           >
-            重新加载
-          </button>
-        </div>
+            <span class="submission-card__topline">
+              <strong>{{ studentDisplayName(submission.studentId) }}</strong>
+              <span class="submission-card__version">版本 {{ submission.version }}</span>
+            </span>
 
-        <div v-else-if="submissions.length === 0" class="state-panel state-panel--empty">
-          <strong>暂无符合条件的提交</strong>
-          <p>调整筛选条件后重新查询，或等待学生提交实验。</p>
-        </div>
-
-        <ul v-else class="submission-list" aria-label="实验提交列表">
-          <li
-            v-for="submission in submissions"
-            :key="submission.submissionId"
-            :data-submission-id="submission.submissionId"
-          >
-            <button
-              class="submission-card"
-              :class="{ 'submission-card--selected': selectedSubmissionId === submission.submissionId }"
-              type="button"
-              :aria-pressed="selectedSubmissionId === submission.submissionId"
-              @click="openSubmission(submission.submissionId)"
-            >
-              <span class="submission-card__topline">
-                <strong>学生 #{{ submission.studentId }}</strong>
-                <span class="submission-card__version">版本 {{ submission.version }}</span>
+            <span class="submission-card__status-row">
+              <span class="status-pill" :class="submitStatusClass(submission.submitStatus)">
+                {{ submitStatusLabel(submission.submitStatus) }}
               </span>
-
-              <span class="submission-card__status-row">
-                <span class="status-pill" :class="submitStatusClass(submission.submitStatus)">
-                  {{ submitStatusLabel(submission.submitStatus) }}
-                </span>
-                <span class="status-pill" :class="evaluationStatusClass(submission.evaluationStatus)">
-                  {{ evaluationStatusLabel(submission.evaluationStatus) }}
-                </span>
+              <span class="status-pill" :class="evaluationStatusClass(submission.evaluationStatus)">
+                {{ evaluationStatusLabel(submission.evaluationStatus) }}
               </span>
+            </span>
 
-              <span class="submission-card__meta">
-                <span>{{ languageLabel(submission.language) }}</span>
-                <span>{{ formatDateTime(submission.submittedAt) }}</span>
-              </span>
+            <span class="submission-card__meta">
+              <span>{{ languageLabel(submission.language) }}</span>
+              <span>{{ formatDateTime(submission.submittedAt) }}</span>
+            </span>
 
-              <span class="submission-card__scores">
-                <span>自动分 <b>{{ scoreLabel(submission.autoScore) }}</b></span>
-                <span>最终分 <b>{{ scoreLabel(submission.finalScore) }}</b></span>
-              </span>
+            <span class="submission-card__scores">
+              <span>自动分 <b>{{ scoreLabel(submission.autoScore) }}</b></span>
+              <span>最终分 <b>{{ scoreLabel(submission.finalScore) }}</b></span>
+            </span>
 
+            <span class="submission-card__footer">
               <span v-if="submissionFlags(submission).length" class="submission-card__flags">
                 <span v-for="flag in submissionFlags(submission)" :key="flag">{{ flag }}</span>
               </span>
-            </button>
-          </li>
-        </ul>
-      </section>
-
-      <section class="work-surface detail-panel" aria-labelledby="submission-detail-title">
-        <div class="section-heading section-heading--compact">
-          <div>
-            <p class="section-heading__kicker">REVIEW &amp; SCORE</p>
-            <h2 id="submission-detail-title">提交详情与评分</h2>
-          </div>
-          <span v-if="submissionDetail" class="count-chip">#{{ submissionDetail.submissionId }}</span>
-        </div>
-
-        <div v-if="detailLoading" class="state-panel" aria-live="polite">
-          <p>正在加载提交详情…</p>
-        </div>
-
-        <div v-else-if="detailError" class="state-panel state-panel--error" role="alert">
-          <strong>提交详情暂时无法加载</strong>
-          <p>{{ detailError }}</p>
-          <button
-            v-if="selectedSubmissionId !== null"
-            class="button button--secondary"
-            type="button"
-            @click="openSubmission(selectedSubmissionId)"
-          >
-            重试详情
-          </button>
-        </div>
-
-        <div v-else-if="!submissionDetail" class="state-panel state-panel--empty">
-          <strong>选择一份提交开始核对</strong>
-          <p>队列中的评测结果、源代码和评分记录会显示在这里。</p>
-        </div>
-
-        <div v-else class="detail-content">
-          <div class="detail-summary">
-            <div>
-              <span>学生</span>
-              <strong>#{{ submissionDetail.studentId }}</strong>
-            </div>
-            <div>
-              <span>提交状态</span>
-              <strong>{{ submitStatusLabel(submissionDetail.submitStatus) }}</strong>
-            </div>
-            <div>
-              <span>评测状态</span>
-              <strong>{{ evaluationStatusLabel(submissionDetail.evaluationStatus) }}</strong>
-            </div>
-            <div data-testid="selected-final-score">
-              <span>最终得分</span>
-              <strong>{{ scoreLabel(submissionDetail.finalScore) }}</strong>
-            </div>
-          </div>
-
-          <section class="detail-block" aria-labelledby="submission-code-title">
-            <div class="detail-block__heading">
-              <h3 id="submission-code-title">源代码</h3>
-              <span>{{ languageLabel(submissionDetail.language) }}</span>
-            </div>
-            <pre v-if="submissionDetail.code" class="code-preview"><code>{{ submissionDetail.code }}</code></pre>
-            <p v-else class="inline-empty">
-              本次提交没有文本代码{{ submissionDetail.hasFile ? '，请核对随附文件。' : '。' }}
-            </p>
-          </section>
-
-          <section class="detail-block" aria-labelledby="submission-report-title">
-            <div class="detail-block__heading">
-              <h3 id="submission-report-title">实验报告</h3>
-              <span v-if="submissionDetail.latestReport">版本 {{ submissionDetail.latestReport.version }}</span>
-            </div>
-            <dl v-if="submissionDetail.latestReport" class="report-meta">
-              <div>
-                <dt>文件</dt>
-                <dd>{{ submissionDetail.latestReport.fileName }}</dd>
-              </div>
-              <div>
-                <dt>类型</dt>
-                <dd>{{ submissionDetail.latestReport.fileType }}</dd>
-              </div>
-              <div>
-                <dt>报告分</dt>
-                <dd>{{ scoreLabel(submissionDetail.latestReport.score) }}</dd>
-              </div>
-            </dl>
-            <p v-else class="inline-empty">该提交未关联实验报告。</p>
-          </section>
-
-          <form
-            class="score-form"
-            data-action="score-submission"
-            aria-labelledby="submission-score-title"
-            @submit.prevent="saveScore"
-          >
-            <div class="detail-block__heading score-form__heading">
-              <div>
-                <h3 id="submission-score-title">教师评分</h3>
-                <p>保存后更新当前提交的最终成绩。</p>
-              </div>
-              <span v-if="submissionDetail.latestScore" class="saved-badge">已有评分</span>
-            </div>
-
-            <div class="score-form__numbers">
-              <label class="field">
-                <span>人工评分</span>
-                <input v-model.trim="scoreForm.manualScore" name="manualScore" type="number" min="0" step="1">
-              </label>
-              <label class="field">
-                <span>报告评分</span>
-                <input
-                  v-model.trim="scoreForm.reportScore"
-                  name="reportScore"
-                  type="number"
-                  min="0"
-                  step="1"
-                  placeholder="选填"
-                >
-              </label>
-              <label class="field">
-                <span>最终得分</span>
-                <input v-model.trim="scoreForm.finalScore" name="finalScore" type="number" min="0" step="1">
-              </label>
-            </div>
-
-            <label class="field">
-              <span>评分评语</span>
-              <textarea
-                v-model="scoreForm.comment"
-                name="comment"
-                rows="3"
-                placeholder="记录完成情况、主要问题与改进建议"
-              ></textarea>
-            </label>
-
-            <label class="field">
-              <span>修改原因 <em v-if="submissionDetail.latestScore">修改已有评分时必填</em></span>
-              <textarea
-                v-model="scoreForm.changeReason"
-                name="changeReason"
-                rows="2"
-                placeholder="首次评分可留空"
-              ></textarea>
-            </label>
-
-            <p v-if="scoreError" class="form-message form-message--error" data-testid="score-error" role="alert">
-              {{ scoreError }}
-            </p>
-            <p v-if="scoreFeedback" class="form-message form-message--success" role="status">
-              {{ scoreFeedback }}
-            </p>
-
-            <button class="button button--primary score-form__submit" type="submit" :disabled="scoreSaving">
-              {{ scoreSaving ? '正在保存…' : '保存评分' }}
-            </button>
-          </form>
-        </div>
-      </section>
-    </div>
+              <span class="submission-card__review-cue">进入批阅 <span aria-hidden="true">→</span></span>
+            </span>
+          </RouterLink>
+        </li>
+      </ul>
+    </section>
+    </template>
   </main>
 </template>
 
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue';
-import {
-  getLabSubmissionDetail,
-  listLabSubmissions,
-  scoreLabSubmission
-} from '../../api/lab/labs';
+import { RouterLink, useRoute, useRouter } from 'vue-router';
+import { getLabDetail, listLabSubmissions } from '../../api/lab/labs';
+import { getTeacherLearningProgress } from '../../api/lrn/learningProgress';
 import type {
-  LabScorePayload,
-  LabSubmissionDetail,
   LabSubmissionHistoryItem,
   LabSubmissionListFilters,
   LabSubmissionSummary
@@ -367,74 +292,207 @@ type SubmitStatus = LabSubmissionSummary['submitStatus'];
 type EvaluationStatus = LabSubmissionSummary['evaluationStatus'];
 
 interface FilterForm {
-  studentId: string;
+  keyword: string;
   submitStatus: '' | SubmitStatus;
   evaluationStatus: '' | EvaluationStatus;
   overdue: boolean;
 }
 
-interface ScoreForm {
-  manualScore: string | number;
-  reportScore: string | number;
-  finalScore: string | number;
-  comment: string;
-  changeReason: string;
-}
+const submitStatuses: SubmitStatus[] = ['SUBMITTED', 'LATE', 'WITHDRAWN'];
+const evaluationStatuses: EvaluationStatus[] = [
+  'NONE',
+  'PENDING',
+  'RUNNING',
+  'ACCEPTED',
+  'WRONG_ANSWER',
+  'COMPILE_ERROR',
+  'RUNTIME_ERROR',
+  'TIME_LIMIT_EXCEEDED',
+  'SYSTEM_ERROR'
+];
 
+const route = useRoute();
+const router = useRouter();
 const filters = reactive<FilterForm>({
-  studentId: '',
-  submitStatus: '',
-  evaluationStatus: '',
-  overdue: false
+  keyword: queryText(route.query.keyword),
+  submitStatus: submitStatusFromQuery(route.query.status),
+  evaluationStatus: evaluationStatusFromQuery(route.query.evaluation),
+  overdue: booleanFromQuery(route.query.overdue)
 });
-const scoreForm = reactive<ScoreForm>({
-  manualScore: '',
-  reportScore: '',
-  finalScore: '',
-  comment: '',
-  changeReason: ''
-});
-
 const submissions = ref<LabSubmissionHistoryItem[]>([]);
-const selectedSubmissionId = ref<number | null>(null);
-const submissionDetail = ref<LabSubmissionDetail | null>(null);
+const labTitle = ref('');
+const courseName = ref('');
+const studentNames = ref<Record<number, string>>({});
+const labContextLoading = ref(false);
+const studentNamesLoading = ref(false);
 const queueLoading = ref(false);
-const detailLoading = ref(false);
-const scoreSaving = ref(false);
+const labContextError = ref('');
+const studentNameWarning = ref('');
 const queueError = ref('');
-const detailError = ref('');
-const scoreError = ref('');
-const scoreFeedback = ref('');
+const fatalError = ref('');
+let labContextRequestId = 0;
+let studentNamesRequestId = 0;
 let queueRequestId = 0;
-let detailRequestId = 0;
 
-const evaluationPendingCount = computed(() => submissions.value.filter((submission) =>
+const contextLoading = computed(() => labContextLoading.value || studentNamesLoading.value);
+const visibleSubmissions = computed(() => {
+  const keyword = filters.keyword.trim().toLocaleLowerCase('zh-CN');
+  if (!keyword) {
+    return submissions.value;
+  }
+  return submissions.value.filter((submission) => studentDisplayName(submission.studentId)
+    .toLocaleLowerCase('zh-CN')
+    .includes(keyword));
+});
+const evaluationPendingCount = computed(() => visibleSubmissions.value.filter((submission) =>
   ['NONE', 'PENDING', 'RUNNING'].includes(submission.evaluationStatus)
 ).length);
-const scoringPendingCount = computed(() => submissions.value.filter((submission) =>
+const scoringPendingCount = computed(() => visibleSubmissions.value.filter((submission) =>
   submission.finalScore === null
 ).length);
-const lateCount = computed(() => submissions.value.filter((submission) =>
+const lateCount = computed(() => visibleSubmissions.value.filter((submission) =>
   submission.submitStatus === 'LATE'
 ).length);
+const courseContextLabel = computed(() => fatalError.value ? '当前课程' : courseName.value || '当前课程');
+const labContextLabel = computed(() => fatalError.value ? '当前实验' : labTitle.value || '当前实验');
 
 watch(
-  () => props.labId,
+  () => `${props.courseId}:${props.labId}`,
   () => {
-    clearSelection();
-    void loadSubmissions();
+    void loadWorkspace();
   },
   { immediate: true }
 );
 
-function buildFilters(): LabSubmissionListFilters {
-  const apiFilters: LabSubmissionListFilters = {};
-  if (filters.studentId !== '') {
-    const studentId = Number(filters.studentId);
-    if (Number.isFinite(studentId) && studentId > 0) {
-      apiFilters.studentId = studentId;
+async function loadWorkspace() {
+  fatalError.value = '';
+  labContextError.value = '';
+  studentNameWarning.value = '';
+  queueError.value = '';
+  labTitle.value = '';
+  courseName.value = '';
+  studentNames.value = {};
+  submissions.value = [];
+  await Promise.all([
+    syncFilterQuery(),
+    loadLabContext(),
+    loadStudentNames(),
+    loadSubmissions()
+  ]);
+}
+
+async function loadLabContext() {
+  const requestId = ++labContextRequestId;
+  const targetLabId = props.labId;
+  const targetCourseId = props.courseId;
+  labContextLoading.value = true;
+  labContextError.value = '';
+  labTitle.value = '';
+  try {
+    const lab = await getLabDetail(targetLabId);
+    if (requestId !== labContextRequestId) {
+      return;
+    }
+    if (lab.id !== targetLabId || lab.courseId !== targetCourseId) {
+      setFatalError('实验详情归属与当前页面不一致，请重新加载。');
+      return;
+    }
+    if (fatalError.value) {
+      return;
+    }
+    labTitle.value = lab.title.trim();
+  } catch (error) {
+    if (requestId !== labContextRequestId) {
+      return;
+    }
+    labContextError.value = errorMessage(error, '实验信息加载失败');
+  } finally {
+    if (requestId === labContextRequestId) {
+      labContextLoading.value = false;
     }
   }
+}
+
+async function loadStudentNames() {
+  const requestId = ++studentNamesRequestId;
+  const targetCourseId = props.courseId;
+  studentNamesLoading.value = true;
+  studentNameWarning.value = '';
+  courseName.value = '';
+  studentNames.value = {};
+  try {
+    const progress = await getTeacherLearningProgress(targetCourseId);
+    if (requestId !== studentNamesRequestId) {
+      return;
+    }
+    if (progress.courseId !== targetCourseId) {
+      setFatalError('课程学生数据归属与当前页面不一致，请重新加载。');
+      return;
+    }
+    if (fatalError.value) {
+      return;
+    }
+    courseName.value = progress.courseName.trim();
+    studentNames.value = Object.fromEntries(progress.students
+      .map((student) => [student.studentId, student.studentName.trim()] as const)
+      .filter(([, name]) => name.length > 0));
+  } catch (error) {
+    if (requestId !== studentNamesRequestId) {
+      return;
+    }
+    studentNameWarning.value = errorMessage(error, '学生姓名加载失败');
+  } finally {
+    if (requestId === studentNamesRequestId) {
+      studentNamesLoading.value = false;
+    }
+  }
+}
+
+async function loadSubmissions() {
+  const requestId = ++queueRequestId;
+  const targetLabId = props.labId;
+  queueLoading.value = true;
+  queueError.value = '';
+  try {
+    const result = await listLabSubmissions(targetLabId, buildApiFilters());
+    if (requestId !== queueRequestId) {
+      return;
+    }
+    if (fatalError.value) {
+      submissions.value = [];
+      return;
+    }
+    submissions.value = result;
+  } catch (error) {
+    if (requestId !== queueRequestId) {
+      return;
+    }
+    submissions.value = [];
+    queueError.value = errorMessage(error, '提交队列加载失败');
+  } finally {
+    if (requestId === queueRequestId) {
+      queueLoading.value = false;
+    }
+  }
+}
+
+async function applyFilters() {
+  filters.keyword = filters.keyword.trim();
+  await syncFilterQuery();
+  await loadSubmissions();
+}
+
+async function resetFilters() {
+  filters.keyword = '';
+  filters.submitStatus = '';
+  filters.evaluationStatus = '';
+  filters.overdue = false;
+  await syncFilterQuery();
+  await loadSubmissions();
+}
+
+function buildApiFilters(): LabSubmissionListFilters {
+  const apiFilters: LabSubmissionListFilters = {};
   if (filters.submitStatus) {
     apiFilters.submitStatus = filters.submitStatus;
   }
@@ -447,200 +505,59 @@ function buildFilters(): LabSubmissionListFilters {
   return apiFilters;
 }
 
-async function loadSubmissions() {
-  const requestId = ++queueRequestId;
-  queueLoading.value = true;
-  queueError.value = '';
-  scoreError.value = '';
-  scoreFeedback.value = '';
-  try {
-    const result = await listLabSubmissions(props.labId, buildFilters());
-    if (requestId !== queueRequestId) {
-      return;
-    }
-    submissions.value = result;
-    clearSelection();
-    if (result.length > 0) {
-      await openSubmission(result[0].submissionId);
-    }
-  } catch (error) {
-    if (requestId !== queueRequestId) {
-      return;
-    }
-    submissions.value = [];
-    clearSelection();
-    queueError.value = errorMessage(error, '提交队列加载失败');
-  } finally {
-    if (requestId === queueRequestId) {
-      queueLoading.value = false;
-    }
+async function syncFilterQuery() {
+  await router.replace({ query: buildFilterQuery() });
+}
+
+function buildFilterQuery() {
+  const query: Record<string, string> = {};
+  const keyword = filters.keyword.trim();
+  if (keyword) {
+    query.keyword = keyword;
   }
-}
-
-async function openSubmission(submissionId: number) {
-  const requestId = ++detailRequestId;
-  selectedSubmissionId.value = submissionId;
-  submissionDetail.value = null;
-  detailLoading.value = true;
-  detailError.value = '';
-  scoreError.value = '';
-  scoreFeedback.value = '';
-  try {
-    const result = await getLabSubmissionDetail(props.labId, submissionId);
-    if (requestId !== detailRequestId) {
-      return;
-    }
-    submissionDetail.value = result;
-    syncScoreForm(result);
-  } catch (error) {
-    if (requestId !== detailRequestId) {
-      return;
-    }
-    detailError.value = errorMessage(error, '提交详情加载失败');
-  } finally {
-    if (requestId === detailRequestId) {
-      detailLoading.value = false;
-    }
+  if (filters.submitStatus) {
+    query.status = filters.submitStatus;
   }
-}
-
-async function saveScore() {
-  const currentDetail = submissionDetail.value;
-  if (!currentDetail) {
-    return;
+  if (filters.evaluationStatus) {
+    query.evaluation = filters.evaluationStatus;
   }
-
-  scoreError.value = '';
-  scoreFeedback.value = '';
-  let payload: LabScorePayload;
-  try {
-    payload = {
-      manualScore: requiredScore(scoreForm.manualScore, '人工评分'),
-      reportScore: optionalScore(scoreForm.reportScore, '报告评分'),
-      finalScore: requiredScore(scoreForm.finalScore, '最终得分'),
-      comment: normalizedText(scoreForm.comment),
-      changeReason: normalizedText(scoreForm.changeReason)
-    };
-  } catch (error) {
-    scoreError.value = errorMessage(error, '请检查评分输入');
-    return;
+  if (filters.overdue) {
+    query.overdue = 'true';
   }
-
-  if (scoreWasChanged(currentDetail, payload) && currentDetail.latestScore && !payload.changeReason) {
-    scoreError.value = '修改已评分记录时必须填写修改原因';
-    return;
-  }
-
-  scoreSaving.value = true;
-  try {
-    const result = await scoreLabSubmission(props.labId, currentDetail.submissionId, payload);
-    submissions.value = submissions.value.map((submission) => submission.submissionId === currentDetail.submissionId
-      ? { ...submission, autoScore: result.autoScore, finalScore: result.finalScore }
-      : submission);
-    if (!isCurrentScoreTarget(currentDetail.submissionId)) {
-      return;
-    }
-    const updatedDetail: LabSubmissionDetail = {
-      ...currentDetail,
-      autoScore: result.autoScore,
-      finalScore: result.finalScore,
-      latestReport: currentDetail.latestReport
-        ? { ...currentDetail.latestReport, score: result.reportScore }
-        : currentDetail.latestReport,
-      latestScore: result
-    };
-    submissionDetail.value = updatedDetail;
-    syncScoreForm(updatedDetail);
-    scoreFeedback.value = '评分已保存';
-  } catch (error) {
-    if (isCurrentScoreTarget(currentDetail.submissionId)) {
-      scoreError.value = errorMessage(error, '评分保存失败');
-    }
-  } finally {
-    scoreSaving.value = false;
-  }
+  return query;
 }
 
-function isCurrentScoreTarget(submissionId: number) {
-  return selectedSubmissionId.value === submissionId
-    && submissionDetail.value?.submissionId === submissionId;
+function reviewRoute(submissionId: number) {
+  const query = buildFilterQuery();
+  return {
+    name: 'lab-submission-review',
+    params: {
+      courseId: props.courseId,
+      labId: props.labId,
+      submissionId
+    },
+    ...(Object.keys(query).length > 0 ? { query } : {})
+  };
 }
 
-function scoreWasChanged(detail: LabSubmissionDetail, payload: LabScorePayload) {
-  const existing = detail.latestScore;
-  if (!existing) {
-    return true;
-  }
-  return existing.manualScore !== payload.manualScore
-    || existing.reportScore !== payload.reportScore
-    || existing.finalScore !== payload.finalScore
-    || existing.comment !== payload.comment;
+function queryText(value: unknown) {
+  const candidate = Array.isArray(value) ? value[0] : value;
+  return typeof candidate === 'string' ? candidate.trim() : '';
 }
 
-function syncScoreForm(detail: LabSubmissionDetail) {
-  const score = detail.latestScore;
-  scoreForm.manualScore = numberInputValue(score?.manualScore ?? detail.autoScore);
-  scoreForm.reportScore = numberInputValue(score?.reportScore ?? detail.latestReport?.score ?? null);
-  scoreForm.finalScore = numberInputValue(score?.finalScore ?? detail.finalScore ?? detail.autoScore);
-  scoreForm.comment = score?.comment ?? '';
-  scoreForm.changeReason = '';
+function submitStatusFromQuery(value: unknown): '' | SubmitStatus {
+  const candidate = queryText(value);
+  return submitStatuses.includes(candidate as SubmitStatus) ? candidate as SubmitStatus : '';
 }
 
-function clearSelection() {
-  detailRequestId += 1;
-  selectedSubmissionId.value = null;
-  submissionDetail.value = null;
-  detailLoading.value = false;
-  detailError.value = '';
-  scoreError.value = '';
-  scoreFeedback.value = '';
-  syncBlankScoreForm();
+function evaluationStatusFromQuery(value: unknown): '' | EvaluationStatus {
+  const candidate = queryText(value);
+  return evaluationStatuses.includes(candidate as EvaluationStatus) ? candidate as EvaluationStatus : '';
 }
 
-function syncBlankScoreForm() {
-  scoreForm.manualScore = '';
-  scoreForm.reportScore = '';
-  scoreForm.finalScore = '';
-  scoreForm.comment = '';
-  scoreForm.changeReason = '';
-}
-
-function resetFilters() {
-  filters.studentId = '';
-  filters.submitStatus = '';
-  filters.evaluationStatus = '';
-  filters.overdue = false;
-  void loadSubmissions();
-}
-
-function requiredScore(value: string | number, label: string) {
-  if (String(value).trim() === '') {
-    throw new Error(`${label}不能为空`);
-  }
-  const score = Number(value);
-  if (!Number.isFinite(score) || score < 0) {
-    throw new Error(`${label}必须是大于或等于 0 的数字`);
-  }
-  if (!Number.isInteger(score)) {
-    throw new Error(`${label}必须是整数`);
-  }
-  return score;
-}
-
-function optionalScore(value: string | number, label: string) {
-  if (String(value).trim() === '') {
-    return null;
-  }
-  return requiredScore(value, label);
-}
-
-function normalizedText(value: string) {
-  const normalized = value.trim();
-  return normalized || null;
-}
-
-function numberInputValue(value: number | null | undefined) {
-  return value === null || value === undefined ? '' : String(value);
+function booleanFromQuery(value: unknown) {
+  const candidate = queryText(value).toLowerCase();
+  return candidate === 'true' || candidate === '1';
 }
 
 function submitStatusLabel(status: SubmitStatus) {
@@ -679,6 +596,10 @@ function evaluationStatusClass(status: EvaluationStatus) {
     return 'status-pill--info';
   }
   return 'status-pill--danger';
+}
+
+function studentDisplayName(studentId: number) {
+  return studentNames.value[studentId] || '学生姓名暂不可用';
 }
 
 function languageLabel(language: string) {
@@ -731,6 +652,17 @@ function formatDateTime(value: string) {
 function errorMessage(error: unknown, fallback: string) {
   return error instanceof Error && error.message ? error.message : fallback;
 }
+
+function setFatalError(message: string) {
+  fatalError.value = message;
+  labTitle.value = '';
+  courseName.value = '';
+  studentNames.value = {};
+  submissions.value = [];
+  labContextError.value = '';
+  studentNameWarning.value = '';
+  queueError.value = '';
+}
 </script>
 
 <style scoped>
@@ -749,7 +681,7 @@ function errorMessage(error: unknown, fallback: string) {
   --warning-soft: #fff3d6;
   width: 100%;
   min-width: 0;
-  max-width: 1440px;
+  max-width: none;
   margin: 0 auto;
   padding: clamp(18px, 3vw, 40px);
   color: var(--ink);
@@ -760,7 +692,7 @@ function errorMessage(error: unknown, fallback: string) {
   box-sizing: border-box;
 }
 
-.lab-workspace :where(a, button, input, select, textarea):focus-visible {
+.lab-workspace :where(a, button, input, select):focus-visible {
   outline: 3px solid #2b7a70;
   outline-offset: 2px;
 }
@@ -792,10 +724,45 @@ function errorMessage(error: unknown, fallback: string) {
 }
 
 .lab-workspace__intro {
-  max-width: 620px;
+  max-width: 680px;
   margin: 10px 0 0;
   color: var(--muted);
   line-height: 1.65;
+}
+
+.lab-workspace__actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 9px;
+  flex-wrap: wrap;
+}
+
+.context-state {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: -8px 0 16px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 13px;
+  background: rgba(255, 255, 255, 0.78);
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.context-state--error {
+  border-color: rgba(163, 58, 54, 0.28);
+  background: rgba(249, 233, 231, 0.62);
+  color: var(--danger);
+}
+
+.context-state--warning {
+  border-color: rgba(146, 95, 11, 0.28);
+  background: rgba(255, 243, 214, 0.68);
+  color: #714b0e;
 }
 
 .summary-grid {
@@ -874,7 +841,7 @@ function errorMessage(error: unknown, fallback: string) {
 
 .filter-form {
   display: grid;
-  grid-template-columns: minmax(120px, 0.85fr) repeat(2, minmax(150px, 1fr)) auto auto;
+  grid-template-columns: minmax(180px, 1.25fr) repeat(2, minmax(160px, 1fr)) auto auto;
   align-items: end;
   gap: 12px;
 }
@@ -888,37 +855,18 @@ function errorMessage(error: unknown, fallback: string) {
   font-weight: 700;
 }
 
-.field em {
-  margin-left: 5px;
-  color: var(--danger);
-  font-size: 0.72rem;
-  font-style: normal;
-  font-weight: 600;
-}
-
 .field input,
-.field select,
-.field textarea {
+.field select {
   width: 100%;
   min-width: 0;
+  min-height: 42px;
   border: 1px solid rgba(35, 69, 68, 0.24);
   border-radius: 9px;
+  padding: 0 11px;
   background: var(--surface-strong);
   color: var(--ink);
   font: inherit;
   font-weight: 500;
-}
-
-.field input,
-.field select {
-  min-height: 42px;
-  padding: 0 11px;
-}
-
-.field textarea {
-  padding: 10px 11px;
-  resize: vertical;
-  line-height: 1.55;
 }
 
 .checkbox-field {
@@ -940,6 +888,9 @@ function errorMessage(error: unknown, fallback: string) {
 }
 
 .button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   min-height: 42px;
   border: 1px solid transparent;
   border-radius: 9px;
@@ -947,6 +898,7 @@ function errorMessage(error: unknown, fallback: string) {
   font: inherit;
   font-size: 0.84rem;
   font-weight: 800;
+  text-decoration: none;
   cursor: pointer;
   transition: transform 140ms ease, background-color 140ms ease, border-color 140ms ease;
 }
@@ -982,26 +934,22 @@ function errorMessage(error: unknown, fallback: string) {
   color: var(--brand);
 }
 
-.lab-workspace__columns {
-  display: grid;
-  grid-template-columns: minmax(0, 0.92fr) minmax(390px, 1.08fr);
-  align-items: start;
-  gap: 16px;
+.button--small {
+  min-height: 34px;
+  padding: 0 11px;
+  font-size: 0.76rem;
+}
+
+.queue-panel {
   min-width: 0;
 }
 
-.queue-panel,
-.detail-panel {
-  min-width: 0;
-}
-
-.count-chip,
-.saved-badge {
+.count-chip {
   flex: 0 0 auto;
   border-radius: 999px;
+  padding: 5px 9px;
   background: var(--brand-soft);
   color: var(--brand-deep);
-  padding: 5px 9px;
   font-size: 0.72rem;
   font-weight: 800;
 }
@@ -1025,12 +973,16 @@ function errorMessage(error: unknown, fallback: string) {
 
 .submission-list {
   display: grid;
-  gap: 10px;
-  max-height: 780px;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 12px;
   margin: 0;
-  padding: 0 3px 0 0;
-  overflow-y: auto;
+  padding: 0;
   list-style: none;
+}
+
+.submission-list li {
+  display: flex;
+  min-width: 0;
 }
 
 .submission-card {
@@ -1040,29 +992,25 @@ function errorMessage(error: unknown, fallback: string) {
   gap: 10px;
   border: 1px solid rgba(35, 69, 68, 0.15);
   border-radius: 10px;
-  padding: 15px;
+  padding: 16px;
   background: rgba(255, 255, 255, 0.88);
   color: var(--ink);
   text-align: left;
-  cursor: pointer;
+  text-decoration: none;
   transition: border-color 140ms ease, box-shadow 140ms ease, transform 140ms ease;
 }
 
-.submission-card:hover,
-.submission-card--selected {
+.submission-card:hover {
   border-color: rgba(22, 66, 60, 0.58);
   box-shadow: 0 8px 18px rgba(18, 47, 48, 0.09);
   transform: translateY(-1px);
-}
-
-.submission-card--selected {
-  background: rgba(220, 235, 230, 0.72);
 }
 
 .submission-card__topline,
 .submission-card__status-row,
 .submission-card__meta,
 .submission-card__scores,
+.submission-card__footer,
 .submission-card__flags {
   display: flex;
   align-items: center;
@@ -1071,8 +1019,14 @@ function errorMessage(error: unknown, fallback: string) {
   flex-wrap: wrap;
 }
 
-.submission-card__topline {
+.submission-card__topline,
+.submission-card__meta,
+.submission-card__footer {
   justify-content: space-between;
+}
+
+.submission-card__topline strong {
+  overflow-wrap: anywhere;
 }
 
 .submission-card__version {
@@ -1114,7 +1068,6 @@ function errorMessage(error: unknown, fallback: string) {
 }
 
 .submission-card__meta {
-  justify-content: space-between;
   color: var(--muted);
   font-size: 0.75rem;
 }
@@ -1129,6 +1082,12 @@ function errorMessage(error: unknown, fallback: string) {
   color: var(--ink);
 }
 
+.submission-card__footer {
+  align-self: end;
+  border-top: 1px solid rgba(35, 69, 68, 0.1);
+  padding-top: 10px;
+}
+
 .submission-card__flags span {
   border: 1px solid rgba(22, 66, 60, 0.14);
   border-radius: 5px;
@@ -1138,11 +1097,19 @@ function errorMessage(error: unknown, fallback: string) {
   font-weight: 700;
 }
 
+.submission-card__review-cue {
+  margin-left: auto;
+  color: var(--brand);
+  font-size: 0.76rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
 .state-panel {
   display: grid;
   justify-items: center;
   gap: 9px;
-  min-height: 220px;
+  min-height: 260px;
   align-content: center;
   border: 1px dashed rgba(35, 69, 68, 0.24);
   border-radius: 10px;
@@ -1156,7 +1123,7 @@ function errorMessage(error: unknown, fallback: string) {
 }
 
 .state-panel p {
-  max-width: 380px;
+  max-width: 460px;
   margin: 0;
   line-height: 1.55;
 }
@@ -1166,161 +1133,11 @@ function errorMessage(error: unknown, fallback: string) {
   background: rgba(249, 233, 231, 0.45);
 }
 
-.detail-content {
-  display: grid;
-  min-width: 0;
-  gap: 14px;
-}
-
-.detail-summary {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.detail-summary > div {
-  min-width: 0;
-  border-radius: 8px;
-  padding: 10px;
-  background: #eef4f2;
-}
-
-.detail-summary span,
-.detail-summary strong {
-  display: block;
-  overflow-wrap: anywhere;
-}
-
-.detail-summary span {
-  margin-bottom: 4px;
-  color: var(--muted);
-  font-size: 0.68rem;
-}
-
-.detail-summary strong {
-  font-size: 0.82rem;
-}
-
-.detail-block,
-.score-form {
-  min-width: 0;
-  border: 1px solid rgba(35, 69, 68, 0.14);
-  border-radius: 10px;
-  padding: 15px;
-  background: rgba(255, 255, 255, 0.75);
-}
-
-.detail-block__heading {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 11px;
-}
-
-.detail-block__heading h3,
-.detail-block__heading p {
-  margin: 0;
-}
-
-.detail-block__heading h3 {
-  font-size: 0.95rem;
-}
-
-.detail-block__heading p,
-.detail-block__heading > span {
-  color: var(--muted);
-  font-size: 0.72rem;
-  line-height: 1.5;
-}
-
-.code-preview {
-  max-width: 100%;
-  max-height: 300px;
-  margin: 0;
-  overflow: auto;
-  border-radius: 8px;
-  padding: 14px;
-  background: #142428;
-  color: #d9eee8;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 0.78rem;
-  line-height: 1.65;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
-
-.inline-empty {
-  margin: 0;
-  border-radius: 8px;
-  padding: 12px;
-  background: #f0f4f4;
-  color: var(--muted);
-  font-size: 0.8rem;
-}
-
-.report-meta {
-  display: grid;
-  grid-template-columns: 1.5fr 0.7fr 0.7fr;
-  gap: 8px;
-  margin: 0;
-}
-
-.report-meta div {
-  min-width: 0;
-}
-
-.report-meta dt {
-  color: var(--muted);
-  font-size: 0.68rem;
-}
-
-.report-meta dd {
-  margin: 3px 0 0;
-  font-size: 0.8rem;
-  font-weight: 700;
-  overflow-wrap: anywhere;
-}
-
-.score-form {
-  display: grid;
-  gap: 13px;
-}
-
-.score-form__heading {
-  margin-bottom: 0;
-}
-
-.score-form__numbers {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
-}
-
-.score-form__submit {
-  justify-self: end;
-  min-width: 130px;
-}
-
-.form-message {
-  margin: 0;
-  border-radius: 8px;
-  padding: 10px 12px;
-  font-size: 0.8rem;
-  font-weight: 700;
-}
-
-.form-message--error {
-  background: var(--danger-soft);
-  color: var(--danger);
-}
-
-.form-message--success {
-  background: #dceee4;
-  color: #17613d;
-}
-
 @media (max-width: 1040px) {
+  .lab-workspace__hero {
+    align-items: flex-start;
+  }
+
   .summary-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -1331,14 +1148,6 @@ function errorMessage(error: unknown, fallback: string) {
 
   .filter-form__submit {
     width: 100%;
-  }
-
-  .lab-workspace__columns {
-    grid-template-columns: minmax(280px, 0.82fr) minmax(0, 1.18fr);
-  }
-
-  .detail-summary {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -1351,17 +1160,41 @@ function errorMessage(error: unknown, fallback: string) {
 
   .lab-workspace__hero {
     display: grid;
-    align-items: start;
-    gap: 12px;
+    gap: 13px;
     margin-bottom: 14px;
   }
 
-  .lab-workspace__intro { margin-top: 6px; line-height: 1.45; }
+  .lab-workspace__actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+  }
 
-  .summary-grid { order: 2; }
-  .lab-workspace__hero { order: 1; }
-  .lab-workspace__columns { order: 3; }
-  .filter-surface { order: 4; margin-top: 16px; }
+  .lab-workspace__actions .button:last-child {
+    grid-column: 1 / -1;
+  }
+
+  .lab-workspace__intro {
+    margin-top: 6px;
+    line-height: 1.5;
+  }
+
+  .context-state {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .context-state .button {
+    width: 100%;
+  }
+
+  .filter-form {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .filter-form__submit {
+    width: 100%;
+  }
 
   #submission-filter-title {
     scroll-margin-top: 90px;
@@ -1371,28 +1204,8 @@ function errorMessage(error: unknown, fallback: string) {
     display: inline-flex;
   }
 
-  .lab-workspace__refresh,
-  .filter-form__submit {
-    width: 100%;
-  }
-
-  .filter-form,
-  .lab-workspace__columns {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
   .submission-list {
-    max-height: none;
-    overflow: visible;
-  }
-
-  .score-form__numbers {
     grid-template-columns: minmax(0, 1fr);
-  }
-
-  .score-form__submit {
-    justify-self: stretch;
-    width: 100%;
   }
 }
 
@@ -1402,12 +1215,12 @@ function errorMessage(error: unknown, fallback: string) {
     gap: 8px;
   }
 
-  .summary-card { padding: 12px; }
-  .summary-card strong { font-size: 1.45rem; }
+  .summary-card {
+    padding: 12px;
+  }
 
-  .detail-summary,
-  .report-meta {
-    grid-template-columns: minmax(0, 1fr);
+  .summary-card strong {
+    font-size: 1.45rem;
   }
 
   .section-heading {
@@ -1418,9 +1231,14 @@ function errorMessage(error: unknown, fallback: string) {
     padding: 16px;
   }
 
-  .submission-card__meta {
+  .submission-card__meta,
+  .submission-card__footer {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .submission-card__review-cue {
+    margin-left: 0;
   }
 }
 

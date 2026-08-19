@@ -202,6 +202,19 @@ const routes: RouteRecordRaw[] = [
             }
           },
           {
+            path: 'labs/new',
+            name: 'lab-create',
+            component: () => import('../views/lab/LabEditorView.vue'),
+            props: numericProps('courseId'),
+            meta: {
+              title: '创建实验',
+              shell: 'course',
+              requiresAuth: true,
+              courseAccess: 'manage',
+              uiIds: ['UI-LAB-04']
+            }
+          },
+          {
             path: 'labs/:labId',
             name: 'lab-detail',
             component: () => import('../views/lab/LabStudentView.vue'),
@@ -280,11 +293,63 @@ const routes: RouteRecordRaw[] = [
             component: () => import('../views/lab/LabSubmissionWorkspaceView.vue'),
             props: numericProps('courseId', 'labId'),
             meta: {
-              title: '实验提交工作台',
+              title: '实验提交队列',
               shell: 'course',
               requiresAuth: true,
               courseAccess: 'manage',
               uiIds: ['UI-LAB-03', 'UI-LAB-06']
+            }
+          },
+          {
+            path: 'labs/:labId/manage/submissions/:submissionId',
+            name: 'lab-submission-review',
+            component: () => import('../views/lab/LabSubmissionReviewView.vue'),
+            props: numericProps('courseId', 'labId', 'submissionId'),
+            meta: {
+              title: '实验提交批阅',
+              shell: 'course',
+              requiresAuth: true,
+              courseAccess: 'manage',
+              uiIds: ['UI-LAB-06']
+            }
+          },
+          {
+            path: 'labs/:labId/manage',
+            name: 'lab-manage-detail',
+            component: () => import('../views/lab/LabManageView.vue'),
+            props: numericProps('courseId', 'labId'),
+            meta: {
+              title: '实验管理详情',
+              shell: 'course',
+              requiresAuth: true,
+              courseAccess: 'manage',
+              uiIds: ['UI-LAB-03']
+            }
+          },
+          {
+            path: 'labs/:labId/edit',
+            name: 'lab-edit',
+            component: () => import('../views/lab/LabEditorView.vue'),
+            props: numericProps('courseId', 'labId'),
+            meta: {
+              title: '编辑实验',
+              shell: 'course',
+              requiresAuth: true,
+              courseAccess: 'manage',
+              uiIds: ['UI-LAB-04']
+            }
+          },
+          {
+            path: 'labs/:labId/manage/statistics',
+            name: 'lab-statistics',
+            component: () => import('../views/lab/LabStatisticsView.vue'),
+            props: numericProps('courseId', 'labId'),
+            meta: {
+              title: '实验统计',
+              shell: 'course',
+              requiresAuth: true,
+              courseAccess: 'manage',
+              uiIds: ['UI-LAB-08']
             }
           },
           {
