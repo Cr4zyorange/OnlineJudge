@@ -1,1424 +1,583 @@
 <template>
-  <main class="labs">
-    <section class="labs__panel" aria-label="实验创建与编辑">
-      <form class="labs__form" @submit.prevent="submit">
-        <label>
-          <span>实验名称</span>
-          <input v-model="form.title" name="title" type="text" />
-        </label>
-        <label class="labs__wide">
-          <span>实验说明</span>
-          <textarea v-model="form.description" name="description" rows="4" />
-        </label>
-        <label>
-          <span>截止时间</span>
-          <input v-model="form.deadline" name="deadline" type="datetime-local" />
-        </label>
-        <label>
-          <span>满分</span>
-          <input v-model="form.maxScore" name="maxScore" type="number" min="1" />
-        </label>
-        <label>
-          <span>评测方式</span>
-          <select v-model="form.evaluationMode" name="evaluationMode">
-            <option value="DOCKER_IO">DOCKER_IO</option>
-            <option value="MIXED">MIXED</option>
-          </select>
-        </label>
-        <label>
-          <span>语言限制</span>
-          <input v-model="form.allowedLanguages" name="allowedLanguages" type="text" />
-        </label>
-        <label>
-          <span>时间限制(ms)</span>
-          <input v-model="form.timeLimitMs" name="timeLimitMs" type="number" min="1" />
-        </label>
-        <label>
-          <span>内存限制(KB)</span>
-          <input v-model="form.memoryLimitKb" name="memoryLimitKb" type="number" min="1" />
-        </label>
-        <label>
-          <span>附件占位(ID 逗号分隔)</span>
-          <input v-model="form.attachmentIds" name="attachmentIds" type="text" />
-        </label>
-        <label class="labs__checkbox">
-          <input v-model="form.autoEvaluate" name="autoEvaluate" type="checkbox" />
-          <span>自动评测</span>
-        </label>
-        <label class="labs__checkbox">
-          <input v-model="form.reportRequired" name="reportRequired" type="checkbox" />
-          <span>要求实验报告</span>
-        </label>
+  <main class="lab-teacher-index" data-testid="lab-teacher-index">
+    <PageHeader
+      title="实验管理"
+      eyebrow="教师实验工作台"
+      :subtitle="`${courseName} · 先定位实验，再进入编辑、提交队列或统计。`"
+    >
+      <template #actions>
+        <RouterLink
+          class="button button--primary"
+          data-testid="create-lab"
+          :to="{ name: 'lab-create', params: { courseId } }"
+        >
+          创建实验
+        </RouterLink>
+      </template>
+    </PageHeader>
 
-        <section class="labs__testcases" aria-label="测试用例列表">
-          <header class="labs__testcases-header">
-            <h2>测试用例</h2>
-            <button type="button" @click="addTestcase">新增用例</button>
-          </header>
-          <div
-            v-for="(testcase, index) in form.testcases"
-            :key="`testcase-${index}`"
-            class="labs__testcase-card"
+    <SummaryStrip :items="summaryItems" aria-label="实验管理摘要" />
+
+    <FilterBar
+      v-model="filterDraft"
+      :fields="filterFields"
+      aria-label="筛选实验"
+      submit-label="应用筛选"
+      @submit="applyFilters"
+      @reset="resetFilters"
+    />
+
+    <p v-if="partialWarning" class="notice notice--warning" data-testid="submission-warning" role="status">
+      {{ partialWarning }}
+    </p>
+    <p v-if="operationFeedback" class="notice notice--success" role="status">
+      {{ operationFeedback }}
+    </p>
+    <p v-if="operationError" class="notice notice--danger" data-testid="operation-error" role="alert">
+      {{ operationError }}
+    </p>
+
+    <PageState
+      v-if="loading"
+      state="loading"
+      title="正在加载实验"
+      message="同步生命周期、提交数与待批阅状态。"
+    />
+    <PageState
+      v-else-if="loadError"
+      state="error"
+      title="实验管理加载失败"
+      :message="loadError"
+      retry-label="重新加载"
+      @retry="loadLabs"
+    />
+    <DataTable
+      v-else
+      :columns="columns"
+      :rows="filteredRows"
+      caption="当前课程实验管理列表"
+      row-key="id"
+      :row-label="rowLabel"
+      empty-title="当前筛选下没有实验"
+      :empty-message="labs.length === 0 ? '创建第一项实验后会显示在这里。' : '调整关键词、状态或待处理条件后再试。'"
+    >
+      <template #cell-title="{ row }">
+        <div class="lab-title-cell">
+          <RouterLink
+            class="lab-title-link"
+            :to="{ name: 'lab-manage-detail', params: { courseId, labId: rowId(row) } }"
           >
-            <label>
-              <span>输入</span>
-              <textarea v-model="testcase.input" :name="`testcase-input-${index}`" rows="2" />
-            </label>
-            <label>
-              <span>输出</span>
-              <textarea v-model="testcase.expectedOutput" :name="`testcase-output-${index}`" rows="2" />
-            </label>
-            <label>
-              <span>分值</span>
-              <input v-model="testcase.scoreWeight" :name="`testcase-weight-${index}`" type="number" min="0" />
-            </label>
-            <label>
-              <span>时间限制(ms)</span>
-              <input v-model="testcase.timeLimitMs" :name="`testcase-time-${index}`" type="number" min="1" />
-            </label>
-            <label>
-              <span>内存限制(KB)</span>
-              <input v-model="testcase.memoryLimitKb" :name="`testcase-memory-${index}`" type="number" min="1" />
-            </label>
-            <label>
-              <span>排序</span>
-              <input v-model="testcase.orderNum" :name="`testcase-order-${index}`" type="number" min="0" />
-            </label>
-            <label class="labs__checkbox">
-              <input v-model="testcase.public" :name="`testcase-public-${index}`" type="checkbox" />
-              <span>公开用例</span>
-            </label>
-            <button type="button" @click="removeTestcase(index)">删除用例</button>
-          </div>
-        </section>
-
-        <div class="labs__form-actions">
-          <button type="submit" :disabled="saving">{{ submitText }}</button>
-          <button type="button" :disabled="saving" @click="resetForm">清空</button>
-        </div>
-      </form>
-
-      <p v-if="feedback" class="labs__feedback">{{ feedback }}</p>
-      <p v-if="errorMessage" class="labs__error">{{ errorMessage }}</p>
-    </section>
-
-    <section class="labs__list" aria-label="实验列表">
-      <div class="labs__toolbar">
-        <label>
-          <span>状态筛选</span>
-          <select v-model="selectedStatus" @change="loadLabs">
-            <option value="">全部</option>
-            <option value="DRAFT">DRAFT</option>
-            <option value="PUBLISHED">PUBLISHED</option>
-            <option value="CLOSED">CLOSED</option>
-            <option value="SCORE_PUBLISHED">SCORE_PUBLISHED</option>
-          </select>
-        </label>
-      </div>
-
-      <p v-if="loading">加载中</p>
-      <p v-else-if="labs.length === 0">暂无实验</p>
-      <table v-else>
-        <thead>
-          <tr>
-            <th>名称</th>
-            <th>状态</th>
-            <th>截止时间</th>
-            <th>满分</th>
-            <th>操作</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="lab in labs" :key="lab.id">
-            <td>{{ lab.title }}</td>
-            <td>{{ lab.status }}</td>
-            <td>{{ formatDeadline(lab.deadline) }}</td>
-            <td>{{ lab.maxScore }}</td>
-            <td class="labs__row-actions">
-              <button v-if="lab.status === 'DRAFT'" type="button" @click="editLab(lab.id)">编辑</button>
-              <button v-if="lab.status === 'DRAFT'" type="button" @click="publish(lab.id)">发布</button>
-              <button v-if="lab.status === 'PUBLISHED'" type="button" @click="close(lab.id)">截止</button>
-              <button
-                v-if="lab.status === 'PUBLISHED' || lab.status === 'CLOSED'"
-                type="button"
-                @click="releaseScores(lab.id)"
-              >
-                发布成绩
-              </button>
-              <button v-if="lab.status === 'DRAFT'" type="button" @click="removeLab(lab.id)">删除草稿</button>
-              <button v-if="lab.status !== 'DRAFT'" type="button" @click="openStatisticsPanel(lab.id, lab.title)">
-                统计
-              </button>
-              <button type="button" @click="openSubmissionPanel(lab.id, lab.title)">查看提交</button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </section>
-
-    <section class="labs__statistics" aria-label="实验统计概览">
-      <header class="labs__submissions-header">
-        <div>
-          <h2>实验统计概览</h2>
-          <p v-if="selectedStatisticsLabId === null">请选择实验查看统计</p>
-          <p v-else>当前实验：{{ selectedStatisticsLabTitle }}</p>
-          <p v-if="statistics" class="labs__statistics-meta">统计生成时间：{{ formatDateTime(statistics.generatedAt) }}</p>
-        </div>
-      </header>
-
-      <p v-if="selectedStatisticsLabId === null" class="labs__statistics-state">尚未选择统计实验</p>
-      <p v-else-if="statisticsLoading" class="labs__statistics-state">统计加载中...</p>
-      <p v-else-if="statisticsErrorMessage" class="labs__error">{{ statisticsErrorMessage }}</p>
-      <p v-else-if="statistics === null" class="labs__statistics-state">暂无实验统计数据</p>
-      <template v-else>
-        <div class="labs__statistics-grid">
-          <article>
-            <span>总人数</span>
-            <strong>{{ statistics.totalStudentCount }}</strong>
-          </article>
-          <article>
-            <span>已提交</span>
-            <strong>{{ statistics.submittedCount }}</strong>
-          </article>
-          <article>
-            <span>未提交</span>
-            <strong>{{ statistics.unsubmittedCount }}</strong>
-          </article>
-          <article>
-            <span>已评测</span>
-            <strong>{{ statistics.evaluatedCount }}</strong>
-          </article>
-          <article>
-            <span>提交率</span>
-            <strong>{{ formatPercentage(statistics.submissionRate) }}</strong>
-          </article>
-          <article>
-            <span>评测完成率</span>
-            <strong>{{ formatPercentage(statistics.evaluationCompletionRate) }}</strong>
-          </article>
-          <article>
-            <span>平均分</span>
-            <strong>{{ formatStatisticScore(statistics.averageScore) }}</strong>
-          </article>
-          <article>
-            <span>逾期提交数</span>
-            <strong>{{ statistics.lateSubmissionCount }}</strong>
-          </article>
-        </div>
-
-        <div class="labs__statistics-layout">
-          <section class="labs__statistics-card">
-            <h3>未提交名单</h3>
-            <p v-if="statistics.unsubmittedStudentIds.length === 0">当前实验已全部提交</p>
-            <p v-else>{{ statistics.unsubmittedStudentIds.join(', ') }}</p>
-          </section>
-
-          <section class="labs__statistics-card">
-            <h3>分数段分布</h3>
-            <div
-              class="labs__statistics-distribution-chart"
-              data-testid="score-distribution-chart"
-              role="img"
-              :aria-label="`分数分布柱状图：${formatScoreDistributionSummary(statistics.scoreDistribution)}`"
-            >
-              <div
-                v-for="entry in getScoreDistributionEntries(statistics.scoreDistribution)"
-                :key="entry.bucket"
-                class="labs__statistics-distribution-bar"
-                data-testid="score-distribution-bar"
-                :style="{ '--bar-height': `${getDistributionBarHeight(entry.count, statistics.scoreDistribution)}%` }"
-                :aria-label="`${entry.bucket}：${entry.count} 人`"
-              >
-                <strong>{{ entry.count }} 人</strong>
-                <span class="labs__statistics-distribution-track">
-                  <span class="labs__statistics-distribution-fill" aria-hidden="true" />
-                </span>
-                <span>{{ entry.bucket }}</span>
-              </div>
-            </div>
-          </section>
+            {{ row.title }}
+          </RouterLink>
+          <small>{{ row.modeLabel }} · 满分 {{ row.maxScore }}</small>
         </div>
       </template>
-    </section>
 
-    <section class="labs__submissions" aria-label="提交版本查看">
-      <header class="labs__submissions-header">
-        <div>
-          <h2>提交版本查看</h2>
-          <p v-if="selectedSubmissionLabId === null">请选择实验查看提交</p>
-          <p v-else>当前实验：{{ selectedSubmissionLabTitle }}</p>
+      <template #cell-status="{ row }">
+        <StatusBadge :label="String(row.statusLabel)" :tone="rowTone(row)" />
+      </template>
+
+      <template #cell-deadline="{ row }">
+        <div class="lab-deadline">
+          <span>{{ row.deadlineLabel }}</span>
+          <small>{{ row.deadlineHint }}</small>
         </div>
-      </header>
+      </template>
 
-      <div v-if="selectedSubmissionLabId !== null" class="labs__submission-layout">
-        <form class="labs__submission-filters" @submit.prevent="searchSubmissions">
-          <label>
-            <span>学生 ID</span>
-            <input v-model="submissionFilters.studentId" name="studentId" type="number" min="1" />
-          </label>
-          <label>
-            <span>提交状态</span>
-            <select v-model="submissionFilters.submitStatus" name="submitStatus">
-              <option value="">全部</option>
-              <option value="SUBMITTED">SUBMITTED</option>
-              <option value="LATE">LATE</option>
-              <option value="WITHDRAWN">WITHDRAWN</option>
-            </select>
-          </label>
-          <label>
-            <span>评测状态</span>
-            <select v-model="submissionFilters.evaluationStatus" name="evaluationStatus">
-              <option value="">全部</option>
-              <option value="NONE">NONE</option>
-              <option value="PENDING">PENDING</option>
-              <option value="RUNNING">RUNNING</option>
-              <option value="ACCEPTED">ACCEPTED</option>
-              <option value="WRONG_ANSWER">WRONG_ANSWER</option>
-              <option value="COMPILE_ERROR">COMPILE_ERROR</option>
-              <option value="RUNTIME_ERROR">RUNTIME_ERROR</option>
-              <option value="TIME_LIMIT_EXCEEDED">TIME_LIMIT_EXCEEDED</option>
-              <option value="SYSTEM_ERROR">SYSTEM_ERROR</option>
-            </select>
-          </label>
-          <label>
-            <span>逾期提交</span>
-            <select v-model="submissionFilters.overdue" name="overdue">
-              <option value="">全部</option>
-              <option value="true">是</option>
-              <option value="false">否</option>
-            </select>
-          </label>
-          <button data-action="search-submissions" type="button" @click="searchSubmissions">查询提交</button>
-        </form>
-
-        <div class="labs__submission-results">
-          <p v-if="submissionLoading">加载中</p>
-          <p v-else-if="submissionErrorMessage" class="labs__error">{{ submissionErrorMessage }}</p>
-          <p v-else-if="submissions.length === 0">暂无提交记录</p>
-          <table v-else>
-            <thead>
-              <tr>
-                <th>学生</th>
-                <th>版本</th>
-                <th>版本标识</th>
-                <th>提交状态</th>
-                <th>评测状态</th>
-                <th>最终得分</th>
-                <th>操作</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr
-                v-for="submission in submissions"
-                :key="submission.submissionId"
-                :data-submission-id="submission.submissionId"
-              >
-                <td>{{ submission.studentId }}</td>
-                <td>{{ submission.version }}</td>
-                <td>
-                  <div class="labs__submission-flags">
-                    <span
-                      v-for="flag in getSubmissionFlags(submission)"
-                      :key="`${submission.submissionId}-${flag}`"
-                      class="labs__submission-flag"
-                    >
-                      {{ flag }}
-                    </span>
-                    <span v-if="getSubmissionFlags(submission).length === 0">无</span>
-                  </div>
-                </td>
-                <td>{{ submission.submitStatus }}</td>
-                <td>{{ submission.evaluationStatus }}</td>
-                <td>{{ submission.finalScore ?? '未生成' }}</td>
-                <td>
-                  <button type="button" @click="openSubmissionDetail(submission.submissionId)">查看详情</button>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+      <template #cell-submissions="{ row }">
+        <div class="lab-submission-counts">
+          <strong>{{ row.submissionCountLabel }}</strong>
+          <small>{{ row.pendingReviewLabel }}</small>
         </div>
+      </template>
 
-        <aside class="labs__submission-detail">
-          <p v-if="submissionDetailLoading">详情加载中</p>
-          <p v-else-if="submissionDetailErrorMessage" class="labs__error">{{ submissionDetailErrorMessage }}</p>
-          <p v-else-if="submissionDetail === null">请选择一个提交版本查看详情</p>
-          <template v-else>
-            <p v-if="submissionDetailFeedbackMessage" class="labs__feedback">{{ submissionDetailFeedbackMessage }}</p>
-            <h3>提交详情</h3>
-            <p>学生 ID：{{ submissionDetail.studentId }}</p>
-            <p>版本：{{ submissionDetail.version }}</p>
-            <div class="labs__submission-flags">
-              <span
-                v-for="flag in getSubmissionFlags(submissionDetail)"
-                :key="`detail-${submissionDetail.submissionId}-${flag}`"
-                class="labs__submission-flag"
-              >
-                {{ flag }}
-              </span>
-              <span v-if="getSubmissionFlags(submissionDetail).length === 0">无版本标识</span>
-            </div>
-            <p>文件标识：{{ submissionDetail.fileId ?? '无' }}</p>
-            <section class="labs__submission-score" aria-label="教师评分">
-              <h4>教师评分</h4>
-              <p>自动得分：{{ formatScore(submissionDetail.latestScore?.autoScore ?? submissionDetail.autoScore) }}</p>
-              <p>人工评分：{{ formatScore(submissionDetail.latestScore?.manualScore) }}</p>
-              <p>报告评分：{{ formatScore(submissionDetail.latestScore?.reportScore ?? submissionDetail.latestReport?.score) }}</p>
-              <p>最终得分：{{ formatScore(submissionDetail.latestScore?.finalScore ?? submissionDetail.finalScore) }}</p>
-              <p>教师评语：{{ submissionDetail.latestScore?.comment ?? '暂无评语' }}</p>
-              <p>评分留痕：{{ submissionDetail.latestScore?.hasChangeLogs ? '已记录' : '暂无' }}</p>
-              <form class="labs__submission-score-form" @submit.prevent="saveSubmissionScore">
-                <label>
-                  <span>人工评分</span>
-                  <input v-model="submissionScoreForm.manualScore" name="manualScore" type="number" min="0" />
-                </label>
-                <label>
-                  <span>报告评分</span>
-                  <input
-                    v-model="submissionScoreForm.reportScore"
-                    name="submissionReportScore"
-                    type="number"
-                    min="0"
-                  />
-                </label>
-                <label>
-                  <span>最终得分</span>
-                  <input v-model="submissionScoreForm.finalScore" name="finalScore" type="number" min="0" />
-                </label>
-                <label class="labs__wide">
-                  <span>教师评语</span>
-                  <textarea v-model="submissionScoreForm.comment" name="scoreComment" rows="3" />
-                </label>
-                <label class="labs__wide">
-                  <span>修改原因</span>
-                  <textarea
-                    v-model="submissionScoreForm.changeReason"
-                    name="changeReason"
-                    rows="2"
-                    placeholder="修改已评分记录时必须填写"
-                  />
-                </label>
-                <button
-                  data-action="score-submission"
-                  type="button"
-                  :disabled="submissionScoreSaving"
-                  @click="saveSubmissionScore"
-                >
-                  保存提交评分
-                </button>
-              </form>
-            </section>
-            <template v-if="submissionDetail.latestReport">
-              <div class="labs__report-detail">
-                <p>报告版本：{{ submissionDetail.latestReport.version }}</p>
-                <p>报告文件：{{ submissionDetail.latestReport.fileName }}</p>
-                <p>报告类型：{{ submissionDetail.latestReport.fileType }}</p>
-                <p>报告评分：{{ submissionDetail.latestReport.score ?? '未评分' }}</p>
-                <p>报告评语：{{ submissionDetail.latestReport.comment ?? '暂无评语' }}</p>
-                <button type="button" @click="downloadSubmissionReport">下载报告</button>
-                <form class="labs__report-score-form" @submit.prevent="saveReportScore">
-                  <label>
-                    <span>报告评分</span>
-                    <input v-model="reportScoreForm.score" name="reportScore" type="number" min="0" />
-                  </label>
-                  <label>
-                    <span>报告评语</span>
-                    <textarea v-model="reportScoreForm.comment" name="reportComment" rows="3" />
-                  </label>
-                  <button
-                    data-action="score-report"
-                    type="button"
-                    :disabled="reportScoreSaving"
-                    @click="saveReportScore"
-                  >
-                    保存报告评分
-                  </button>
-                </form>
-              </div>
-            </template>
-            <p v-else>暂无实验报告</p>
-            <pre class="labs__submission-code">{{ submissionDetail.code || '本次提交未包含在线代码' }}</pre>
-          </template>
-        </aside>
-      </div>
-    </section>
+      <template #cell-actions="{ row }">
+        <div class="lab-row-actions">
+          <RouterLink
+            :data-testid="`manage-lab-${rowId(row)}`"
+            :to="{ name: 'lab-manage-detail', params: { courseId, labId: rowId(row) } }"
+          >
+            进入
+          </RouterLink>
+          <RouterLink
+            v-if="rowStatus(row) === 'DRAFT'"
+            :data-testid="`edit-lab-${rowId(row)}`"
+            :to="{ name: 'lab-edit', params: { courseId, labId: rowId(row) } }"
+          >
+            编辑
+          </RouterLink>
+          <RouterLink
+            v-if="rowStatus(row) !== 'DRAFT'"
+            :data-testid="`submissions-lab-${rowId(row)}`"
+            :to="{ name: 'lab-submission-workspace', params: { courseId, labId: rowId(row) } }"
+          >
+            提交队列
+          </RouterLink>
+          <RouterLink
+            v-if="rowStatus(row) !== 'DRAFT'"
+            :data-testid="`statistics-lab-${rowId(row)}`"
+            :to="{ name: 'lab-statistics', params: { courseId, labId: rowId(row) } }"
+          >
+            统计
+          </RouterLink>
+          <button
+            v-if="rowStatus(row) === 'DRAFT'"
+            :data-testid="`publish-lab-${rowId(row)}`"
+            type="button"
+            :disabled="pendingLabId !== null"
+            @click="runLifecycleRow(row, 'publish')"
+          >
+            {{ pendingLabel(rowId(row), '发布') }}
+          </button>
+          <button
+            v-if="rowStatus(row) === 'PUBLISHED'"
+            :data-testid="`close-lab-${rowId(row)}`"
+            type="button"
+            :disabled="pendingLabId !== null"
+            @click="runLifecycleRow(row, 'close')"
+          >
+            {{ pendingLabel(rowId(row), '截止') }}
+          </button>
+          <button
+            v-if="rowStatus(row) === 'PUBLISHED' || rowStatus(row) === 'CLOSED'"
+            :data-testid="`release-lab-${rowId(row)}`"
+            type="button"
+            :disabled="pendingLabId !== null"
+            @click="runLifecycleRow(row, 'release')"
+          >
+            {{ pendingLabel(rowId(row), '发布成绩') }}
+          </button>
+          <button
+            v-if="rowStatus(row) === 'DRAFT'"
+            class="danger-action"
+            :data-testid="`delete-lab-${rowId(row)}`"
+            type="button"
+            :disabled="pendingLabId !== null"
+            @click="runLifecycleRow(row, 'delete')"
+          >
+            {{ pendingLabel(rowId(row), '删除草稿') }}
+          </button>
+        </div>
+      </template>
+    </DataTable>
   </main>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
+import { RouterLink } from 'vue-router';
 import {
   closeLab,
-  createLab,
   deleteLab,
-  downloadLabReport,
-  getLabSubmissionDetail,
-  getLabStatistics,
-  getLabDetail,
   listLabSubmissions,
   listLabs,
   publishLab,
-  releaseLabScores,
-  scoreLabSubmission,
-  scoreLabReport,
-  updateLab
+  releaseLabScores
 } from '../../api/lab/labs';
+import { currentCourse } from '../../app/runtimeContext';
+import DataTable, { type DataTableColumn, type DataTableRow } from '../../components/foundation/DataTable.vue';
+import FilterBar, { type FilterFieldModel } from '../../components/foundation/FilterBar.vue';
+import PageHeader from '../../components/foundation/PageHeader.vue';
+import PageState from '../../components/foundation/PageState.vue';
+import StatusBadge, { type StatusBadgeTone } from '../../components/foundation/StatusBadge.vue';
+import SummaryStrip, { type SummaryStripItem } from '../../components/foundation/SummaryStrip.vue';
 import type {
-  LabSubmissionDetail,
-  LabSubmissionHistoryItem,
-  LabSubmissionListFilters,
-  LabEvaluationMode,
-  LabExperimentPayload,
   LabExperimentStatus,
   LabExperimentSummary,
-  LabStatistics,
-  LabTestcase,
-  LabTestcasePayload
+  LabSubmissionHistoryItem
 } from '../../types/lab';
+import {
+  formatLabDateTime,
+  formatLabEvaluationMode,
+  formatLabExperimentStatus,
+  labExperimentStatusTone,
+  localizedLabError
+} from './labDisplay';
 
-const props = defineProps<{
-  courseId: number;
-}>();
+type LifecycleAction = 'publish' | 'close' | 'release' | 'delete';
 
+interface LabRow extends DataTableRow {
+  id: number;
+  title: string;
+  status: LabExperimentStatus;
+  statusLabel: string;
+  statusTone: StatusBadgeTone;
+  modeLabel: string;
+  maxScore: number;
+  deadlineLabel: string;
+  deadlineHint: string;
+  submissionCount: number | null;
+  submissionCountLabel: string;
+  pendingReviewCount: number | null;
+  pendingReviewLabel: string;
+  pendingEvaluationCount: number | null;
+}
+
+const props = defineProps<{ courseId: number }>();
 const labs = ref<LabExperimentSummary[]>([]);
+const submissionsByLab = ref(new Map<number, LabSubmissionHistoryItem[] | null>());
 const loading = ref(false);
-const saving = ref(false);
-const feedback = ref('');
-const errorMessage = ref('');
-const editingId = ref<number | null>(null);
-const selectedStatus = ref('');
-const selectedSubmissionLabId = ref<number | null>(null);
-const selectedSubmissionLabTitle = ref('');
-const selectedStatisticsLabId = ref<number | null>(null);
-const selectedStatisticsLabTitle = ref('');
-const statistics = ref<LabStatistics | null>(null);
-const statisticsLoading = ref(false);
-const statisticsErrorMessage = ref('');
-const submissions = ref<LabSubmissionHistoryItem[]>([]);
-const submissionLoading = ref(false);
-const submissionErrorMessage = ref('');
-const submissionDetail = ref<LabSubmissionDetail | null>(null);
-const submissionDetailLoading = ref(false);
-const submissionDetailErrorMessage = ref('');
-const submissionDetailFeedbackMessage = ref('');
-const reportScoreSaving = ref(false);
-const submissionScoreSaving = ref(false);
-const submissionFilters = reactive({
-  studentId: '',
-  submitStatus: '',
-  evaluationStatus: '',
-  overdue: ''
-});
-const reportScoreForm = reactive({
-  score: '',
-  comment: ''
-});
-const submissionScoreForm = reactive({
-  manualScore: '',
-  reportScore: '',
-  finalScore: '',
-  comment: '',
-  changeReason: ''
+const loadError = ref('');
+const partialWarning = ref('');
+const operationFeedback = ref('');
+const operationError = ref('');
+const pendingLabId = ref<number | null>(null);
+const filterDraft = ref<Record<string, string>>({ keyword: '', status: '', attention: '' });
+const appliedFilters = ref<Record<string, string>>({ keyword: '', status: '', attention: '' });
+let loadGeneration = 0;
+
+const courseName = computed(() => (
+  currentCourse.value?.id === props.courseId ? currentCourse.value.name : '当前课程'
+));
+
+const filterFields: readonly FilterFieldModel[] = [
+  { key: 'keyword', label: '搜索实验', kind: 'search', placeholder: '输入实验名称' },
+  {
+    key: 'status',
+    label: '生命周期',
+    kind: 'select',
+    options: [
+      { value: '', label: '全部状态' },
+      { value: 'DRAFT', label: '草稿' },
+      { value: 'PUBLISHED', label: '进行中' },
+      { value: 'CLOSED', label: '已截止' },
+      { value: 'SCORE_PUBLISHED', label: '成绩已发布' },
+      { value: 'ARCHIVED', label: '已归档' }
+    ]
+  },
+  {
+    key: 'attention',
+    label: '待处理',
+    kind: 'select',
+    options: [
+      { value: '', label: '全部实验' },
+      { value: 'review', label: '有待批阅提交' },
+      { value: 'evaluation', label: '有评测中提交' },
+      { value: 'draft', label: '待发布草稿' }
+    ]
+  }
+];
+
+const columns: readonly DataTableColumn[] = [
+  { key: 'title', label: '实验', width: '25%' },
+  { key: 'status', label: '状态', width: '12%' },
+  { key: 'deadline', label: '截止时间', width: '17%' },
+  { key: 'submissions', label: '提交与批阅', width: '16%' },
+  { key: 'actions', label: '操作', width: '30%' }
+];
+
+const rows = computed<LabRow[]>(() => labs.value.map((lab) => {
+  const submissions = submissionsByLab.value.get(lab.id);
+  const pendingReview = submissions?.filter((item) => (
+    item.isScoringBasis && item.finalScore === null
+  )).length ?? null;
+  const pendingEvaluation = submissions?.filter((item) => (
+    item.isLatest && ['NONE', 'PENDING', 'RUNNING'].includes(item.evaluationStatus)
+  )).length ?? null;
+  const remaining = new Date(lab.deadline).getTime() - Date.now();
+  return {
+    id: lab.id,
+    title: lab.title,
+    status: lab.status,
+    statusLabel: formatLabExperimentStatus(lab.status),
+    statusTone: labExperimentStatusTone(lab.status),
+    modeLabel: formatLabEvaluationMode(lab.evaluationMode),
+    maxScore: lab.maxScore,
+    deadlineLabel: formatLabDateTime(lab.deadline),
+    deadlineHint: remaining > 0
+      ? `距截止 ${Math.max(1, Math.ceil(remaining / 86_400_000))} 天`
+      : '截止时间已过',
+    submissionCount: submissions?.length ?? null,
+    submissionCountLabel: submissions === null || submissions === undefined
+      ? '暂不可用'
+      : `${submissions.length} 份提交`,
+    pendingReviewCount: pendingReview,
+    pendingReviewLabel: pendingReview === null
+      ? '待批阅未知'
+      : `${pendingReview} 份待批阅`,
+    pendingEvaluationCount: pendingEvaluation
+  };
+}));
+
+const filteredRows = computed(() => {
+  const keyword = (appliedFilters.value.keyword ?? '').trim().toLowerCase();
+  const status = appliedFilters.value.status ?? '';
+  const attention = appliedFilters.value.attention ?? '';
+  return rows.value.filter((row) => {
+    if (keyword && !row.title.toLowerCase().includes(keyword)) return false;
+    if (status && row.status !== status) return false;
+    if (attention === 'review' && (row.pendingReviewCount ?? 0) === 0) return false;
+    if (attention === 'evaluation' && Number(row.pendingEvaluationCount ?? 0) === 0) return false;
+    if (attention === 'draft' && row.status !== 'DRAFT') return false;
+    return true;
+  });
 });
 
-const form = reactive({
-  title: '',
-  description: '',
-  deadline: '',
-  maxScore: '100',
-  attachmentIds: '',
-  allowedLanguages: '',
-  evaluationMode: 'DOCKER_IO' as LabEvaluationMode,
-  autoEvaluate: true,
-  reportRequired: false,
-  timeLimitMs: '60000',
-  memoryLimitKb: '262144',
-  testcases: [createEmptyTestcase()]
-});
+const summaryItems = computed<SummaryStripItem[]>(() => [
+  {
+    key: 'total',
+    label: '课程实验',
+    value: labs.value.length,
+    hint: '当前课程全部实验',
+    tone: 'brand'
+  },
+  {
+    key: 'active',
+    label: '进行中',
+    value: labs.value.filter((lab) => lab.status === 'PUBLISHED').length,
+    hint: '学生可提交'
+  },
+  {
+    key: 'review',
+    label: '待批阅',
+    value: rows.value.reduce((total, row) => total + (row.pendingReviewCount ?? 0), 0),
+    hint: '当前有效版本未定分',
+    tone: rows.value.some((row) => (row.pendingReviewCount ?? 0) > 0) ? 'warning' : 'neutral'
+  },
+  {
+    key: 'released',
+    label: '成绩已发布',
+    value: labs.value.filter((lab) => ['SCORE_PUBLISHED', 'ARCHIVED'].includes(lab.status)).length,
+    hint: '学生可查看最终成绩',
+    tone: 'success'
+  }
+]);
 
-const scoreDistributionBuckets = ['0-59', '60-69', '70-79', '80-89', '90-100'];
-const submitText = computed(() => (editingId.value === null ? '保存' : '更新'));
-
-onMounted(loadLabs);
+watch(
+  () => props.courseId,
+  () => void loadLabs(),
+  { immediate: true }
+);
 
 async function loadLabs() {
+  const generation = ++loadGeneration;
   loading.value = true;
-  errorMessage.value = '';
+  loadError.value = '';
+  partialWarning.value = '';
+  operationError.value = '';
   try {
-    labs.value = await listLabs(
-      props.courseId,
-      selectedStatus.value ? (selectedStatus.value as LabExperimentStatus) : undefined
+    const result = await listLabs(props.courseId);
+    if (generation !== loadGeneration) return;
+    if (result.some((lab) => lab.courseId !== props.courseId)) {
+      throw new Error('实验列表与当前课程不匹配，请重新加载。');
+    }
+    labs.value = result.filter((lab) => !lab.deleted);
+    const histories = await Promise.allSettled(
+      labs.value.map((lab) => listLabSubmissions(lab.id))
     );
+    if (generation !== loadGeneration) return;
+    submissionsByLab.value = new Map(labs.value.map((lab, index) => {
+      const history = histories[index];
+      return [lab.id, history.status === 'fulfilled' ? history.value : null];
+    }));
+    if (histories.some((history) => history.status === 'rejected')) {
+      partialWarning.value = '部分实验的提交摘要暂不可用；仍可进入实验详情或提交队列继续处理。';
+    }
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : '实验列表加载失败';
+    if (generation !== loadGeneration) return;
+    labs.value = [];
+    submissionsByLab.value = new Map();
+    loadError.value = localizedLabError(error, '实验管理加载失败，请稍后重试。');
   } finally {
-    loading.value = false;
+    if (generation === loadGeneration) loading.value = false;
   }
 }
 
-async function submit() {
-  feedback.value = '';
-  errorMessage.value = validateForm();
-  if (errorMessage.value) {
-    return;
-  }
+function applyFilters(filters: Record<string, string>) {
+  appliedFilters.value = { ...filters };
+}
 
-  saving.value = true;
+function resetFilters() {
+  filterDraft.value = { keyword: '', status: '', attention: '' };
+  appliedFilters.value = { ...filterDraft.value };
+}
+
+async function runLifecycle(row: LabRow, action: LifecycleAction) {
+  const copy = lifecycleCopy(action, row.title);
+  if (!window.confirm(copy.confirm)) return;
+  pendingLabId.value = row.id;
+  operationFeedback.value = '';
+  operationError.value = '';
   try {
-    const payload = buildPayload();
-    if (editingId.value === null) {
-      await createLab(props.courseId, payload);
-      feedback.value = '保存成功';
-    } else {
-      await updateLab(editingId.value, payload);
-      feedback.value = '更新成功';
-    }
-    resetForm();
+    if (action === 'publish') await publishLab(row.id);
+    if (action === 'close') await closeLab(row.id);
+    if (action === 'release') await releaseLabScores(row.id);
+    if (action === 'delete') await deleteLab(row.id);
+    operationFeedback.value = copy.success;
     await loadLabs();
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : '实验保存失败';
+    operationError.value = localizedLabError(error, copy.failure);
   } finally {
-    saving.value = false;
+    pendingLabId.value = null;
   }
 }
 
-async function editLab(labId: number) {
-  feedback.value = '';
-  errorMessage.value = '';
-  try {
-    const detail = await getLabDetail(labId);
-    editingId.value = detail.id;
-    form.title = detail.title;
-    form.description = detail.description;
-    form.deadline = toDateTimeLocal(detail.deadline);
-    form.maxScore = String(detail.maxScore);
-    form.attachmentIds = detail.attachmentIds.join(',');
-    form.allowedLanguages = detail.allowedLanguages ?? '';
-    form.evaluationMode = detail.evaluationMode;
-    form.autoEvaluate = detail.autoEvaluate;
-    form.reportRequired = detail.reportRequired;
-    form.timeLimitMs = String(detail.timeLimitMs);
-    form.memoryLimitKb = String(detail.memoryLimitKb);
-    form.testcases = detail.testcases.length === 0
-      ? [createEmptyTestcase()]
-      : detail.testcases.map((testcase) => mapTestcase(testcase));
-  } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : '实验详情加载失败';
-  }
-}
-
-async function publish(labId: number) {
-  feedback.value = '';
-  errorMessage.value = '';
-  try {
-    await publishLab(labId);
-    feedback.value = '发布成功';
-    await loadLabs();
-  } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : '实验发布失败';
-  }
-}
-
-async function close(labId: number) {
-  feedback.value = '';
-  errorMessage.value = '';
-  try {
-    await closeLab(labId);
-    feedback.value = '截止成功';
-    await loadLabs();
-  } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : '实验截止失败';
-  }
-}
-
-async function releaseScores(labId: number) {
-  feedback.value = '';
-  errorMessage.value = '';
-  try {
-    await releaseLabScores(labId);
-    feedback.value = '成绩发布成功';
-    await loadLabs();
-  } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : '成绩发布失败';
-  }
-}
-
-async function openStatisticsPanel(labId: number, title: string) {
-  selectedStatisticsLabId.value = labId;
-  selectedStatisticsLabTitle.value = title;
-  statisticsErrorMessage.value = '';
-  statistics.value = null;
-  statisticsLoading.value = true;
-  try {
-    statistics.value = await getLabStatistics(labId);
-  } catch (error) {
-    statisticsErrorMessage.value = error instanceof Error ? error.message : '实验统计加载失败';
-  } finally {
-    statisticsLoading.value = false;
-  }
-}
-
-async function removeLab(labId: number) {
-  feedback.value = '';
-  errorMessage.value = '';
-  try {
-    await deleteLab(labId);
-    feedback.value = '草稿已删除';
-    if (editingId.value === labId) {
-      resetForm();
-    }
-    await loadLabs();
-  } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : '草稿删除失败';
-  }
-}
-
-async function openSubmissionPanel(labId: number, title: string) {
-  selectedSubmissionLabId.value = labId;
-  selectedSubmissionLabTitle.value = title;
-  submissionDetail.value = null;
-  submissionDetailErrorMessage.value = '';
-  submissionDetailFeedbackMessage.value = '';
-  await loadSubmissions();
-}
-
-async function searchSubmissions() {
-  await loadSubmissions();
-}
-
-async function loadSubmissions() {
-  if (selectedSubmissionLabId.value === null) {
-    return;
-  }
-  submissionLoading.value = true;
-  submissionErrorMessage.value = '';
-  try {
-    submissions.value = await listLabSubmissions(selectedSubmissionLabId.value, buildSubmissionFilters());
-  } catch (error) {
-    submissionErrorMessage.value = error instanceof Error ? error.message : '提交列表加载失败';
-  } finally {
-    submissionLoading.value = false;
-  }
-}
-
-async function openSubmissionDetail(submissionId: number) {
-  if (selectedSubmissionLabId.value === null) {
-    return;
-  }
-  submissionDetailLoading.value = true;
-  submissionDetailErrorMessage.value = '';
-  submissionDetailFeedbackMessage.value = '';
-  try {
-    submissionDetail.value = await getLabSubmissionDetail(selectedSubmissionLabId.value, submissionId);
-    syncReportScoreForm();
-    syncSubmissionScoreForm();
-  } catch (error) {
-    submissionDetailErrorMessage.value = error instanceof Error ? error.message : '提交详情加载失败';
-  } finally {
-    submissionDetailLoading.value = false;
-  }
-}
-
-async function saveReportScore() {
-  if (selectedSubmissionLabId.value === null || !submissionDetail.value?.latestReport) {
-    return;
-  }
-  const score = Number(reportScoreForm.score);
-  if (!Number.isFinite(score) || score < 0) {
-    submissionDetailErrorMessage.value = '报告评分不能为负数';
-    return;
-  }
-
-  reportScoreSaving.value = true;
-  submissionDetailErrorMessage.value = '';
-  submissionDetailFeedbackMessage.value = '';
-  try {
-    const updatedReport = await scoreLabReport(
-      selectedSubmissionLabId.value,
-      submissionDetail.value.latestReport.reportId,
-      {
-        score,
-        comment: reportScoreForm.comment.trim()
-      }
-    );
-    submissionDetail.value = {
-      ...submissionDetail.value,
-      latestReport: updatedReport
-    };
-    syncReportScoreForm();
-    syncSubmissionScoreForm();
-    submissionDetailFeedbackMessage.value = '报告评分已保存';
-  } catch (error) {
-    submissionDetailErrorMessage.value = error instanceof Error ? error.message : '报告评分保存失败';
-  } finally {
-    reportScoreSaving.value = false;
-  }
-}
-
-async function saveSubmissionScore() {
-  if (selectedSubmissionLabId.value === null || submissionDetail.value === null) {
-    return;
-  }
-
-  const currentDetail = submissionDetail.value;
-  let manualScore: number;
-  let reportScore: number | null;
-  let finalScore: number;
-  try {
-    manualScore = parseScoreInput(submissionScoreForm.manualScore, '人工评分');
-    reportScore = parseOptionalScoreInput(submissionScoreForm.reportScore, '报告评分');
-    finalScore = parseScoreInput(submissionScoreForm.finalScore, '最终得分');
-  } catch (error) {
-    submissionDetailErrorMessage.value = error instanceof Error ? error.message : '提交评分保存失败';
-    submissionDetailFeedbackMessage.value = '';
-    return;
-  }
-  const comment = normalizeText(submissionScoreForm.comment);
-  const changeReason = normalizeText(submissionScoreForm.changeReason);
-  const existingScore = currentDetail.latestScore;
-  const changed = existingScore === undefined || existingScore === null
-    ? true
-    : manualScore !== existingScore.manualScore
-      || reportScore !== existingScore.reportScore
-      || finalScore !== existingScore.finalScore
-      || comment !== existingScore.comment;
-
-  if (existingScore && changed && !changeReason) {
-    submissionDetailErrorMessage.value = '修改已评分记录时必须填写修改原因';
-    return;
-  }
-
-  submissionScoreSaving.value = true;
-  submissionDetailErrorMessage.value = '';
-  submissionDetailFeedbackMessage.value = '';
-  try {
-    const updatedScore = await scoreLabSubmission(selectedSubmissionLabId.value, currentDetail.submissionId, {
-      manualScore,
-      reportScore,
-      finalScore,
-      comment,
-      changeReason
-    });
-    submissionDetail.value = {
-      ...currentDetail,
-      finalScore: updatedScore.finalScore,
-      latestReport: updateReportScoreSummary(currentDetail.latestReport, updatedScore.reportScore),
-      latestScore: updatedScore
-    };
-    submissions.value = submissions.value.map((item) => item.submissionId === currentDetail.submissionId
-      ? {
-          ...item,
-          finalScore: updatedScore.finalScore,
-          autoScore: updatedScore.autoScore
-        }
-      : item);
-    syncReportScoreForm();
-    syncSubmissionScoreForm();
-    submissionDetailFeedbackMessage.value = '提交评分已保存';
-  } catch (error) {
-    submissionDetailErrorMessage.value = error instanceof Error ? error.message : '提交评分保存失败';
-  } finally {
-    submissionScoreSaving.value = false;
-  }
-}
-
-async function downloadSubmissionReport() {
-  if (selectedSubmissionLabId.value === null || !submissionDetail.value?.latestReport) {
-    return;
-  }
-  submissionDetailErrorMessage.value = '';
-  try {
-    const { blob, filename } = await downloadLabReport(
-      selectedSubmissionLabId.value,
-      submissionDetail.value.latestReport.reportId
-    );
-    const objectUrl = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = objectUrl;
-    link.download = filename || submissionDetail.value.latestReport.fileName;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    window.URL.revokeObjectURL(objectUrl);
-  } catch (error) {
-    submissionDetailErrorMessage.value = error instanceof Error ? error.message : '实验报告下载失败';
-  }
-}
-
-function syncReportScoreForm() {
-  const latestReport = submissionDetail.value?.latestReport;
-  reportScoreForm.score = latestReport?.score == null ? '' : String(latestReport.score);
-  reportScoreForm.comment = latestReport?.comment ?? '';
-}
-
-function syncSubmissionScoreForm() {
-  const latestScore = submissionDetail.value?.latestScore;
-  const latestReport = submissionDetail.value?.latestReport;
-  submissionScoreForm.manualScore = latestScore?.manualScore == null ? '' : String(latestScore.manualScore);
-  submissionScoreForm.reportScore = latestScore?.reportScore != null
-    ? String(latestScore.reportScore)
-    : latestReport?.score == null
-      ? ''
-      : String(latestReport.score);
-  submissionScoreForm.finalScore = latestScore?.finalScore != null
-    ? String(latestScore.finalScore)
-    : submissionDetail.value?.finalScore == null
-      ? ''
-      : String(submissionDetail.value.finalScore);
-  submissionScoreForm.comment = latestScore?.comment ?? '';
-  submissionScoreForm.changeReason = '';
-}
-
-function addTestcase() {
-  form.testcases.push(createEmptyTestcase(form.testcases.length));
-}
-
-function removeTestcase(index: number) {
-  if (form.testcases.length === 1) {
-    form.testcases[0] = createEmptyTestcase();
-    return;
-  }
-  form.testcases.splice(index, 1);
-  form.testcases.forEach((testcase, testcaseIndex) => {
-    testcase.orderNum = testcaseIndex + 1;
-  });
-}
-
-function validateForm() {
-  const errors: string[] = [];
-  const deadline = new Date(form.deadline);
-  const maxScore = Number(form.maxScore);
-  const timeLimitMs = Number(form.timeLimitMs);
-  const memoryLimitKb = Number(form.memoryLimitKb);
-  const activeTestcases = collectActiveTestcases();
-
-  if (!form.title.trim()) {
-    errors.push('实验名称不能为空');
-  }
-  if (!form.description.trim()) {
-    errors.push('实验说明不能为空');
-  }
-  if (!form.deadline || Number.isNaN(deadline.getTime()) || deadline.getTime() <= Date.now()) {
-    errors.push('截止时间必须晚于当前时间');
-  }
-  if (!Number.isFinite(maxScore) || maxScore <= 0) {
-    errors.push('满分必须大于 0');
-  }
-  if (!Number.isFinite(timeLimitMs) || timeLimitMs <= 0) {
-    errors.push('时间限制必须大于 0');
-  }
-  if (!Number.isFinite(memoryLimitKb) || memoryLimitKb <= 0) {
-    errors.push('内存限制必须大于 0');
-  }
-
-  activeTestcases.forEach((testcase, index) => {
-    if (!testcase.input) {
-      errors.push(`测试用例 ${index + 1} 输入不能为空`);
-    }
-    if (!testcase.expectedOutput) {
-      errors.push(`测试用例 ${index + 1} 输出不能为空`);
-    }
-    if (!Number.isFinite(testcase.scoreWeight) || testcase.scoreWeight < 0) {
-      errors.push(`测试用例 ${index + 1} 分值不能为负数`);
-    }
-  });
-
-  return errors.join('；');
-}
-
-function buildPayload(): LabExperimentPayload {
+function lifecycleCopy(action: LifecycleAction, title: string) {
   return {
-    title: form.title.trim(),
-    description: form.description.trim(),
-    deadline: formatForApi(form.deadline),
-    maxScore: Number(form.maxScore),
-    attachmentIds: parseAttachmentIds(form.attachmentIds),
-    allowedLanguages: form.allowedLanguages.trim() || null,
-    evaluationMode: form.evaluationMode,
-    autoEvaluate: form.autoEvaluate,
-    reportRequired: form.reportRequired,
-    timeLimitMs: Number(form.timeLimitMs),
-    memoryLimitKb: Number(form.memoryLimitKb),
-    testcases: collectActiveTestcases()
-  };
+    publish: {
+      confirm: `确认发布“${title}”？发布后学生将看到实验并可按规则提交。`,
+      success: `“${title}”发布成功。`,
+      failure: '实验发布失败，请核对配置后重试。'
+    },
+    close: {
+      confirm: `确认将“${title}”设为截止？截止后将停止常规提交。`,
+      success: `“${title}”已截止。`,
+      failure: '实验截止操作失败，请刷新状态后重试。'
+    },
+    release: {
+      confirm: `确认发布“${title}”的成绩？学生将看到最终分与公开反馈。`,
+      success: `“${title}”成绩发布成功。`,
+      failure: '成绩发布失败，请检查待批阅提交后重试。'
+    },
+    delete: {
+      confirm: `确认删除草稿“${title}”？此操作只适用于未发布草稿。`,
+      success: `草稿“${title}”已删除。`,
+      failure: '草稿删除失败，请刷新状态后重试。'
+    }
+  }[action];
 }
 
-function resetForm() {
-  editingId.value = null;
-  form.title = '';
-  form.description = '';
-  form.deadline = '';
-  form.maxScore = '100';
-  form.attachmentIds = '';
-  form.allowedLanguages = '';
-  form.evaluationMode = 'DOCKER_IO';
-  form.autoEvaluate = true;
-  form.reportRequired = false;
-  form.timeLimitMs = '60000';
-  form.memoryLimitKb = '262144';
-  form.testcases = [createEmptyTestcase()];
+function pendingLabel(labId: number, label: string) {
+  return pendingLabId.value === labId ? '处理中…' : label;
 }
 
-function createEmptyTestcase(index = 0) {
-  return reactive({
-    input: '',
-    expectedOutput: '',
-    scoreWeight: '100',
-    public: true,
-    timeLimitMs: '1000',
-    memoryLimitKb: '65536',
-    orderNum: index + 1
-  });
+function rowId(row: DataTableRow) {
+  return Number(row.id);
 }
 
-function mapTestcase(testcase: LabTestcase) {
-  return reactive({
-    input: testcase.input,
-    expectedOutput: testcase.expectedOutput,
-    scoreWeight: String(testcase.scoreWeight),
-    public: testcase.public,
-    timeLimitMs: String(testcase.timeLimitMs),
-    memoryLimitKb: String(testcase.memoryLimitKb),
-    orderNum: testcase.orderNum
-  });
+function rowStatus(row: DataTableRow) {
+  return row.status as LabExperimentStatus;
 }
 
-function parseAttachmentIds(value: string) {
-  return value
-    .split(',')
-    .map((item) => item.trim())
-    .filter(Boolean)
-    .map((item) => Number(item))
-    .filter((item) => Number.isInteger(item) && item > 0);
+function rowTone(row: DataTableRow) {
+  return row.statusTone as StatusBadgeTone;
 }
 
-function buildSubmissionFilters(): LabSubmissionListFilters {
-  const filters: LabSubmissionListFilters = {};
-  const studentId = Number(submissionFilters.studentId);
-  if (Number.isInteger(studentId) && studentId > 0) {
-    filters.studentId = studentId;
-  }
-  if (submissionFilters.submitStatus) {
-    filters.submitStatus = submissionFilters.submitStatus as LabSubmissionListFilters['submitStatus'];
-  }
-  if (submissionFilters.evaluationStatus) {
-    filters.evaluationStatus = submissionFilters.evaluationStatus as LabSubmissionListFilters['evaluationStatus'];
-  }
-  if (submissionFilters.overdue === 'true') {
-    filters.overdue = true;
-  }
-  if (submissionFilters.overdue === 'false') {
-    filters.overdue = false;
-  }
-  return filters;
+function runLifecycleRow(row: DataTableRow, action: LifecycleAction) {
+  return runLifecycle(row as LabRow, action);
 }
 
-function getSubmissionFlags(submission: Pick<LabSubmissionHistoryItem, 'isLatest' | 'isFinal' | 'isScoringBasis' | 'hasFile'>) {
-  const flags: string[] = [];
-  if (submission.isLatest) {
-    flags.push('最新版本');
-  }
-  if (submission.isFinal) {
-    flags.push('当前有效版本');
-  }
-  if (submission.isScoringBasis) {
-    flags.push('当前评分依据');
-  }
-  if (submission.hasFile) {
-    flags.push('包含文件');
-  }
-  return flags;
-}
-
-function parseScoreInput(value: string, label: string) {
-  const normalized = String(value ?? '').trim();
-  if (!normalized) {
-    throw new Error(`${label}不能为空`);
-  }
-  const score = Number(normalized);
-  if (!Number.isFinite(score) || score < 0) {
-    throw new Error(`${label}不能为负数`);
-  }
-  return score;
-}
-
-function parseOptionalScoreInput(value: string, label: string) {
-  const normalized = String(value ?? '').trim();
-  if (!normalized) {
-    return null;
-  }
-  const score = Number(normalized);
-  if (!Number.isFinite(score) || score < 0) {
-    throw new Error(`${label}不能为负数`);
-  }
-  return score;
-}
-
-function normalizeText(value: string) {
-  const normalized = value.trim();
-  return normalized ? normalized : null;
-}
-
-function updateReportScoreSummary(report: LabSubmissionDetail['latestReport'], reportScore: number | null) {
-  if (!report || reportScore === null) {
-    return report;
-  }
-  return {
-    ...report,
-    score: reportScore
-  };
-}
-
-function formatScore(value: number | null | undefined) {
-  return value ?? '未生成';
-}
-
-function formatPercentage(value: number | null | undefined) {
-  if (value === null || value === undefined) {
-    return '-';
-  }
-  return `${Number(value).toFixed(2)}%`;
-}
-
-function formatStatisticScore(value: number | null | undefined) {
-  if (value === null || value === undefined) {
-    return '-';
-  }
-  return Number(value).toFixed(2);
-}
-
-function getScoreDistributionEntries(distribution: LabStatistics['scoreDistribution']) {
-  return scoreDistributionBuckets.map((bucket) => ({
-    bucket,
-    count: distribution[bucket] ?? 0
-  }));
-}
-
-function getDistributionBarHeight(count: number, distribution: LabStatistics['scoreDistribution']) {
-  const maxCount = Math.max(...getScoreDistributionEntries(distribution).map((entry) => entry.count));
-  if (maxCount === 0) {
-    return 0;
-  }
-  return Math.round((count / maxCount) * 100);
-}
-
-function formatScoreDistributionSummary(distribution: LabStatistics['scoreDistribution']) {
-  return getScoreDistributionEntries(distribution)
-    .map((entry) => `${entry.bucket} ${entry.count} 人`)
-    .join('，');
-}
-
-function collectActiveTestcases(): LabTestcasePayload[] {
-  return form.testcases
-    .map((testcase, index) => ({
-      input: testcase.input.trim(),
-      expectedOutput: testcase.expectedOutput.trim(),
-      scoreWeight: Number(testcase.scoreWeight),
-      public: testcase.public,
-      timeLimitMs: Number(testcase.timeLimitMs),
-      memoryLimitKb: Number(testcase.memoryLimitKb),
-      orderNum: Number(testcase.orderNum || index + 1)
-    }))
-    .filter((testcase) => {
-      const hasContent = testcase.input || testcase.expectedOutput;
-      const hasCustomLimits =
-        testcase.scoreWeight !== 100 || testcase.timeLimitMs !== 1000 || testcase.memoryLimitKb !== 65536;
-      return Boolean(hasContent || hasCustomLimits);
-    });
-}
-
-function formatForApi(value: string) {
-  return `${value}:00`;
-}
-
-function toDateTimeLocal(value: string) {
-  return value.slice(0, 16);
-}
-
-function formatDeadline(value: string) {
-  return value.replace('T', ' ').slice(0, 16);
-}
-
-function formatDateTime(value: string) {
-  return value.replace('T', ' ').slice(0, 19);
+function rowLabel(row: DataTableRow) {
+  return `实验：${String(row.title)}`;
 }
 </script>
 
 <style scoped>
-.labs {
-  background: #f6f8fb;
-  color: #1f2937;
+.lab-teacher-index {
   display: grid;
-  gap: 20px;
-  min-height: 100vh;
-  padding: 24px;
-}
-
-.labs__panel,
-.labs__list,
-.labs__statistics,
-.labs__submissions {
-  background: #ffffff;
-  border: 1px solid #d7dde8;
-  border-radius: 8px;
-  padding: 18px;
-}
-
-.labs__form {
-  display: grid;
-  gap: 14px;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-}
-
-.labs__wide,
-.labs__testcases {
-  grid-column: 1 / -1;
-}
-
-.labs__testcases {
-  border-top: 1px solid #d7dde8;
-  margin-top: 8px;
-  padding-top: 16px;
-}
-
-.labs__testcases-header,
-.labs__form-actions,
-.labs__toolbar,
-.labs__row-actions,
-.labs__checkbox,
-.labs__submissions-header {
-  align-items: center;
-  display: flex;
-  gap: 8px;
-}
-
-.labs__testcases-header {
-  justify-content: space-between;
-}
-
-.labs__submissions-header {
-  justify-content: space-between;
-}
-
-.labs__submission-layout {
-  display: grid;
-  gap: 16px;
-  grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr);
-  margin-top: 16px;
-}
-
-.labs__submission-filters {
-  display: grid;
-  gap: 12px;
-  grid-column: 1 / -1;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-}
-
-.labs__submission-results,
-.labs__submission-detail {
-  background: #f8fafc;
-  border: 1px solid #d7dde8;
-  border-radius: 8px;
-  padding: 12px;
-}
-
-.labs__statistics-state {
-  color: #5f6b7a;
-  margin-top: 12px;
-}
-
-.labs__statistics-meta {
-  color: #5f6b7a;
-  font-size: 13px;
-  margin-top: 4px;
-}
-
-.labs__statistics-grid {
-  display: grid;
-  gap: 12px;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-  margin-top: 16px;
-}
-
-.labs__statistics-grid article,
-.labs__statistics-card {
-  background: #f8fafc;
-  border: 1px solid #d7dde8;
-  border-radius: 8px;
-  padding: 12px;
-}
-
-.labs__statistics-grid article span,
-.labs__statistics-card h3 {
-  color: #5f6b7a;
-  display: block;
-  font-size: 13px;
-  margin-bottom: 6px;
-}
-
-.labs__statistics-grid article strong,
-.labs__statistics-card strong {
-  color: #111827;
-  font-size: 20px;
-}
-
-.labs__statistics-layout {
-  display: grid;
-  gap: 16px;
-  grid-template-columns: minmax(220px, 1fr) minmax(260px, 1.2fr);
-  margin-top: 16px;
-}
-
-.labs__statistics-distribution-chart {
-  align-items: end;
-  background: linear-gradient(180deg, #f8fafc, #e8eef7);
-  border: 1px solid #d7dde8;
-  border-radius: 8px;
-  display: grid;
-  gap: 10px;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  min-height: 208px;
-  padding: 14px 10px 10px;
-}
-
-.labs__statistics-distribution-bar {
-  color: #334155;
-  display: grid;
-  gap: 8px;
-  grid-template-rows: auto minmax(128px, 1fr) auto;
-  height: 100%;
-  min-width: 0;
-  text-align: center;
-}
-
-.labs__statistics-distribution-bar strong {
-  color: #111827;
-  font-size: 16px;
-  line-height: 1.2;
-}
-
-.labs__statistics-distribution-bar > span:last-child {
-  font-size: 12px;
-  line-height: 1.2;
-  overflow-wrap: anywhere;
-}
-
-.labs__statistics-distribution-track {
-  align-items: end;
-  background: #dbe4ef;
-  border-radius: 8px 8px 4px 4px;
-  display: flex;
-  min-height: 128px;
-  overflow: hidden;
-}
-
-.labs__statistics-distribution-fill {
-  background: linear-gradient(180deg, #38bdf8, #2563eb);
-  border-radius: 8px 8px 4px 4px;
-  display: block;
-  height: var(--bar-height);
-  min-height: 3px;
+  gap: 18px;
   width: 100%;
+  min-width: 0;
+  padding-bottom: 36px;
+  color: var(--oj-ink);
 }
 
-.labs__report-detail {
+.button,
+.lab-row-actions a,
+.lab-row-actions button {
+  min-height: 38px;
+  padding: 8px 12px;
+  border: 1px solid var(--oj-line-strong);
+  border-radius: var(--oj-radius);
+  background: var(--oj-surface-solid);
+  color: var(--oj-brand);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 800;
+  line-height: 1.3;
+  text-decoration: none;
+}
+
+.button--primary {
+  border-color: var(--oj-brand);
+  background: var(--oj-brand);
+  color: #fff;
+}
+
+.lab-title-cell,
+.lab-deadline,
+.lab-submission-counts {
   display: grid;
-  gap: 6px;
+  gap: 4px;
 }
 
-.labs__submission-score,
-.labs__submission-score-form {
-  display: grid;
-  gap: 8px;
+.lab-title-link {
+  color: var(--oj-ink);
+  font-weight: 800;
+  text-decoration: none;
 }
 
-.labs__submission-flags {
-  align-items: center;
+.lab-title-cell small,
+.lab-deadline small,
+.lab-submission-counts small {
+  color: var(--oj-muted);
+  font-size: 0.75rem;
+}
+
+.lab-row-actions {
   display: flex;
+  align-items: center;
   flex-wrap: wrap;
   gap: 6px;
 }
 
-.labs__submission-flag {
-  background: #e8f0ff;
-  border: 1px solid #bfd3ff;
-  border-radius: 999px;
-  color: #1d4ed8;
-  font-size: 12px;
-  padding: 2px 8px;
+.lab-row-actions button:disabled {
+  cursor: wait;
+  opacity: 0.58;
 }
 
-.labs__submission-code {
-  background: #111827;
-  border-radius: 8px;
-  color: #f8fafc;
-  overflow-x: auto;
-  padding: 12px;
-  white-space: pre-wrap;
+.lab-row-actions .danger-action {
+  border-color: rgba(180, 35, 24, 0.28);
+  color: #8f2d24;
 }
 
-.labs__testcase-card {
-  border: 1px solid #d7dde8;
-  border-radius: 8px;
-  display: grid;
-  gap: 12px;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  margin-top: 12px;
-  padding: 12px;
+.notice {
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--oj-line);
+  border-radius: var(--oj-radius);
+  background: var(--oj-surface);
+  font-size: 0.88rem;
+  font-weight: 700;
+  line-height: 1.6;
 }
 
-label {
-  display: grid;
-  gap: 6px;
+.notice--success {
+  border-color: rgba(22, 101, 52, 0.24);
+  color: #166534;
 }
 
-input,
-select,
-textarea {
-  background: #ffffff;
-  border: 1px solid #b8c2d2;
-  color: #111827;
-  min-height: 36px;
-  padding: 6px 8px;
+.notice--warning {
+  border-color: rgba(146, 64, 14, 0.24);
+  color: #7c4a03;
 }
 
-button {
-  background: #ffffff;
-  border: 1px solid #aeb8c8;
-  color: #111827;
-  min-height: 36px;
-  padding: 6px 12px;
+.notice--danger {
+  border-color: rgba(180, 35, 24, 0.24);
+  color: #8f2d24;
 }
 
-button:disabled {
-  color: #697386;
+.lab-teacher-index :deep(a:focus-visible),
+.lab-teacher-index button:focus-visible {
+  outline: 3px solid var(--oj-brand);
+  outline-offset: 2px;
 }
 
-.labs__feedback {
-  color: #116329;
-  margin-top: 14px;
-}
+@media (max-width: 640px) {
+  .lab-teacher-index {
+    gap: 14px;
+  }
 
-.labs__error {
-  color: #b42318;
-  margin-top: 14px;
-}
+  .lab-row-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
 
-table {
-  border-collapse: collapse;
-  width: 100%;
-}
-
-th,
-td {
-  border-bottom: 1px solid #d7dde8;
-  padding: 10px;
-  text-align: left;
-}
-
-@media (max-width: 960px) {
-  .labs__statistics-layout,
-  .labs__submission-layout {
-    grid-template-columns: 1fr;
+  .lab-row-actions a,
+  .lab-row-actions button {
+    width: 100%;
+    text-align: center;
   }
 }
 </style>
