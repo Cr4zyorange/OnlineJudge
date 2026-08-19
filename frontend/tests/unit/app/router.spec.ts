@@ -39,6 +39,60 @@ describe('application router access contract', () => {
     expect(router.currentRoute.value.fullPath).toBe('/courses/42/labs/9/manage/submissions');
   });
 
+  it.each([
+    {
+      path: '/courses/42/labs/new',
+      routeName: 'lab-create',
+      uiIds: ['UI-LAB-04'],
+      props: { courseId: 42 }
+    },
+    {
+      path: '/courses/42/labs/9/manage',
+      routeName: 'lab-manage-detail',
+      uiIds: ['UI-LAB-03'],
+      props: { courseId: 42, labId: 9 }
+    },
+    {
+      path: '/courses/42/labs/9/edit',
+      routeName: 'lab-edit',
+      uiIds: ['UI-LAB-04'],
+      props: { courseId: 42, labId: 9 }
+    },
+    {
+      path: '/courses/42/labs/9/manage/submissions',
+      routeName: 'lab-submission-workspace',
+      uiIds: ['UI-LAB-03', 'UI-LAB-06'],
+      props: { courseId: 42, labId: 9 }
+    },
+    {
+      path: '/courses/42/labs/9/manage/submissions/55',
+      routeName: 'lab-submission-review',
+      uiIds: ['UI-LAB-06'],
+      props: { courseId: 42, labId: 9, submissionId: 55 }
+    },
+    {
+      path: '/courses/42/labs/9/manage/statistics',
+      routeName: 'lab-statistics',
+      uiIds: ['UI-LAB-08'],
+      props: { courseId: 42, labId: 9 }
+    }
+  ])('exposes the $routeName LAB teacher route contract', async ({ path, routeName, uiIds, props }) => {
+    const router = createAppRouter({
+      history: createMemoryHistory(),
+      services: {
+        loadCurrentUser: vi.fn().mockResolvedValue(user('TEACHER')),
+        loadCourse: vi.fn().mockResolvedValue(course({ manageable: true }))
+      }
+    });
+
+    await router.push(path);
+
+    expect(router.currentRoute.value.name).toBe(routeName);
+    expect(router.currentRoute.value.meta.uiIds).toEqual(uiIds);
+    expect(resolveDefaultProps(router.currentRoute.value)).toEqual(props);
+    expect(router.currentRoute.value.query.role).toBeUndefined();
+  });
+
   it('routes a course member without manage permission to 403 for teacher workspaces', async () => {
     const router = createAppRouter({
       history: createMemoryHistory(),
