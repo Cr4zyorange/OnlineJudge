@@ -1,401 +1,321 @@
-import { mount } from '@vue/test-utils';
+import { flushPromises, mount, RouterLinkStub } from '@vue/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import HomeworkTeacherView from '../../../src/views/hwk/HomeworkTeacherView.vue';
 import * as homeworkApi from '../../../src/api/hwk/homeworks';
-import type { HomeworkDetail, HomeworkStatus, HomeworkSummary, HomeworkType } from '../../../src/types/hwk';
+import { currentCourse } from '../../../src/app/runtimeContext';
+import type {
+  HomeworkDetail,
+  HomeworkStatistics,
+  HomeworkStatus,
+  HomeworkSummary,
+  HomeworkType
+} from '../../../src/types/hwk';
 
 vi.mock('../../../src/api/hwk/homeworks');
+
+const draft = homeworkSummary({ id: 1, title: '软件需求草稿', status: 'DRAFT', type: 'TEXT' });
+const published = homeworkSummary({ id: 2, title: '数组与循环', status: 'PUBLISHED', type: 'CODE' });
+const closed = homeworkSummary({ id: 3, title: '数据库设计', status: 'CLOSED', type: 'FILE' });
+const scored = homeworkSummary({ id: 4, title: '选择题复习', status: 'SCORE_PUBLISHED', type: 'OBJECTIVE' });
 
 describe('HomeworkTeacherView', () => {
   beforeEach(() => {
     vi.resetAllMocks();
-    vi.spyOn(Date, 'now').mockReturnValue(new Date('2026-06-01T00:00:00Z').getTime());
+    currentCourse.value = {
+      id: 101,
+      name: '软件工程实践',
+      teacherId: 9,
+      teacherName: '周老师',
+      enrollmentMode: 'PUBLIC',
+      status: 'ACTIVE',
+      memberCount: 32,
+      member: true,
+      manageable: true,
+      createdAt: '2026-08-01T08:00:00',
+      updatedAt: '2026-08-19T08:00:00'
+    };
+    vi.spyOn(Date, 'now').mockReturnValue(new Date('2026-08-20T00:00:00Z').getTime());
+    vi.stubGlobal('confirm', vi.fn(() => true));
   });
 
   afterEach(() => {
+    currentCourse.value = null;
     vi.restoreAllMocks();
+    vi.unstubAllGlobals();
   });
 
-  it('creates a draft objective homework and refreshes the teacher list', async () => {
-    vi.mocked(homeworkApi.listHomeworks).mockResolvedValueOnce({ list: [], page: 1, size: 20, total: 0 });
-    vi.mocked(homeworkApi.createHomework).mockResolvedValueOnce(homeworkDetail({ id: 1 }));
-    vi.mocked(homeworkApi.listHomeworks).mockResolvedValueOnce({
-      list: [homeworkSummary({ id: 1, title: 'HWK01 objective draft' })],
-      page: 1,
-      size: 20,
-      total: 1
+  it('starts with existing homework, localized lifecycle summaries, and teacher task routes', async () => {
+    vi.mocked(homeworkApi.listHomeworks).mockResolvedValueOnce(page([draft, published, closed, scored]));
+    mockStatistics({
+      2: statistics({ homeworkId: 2, submittedCount: 18, unsubmittedCount: 2, reviewedCount: 12 }),
+      3: statistics({ homeworkId: 3, submittedCount: 20, unsubmittedCount: 0, reviewedCount: 20 }),
+      4: statistics({ homeworkId: 4, submittedCount: 19, unsubmittedCount: 1, reviewedCount: 19 })
     });
 
-    const wrapper = mount(HomeworkTeacherView, {
-      props: {
-        courseId: 101
-      }
-    });
+    const wrapper = mountView();
     await flushPromises();
 
-    expect(wrapper.text()).toContain('暂无作业');
-
-    await wrapper.get('[name="title"]').setValue('HWK01 objective draft');
-    await wrapper.get('[name="description"]').setValue('Answer basics.');
-    await wrapper.get('[name="deadline"]').setValue('2026-06-30T23:59');
-    await wrapper.get('[name="totalScore"]').setValue('100');
-    await wrapper.get('[name="question-stem-0"]').setValue('1 + 1 = ?');
-    await wrapper.get('[name="question-options-0"]').setValue('["1","2"]');
-    await wrapper.get('[name="question-answer-0"]').setValue('["2"]');
-    await wrapper.get('[name="question-score-0"]').setValue('100');
-    await wrapper.get('form').trigger('submit');
-    await flushPromises();
-
-    expect(homeworkApi.createHomework).toHaveBeenCalledWith(expect.objectContaining({
-      courseId: 101,
-      title: 'HWK01 objective draft',
-      description: 'Answer basics.',
-      type: 'OBJECTIVE',
-      totalScore: 100,
-      allowResubmit: true,
-      allowLateSubmit: false,
-      showEvaluationBeforePublish: true,
-      questions: [
-        expect.objectContaining({
-          stem: '1 + 1 = ?',
-          optionsJson: '["1","2"]',
-          answerJson: '["2"]',
-          score: 100
-        })
-      ]
-    }));
-    expect(wrapper.text()).toContain('保存成功');
-    expect(wrapper.text()).toContain('HWK01 objective draft');
+    expect(wrapper.find('[data-testid="homework-teacher-index"]').exists()).toBe(true);
+    expect(wrapper.get('h1').text()).toBe('作业管理');
+    expect(wrapper.text()).toContain('软件工程实践');
+    expect(wrapper.text()).toContain('软件需求草稿');
     expect(wrapper.text()).toContain('草稿');
-    expect(wrapper.text()).not.toContain('DRAFT');
-  });
-
-  it('validates code homework test cases before sending create requests', async () => {
-    vi.mocked(homeworkApi.listHomeworks).mockResolvedValueOnce({ list: [], page: 1, size: 20, total: 0 });
-
-    const wrapper = mount(HomeworkTeacherView, {
-      props: {
-        courseId: 101
-      }
-    });
-    await flushPromises();
-
-    await wrapper.get('[name="type"]').setValue('CODE');
-    await wrapper.get('[name="title"]').setValue('Code homework');
-    await wrapper.get('[name="description"]').setValue('Implement addition.');
-    await wrapper.get('[name="deadline"]').setValue('2026-06-30T23:59');
-    await wrapper.get('form').trigger('submit');
-    await flushPromises();
-
-    expect(homeworkApi.createHomework).not.toHaveBeenCalled();
-    expect(wrapper.text()).toContain('代码题至少配置一个测试用例');
-  });
-
-  it('publishes and closes homework from the management table', async () => {
-    vi.mocked(homeworkApi.listHomeworks).mockResolvedValueOnce({
-      list: [homeworkSummary({ id: 7, title: 'Draft homework', status: 'DRAFT' })],
-      page: 1,
-      size: 20,
-      total: 1
-    });
-    vi.mocked(homeworkApi.publishHomework).mockResolvedValueOnce(homeworkDetail({ id: 7, status: 'PUBLISHED' }));
-    vi.mocked(homeworkApi.listHomeworks).mockResolvedValueOnce({
-      list: [homeworkSummary({ id: 7, title: 'Draft homework', status: 'PUBLISHED' })],
-      page: 1,
-      size: 20,
-      total: 1
-    });
-    vi.mocked(homeworkApi.closeHomework).mockResolvedValueOnce(homeworkDetail({ id: 7, status: 'CLOSED' }));
-    vi.mocked(homeworkApi.listHomeworks).mockResolvedValueOnce({
-      list: [homeworkSummary({ id: 7, title: 'Draft homework', status: 'CLOSED' })],
-      page: 1,
-      size: 20,
-      total: 1
-    });
-
-    const wrapper = mount(HomeworkTeacherView, {
-      props: {
-        courseId: 101
-      }
-    });
-    await flushPromises();
-
-    await wrapper.findAll('button').find((button) => button.text() === '发布')?.trigger('click');
-    await flushPromises();
-    expect(homeworkApi.publishHomework).toHaveBeenCalledWith(7);
-    expect(wrapper.text()).toContain('发布成功');
-
-    await wrapper.findAll('button').find((button) => button.text() === '关闭')?.trigger('click');
-    await flushPromises();
-    expect(homeworkApi.closeHomework).toHaveBeenCalledWith(7);
-    expect(wrapper.text()).toContain('关闭成功');
-  });
-
-  it('links published homework to the teacher submission review page', async () => {
-    vi.mocked(homeworkApi.listHomeworks).mockResolvedValueOnce({
-      list: [homeworkSummary({ id: 7, title: 'Published homework', status: 'PUBLISHED' })],
-      page: 1,
-      size: 20,
-      total: 1
-    });
-
-    const wrapper = mount(HomeworkTeacherView, {
-      props: {
-        courseId: 101
-      }
-    });
-    await flushPromises();
-
-    expect(wrapper.get('[data-testid="review-homework-submissions-7"]').attributes('href'))
-      .toBe('/courses/101/homeworks/7/manage/submissions');
-  });
-
-  it('loads homework statistics and publishes scores from the management table', async () => {
-    vi.mocked(homeworkApi.listHomeworks).mockResolvedValueOnce({
-      list: [homeworkSummary({ id: 9, title: 'Reviewed homework', status: 'PUBLISHED' })],
-      page: 1,
-      size: 20,
-      total: 1
-    });
-    vi.mocked(homeworkApi.getHomeworkStatistics).mockResolvedValueOnce({
-      homeworkId: 9,
-      courseId: 101,
-      totalStudentCount: 22,
-      submittedCount: 1,
-      unsubmittedCount: 21,
-      evaluatedCount: 2,
-      reviewedCount: 2,
-      averageScore: 70,
-      maxScore: 100,
-      minScore: 40,
-      unsubmittedPage: 1,
-      unsubmittedSize: 20,
-      unsubmittedTotal: 21,
-      unsubmittedStudentIds: [603]
-    });
-    vi.mocked(homeworkApi.getHomeworkStatistics).mockResolvedValueOnce({
-      homeworkId: 9,
-      courseId: 101,
-      totalStudentCount: 22,
-      submittedCount: 1,
-      unsubmittedCount: 21,
-      evaluatedCount: 1,
-      reviewedCount: 1,
-      averageScore: 70,
-      maxScore: 70,
-      minScore: 70,
-      unsubmittedPage: 2,
-      unsubmittedSize: 20,
-      unsubmittedTotal: 21,
-      unsubmittedStudentIds: [604]
-    });
-    vi.mocked(homeworkApi.publishHomeworkScores).mockResolvedValueOnce(homeworkDetail({
-      id: 9,
-      title: 'Reviewed homework',
-      status: 'SCORE_PUBLISHED'
-    }));
-    vi.mocked(homeworkApi.listHomeworks).mockResolvedValueOnce({
-      list: [homeworkSummary({ id: 9, title: 'Reviewed homework', status: 'SCORE_PUBLISHED' })],
-      page: 1,
-      size: 20,
-      total: 1
-    });
-
-    const wrapper = mount(HomeworkTeacherView, {
-      props: {
-        courseId: 101
-      }
-    });
-    await flushPromises();
-
-    const statusOption = wrapper.findAll('option')
-      .find((option) => (option.element as HTMLOptionElement).value === 'SCORE_PUBLISHED');
-    expect(statusOption?.text()).toBe('成绩已发布');
-
-    await wrapper.get('[data-testid="homework-statistics-9"]').trigger('click');
-    await flushPromises();
-    expect(homeworkApi.getHomeworkStatistics).toHaveBeenCalledWith(9, { page: 1, size: 20 });
-    expect(wrapper.text()).toContain('Reviewed homework');
-    expect(wrapper.text()).toContain('70');
-    expect(wrapper.text()).toContain('603');
-
-    await wrapper.get('[data-testid="statistics-next-page"]').trigger('click');
-    await flushPromises();
-    expect(homeworkApi.getHomeworkStatistics).toHaveBeenLastCalledWith(9, { page: 2, size: 20 });
-    expect(wrapper.text()).toContain('604');
-
-    await wrapper.get('[data-testid="publish-homework-scores-9"]').trigger('click');
-    await flushPromises();
-    expect(homeworkApi.publishHomeworkScores).toHaveBeenCalledWith(9);
-    expect(homeworkApi.listHomeworks).toHaveBeenLastCalledWith(expect.objectContaining({
-      status: 'SCORE_PUBLISHED'
-    }));
+    expect(wrapper.text()).toContain('已发布');
+    expect(wrapper.text()).toContain('已关闭');
     expect(wrapper.text()).toContain('成绩已发布');
-    expect(wrapper.text()).not.toContain('SCORE_PUBLISHED');
-  });
-
-  it('renders teacher form options and table metadata with localized labels', async () => {
-    vi.mocked(homeworkApi.listHomeworks).mockResolvedValueOnce({
-      list: [homeworkSummary({ id: 8, title: 'Code draft', status: 'DRAFT', type: 'CODE' })],
-      page: 1,
-      size: 20,
-      total: 1
-    });
-
-    const wrapper = mount(HomeworkTeacherView, {
-      props: {
-        courseId: 101
-      }
-    });
-    await flushPromises();
-
-    const objectiveOptionLabels = wrapper.findAll('option').map((option) => option.text());
-    expect(objectiveOptionLabels).toEqual(expect.arrayContaining(['客观题作业', '附件作业', '代码作业', '单选题', '多选题', '判断题']));
-    expect(objectiveOptionLabels).not.toEqual(expect.arrayContaining(['OBJECTIVE', 'FILE', 'CODE', 'SINGLE_CHOICE']));
-    expect(wrapper.text()).toContain('选项配置');
-    expect(wrapper.text()).toContain('正确答案');
-    expect(wrapper.text()).not.toContain('选项 JSON');
-    expect(wrapper.text()).not.toContain('答案 JSON');
-
-    await wrapper.get('[name="type"]').setValue('CODE');
-
-    const optionLabels = wrapper.findAll('option').map((option) => option.text());
-    expect(optionLabels).toEqual(expect.arrayContaining(['客观题作业', '附件作业', '代码作业', '严格匹配', '忽略首尾空白']));
-    expect(optionLabels).not.toEqual(expect.arrayContaining(['OBJECTIVE', 'FILE', 'CODE', 'EXACT', 'TRIM']));
-    expect(wrapper.text()).toContain('语言限制');
-    expect(wrapper.text()).not.toContain('语言限制 JSON');
-    expect(wrapper.text()).toContain('代码作业');
-    expect(wrapper.text()).toContain('草稿');
-    expect(wrapper.text()).not.toContain('CODE');
+    expect(wrapper.text()).toContain('已完成批阅');
+    expect(wrapper.get('[data-testid="summary-strip"]').text()).toContain('51');
+    expect(wrapper.text()).toContain('12 份已完成批阅');
+    expect(wrapper.text()).not.toContain('未完成批阅');
+    expect(wrapper.text()).not.toContain('待批阅');
     expect(wrapper.text()).not.toContain('DRAFT');
+    expect(wrapper.text()).not.toContain('PUBLISHED');
+    expect(wrapper.find('form[aria-label="作业创建与编辑"]').exists()).toBe(false);
+    expect(homeworkApi.getHomeworkStatistics).toHaveBeenCalledTimes(3);
+
+    const links = wrapper.findAllComponents(RouterLinkStub).map((link) => link.props('to'));
+    expect(links).toEqual(expect.arrayContaining([
+      { name: 'homework-create', params: { courseId: 101 } },
+      { name: 'homework-manage-detail', params: { courseId: 101, homeworkId: 2 } },
+      { name: 'homework-edit', params: { courseId: 101, homeworkId: 1 } },
+      { name: 'homework-submission-workspace', params: { courseId: 101, homeworkId: 2 } },
+      { name: 'homework-statistics', params: { courseId: 101, homeworkId: 2 } }
+    ]));
+    expect(wrapper.text()).not.toContain('删除');
   });
 
-  it('loads a draft homework into the form and updates it', async () => {
-    vi.mocked(homeworkApi.listHomeworks).mockResolvedValueOnce({
-      list: [homeworkSummary({ id: 7, title: 'Draft homework', status: 'DRAFT' })],
-      page: 1,
-      size: 20,
-      total: 1
+  it('keeps only the draft attention filter and scopes it explicitly to the current server page', async () => {
+    vi.mocked(homeworkApi.listHomeworks).mockResolvedValue(page(
+      [draft, published, closed],
+      { total: 41 }
+    ));
+    mockStatistics({
+      2: statistics({ homeworkId: 2, submittedCount: 18, reviewedCount: 12 }),
+      3: statistics({ homeworkId: 3, submittedCount: 20, reviewedCount: 20 })
     });
-    vi.mocked(homeworkApi.getHomeworkDetail).mockResolvedValueOnce(homeworkDetail({
-      id: 7,
-      title: 'Draft homework',
-      questions: [
-        {
-          id: 70,
-          homeworkId: 7,
-          questionType: 'SINGLE_CHOICE',
-          stem: '1 + 1 = ?',
-          optionsJson: '["1","2"]',
-          answerJson: '["2"]',
-          score: 100,
-          sortOrder: 1
-        }
-      ]
-    }));
-    vi.mocked(homeworkApi.updateHomework).mockResolvedValueOnce(homeworkDetail({ id: 7, title: 'Draft homework updated' }));
-    vi.mocked(homeworkApi.listHomeworks).mockResolvedValueOnce({
-      list: [homeworkSummary({ id: 7, title: 'Draft homework updated', status: 'DRAFT' })],
-      page: 1,
-      size: 20,
-      total: 1
-    });
-
-    const wrapper = mount(HomeworkTeacherView, {
-      props: {
-        courseId: 101
-      }
-    });
+    const wrapper = mountView();
     await flushPromises();
 
-    await wrapper.get('[data-testid="edit-homework-7"]').trigger('click');
+    await wrapper.get('[name="keyword"]').setValue('数组');
+    await wrapper.get('[data-testid="filter-bar"]').trigger('submit');
     await flushPromises();
-    expect(homeworkApi.getHomeworkDetail).toHaveBeenCalledWith(7);
-    expect((wrapper.get('[name="title"]').element as HTMLInputElement).value).toBe('Draft homework');
-    expect((wrapper.get('[name="question-answer-0"]').element as HTMLInputElement).value).toBe('["2"]');
-
-    await wrapper.get('[name="title"]').setValue('Draft homework updated');
-    await wrapper.get('form').trigger('submit');
-    await flushPromises();
-
-    expect(homeworkApi.updateHomework).toHaveBeenCalledWith(7, expect.objectContaining({
+    expect(wrapper.text()).toContain('数组与循环');
+    expect(wrapper.text()).not.toContain('数据库设计');
+    expect(homeworkApi.listHomeworks).toHaveBeenLastCalledWith({
       courseId: 101,
-      title: 'Draft homework updated'
-    }));
-    expect(homeworkApi.createHomework).not.toHaveBeenCalled();
-    expect(wrapper.text()).toContain('Draft homework updated');
+      page: 1,
+      size: 20,
+      keyword: '数组'
+    });
+
+    await wrapper.get('[name="keyword"]').setValue('');
+    await wrapper.get('[name="status"]').setValue('DRAFT');
+    await wrapper.get('[data-testid="filter-bar"]').trigger('submit');
+    await flushPromises();
+    expect(wrapper.text()).toContain('软件需求草稿');
+    expect(wrapper.text()).not.toContain('数组与循环');
+    expect(homeworkApi.listHomeworks).toHaveBeenLastCalledWith({
+      courseId: 101,
+      page: 1,
+      size: 20,
+      status: 'DRAFT'
+    });
+
+    await wrapper.get('[name="status"]').setValue('');
+    await wrapper.get('[name="attention"]').setValue('draft');
+    await wrapper.get('[data-testid="filter-bar"]').trigger('submit');
+    await flushPromises();
+
+    expect(wrapper.get('[name="attention"]').element.closest('label')?.textContent).toContain('本页待处理');
+    expect(wrapper.get('[name="attention"]').text()).toContain('本页待发布草稿');
+    expect(wrapper.get('[name="attention"]').text()).not.toContain('批阅');
+    expect(wrapper.get('[data-testid="attention-scope-note"]').text()).toContain('待发布草稿条件只细化当前页');
+    expect(wrapper.text()).toContain('软件需求草稿');
+    expect(wrapper.text()).not.toContain('数组与循环');
+    expect(wrapper.text()).not.toContain('数据库设计');
+    expect(wrapper.get('nav[aria-label="作业分页"]').text()).toContain('服务端筛选共 41 份');
+    expect(wrapper.get('nav[aria-label="作业分页"]').text()).toContain('本页显示 1 份');
+    expect(wrapper.get('[data-testid="summary-strip"]').text()).toContain('服务端匹配');
+    expect(wrapper.get('[data-action="next-homework-page"]').attributes('disabled')).toBeUndefined();
+    expect(homeworkApi.listHomeworks).toHaveBeenCalledTimes(4);
   });
 
-  it('preserves code judge config when editing a draft homework', async () => {
-    vi.mocked(homeworkApi.listHomeworks).mockResolvedValueOnce({
-      list: [homeworkSummary({ id: 8, title: 'Code draft', status: 'DRAFT', type: 'CODE' })],
-      page: 1,
-      size: 20,
-      total: 1
-    });
-    vi.mocked(homeworkApi.getHomeworkDetail).mockResolvedValueOnce(homeworkDetail({
-      id: 8,
-      title: 'Code draft',
-      type: 'CODE',
-      languageLimitJson: '["python"]',
-      timeLimitMs: 2000,
-      memoryLimitKb: 131072,
-      outputCompareMode: 'TRIM',
-      testCases: [
-        {
-          id: 80,
-          homeworkId: 8,
-          inputData: '1 2',
-          expectedOutput: '3',
-          scoreWeight: 100,
-          hidden: false,
-          timeLimitMs: 2000,
-          memoryLimitKb: 131072,
-          sortOrder: 1
-        }
-      ]
-    } as Partial<HomeworkDetail>));
-    vi.mocked(homeworkApi.updateHomework).mockResolvedValueOnce(homeworkDetail({ id: 8, title: 'Code draft updated', type: 'CODE' }));
-    vi.mocked(homeworkApi.listHomeworks).mockResolvedValueOnce({
-      list: [homeworkSummary({ id: 8, title: 'Code draft updated', status: 'DRAFT', type: 'CODE' })],
-      page: 1,
-      size: 20,
-      total: 1
-    });
-
-    const wrapper = mount(HomeworkTeacherView, {
-      props: {
-        courseId: 101
-      }
-    });
-    await flushPromises();
-
-    await wrapper.get('[data-testid="edit-homework-8"]').trigger('click');
-    await flushPromises();
-    await wrapper.get('[name="title"]').setValue('Code draft updated');
-    await wrapper.get('form').trigger('submit');
-    await flushPromises();
-
-    expect(homeworkApi.updateHomework).toHaveBeenCalledWith(8, expect.objectContaining({
-      title: 'Code draft updated',
-      type: 'CODE',
-      languageLimitJson: '["python"]',
-      timeLimitMs: 2000,
-      memoryLimitKb: 131072,
-      outputCompareMode: 'TRIM'
+  it('uses the paginated list contract so homework after the first page remains reachable', async () => {
+    const firstPageItems = Array.from({ length: 20 }, (_, index) => homeworkSummary({
+      id: index + 1,
+      title: `作业 ${index + 1}`
     }));
+    vi.mocked(homeworkApi.listHomeworks)
+      .mockResolvedValueOnce(page(firstPageItems, { page: 1, size: 20, total: 101 }))
+      .mockResolvedValueOnce(page([
+        homeworkSummary({ id: 21, title: '作业 21' })
+      ], { page: 2, size: 20, total: 101 }));
+    const wrapper = mountView();
+    await flushPromises();
+
+    expect(homeworkApi.listHomeworks).toHaveBeenNthCalledWith(1, {
+      courseId: 101,
+      page: 1,
+      size: 20
+    });
+    expect(wrapper.get('[data-testid="summary-strip"]').text()).toContain('101');
+
+    await wrapper.get('[data-action="next-homework-page"]').trigger('click');
+    await flushPromises();
+
+    expect(homeworkApi.listHomeworks).toHaveBeenLastCalledWith({
+      courseId: 101,
+      page: 2,
+      size: 20
+    });
+    expect(wrapper.text()).toContain('作业 21');
+    expect(wrapper.text()).toContain('第 2 / 6 页');
+  });
+
+  it('confirms lifecycle operations, prevents duplicate actions, and refreshes after success', async () => {
+    vi.mocked(homeworkApi.listHomeworks).mockResolvedValue(page([draft, published, closed]));
+    vi.mocked(homeworkApi.getHomeworkStatistics).mockResolvedValue(statistics());
+    const publishPending = deferred<HomeworkDetail>();
+    vi.mocked(homeworkApi.publishHomework).mockReturnValueOnce(publishPending.promise);
+    vi.mocked(homeworkApi.closeHomework).mockResolvedValueOnce(homeworkDetail({ id: 2, status: 'CLOSED' }));
+    vi.mocked(homeworkApi.publishHomeworkScores).mockResolvedValueOnce(homeworkDetail({ id: 3, status: 'SCORE_PUBLISHED' }));
+    const wrapper = mountView();
+    await flushPromises();
+
+    const publishButton = wrapper.get('[data-testid="publish-homework-1"]');
+    await publishButton.trigger('click');
+    await publishButton.trigger('click');
+    expect(confirm).toHaveBeenCalledWith(expect.stringContaining('软件需求草稿'));
+    expect(homeworkApi.publishHomework).toHaveBeenCalledTimes(1);
+    expect(publishButton.attributes('disabled')).toBeDefined();
+    expect(publishButton.text()).toContain('处理中');
+
+    publishPending.resolve(homeworkDetail({ id: 1, title: draft.title, status: 'PUBLISHED', type: 'TEXT' }));
+    await flushPromises();
+    expect(wrapper.get('[data-testid="operation-feedback"]').text()).toContain('发布成功');
+
+    await wrapper.get('[data-testid="close-homework-2"]').trigger('click');
+    await flushPromises();
+    expect(homeworkApi.closeHomework).toHaveBeenCalledWith(2);
+    expect(confirm).toHaveBeenLastCalledWith(expect.stringContaining('数组与循环'));
+
+    await wrapper.get('[data-testid="release-homework-3"]').trigger('click');
+    await flushPromises();
+    expect(homeworkApi.publishHomeworkScores).toHaveBeenCalledWith(3);
+    expect(confirm).toHaveBeenLastCalledWith(expect.stringContaining('数据库设计'));
+    expect(wrapper.text()).not.toContain('删除草稿');
+  });
+
+  it('keeps the homework row and action available after a lifecycle failure', async () => {
+    vi.mocked(homeworkApi.listHomeworks).mockResolvedValueOnce(page([draft]));
+    vi.mocked(homeworkApi.publishHomework).mockRejectedValueOnce(new Error('题目分值合计与满分不一致'));
+    const wrapper = mountView();
+    await flushPromises();
+
+    await wrapper.get('[data-testid="publish-homework-1"]').trigger('click');
+    await flushPromises();
+
+    expect(wrapper.get('[data-testid="operation-error"]').text()).toContain('题目分值合计与满分不一致');
+    expect(wrapper.text()).toContain('软件需求草稿');
+    expect(wrapper.get('[data-testid="publish-homework-1"]').attributes('disabled')).toBeUndefined();
+  });
+
+  it('does not offer draft-only or released-only actions for a NOT_OPEN legacy state', async () => {
+    const notOpen = homeworkSummary({ id: 5, title: '等待开放的作业', status: 'NOT_OPEN', type: 'TEXT' });
+    vi.mocked(homeworkApi.listHomeworks).mockResolvedValueOnce(page([notOpen]));
+    const wrapper = mountView();
+    await flushPromises();
+
+    expect(wrapper.text()).toContain('等待开放的作业');
+    expect(wrapper.find('[data-testid="manage-homework-5"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="edit-homework-5"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="publish-homework-5"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="submissions-homework-5"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="statistics-homework-5"]').exists()).toBe(false);
+    expect(homeworkApi.getHomeworkStatistics).not.toHaveBeenCalled();
+  });
+
+  it('keeps FILE drafts editable but blocks publication until issue 214 supplies the upload contract', async () => {
+    const fileDraft = homeworkSummary({ id: 5, title: '课程报告附件', status: 'DRAFT', type: 'FILE' });
+    vi.mocked(homeworkApi.listHomeworks).mockResolvedValueOnce(page([fileDraft]));
+    const wrapper = mountView();
+    await flushPromises();
+
+    expect(wrapper.get('[data-testid="file-contract-blocked-5"]').text()).toContain('#214');
+    expect(wrapper.find('[data-testid="publish-homework-5"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="edit-homework-5"]').exists()).toBe(true);
+  });
+
+  it('blocks direct publication of a legacy CODE draft that still enables unsupported sandbox languages', async () => {
+    const legacyCodeDraft = homeworkSummary({ id: 6, title: '旧版 Java 作业', status: 'DRAFT', type: 'CODE' });
+    vi.mocked(homeworkApi.listHomeworks).mockResolvedValueOnce(page([legacyCodeDraft]));
+    vi.mocked(homeworkApi.getHomeworkDetail).mockResolvedValueOnce(homeworkDetail({
+      id: 6,
+      title: legacyCodeDraft.title,
+      status: 'DRAFT',
+      type: 'CODE',
+      languageLimitJson: '["python","java"]'
+    }));
+    const wrapper = mountView();
+    await flushPromises();
+
+    await wrapper.get('[data-testid="publish-homework-6"]').trigger('click');
+    await flushPromises();
+
+    expect(homeworkApi.getHomeworkDetail).toHaveBeenCalledWith(6);
+    expect(homeworkApi.publishHomework).not.toHaveBeenCalled();
+    expect(confirm).not.toHaveBeenCalled();
+    expect(wrapper.get('[data-testid="operation-error"]').text()).toContain('Python');
+    expect(wrapper.get('[data-testid="operation-error"]').text()).toContain('移除');
+  });
+
+  it('shows loading, recoverable failure, and an empty state with the create entry', async () => {
+    const firstLoad = deferred<ReturnType<typeof page>>();
+    vi.mocked(homeworkApi.listHomeworks)
+      .mockReturnValueOnce(firstLoad.promise)
+      .mockRejectedValueOnce(new Error('作业服务暂不可用'))
+      .mockResolvedValueOnce(page([]));
+    const wrapper = mountView();
+
+    expect(wrapper.get('[data-state="loading"]').text()).toContain('正在加载作业');
+    firstLoad.reject(new Error('网络连接失败'));
+    await flushPromises();
+    expect(wrapper.get('[role="alert"]').text()).toContain('作业管理加载失败');
+
+    await wrapper.get('[data-testid="page-state-retry"]').trigger('click');
+    await flushPromises();
+    expect(wrapper.get('[role="alert"]').text()).toContain('作业服务暂不可用');
+
+    await wrapper.get('[data-testid="page-state-retry"]').trigger('click');
+    await flushPromises();
+    expect(wrapper.get('[data-testid="data-table-empty"]').text()).toContain('创建第一份作业');
+    expect(wrapper.find('[data-testid="create-homework"]').exists()).toBe(true);
   });
 });
+
+function mountView() {
+  return mount(HomeworkTeacherView, {
+    props: { courseId: 101 },
+    global: { stubs: { RouterLink: RouterLinkStub } }
+  });
+}
+
+function page(
+  list: HomeworkSummary[],
+  pagination: Partial<{ page: number; size: number; total: number }> = {}
+) {
+  return { list, page: 1, size: 20, total: list.length, ...pagination };
+}
 
 function homeworkSummary(overrides: Partial<HomeworkSummary> = {}): HomeworkSummary {
   return {
     id: 1,
     courseId: 101,
-    title: 'HWK01 objective draft',
-    description: 'Answer basics.',
+    title: '作业',
+    description: '完成本周学习任务。',
     type: 'OBJECTIVE' as HomeworkType,
     status: 'DRAFT' as HomeworkStatus,
-    deadline: '2026-06-30T23:59:59',
+    deadline: '2026-08-25T23:59:59',
     totalScore: 100,
     allowResubmit: true,
     allowLateSubmit: false,
@@ -409,19 +329,51 @@ function homeworkDetail(overrides: Partial<HomeworkDetail> = {}): HomeworkDetail
   return {
     ...homeworkSummary(),
     chapterId: null,
-    description: 'Answer basics.',
     judgeConfigId: null,
     createdBy: 501,
     publishedAt: null,
-    createdAt: '2026-05-30T12:00:00',
-    updatedAt: '2026-05-30T12:00:00',
+    createdAt: '2026-08-18T12:00:00',
+    updatedAt: '2026-08-18T12:00:00',
     questions: [],
     testCases: [],
     ...overrides
   };
 }
 
-async function flushPromises() {
-  await Promise.resolve();
-  await Promise.resolve();
+function statistics(overrides: Partial<HomeworkStatistics> = {}): HomeworkStatistics {
+  return {
+    homeworkId: 2,
+    courseId: 101,
+    totalStudentCount: 20,
+    submittedCount: 18,
+    unsubmittedCount: 2,
+    evaluatedCount: 16,
+    reviewedCount: 12,
+    averageScore: 84,
+    maxScore: 100,
+    minScore: 48,
+    unsubmittedPage: 1,
+    unsubmittedSize: 20,
+    unsubmittedTotal: 2,
+    unsubmittedStudentIds: [501, 502],
+    ...overrides
+  };
+}
+
+function mockStatistics(byHomework: Record<number, HomeworkStatistics>) {
+  vi.mocked(homeworkApi.getHomeworkStatistics).mockImplementation(async (homeworkId) => {
+    const value = byHomework[homeworkId];
+    if (!value) throw new Error('统计不存在');
+    return value;
+  });
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject };
 }

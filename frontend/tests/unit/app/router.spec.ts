@@ -107,6 +107,98 @@ describe('application router access contract', () => {
     expect(router.currentRoute.value.name).toBe('forbidden');
   });
 
+  it('blocks a student from refreshed HWK teacher deep links', async () => {
+    const router = createAppRouter({
+      history: createMemoryHistory(),
+      services: {
+        loadCurrentUser: vi.fn().mockResolvedValue(user('STUDENT')),
+        loadCourse: vi.fn().mockResolvedValue(course({ manageable: false }))
+      }
+    });
+
+    await router.push('/courses/42/homeworks/9/manage/submissions/55');
+
+    expect(router.currentRoute.value.name).toBe('forbidden');
+  });
+
+  it.each([
+    {
+      path: '/courses/42/homeworks/manage',
+      routeName: 'homework-manage',
+      uiIds: ['UI-HWK-01', 'UI-HWK-03'],
+      props: { courseId: 42 }
+    },
+    {
+      path: '/courses/42/homeworks/new',
+      routeName: 'homework-create',
+      uiIds: ['UI-HWK-02'],
+      props: { courseId: 42 }
+    },
+    {
+      path: '/courses/42/homeworks/9/manage',
+      routeName: 'homework-manage-detail',
+      uiIds: ['UI-HWK-03'],
+      props: { courseId: 42, homeworkId: 9 }
+    },
+    {
+      path: '/courses/42/homeworks/9/edit',
+      routeName: 'homework-edit',
+      uiIds: ['UI-HWK-02'],
+      props: { courseId: 42, homeworkId: 9 }
+    },
+    {
+      path: '/courses/42/homeworks/9/manage/submissions',
+      routeName: 'homework-submission-workspace',
+      uiIds: ['UI-HWK-06', 'UI-HWK-08'],
+      props: { courseId: 42, homeworkId: 9 }
+    },
+    {
+      path: '/courses/42/homeworks/9/manage/submissions/55',
+      routeName: 'homework-submission-review',
+      uiIds: ['UI-HWK-08'],
+      props: { courseId: 42, homeworkId: 9, submissionId: 55 }
+    },
+    {
+      path: '/courses/42/homeworks/9/manage/statistics',
+      routeName: 'homework-statistics',
+      uiIds: ['UI-HWK-09'],
+      props: { courseId: 42, homeworkId: 9 }
+    }
+  ])('exposes the $routeName HWK teacher route contract', async ({ path, routeName, uiIds, props }) => {
+    const router = createAppRouter({
+      history: createMemoryHistory(),
+      services: {
+        loadCurrentUser: vi.fn().mockResolvedValue(user('TEACHER')),
+        loadCourse: vi.fn().mockResolvedValue(course({ manageable: true }))
+      }
+    });
+
+    await router.push(path);
+
+    expect(router.currentRoute.value.name).toBe(routeName);
+    expect(router.currentRoute.value.meta.uiIds).toEqual(uiIds);
+    expect(resolveDefaultProps(router.currentRoute.value)).toEqual(props);
+  });
+
+  it('restores the HWK statistics follow-up page from a refreshed deep link', async () => {
+    const router = createAppRouter({
+      history: createMemoryHistory(),
+      services: {
+        loadCurrentUser: vi.fn().mockResolvedValue(user('TEACHER')),
+        loadCourse: vi.fn().mockResolvedValue(course({ manageable: true }))
+      }
+    });
+
+    await router.push('/courses/42/homeworks/9/manage/statistics?page=3');
+
+    expect(router.currentRoute.value.name).toBe('homework-statistics');
+    expect(resolveDefaultProps(router.currentRoute.value)).toEqual({
+      courseId: 42,
+      homeworkId: 9,
+      initialPage: 3
+    });
+  });
+
   it('routes a non-member course visit to 403', async () => {
     const router = createAppRouter({
       history: createMemoryHistory(),
@@ -293,7 +385,22 @@ describe('application router access contract', () => {
 
     await router.push('/courses/42/homeworks/9/result');
 
-    expect(router.currentRoute.value.name).toBe('homework-submission-manage');
+    expect(router.currentRoute.value.name).toBe('homework-submission-workspace');
+    expect(router.currentRoute.value.fullPath).toBe('/courses/42/homeworks/9/manage/submissions');
+  });
+
+  it('redirects a course manager from the legacy student submission-history route to the review workspace', async () => {
+    const router = createAppRouter({
+      history: createMemoryHistory(),
+      services: {
+        loadCurrentUser: vi.fn().mockResolvedValue(user('TEACHER')),
+        loadCourse: vi.fn().mockResolvedValue(course({ manageable: true }))
+      }
+    });
+
+    await router.push('/courses/42/homeworks/9/submissions');
+
+    expect(router.currentRoute.value.name).toBe('homework-submission-workspace');
     expect(router.currentRoute.value.fullPath).toBe('/courses/42/homeworks/9/manage/submissions');
   });
 
