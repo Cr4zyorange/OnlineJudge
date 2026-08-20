@@ -375,7 +375,20 @@ const routes: RouteRecordRaw[] = [
               shell: 'course',
               requiresAuth: true,
               courseAccess: 'manage',
-              uiIds: ['UI-HWK-01', 'UI-HWK-02']
+              uiIds: ['UI-HWK-01', 'UI-HWK-03']
+            }
+          },
+          {
+            path: 'homeworks/new',
+            name: 'homework-create',
+            component: () => import('../views/hwk/HomeworkEditorView.vue'),
+            props: numericProps('courseId'),
+            meta: {
+              title: '创建作业',
+              shell: 'course',
+              requiresAuth: true,
+              courseAccess: 'manage',
+              uiIds: ['UI-HWK-02']
             }
           },
           {
@@ -409,6 +422,14 @@ const routes: RouteRecordRaw[] = [
             name: 'homework-submission-history',
             component: () => import('../views/hwk/HomeworkSubmissionHistoryView.vue'),
             props: (route) => ({ ...numberParams(route, 'courseId', 'homeworkId'), role: 'student' }),
+            beforeEnter: (to) =>
+              currentCourse.value?.manageable
+                ? {
+                    name: 'homework-submission-workspace',
+                    params: { courseId: to.params.courseId, homeworkId: to.params.homeworkId },
+                    replace: true
+                  }
+                : true,
             meta: {
               title: '作业提交历史',
               shell: 'course',
@@ -425,7 +446,7 @@ const routes: RouteRecordRaw[] = [
             beforeEnter: (to) =>
               currentCourse.value?.manageable
                 ? {
-                    name: 'homework-submission-manage',
+                    name: 'homework-submission-workspace',
                     params: { courseId: to.params.courseId, homeworkId: to.params.homeworkId },
                     replace: true
                   }
@@ -453,15 +474,73 @@ const routes: RouteRecordRaw[] = [
           },
           {
             path: 'homeworks/:homeworkId/manage/submissions',
-            name: 'homework-submission-manage',
-            component: () => import('../views/hwk/HomeworkSubmissionHistoryView.vue'),
-            props: (route) => ({ ...numberParams(route, 'courseId', 'homeworkId'), role: 'teacher' }),
+            name: 'homework-submission-workspace',
+            component: () => import('../views/hwk/HomeworkSubmissionWorkspaceView.vue'),
+            props: numericProps('courseId', 'homeworkId'),
             meta: {
-              title: '作业批阅',
+              title: '作业提交队列',
               shell: 'course',
               requiresAuth: true,
               courseAccess: 'manage',
-              uiIds: ['UI-HWK-06', 'UI-HWK-07']
+              uiIds: ['UI-HWK-06', 'UI-HWK-08']
+            }
+          },
+          {
+            path: 'homeworks/:homeworkId/manage/submissions/:submissionId',
+            name: 'homework-submission-review',
+            component: () => import('../views/hwk/HomeworkSubmissionReviewView.vue'),
+            props: numericProps('courseId', 'homeworkId', 'submissionId'),
+            meta: {
+              title: '作业提交批阅',
+              shell: 'course',
+              requiresAuth: true,
+              courseAccess: 'manage',
+              uiIds: ['UI-HWK-08']
+            }
+          },
+          {
+            path: 'homeworks/:homeworkId/manage',
+            name: 'homework-manage-detail',
+            component: () => import('../views/hwk/HomeworkManageView.vue'),
+            props: numericProps('courseId', 'homeworkId'),
+            meta: {
+              title: '作业管理详情',
+              shell: 'course',
+              requiresAuth: true,
+              courseAccess: 'manage',
+              uiIds: ['UI-HWK-03']
+            }
+          },
+          {
+            path: 'homeworks/:homeworkId/edit',
+            name: 'homework-edit',
+            component: () => import('../views/hwk/HomeworkEditorView.vue'),
+            props: numericProps('courseId', 'homeworkId'),
+            meta: {
+              title: '编辑作业',
+              shell: 'course',
+              requiresAuth: true,
+              courseAccess: 'manage',
+              uiIds: ['UI-HWK-02']
+            }
+          },
+          {
+            path: 'homeworks/:homeworkId/manage/statistics',
+            name: 'homework-statistics',
+            component: () => import('../views/hwk/HomeworkStatisticsView.vue'),
+            props: (route) => {
+              const initialPage = positiveInteger(route.query.page);
+              return {
+                ...numberParams(route, 'courseId', 'homeworkId'),
+                ...(initialPage === null ? {} : { initialPage })
+              };
+            },
+            meta: {
+              title: '作业统计',
+              shell: 'course',
+              requiresAuth: true,
+              courseAccess: 'manage',
+              uiIds: ['UI-HWK-09']
             }
           },
           {
