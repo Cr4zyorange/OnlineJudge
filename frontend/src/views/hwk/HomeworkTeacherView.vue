@@ -1,845 +1,739 @@
 <template>
-  <main class="homeworks">
-    <section class="homeworks__panel" aria-label="作业创建与编辑">
-      <form class="homeworks__form" @submit.prevent="submit">
-        <label>
-          <span>作业标题</span>
-          <input v-model="form.title" name="title" type="text" />
-        </label>
-        <label>
-          <span>作业类型</span>
-          <select v-model="form.type" name="type">
-            <option value="OBJECTIVE">客观题作业</option>
-            <option value="FILE">附件作业</option>
-            <option value="CODE">代码作业</option>
-          </select>
-        </label>
-        <label class="homeworks__wide">
-          <span>作业说明</span>
-          <textarea v-model="form.description" name="description" rows="4" />
-        </label>
-        <label>
-          <span>截止时间</span>
-          <input v-model="form.deadline" name="deadline" type="datetime-local" />
-        </label>
-        <label>
-          <span>满分</span>
-          <input v-model="form.totalScore" name="totalScore" type="number" min="1" />
-        </label>
-        <label class="homeworks__checkbox homeworks__checkbox--field">
-          <input v-model="form.allowResubmit" name="allowResubmit" type="checkbox" />
-          <span>允许多次提交</span>
-        </label>
-        <label class="homeworks__checkbox homeworks__checkbox--field">
-          <input v-model="form.allowLateSubmit" name="allowLateSubmit" type="checkbox" />
-          <span>允许逾期提交</span>
-        </label>
-        <label class="homeworks__checkbox homeworks__checkbox--field">
-          <input v-model="form.showEvaluationBeforePublish" name="showEvaluationBeforePublish" type="checkbox" />
-          <span>成绩发布前显示评测</span>
-        </label>
+  <main class="homework-teacher-index" data-testid="homework-teacher-index">
+    <PageHeader
+      title="作业管理"
+      eyebrow="教师作业工作台"
+      :subtitle="`${courseName} · 先定位已有作业，再进入编辑、提交队列或统计。`"
+    >
+      <template #actions>
+        <RouterLink
+          class="button button--primary"
+          data-testid="create-homework"
+          :to="{ name: 'homework-create', params: { courseId } }"
+        >
+          新建作业
+        </RouterLink>
+      </template>
+    </PageHeader>
 
-        <section v-if="form.type === 'OBJECTIVE'" class="homeworks__wide homeworks__config" aria-label="客观题配置">
-          <header class="homeworks__section-header">
-            <h2>客观题配置</h2>
-            <button type="button" @click="addQuestion">新增题目</button>
-          </header>
-          <div v-for="(question, index) in form.questions" :key="`question-${index}`" class="homeworks__config-card">
-            <label class="homeworks__field--type">
-              <span>题型</span>
-              <select v-model="question.questionType" :name="`question-type-${index}`">
-                <option value="SINGLE_CHOICE">单选题</option>
-                <option value="MULTIPLE_CHOICE">多选题</option>
-                <option value="JUDGE">判断题</option>
-              </select>
-            </label>
-            <label class="homeworks__wide">
-              <span>题干</span>
-              <textarea v-model="question.stem" :name="`question-stem-${index}`" rows="2" />
-            </label>
-            <label class="homeworks__field--options">
-              <span>选项配置</span>
-              <input v-model="question.optionsJson" :name="`question-options-${index}`" type="text" placeholder='["选项 A","选项 B"]' />
-            </label>
-            <label class="homeworks__field--answer">
-              <span>正确答案</span>
-              <input v-model="question.answerJson" :name="`question-answer-${index}`" type="text" placeholder='["选项 A"]' />
-            </label>
-            <label class="homeworks__field--score">
-              <span>分值</span>
-              <input v-model="question.score" :name="`question-score-${index}`" type="number" min="1" />
-            </label>
-            <button class="homeworks__config-remove" type="button" @click="removeQuestion(index)">删除题目</button>
-          </div>
-        </section>
+    <SummaryStrip :items="summaryItems" aria-label="作业管理摘要" />
 
-        <section v-if="form.type === 'CODE'" class="homeworks__wide homeworks__config" aria-label="代码题配置">
-          <header class="homeworks__section-header">
-            <h2>测试用例配置</h2>
-            <button type="button" @click="addTestCase">新增用例</button>
-          </header>
-          <label>
-            <span>语言限制</span>
-            <input v-model="form.languageLimitJson" name="languageLimitJson" type="text" />
-          </label>
-          <label>
-            <span>时间限制(ms)</span>
-            <input v-model="form.timeLimitMs" name="timeLimitMs" type="number" min="1" />
-          </label>
-          <label>
-            <span>内存限制(KB)</span>
-            <input v-model="form.memoryLimitKb" name="memoryLimitKb" type="number" min="1" />
-          </label>
-          <label>
-            <span>输出比较</span>
-            <select v-model="form.outputCompareMode" name="outputCompareMode">
-              <option value="EXACT">严格匹配</option>
-              <option value="TRIM">忽略首尾空白</option>
-            </select>
-          </label>
-          <div v-for="(testCase, index) in form.testCases" :key="`test-case-${index}`" class="homeworks__config-card">
-            <label class="homeworks__field--half">
-              <span>输入</span>
-              <textarea v-model="testCase.inputData" :name="`testcase-input-${index}`" rows="2" />
-            </label>
-            <label class="homeworks__field--half">
-              <span>期望输出</span>
-              <textarea v-model="testCase.expectedOutput" :name="`testcase-output-${index}`" rows="2" />
-            </label>
-            <label>
-              <span>权重</span>
-              <input v-model="testCase.scoreWeight" :name="`testcase-weight-${index}`" type="number" min="0" />
-            </label>
-            <label>
-              <span>时间限制(ms)</span>
-              <input v-model="testCase.timeLimitMs" :name="`testcase-time-${index}`" type="number" min="1" />
-            </label>
-            <label>
-              <span>内存限制(KB)</span>
-              <input v-model="testCase.memoryLimitKb" :name="`testcase-memory-${index}`" type="number" min="1" />
-            </label>
-            <label class="homeworks__checkbox">
-              <input v-model="testCase.hidden" :name="`testcase-hidden-${index}`" type="checkbox" />
-              <span>隐藏用例</span>
-            </label>
-            <button class="homeworks__config-remove" type="button" @click="removeTestCase(index)">删除用例</button>
-          </div>
-        </section>
+    <FilterBar
+      v-model="filterDraft"
+      :fields="filterFields"
+      aria-label="筛选作业"
+      submit-label="应用筛选"
+      @submit="applyFilters"
+      @reset="resetFilters"
+    />
+    <p
+      v-if="attentionIsApplied"
+      class="notice notice--warning"
+      data-testid="attention-scope-note"
+      role="status"
+    >
+      待发布草稿条件只细化当前页；可继续翻页查看。总数与页码仍以关键词和生命周期的服务端筛选为准。
+    </p>
 
-        <div class="homeworks__actions">
-          <button type="submit" :disabled="saving">{{ editingId ? '保存修改' : '保存草稿' }}</button>
-          <button type="button" :disabled="saving" @click="resetForm">清空</button>
+    <p v-if="partialWarning" class="notice notice--warning" data-testid="statistics-warning" role="status">
+      {{ partialWarning }}
+    </p>
+    <p
+      v-if="operationFeedback"
+      class="notice notice--success"
+      data-testid="operation-feedback"
+      role="status"
+    >
+      {{ operationFeedback }}
+    </p>
+    <p v-if="operationError" class="notice notice--danger" data-testid="operation-error" role="alert">
+      {{ operationError }}
+    </p>
+
+    <PageState
+      v-if="loading"
+      state="loading"
+      title="正在加载作业"
+      message="同步生命周期、提交数与已完成批阅摘要。"
+    />
+    <PageState
+      v-else-if="loadError"
+      state="error"
+      title="作业管理加载失败"
+      :message="loadError"
+      retry-label="重新加载"
+      @retry="loadHomeworks"
+    />
+    <DataTable
+      v-else
+      :columns="columns"
+      :rows="filteredRows"
+      caption="当前课程作业管理列表"
+      row-key="id"
+      :row-label="rowLabel"
+      empty-title="当前筛选下没有作业"
+      :empty-message="homeworks.length === 0 ? '创建第一份作业后会显示在这里。' : '调整关键词、状态或本页草稿条件后再试。'"
+    >
+      <template #cell-title="{ row }">
+        <div class="homework-title-cell">
+          <RouterLink
+            class="homework-title-link"
+            :to="{ name: 'homework-manage-detail', params: { courseId, homeworkId: rowId(row) } }"
+          >
+            {{ row.title }}
+          </RouterLink>
+          <small>{{ row.typeLabel }} · 满分 {{ row.totalScore }}</small>
         </div>
-      </form>
-      <p v-if="feedback" class="homeworks__feedback">{{ feedback }}</p>
-      <p v-if="errorMessage" class="homeworks__error">{{ errorMessage }}</p>
-    </section>
+      </template>
 
-    <section class="homeworks__list" aria-label="作业发布管理">
-      <div class="homeworks__toolbar">
-        <label>
-          <span>状态筛选</span>
-          <select v-model="selectedStatus" @change="loadHomeworks">
-            <option value="">全部</option>
-            <option value="DRAFT">草稿</option>
-            <option value="PUBLISHED">已发布</option>
-            <option value="CLOSED">已关闭</option>
-            <option value="SCORE_PUBLISHED">成绩已发布</option>
-          </select>
-        </label>
-        <label>
-          <span>关键词</span>
-          <input v-model="keyword" type="search" @change="loadHomeworks" />
-        </label>
-      </div>
+      <template #cell-status="{ row }">
+        <StatusBadge :label="String(row.statusLabel)" :tone="rowTone(row)" />
+      </template>
 
-      <p v-if="loading">加载中</p>
-      <p v-else-if="homeworks.length === 0">暂无作业</p>
-      <table v-else>
-        <thead>
-          <tr>
-            <th>标题</th>
-            <th>类型</th>
-            <th>状态</th>
-            <th>截止时间</th>
-            <th>满分</th>
-            <th>操作</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="homework in homeworks" :key="homework.id">
-            <td>{{ homework.title }}</td>
-            <td>{{ formatHomeworkType(homework.type) }}</td>
-            <td>{{ formatHomeworkStatus(homework.status) }}</td>
-            <td>{{ formatDeadline(homework.deadline) }}</td>
-            <td>{{ homework.totalScore }}</td>
-            <td class="homeworks__row-actions">
-              <button
-                v-if="homework.status === 'DRAFT'"
-                :data-testid="`edit-homework-${homework.id}`"
-                type="button"
-                @click="edit(homework.id)"
-              >编辑</button>
-              <button v-if="homework.status === 'DRAFT'" type="button" @click="publish(homework.id)">发布</button>
-              <button v-if="homework.status === 'PUBLISHED'" type="button" @click="close(homework.id)">关闭</button>
-              <button
-                v-if="homework.status === 'PUBLISHED' || homework.status === 'CLOSED'"
-                :data-testid="`publish-homework-scores-${homework.id}`"
-                type="button"
-                @click="publishScores(homework.id)"
-              >发布成绩</button>
-              <button
-                v-if="homework.status !== 'DRAFT'"
-                :data-testid="`homework-statistics-${homework.id}`"
-                type="button"
-                @click="loadStatistics(homework)"
-              >统计</button>
-              <a
-                v-if="homework.status !== 'DRAFT'"
-                :data-testid="`review-homework-submissions-${homework.id}`"
-                :href="`/courses/${props.courseId}/homeworks/${homework.id}/manage/submissions`"
-              >查看提交</a>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-
-      <section v-if="selectedStatistics" class="homeworks__statistics" data-testid="homework-statistics-panel">
-        <header class="homeworks__section-header">
-          <h2>{{ selectedStatisticsTitle }}</h2>
-          <span>{{ statisticsLoading ? '加载中' : '统计' }}</span>
-        </header>
-        <dl>
-          <div>
-            <dt>总人数</dt>
-            <dd>{{ selectedStatistics.totalStudentCount }}</dd>
-          </div>
-          <div>
-            <dt>已提交</dt>
-            <dd>{{ selectedStatistics.submittedCount }}</dd>
-          </div>
-          <div>
-            <dt>未提交</dt>
-            <dd>{{ selectedStatistics.unsubmittedCount }}</dd>
-          </div>
-          <div>
-            <dt>已评测</dt>
-            <dd>{{ selectedStatistics.evaluatedCount }}</dd>
-          </div>
-          <div>
-            <dt>已批阅</dt>
-            <dd>{{ selectedStatistics.reviewedCount }}</dd>
-          </div>
-          <div>
-            <dt>平均分</dt>
-            <dd>{{ formatNullableScore(selectedStatistics.averageScore) }}</dd>
-          </div>
-          <div>
-            <dt>最高分</dt>
-            <dd>{{ formatNullableScore(selectedStatistics.maxScore) }}</dd>
-          </div>
-          <div>
-            <dt>最低分</dt>
-            <dd>{{ formatNullableScore(selectedStatistics.minScore) }}</dd>
-          </div>
-        </dl>
-        <p>未提交：{{ selectedStatistics.unsubmittedStudentIds.length ? selectedStatistics.unsubmittedStudentIds.join(', ') : '-' }}</p>
-        <div class="homeworks__statistics-pages">
-          <button
-            type="button"
-            data-testid="statistics-previous-page"
-            :disabled="statisticsLoading || selectedStatistics.unsubmittedPage <= 1"
-            @click="loadStatisticsPage(selectedStatistics.unsubmittedPage - 1)"
-          >上一页</button>
-          <span>{{ selectedStatistics.unsubmittedPage }} / {{ Math.max(1, Math.ceil(selectedStatistics.unsubmittedTotal / selectedStatistics.unsubmittedSize)) }}</span>
-          <button
-            type="button"
-            data-testid="statistics-next-page"
-            :disabled="statisticsLoading || selectedStatistics.unsubmittedPage * selectedStatistics.unsubmittedSize >= selectedStatistics.unsubmittedTotal"
-            @click="loadStatisticsPage(selectedStatistics.unsubmittedPage + 1)"
-          >下一页</button>
+      <template #cell-deadline="{ row }">
+        <div class="homework-deadline">
+          <span>{{ row.deadlineLabel }}</span>
+          <small>{{ row.deadlineHint }}</small>
         </div>
-      </section>
-    </section>
+      </template>
+
+      <template #cell-submissions="{ row }">
+        <div class="homework-submission-counts">
+          <strong>{{ row.submissionCountLabel }}</strong>
+          <small>{{ row.reviewedLabel }}</small>
+        </div>
+      </template>
+
+      <template #cell-actions="{ row }">
+        <div class="homework-row-actions">
+          <RouterLink
+            :data-testid="`manage-homework-${rowId(row)}`"
+            :to="{ name: 'homework-manage-detail', params: { courseId, homeworkId: rowId(row) } }"
+          >
+            进入
+          </RouterLink>
+          <RouterLink
+            v-if="isEditable(rowStatus(row))"
+            :data-testid="`edit-homework-${rowId(row)}`"
+            :to="{ name: 'homework-edit', params: { courseId, homeworkId: rowId(row) } }"
+          >
+            编辑
+          </RouterLink>
+          <RouterLink
+            v-if="isReleased(rowStatus(row))"
+            :data-testid="`submissions-homework-${rowId(row)}`"
+            :to="{ name: 'homework-submission-workspace', params: { courseId, homeworkId: rowId(row) } }"
+          >
+            提交队列
+          </RouterLink>
+          <RouterLink
+            v-if="isReleased(rowStatus(row))"
+            :data-testid="`statistics-homework-${rowId(row)}`"
+            :to="{ name: 'homework-statistics', params: { courseId, homeworkId: rowId(row) } }"
+          >
+            统计
+          </RouterLink>
+          <button
+            v-if="isEditable(rowStatus(row)) && rowType(row) !== 'FILE'"
+            :data-testid="`publish-homework-${rowId(row)}`"
+            type="button"
+            :disabled="pendingAction !== null"
+            @click="runLifecycleRow(row, 'publish')"
+          >
+            {{ pendingLabel(rowId(row), 'publish', '发布') }}
+          </button>
+          <span
+            v-if="isEditable(rowStatus(row)) && rowType(row) === 'FILE'"
+            class="contract-blocker"
+            :data-testid="`file-contract-blocked-${rowId(row)}`"
+          >
+            #214 附件提交契约待补齐，暂不可发布
+          </span>
+          <button
+            v-if="rowStatus(row) === 'PUBLISHED'"
+            :data-testid="`close-homework-${rowId(row)}`"
+            type="button"
+            :disabled="pendingAction !== null"
+            @click="runLifecycleRow(row, 'close')"
+          >
+            {{ pendingLabel(rowId(row), 'close', '关闭') }}
+          </button>
+          <button
+            v-if="rowStatus(row) === 'PUBLISHED' || rowStatus(row) === 'CLOSED'"
+            :data-testid="`release-homework-${rowId(row)}`"
+            type="button"
+            :disabled="pendingAction !== null"
+            @click="runLifecycleRow(row, 'release')"
+          >
+            {{ pendingLabel(rowId(row), 'release', '发布成绩') }}
+          </button>
+        </div>
+      </template>
+    </DataTable>
+
+    <nav v-if="!loading && !loadError && total > 0" class="homework-pager" aria-label="作业分页">
+      <button
+        class="button button--secondary"
+        data-action="previous-homework-page"
+        type="button"
+        :disabled="currentPage <= 1 || loading"
+        @click="goToPage(currentPage - 1)"
+      >上一页</button>
+      <span>
+        第 {{ currentPage }} / {{ totalPages }} 页 · 服务端筛选共 {{ total }} 份
+        <template v-if="attentionIsApplied"> · 本页显示 {{ filteredRows.length }} 份</template>
+      </span>
+      <button
+        class="button button--secondary"
+        data-action="next-homework-page"
+        type="button"
+        :disabled="currentPage >= totalPages || loading"
+        @click="goToPage(currentPage + 1)"
+      >下一页</button>
+    </nav>
   </main>
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
+import { RouterLink } from 'vue-router';
 import {
   closeHomework,
-  createHomework,
   getHomeworkDetail,
   getHomeworkStatistics,
   listHomeworks,
   publishHomework,
-  publishHomeworkScores,
-  updateHomework
+  publishHomeworkScores
 } from '../../api/hwk/homeworks';
-import type {
-  HomeworkDetail,
-  HomeworkPayload,
-  HomeworkQuestionPayload,
-  HomeworkStatistics,
-  HomeworkStatus,
-  HomeworkSummary,
-  HomeworkTestCasePayload,
-  HomeworkType
-} from '../../types/hwk';
+import { currentCourse } from '../../app/runtimeContext';
+import DataTable, { type DataTableColumn, type DataTableRow } from '../../components/foundation/DataTable.vue';
+import FilterBar, { type FilterFieldModel } from '../../components/foundation/FilterBar.vue';
+import PageHeader from '../../components/foundation/PageHeader.vue';
+import PageState from '../../components/foundation/PageState.vue';
+import StatusBadge, { type StatusBadgeTone } from '../../components/foundation/StatusBadge.vue';
+import SummaryStrip, { type SummaryStripItem } from '../../components/foundation/SummaryStrip.vue';
+import type { HomeworkStatistics, HomeworkStatus, HomeworkSummary, HomeworkType } from '../../types/hwk';
 import { formatHomeworkStatus, formatHomeworkType } from './hwkDisplay';
 
-const props = defineProps<{
-  courseId: number;
-}>();
+type LifecycleAction = 'publish' | 'close' | 'release';
 
+interface HomeworkRow extends DataTableRow {
+  id: number;
+  title: string;
+  status: HomeworkStatus;
+  statusLabel: string;
+  statusTone: StatusBadgeTone;
+  type: HomeworkType;
+  typeLabel: string;
+  totalScore: number;
+  deadlineLabel: string;
+  deadlineHint: string;
+  submissionCount: number | null;
+  submissionCountLabel: string;
+  reviewedCount: number | null;
+  reviewedLabel: string;
+}
+
+const props = defineProps<{ courseId: number }>();
 const homeworks = ref<HomeworkSummary[]>([]);
+const statisticsByHomework = ref(new Map<number, HomeworkStatistics | null>());
 const loading = ref(false);
-const saving = ref(false);
-const statisticsLoading = ref(false);
-const feedback = ref('');
-const errorMessage = ref('');
-const selectedStatus = ref('');
-const keyword = ref('');
-const editingId = ref<number | null>(null);
-const selectedStatistics = ref<HomeworkStatistics | null>(null);
-const selectedStatisticsTitle = ref('');
-const selectedStatisticsHomework = ref<HomeworkSummary | null>(null);
+const loadError = ref('');
+const partialWarning = ref('');
+const operationFeedback = ref('');
+const operationError = ref('');
+const pendingAction = ref<{ homeworkId: number; action: LifecycleAction } | null>(null);
+const filterDraft = ref<Record<string, string>>({ keyword: '', status: '', attention: '' });
+const appliedFilters = ref<Record<string, string>>({ keyword: '', status: '', attention: '' });
+const currentPage = ref(1);
+const total = ref(0);
+const pageSize = 20;
+let loadGeneration = 0;
 
-const form = reactive({
-  title: '',
-  description: '',
-  type: 'OBJECTIVE' as HomeworkType,
-  deadline: '',
-  totalScore: '100',
-  allowResubmit: true,
-  allowLateSubmit: false,
-  showEvaluationBeforePublish: true,
-  languageLimitJson: '["java"]',
-  timeLimitMs: '1000',
-  memoryLimitKb: '65536',
-  outputCompareMode: 'EXACT',
-  questions: [createEmptyQuestion()],
-  testCases: [createEmptyTestCase()]
+const courseName = computed(() => (
+  currentCourse.value?.id === props.courseId ? currentCourse.value.name : '当前课程'
+));
+
+const filterFields: readonly FilterFieldModel[] = [
+  { key: 'keyword', label: '搜索作业', kind: 'search', placeholder: '输入作业名称' },
+  {
+    key: 'status',
+    label: '生命周期',
+    kind: 'select',
+    options: [
+      { value: '', label: '全部状态' },
+      { value: 'DRAFT', label: '草稿' },
+      { value: 'NOT_OPEN', label: '未开放' },
+      { value: 'PUBLISHED', label: '已发布' },
+      { value: 'CLOSED', label: '已关闭' },
+      { value: 'SCORE_PUBLISHED', label: '成绩已发布' },
+      { value: 'ARCHIVED', label: '已归档' }
+    ]
+  },
+  {
+    key: 'attention',
+    label: '本页待处理',
+    kind: 'select',
+    options: [
+      { value: '', label: '全部作业' },
+      { value: 'draft', label: '本页待发布草稿' }
+    ]
+  }
+];
+
+const columns: readonly DataTableColumn[] = [
+  { key: 'title', label: '作业', width: '25%' },
+  { key: 'status', label: '状态', width: '12%' },
+  { key: 'deadline', label: '截止时间', width: '17%' },
+  { key: 'submissions', label: '提交与批阅', width: '16%' },
+  { key: 'actions', label: '操作', width: '30%' }
+];
+
+const rows = computed<HomeworkRow[]>(() => homeworks.value.map((homework) => {
+  const statistics = statisticsByHomework.value.get(homework.id);
+  const reviewedCount = statistics?.reviewedCount ?? null;
+  const remaining = new Date(homework.deadline).getTime() - Date.now();
+  const unpublished = !isReleased(homework.status);
+  return {
+    id: homework.id,
+    title: homework.title,
+    status: homework.status,
+    statusLabel: formatHomeworkStatus(homework.status),
+    statusTone: homeworkStatusTone(homework.status),
+    type: homework.type,
+    typeLabel: formatHomeworkType(homework.type),
+    totalScore: homework.totalScore,
+    deadlineLabel: formatDateTime(homework.deadline),
+    deadlineHint: remaining > 0
+      ? `距截止 ${Math.max(1, Math.ceil(remaining / 86_400_000))} 天`
+      : '截止时间已过',
+    submissionCount: statistics?.submittedCount ?? null,
+    submissionCountLabel: unpublished
+      ? '尚未发布'
+      : statistics
+        ? `${statistics.submittedCount} / ${statistics.totalStudentCount} 人已提交`
+        : '提交摘要暂不可用',
+    reviewedCount,
+    reviewedLabel: unpublished
+      ? '发布后生成提交摘要'
+      : reviewedCount === null
+        ? '已完成批阅数量未知'
+        : `${reviewedCount} 份已完成批阅`
+  };
+}));
+
+const filteredRows = computed(() => {
+  const keyword = (appliedFilters.value.keyword ?? '').trim().toLowerCase();
+  const status = appliedFilters.value.status ?? '';
+  const attention = appliedFilters.value.attention ?? '';
+  return rows.value.filter((row) => {
+    if (keyword && !row.title.toLowerCase().includes(keyword)) return false;
+    if (status && row.status !== status) return false;
+    if (attention === 'draft' && !isEditable(row.status)) return false;
+    return true;
+  });
 });
 
-onMounted(loadHomeworks);
+const attentionIsApplied = computed(() => Boolean(appliedFilters.value.attention));
+const totalPages = computed(() => Math.max(1, Math.ceil(total.value / pageSize)));
 
-watch(() => form.type, () => {
-  errorMessage.value = '';
-});
+const summaryItems = computed<SummaryStripItem[]>(() => [
+  {
+    key: 'total',
+    label: '服务端匹配',
+    value: total.value,
+    hint: '关键词与生命周期命中的作业总数',
+    tone: 'brand'
+  },
+  {
+    key: 'active',
+    label: '已发布',
+    value: homeworks.value.filter((homework) => homework.status === 'PUBLISHED').length,
+    hint: '当前页学生可提交作业'
+  },
+  {
+    key: 'review',
+    label: '已完成批阅',
+    value: rows.value.reduce((total, row) => total + (row.reviewedCount ?? 0), 0),
+    hint: partialWarning.value ? '部分摘要暂不可用' : '当前页接口原始批阅计数合计',
+    tone: rows.value.some((row) => (row.reviewedCount ?? 0) > 0) ? 'success' : 'neutral'
+  },
+  {
+    key: 'released',
+    label: '成绩已发布',
+    value: homeworks.value.filter((homework) => ['SCORE_PUBLISHED', 'ARCHIVED'].includes(homework.status)).length,
+    hint: '当前页学生可查看成绩',
+    tone: 'success'
+  }
+]);
+
+watch(
+  () => props.courseId,
+  () => void loadHomeworks(),
+  { immediate: true }
+);
 
 async function loadHomeworks() {
+  const generation = ++loadGeneration;
   loading.value = true;
-  errorMessage.value = '';
+  loadError.value = '';
+  partialWarning.value = '';
   try {
-    const page = await listHomeworks({
+    const keyword = (appliedFilters.value.keyword ?? '').trim();
+    const status = (appliedFilters.value.status ?? '') as HomeworkStatus | '';
+    const result = await listHomeworks({
       courseId: props.courseId,
-      status: selectedStatus.value ? (selectedStatus.value as HomeworkStatus) : undefined,
-      keyword: keyword.value
+      page: currentPage.value,
+      size: pageSize,
+      ...(keyword ? { keyword } : {}),
+      ...(status ? { status } : {})
     });
-    homeworks.value = page.list;
-  } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : '作业列表加载失败';
-  } finally {
-    loading.value = false;
-  }
-}
-
-async function submit() {
-  feedback.value = '';
-  errorMessage.value = validateForm();
-  if (errorMessage.value) {
-    return;
-  }
-  saving.value = true;
-  try {
-    if (editingId.value) {
-      await updateHomework(editingId.value, buildPayload());
-    } else {
-      await createHomework(buildPayload());
+    if (generation !== loadGeneration) return;
+    if (result.list.some((homework) => homework.courseId !== props.courseId)) {
+      throw new Error('作业列表与当前课程不匹配，请重新加载。');
     }
-    feedback.value = '保存成功';
-    resetForm();
-    await loadHomeworks();
+    total.value = result.total;
+    const lastPage = Math.max(1, Math.ceil(result.total / pageSize));
+    if (result.total > 0 && result.list.length === 0 && result.page > lastPage) {
+      currentPage.value = lastPage;
+      await loadHomeworks();
+      return;
+    }
+    currentPage.value = result.page;
+    homeworks.value = result.list.filter((homework) => !homework.deleted);
+    const statisticTargets = homeworks.value.filter((homework) => isReleased(homework.status));
+    const statisticResults = await Promise.allSettled(
+      statisticTargets.map((homework) => getHomeworkStatistics(homework.id, { page: 1, size: 20 }))
+    );
+    if (generation !== loadGeneration) return;
+    statisticsByHomework.value = new Map(homeworks.value.map((homework) => [homework.id, null]));
+    statisticTargets.forEach((homework, index) => {
+      const result = statisticResults[index];
+      if (result.status === 'fulfilled'
+        && result.value.homeworkId === homework.id
+        && result.value.courseId === props.courseId) {
+        statisticsByHomework.value.set(homework.id, result.value);
+      }
+    });
+    if (statisticResults.some((result, index) => (
+      result.status === 'rejected'
+      || result.value.homeworkId !== statisticTargets[index].id
+      || result.value.courseId !== props.courseId
+    ))) {
+      partialWarning.value = '部分作业的提交与批阅摘要暂不可用；仍可进入作业详情继续处理。';
+    }
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : '作业保存失败';
+    if (generation !== loadGeneration) return;
+    homeworks.value = [];
+    total.value = 0;
+    statisticsByHomework.value = new Map();
+    loadError.value = localizedError(error, '作业管理加载失败，请稍后重试。');
   } finally {
-    saving.value = false;
+    if (generation === loadGeneration) loading.value = false;
   }
 }
 
-async function edit(homeworkId: number) {
-  feedback.value = '';
-  errorMessage.value = '';
-  saving.value = true;
-  try {
-    const detail = await getHomeworkDetail(homeworkId);
-    fillForm(detail);
-    editingId.value = homeworkId;
-  } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : '作业详情加载失败';
-  } finally {
-    saving.value = false;
-  }
+function applyFilters(filters: Record<string, string>) {
+  appliedFilters.value = { ...filters };
+  currentPage.value = 1;
+  void loadHomeworks();
 }
 
-async function publish(homeworkId: number) {
-  feedback.value = '';
-  errorMessage.value = '';
-  try {
-    await publishHomework(homeworkId);
-    feedback.value = '发布成功';
-    await loadHomeworks();
-  } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : '作业发布失败';
-  }
+function resetFilters() {
+  filterDraft.value = { keyword: '', status: '', attention: '' };
+  appliedFilters.value = { ...filterDraft.value };
+  currentPage.value = 1;
+  void loadHomeworks();
 }
 
-async function close(homeworkId: number) {
-  feedback.value = '';
-  errorMessage.value = '';
-  try {
-    await closeHomework(homeworkId);
-    feedback.value = '关闭成功';
-    await loadHomeworks();
-  } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : '作业关闭失败';
-  }
+function goToPage(nextPage: number) {
+  if (loading.value || nextPage < 1 || nextPage > totalPages.value) return;
+  currentPage.value = nextPage;
+  void loadHomeworks();
 }
 
-async function publishScores(homeworkId: number) {
-  feedback.value = '';
-  errorMessage.value = '';
-  try {
-    await publishHomeworkScores(homeworkId);
-    feedback.value = '成绩发布成功';
-    selectedStatus.value = 'SCORE_PUBLISHED';
-    await loadHomeworks();
-  } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : '成绩发布失败';
-  }
-}
-
-async function loadStatistics(homework: HomeworkSummary) {
-  selectedStatisticsHomework.value = homework;
-  await loadStatisticsPage(1, 20);
-}
-
-async function loadStatisticsPage(page: number, size = selectedStatistics.value?.unsubmittedSize ?? 20) {
-  if (!selectedStatisticsHomework.value) {
+async function runLifecycle(row: HomeworkRow, action: LifecycleAction) {
+  if (pendingAction.value) return;
+  if (action === 'publish' && row.type === 'FILE') {
+    operationFeedback.value = '';
+    operationError.value = '#214 附件上传与安全提交链路完成前不可发布 FILE 作业。';
     return;
   }
-  feedback.value = '';
-  errorMessage.value = '';
-  statisticsLoading.value = true;
-  selectedStatisticsTitle.value = selectedStatisticsHomework.value.title;
+  const copy = lifecycleCopy(action, row.title);
+  operationFeedback.value = '';
+  operationError.value = '';
+  if (action === 'publish' && row.type === 'CODE') {
+    pendingAction.value = { homeworkId: row.id, action };
+    try {
+      const detail = await getHomeworkDetail(row.id);
+      if (detail.id !== row.id || detail.courseId !== props.courseId || detail.type !== 'CODE') {
+        throw new Error('作业配置与当前课程不匹配，请重新加载后再发布。');
+      }
+      if (!usesOnlySupportedCodeLanguages(detail.languageLimitJson)) {
+        operationError.value = '当前评测沙箱仅支持 Python；请先进入编辑器移除 Java、C++ 或 JavaScript 等未支持语言。';
+        pendingAction.value = null;
+        return;
+      }
+    } catch (error) {
+      operationError.value = localizedError(error, '发布前无法读取代码语言配置，请稍后重试。');
+      pendingAction.value = null;
+      return;
+    }
+  }
+  if (!window.confirm(copy.confirm)) {
+    pendingAction.value = null;
+    return;
+  }
+  pendingAction.value ??= { homeworkId: row.id, action };
   try {
-    selectedStatistics.value = await getHomeworkStatistics(selectedStatisticsHomework.value.id, { page, size });
+    if (action === 'publish') await publishHomework(row.id);
+    if (action === 'close') await closeHomework(row.id);
+    if (action === 'release') await publishHomeworkScores(row.id);
+    operationFeedback.value = copy.success;
+    await loadHomeworks();
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : '作业统计加载失败';
+    operationError.value = localizedError(error, copy.failure);
   } finally {
-    statisticsLoading.value = false;
+    pendingAction.value = null;
   }
 }
 
-function validateForm() {
-  const errors: string[] = [];
-  const deadline = new Date(form.deadline);
-  const totalScore = Number(form.totalScore);
-  if (!form.title.trim()) {
-    errors.push('作业标题不能为空');
+function usesOnlySupportedCodeLanguages(value: string | null | undefined) {
+  if (!value?.trim()) return false;
+  try {
+    const languages: unknown = JSON.parse(value);
+    return Array.isArray(languages)
+      && languages.length > 0
+      && languages.every((language) => typeof language === 'string' && language.toLowerCase() === 'python');
+  } catch {
+    return false;
   }
-  if (!form.description.trim()) {
-    errors.push('作业说明不能为空');
-  }
-  if (!form.deadline || Number.isNaN(deadline.getTime()) || deadline.getTime() <= Date.now()) {
-    errors.push('截止时间必须晚于当前时间');
-  }
-  if (!Number.isFinite(totalScore) || totalScore <= 0) {
-    errors.push('满分必须大于 0');
-  }
-  if (form.type === 'OBJECTIVE' && collectQuestions().length === 0) {
-    errors.push('客观题至少配置一个题目');
-  }
-  if (form.type === 'CODE' && collectTestCases().length === 0) {
-    errors.push('代码题至少配置一个测试用例');
-  }
-  return errors.join('；');
 }
 
-function buildPayload(): HomeworkPayload {
+function lifecycleCopy(action: LifecycleAction, title: string) {
   return {
-    courseId: props.courseId,
-    chapterId: null,
-    title: form.title.trim(),
-    description: form.description.trim(),
-    type: form.type,
-    deadline: `${form.deadline}:00`,
-    totalScore: Number(form.totalScore),
-    allowResubmit: form.allowResubmit,
-    allowLateSubmit: form.allowLateSubmit,
-    showEvaluationBeforePublish: form.showEvaluationBeforePublish,
-    questions: form.type === 'OBJECTIVE' ? collectQuestions() : [],
-    testCases: form.type === 'CODE' ? collectTestCases() : [],
-    languageLimitJson: form.type === 'CODE' ? form.languageLimitJson.trim() || null : null,
-    timeLimitMs: form.type === 'CODE' ? Number(form.timeLimitMs) : 1000,
-    memoryLimitKb: form.type === 'CODE' ? Number(form.memoryLimitKb) : 65536,
-    outputCompareMode: form.type === 'CODE' ? form.outputCompareMode : 'EXACT'
+    publish: {
+      confirm: `确认发布“${title}”？发布后课程学生将看到作业并可按规则提交。`,
+      success: `“${title}”发布成功。`,
+      failure: '作业发布失败，请核对题目、用例与截止时间后重试。'
+    },
+    close: {
+      confirm: `确认关闭“${title}”？关闭后将停止常规提交。`,
+      success: `“${title}”已关闭。`,
+      failure: '作业关闭失败，请刷新状态后重试。'
+    },
+    release: {
+      confirm: `确认发布“${title}”的成绩？学生将看到最终分与公开反馈。`,
+      success: `“${title}”成绩发布成功。`,
+      failure: '成绩发布失败，请确认批阅状态后重试。'
+    }
+  }[action];
+}
+
+function pendingLabel(homeworkId: number, action: LifecycleAction, label: string) {
+  return pendingAction.value?.homeworkId === homeworkId && pendingAction.value.action === action
+    ? '处理中…'
+    : label;
+}
+
+function rowId(row: DataTableRow) {
+  return Number(row.id);
+}
+
+function rowStatus(row: DataTableRow) {
+  return row.status as HomeworkStatus;
+}
+
+function rowType(row: DataTableRow) {
+  return row.type as HomeworkType;
+}
+
+function rowTone(row: DataTableRow) {
+  return row.statusTone as StatusBadgeTone;
+}
+
+function runLifecycleRow(row: DataTableRow, action: LifecycleAction) {
+  return runLifecycle(row as HomeworkRow, action);
+}
+
+function rowLabel(row: DataTableRow) {
+  return `作业：${String(row.title)}`;
+}
+
+function isEditable(status: HomeworkStatus) {
+  return status === 'DRAFT';
+}
+
+function isReleased(status: HomeworkStatus) {
+  return status === 'PUBLISHED'
+    || status === 'CLOSED'
+    || status === 'SCORE_PUBLISHED'
+    || status === 'ARCHIVED';
+}
+
+function homeworkStatusTone(status: HomeworkStatus): StatusBadgeTone {
+  const tones: Record<HomeworkStatus, StatusBadgeTone> = {
+    DRAFT: 'neutral',
+    NOT_OPEN: 'neutral',
+    PUBLISHED: 'brand',
+    CLOSED: 'warning',
+    SCORE_PUBLISHED: 'success',
+    ARCHIVED: 'neutral'
   };
+  return tones[status];
 }
 
-function collectQuestions(): HomeworkQuestionPayload[] {
-  return form.questions
-    .map((question, index) => ({
-      questionType: question.questionType,
-      stem: question.stem.trim(),
-      optionsJson: question.optionsJson.trim() || null,
-      answerJson: question.answerJson.trim(),
-      score: Number(question.score),
-      sortOrder: index + 1
-    }))
-    .filter((question) => Boolean(question.stem || question.answerJson || question.optionsJson));
-}
-
-function collectTestCases(): HomeworkTestCasePayload[] {
-  return form.testCases
-    .map((testCase, index) => ({
-      inputData: testCase.inputData,
-      expectedOutput: testCase.expectedOutput,
-      scoreWeight: Number(testCase.scoreWeight),
-      hidden: testCase.hidden,
-      timeLimitMs: Number(testCase.timeLimitMs),
-      memoryLimitKb: Number(testCase.memoryLimitKb),
-      sortOrder: index + 1
-    }))
-    .filter((testCase) => Boolean(testCase.inputData || testCase.expectedOutput));
-}
-
-function addQuestion() {
-  form.questions.push(createEmptyQuestion());
-}
-
-function removeQuestion(index: number) {
-  if (form.questions.length === 1) {
-    form.questions[0] = createEmptyQuestion();
-    return;
-  }
-  form.questions.splice(index, 1);
-}
-
-function addTestCase() {
-  form.testCases.push(createEmptyTestCase());
-}
-
-function removeTestCase(index: number) {
-  if (form.testCases.length === 1) {
-    form.testCases[0] = createEmptyTestCase();
-    return;
-  }
-  form.testCases.splice(index, 1);
-}
-
-function resetForm() {
-  editingId.value = null;
-  form.title = '';
-  form.description = '';
-  form.type = 'OBJECTIVE';
-  form.deadline = '';
-  form.totalScore = '100';
-  form.allowResubmit = true;
-  form.allowLateSubmit = false;
-  form.showEvaluationBeforePublish = true;
-  form.languageLimitJson = '["java"]';
-  form.timeLimitMs = '1000';
-  form.memoryLimitKb = '65536';
-  form.outputCompareMode = 'EXACT';
-  form.questions = [createEmptyQuestion()];
-  form.testCases = [createEmptyTestCase()];
-}
-
-function fillForm(homework: HomeworkDetail) {
-  form.title = homework.title;
-  form.description = homework.description;
-  form.type = homework.type;
-  form.deadline = homework.deadline.slice(0, 16);
-  form.totalScore = String(homework.totalScore);
-  form.allowResubmit = homework.allowResubmit;
-  form.allowLateSubmit = homework.allowLateSubmit;
-  form.showEvaluationBeforePublish = homework.showEvaluationBeforePublish;
-  form.languageLimitJson = homework.languageLimitJson ?? '["java"]';
-  form.timeLimitMs = String(homework.timeLimitMs ?? 1000);
-  form.memoryLimitKb = String(homework.memoryLimitKb ?? 65536);
-  form.outputCompareMode = homework.outputCompareMode ?? 'EXACT';
-  form.questions = homework.questions.length > 0
-    ? homework.questions.map((question) => ({
-      questionType: question.questionType,
-      stem: question.stem,
-      optionsJson: question.optionsJson ?? '',
-      answerJson: question.answerJson ?? '',
-      score: String(question.score)
-    }))
-    : [createEmptyQuestion()];
-  form.testCases = homework.testCases.length > 0
-    ? homework.testCases.map((testCase) => ({
-      inputData: testCase.inputData,
-      expectedOutput: testCase.expectedOutput ?? '',
-      scoreWeight: String(testCase.scoreWeight),
-      hidden: testCase.hidden,
-      timeLimitMs: String(testCase.timeLimitMs),
-      memoryLimitKb: String(testCase.memoryLimitKb)
-    }))
-    : [createEmptyTestCase()];
-}
-
-function createEmptyQuestion() {
-  return {
-    questionType: 'SINGLE_CHOICE',
-    stem: '',
-    optionsJson: '',
-    answerJson: '',
-    score: '100'
-  };
-}
-
-function createEmptyTestCase() {
-  return {
-    inputData: '',
-    expectedOutput: '',
-    scoreWeight: '100',
-    hidden: false,
-    timeLimitMs: '1000',
-    memoryLimitKb: '65536'
-  };
-}
-
-function formatDeadline(value: string) {
+function formatDateTime(value: string) {
   return value.replace('T', ' ').slice(0, 16);
 }
 
-function formatNullableScore(value: number | null) {
-  return value === null || value === undefined ? '-' : String(value);
+function localizedError(error: unknown, fallback: string) {
+  const message = error instanceof Error ? error.message.trim() : '';
+  return /[\u3400-\u9fff]/u.test(message) ? message : fallback;
 }
 </script>
 
 <style scoped>
-.homeworks {
-  background: #f6f8fb;
-  color: #1f2937;
+.homework-teacher-index {
   display: grid;
-  gap: 20px;
-  min-height: 100vh;
-  padding: 24px;
-}
-
-.homeworks__panel,
-.homeworks__list {
-  background: #ffffff;
-  border: 1px solid #d7dde8;
-  border-radius: 8px;
-  padding: 18px;
-}
-
-.homeworks__form {
-  display: grid;
-  align-items: start;
-  gap: 16px;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-}
-
-.homeworks__wide {
-  grid-column: 1 / -1;
-}
-
-.homeworks__config {
-  border-top: 1px solid #d7dde8;
-  display: grid;
-  gap: 14px;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  margin-top: 6px;
-  padding: 18px 14px 14px;
-}
-
-.homeworks__section-header,
-.homeworks__actions,
-.homeworks__toolbar,
-.homeworks__row-actions,
-.homeworks__checkbox {
-  align-items: center;
-  display: flex;
-  gap: 8px;
-}
-
-.homeworks__checkbox input[type="checkbox"] {
-  accent-color: #16423c;
-  appearance: auto;
-  background: transparent !important;
-  border: 0 !important;
-  border-radius: 0 !important;
-  box-shadow: none !important;
-  flex: 0 0 18px;
-  height: 18px;
-  margin: 0;
-  min-height: 18px;
-  min-width: 18px;
-  padding: 0;
-  -webkit-appearance: checkbox;
-  width: 18px;
-}
-
-.homeworks__checkbox--field {
-  align-self: end;
-  min-height: 36px;
-}
-
-.homeworks__section-header {
-  grid-column: 1 / -1;
-  justify-content: space-between;
-}
-
-.homeworks__section-header h2 {
-  font-size: 20px;
-  line-height: 1.35;
-  margin: 0;
-}
-
-.homeworks__config-card {
-  border: 1px solid #d7dde8;
-  border-radius: 8px;
-  display: grid;
-  gap: 12px;
-  grid-column: 1 / -1;
-  grid-template-columns: repeat(12, minmax(0, 1fr));
-  margin-top: 12px;
-  padding: 12px;
-}
-
-.homeworks__config-card .homeworks__wide {
-  grid-column: 1 / -1;
-}
-
-.homeworks__field--type,
-.homeworks__field--score {
-  grid-column: span 2;
-}
-
-.homeworks__field--options,
-.homeworks__field--answer,
-.homeworks__field--half {
-  grid-column: span 5;
-}
-
-.homeworks__config-remove {
-  align-self: end;
-  grid-column: span 2;
-  justify-self: start;
-  min-width: 112px;
-}
-
-label {
-  display: grid;
-  gap: 8px;
-  min-width: 0;
-}
-
-label > span {
-  color: #344e49;
-  font-weight: 700;
-  line-height: 1.35;
-}
-
-input,
-select,
-textarea {
-  background: #ffffff;
-  border: 1px solid #b8c2d2;
-  color: #111827;
-  min-height: 36px;
-  padding: 6px 8px;
+  gap: 18px;
   width: 100%;
+  min-width: 0;
+  padding-bottom: 36px;
+  color: var(--oj-ink);
 }
 
-button {
-  background: #ffffff;
-  border: 1px solid #aeb8c8;
-  color: #111827;
-  min-height: 36px;
-  padding: 6px 12px;
-  white-space: nowrap;
-}
-
-button:disabled {
-  color: #697386;
-}
-
-.homeworks__row-actions a {
-  border: 1px solid #aeb8c8;
-  color: #175cd3;
-  min-height: 36px;
-  padding: 7px 12px;
+.button,
+.homework-row-actions a,
+.homework-row-actions button {
+  min-height: 38px;
+  padding: 8px 12px;
+  border: 1px solid var(--oj-line-strong);
+  border-radius: var(--oj-radius);
+  background: var(--oj-surface-solid);
+  color: var(--oj-brand);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 800;
+  line-height: 1.3;
   text-decoration: none;
 }
 
-.homeworks__feedback {
-  color: #116329;
-  margin-top: 14px;
+.button--primary {
+  border-color: var(--oj-brand);
+  background: var(--oj-brand);
+  color: #fff;
 }
 
-.homeworks__error {
-  color: #b42318;
-  margin-top: 14px;
-}
-
-table {
-  border-collapse: collapse;
-  width: 100%;
-}
-
-.homeworks__statistics {
-  border-top: 1px solid #d7dde8;
-  margin-top: 16px;
-  padding-top: 16px;
-}
-
-.homeworks__statistics dl {
+.homework-title-cell,
+.homework-deadline,
+.homework-submission-counts {
   display: grid;
-  gap: 10px;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-  margin: 12px 0;
+  gap: 4px;
 }
 
-.homeworks__statistics dt {
-  color: #5f6b7a;
-  font-size: 13px;
+.homework-title-link {
+  color: var(--oj-ink);
+  font-weight: 800;
+  text-decoration: none;
 }
 
-.homeworks__statistics dd {
-  font-size: 18px;
-  font-weight: 700;
-  margin: 4px 0 0;
+.homework-title-cell small,
+.homework-deadline small,
+.homework-submission-counts small {
+  color: var(--oj-muted);
+  font-size: 0.75rem;
 }
 
-.homeworks__statistics-pages {
-  align-items: center;
+.homework-row-actions {
   display: flex;
-  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 
-th,
-td {
-  border-bottom: 1px solid #d7dde8;
-  padding: 10px;
-  text-align: left;
+.homework-row-actions button:disabled {
+  cursor: wait;
+  opacity: 0.58;
 }
 
-@media (max-width: 900px) {
-  .homeworks__config-card,
-  .homeworks__field--type,
-  .homeworks__field--score,
-  .homeworks__field--options,
-  .homeworks__field--answer,
-  .homeworks__field--half,
-  .homeworks__config-remove {
-    grid-column: 1 / -1;
+.contract-blocker {
+  max-width: 190px;
+  color: #7c4a03;
+  font-size: 0.74rem;
+  font-weight: 800;
+  line-height: 1.45;
+}
+
+.homework-pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: var(--oj-muted);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.notice {
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--oj-line);
+  border-radius: var(--oj-radius);
+  background: var(--oj-surface);
+  font-size: 0.88rem;
+  font-weight: 700;
+  line-height: 1.6;
+}
+
+.notice--success {
+  border-color: rgba(22, 101, 52, 0.24);
+  color: #166534;
+}
+
+.notice--warning {
+  border-color: rgba(146, 64, 14, 0.24);
+  color: #7c4a03;
+}
+
+.notice--danger {
+  border-color: rgba(180, 35, 24, 0.24);
+  color: #8f2d24;
+}
+
+.homework-teacher-index :deep(a:focus-visible),
+.homework-teacher-index button:focus-visible {
+  outline: 3px solid var(--oj-brand);
+  outline-offset: 2px;
+}
+
+@media (max-width: 640px) {
+  .homework-teacher-index {
+    gap: 14px;
+  }
+
+  .homework-row-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .homework-row-actions a,
+  .homework-row-actions button {
+    width: 100%;
+    text-align: center;
+  }
+
+  .contract-blocker {
+    max-width: none;
+    padding: 8px 2px;
+    text-align: left;
+  }
+
+  .homework-pager {
+    align-items: stretch;
+    flex-direction: column;
+    text-align: center;
   }
 }
 </style>
