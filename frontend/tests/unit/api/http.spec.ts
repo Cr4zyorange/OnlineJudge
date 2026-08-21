@@ -1,10 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { currentCourse, currentUser, resetRuntimeContext } from '../../../src/app/runtimeContext';
 import { readAuthStorage, removeAuthStorage, writeAuthStorage } from '../../../src/api/auth/storage';
 import { configureAuthContext, request, requestBlob } from '../../../src/api/http';
 
 describe('shared API request client', () => {
   afterEach(() => {
     configureAuthContext(null);
+    resetRuntimeContext();
     vi.restoreAllMocks();
     removeAuthStorage('onlinejudge.authToken');
     removeAuthStorage('onlinejudge.userId');
@@ -165,12 +167,14 @@ describe('shared API request client', () => {
     })).rejects.toThrow('Invalid CORS request');
   });
 
-  it('routes unauthorized responses to the expired session page and clears local auth state', async () => {
+  it('clears persisted and cached session state for authenticated API 401/session-expired responses', async () => {
     writeAuthStorage('onlinejudge.authToken', 'expired-token');
     writeAuthStorage('onlinejudge.userId', '601');
     writeAuthStorage('onlinejudge.userRole', 'STUDENT');
+    seedRuntimeContext();
     vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
       ok: false,
+      status: 401,
       json: async () => ({
         code: 'ERR-AUTH-04',
         message: '登录已失效，请重新登录',
@@ -181,15 +185,19 @@ describe('shared API request client', () => {
     await expect(request('/api/v1/users/me')).rejects.toThrow('登录已失效，请重新登录');
 
     expect(readAuthStorage('onlinejudge.authToken')).toBeNull();
+    expect(currentUser.value).toBeNull();
+    expect(currentCourse.value).toBeNull();
     expect(window.location.pathname).toBe('/session-expired');
   });
 
-  it('routes disabled or locked account responses to the account status page and clears local auth state', async () => {
+  it('clears persisted and cached session state for disabled or locked account responses', async () => {
     writeAuthStorage('onlinejudge.authToken', 'locked-token');
     writeAuthStorage('onlinejudge.userId', '602');
     writeAuthStorage('onlinejudge.userRole', 'STUDENT');
+    seedRuntimeContext();
     vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
       ok: false,
+      status: 401,
       json: async () => ({
         code: 'ERR-AUTH-03',
         message: '账号已被禁用、冻结或锁定',
@@ -200,6 +208,8 @@ describe('shared API request client', () => {
     await expect(request('/api/v1/users/me')).rejects.toThrow('账号已被禁用、冻结或锁定');
 
     expect(readAuthStorage('onlinejudge.authToken')).toBeNull();
+    expect(currentUser.value).toBeNull();
+    expect(currentCourse.value).toBeNull();
     expect(window.location.pathname).toBe('/account-disabled');
   });
 
@@ -238,4 +248,28 @@ function jsonResponse<T>(data: T) {
       data
     })
   } as Response;
+}
+
+function seedRuntimeContext() {
+  currentUser.value = {
+    id: 601,
+    username: 'student601',
+    userType: 'STUDENT',
+    displayName: '学生 601',
+    roles: ['STUDENT'],
+    permissions: []
+  };
+  currentCourse.value = {
+    id: 9501,
+    name: '软件工程基础',
+    teacherId: 501,
+    teacherName: '教师 501',
+    enrollmentMode: 'PUBLIC',
+    status: 'ACTIVE',
+    memberCount: 1,
+    member: true,
+    manageable: false,
+    createdAt: '2026-08-21T00:00:00Z',
+    updatedAt: '2026-08-21T00:00:00Z'
+  };
 }

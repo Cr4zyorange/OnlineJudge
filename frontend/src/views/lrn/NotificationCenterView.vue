@@ -1,10 +1,5 @@
 <template>
   <main class="notification-center">
-    <nav class="notification-center__topbar" aria-label="页面导航">
-      <a class="notification-center__home" data-testid="lrn-home-entry" href="/" aria-label="返回主页面">
-        &lt;-
-      </a>
-    </nav>
     <section class="notification-center__shell">
       <aside class="notification-center__sidebar" aria-label="通知概览">
         <h1>消息通知中心</h1>
@@ -84,12 +79,21 @@
           <span v-if="feedbackMessage">{{ feedbackMessage }}</span>
         </section>
 
-        <p v-if="loading" class="notification-center__state">加载中...</p>
-        <section v-else-if="errorMessage" class="notification-center__state notification-center__state--error">
-          <p>{{ errorMessage }}</p>
-          <button type="button" data-testid="retry-notifications" @click="loadNotifications">重试</button>
-        </section>
-        <p v-else-if="notifications.length === 0" class="notification-center__state">暂无符合条件的通知</p>
+        <PageState v-if="loading" state="loading" title="正在加载通知" />
+        <PageState
+          v-else-if="errorMessage"
+          state="error"
+          title="通知加载失败"
+          :message="errorMessage"
+          retry-label="重试"
+          @retry="loadNotifications"
+        />
+        <PageState
+          v-else-if="notifications.length === 0"
+          state="empty"
+          title="暂无符合条件的通知"
+          message="可以调整筛选条件，或稍后刷新查看新通知。"
+        />
 
         <div v-else class="notification-center__list">
           <article
@@ -118,7 +122,7 @@
             <dl class="notification-card__meta">
               <div>
                 <dt>来源</dt>
-                <dd>{{ notification.sourceModule }}{{ notification.sourceId ? ` #${notification.sourceId}` : '' }}</dd>
+                <dd>{{ sourceLabel(notification.sourceModule) }}</dd>
               </div>
               <div>
                 <dt>创建时间</dt>
@@ -126,7 +130,23 @@
               </div>
             </dl>
             <div class="notification-card__commands">
-              <a class="notification-card__link" :href="notification.actionUrl ?? '#'">查看详情</a>
+              <a
+                v-if="safeActionUrl(notification.actionUrl)"
+                class="notification-card__link"
+                :href="safeActionUrl(notification.actionUrl) ?? undefined"
+              >
+                查看详情
+              </a>
+              <div v-else class="notification-card__recovery">
+                <span class="notification-card__unavailable">入口已失效</span>
+                <a
+                  class="notification-card__fallback"
+                  :data-testid="`notification-fallback-${notification.notificationId}`"
+                  :href="fallbackActionUrl(notification)"
+                >
+                  前往相关页面
+                </a>
+              </div>
               <button
                 type="button"
                 class="notification-card__delete"
@@ -161,7 +181,9 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { deleteNotification, listNotifications, markNotificationsRead } from '../../api/lrn/notifications';
+import PageState from '../../components/foundation/PageState.vue';
 import type { NotificationItem, NotificationPage, NotificationType } from '../../types/lrn';
+import { sanitizeInternalActionUrl } from './internalActionUrl';
 
 const loading = ref(false);
 const errorMessage = ref('');
@@ -286,36 +308,38 @@ function typeLabel(type: NotificationItem['type']) {
   };
   return labels[type];
 }
+
+function sourceLabel(sourceModule: string) {
+  const labels: Record<string, string> = {
+    AUTH: '账号与权限',
+    CRS: '课程内容',
+    LAB: '实验任务',
+    HWK: '作业任务',
+    GRD: '成绩中心',
+    LRN: '学习中心',
+    SYSTEM: '系统通知'
+  };
+  return labels[sourceModule] ?? '平台通知';
+}
+
+function safeActionUrl(actionUrl: string | null) {
+  return sanitizeInternalActionUrl(actionUrl);
+}
+
+function fallbackActionUrl(notification: NotificationItem) {
+  const courseSource = ['CRS', 'LAB', 'HWK', 'GRD'].includes(notification.sourceModule);
+  if (courseSource && notification.courseId && notification.courseId > 0) {
+    return notification.sourceModule === 'GRD'
+      ? `/courses/${notification.courseId}/grades`
+      : `/courses/${notification.courseId}`;
+  }
+  return '/learning/tasks';
+}
 </script>
 
 <style scoped>
 .notification-center {
-  background-attachment: fixed;
-  background-image: url("../../assets/back1.jpg");
-  background-position: top center;
-  background-repeat: no-repeat;
-  background-size: cover;
-  min-height: 100vh;
   padding: 24px;
-}
-
-.notification-center__topbar {
-  display: flex;
-  margin: 0 auto 18px;
-  max-width: 1280px;
-}
-
-.notification-center__home {
-  align-items: center;
-  background: #16423c;
-  border: 1px solid #16423c;
-  border-radius: 8px;
-  color: #ffffff;
-  display: inline-flex;
-  font-weight: 800;
-  min-height: 40px;
-  padding: 0 14px;
-  text-decoration: none;
 }
 
 .notification-center__shell {
@@ -561,6 +585,31 @@ button:disabled {
   align-items: center;
   display: inline-flex;
   justify-content: center;
+}
+
+.notification-card__unavailable {
+  align-items: center;
+  background: rgba(65, 80, 76, 0.12);
+  border: 1px solid rgba(65, 80, 76, 0.2);
+  border-radius: 8px;
+  color: #41504c;
+  display: inline-flex;
+  font-weight: 700;
+  justify-content: center;
+  min-height: 40px;
+  padding: 0 12px;
+}
+
+.notification-card__recovery {
+  display: grid;
+  gap: 6px;
+}
+
+.notification-card__fallback {
+  color: #16423c;
+  font-size: 12px;
+  font-weight: 800;
+  text-align: center;
 }
 
 .notification-card__commands {

@@ -1,10 +1,5 @@
 <template>
   <main class="statistics-page">
-    <nav class="statistics-page__topbar" aria-label="页面导航">
-      <a class="statistics-page__home" data-testid="lrn-home-entry" href="/learning/tasks" aria-label="返回学习任务中心">
-        &lt;-
-      </a>
-    </nav>
     <section class="statistics-page__shell">
       <aside class="statistics-page__summary" aria-label="学习行为概览">
         <h1>学习行为仪表盘</h1>
@@ -35,12 +30,23 @@
           </button>
         </header>
 
-        <p v-if="loading" class="statistics-page__state">加载中...</p>
-        <section v-else-if="errorMessage" class="statistics-page__state statistics-page__state--error">
-          <p>{{ errorMessage }}</p>
-          <button type="button" data-testid="retry-statistics" @click="loadStatistics">重试</button>
-        </section>
-        <p v-else-if="!overview" class="statistics-page__state">暂无学习行为数据</p>
+        <PageState v-if="loading" state="loading" title="正在加载学习统计" />
+        <PageState
+          v-else-if="errorMessage"
+          state="error"
+          title="学习统计加载失败"
+          :message="errorMessage"
+        >
+          <template #actions>
+            <button type="button" data-testid="retry-statistics" @click="loadStatistics">重试</button>
+          </template>
+        </PageState>
+        <PageState
+          v-else-if="!overview"
+          state="empty"
+          title="暂无学习行为数据"
+          message="完成资源学习或任务提交后，这里会生成趋势和行为记录。"
+        />
 
         <template v-else>
           <p v-if="overview.fromCache" class="statistics-page__cache">当前展示本地缓存数据</p>
@@ -95,6 +101,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { getLearningStatistics } from '../../api/lrn/learningRecords';
+import PageState from '../../components/foundation/PageState.vue';
 import type { LearningProgressSourceModule, LearningRecordActionType, LearningStatisticsOverview } from '../../types/lrn';
 
 const loading = ref(false);
@@ -164,32 +171,7 @@ function actionLabel(actionType: LearningRecordActionType) {
 
 <style scoped>
 .statistics-page {
-  min-height: 100vh;
-  background-image: url("../../assets/back1.jpg");
-  background-size: cover;
-  background-position: top center;
-  background-repeat: no-repeat;
-  background-attachment: fixed;
   padding: 24px;
-}
-
-.statistics-page__topbar {
-  display: flex;
-  margin: 0 auto 18px;
-  max-width: 1280px;
-}
-
-.statistics-page__home {
-  align-items: center;
-  background: #16423c;
-  border: 1px solid #16423c;
-  border-radius: 8px;
-  color: #ffffff;
-  display: inline-flex;
-  font-weight: 800;
-  min-height: 40px;
-  padding: 0 14px;
-  text-decoration: none;
 }
 
 .statistics-page__shell {

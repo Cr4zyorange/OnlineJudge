@@ -9,16 +9,31 @@
       <div class="student-grade__score" data-testid="final-score">
         <span>课程总评</span>
         <strong>{{ gradeRow?.summary?.finalScore ?? '-' }}</strong>
-        <small>{{ gradeRow?.summary?.finalStatus ?? '未发布' }}</small>
+        <small>{{ gradeRow?.summary ? finalStatusLabel(gradeRow.summary.finalStatus) : '未发布' }}</small>
       </div>
     </section>
 
     <section class="student-grade__content" aria-label="成绩构成">
-      <p v-if="loading" class="student-grade__state">加载中</p>
-      <p v-else-if="errorMessage" class="student-grade__state student-grade__state--error">
-        {{ errorMessage }}
-      </p>
-      <p v-else-if="records.length === 0" class="student-grade__state">暂无已发布成绩</p>
+      <PageState
+        v-if="loading"
+        state="loading"
+        title="正在加载成绩"
+        message="正在获取已发布的课程成绩。"
+      />
+      <PageState
+        v-else-if="errorMessage"
+        state="error"
+        title="成绩加载失败"
+        :message="errorMessage"
+        retry-label="重试"
+        @retry="loadMyGrades"
+      />
+      <PageState
+        v-else-if="records.length === 0"
+        state="empty"
+        title="暂无已发布成绩"
+        message="教师发布成绩后，成绩构成会显示在这里。"
+      />
       <table v-else>
         <thead>
           <tr>
@@ -31,9 +46,9 @@
           </tr>
         </thead>
         <tbody>
-          <tr v-for="record in records" :key="record.id">
-            <td>成绩项 {{ record.gradeItemId }}</td>
-            <td>{{ sourceLabel(record) }}</td>
+          <tr v-for="(record, index) in records" :key="record.id">
+            <td>第 {{ index + 1 }} 项</td>
+            <td>{{ gradeSourceLabel(record.sourceType) }}</td>
             <td>{{ record.rawScore ?? '-' }}</td>
             <td>{{ record.weightedScore ?? '-' }}</td>
             <td>{{ gradeStatusLabel(record.gradeStatus) }}</td>
@@ -57,11 +72,11 @@
           成绩项
           <select v-model.number="reviewGradeItemId" data-testid="review-grade-item-id">
             <option
-              v-for="record in records"
+              v-for="(record, index) in records"
               :key="record.gradeItemId"
               :value="record.gradeItemId"
             >
-              成绩项 {{ record.gradeItemId }}
+              第 {{ index + 1 }} 项 · {{ gradeSourceLabel(record.sourceType) }}
             </option>
           </select>
         </label>
@@ -83,12 +98,30 @@
 
     <section class="student-grade__content" aria-label="我的成绩异议">
       <h2>复核记录</h2>
-      <p v-if="reviewsLoading" class="student-grade__state">加载中</p>
-      <p v-else-if="reviewRequests.length === 0" class="student-grade__state">暂无复核记录</p>
+      <PageState
+        v-if="reviewsLoading"
+        state="loading"
+        title="正在加载复核记录"
+        message="正在获取异议申请的处理进度。"
+      />
+      <PageState
+        v-else-if="reviewListError"
+        state="error"
+        title="复核记录加载失败"
+        :message="reviewListError"
+        retry-label="重试"
+        @retry="loadReviewRequests"
+      />
+      <PageState
+        v-else-if="reviewRequests.length === 0"
+        state="empty"
+        title="暂无复核记录"
+        message="提交成绩异议后，处理进度会显示在这里。"
+      />
       <ul v-else class="student-grade__reviews">
         <li v-for="request in reviewRequests" :key="request.requestId">
-          <strong>{{ request.status }}</strong>
-          <span>{{ request.targetType === 'FINAL_SCORE' ? '课程总评' : `成绩项 ${request.gradeItemId}` }}</span>
+          <strong>{{ reviewStatusLabel(request.status) }}</strong>
+          <span>{{ reviewTargetLabel(request) }}</span>
           <span>{{ request.reason }}</span>
           <span v-if="request.responseComment">{{ request.responseComment }}</span>
         </li>
@@ -99,6 +132,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
+import PageState from '../../components/foundation/PageState.vue';
 import {
   getMyPublishedGrades,
   listMyGradeReviewRequests,
@@ -106,11 +140,15 @@ import {
 } from '../../api/grd/gradeRecords';
 import type {
   CourseGradeRow,
-  GradeRecord,
   GradeReviewRequest,
-  GradeReviewTargetType,
-  GradeStatus
+  GradeReviewTargetType
 } from '../../types/grd';
+import {
+  finalStatusLabel,
+  gradeSourceLabel,
+  gradeStatusLabel,
+  reviewStatusLabel
+} from './grdDisplay';
 
 const props = defineProps<{
   courseId: number;
@@ -121,6 +159,7 @@ const loading = ref(false);
 const errorMessage = ref('');
 const reviewRequests = ref<GradeReviewRequest[]>([]);
 const reviewsLoading = ref(false);
+const reviewListError = ref('');
 const reviewTargetType = ref<GradeReviewTargetType>('FINAL_SCORE');
 const reviewGradeItemId = ref<number | null>(null);
 const reviewReason = ref('');
@@ -150,7 +189,7 @@ async function loadMyGrades() {
 
 async function loadReviewRequests() {
   reviewsLoading.value = true;
-  reviewError.value = '';
+  reviewListError.value = '';
   try {
     const result = await listMyGradeReviewRequests(props.courseId, {
       page: 1,
@@ -159,7 +198,7 @@ async function loadReviewRequests() {
     reviewRequests.value = result.records;
   } catch (error) {
     reviewRequests.value = [];
-    reviewError.value = error instanceof Error ? error.message : '复核记录加载失败';
+    reviewListError.value = error instanceof Error ? error.message : '复核记录加载失败';
   } finally {
     reviewsLoading.value = false;
   }
@@ -192,19 +231,15 @@ function selectedReviewGradeItemId() {
   return records.value[0]?.gradeItemId;
 }
 
-function sourceLabel(record: GradeRecord) {
-  return record.sourceId ? `${record.sourceType} #${record.sourceId}` : record.sourceType;
-}
-
-function gradeStatusLabel(status: GradeStatus) {
-  const labels: Record<GradeStatus, string> = {
-    SCORED: '已评分',
-    UNSUBMITTED: '未提交',
-    UNGRADED: '待评分',
-    MISSING: '缺失',
-    ADJUSTED: '已调整'
-  };
-  return labels[status];
+function reviewTargetLabel(request: GradeReviewRequest) {
+  if (request.targetType === 'FINAL_SCORE') {
+    return '课程总评';
+  }
+  const index = records.value.findIndex((record) => record.gradeItemId === request.gradeItemId);
+  if (index < 0) {
+    return '单项成绩';
+  }
+  return `第 ${index + 1} 项 · ${gradeSourceLabel(records.value[index].sourceType)}`;
 }
 
 function formatDateTime(value: string | null) {

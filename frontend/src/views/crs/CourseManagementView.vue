@@ -48,7 +48,7 @@
       <main class="main-content">
         <div class="page-header">
           <div>
-            <h2>{{ pageTitle }}</h2>
+            <h1>{{ pageTitle }}</h1>
             <p>{{ pageSubtitle }}</p>
           </div>
           <div v-if="!chapterCourse && !resourceCourse && !announcementCourse" class="header-actions">
@@ -426,9 +426,21 @@
     </div>
 
     <main v-if="isConcreteCoursePage && !selectedCourse && !hasManagementWorkspace" class="course-detail-page">
-      <section class="course-home course-home__summary" aria-label="课程详情加载中">
-        <p>课程加载中...</p>
-      </section>
+      <h1 class="visually-hidden">课程详情</h1>
+      <PageState
+        v-if="loadError"
+        state="error"
+        title="课程详情加载失败"
+        :message="loadError"
+        retry-label="重试"
+        @retry="loadConcreteCourse"
+      />
+      <PageState
+        v-else
+        state="loading"
+        title="课程加载中"
+        message="正在获取课程详情，请稍候。"
+      />
     </main>
 
     <div
@@ -453,7 +465,7 @@
           <div>
             <p class="modal-label">课程详情</p>
             <p class="modal-eyebrow">{{ selectedCourse.category || '未分类' }}</p>
-            <h3>{{ selectedCourse.name }}</h3>
+            <component :is="isConcreteCoursePage ? 'h1' : 'h3'">{{ selectedCourse.name }}</component>
           </div>
           <button v-if="!isConcreteCoursePage" class="modal-close" type="button" title="关闭详情" @click="closeCourseDetail">
             <i class="bi bi-x-lg"></i>
@@ -589,7 +601,7 @@
             <article v-for="member in pendingMembers" :key="member.userId" class="resource-row">
               <div>
                 <strong>学生 {{ member.userId }}</strong>
-                <p>{{ enrollmentModeText(member.joinMethod === 'CREATED' ? 'PUBLIC' : member.joinMethod) }} · {{ member.status }}</p>
+                <p>{{ enrollmentModeText(member.joinMethod === 'CREATED' ? 'PUBLIC' : member.joinMethod) }} · {{ memberStatusText(member.status) }}</p>
               </div>
               <button class="card-btn" type="button" :disabled="approvingUserId === member.userId" @click="approvePendingMember(member)">
                 <i class="bi bi-check2-circle"></i> 通过
@@ -666,6 +678,7 @@ import { computed, defineComponent, h, inject, onMounted, onUnmounted, reactive,
 import type { Component, VNode } from 'vue';
 import { routerKey } from 'vue-router';
 import CourseContextNavigation from '../../components/CourseContextNavigation.vue';
+import PageState from '../../components/foundation/PageState.vue';
 import {
   archiveCourse,
   createChapter,
@@ -2044,19 +2057,26 @@ function flattenChapters(items: Chapter[], depth = 0): Array<{ chapter: Chapter;
   ]);
 }
 
+async function loadConcreteCourse() {
+  const courseId = Number(window.location.pathname.match(/\/courses\/(\d+)(?:\/|$)/)?.[1]);
+  if (!Number.isFinite(courseId) || courseId <= 0) {
+    return;
+  }
+  loadError.value = '';
+  try {
+    await openCourseDetail(await getCourse(courseId));
+  } catch (error) {
+    selectedCourse.value = null;
+    loadError.value = error instanceof Error ? error.message : '课程详情加载失败';
+  }
+}
+
 onMounted(async () => {
   syncCourseLocation();
   window.addEventListener('popstate', syncCourseLocation);
   window.addEventListener('onlinejudge:navigation', syncCourseLocation);
-  await Promise.all([loadCourses(), loadStats()]);
-  const courseId = Number(window.location.pathname.match(/\/courses\/(\d+)(?:\/|$)/)?.[1]);
-  if (Number.isFinite(courseId) && courseId > 0) {
-    try {
-      await openCourseDetail(await getCourse(courseId));
-    } catch (error) {
-      loadError.value = error instanceof Error ? error.message : '课程详情加载失败';
-    }
-  }
+  await Promise.allSettled([loadCourses(), loadStats()]);
+  await loadConcreteCourse();
 });
 
 onUnmounted(() => {
@@ -2084,6 +2104,18 @@ function syncCourseLocation() {
   width: min(1120px, calc(100vw - 40px));
   margin: 0 auto;
   padding: 24px 0 48px;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .course-home {

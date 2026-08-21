@@ -30,28 +30,28 @@ const routes: RouteRecordRaw[] = [
     name: 'login',
     component: () => import('../views/auth/AuthView.vue'),
     props: { initialMode: 'login' },
-    meta: { title: '登录', shell: 'public' }
+    meta: { title: '登录', shell: 'public', uiIds: ['UI-AUTH-01'] }
   },
   {
     path: '/register',
     name: 'register',
     component: () => import('../views/auth/AuthView.vue'),
     props: { initialMode: 'register' },
-    meta: { title: '注册', shell: 'public' }
+    meta: { title: '注册', shell: 'public', uiIds: ['UI-AUTH-02'] }
   },
   {
     path: '/403',
     name: 'forbidden',
     component: () => import('../views/auth/AuthStatusView.vue'),
     props: { kind: 'forbidden' },
-    meta: { title: '无权限访问', shell: 'public' }
+    meta: { title: '无权限访问', shell: 'public', uiIds: ['UI-AUTH-10'] }
   },
   {
     path: '/session-expired',
     name: 'session-expired',
     component: () => import('../views/auth/AuthStatusView.vue'),
     props: { kind: 'expired' },
-    meta: { title: '登录已失效', shell: 'public' }
+    meta: { title: '登录已失效', shell: 'public', uiIds: ['UI-AUTH-11'] }
   },
   {
     path: '/account-disabled',
@@ -93,19 +93,24 @@ const routes: RouteRecordRaw[] = [
         path: 'courses',
         name: 'courses',
         component: () => import('../views/crs/CourseManagementView.vue'),
-        meta: { title: '课程中心', shell: 'platform', requiresAuth: true, uiIds: ['UI-CRS-01'] }
+        meta: {
+          title: '课程中心',
+          shell: 'platform',
+          requiresAuth: true,
+          uiIds: ['UI-CRS-01', 'UI-CRS-03', 'UI-CRS-04', 'UI-CRS-06', 'UI-CRS-07']
+        }
       },
       {
         path: 'profile',
         name: 'profile',
         component: () => import('../views/auth/AuthProfileView.vue'),
-        meta: { title: '个人中心', shell: 'platform', requiresAuth: true }
+        meta: { title: '个人中心', shell: 'platform', requiresAuth: true, uiIds: ['UI-AUTH-03'] }
       },
       {
         path: 'profile/password',
         name: 'profile-password',
         component: () => import('../views/auth/AuthProfileView.vue'),
-        meta: { title: '修改密码', shell: 'platform', requiresAuth: true }
+        meta: { title: '修改密码', shell: 'platform', requiresAuth: true, uiIds: ['UI-AUTH-04'] }
       },
       {
         path: 'admin/auth',
@@ -115,7 +120,8 @@ const routes: RouteRecordRaw[] = [
           title: '认证与权限管理',
           shell: 'platform',
           requiresAuth: true,
-          platformRoles: ['ADMIN']
+          platformRoles: ['ADMIN'],
+          uiIds: ['UI-AUTH-05', 'UI-AUTH-06', 'UI-AUTH-07', 'UI-AUTH-08', 'UI-AUTH-09']
         }
       },
       {
@@ -133,25 +139,25 @@ const routes: RouteRecordRaw[] = [
         path: 'learning/progress',
         name: 'learning-progress',
         component: () => import('../views/lrn/LearningProgressView.vue'),
-        meta: { title: '学习进度', shell: 'platform', requiresAuth: true }
+        meta: { title: '学习进度', shell: 'platform', requiresAuth: true, uiIds: ['UI-LRN-02'] }
       },
       {
         path: 'learning/statistics',
         name: 'learning-statistics',
         component: () => import('../views/lrn/LearningStatisticsView.vue'),
-        meta: { title: '学习统计', shell: 'platform', requiresAuth: true }
+        meta: { title: '学习统计', shell: 'platform', requiresAuth: true, uiIds: ['UI-LRN-03'] }
       },
       {
         path: 'learning/reminders',
         name: 'learning-reminders',
         component: () => import('../views/lrn/ReminderRuleSettingsView.vue'),
-        meta: { title: '提醒设置', shell: 'platform', requiresAuth: true }
+        meta: { title: '提醒设置', shell: 'platform', requiresAuth: true, uiIds: ['UI-LRN-05'] }
       },
       {
         path: 'notifications',
         name: 'notifications',
         component: () => import('../views/lrn/NotificationCenterView.vue'),
-        meta: { title: '通知中心', shell: 'platform', requiresAuth: true }
+        meta: { title: '通知中心', shell: 'platform', requiresAuth: true, uiIds: ['UI-LRN-04'] }
       },
       {
         path: 'courses/:courseId',
@@ -172,7 +178,7 @@ const routes: RouteRecordRaw[] = [
               shell: 'course',
               requiresAuth: true,
               courseAccess: 'member',
-              uiIds: ['UI-CRS-02']
+              uiIds: ['UI-CRS-02', 'UI-CRS-05']
             }
           },
           {
@@ -552,7 +558,8 @@ const routes: RouteRecordRaw[] = [
               title: '我的成绩',
               shell: 'course',
               requiresAuth: true,
-              courseAccess: 'member'
+              courseAccess: 'member',
+              uiIds: ['UI-GRD-06', 'UI-GRD-09']
             }
           },
           {
@@ -564,7 +571,8 @@ const routes: RouteRecordRaw[] = [
               title: '成绩项配置',
               shell: 'course',
               requiresAuth: true,
-              courseAccess: 'manage'
+              courseAccess: 'manage',
+              uiIds: ['UI-GRD-01']
             }
           },
           {
@@ -576,7 +584,16 @@ const routes: RouteRecordRaw[] = [
               title: '成绩管理',
               shell: 'course',
               requiresAuth: true,
-              courseAccess: 'manage'
+              courseAccess: 'manage',
+              uiIds: [
+                'UI-GRD-02',
+                'UI-GRD-03',
+                'UI-GRD-04',
+                'UI-GRD-05',
+                'UI-GRD-07',
+                'UI-GRD-08',
+                'UI-GRD-10'
+              ]
             }
           },
           {

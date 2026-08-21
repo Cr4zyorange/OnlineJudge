@@ -34,7 +34,35 @@ describe('AuthView', () => {
 
     expect(wrapper.text()).toContain('登录成功');
     expect(wrapper.text()).toContain('教师工作台');
+    expect(wrapper.get('.landing-link').attributes('href')).toBe('/courses');
     expect(window.localStorage.getItem('onlinejudge.authToken')).toBe('token-45');
+  });
+
+  it.each([
+    { role: 'ADMIN', expectedText: '管理员工作台', expectedHref: '/admin/auth' },
+    { role: 'STUDENT', expectedText: '学生工作台', expectedHref: '/learning/tasks' }
+  ])('uses the trusted $role role to expose its real landing entry', async ({ role, expectedText, expectedHref }) => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(jsonResponse({
+      token: `token-${role.toLowerCase()}`,
+      expiresAt: '2026-08-21T18:00:00',
+      user: {
+        id: role === 'ADMIN' ? 1 : 601,
+        username: role.toLowerCase(),
+        userType: role,
+        displayName: expectedText,
+        roles: [role],
+        permissions: []
+      }
+    }));
+    const wrapper = mount(AuthView);
+
+    await wrapper.find('input[name="account"]').setValue(role.toLowerCase());
+    await wrapper.find('input[name="password"]').setValue('Password123');
+    await wrapper.find('form[data-auth-form="login"]').trigger('submit.prevent');
+    await flushPromises();
+
+    expect(wrapper.text()).toContain(expectedText);
+    expect(wrapper.get('.landing-link').attributes('href')).toBe(expectedHref);
   });
 
   it('switches to register mode and renders backend validation failures', async () => {

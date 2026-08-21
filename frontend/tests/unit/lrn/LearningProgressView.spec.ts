@@ -2,6 +2,7 @@ import { flushPromises, mount } from '@vue/test-utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import LearningProgressView from '../../../src/views/lrn/LearningProgressView.vue';
 import * as learningProgressApi from '../../../src/api/lrn/learningProgress';
+import { currentUser, resetRuntimeContext } from '../../../src/app/runtimeContext';
 import type { LearningProgressOverview } from '../../../src/types/lrn';
 
 vi.mock('../../../src/api/lrn/learningProgress');
@@ -52,6 +53,8 @@ describe('LearningProgressView', () => {
     vi.resetAllMocks();
     installLocalStorageMock();
     window.localStorage.clear();
+    resetRuntimeContext();
+    currentUser.value = user('STUDENT');
     window.history.replaceState({}, '', '/learning/progress');
   });
 
@@ -63,7 +66,7 @@ describe('LearningProgressView', () => {
 
     expect(learningProgressApi.getLearningProgress).toHaveBeenCalledWith(undefined);
     expect(wrapper.text()).toContain('学习进度');
-    expect(wrapper.get('[data-testid="lrn-home-entry"]').attributes('href')).toBe('/learning/tasks');
+    expect(wrapper.find('[data-testid="lrn-home-entry"]').exists()).toBe(false);
     expect(wrapper.text()).not.toContain('UI-LRN-02');
     expect(wrapper.text()).not.toContain('API-LRN-02');
     expect(wrapper.text()).toContain('Java Programming');
@@ -83,7 +86,7 @@ describe('LearningProgressView', () => {
 
     expect(wrapper.text()).toContain('进度加载失败');
 
-    await wrapper.get('[data-testid="retry-progress"]').trigger('click');
+    await wrapper.get('[data-testid="page-state-retry"]').trigger('click');
     await flushPromises();
 
     expect(learningProgressApi.getLearningProgress).toHaveBeenCalledTimes(2);
@@ -91,7 +94,8 @@ describe('LearningProgressView', () => {
   });
 
   it('lets teachers query managed course aggregate progress', async () => {
-    window.localStorage.setItem('onlinejudge.userRole', 'TEACHER');
+    currentUser.value = user('TEACHER');
+    window.localStorage.setItem('onlinejudge.userRole', 'STUDENT');
     window.history.replaceState({}, '', '/learning/progress?courseId=101');
     vi.mocked(learningProgressApi.getLearningProgress).mockResolvedValueOnce({ courses: [], total: 0 });
     vi.mocked(learningProgressApi.getTeacherLearningProgress).mockResolvedValueOnce({
@@ -120,8 +124,33 @@ describe('LearningProgressView', () => {
     expect(learningProgressApi.getTeacherLearningProgress).toHaveBeenCalledWith(101);
     expect(wrapper.text()).toContain('Student 601');
     expect(wrapper.text()).toContain('65%');
+    expect(wrapper.text()).toContain('进行中');
+    expect(wrapper.text()).not.toContain('IN_PROGRESS');
+  });
+
+  it('does not allow local storage to elevate a student into teacher statistics', async () => {
+    currentUser.value = user('STUDENT');
+    window.localStorage.setItem('onlinejudge.userRole', 'TEACHER');
+    vi.mocked(learningProgressApi.getLearningProgress).mockResolvedValueOnce({ courses: [], total: 0 });
+
+    const wrapper = mount(LearningProgressView);
+    await flushPromises();
+
+    expect(wrapper.text()).not.toContain('课程学习统计');
+    expect(learningProgressApi.getTeacherLearningProgress).not.toHaveBeenCalled();
   });
 });
+
+function user(role: 'STUDENT' | 'TEACHER') {
+  return {
+    id: role === 'TEACHER' ? 501 : 601,
+    username: role.toLowerCase(),
+    userType: role,
+    displayName: role === 'TEACHER' ? 'Teacher 501' : 'Student 601',
+    roles: [role],
+    permissions: []
+  };
+}
 
 function installLocalStorageMock() {
   const values = new Map<string, string>();

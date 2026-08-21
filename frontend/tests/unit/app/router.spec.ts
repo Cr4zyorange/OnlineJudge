@@ -6,6 +6,24 @@ import { currentCourse, currentUser } from '../../../src/app/runtimeContext';
 import type { Course } from '../../../src/types/crs';
 
 describe('application router access contract', () => {
+  it('maps all 50 formal UI identifiers to an addressable route carrier', () => {
+    const router = createAppRouter({ history: createMemoryHistory() });
+    const actualIds = new Set(
+      router.getRoutes().flatMap((route) => route.meta.uiIds ?? [])
+    );
+    const expectedIds = [
+      ...numberedUiIds('AUTH', 11),
+      ...numberedUiIds('CRS', 7),
+      ...numberedUiIds('LAB', 8),
+      ...numberedUiIds('HWK', 9),
+      ...numberedUiIds('GRD', 10),
+      ...numberedUiIds('LRN', 5)
+    ];
+
+    expect(expectedIds).toHaveLength(50);
+    expect([...actualIds].sort()).toEqual(expectedIds.sort());
+  });
+
   it('uses /auth/me and CRS membership instead of a role query to enter a student course page', async () => {
     const loadCurrentUser = vi.fn().mockResolvedValue(user('STUDENT'));
     const loadCourse = vi.fn().mockResolvedValue(course({ manageable: false }));
@@ -419,6 +437,10 @@ describe('application router access contract', () => {
     expect(router.currentRoute.value.fullPath).toBe('/courses/42/labs/9/manage/submissions');
   });
 });
+
+function numberedUiIds(module: string, count: number) {
+  return Array.from({ length: count }, (_, index) => `UI-${module}-${String(index + 1).padStart(2, '0')}`);
+}
 
 function resolveDefaultProps(route: RouteLocationNormalized) {
   const propContract = route.matched.at(-1)?.props.default;

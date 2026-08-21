@@ -17,7 +17,7 @@ const taskPage: LearningTaskPage = {
       deadline: '2026-05-29 23:59:59',
       progress: 0,
       status: 'OVERDUE',
-      actionUrl: '/courses/101/labs/301'
+      actionUrl: '/courses/101/labs/301?role=student'
     },
     {
       taskId: 501,
@@ -54,7 +54,7 @@ describe('LearningTaskCenterView', () => {
       order: 'asc'
     }));
     expect(wrapper.text()).toContain('学习任务中心');
-    expect(wrapper.get('[data-testid="lrn-home-entry"]').attributes('href')).toBe('/');
+    expect(wrapper.find('[data-testid="lrn-home-entry"]').exists()).toBe(false);
     expect(wrapper.get('[data-testid="learning-progress-entry"]').attributes('href')).toBe('/learning/progress');
     expect(wrapper.get('[data-testid="learning-statistics-entry"]').attributes('href')).toBe('/learning/statistics');
     expect(wrapper.get('[data-testid="learning-reminders-entry"]').attributes('href')).toBe('/learning/reminders');
@@ -65,6 +65,21 @@ describe('LearningTaskCenterView', () => {
     expect(wrapper.text()).toContain('进行中');
     expect(wrapper.text()).toContain('25%');
     expect(wrapper.get('a[href="/courses/101/labs/301"]').text()).toContain('进入任务');
+    expect(wrapper.find('a[href*="role="]').exists()).toBe(false);
+  });
+
+  it('uses a friendly unavailable state instead of a dead task link', async () => {
+    vi.mocked(learningTasksApi.listLearningTasks).mockResolvedValueOnce({
+      ...taskPage,
+      records: [{ ...taskPage.records[0], actionUrl: null }],
+      total: 1
+    });
+
+    const wrapper = mount(LearningTaskCenterView);
+    await flushPromises();
+
+    expect(wrapper.text()).toContain('入口已失效');
+    expect(wrapper.find('a[href="#"]').exists()).toBe(false);
   });
 
   it('reloads tasks when filters change and shows empty state', async () => {

@@ -91,6 +91,49 @@ describe('CourseManagementView', () => {
     expect(wrapper.text()).toContain('暂无章节目录');
   });
 
+  it('replaces the concrete course loading placeholder with the detail request error', async () => {
+    window.history.replaceState({}, '', '/courses/81');
+    const page = {
+      code: '0',
+      message: 'success',
+      data: { list: [], total: 0, page: 1, size: 20 }
+    };
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => page })
+      .mockResolvedValueOnce({
+        ok: false,
+        json: async () => ({ code: 'CRS_500', message: '课程统计加载失败', data: null })
+      })
+      .mockResolvedValueOnce({ ok: true, json: async () => page })
+      .mockResolvedValueOnce({ ok: true, json: async () => page })
+      .mockResolvedValueOnce({
+        ok: false,
+        json: async () => ({ code: 'CRS_404', message: '课程详情加载失败', data: null })
+      })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ code: '0', message: 'success', data: { ...course, id: 81 } }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => homeSummary({ ...course, id: 81 }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ code: '0', message: 'success', data: [] }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ code: '0', message: 'success', data: [] }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ code: '0', message: 'success', data: [] }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ code: '0', message: 'success', data: [] }) });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const wrapper = mount(CourseManagementView);
+    await flushPromises();
+
+    const detailState = wrapper.get('[data-testid="page-state"]');
+    expect(detailState.attributes('data-state')).toBe('error');
+    expect(detailState.attributes('role')).toBe('alert');
+    expect(detailState.text()).toContain('课程详情加载失败');
+    expect(wrapper.text()).not.toContain('课程加载中...');
+
+    await wrapper.get('[data-testid="page-state-retry"]').trigger('click');
+    await flushPromises();
+
+    expect(wrapper.find('[data-testid="course-detail-page"]').exists()).toBe(true);
+    expect(wrapper.get('[data-testid="course-detail-page"] h1').text()).toBe('软件工程基础');
+  });
+
   it('delegates course entry to Vue Router when mounted in the routed application', async () => {
     const page = {
       code: '0',
@@ -944,6 +987,8 @@ describe('CourseManagementView', () => {
 
     expect(wrapper.text()).toContain('学生 501');
     expect(wrapper.text()).toContain('学生 502');
+    expect(wrapper.text()).toContain('待审核');
+    expect(wrapper.text()).not.toContain('PENDING');
 
     const approveButton = wrapper.findAll('button.card-btn').find((button) => button.text().includes('通过'));
     expect(approveButton).toBeTruthy();

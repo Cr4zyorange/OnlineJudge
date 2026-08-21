@@ -16,14 +16,21 @@
       <article class="admin-panel users-panel">
         <div class="panel-heading">
           <div>
-            <p class="eyebrow">UI-AUTH-05 / UI-AUTH-08</p>
+            <p class="eyebrow">账号治理</p>
             <h2>用户管理</h2>
           </div>
           <span>{{ users.length }} 人</span>
         </div>
 
-        <div v-if="loading" class="state-block">正在加载用户和角色</div>
-        <div v-else-if="error" class="state-block error">{{ error }}</div>
+        <PageState v-if="loading" state="loading" title="正在加载用户和角色" />
+        <PageState
+          v-else-if="error"
+          state="error"
+          title="用户与角色加载失败"
+          :message="error"
+          retry-label="重试"
+          @retry="loadAll"
+        />
 
         <form class="user-form" data-create-user-form @submit.prevent="createNewUser">
           <label>
@@ -69,14 +76,19 @@
           <button type="submit" class="primary-action" data-create-user>新增用户</button>
         </form>
 
-        <div v-if="!loading && !error && users.length === 0" class="state-block">暂无用户</div>
+        <PageState
+          v-if="!loading && !error && users.length === 0"
+          state="empty"
+          title="暂无用户"
+          message="创建用户后，可在这里分配角色并管理账号状态。"
+        />
 
         <div v-if="!loading && !error && users.length > 0" class="user-list">
           <section v-for="user in users" :key="user.id" class="user-row">
             <div class="user-main">
               <strong>{{ user.username }}</strong>
               <span>{{ user.displayName }}</span>
-              <mark>{{ user.accountStatus ?? 'ACTIVE' }}</mark>
+              <mark>{{ accountStatusLabel(user.accountStatus) }}</mark>
             </div>
             <div class="assignment-block">
               <p>用户角色分配</p>
@@ -113,7 +125,7 @@
       <article class="admin-panel roles-panel">
         <div class="panel-heading">
           <div>
-            <p class="eyebrow">UI-AUTH-06 / UI-AUTH-07</p>
+            <p class="eyebrow">角色与权限</p>
             <h2>角色管理</h2>
           </div>
           <span>{{ roles.length }} 类</span>
@@ -139,7 +151,12 @@
           <button type="submit" class="primary-action" data-create-role>新增角色</button>
         </form>
 
-        <div v-if="!loading && roles.length === 0" class="state-block">暂无角色</div>
+        <PageState
+          v-if="!loading && roles.length === 0"
+          state="empty"
+          title="暂无角色"
+          message="创建角色后，可为角色分配平台权限。"
+        />
 
         <section v-for="role in roles" v-else :key="role.roleId" class="role-row">
           <form class="role-edit-form" :data-save-role-form="role.roleId" @submit.prevent="saveRole(role.roleId)">
@@ -187,7 +204,7 @@
       <article class="admin-panel audit-panel">
         <div class="panel-heading">
           <div>
-            <p class="eyebrow">UI-AUTH-09</p>
+            <p class="eyebrow">安全审计</p>
             <h2>安全审计日志</h2>
           </div>
           <span>{{ auditLogs.length }} 条</span>
@@ -199,16 +216,21 @@
             <input v-model.trim="auditFilters.operatorId" name="operatorId" inputmode="numeric" />
           </label>
           <label>
-            操作类型
-            <input v-model.trim="auditFilters.operationType" name="operationType" placeholder="LOGIN_FAILURE" />
+            操作事件
+            <select v-model="auditFilters.operationType" name="operationType">
+              <option value="">全部事件</option>
+              <option v-for="option in auditOperationOptions" :key="option.value" :value="option.value">
+                {{ option.label }}
+              </option>
+            </select>
           </label>
           <label>
             结果
             <select v-model="auditFilters.resultStatus" name="resultStatus">
               <option value="">全部</option>
-              <option value="SUCCESS">SUCCESS</option>
-              <option value="FAILURE">FAILURE</option>
-              <option value="DENIED">DENIED</option>
+              <option value="SUCCESS">成功</option>
+              <option value="FAILURE">失败</option>
+              <option value="DENIED">已拒绝</option>
             </select>
           </label>
           <label>
@@ -222,18 +244,23 @@
           <button type="submit" class="ghost-action">筛选日志</button>
         </form>
 
-        <div v-if="!loading && auditLogs.length === 0" class="state-block">暂无审计日志</div>
+        <PageState
+          v-if="!loading && auditLogs.length === 0"
+          state="empty"
+          title="暂无审计日志"
+          message="当前筛选条件下没有安全操作记录。"
+        />
         <div v-else class="audit-list">
           <section v-for="log in auditLogs" :key="log.logId" class="audit-row">
             <div>
-              <strong>{{ log.operationType }}</strong>
-              <span>{{ log.createdAt }}</span>
+              <strong>{{ auditOperationLabel(log.operationType) }}</strong>
+              <span>记录 #{{ log.logId }} · {{ log.createdAt }}</span>
             </div>
-            <mark>{{ log.resultStatus }}</mark>
-            <span>{{ log.operatorId ?? 'SYSTEM' }}</span>
-            <span>{{ log.targetType ?? '-' }} / {{ log.targetId ?? '-' }}</span>
-            <span>{{ log.clientIp ?? '-' }}</span>
-            <small>{{ log.failureReason ?? log.userAgent ?? '-' }}</small>
+            <mark>{{ auditResultLabel(log.resultStatus) }}</mark>
+            <span>{{ auditOperatorLabel(log.operatorId) }}</span>
+            <span>{{ auditTargetText(log.targetType, log.targetId) }}</span>
+            <span>{{ auditClientLabel(log.clientIp) }}</span>
+            <small>{{ auditDetail(log) }}</small>
           </section>
         </div>
       </article>
@@ -243,6 +270,7 @@
 
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue';
+import PageState from '../../components/foundation/PageState.vue';
 import {
   createAdminUser,
   createRole,
@@ -292,6 +320,26 @@ const auditFilters = reactive({
   startTime: '',
   endTime: ''
 });
+const auditOperationLabels: Record<string, string> = {
+  LOGIN_SUCCESS: '登录成功',
+  LOGIN_FAILURE: '登录失败',
+  ACCOUNT_LOCKED: '账号已锁定',
+  PASSWORD_CHANGED: '密码已修改',
+  PASSWORD_CHANGE_FAILED: '修改密码失败',
+  LOGOUT: '退出登录',
+  ACCESS_DENIED: '访问被拒绝',
+  USER_CREATED: '创建用户',
+  ACCOUNT_STATUS_UPDATED: '更新账号状态',
+  USER_ROLE_UPDATED: '更新用户角色',
+  ROLE_PERMISSION_UPDATED: '更新角色权限'
+};
+const auditTargetLabels: Record<string, string> = {
+  AUTH_USER: '用户账号',
+  AUTH_ROLE: '平台角色',
+  AUTH_SESSION: '登录会话',
+  PERMISSION: '权限点'
+};
+const auditOperationOptions = Object.entries(auditOperationLabels).map(([value, label]) => ({ value, label }));
 const loading = ref(false);
 const error = ref('');
 const feedback = ref('');
@@ -474,6 +522,55 @@ function nextAccountStatus(user: AuthUser) {
   return (user.accountStatus ?? 'ACTIVE') === 'DISABLED' ? 'ACTIVE' : 'DISABLED';
 }
 
+function accountStatusLabel(status?: string) {
+  const labels: Record<string, string> = {
+    ACTIVE: '正常',
+    DISABLED: '已禁用',
+    LOCKED: '已锁定',
+    FROZEN: '已冻结'
+  };
+  return labels[status ?? 'ACTIVE'] ?? '未知状态';
+}
+
+function auditResultLabel(status: string) {
+  const labels: Record<string, string> = {
+    SUCCESS: '成功',
+    FAILURE: '失败',
+    DENIED: '已拒绝'
+  };
+  return labels[status] ?? '未知结果';
+}
+
+function auditOperationLabel(operationType: string) {
+  return auditOperationLabels[operationType] ?? '其他安全操作';
+}
+
+function auditOperatorLabel(operatorId?: number | null) {
+  return operatorId == null ? '系统自动执行' : `操作人 #${operatorId}`;
+}
+
+function auditTargetText(targetType?: string | null, targetId?: string | null) {
+  if (!targetType && !targetId) {
+    return '未指定业务对象';
+  }
+  const targetLabel = targetType ? auditTargetLabels[targetType] ?? '业务对象' : '业务对象';
+  return targetId ? `${targetLabel}：${targetId}` : `${targetLabel}：未记录标识`;
+}
+
+function auditClientLabel(clientIp?: string | null) {
+  return clientIp ? `来源地址：${clientIp}` : '来源地址未记录';
+}
+
+function auditDetail(log: AuditLogRecord) {
+  if (log.failureReason) {
+    return `说明：${log.failureReason}`;
+  }
+  if (log.userAgent) {
+    return `客户端：${log.userAgent}`;
+  }
+  return '无补充说明';
+}
+
 async function runAction(successMessage: string, action: () => Promise<void>) {
   feedback.value = '';
   try {
@@ -491,8 +588,8 @@ async function runAction(successMessage: string, action: () => Promise<void>) {
 .auth-admin-page {
   min-height: 100vh;
   padding: 28px;
-  background: #eef4f1;
-  color: #172b27;
+  background: transparent;
+  color: var(--oj-ink);
 }
 
 .admin-header,
@@ -537,10 +634,12 @@ h2 {
 }
 
 .admin-panel {
-  border: 1px solid rgba(23, 43, 39, 0.12);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.76);
-  box-shadow: 0 12px 30px rgba(31, 54, 49, 0.08);
+  border: 1px solid var(--oj-line);
+  border-radius: var(--oj-radius);
+  background: var(--oj-surface);
+  box-shadow: var(--oj-shadow-soft);
+  backdrop-filter: var(--oj-blur);
+  -webkit-backdrop-filter: var(--oj-blur);
 }
 
 .audit-panel {
