@@ -1,10 +1,5 @@
 <template>
   <main class="reminder-settings">
-    <nav class="reminder-settings__topbar" aria-label="页面导航">
-      <a class="reminder-settings__home" data-testid="lrn-home-entry" href="/learning/tasks" aria-label="返回学习任务中心">
-        &lt;-
-      </a>
-    </nav>
     <section class="reminder-settings__shell">
       <aside class="reminder-settings__summary" aria-label="提醒规则概览">
         <h1>提醒规则设置</h1>
@@ -32,11 +27,17 @@
           </button>
         </header>
 
-        <p v-if="loading" class="reminder-settings__state">加载中...</p>
-        <section v-else-if="errorMessage" class="reminder-settings__state reminder-settings__state--error">
-          <p>{{ errorMessage }}</p>
-          <button type="button" data-testid="retry-reminder-rules" @click="loadSettings">重试</button>
-        </section>
+        <PageState v-if="loading" state="loading" title="正在加载提醒设置" />
+        <PageState
+          v-else-if="errorMessage"
+          state="error"
+          title="提醒设置加载失败"
+          :message="errorMessage"
+        >
+          <template #actions>
+            <button type="button" data-testid="retry-reminder-rules" @click="loadSettings">重试</button>
+          </template>
+        </PageState>
 
         <form v-else-if="overview" class="reminder-settings__form" @submit.prevent="saveSettings">
           <section class="preference-panel" aria-label="通知偏好">
@@ -89,6 +90,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { getReminderRules, saveReminderRules } from '../../api/lrn/reminderRules';
+import PageState from '../../components/foundation/PageState.vue';
 import type { NotificationSettingItem, ReminderRuleItem, ReminderRuleOverview } from '../../types/lrn';
 
 type PreferenceKey = keyof NotificationSettingItem;
@@ -165,33 +167,8 @@ function aheadLabel(minutes: number) {
 
 <style scoped>
 .reminder-settings {
-  min-height: 100vh;
   padding: 24px;
   color: #102033;
-  background-image: url("../../assets/back1.jpg");
-  background-size: cover;
-  background-position: top center;
-  background-repeat: no-repeat;
-  background-attachment: fixed;
-}
-
-.reminder-settings__topbar {
-  display: flex;
-  margin: 0 auto 18px;
-  width: min(1180px, 100%);
-}
-
-.reminder-settings__home {
-  align-items: center;
-  background: #16423c;
-  border: 1px solid #16423c;
-  border-radius: 8px;
-  color: #ffffff;
-  display: inline-flex;
-  font-weight: 800;
-  min-height: 40px;
-  padding: 0 14px;
-  text-decoration: none;
 }
 
 .reminder-settings__shell {

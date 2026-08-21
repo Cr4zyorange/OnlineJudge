@@ -6,8 +6,15 @@
         <p v-if="profile">{{ profile.username }} · {{ roleLabel }}</p>
       </header>
 
-      <div v-if="loading" class="state-block">正在加载个人资料</div>
-      <div v-else-if="loadError" class="state-block error">{{ loadError }}</div>
+      <PageState v-if="loading" state="loading" title="正在加载个人资料" />
+      <PageState
+        v-else-if="loadError"
+        state="error"
+        title="个人资料加载失败"
+        :message="loadError"
+        retry-label="重试"
+        @retry="loadProfile"
+      />
 
       <div v-else class="profile-grid">
         <form class="profile-form" data-profile-form="profile" @submit.prevent="submitProfile">
@@ -71,6 +78,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue';
+import PageState from '../../components/foundation/PageState.vue';
 import {
   changePassword,
   clearAuthSession,

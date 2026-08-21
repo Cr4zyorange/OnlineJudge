@@ -1,10 +1,5 @@
 <template>
   <main class="task-center">
-    <nav class="task-center__topbar" aria-label="页面导航">
-      <a class="task-center__home" data-testid="lrn-home-entry" href="/" aria-label="返回主页面">
-        &lt;-
-      </a>
-    </nav>
     <section class="task-center__shell">
       <aside class="task-center__sidebar" aria-label="学习任务概览">
         <h1>学习任务中心</h1>
@@ -85,12 +80,23 @@
           </label>
         </form>
 
-        <p v-if="loading" class="task-center__state">加载中</p>
-        <section v-else-if="errorMessage" class="task-center__state task-center__state--error">
-          <p>{{ errorMessage }}</p>
-          <button type="button" data-testid="retry-tasks" @click="loadTasks">重试</button>
-        </section>
-        <p v-else-if="tasks.length === 0" class="task-center__state">暂无符合条件的学习任务</p>
+        <PageState v-if="loading" state="loading" title="正在加载学习任务" />
+        <PageState
+          v-else-if="errorMessage"
+          state="error"
+          title="学习任务加载失败"
+          :message="errorMessage"
+        >
+          <template #actions>
+            <button type="button" data-testid="retry-tasks" @click="loadTasks">重试</button>
+          </template>
+        </PageState>
+        <PageState
+          v-else-if="tasks.length === 0"
+          state="empty"
+          title="暂无符合条件的学习任务"
+          message="可以调整筛选条件，或等待课程发布新的学习任务。"
+        />
 
         <div v-else class="task-center__list">
           <article v-for="task in tasks" :key="`${task.taskType}-${task.taskId}`" class="task-card">
@@ -117,7 +123,14 @@
             <div class="task-card__progress" aria-hidden="true">
               <span :style="{ width: `${task.progress}%` }" />
             </div>
-            <a class="task-card__link" :href="task.actionUrl ?? '#'">进入任务</a>
+            <a
+              v-if="sanitizeInternalActionUrl(task.actionUrl)"
+              class="task-card__link"
+              :href="sanitizeInternalActionUrl(task.actionUrl) ?? undefined"
+            >
+              进入任务
+            </a>
+            <span v-else class="task-card__unavailable">入口已失效</span>
           </article>
         </div>
 
@@ -152,6 +165,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { listLearningTasks } from '../../api/lrn/learningTasks';
+import PageState from '../../components/foundation/PageState.vue';
 import type {
   LearningTask,
   LearningTaskPage,
@@ -160,6 +174,7 @@ import type {
   LearningTaskType,
   SortOrder
 } from '../../types/lrn';
+import { sanitizeInternalActionUrl } from './internalActionUrl';
 
 const loading = ref(false);
 const errorMessage = ref('');
@@ -248,32 +263,7 @@ function statusLabel(status: LearningTask['status']) {
 <style scoped>
 /* 背景：纯清晰图，无模糊渐变（和style.css一致） */
 .task-center {
-  min-height: 100vh;
-  background-image: url("../../assets/back1.jpg");
-  background-size: cover;
-  background-position: top center;
-  background-repeat: no-repeat;
-  background-attachment: fixed;
   padding: 24px;
-}
-
-.task-center__topbar {
-  display: flex;
-  margin: 0 auto 18px;
-  max-width: 1280px;
-}
-
-.task-center__home {
-  align-items: center;
-  background: #16423c;
-  border: 1px solid #16423c;
-  border-radius: 8px;
-  color: #ffffff;
-  display: inline-flex;
-  font-weight: 800;
-  min-height: 40px;
-  padding: 0 14px;
-  text-decoration: none;
 }
 
 .task-center__quick-nav a {
@@ -437,7 +427,8 @@ function statusLabel(status: LearningTask['status']) {
 
 select,
 button,
-.task-card__link {
+.task-card__link,
+.task-card__unavailable {
   border-radius: 8px;
   min-height: 40px;
 }
@@ -450,7 +441,8 @@ select {
 }
 
 button,
-.task-card__link {
+.task-card__link,
+.task-card__unavailable {
   background: #16423c;
   border: 1px solid #16423c;
   color: #ffffff;
@@ -566,6 +558,18 @@ button:disabled {
   justify-content: center;
 }
 
+.task-card__unavailable {
+  align-items: center;
+  background: rgba(78, 92, 87, 0.08);
+  border: 1px solid rgba(78, 92, 87, 0.22);
+  color: #60706b;
+  display: inline-flex;
+  grid-column: 3;
+  grid-row: 1 / 3;
+  justify-content: center;
+  padding: 0 16px;
+}
+
 @media (max-width: 980px) {
   .task-center__shell,
   .task-card {
@@ -581,7 +585,8 @@ button:disabled {
   }
 
   .task-card__progress,
-  .task-card__link {
+  .task-card__link,
+  .task-card__unavailable {
     grid-column: auto;
     grid-row: auto;
   }

@@ -1,4 +1,5 @@
 import { publicRequest, request } from '../http';
+import { resetRuntimeContext } from '../../app/runtimeContext';
 import { removeAuthStorage, writeAuthStorage } from './storage';
 
 export interface AuthUser {
@@ -265,6 +266,7 @@ export function clearAuthSession() {
     'onlinejudge.role',
     'onlinejudge.permissions'
   ].forEach((key) => removeAuthStorage(key));
+  resetRuntimeContext();
 }
 
 function persistAuthSession(result: LoginResult) {

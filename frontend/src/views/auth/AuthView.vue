@@ -79,8 +79,16 @@ const registerForm = reactive({
   password: ''
 });
 
+const landingRole = computed(() => {
+  const roles = new Set([
+    currentUser.value?.userType,
+    ...(currentUser.value?.roles ?? [])
+  ]);
+  return ['ADMIN', 'TEACHER', 'STUDENT'].find((role) => roles.has(role)) ?? '';
+});
+
 const landingText = computed(() => {
-  const role = currentUser.value?.roles[0] ?? currentUser.value?.userType;
+  const role = landingRole.value;
   if (role === 'ADMIN') {
     return '管理员工作台';
   }
@@ -93,7 +101,14 @@ const landingText = computed(() => {
   return '';
 });
 
-const landingHref = computed(() => currentUser.value ? '/courses' : '');
+const landingHref = computed(() => {
+  const destinations: Record<string, string> = {
+    ADMIN: '/admin/auth',
+    TEACHER: '/courses',
+    STUDENT: '/learning/tasks'
+  };
+  return destinations[landingRole.value] ?? '';
+});
 
 async function submitLogin() {
   await run(async () => {

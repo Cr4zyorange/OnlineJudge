@@ -1,6 +1,7 @@
 <template>
   <main class="grade-table">
     <section class="grade-table__panel" aria-label="教师成绩总表">
+      <h1>成绩管理</h1>
       <div class="grade-table__actions">
         <button type="button" :disabled="busy" @click="syncGrades">
           {{ busy ? '处理中' : '同步来源成绩' }}
@@ -25,14 +26,16 @@
         </label>
         <label>
           成绩项
-          <input
-            v-model.trim="gradeItemIdInput"
+          <select
+            v-model="gradeItemIdInput"
             data-testid="grade-item-id"
-            inputmode="numeric"
-            min="1"
-            type="number"
-            placeholder="ID"
-          />
+            :disabled="gradeItemsLoading"
+          >
+            <option value="">全部成绩项</option>
+            <option v-for="item in gradeItems" :key="item.id" :value="String(item.id)">
+              {{ item.name }}
+            </option>
+          </select>
         </label>
         <label>
           成绩状态
@@ -66,6 +69,7 @@
       </form>
       <p v-if="feedback" class="grade-table__feedback">{{ feedback }}</p>
       <p v-if="errorMessage" class="grade-table__error">{{ errorMessage }}</p>
+      <p v-if="gradeItemsError" class="grade-table__error">{{ gradeItemsError }}</p>
     </section>
 
     <section class="grade-table__analysis" data-testid="grade-analysis-panel" aria-label="教学分析">
@@ -80,15 +84,18 @@
             </select>
           </label>
           <label v-if="analysisTargetType === 'GRADE_ITEM'">
-            成绩项 ID
-            <input
-              v-model.trim="analysisGradeItemIdInput"
+            成绩项
+            <select
+              v-model="analysisGradeItemIdInput"
               data-testid="analysis-grade-item-id"
-              inputmode="numeric"
-              min="1"
+              :disabled="gradeItemsLoading"
               required
-              type="number"
-            />
+            >
+              <option value="">请选择成绩项</option>
+              <option v-for="item in gradeItems" :key="item.id" :value="String(item.id)">
+                {{ item.name }}
+              </option>
+            </select>
           </label>
           <button type="submit" :disabled="analysisLoading">刷新</button>
         </form>
@@ -97,7 +104,7 @@
       <p v-else-if="analysisError" class="grade-table__error">{{ analysisError }}</p>
       <template v-else-if="analysis">
         <p class="grade-table__analysis-target">
-          {{ analysis.targetType === 'COURSE_TOTAL' ? '课程总评' : `成绩项 ${analysis.gradeItemId}` }}
+          {{ analysis.targetType === 'COURSE_TOTAL' ? '课程总评' : gradeItemName(analysis.gradeItemId) }}
         </p>
         <dl class="grade-table__metrics">
           <div>
@@ -135,8 +142,26 @@
     </section>
 
     <section class="grade-table__list" aria-label="课程成绩总表">
-      <p v-if="loading">加载中</p>
-      <p v-else-if="rows.length === 0">暂无成绩记录</p>
+      <PageState
+        v-if="loading"
+        state="loading"
+        title="正在加载成绩总表"
+        message="正在获取课程学生和成绩记录。"
+      />
+      <PageState
+        v-else-if="rowsError"
+        state="error"
+        title="成绩总表加载失败"
+        :message="rowsError"
+        retry-label="重试"
+        @retry="loadRows"
+      />
+      <PageState
+        v-else-if="rows.length === 0"
+        state="empty"
+        title="暂无成绩记录"
+        message="可先同步来源成绩，再检查课程总评。"
+      />
       <template v-else>
         <p class="grade-table__total">共 {{ total }} 名学生</p>
         <table>
@@ -154,8 +179,8 @@
             <tr v-for="row in rows" :key="row.studentId">
               <td>{{ row.studentId }}</td>
               <td>{{ row.summary?.finalScore ?? '-' }}</td>
-              <td>{{ row.summary?.finalStatus ?? 'INCOMPLETE' }}</td>
-              <td>{{ row.summary?.publishStatus ?? 'UNPUBLISHED' }}</td>
+              <td>{{ finalStatusLabel(row.summary?.finalStatus ?? 'INCOMPLETE') }}</td>
+              <td>{{ publishStatusLabel(row.summary?.publishStatus ?? 'UNPUBLISHED') }}</td>
               <td>{{ row.records.length }}</td>
               <td>
                 <button
@@ -251,11 +276,11 @@
         </thead>
         <tbody>
           <tr v-for="record in selectedRow.records" :key="record.id">
-            <td>{{ record.gradeItemId }}</td>
-            <td>{{ record.sourceType }}</td>
+            <td>{{ gradeItemName(record.gradeItemId) }}</td>
+            <td>{{ gradeSourceLabel(record.sourceType) }}</td>
             <td>{{ record.rawScore ?? '-' }}</td>
             <td>{{ record.weightedScore ?? '-' }}</td>
-            <td>{{ record.gradeStatus }}</td>
+            <td>{{ gradeStatusLabel(record.gradeStatus) }}</td>
             <td>
               <button type="button" @click="selectRecordForAdjustment(record)">
                 调整
@@ -302,7 +327,7 @@
         <p v-else-if="changeLogs.length === 0">暂无变更记录</p>
         <ul v-else>
           <li v-for="log in changeLogs" :key="log.id">
-            {{ log.changeType }}：{{ log.oldValue ?? '-' }} -> {{ log.newValue ?? '-' }}，{{ log.reason }}
+            {{ changeTypeLabel(log.changeType) }}：{{ log.oldValue ?? '-' }} -> {{ log.newValue ?? '-' }}，{{ log.reason }}
           </li>
         </ul>
       </div>
@@ -314,7 +339,7 @@
       <p v-else-if="publishRecords.length === 0">暂无发布记录</p>
       <ul v-else class="grade-table__publish-records">
         <li v-for="record in publishRecords" :key="record.id">
-          {{ record.publishScope }}：{{ record.publishedCount }} 名学生，通知 {{ record.notificationStatus }}
+          {{ publishScopeLabel(record.publishScope) }}：{{ record.publishedCount }} 名学生，通知 {{ notificationStatusLabel(record.notificationStatus) }}
         </li>
       </ul>
     </section>
@@ -346,9 +371,9 @@
       <ul v-else class="grade-table__reviews">
         <li v-for="request in reviewRequests" :key="request.requestId">
           <div>
-            <strong>{{ request.status }}</strong>
+            <strong>{{ reviewStatusLabel(request.status) }}</strong>
             <span>学生 {{ request.studentId }}</span>
-            <span>{{ request.targetType === 'FINAL_SCORE' ? '课程总评' : `成绩项 ${request.gradeItemId}` }}</span>
+            <span>{{ request.targetType === 'FINAL_SCORE' ? '课程总评' : gradeItemName(request.gradeItemId) }}</span>
             <span>原成绩 {{ request.originalScore ?? '-' }}</span>
           </div>
           <p>{{ request.reason }}</p>
@@ -401,6 +426,8 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
+import { listGradeItems } from '../../api/grd/gradeItems';
+import PageState from '../../components/foundation/PageState.vue';
 import {
   adjustGradeRecord,
   adjustCourseFinalScore,
@@ -421,6 +448,7 @@ import type {
   GradeAnalysisResult,
   GradeAnalysisTargetType,
   GradeItemCompletionResult,
+  GradeItem,
   GradeChangeLog,
   GradePublishRecord,
   GradeReviewRequest,
@@ -429,13 +457,27 @@ import type {
   GradeStatus,
   PublishStatus
 } from '../../types/grd';
+import {
+  changeTypeLabel,
+  finalStatusLabel,
+  gradeSourceLabel,
+  gradeStatusLabel,
+  notificationStatusLabel,
+  publishScopeLabel,
+  publishStatusLabel,
+  reviewStatusLabel
+} from './grdDisplay';
 
 const props = defineProps<{
   courseId: number;
 }>();
 
 const rows = ref<CourseGradeRow[]>([]);
+const gradeItems = ref<GradeItem[]>([]);
+const gradeItemsLoading = ref(false);
+const gradeItemsError = ref('');
 const loading = ref(false);
+const rowsError = ref('');
 const busy = ref(false);
 const feedback = ref('');
 const errorMessage = ref('');
@@ -469,12 +511,31 @@ const totalPages = computed(() => Math.max(1, Math.ceil(total.value / size.value
 const selectedRecord = computed(() => selectedRow.value?.records.find((record) => record.id === selectedRecordId.value) ?? null);
 
 onMounted(async () => {
-  await Promise.all([loadRows(), refreshPublishRecords(), refreshAnalysis(), refreshReviewRequests()]);
+  await Promise.all([
+    loadGradeItems(),
+    loadRows(),
+    refreshPublishRecords(),
+    refreshAnalysis(),
+    refreshReviewRequests()
+  ]);
 });
+
+async function loadGradeItems() {
+  gradeItemsLoading.value = true;
+  gradeItemsError.value = '';
+  try {
+    gradeItems.value = (await listGradeItems(props.courseId)).filter((item) => item.enabled);
+  } catch (error) {
+    gradeItems.value = [];
+    gradeItemsError.value = error instanceof Error ? error.message : '成绩项列表加载失败';
+  } finally {
+    gradeItemsLoading.value = false;
+  }
+}
 
 async function loadRows() {
   loading.value = true;
-  errorMessage.value = '';
+  rowsError.value = '';
   try {
     const result = await listCourseGrades(props.courseId, currentQuery());
     rows.value = result.records;
@@ -483,7 +544,16 @@ async function loadRows() {
     size.value = result.size;
     refreshSelectedRow();
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : '成绩总表加载失败';
+    rows.value = [];
+    total.value = 0;
+    selectedRow.value = null;
+    selectedRecordId.value = null;
+    changeLogs.value = [];
+    finalScore.value = '';
+    finalReason.value = '';
+    adjustmentScore.value = '';
+    adjustmentReason.value = '';
+    rowsError.value = error instanceof Error ? error.message : '成绩总表加载失败';
   } finally {
     loading.value = false;
   }
@@ -613,7 +683,7 @@ async function publishSelectedStudent() {
       studentIds: [selectedRow.value.studentId],
       gradeItemIds: []
     });
-    feedback.value = `发布完成：${result.publishedCount} 名学生可查看成绩，通知状态 ${result.notificationStatus}`;
+    feedback.value = `发布完成：${result.publishedCount} 名学生可查看成绩，通知状态 ${notificationStatusLabel(result.notificationStatus)}`;
     await loadRows();
     await refreshPublishRecords();
   } catch (error) {
@@ -700,7 +770,7 @@ async function processReview(requestId: number, action: 'APPROVE' | 'REJECT') {
       adjustedScore: action === 'APPROVE' ? normalizeScoreInput(form.adjustedScore) : null,
       responseComment: form.responseComment
     });
-    feedback.value = `复核已处理：${result.status}`;
+    feedback.value = `复核已处理：${reviewStatusLabel(result.status)}`;
     await Promise.all([loadRows(), refreshChangeLogs(), refreshReviewRequests()]);
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '复核处理失败';
@@ -715,6 +785,9 @@ async function refreshAnalysis() {
   try {
     if (analysisTargetType.value === 'GRADE_ITEM') {
       const gradeItemId = Number(analysisGradeItemIdInput.value);
+      if (!Number.isInteger(gradeItemId) || gradeItemId <= 0) {
+        throw new Error('请选择成绩项');
+      }
       analysis.value = completionToAnalysis(await getGradeItemCompletion(props.courseId, gradeItemId));
       return;
     }
@@ -788,6 +861,13 @@ function formatRate(value: string | null) {
   return `${(numericValue * 100).toFixed(2)}%`;
 }
 
+function gradeItemName(gradeItemId: number | null | undefined) {
+  if (gradeItemId === null || gradeItemId === undefined) {
+    return '课程总评';
+  }
+  return gradeItems.value.find((item) => item.id === gradeItemId)?.name ?? '成绩项已不可用';
+}
+
 function currentQuery() {
   const gradeItemId = Number(gradeItemIdInput.value);
   const query: GradeTableQuery = {
@@ -812,8 +892,8 @@ function currentQuery() {
 
 <style scoped>
 .grade-table {
-  background: #f6f8fb;
-  color: #1f2937;
+  background: var(--oj-page-bg, #f6f8fb);
+  color: var(--oj-ink, #1f2937);
   display: grid;
   gap: 16px;
   min-height: 100vh;
@@ -828,8 +908,8 @@ function currentQuery() {
 .grade-table__list,
 .grade-table__detail,
 .grade-table__analysis {
-  background: #ffffff;
-  border: 1px solid #d8dee9;
+  background: var(--oj-surface, #ffffff);
+  border: 1px solid var(--oj-border, #d8dee9);
   border-radius: 8px;
   overflow-x: auto;
   padding: 16px;
@@ -850,7 +930,7 @@ function currentQuery() {
 }
 
 label {
-  color: #334155;
+  color: var(--oj-ink-soft, #334155);
   display: grid;
   font-size: 13px;
   gap: 6px;
@@ -859,8 +939,8 @@ label {
 input,
 select,
 textarea {
-  background: #ffffff;
-  border: 1px solid #cbd5e1;
+  background: var(--oj-surface, #ffffff);
+  border: 1px solid var(--oj-border-strong, #cbd5e1);
   border-radius: 6px;
   color: #1f2937;
   min-height: 36px;
@@ -872,7 +952,7 @@ textarea {
 }
 
 button {
-  background: #2563eb;
+  background: var(--oj-brand, #2563eb);
   border: 0;
   border-radius: 6px;
   color: #ffffff;

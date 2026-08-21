@@ -1,3 +1,4 @@
+import { resetRuntimeContext } from '../app/runtimeContext';
 import { readAuthStorage, removeAuthStorage } from './auth/storage';
 
 export interface AuthContext {
@@ -190,6 +191,7 @@ function clearStoredAuthSession() {
     'onlinejudge.role',
     'onlinejudge.permissions'
   ].forEach((key) => removeAuthStorage(key));
+  resetRuntimeContext();
 }
 
 function redirectTo(path: string) {

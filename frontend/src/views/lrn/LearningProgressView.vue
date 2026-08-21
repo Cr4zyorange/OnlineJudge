@@ -1,10 +1,5 @@
 <template>
   <main class="progress-page">
-    <nav class="progress-page__topbar" aria-label="页面导航">
-      <a class="progress-page__home" data-testid="lrn-home-entry" href="/learning/tasks" aria-label="返回学习任务中心">
-        &lt;-
-      </a>
-    </nav>
     <section class="progress-page__shell">
       <aside class="progress-page__summary" aria-label="学习进度概览">
         <h1>学习进度</h1>
@@ -29,12 +24,21 @@
           <button type="button" :disabled="loading" @click="loadProgress">刷新</button>
         </header>
 
-        <p v-if="loading" class="progress-page__state">加载中</p>
-        <section v-else-if="errorMessage" class="progress-page__state progress-page__state--error">
-          <p>{{ errorMessage }}</p>
-          <button type="button" data-testid="retry-progress" @click="loadProgress">重试</button>
-        </section>
-        <p v-else-if="courses.length === 0" class="progress-page__state">暂无学习进度记录</p>
+        <PageState v-if="loading" state="loading" title="正在加载学习进度" />
+        <PageState
+          v-else-if="errorMessage"
+          state="error"
+          title="学习进度加载失败"
+          :message="errorMessage"
+          retry-label="重试"
+          @retry="loadProgress"
+        />
+        <PageState
+          v-else-if="courses.length === 0"
+          state="empty"
+          title="暂无学习进度记录"
+          message="开始课程学习后，进度和继续学习入口会显示在这里。"
+        />
 
         <div v-else class="progress-page__list">
           <article v-for="course in courses" :key="course.courseId" class="course-progress">
@@ -94,7 +98,7 @@
             <article v-for="student in teacherOverview.students" :key="student.studentId" class="chapter-progress">
               <div>
                 <h4>{{ student.studentName }}</h4>
-                <p>{{ student.status }}</p>
+                <p>{{ progressStatusLabel(student.status) }}</p>
               </div>
               <strong>{{ student.progressPercent }}%</strong>
             </article>
@@ -108,6 +112,9 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { getLearningProgress, getTeacherLearningProgress } from '../../api/lrn/learningProgress';
+import { currentUser } from '../../app/runtimeContext';
+import PageState from '../../components/foundation/PageState.vue';
+import type { LearningProgressStatus } from '../../types/lrn';
 import type { LearningCourseProgressAggregate, LearningProgressOverview } from '../../types/lrn';
 
 const loading = ref(false);
@@ -120,8 +127,11 @@ const teacherCourseId = ref<number | null>(Number(new URLSearchParams(window.loc
 
 const courses = computed(() => progressOverview.value?.courses ?? []);
 const isTeacher = computed(() => {
-  const role = window.localStorage.getItem('onlinejudge.userRole') ?? window.localStorage.getItem('onlinejudge.role');
-  return role === 'TEACHER' || role === 'ADMIN';
+  const trustedRoles = new Set([
+    currentUser.value?.userType,
+    ...(currentUser.value?.roles ?? [])
+  ].filter((role): role is string => Boolean(role)));
+  return trustedRoles.has('TEACHER') || trustedRoles.has('ADMIN');
 });
 const averageProgress = computed(() => {
   if (courses.value.length === 0) {
@@ -162,36 +172,20 @@ async function loadTeacherProgress() {
     teacherLoading.value = false;
   }
 }
+
+function progressStatusLabel(status: LearningProgressStatus) {
+  const labels: Record<LearningProgressStatus, string> = {
+    NOT_STARTED: '未开始',
+    IN_PROGRESS: '进行中',
+    COMPLETED: '已完成'
+  };
+  return labels[status] ?? '未知状态';
+}
 </script>
 
 <style scoped>
 .progress-page {
-  min-height: 100vh;
-  background-image: url("../../assets/back1.jpg");
-  background-size: cover;
-  background-position: top center;
-  background-repeat: no-repeat;
-  background-attachment: fixed;
   padding: 24px;
-}
-
-.progress-page__topbar {
-  display: flex;
-  margin: 0 auto 18px;
-  max-width: 1280px;
-}
-
-.progress-page__home {
-  align-items: center;
-  background: #16423c;
-  border: 1px solid #16423c;
-  border-radius: 8px;
-  color: #ffffff;
-  display: inline-flex;
-  font-weight: 800;
-  min-height: 40px;
-  padding: 0 14px;
-  text-decoration: none;
 }
 
 .progress-page__shell {

@@ -8,6 +8,7 @@
       <div class="platform-nav__links">
         <RouterLink to="/courses" data-testid="platform-nav-courses">课程</RouterLink>
         <RouterLink to="/learning/tasks" data-testid="platform-nav-learning">学习任务</RouterLink>
+        <RouterLink v-if="isAdmin" to="/admin/auth" data-testid="platform-nav-admin">权限管理</RouterLink>
       </div>
       <div class="platform-nav__account">
         <RouterLink to="/notifications" data-testid="platform-nav-notifications" aria-label="消息通知">
@@ -39,6 +40,10 @@ import { currentCourse, currentUser } from '../../app/runtimeContext';
 
 const router = useRouter();
 const logoutPending = ref(false);
+const isAdmin = computed(() => (
+  currentUser.value?.userType === 'ADMIN'
+  || currentUser.value?.roles.includes('ADMIN') === true
+));
 const avatarText = computed(() => (
   currentUser.value?.displayName?.trim().charAt(0)
   || currentUser.value?.username?.trim().charAt(0)

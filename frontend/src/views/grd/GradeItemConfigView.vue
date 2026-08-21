@@ -1,6 +1,7 @@
 <template>
   <main class="grade-items">
     <section class="grade-items__panel" aria-label="成绩项配置">
+      <h1>成绩项配置</h1>
       <form class="grade-items__form" @submit.prevent="submit">
         <label>
           <span>成绩项名称</span>
@@ -8,16 +9,25 @@
         </label>
         <label>
           <span>来源模块</span>
-          <select v-model="form.sourceType" name="sourceType">
-            <option value="LAB">LAB</option>
-            <option value="HWK">HWK</option>
-            <option value="OTHER_COURSE_ITEM">OTHER_COURSE_ITEM</option>
+          <select v-model="form.sourceType" name="sourceType" @change="changeSourceType">
+            <option value="LAB">{{ gradeSourceLabel('LAB') }}</option>
+            <option value="HWK">{{ gradeSourceLabel('HWK') }}</option>
+            <option value="OTHER_COURSE_ITEM">{{ gradeSourceLabel('OTHER_COURSE_ITEM') }}</option>
           </select>
         </label>
-        <label>
-          <span>来源任务</span>
-          <input v-model="form.sourceId" name="sourceId" type="number" min="1" />
+        <label v-if="form.sourceType !== 'OTHER_COURSE_ITEM'">
+          <span>关联任务</span>
+          <select v-model="form.sourceId" name="sourceId">
+            <option value="">{{ sourceTaskPlaceholder }}</option>
+            <option v-if="selectedTaskUnavailable" :value="form.sourceId" disabled>
+              关联任务已不可用
+            </option>
+            <option v-for="task in sourceTasks" :key="task.id" :value="String(task.id)">
+              {{ task.title }}
+            </option>
+          </select>
         </label>
+        <p v-else class="grade-items__source-note">课程内其他成绩项无需关联实验或作业任务。</p>
         <label>
           <span>满分</span>
           <input v-model="form.fullScore" name="fullScore" type="number" min="0" step="0.01" />
@@ -51,8 +61,26 @@
     </section>
 
     <section class="grade-items__list" aria-label="成绩项列表">
-      <p v-if="loading">加载中</p>
-      <p v-else-if="items.length === 0">暂无成绩项</p>
+      <PageState
+        v-if="loading"
+        state="loading"
+        title="正在加载成绩项数据"
+        message="正在获取成绩项及可关联的实验、作业任务。"
+      />
+      <PageState
+        v-else-if="loadError"
+        state="error"
+        title="成绩项数据加载失败"
+        :message="loadError"
+        retry-label="重试"
+        @retry="loadPageData"
+      />
+      <PageState
+        v-else-if="items.length === 0"
+        state="empty"
+        title="暂无成绩项"
+        message="创建成绩项后，可在这里检查来源任务、权重和总评规则。"
+      />
       <table v-else>
         <thead>
           <tr>
@@ -67,7 +95,7 @@
         <tbody>
           <tr v-for="item in items" :key="item.id">
             <td>{{ item.name }}</td>
-            <td>{{ item.sourceType }}</td>
+            <td>{{ sourceDisplay(item) }}</td>
             <td>{{ item.fullScore }}</td>
             <td>{{ item.weight }}</td>
             <td>{{ item.includedInFinal ? '是' : '否' }}</td>
@@ -84,6 +112,8 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue';
+import { listHomeworks } from '../../api/hwk/homeworks';
+import { listLabs } from '../../api/lab/labs';
 import {
   createGradeItem,
   deleteGradeItem,
@@ -91,14 +121,21 @@ import {
   updateGradeItem,
   validateGradeRules
 } from '../../api/grd/gradeItems';
+import PageState from '../../components/foundation/PageState.vue';
 import type { CreateGradeItemPayload, GradeItem, GradeItemSourceType } from '../../types/grd';
+import type { HomeworkSummary } from '../../types/hwk';
+import type { LabExperimentSummary } from '../../types/lab';
+import { gradeSourceLabel } from './grdDisplay';
 
 const props = defineProps<{
   courseId: number;
 }>();
 
 const items = ref<GradeItem[]>([]);
+const labs = ref<LabExperimentSummary[]>([]);
+const homeworks = ref<HomeworkSummary[]>([]);
 const loading = ref(false);
+const loadError = ref('');
 const saving = ref(false);
 const runningValidation = ref(false);
 const feedback = ref('');
@@ -116,16 +153,74 @@ const form = reactive({
 });
 
 const submitText = computed(() => (editingId.value === null ? '保存' : '更新'));
+const sourceTasks = computed(() => {
+  if (form.sourceType === 'LAB') {
+    return labs.value.map((lab) => ({ id: lab.id, title: lab.title }));
+  }
+  if (form.sourceType === 'HWK') {
+    return homeworks.value.map((homework) => ({ id: homework.id, title: homework.title }));
+  }
+  return [];
+});
+const sourceTaskPlaceholder = computed(() => {
+  if (sourceTasks.value.length === 0) {
+    return form.sourceType === 'LAB' ? '当前课程暂无实验任务' : '当前课程暂无作业任务';
+  }
+  return form.sourceType === 'LAB' ? '请选择实验任务' : '请选择作业任务';
+});
+const selectedTaskUnavailable = computed(() => (
+  form.sourceId !== '' && !sourceTasks.value.some((task) => String(task.id) === form.sourceId)
+));
 
-onMounted(loadItems);
+onMounted(loadPageData);
+
+async function loadPageData() {
+  loading.value = true;
+  loadError.value = '';
+  try {
+    const [nextItems, nextLabs, nextHomeworks] = await Promise.all([
+      listGradeItems(props.courseId),
+      listLabs(props.courseId),
+      loadAllHomeworks()
+    ]);
+    items.value = nextItems;
+    labs.value = nextLabs.filter((lab) => !lab.deleted);
+    homeworks.value = nextHomeworks.filter((homework) => !homework.deleted);
+  } catch (error) {
+    items.value = [];
+    labs.value = [];
+    homeworks.value = [];
+    loadError.value = error instanceof Error ? error.message : '成绩项数据加载失败';
+  } finally {
+    loading.value = false;
+  }
+}
+
+async function loadAllHomeworks() {
+  const allHomeworks: HomeworkSummary[] = [];
+  const size = 100;
+  let page = 1;
+  let total = 0;
+  do {
+    const result = await listHomeworks({ courseId: props.courseId, page, size });
+    allHomeworks.push(...result.list);
+    total = result.total;
+    page += 1;
+    if (result.list.length === 0) {
+      break;
+    }
+  } while (allHomeworks.length < total);
+  return allHomeworks;
+}
 
 async function loadItems() {
   loading.value = true;
-  errorMessage.value = '';
+  loadError.value = '';
   try {
     items.value = await listGradeItems(props.courseId);
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : '成绩项加载失败';
+    items.value = [];
+    loadError.value = error instanceof Error ? error.message : '成绩项加载失败';
   } finally {
     loading.value = false;
   }
@@ -173,6 +268,22 @@ function editItem(item: GradeItem) {
   form.includedInFinal = item.includedInFinal;
 }
 
+function changeSourceType() {
+  form.sourceId = '';
+}
+
+function sourceDisplay(item: GradeItem) {
+  if (item.sourceType === 'OTHER_COURSE_ITEM') {
+    return gradeSourceLabel(item.sourceType);
+  }
+  const task = item.sourceType === 'LAB'
+    ? labs.value.find((lab) => lab.id === item.sourceId)
+    : homeworks.value.find((homework) => homework.id === item.sourceId);
+  return task
+    ? `${gradeSourceLabel(item.sourceType)} · ${task.title}`
+    : `${gradeSourceLabel(item.sourceType)} · 关联任务已不可用`;
+}
+
 async function removeItem(item: GradeItem) {
   feedback.value = '';
   errorMessage.value = '';
@@ -210,7 +321,7 @@ function buildPayload(): CreateGradeItemPayload {
   return {
     name: form.name.trim(),
     sourceType: form.sourceType,
-    sourceId: form.sourceId ? Number(form.sourceId) : null,
+    sourceId: form.sourceType === 'OTHER_COURSE_ITEM' || !form.sourceId ? null : Number(form.sourceId),
     fullScore: Number(form.fullScore).toFixed(2),
     weight: Number(form.weight).toFixed(2),
     includedInFinal: form.includedInFinal,
@@ -223,7 +334,6 @@ function validateForm() {
   const fullScore = Number(form.fullScore);
   const weight = Number(form.weight);
   const sortOrder = Number(form.sortOrder);
-  const sourceId = Number(form.sourceId);
 
   if (!form.name.trim()) {
     errors.push('成绩项名称不能为空');
@@ -239,9 +349,9 @@ function validateForm() {
   }
   if (
     (form.sourceType === 'LAB' || form.sourceType === 'HWK') &&
-    (form.sourceId === '' || !Number.isInteger(sourceId) || sourceId <= 0)
+    !sourceTasks.value.some((task) => String(task.id) === form.sourceId)
   ) {
-    errors.push('来源任务编号必须大于 0');
+    errors.push(form.sourceType === 'LAB' ? '请选择关联实验任务' : '请选择关联作业任务');
   }
 
   return errors.join('；');
@@ -261,8 +371,8 @@ function resetForm() {
 
 <style scoped>
 .grade-items {
-  background: #f6f8fb;
-  color: #1f2937;
+  background: var(--oj-page-bg, #f6f8fb);
+  color: var(--oj-ink, #1f2937);
   display: grid;
   gap: 20px;
   min-height: 100vh;
@@ -271,8 +381,8 @@ function resetForm() {
 
 .grade-items__panel,
 .grade-items__list {
-  background: #ffffff;
-  border: 1px solid #d7dde8;
+  background: var(--oj-surface, #ffffff);
+  border: 1px solid var(--oj-border, #d7dde8);
   border-radius: 8px;
   padding: 18px;
 }
@@ -290,17 +400,17 @@ label {
 
 input,
 select {
-  background: #ffffff;
-  border: 1px solid #b8c2d2;
-  color: #111827;
+  background: var(--oj-surface, #ffffff);
+  border: 1px solid var(--oj-border-strong, #b8c2d2);
+  color: var(--oj-ink, #111827);
   min-height: 36px;
   padding: 6px 8px;
 }
 
 button {
-  background: #ffffff;
-  border: 1px solid #aeb8c8;
-  color: #111827;
+  background: var(--oj-surface, #ffffff);
+  border: 1px solid var(--oj-border-strong, #aeb8c8);
+  color: var(--oj-ink, #111827);
   min-height: 36px;
   padding: 6px 12px;
 }
@@ -320,6 +430,13 @@ button:disabled {
 
 .grade-items__actions {
   margin-top: 14px;
+}
+
+.grade-items__source-note {
+  align-self: end;
+  color: var(--oj-ink-soft, #5d7177);
+  margin: 0;
+  padding: 8px 0;
 }
 
 .grade-items__feedback {
