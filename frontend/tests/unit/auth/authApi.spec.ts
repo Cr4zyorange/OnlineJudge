@@ -21,6 +21,7 @@ import {
   updateUserRoles
 } from '../../../src/api/auth/auth';
 import type { AdminUserPayload } from '../../../src/api/auth/auth';
+import { currentCourse, currentUser, resetRuntimeContext } from '../../../src/app/runtimeContext';
 
 describe('AUTH API client', () => {
   beforeEach(() => {
@@ -29,10 +30,30 @@ describe('AUTH API client', () => {
 
   afterEach(() => {
     clearAuthSession();
+    resetRuntimeContext();
     vi.restoreAllMocks();
     if (typeof window.localStorage.clear === 'function') {
       window.localStorage.clear();
     }
+  });
+
+  it('clears cached user and course context together with persisted authentication', () => {
+    window.localStorage.setItem('onlinejudge.authToken', 'stale-token');
+    currentUser.value = {
+      id: 45,
+      username: 'student45',
+      userType: 'STUDENT',
+      displayName: '学生45',
+      roles: ['STUDENT'],
+      permissions: ['course:view']
+    };
+    currentCourse.value = { id: 101, name: '软件工程' } as typeof currentCourse.value;
+
+    clearAuthSession();
+
+    expect(window.localStorage.getItem('onlinejudge.authToken')).toBeNull();
+    expect(currentUser.value).toBeNull();
+    expect(currentCourse.value).toBeNull();
   });
 
   it('registers users through the documented AUTH endpoint without requiring existing login state', async () => {

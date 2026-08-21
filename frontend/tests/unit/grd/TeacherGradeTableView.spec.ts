@@ -2,12 +2,52 @@ import { mount } from '@vue/test-utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import TeacherGradeTableView from '../../../src/views/grd/TeacherGradeTableView.vue';
 import * as gradeRecordsApi from '../../../src/api/grd/gradeRecords';
+import * as gradeItemsApi from '../../../src/api/grd/gradeItems';
 
 vi.mock('../../../src/api/grd/gradeRecords');
+vi.mock('../../../src/api/grd/gradeItems');
 
 describe('TeacherGradeTableView', () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    vi.mocked(gradeItemsApi.listGradeItems).mockResolvedValue([
+      {
+        id: 1,
+        courseId: 101,
+        name: '数据结构实验',
+        sourceType: 'LAB',
+        sourceId: 301,
+        fullScore: '100.00',
+        weight: '0.40',
+        includedInFinal: true,
+        enabled: true,
+        sortOrder: 1
+      },
+      {
+        id: 2,
+        courseId: 101,
+        name: '单元测试作业',
+        sourceType: 'HWK',
+        sourceId: 401,
+        fullScore: '100.00',
+        weight: '0.40',
+        includedInFinal: true,
+        enabled: true,
+        sortOrder: 2
+      },
+      {
+        id: 7,
+        courseId: 101,
+        name: '阶段测验',
+        sourceType: 'OTHER_COURSE_ITEM',
+        sourceId: null,
+        fullScore: '100.00',
+        weight: '0.20',
+        includedInFinal: true,
+        enabled: true,
+        sortOrder: 3
+      }
+    ]);
   });
 
   it('syncs source grades and renders calculated final score and incomplete status', async () => {
@@ -75,7 +115,8 @@ describe('TeacherGradeTableView', () => {
     expect(wrapper.text()).toContain('601');
     expect(wrapper.text()).toContain('84.00');
     expect(wrapper.text()).toContain('603');
-    expect(wrapper.text()).toContain('INCOMPLETE');
+    expect(wrapper.text()).toContain('待补全');
+    expect(wrapper.text()).not.toContain('INCOMPLETE');
   });
 
   it('queries the grade table with filters and page navigation', async () => {
@@ -125,7 +166,10 @@ describe('TeacherGradeTableView', () => {
     await flushPromises();
 
     await wrapper.get('[data-testid="student-keyword"]').setValue('603');
-    await wrapper.get('[data-testid="grade-item-id"]').setValue('7');
+    const gradeItemFilter = wrapper.get('[data-testid="grade-item-id"]');
+    expect(gradeItemFilter.element.tagName).toBe('SELECT');
+    expect(gradeItemFilter.text()).toContain('阶段测验');
+    await gradeItemFilter.setValue('7');
     await wrapper.get('[data-testid="grade-status"]').setValue('MISSING');
     await wrapper.get('[data-testid="publish-status"]').setValue('UNPUBLISHED');
     await wrapper.get('[data-testid="page-size"]').setValue('10');
@@ -265,6 +309,8 @@ describe('TeacherGradeTableView', () => {
 
     expect(wrapper.text()).toContain('成绩明细');
     expect(wrapper.text()).toContain('90.00');
+    expect(wrapper.text()).toContain('数据结构实验');
+    expect(wrapper.text()).not.toContain('成绩项 1');
 
     await wrapper.get('[data-testid="adjustment-score"]').setValue('95.00');
     await wrapper.get('[data-testid="adjustment-reason"]').setValue('复核测试用例后修正');
@@ -282,7 +328,52 @@ describe('TeacherGradeTableView', () => {
     });
     expect(wrapper.text()).toContain('调整完成：90.00 -> 95.00');
     expect(wrapper.text()).toContain('复核测试用例后修正');
-    expect(wrapper.text()).toContain('ADJUSTED');
+    expect(wrapper.text()).toContain('已调整');
+    expect(wrapper.text()).not.toContain('ADJUSTED');
+  });
+
+  it('clears stale student detail controls when a refreshed grade-table request fails', async () => {
+    vi.mocked(gradeRecordsApi.listCourseGrades)
+      .mockResolvedValueOnce({
+        records: [
+          {
+            studentId: 601,
+            summary: {
+              id: 1,
+              courseId: 101,
+              studentId: 601,
+              finalScore: '84.00',
+              finalStatus: 'CALCULATED',
+              publishStatus: 'UNPUBLISHED'
+            },
+            records: []
+          }
+        ],
+        total: 1,
+        page: 1,
+        size: 20
+      })
+      .mockRejectedValueOnce(new Error('成绩服务暂时不可用'));
+    vi.mocked(gradeRecordsApi.listGradeChangeLogs).mockResolvedValue({
+      records: [],
+      total: 0,
+      page: 1,
+      size: 20
+    });
+
+    const wrapper = mount(TeacherGradeTableView, { props: { courseId: 101 } });
+    await flushPromises();
+
+    await wrapper.get('[data-testid="detail-student-601"]').trigger('click');
+    await flushPromises();
+    expect(wrapper.find('[data-testid="publish-selected-student"]').exists()).toBe(true);
+
+    await wrapper.get('[data-testid="grade-filter-form"]').trigger('submit');
+    await flushPromises();
+
+    expect(wrapper.text()).toContain('成绩服务暂时不可用');
+    expect(wrapper.find('[data-testid="publish-selected-student"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="submit-adjustment"]').exists()).toBe(false);
   });
 
   it('submits a reasoned final-score adjustment from the student detail panel', async () => {
@@ -359,7 +450,8 @@ describe('TeacherGradeTableView', () => {
       reason: '课程总评复核修正'
     });
     expect(wrapper.text()).toContain('总评调整完成：84.00 -> 88.00');
-    expect(wrapper.text()).toContain('ADJUSTED');
+    expect(wrapper.text()).toContain('已调整');
+    expect(wrapper.text()).not.toContain('ADJUSTED');
   });
 
   it('publishes selected student grades and renders the publish record', async () => {
@@ -448,9 +540,11 @@ describe('TeacherGradeTableView', () => {
       page: 1,
       size: 20
     });
-    expect(wrapper.text()).toContain('发布完成：1 名学生可查看成绩，通知状态 SENT');
-    expect(wrapper.text()).toContain('PARTIAL_STUDENTS');
-    expect(wrapper.text()).toContain('PUBLISHED');
+    expect(wrapper.text()).toContain('发布完成：1 名学生可查看成绩，通知状态 已发送');
+    expect(wrapper.text()).toContain('指定学生');
+    expect(wrapper.text()).toContain('已发布');
+    expect(wrapper.text()).not.toContain('PARTIAL_STUDENTS');
+    expect(wrapper.text()).not.toContain('PUBLISHED');
   });
 
   it('loads publish records when the grade table first renders', async () => {
@@ -489,8 +583,10 @@ describe('TeacherGradeTableView', () => {
       page: 1,
       size: 20
     });
-    expect(wrapper.text()).toContain('PARTIAL_STUDENTS');
-    expect(wrapper.text()).toContain('通知 SENT');
+    expect(wrapper.text()).toContain('指定学生');
+    expect(wrapper.text()).not.toContain('PARTIAL_STUDENTS');
+    expect(wrapper.text()).toContain('通知 已发送');
+    expect(wrapper.text()).not.toContain('SENT');
   });
 
   it('renders course grade analysis and refreshes a selected grade item analysis', async () => {
@@ -562,12 +658,16 @@ describe('TeacherGradeTableView', () => {
     expect(wrapper.text()).toContain('80-89：1');
 
     await wrapper.get('[data-testid="analysis-target-type"]').setValue('GRADE_ITEM');
-    await wrapper.get('[data-testid="analysis-grade-item-id"]').setValue('2');
+    const analysisGradeItem = wrapper.get('[data-testid="analysis-grade-item-id"]');
+    expect(analysisGradeItem.element.tagName).toBe('SELECT');
+    expect(analysisGradeItem.text()).toContain('单元测试作业');
+    await analysisGradeItem.setValue('2');
     await wrapper.get('[data-testid="analysis-form"]').trigger('submit');
     await flushPromises();
 
     expect(gradeRecordsApi.getGradeItemCompletion).toHaveBeenCalledWith(101, 2);
-    expect(wrapper.text()).toContain('成绩项 2');
+    expect(wrapper.text()).toContain('单元测试作业');
+    expect(wrapper.text()).not.toContain('成绩项 2');
     expect(wrapper.text()).toContain('80.00');
     expect(wrapper.text()).toContain('已提交 2');
     expect(wrapper.text()).toContain('待评分 1');
@@ -637,7 +737,8 @@ describe('TeacherGradeTableView', () => {
       page: 1,
       size: 20
     });
-    expect(wrapper.text()).toContain('APPROVED');
+    expect(wrapper.text()).toContain('已同意');
+    expect(wrapper.text()).not.toContain('APPROVED');
     expect(wrapper.text()).toContain('复核后确认补交成绩');
     expect(wrapper.text()).toContain('确认补交成绩有效');
     expect(wrapper.text()).toContain('88.00');
@@ -735,7 +836,8 @@ describe('TeacherGradeTableView', () => {
       adjustedScore: '88.00',
       responseComment: '确认补交成绩有效'
     });
-    expect(wrapper.text()).toContain('复核已处理：APPROVED');
+    expect(wrapper.text()).toContain('复核已处理：已同意');
+    expect(wrapper.text()).not.toContain('APPROVED');
     expect(wrapper.text()).toContain('确认补交成绩有效');
   });
 });

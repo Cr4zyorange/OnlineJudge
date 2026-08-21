@@ -48,8 +48,19 @@ describe('AuthAdminView', () => {
           clientIp: '203.0.113.50',
           userAgent: 'AuditTest/50',
           createdAt: '2026-06-01T12:00:00'
+        }, {
+          logId: 49,
+          operatorId: null,
+          operationType: 'ACCESS_DENIED',
+          targetType: 'PERMISSION',
+          targetId: 'auth:manage',
+          resultStatus: 'DENIED',
+          failureReason: '缺少权限：auth:manage',
+          clientIp: null,
+          userAgent: null,
+          createdAt: '2026-06-01T11:30:00'
         }],
-        total: 1
+        total: 2
       }))
       .mockResolvedValueOnce(jsonResponse({
         id: 46,
@@ -123,8 +134,25 @@ describe('AuthAdminView', () => {
     expect(wrapper.text()).toContain('角色管理');
     expect(wrapper.text()).toContain('权限分配');
     expect(wrapper.text()).toContain('用户角色分配');
-    expect(wrapper.text()).toContain('UI-AUTH-09');
-    expect(wrapper.text()).toContain('LOGIN_FAILURE');
+    expect(wrapper.text()).toContain('安全审计');
+    expect(wrapper.text()).not.toContain('UI-AUTH-09');
+    expect(wrapper.text()).toContain('失败');
+    expect(wrapper.get('.audit-row mark').text()).toBe('失败');
+    const auditRows = wrapper.findAll('.audit-row');
+    expect(auditRows[0].text()).toContain('登录失败');
+    expect(auditRows[0].text()).toContain('记录 #50');
+    expect(auditRows[0].text()).toContain('操作人 #1');
+    expect(auditRows[0].text()).toContain('用户账号：teacher46');
+    expect(auditRows[0].text()).not.toContain('LOGIN_FAILURE');
+    expect(auditRows[0].text()).not.toContain('AUTH_USER');
+    expect(auditRows[1].text()).toContain('访问被拒绝');
+    expect(auditRows[1].text()).toContain('系统自动执行');
+    expect(auditRows[1].text()).toContain('权限点：auth:manage');
+    expect(auditRows[1].text()).not.toContain('ACCESS_DENIED');
+    expect(auditRows[1].text()).not.toContain('PERMISSION');
+    expect(auditRows[1].text()).not.toContain('SYSTEM');
+    expect(wrapper.find('input[name="operationType"]').exists()).toBe(false);
+    expect(wrapper.get('select[name="operationType"] option[value="LOGIN_FAILURE"]').text()).toBe('登录失败');
     expect(wrapper.text()).toContain('203.0.113.50');
     expect(wrapper.text()).toContain('teacher46');
     expect(wrapper.text()).toContain('auth:manage');
@@ -163,16 +191,18 @@ describe('AuthAdminView', () => {
     await wrapper.find('[data-toggle-user-status="46"]').trigger('click');
     await flushPromises();
     expect(wrapper.text()).toContain('账号状态已更新');
-    expect(wrapper.text()).toContain('DISABLED');
+    expect(wrapper.text()).toContain('已禁用');
+    expect(wrapper.text()).not.toContain('DISABLED');
 
     await wrapper.find('input[name="operatorId"]').setValue('1');
-    await wrapper.find('input[name="operationType"]').setValue('LOGIN_SUCCESS');
+    await wrapper.find('select[name="operationType"]').setValue('LOGIN_SUCCESS');
     await wrapper.find('select[name="resultStatus"]').setValue('SUCCESS');
     await wrapper.find('input[name="startTime"]').setValue('2026-06-01T00:00');
     await wrapper.find('input[name="endTime"]').setValue('2026-06-01T23:59');
     await wrapper.find('[data-audit-filter-form]').trigger('submit');
     await flushPromises();
-    expect(wrapper.text()).toContain('LOGIN_SUCCESS');
+    expect(wrapper.text()).toContain('登录成功');
+    expect(wrapper.text()).not.toContain('LOGIN_SUCCESS');
     expect(wrapper.text()).toContain('203.0.113.51');
 
     expect(fetchMock).toHaveBeenNthCalledWith(4, '/api/v1/admin/audit-logs?page=1&size=20', expect.objectContaining({

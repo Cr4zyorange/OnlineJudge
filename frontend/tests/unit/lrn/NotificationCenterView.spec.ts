@@ -60,15 +60,65 @@ describe('NotificationCenterView', () => {
       size: 20
     }));
     expect(wrapper.text()).toContain('消息通知中心');
-    expect(wrapper.get('[data-testid="lrn-home-entry"]').attributes('href')).toBe('/');
+    expect(wrapper.find('[data-testid="lrn-home-entry"]').exists()).toBe(false);
     expect(wrapper.text()).not.toContain('UI-LRN-04');
     expect(wrapper.text()).not.toContain('API-LRN-06');
     expect(wrapper.text()).toContain('未读 1');
     expect(wrapper.text()).toContain('任务通知');
     expect(wrapper.text()).toContain('成绩通知');
     expect(wrapper.text()).toContain('新作业发布：Java 编程题');
+    expect(wrapper.text()).toContain('作业任务');
+    expect(wrapper.text()).toContain('成绩中心');
+    expect(wrapper.text()).not.toContain('HWK #501');
+    expect(wrapper.text()).not.toContain('GRD #801');
     expect(wrapper.get('[data-testid="notification-card-10"]').classes()).toContain('notification-card--unread');
     expect(wrapper.get('a[href="/courses/101/homeworks/501"]').text()).toContain('查看详情');
+    expect(wrapper.get('a[href="/courses/101/grades"]').text()).toContain('查看详情');
+  });
+
+  it('renders a friendly unavailable state instead of a dead hash link', async () => {
+    vi.mocked(notificationsApi.listNotifications).mockResolvedValueOnce({
+      records: [{
+        ...notificationPage.records[0],
+        notificationId: 12,
+        sourceModule: 'SYSTEM',
+        sourceId: null,
+        actionUrl: null
+      }],
+      total: 1,
+      page: 1,
+      size: 20,
+      unreadCount: 1
+    });
+
+    const wrapper = mount(NotificationCenterView);
+    await flushPromises();
+
+    expect(wrapper.text()).toContain('入口已失效');
+    expect(wrapper.find('a[href="#"]').exists()).toBe(false);
+    expect(wrapper.get('[data-testid="notification-fallback-12"]').attributes('href')).toBe('/learning/tasks');
+  });
+
+  it('replaces an obsolete same-origin route with a recoverable course destination', async () => {
+    vi.mocked(notificationsApi.listNotifications).mockResolvedValueOnce({
+      records: [{
+        ...notificationPage.records[0],
+        notificationId: 13,
+        sourceModule: 'LAB',
+        actionUrl: '/deleted/labs/501'
+      }],
+      total: 1,
+      page: 1,
+      size: 20,
+      unreadCount: 1
+    });
+
+    const wrapper = mount(NotificationCenterView);
+    await flushPromises();
+
+    expect(wrapper.text()).toContain('入口已失效');
+    expect(wrapper.find('a[href="/deleted/labs/501"]').exists()).toBe(false);
+    expect(wrapper.get('[data-testid="notification-fallback-13"]').attributes('href')).toBe('/courses/101');
   });
 
   it('reloads from the first page when filters change and shows empty state', async () => {
@@ -105,7 +155,7 @@ describe('NotificationCenterView', () => {
 
     expect(wrapper.text()).toContain('通知加载失败');
 
-    await wrapper.get('[data-testid="retry-notifications"]').trigger('click');
+    await wrapper.get('[data-testid="page-state-retry"]').trigger('click');
     await flushPromises();
 
     expect(notificationsApi.listNotifications).toHaveBeenCalledTimes(2);

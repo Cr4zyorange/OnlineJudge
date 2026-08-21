@@ -81,8 +81,16 @@ describe('StudentGradeView', () => {
 
     expect(mockedGetMyPublishedGrades).toHaveBeenCalledWith(101);
     expect(wrapper.text()).toContain('84.00');
-    expect(wrapper.text()).toContain('LAB #301');
-    expect(wrapper.text()).toContain('HWK #401');
+    expect(wrapper.text()).toContain('实验任务');
+    expect(wrapper.text()).toContain('作业任务');
+    expect(wrapper.text()).toContain('已计算');
+    expect(wrapper.text()).not.toContain('LAB #301');
+    expect(wrapper.text()).not.toContain('HWK #401');
+    expect(wrapper.text()).not.toContain('成绩项 1');
+    expect(wrapper.text()).not.toContain('成绩项 2');
+    expect(wrapper.text()).toContain('第 1 项');
+    expect(wrapper.text()).toContain('第 2 项');
+    expect(wrapper.text()).not.toContain('CALCULATED');
     expect(wrapper.text()).toContain('36.00');
     expect(wrapper.text()).toContain('48.00');
     expect(wrapper.text()).toContain('实验完成度良好');
@@ -169,8 +177,32 @@ describe('StudentGradeView', () => {
       reason: '总评未计入补交成绩'
     });
     expect(wrapper.text()).toContain('异议已提交，等待教师复核');
-    expect(wrapper.text()).toContain('PENDING');
+    expect(wrapper.text()).toContain('待处理');
+    expect(wrapper.text()).not.toContain('PENDING');
     expect(wrapper.text()).toContain('总评未计入补交成绩');
+  });
+
+  it('keeps a failed review query distinguishable from an empty review list and retries it', async () => {
+    mockedGetMyPublishedGrades.mockResolvedValueOnce({
+      studentId: 601,
+      summary: null,
+      records: []
+    });
+    mockedListMyGradeReviewRequests
+      .mockRejectedValueOnce(new Error('复核服务暂不可用'))
+      .mockResolvedValueOnce({ records: [], total: 0, page: 1, size: 20 });
+
+    const wrapper = mount(StudentGradeView, { props: { courseId: 101 } });
+    await flushPromises();
+
+    expect(wrapper.text()).toContain('复核服务暂不可用');
+    expect(wrapper.text()).not.toContain('暂无复核记录');
+
+    await wrapper.get('[data-testid="page-state-retry"]').trigger('click');
+    await flushPromises();
+
+    expect(mockedListMyGradeReviewRequests).toHaveBeenCalledTimes(2);
+    expect(wrapper.text()).toContain('暂无复核记录');
   });
 });
 
