@@ -11,7 +11,6 @@ import com.onlinejudge.hwk.domain.HomeworkRepository;
 import com.onlinejudge.hwk.domain.HomeworkReviewLog;
 import com.onlinejudge.hwk.domain.HomeworkReviewLogRepository;
 import com.onlinejudge.hwk.domain.HomeworkReviewOperationType;
-import com.onlinejudge.hwk.domain.HomeworkReviewStatus;
 import com.onlinejudge.hwk.domain.HomeworkStatus;
 import com.onlinejudge.hwk.domain.HomeworkSubmission;
 import com.onlinejudge.hwk.domain.HomeworkSubmissionRepository;
@@ -25,14 +24,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.LocalDateTime;
-import java.util.Comparator;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Objects;
 import java.util.Optional;
-import java.util.Set;
 
 @Service
 public class HomeworkService {
@@ -267,59 +261,6 @@ public class HomeworkService {
         return published;
     }
 
-    public HomeworkStatistics statistics(long homeworkId, long managerId, int page, int size) {
-        Homework homework = findExisting(homeworkId);
-        requireManagePermission(homework.courseId(), managerId);
-        int normalizedPage = Math.max(page, 1);
-        int normalizedSize = Math.max(1, Math.min(size, 100));
-        List<Long> courseStudentIds = coursePermissionClient.listCourseStudentIds(homework.courseId()).stream()
-                .filter(Objects::nonNull)
-                .distinct()
-                .sorted()
-                .toList();
-        List<HomeworkSubmission> submissions = finalSubmissions(homeworkId);
-        Set<Long> submittedStudentIds = new HashSet<>();
-        submissions.forEach(submission -> submittedStudentIds.add(submission.studentId()));
-        List<Long> unsubmittedStudentIds = courseStudentIds.stream()
-                .filter(studentId -> !submittedStudentIds.contains(studentId))
-                .toList();
-        List<BigDecimal> scores = submissions.stream()
-                .map(this::effectiveScore)
-                .flatMap(Optional::stream)
-                .toList();
-        BigDecimal average = scores.isEmpty() ? null : scores.stream()
-                .reduce(BigDecimal.ZERO, BigDecimal::add)
-                .divide(BigDecimal.valueOf(scores.size()), 2, RoundingMode.HALF_UP);
-        BigDecimal max = scores.stream().max(Comparator.naturalOrder()).orElse(null);
-        BigDecimal min = scores.stream().min(Comparator.naturalOrder()).orElse(null);
-        int evaluatedCount = (int) submissions.stream().filter(this::evaluationCompleted).count();
-        int reviewedCount = (int) submissions.stream()
-                .filter(submission -> submission.reviewStatus() == HomeworkReviewStatus.REVIEWED)
-                .count();
-        int totalStudentCount = courseStudentIds.isEmpty() ? submittedStudentIds.size() : courseStudentIds.size();
-        long unsubmittedOffset = ((long) normalizedPage - 1L) * normalizedSize;
-        int fromIndex = unsubmittedOffset >= unsubmittedStudentIds.size()
-                ? unsubmittedStudentIds.size()
-                : (int) unsubmittedOffset;
-        int toIndex = Math.min(fromIndex + normalizedSize, unsubmittedStudentIds.size());
-        return new HomeworkStatistics(
-                homework.id(),
-                homework.courseId(),
-                totalStudentCount,
-                submittedStudentIds.size(),
-                Math.max(totalStudentCount - submittedStudentIds.size(), unsubmittedStudentIds.size()),
-                evaluatedCount,
-                reviewedCount,
-                average,
-                max,
-                min,
-                normalizedPage,
-                normalizedSize,
-                unsubmittedStudentIds.size(),
-                unsubmittedStudentIds.subList(fromIndex, toIndex)
-        );
-    }
-
     public List<HomeworkSubmission> finalSubmissions(long homeworkId) {
         return submissionRepository.findFinalByHomeworkId(homeworkId);
     }
@@ -332,24 +273,6 @@ public class HomeworkService {
             return Optional.of(BigDecimal.valueOf(submission.autoScore()));
         }
         return Optional.empty();
-    }
-
-    public record HomeworkStatistics(
-            long homeworkId,
-            long courseId,
-            int totalStudentCount,
-            int submittedCount,
-            int unsubmittedCount,
-            int evaluatedCount,
-            int reviewedCount,
-            BigDecimal averageScore,
-            BigDecimal maxScore,
-            BigDecimal minScore,
-            int unsubmittedPage,
-            int unsubmittedSize,
-            int unsubmittedTotal,
-            List<Long> unsubmittedStudentIds
-    ) {
     }
 
     private Homework findExisting(long homeworkId) {
@@ -368,12 +291,6 @@ public class HomeworkService {
         if (!coursePermissionClient.canViewCourse(courseId, userId)) {
             throw new HomeworkApiException("HWK_4031", "course access denied", HttpStatus.FORBIDDEN);
         }
-    }
-
-    private boolean evaluationCompleted(HomeworkSubmission submission) {
-        return submission.evaluationStatus() != com.onlinejudge.common.evaluation.EvaluationStatus.NONE
-                && submission.evaluationStatus() != com.onlinejudge.common.evaluation.EvaluationStatus.PENDING
-                && submission.evaluationStatus() != com.onlinejudge.common.evaluation.EvaluationStatus.RUNNING;
     }
 
     private void publishScoreNotification(

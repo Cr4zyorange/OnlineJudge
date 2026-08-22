@@ -28,6 +28,11 @@ CREATE TABLE IF NOT EXISTS t_hwk_submission (
     KEY idx_hwk_submission_evaluation (evaluation_status),
     KEY idx_hwk_submission_review (review_status),
     KEY idx_hwk_submission_submitted_at (submitted_at),
+    KEY idx_hwk_submission_effective (homework_id, is_final, is_deleted, submit_status, student_id),
+    KEY idx_hwk_submission_attention (
+        homework_id, is_final, is_deleted, submitted_at, id,
+        submit_status, student_id, submit_type, evaluation_status, review_status
+    ),
     UNIQUE KEY uk_hwk_submission_version (homework_id, student_id, version),
     CONSTRAINT fk_hwk_submission_homework
         FOREIGN KEY (homework_id) REFERENCES t_hwk_homework(id) ON DELETE CASCADE

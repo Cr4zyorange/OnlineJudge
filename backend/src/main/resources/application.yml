@@ -19,6 +19,7 @@ spring:
         - file:../database/migrations/20260601_02_create_lab_evaluation.sql
         - file:../database/migrations/20260530_01_create_hwk_homework.sql
         - file:../database/migrations/20260601_01_create_hwk_submission.sql
+        - classpath:h2-hwk-statistics-attention-indexes.sql
         - file:../database/migrations/20260530_01_create_lrn_learning_task.sql
         - file:../database/migrations/20260531_01_create_lrn_learning_progress.sql
 
