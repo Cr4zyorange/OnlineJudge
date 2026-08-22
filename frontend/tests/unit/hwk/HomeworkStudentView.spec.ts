@@ -1,16 +1,34 @@
-import { config, flushPromises, mount, RouterLinkStub } from '@vue/test-utils';
+import { config, flushPromises, mount, RouterLinkStub, type VueWrapper } from '@vue/test-utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import HomeworkStudentView from '../../../src/views/hwk/HomeworkStudentView.vue';
 import * as homeworkApi from '../../../src/api/hwk/homeworks';
 import * as learningProgressApi from '../../../src/api/lrn/learningProgress';
 import * as learningRecordsApi from '../../../src/api/lrn/learningRecords';
+import { currentUser } from '../../../src/app/runtimeContext';
 import type {
+  HomeworkAttachmentUpload,
   HomeworkDetail,
   HomeworkEvaluationResult,
   HomeworkSubmissionSummary
 } from '../../../src/types/hwk';
 
-vi.mock('../../../src/api/hwk/homeworks');
+const attachmentApiMocks = vi.hoisted(() => ({
+  uploadHomeworkAttachment: vi.fn(),
+  getHomeworkAttachment: vi.fn(),
+  deleteHomeworkAttachment: vi.fn()
+}));
+
+vi.mock('../../../src/api/hwk/homeworks', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../src/api/hwk/homeworks')>();
+  return {
+    ...actual,
+    getHomeworkDetail: vi.fn(),
+    getHomeworkSubmissionEvaluation: vi.fn(),
+    listMyHomeworkSubmissions: vi.fn(),
+    submitHomework: vi.fn(),
+    ...attachmentApiMocks
+  };
+});
 vi.mock('../../../src/api/lrn/learningProgress');
 vi.mock('../../../src/api/lrn/learningRecords');
 
@@ -24,6 +42,7 @@ describe('HomeworkStudentView', () => {
     vi.resetAllMocks();
     vi.useRealTimers();
     window.sessionStorage.clear();
+    currentUser.value = null;
     window.history.replaceState({}, '', '/courses/101/homeworks/11?role=student');
     vi.mocked(homeworkApi.listMyHomeworkSubmissions).mockResolvedValue([]);
     vi.mocked(learningRecordsApi.reportLearningRecord).mockResolvedValue({
@@ -764,7 +783,7 @@ describe('HomeworkStudentView', () => {
     }));
   });
 
-  it('uses a real file picker and blocks FILE submission while the upload API is unavailable', async () => {
+  it('uses a real file picker and exposes the completed attachment upload workflow', async () => {
     vi.mocked(homeworkApi.getHomeworkDetail).mockResolvedValueOnce(homeworkDetail({
       type: 'FILE'
     }));
@@ -776,13 +795,324 @@ describe('HomeworkStudentView', () => {
 
     expect(wrapper.find('input[name="fileIds"]').exists()).toBe(false);
     expect(wrapper.get('input[name="homeworkFile"]').attributes('type')).toBe('file');
-    expect(wrapper.get('[data-testid="homework-file-blocker"]').text())
-      .toContain('附件上传通道尚未提供');
+    expect(wrapper.find('[data-testid="homework-file-blocker"]').exists()).toBe(false);
+    expect(wrapper.get('[data-action="upload-homework-file"]').text()).toContain('上传附件');
     expect(wrapper.get('[data-testid="homework-primary-submit"]').attributes('disabled')).toBeDefined();
+  });
+
+  it('uploads one FILE attachment and submits only the returned opaque file id', async () => {
+    currentUser.value = studentUser();
+    vi.mocked(homeworkApi.getHomeworkDetail).mockResolvedValueOnce(homeworkDetail({ type: 'FILE' }));
+    attachmentApiMocks.uploadHomeworkAttachment.mockResolvedValueOnce(attachmentUpload());
+    vi.mocked(homeworkApi.submitHomework).mockResolvedValueOnce(submissionReceipt());
+    const wrapper = mount(HomeworkStudentView, {
+      props: { courseId: 101, homeworkId: 11, mode: 'submit' }
+    });
+    await flushPromises();
+
+    const file = new File(['private report bytes'], '课程报告.pdf', { type: 'application/pdf' });
+    await chooseFile(wrapper, file);
+    await wrapper.get('[data-action="upload-homework-file"]').trigger('click');
+    await flushPromises();
+
+    expect(attachmentApiMocks.uploadHomeworkAttachment).toHaveBeenCalledWith(11, file);
+    expect(wrapper.get('[data-testid="homework-file-name"]').text()).toContain('课程报告.pdf');
+    const storageKey = 'oj:hwk-file-upload:v1:601:101:11';
+    const persisted = window.sessionStorage.getItem(storageKey);
+    expect(persisted).toContain('85c3d5a0-2140-4d80-9000-000000000011');
+    expect(persisted).toContain('课程报告.pdf');
+    expect(persisted).not.toContain('private report bytes');
+    expect(persisted).not.toContain('fileUrl');
+    expect(persisted).not.toContain('storageKey');
 
     await wrapper.get('form').trigger('submit');
     await flushPromises();
-    expect(homeworkApi.submitHomework).not.toHaveBeenCalled();
+
+    expect(homeworkApi.submitHomework).toHaveBeenCalledWith(11, expect.objectContaining({
+      fileIds: ['85c3d5a0-2140-4d80-9000-000000000011']
+    }));
+    expect(window.sessionStorage.getItem(storageKey)).toBeNull();
+    expect((wrapper.get('input[name="homeworkFile"]').element as HTMLInputElement).value).toBe('');
+  });
+
+  it('treats an uploaded but unsubmitted attachment as unsaved work when the tab closes', async () => {
+    currentUser.value = studentUser();
+    const addListener = vi.spyOn(window, 'addEventListener');
+    vi.mocked(homeworkApi.getHomeworkDetail).mockResolvedValueOnce(homeworkDetail({ type: 'FILE' }));
+    attachmentApiMocks.uploadHomeworkAttachment.mockResolvedValueOnce(attachmentUpload());
+    const wrapper = mount(HomeworkStudentView, {
+      props: { courseId: 101, homeworkId: 11, mode: 'submit' }
+    });
+    await flushPromises();
+
+    await chooseFile(wrapper, new File(['unsubmitted'], '待提交报告.pdf', { type: 'application/pdf' }));
+    await wrapper.get('[data-action="upload-homework-file"]').trigger('click');
+    await flushPromises();
+
+    const unloadHandler = addListener.mock.calls.find(([eventName]) => eventName === 'beforeunload')?.[1];
+    expect(unloadHandler).toEqual(expect.any(Function));
+    const event = new Event('beforeunload', { cancelable: true });
+    (unloadHandler as EventListener)(event);
+
+    expect(event.defaultPrevented).toBe(true);
+    expect(window.sessionStorage.getItem('oj:hwk-file-upload:v1:601:101:11')).toContain('000000000011');
+    wrapper.unmount();
+  });
+
+  it('retains the selected File after upload failure and retries the same file', async () => {
+    currentUser.value = studentUser();
+    vi.mocked(homeworkApi.getHomeworkDetail).mockResolvedValueOnce(homeworkDetail({ type: 'FILE' }));
+    attachmentApiMocks.uploadHomeworkAttachment
+      .mockRejectedValueOnce(new Error('附件存储服务暂不可用'))
+      .mockResolvedValueOnce(attachmentUpload());
+    const wrapper = mount(HomeworkStudentView, {
+      props: { courseId: 101, homeworkId: 11, mode: 'submit' }
+    });
+    await flushPromises();
+
+    const file = new File(['retry bytes'], '可重试报告.pdf', { type: 'application/pdf' });
+    await chooseFile(wrapper, file);
+    const upload = wrapper.get('[data-action="upload-homework-file"]');
+    await upload.trigger('click');
+    await flushPromises();
+
+    expect(wrapper.get('[data-testid="homework-file-upload-error"]').text()).toContain('附件存储服务暂不可用');
+    expect((wrapper.get('input[name="homeworkFile"]').element as HTMLInputElement).files?.[0]).toBe(file);
+
+    await upload.trigger('click');
+    await flushPromises();
+    expect(attachmentApiMocks.uploadHomeworkAttachment).toHaveBeenNthCalledWith(2, 11, file);
+    expect(wrapper.get('[data-testid="homework-file-name"]').text()).toContain('课程报告.pdf');
+  });
+
+  it.each([
+    ['HWK_4131', '附件大小超过 10 MiB，请重新选择较小的文件'],
+    ['HWK_4151', '不支持该附件类型，请重新选择允许的文件'],
+    ['HWK_4005', '附件为空或文件内容无效，请重新选择有效文件']
+  ])('maps deterministic upload error %s and requires a new file selection', async (code, expectedMessage) => {
+    currentUser.value = studentUser();
+    vi.mocked(homeworkApi.getHomeworkDetail).mockResolvedValueOnce(homeworkDetail({ type: 'FILE' }));
+    attachmentApiMocks.uploadHomeworkAttachment.mockRejectedValueOnce(codedError(code, 'backend english error'));
+    const wrapper = mount(HomeworkStudentView, {
+      props: { courseId: 101, homeworkId: 11, mode: 'submit' }
+    });
+    await flushPromises();
+
+    await chooseFile(wrapper, new File(['server validated bytes'], '待校验报告.pdf', { type: 'application/pdf' }));
+    await wrapper.get('[data-action="upload-homework-file"]').trigger('click');
+    await flushPromises();
+
+    expect(wrapper.get('[data-testid="homework-file-upload-error"]').text()).toContain(expectedMessage);
+    expect(wrapper.text()).not.toContain('backend english error');
+    expect(wrapper.text()).not.toContain('已选择：待校验报告.pdf');
+    expect(wrapper.get('[data-action="upload-homework-file"]').attributes('disabled')).toBeDefined();
+  });
+
+  it('shows the FILE constraints and rejects an oversized selection before upload', async () => {
+    currentUser.value = studentUser();
+    vi.mocked(homeworkApi.getHomeworkDetail).mockResolvedValueOnce(homeworkDetail({ type: 'FILE' }));
+    const wrapper = mount(HomeworkStudentView, {
+      props: { courseId: 101, homeworkId: 11, mode: 'submit' }
+    });
+    await flushPromises();
+
+    const input = wrapper.get('input[name="homeworkFile"]');
+    expect(input.attributes('accept')).toBe('.pdf,.zip,.docx,.xlsx,.pptx,.txt,.md,.csv,.png,.jpg,.jpeg');
+    expect(wrapper.text()).toContain('单个附件，最大 10 MiB');
+
+    const oversized = new File([new Uint8Array(10 * 1024 * 1024 + 1)], '过大报告.pdf', {
+      type: 'application/pdf'
+    });
+    await chooseFile(wrapper, oversized);
+
+    expect(wrapper.get('[data-testid="homework-file-upload-error"]').text())
+      .toContain('附件大小超过 10 MiB');
+    expect(wrapper.text()).not.toContain('已选择：过大报告.pdf');
+    expect(attachmentApiMocks.uploadHomeworkAttachment).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['HWK_4042', '附件不存在或不属于当前作业，请重新选择并上传', true],
+    ['HWK_4091', '附件已过期或不可用，请重新选择并上传', true],
+    ['HWK_4092', '附件已被提交绑定，不能重复使用，请重新选择并上传', true],
+    ['HWK_5002', '附件存储暂时不可用，请稍后重试提交', false]
+  ])('handles FILE submission attachment error %s without unsafe DELETE', async (code, expectedMessage, shouldClear) => {
+    currentUser.value = studentUser();
+    vi.mocked(homeworkApi.getHomeworkDetail).mockResolvedValueOnce(homeworkDetail({ type: 'FILE' }));
+    attachmentApiMocks.uploadHomeworkAttachment.mockResolvedValueOnce(attachmentUpload());
+    vi.mocked(homeworkApi.submitHomework).mockRejectedValueOnce(codedError(code, 'attachment conflict'));
+    const wrapper = mount(HomeworkStudentView, {
+      props: { courseId: 101, homeworkId: 11, mode: 'submit' }
+    });
+    await flushPromises();
+
+    await chooseFile(wrapper, new File(['report'], '课程报告.pdf', { type: 'application/pdf' }));
+    await wrapper.get('[data-action="upload-homework-file"]').trigger('click');
+    await flushPromises();
+    await wrapper.get('form').trigger('submit');
+    await flushPromises();
+
+    expect(wrapper.get('[data-testid="homework-submit-error"]').text()).toContain(expectedMessage);
+    expect(attachmentApiMocks.deleteHomeworkAttachment).not.toHaveBeenCalled();
+    if (shouldClear) {
+      expect(wrapper.find('[data-testid="homework-file-name"]').exists()).toBe(false);
+      expect(window.sessionStorage.getItem('oj:hwk-file-upload:v1:601:101:11')).toBeNull();
+      expect(wrapper.get('input[name="homeworkFile"]').attributes('disabled')).toBeUndefined();
+    } else {
+      expect(wrapper.get('[data-testid="homework-file-name"]').text()).toContain('课程报告.pdf');
+      expect(window.sessionStorage.getItem('oj:hwk-file-upload:v1:601:101:11')).toContain('000000000011');
+      expect(wrapper.get('input[name="homeworkFile"]').attributes('disabled')).toBeDefined();
+    }
+  });
+
+  it('expires an uploaded attachment in place without attempting DELETE', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-23T09:59:59.900+08:00'));
+    currentUser.value = studentUser();
+    vi.mocked(homeworkApi.getHomeworkDetail).mockResolvedValueOnce(homeworkDetail({ type: 'FILE' }));
+    attachmentApiMocks.uploadHomeworkAttachment.mockResolvedValueOnce(attachmentUpload());
+    const wrapper = mount(HomeworkStudentView, {
+      props: { courseId: 101, homeworkId: 11, mode: 'submit' }
+    });
+    await flushPromises();
+
+    await chooseFile(wrapper, new File(['report'], '课程报告.pdf', { type: 'application/pdf' }));
+    await wrapper.get('[data-action="upload-homework-file"]').trigger('click');
+    await flushPromises();
+    expect(wrapper.find('[data-testid="homework-file-name"]').exists()).toBe(true);
+
+    await vi.advanceTimersByTimeAsync(101);
+
+    expect(wrapper.find('[data-testid="homework-file-name"]').exists()).toBe(false);
+    expect(wrapper.get('[data-testid="homework-file-upload-error"]').text()).toContain('附件已过期，请重新选择并上传');
+    expect(window.sessionStorage.getItem('oj:hwk-file-upload:v1:601:101:11')).toBeNull();
+    expect(attachmentApiMocks.deleteHomeworkAttachment).not.toHaveBeenCalled();
+  });
+
+  it('clears a server-gone upload after one failed DELETE so removal cannot loop', async () => {
+    currentUser.value = studentUser();
+    vi.mocked(homeworkApi.getHomeworkDetail).mockResolvedValueOnce(homeworkDetail({ type: 'FILE' }));
+    attachmentApiMocks.uploadHomeworkAttachment.mockResolvedValueOnce(attachmentUpload());
+    attachmentApiMocks.deleteHomeworkAttachment.mockRejectedValueOnce(codedError('HWK_4092', 'already bound'));
+    const wrapper = mount(HomeworkStudentView, {
+      props: { courseId: 101, homeworkId: 11, mode: 'submit' }
+    });
+    await flushPromises();
+
+    await chooseFile(wrapper, new File(['report'], '课程报告.pdf', { type: 'application/pdf' }));
+    await wrapper.get('[data-action="upload-homework-file"]').trigger('click');
+    await flushPromises();
+    await wrapper.get('[data-action="remove-homework-file"]').trigger('click');
+    await flushPromises();
+
+    expect(attachmentApiMocks.deleteHomeworkAttachment).toHaveBeenCalledTimes(1);
+    expect(wrapper.find('[data-action="remove-homework-file"]').exists()).toBe(false);
+    expect(window.sessionStorage.getItem('oj:hwk-file-upload:v1:601:101:11')).toBeNull();
+  });
+
+  it('removes an unbound upload through the server before clearing local metadata', async () => {
+    currentUser.value = studentUser();
+    vi.mocked(homeworkApi.getHomeworkDetail).mockResolvedValueOnce(homeworkDetail({ type: 'FILE' }));
+    attachmentApiMocks.uploadHomeworkAttachment.mockResolvedValueOnce(attachmentUpload());
+    attachmentApiMocks.deleteHomeworkAttachment.mockResolvedValueOnce(null);
+    const wrapper = mount(HomeworkStudentView, {
+      props: { courseId: 101, homeworkId: 11, mode: 'submit' }
+    });
+    await flushPromises();
+
+    await chooseFile(wrapper, new File(['remove me'], '课程报告.pdf', { type: 'application/pdf' }));
+    await wrapper.get('[data-action="upload-homework-file"]').trigger('click');
+    await flushPromises();
+    await wrapper.get('[data-action="remove-homework-file"]').trigger('click');
+    await flushPromises();
+
+    expect(attachmentApiMocks.deleteHomeworkAttachment).toHaveBeenCalledWith(
+      11,
+      '85c3d5a0-2140-4d80-9000-000000000011'
+    );
+    expect(window.sessionStorage.getItem('oj:hwk-file-upload:v1:601:101:11')).toBeNull();
+    expect(wrapper.find('[data-testid="homework-file-name"]').exists()).toBe(false);
+  });
+
+  it('restores only safe upload metadata after a server GET revalidation', async () => {
+    currentUser.value = studentUser();
+    const storageKey = 'oj:hwk-file-upload:v1:601:101:11';
+    window.sessionStorage.setItem(storageKey, JSON.stringify({
+      version: 1,
+      savedAt: Date.now(),
+      attachment: attachmentUpload()
+    }));
+    vi.mocked(homeworkApi.getHomeworkDetail).mockResolvedValueOnce(homeworkDetail({ type: 'FILE' }));
+    attachmentApiMocks.getHomeworkAttachment.mockResolvedValueOnce(attachmentUpload());
+    const wrapper = mount(HomeworkStudentView, {
+      props: { courseId: 101, homeworkId: 11, mode: 'submit' }
+    });
+    await flushPromises();
+
+    expect(attachmentApiMocks.getHomeworkAttachment).toHaveBeenCalledWith(
+      11,
+      '85c3d5a0-2140-4d80-9000-000000000011'
+    );
+    expect(wrapper.get('[data-testid="homework-file-name"]').text()).toContain('课程报告.pdf');
+    expect(wrapper.get('[data-testid="homework-file-restore-status"]').text()).toContain('已恢复');
+    expect(attachmentApiMocks.uploadHomeworkAttachment).not.toHaveBeenCalled();
+  });
+
+  it('forgets a restored file id when server revalidation rejects it', async () => {
+    currentUser.value = studentUser();
+    const storageKey = 'oj:hwk-file-upload:v1:601:101:11';
+    window.sessionStorage.setItem(storageKey, JSON.stringify({
+      version: 1,
+      savedAt: Date.now(),
+      attachment: attachmentUpload()
+    }));
+    vi.mocked(homeworkApi.getHomeworkDetail).mockResolvedValueOnce(homeworkDetail({ type: 'FILE' }));
+    attachmentApiMocks.getHomeworkAttachment.mockRejectedValueOnce(
+      codedError('HWK_4042', '附件不存在或不属于当前学生')
+    );
+
+    const wrapper = mount(HomeworkStudentView, {
+      props: { courseId: 101, homeworkId: 11, mode: 'submit' }
+    });
+    await flushPromises();
+
+    expect(attachmentApiMocks.getHomeworkAttachment).toHaveBeenCalledWith(
+      11,
+      '85c3d5a0-2140-4d80-9000-000000000011'
+    );
+    expect(window.sessionStorage.getItem(storageKey)).toBeNull();
+    expect(wrapper.get('[data-testid="homework-file-upload-error"]').text())
+      .toContain('附件不存在或不属于当前学生');
+    expect(wrapper.get('[data-testid="homework-primary-submit"]').attributes('disabled')).toBeDefined();
+  });
+
+  it('preserves restored file metadata when server revalidation has a retryable storage failure', async () => {
+    currentUser.value = studentUser();
+    const storageKey = 'oj:hwk-file-upload:v1:601:101:11';
+    window.sessionStorage.setItem(storageKey, JSON.stringify({
+      version: 1,
+      savedAt: Date.now(),
+      attachment: attachmentUpload()
+    }));
+    vi.mocked(homeworkApi.getHomeworkDetail).mockResolvedValueOnce(homeworkDetail({ type: 'FILE' }));
+    attachmentApiMocks.getHomeworkAttachment.mockRejectedValueOnce(
+      codedError('HWK_5002', 'attachment storage failure')
+    );
+
+    const wrapper = mount(HomeworkStudentView, {
+      props: { courseId: 101, homeworkId: 11, mode: 'submit' }
+    });
+    await flushPromises();
+
+    expect(attachmentApiMocks.getHomeworkAttachment).toHaveBeenCalledWith(
+      11,
+      '85c3d5a0-2140-4d80-9000-000000000011'
+    );
+    expect(window.sessionStorage.getItem(storageKey)).toContain('85c3d5a0-2140-4d80-9000-000000000011');
+    expect(wrapper.get('[data-testid="homework-file-upload-error"]').text())
+      .toContain('附件存储暂时不可用，已保留恢复信息，请稍后刷新页面重试验证');
+    expect(wrapper.find('[data-testid="homework-file-name"]').exists()).toBe(false);
+    expect(wrapper.get('input[name="homeworkFile"]').attributes('disabled')).toBeUndefined();
   });
 
   it('restores a fresh draft and preserves it when submission fails', async () => {
@@ -886,8 +1216,10 @@ describe('HomeworkStudentView', () => {
     await wrapper.setProps({ mode: 'submit' });
     await flushPromises();
 
-    expect((wrapper.get('[name="answerText"]').element as HTMLTextAreaElement).value)
-      .toBe('路由切换后应恢复的草稿');
+    await vi.waitFor(() => {
+      expect((wrapper.get('[name="answerText"]').element as HTMLTextAreaElement).value)
+        .toBe('路由切换后应恢复的草稿');
+    });
   });
 
   it('removes the unload guard when a reused component leaves submit mode', async () => {
@@ -1051,6 +1383,55 @@ describe('HomeworkStudentView', () => {
     }));
   });
 
+  it('clears only the submitted FILE upload metadata when its success response arrives after route reuse', async () => {
+    currentUser.value = studentUser();
+    const staleSubmission = deferred<HomeworkSubmissionSummary>();
+    const nextAttachment = attachmentUpload({
+      fileId: '85c3d5a0-2140-4d80-9000-000000000012',
+      originalFilename: '第二份报告.pdf'
+    });
+    const oldStorageKey = 'oj:hwk-file-upload:v1:601:101:11';
+    const nextStorageKey = 'oj:hwk-file-upload:v1:601:101:12';
+    vi.mocked(homeworkApi.getHomeworkDetail)
+      .mockResolvedValueOnce(homeworkDetail({ id: 11, type: 'FILE', title: '第一份文件作业' }))
+      .mockResolvedValueOnce(homeworkDetail({ id: 12, type: 'FILE', title: '第二份文件作业' }));
+    vi.mocked(homeworkApi.listMyHomeworkSubmissions)
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([]);
+    attachmentApiMocks.uploadHomeworkAttachment.mockResolvedValueOnce(attachmentUpload());
+    attachmentApiMocks.getHomeworkAttachment.mockResolvedValueOnce(nextAttachment);
+    vi.mocked(homeworkApi.submitHomework).mockReturnValueOnce(staleSubmission.promise);
+
+    const wrapper = mount(HomeworkStudentView, {
+      props: { courseId: 101, homeworkId: 11, mode: 'submit' }
+    });
+    await flushPromises();
+
+    await chooseFile(wrapper, new File(['first report'], '第一份报告.pdf', { type: 'application/pdf' }));
+    await wrapper.get('[data-action="upload-homework-file"]').trigger('click');
+    await flushPromises();
+    expect(window.sessionStorage.getItem(oldStorageKey)).toContain('000000000011');
+
+    await wrapper.get('form').trigger('submit');
+    await flushPromises();
+    window.sessionStorage.setItem(nextStorageKey, JSON.stringify({
+      version: 1,
+      savedAt: Date.now(),
+      attachment: nextAttachment
+    }));
+    await wrapper.setProps({ homeworkId: 12 });
+    await flushPromises();
+    expect(wrapper.get('[data-testid="homework-file-name"]').text()).toContain('第二份报告.pdf');
+
+    staleSubmission.resolve(submissionReceipt());
+    await flushPromises();
+
+    expect(window.sessionStorage.getItem(oldStorageKey)).toBeNull();
+    expect(window.sessionStorage.getItem(nextStorageKey)).toContain('000000000012');
+    expect(wrapper.get('[data-testid="homework-file-name"]').text()).toContain('第二份报告.pdf');
+    expect(attachmentApiMocks.deleteHomeworkAttachment).not.toHaveBeenCalled();
+  });
+
   it('invalidates a pending submit when the same homework leaves and re-enters submit mode', async () => {
     const staleSubmission = deferred<HomeworkSubmissionSummary>();
     vi.mocked(homeworkApi.getHomeworkDetail).mockResolvedValueOnce(homeworkDetail());
@@ -1186,6 +1567,58 @@ function homeworkDetail(overrides: Partial<HomeworkDetail> = {}): HomeworkDetail
     testCases: [],
     ...overrides
   };
+}
+
+function attachmentUpload(overrides: Partial<HomeworkAttachmentUpload> = {}): HomeworkAttachmentUpload {
+  return {
+    fileId: '85c3d5a0-2140-4d80-9000-000000000011',
+    originalFilename: '课程报告.pdf',
+    contentType: 'application/pdf',
+    fileSize: 20,
+    expiresAt: '2026-08-23T10:00:00+08:00',
+    status: 'UPLOADED',
+    uploadedAt: '2026-08-22T10:00:00+08:00',
+    ...overrides
+  };
+}
+
+function codedError(code: string, message: string) {
+  return Object.assign(new Error(message), { code });
+}
+
+function submissionReceipt(): HomeworkSubmissionSummary {
+  return {
+    submissionId: 214,
+    homeworkId: 11,
+    studentId: 601,
+    submitType: 'FILE',
+    submitStatus: 'SUBMITTED',
+    evaluationStatus: 'NONE',
+    reviewStatus: 'UNREVIEWED',
+    version: 1,
+    final: true,
+    submittedAt: '2026-08-22T10:05:00+08:00'
+  };
+}
+
+function studentUser() {
+  return {
+    id: 601,
+    username: 'student601',
+    displayName: '林晓',
+    userType: 'STUDENT',
+    roles: ['STUDENT'],
+    permissions: []
+  };
+}
+
+async function chooseFile(wrapper: VueWrapper, file: File) {
+  const input = wrapper.get('input[name="homeworkFile"]');
+  Object.defineProperty(input.element, 'files', {
+    configurable: true,
+    value: [file]
+  });
+  await input.trigger('change');
 }
 
 function deferred<T>() {

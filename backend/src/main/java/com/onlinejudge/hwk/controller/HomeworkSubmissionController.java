@@ -3,6 +3,7 @@ package com.onlinejudge.hwk.controller;
 import com.onlinejudge.common.security.CurrentUser;
 import com.onlinejudge.common.web.ApiResponse;
 import com.onlinejudge.hwk.service.HomeworkSubmissionService;
+import com.onlinejudge.hwk.service.HomeworkAttachmentService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -18,9 +19,14 @@ import java.util.List;
 @RequestMapping("/api/v1/submissions")
 public class HomeworkSubmissionController {
     private final HomeworkSubmissionService homeworkSubmissionService;
+    private final HomeworkAttachmentService homeworkAttachmentService;
 
-    public HomeworkSubmissionController(HomeworkSubmissionService homeworkSubmissionService) {
+    public HomeworkSubmissionController(
+            HomeworkSubmissionService homeworkSubmissionService,
+            HomeworkAttachmentService homeworkAttachmentService
+    ) {
         this.homeworkSubmissionService = homeworkSubmissionService;
+        this.homeworkAttachmentService = homeworkAttachmentService;
     }
 
     @GetMapping("/{submissionId}")
@@ -33,9 +39,16 @@ public class HomeworkSubmissionController {
                 currentUser.id()
         );
         if (detail.managerView()) {
-            return ApiResponse.ok(HomeworkSubmissionResponse.fromTeacherView(detail.submission()));
+            return ApiResponse.ok(HomeworkSubmissionResponse.fromTeacherView(
+                    detail.submission(),
+                    homeworkAttachmentService.viewForSubmission(detail.submission(), detail.homework().courseId())
+            ));
         }
-        return ApiResponse.ok(HomeworkSubmissionResponse.fromStudentView(detail.homework(), detail.submission()));
+        return ApiResponse.ok(HomeworkSubmissionResponse.fromStudentView(
+                detail.homework(),
+                detail.submission(),
+                homeworkAttachmentService.viewForSubmission(detail.submission(), detail.homework().courseId())
+        ));
     }
 
     @GetMapping("/{submissionId}/evaluation")
@@ -61,7 +74,10 @@ public class HomeworkSubmissionController {
                 currentUser.id(),
                 request == null ? null : request.toCommand()
         );
-        return ApiResponse.ok(HomeworkSubmissionResponse.fromTeacherView(detail.submission()));
+        return ApiResponse.ok(HomeworkSubmissionResponse.fromTeacherView(
+                detail.submission(),
+                homeworkAttachmentService.viewForSubmission(detail.submission(), detail.homework().courseId())
+        ));
     }
 
     @GetMapping("/{submissionId}/review-logs")

@@ -14,12 +14,21 @@ import type {
 import type { LearningCourseProgressAggregate } from '../../../src/types/lrn';
 
 const useRouteMock = vi.hoisted(() => vi.fn());
+const downloadAttachmentMock = vi.hoisted(() => vi.fn());
 
 vi.mock('vue-router', async (importOriginal) => {
   const actual = await importOriginal<typeof import('vue-router')>();
   return { ...actual, useRoute: useRouteMock };
 });
-vi.mock('../../../src/api/hwk/homeworks');
+vi.mock('../../../src/api/hwk/homeworks', () => ({
+  getHomeworkDetail: vi.fn(),
+  getHomeworkSubmission: vi.fn(),
+  getHomeworkSubmissionEvaluation: vi.fn(),
+  getHomeworkSubmissionReviewLogs: vi.fn(),
+  reevaluateHomeworkSubmission: vi.fn(),
+  reviewHomeworkSubmission: vi.fn(),
+  downloadHomeworkSubmissionAttachment: downloadAttachmentMock
+}));
 vi.mock('../../../src/api/lrn/learningProgress');
 
 describe('HomeworkSubmissionReviewView', () => {
@@ -35,6 +44,7 @@ describe('HomeworkSubmissionReviewView', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.unstubAllGlobals();
   });
 
   it('loads one review with course, homework, student, version, evaluation, scores, and audit logs', async () => {
@@ -139,13 +149,8 @@ describe('HomeworkSubmissionReviewView', () => {
     },
     {
       type: 'FILE' as HomeworkType,
-      detail: submission({
-        submitType: 'FILE',
-        answerText: null,
-        fileUrl: 'private-file-token-must-not-render',
-        language: null
-      }),
-      expected: '本次提交包含附件',
+      detail: submissionWithAttachment(),
+      expected: '课程报告.pdf',
       forbidden: 'private-file-token-must-not-render'
     }
   ])('renders $type answers as teacher-readable content without raw transport data', async ({
@@ -173,6 +178,29 @@ describe('HomeworkSubmissionReviewView', () => {
       expect(homeworkApi.getHomeworkSubmissionEvaluation).not.toHaveBeenCalled();
       expect(wrapper.get('[data-testid="reevaluation-unavailable"]').text()).toContain('不支持自动重评');
     }
+  });
+
+  it('downloads a FILE submission from safe metadata through the controlled teacher blob route', async () => {
+    vi.mocked(homeworkApi.getHomeworkDetail).mockResolvedValueOnce(homework({ type: 'FILE' }));
+    vi.mocked(homeworkApi.getHomeworkSubmission).mockResolvedValueOnce(submissionWithAttachment());
+    const blob = new Blob(['teacher download'], { type: 'application/pdf' });
+    downloadAttachmentMock.mockResolvedValueOnce({ blob, filename: 'review-copy.pdf' });
+    const browserDownload = stubBrowserDownload();
+    const wrapper = mountView();
+    await flushPromises();
+
+    const panel = wrapper.get('[data-testid="homework-attachment-panel"]');
+    expect(panel.text()).toContain('课程报告.pdf');
+    expect(panel.text()).toContain('application/pdf');
+    expect(panel.text()).toContain('2.0 KB');
+    expect(wrapper.text()).not.toContain('private/storage/report.pdf');
+
+    await panel.get('[data-action="download-homework-attachment"]').trigger('click');
+    await flushPromises();
+
+    expect(downloadAttachmentMock).toHaveBeenCalledWith(11, 301);
+    expect(browserDownload.createObjectURL).toHaveBeenCalledWith(blob);
+    expect(browserDownload.downloadedFilename()).toBe('review-copy.pdf');
   });
 
   it('degrades only the student name when LRN fails and never leaks the student identifier', async () => {
@@ -591,7 +619,6 @@ function submission(overrides: Partial<HomeworkSubmissionDetail> = {}): Homework
     submitType: 'CODE',
     answerText: 'public class Main { public static void main(String[] args) {} }',
     answerJson: null,
-    fileUrl: null,
     language: 'java',
     submitStatus: 'SUBMITTED',
     evaluationStatus: 'ACCEPTED',
@@ -604,6 +631,35 @@ function submission(overrides: Partial<HomeworkSubmissionDetail> = {}): Homework
     final: true,
     submittedAt: '2026-08-20T10:30:00',
     ...overrides
+  };
+}
+
+function submissionWithAttachment(): HomeworkSubmissionDetail {
+  return {
+    ...submission({ submitType: 'FILE', answerText: null, language: null }),
+    hasAttachment: true,
+    attachment: {
+      originalFilename: '课程报告.pdf',
+      contentType: 'application/pdf',
+      fileSize: 2048,
+      downloadAvailable: true
+    },
+    fileUrl: 'private-file-token-must-not-render',
+    storageKey: 'private/storage/report.pdf'
+  } as unknown as HomeworkSubmissionDetail;
+}
+
+function stubBrowserDownload() {
+  const createObjectURL = vi.fn(() => 'blob:homework-attachment');
+  const revokeObjectURL = vi.fn();
+  let downloadedFilename = '';
+  vi.stubGlobal('URL', { createObjectURL, revokeObjectURL });
+  vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
+    downloadedFilename = this.download;
+  });
+  return {
+    createObjectURL,
+    downloadedFilename: () => downloadedFilename
   };
 }
 

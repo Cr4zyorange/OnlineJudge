@@ -824,7 +824,6 @@ function submission(overrides: Partial<HomeworkSubmissionSummary> = {}): Homewor
     submitType: 'CODE',
     answerText: 'public class Main {}',
     answerJson: null,
-    fileUrl: null,
     language: 'java',
     submitStatus: 'SUBMITTED',
     evaluationStatus: 'ACCEPTED',

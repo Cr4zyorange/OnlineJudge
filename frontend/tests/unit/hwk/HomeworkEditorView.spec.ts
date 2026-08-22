@@ -51,11 +51,10 @@ describe('HomeworkEditorView', () => {
 
     await wrapper.get('[name="type"]').setValue('FILE');
 
-    expect(wrapper.get('[data-testid="file-contract-notice"]').text()).toContain('#214');
-    expect(wrapper.get('[data-testid="file-contract-notice"]').text()).toContain('学生安全上传链路尚未就绪');
-    expect(wrapper.get('[data-testid="type-content-check"]').attributes('data-ready')).toBe('false');
-    expect(wrapper.get('[data-testid="type-content-check"]').text()).toContain('#214');
-    expect(wrapper.get('[data-testid="type-content-check"]').text()).toContain('不可发布');
+    expect(wrapper.find('[data-testid="file-contract-notice"]').exists()).toBe(false);
+    expect(wrapper.get('[data-testid="type-content-check"]').attributes('data-ready')).toBe('true');
+    expect(wrapper.get('[data-testid="type-content-check"]').text()).toContain('附件提交契约已就绪');
+    expect(wrapper.get('[data-testid="type-content-check"]').text()).not.toContain('#214');
   });
 
   it('creates a text draft, exposes pending state, then updates the created draft', async () => {

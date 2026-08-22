@@ -347,16 +347,28 @@ describe('HomeworkTeacherView', () => {
     expect(wrapper.find('[data-testid="delete-homework-7"]').exists()).toBe(false);
   });
 
-  it('keeps FILE drafts editable but blocks publication until issue 214 supplies the upload contract', async () => {
+  it('publishes a FILE draft now that the secure attachment contract is available', async () => {
     const fileDraft = homeworkSummary({ id: 5, title: '课程报告附件', status: 'DRAFT', type: 'FILE' });
-    vi.mocked(homeworkApi.listHomeworks).mockResolvedValueOnce(page([fileDraft]));
+    vi.mocked(homeworkApi.listHomeworks)
+      .mockResolvedValueOnce(page([fileDraft]))
+      .mockResolvedValueOnce(page([homeworkSummary({ ...fileDraft, status: 'PUBLISHED' })]));
+    vi.mocked(homeworkApi.publishHomework).mockResolvedValueOnce(homeworkDetail({
+      id: 5,
+      title: fileDraft.title,
+      status: 'PUBLISHED',
+      type: 'FILE'
+    }));
     const wrapper = mountView();
     await flushPromises();
 
-    expect(wrapper.get('[data-testid="file-contract-blocked-5"]').text()).toContain('#214');
-    expect(wrapper.find('[data-testid="publish-homework-5"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="file-contract-blocked-5"]').exists()).toBe(false);
     expect(wrapper.find('[data-testid="edit-homework-5"]').exists()).toBe(true);
-    expect(wrapper.find('[data-testid="delete-homework-5"]').exists()).toBe(true);
+    await wrapper.get('[data-testid="publish-homework-5"]').trigger('click');
+    await flushPromises();
+
+    expect(homeworkApi.publishHomework).toHaveBeenCalledWith(5);
+    expect(confirm).toHaveBeenCalledWith(expect.stringContaining('课程报告附件'));
+    expect(wrapper.get('[data-testid="operation-feedback"]').text()).toContain('发布成功');
   });
 
   it('blocks direct publication of a legacy CODE draft that still enables unsupported sandbox languages', async () => {

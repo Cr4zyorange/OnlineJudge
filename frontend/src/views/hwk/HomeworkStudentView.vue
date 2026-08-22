@@ -276,24 +276,56 @@
                 />
               </label>
 
-              <label v-if="homework.type === 'FILE'">
-                <span>作业附件</span>
+              <div v-if="homework.type === 'FILE'" class="homework-student__file-field">
+                <label for="homework-file-input">作业附件</label>
                 <input
+                  id="homework-file-input"
+                  ref="fileInput"
                   name="homeworkFile"
                   type="file"
-                  :disabled="submitting"
+                  :accept="homeworkFileAccept"
+                  :disabled="submitting || fileUploading || fileRemoving || Boolean(uploadedAttachment)"
                   @change="selectHomeworkFile"
                 />
-                <small v-if="selectedFileName">已选择：{{ selectedFileName }}</small>
-              </label>
-              <p
-                v-if="homework.type === 'FILE'"
-                class="homework-student__warning"
-                data-testid="homework-file-blocker"
-                role="alert"
-              >
-                附件上传通道尚未提供，已阻止文件作业提交，不会用本地文件名或伪造附件编号代替上传。
-              </p>
+                <small>单个附件，最大 10 MiB；支持 pdf/zip/docx/xlsx/pptx/txt/md/csv/png/jpg/jpeg</small>
+                <small v-if="selectedFile && !uploadedAttachment">已选择：{{ selectedFile.name }}</small>
+                <div
+                  v-if="uploadedAttachment"
+                  class="homework-student__file-summary"
+                  data-testid="homework-file-name"
+                >
+                  <strong>{{ uploadedAttachment.originalFilename }}</strong>
+                  <span>{{ uploadedAttachment.contentType }} · {{ formatFileSize(uploadedAttachment.fileSize) }}</span>
+                </div>
+                <div class="homework-student__file-actions">
+                  <button
+                    v-if="!uploadedAttachment"
+                    type="button"
+                    data-action="upload-homework-file"
+                    :disabled="!selectedFile || fileUploading || fileRemoving || Boolean(submissionBlockedReason)"
+                    @click="uploadSelectedHomeworkFile"
+                  >{{ fileUploading ? '正在上传…' : '上传附件' }}</button>
+                  <button
+                    v-else
+                    type="button"
+                    data-action="remove-homework-file"
+                    :disabled="fileRemoving || submitting"
+                    @click="removeUploadedHomeworkFile"
+                  >{{ fileRemoving ? '正在移除…' : '移除附件' }}</button>
+                </div>
+                <p
+                  v-if="fileUploadError"
+                  class="homework-student__warning"
+                  data-testid="homework-file-upload-error"
+                  role="alert"
+                >{{ fileUploadError }}</p>
+                <p
+                  v-if="fileRestoreStatus"
+                  class="homework-student__draft-status"
+                  data-testid="homework-file-restore-status"
+                  role="status"
+                >{{ fileRestoreStatus }}</p>
+              </div>
 
               <template v-if="homework.type === 'CODE'">
                 <label>
@@ -340,7 +372,12 @@
               >
                 查看最新提交结果
               </RouterLink>
-              <p v-if="submitErrorMessage" class="homework-student__error" role="alert">
+              <p
+                v-if="submitErrorMessage"
+                class="homework-student__error"
+                data-testid="homework-submit-error"
+                role="alert"
+              >
                 {{ submitErrorMessage }}
               </p>
 
@@ -413,10 +450,13 @@
 import { computed, inject, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { matchedRouteKey, onBeforeRouteLeave, RouterLink } from 'vue-router';
 import {
+  deleteHomeworkAttachment,
+  getHomeworkAttachment,
   getHomeworkDetail,
   getHomeworkSubmissionEvaluation,
   listMyHomeworkSubmissions,
-  submitHomework
+  submitHomework,
+  uploadHomeworkAttachment
 } from '../../api/hwk/homeworks';
 import { saveLearningProgress } from '../../api/lrn/learningProgress';
 import { reportLearningRecord } from '../../api/lrn/learningRecords';
@@ -424,6 +464,7 @@ import { currentUser } from '../../app/runtimeContext';
 import PageHeader from '../../components/foundation/PageHeader.vue';
 import StatusBadge from '../../components/foundation/StatusBadge.vue';
 import type {
+  HomeworkAttachmentUpload,
   HomeworkDetail,
   HomeworkEvaluationResult,
   HomeworkQuestion,
@@ -462,14 +503,25 @@ const answerText = ref('');
 const objectiveAnswers = ref<Record<string, string[]>>({});
 const codeText = ref('');
 const language = ref('');
-const selectedFileName = ref('');
+const selectedFile = ref<File | null>(null);
+const uploadedAttachment = ref<HomeworkAttachmentUpload | null>(null);
+const fileInput = ref<HTMLInputElement | null>(null);
+const fileUploading = ref(false);
+const fileRemoving = ref(false);
+const fileUploadError = ref('');
+const fileRestoreStatus = ref('');
 const draftStatusMessage = ref('');
 const openedAt = ref<Date | null>(null);
+const homeworkFileAccept = '.pdf,.zip,.docx,.xlsx,.pptx,.txt,.md,.csv,.png,.jpg,.jpeg';
+const homeworkFileExtensions = new Set(homeworkFileAccept.split(',').map((extension) => extension.slice(1)));
+const homeworkFileMaxSize = 10 * 1024 * 1024;
 let draftTimer: ReturnType<typeof setTimeout> | undefined;
+let attachmentExpiryTimer: ReturnType<typeof setTimeout> | undefined;
 let beforeUnloadRegistered = false;
 let draftWatchSuspended = false;
 let loadGeneration = 0;
 let submissionEditorGeneration = 0;
+let attachmentRequestGeneration = 0;
 
 interface HomeworkDraft {
   version: 1;
@@ -479,6 +531,12 @@ interface HomeworkDraft {
   objectiveAnswers: Record<string, string[]>;
   codeText: string;
   language: string;
+}
+
+interface HomeworkAttachmentDraft {
+  version: 1;
+  savedAt: number;
+  attachment: HomeworkAttachmentUpload;
 }
 
 interface ObjectiveOption {
@@ -514,9 +572,6 @@ const submissionBlockedReason = computed(() => {
   if (!homework.value) {
     return '作业详情尚未加载';
   }
-  if (homework.value.type === 'FILE') {
-    return '附件上传通道尚未提供，当前不能提交文件作业';
-  }
   if (homework.value.status !== 'PUBLISHED') {
     return `作业当前为${formatHomeworkStatus(homework.value.status)}，暂不可提交`;
   }
@@ -528,7 +583,12 @@ const submissionBlockedReason = computed(() => {
   }
   return '';
 });
-const canSubmit = computed(() => !submissionBlockedReason.value);
+const canSubmit = computed(() => (
+  !submissionBlockedReason.value
+  && !fileUploading.value
+  && !fileRemoving.value
+  && (homework.value?.type !== 'FILE' || Boolean(uploadedAttachment.value))
+));
 const homeworkStatusSummary = computed(() => {
   if (homework.value?.status === 'PUBLISHED' && isPastDeadline.value) {
     return '已截止';
@@ -600,14 +660,19 @@ watch(
 
 watch(() => props.mode, (mode, previousMode) => {
   submissionEditorGeneration += 1;
+  attachmentRequestGeneration += 1;
+  fileUploading.value = false;
+  fileRemoving.value = false;
   submitting.value = false;
   if (previousMode === 'submit' && mode !== 'submit') {
     saveDraftNow();
+    clearAttachmentExpiryTimer();
     unregisterBeforeUnload();
   }
   if (mode === 'submit' && previousMode !== 'submit') {
     registerBeforeUnload();
     restoreDraft();
+    void restoreHomeworkAttachment(loadGeneration, props.homeworkId);
   }
 });
 
@@ -620,6 +685,7 @@ watch(
     cancelScheduledDraftSave();
     resetEditorState();
     submissionEditorGeneration += 1;
+    attachmentRequestGeneration += 1;
     submitting.value = false;
     void loadHomework();
   }
@@ -638,14 +704,22 @@ onBeforeUnmount(() => {
   }
   unregisterBeforeUnload();
   cancelScheduledDraftSave();
+  clearAttachmentExpiryTimer();
   loadGeneration += 1;
   submissionEditorGeneration += 1;
+  attachmentRequestGeneration += 1;
 });
 
 if (inject(matchedRouteKey, null)) {
   onBeforeRouteLeave(() => {
     if (props.mode !== 'submit' || !hasUnsavedAnswer()) {
       return true;
+    }
+    if (homework.value?.type === 'FILE' && selectedFile.value && !uploadedAttachment.value) {
+      return window.confirm('所选本地文件尚未上传，离开后无法恢复。确认离开提交页吗？');
+    }
+    if (homework.value?.type === 'FILE' && uploadedAttachment.value) {
+      return window.confirm('附件已暂存但尚未提交，可返回提交页恢复。确认离开吗？');
     }
     saveDraftNow();
     return window.confirm('当前作答已自动保存。确认离开提交页吗？');
@@ -670,6 +744,7 @@ async function loadHomework() {
     syncDefaultCodeLanguage();
     if (props.mode === 'submit') {
       restoreDraft();
+      void restoreHomeworkAttachment(generation, requestedHomeworkId);
     }
     restoreResume();
     await loadLatestSubmission(requestedHomeworkId, generation);
@@ -715,8 +790,12 @@ async function loadLatestSubmission(homeworkId: number, generation: number) {
 }
 
 async function submit() {
-  submitErrorMessage.value = validateForm();
   feedbackMessage.value = '';
+  if (expireUploadedAttachmentIfNeeded()) {
+    submitErrorMessage.value = '附件已过期，请重新选择并上传。';
+    return;
+  }
+  submitErrorMessage.value = validateForm();
   if (submitErrorMessage.value) {
     return;
   }
@@ -724,14 +803,32 @@ async function submit() {
   const generation = loadGeneration;
   const editorGeneration = ++submissionEditorGeneration;
   const requestedHomeworkId = props.homeworkId;
+  const requestedCourseId = props.courseId;
+  const requestedUserId = currentUser.value?.id ?? 'anonymous';
+  const submittedAttachmentFileId = homework.value?.type === 'FILE'
+    ? uploadedAttachment.value?.fileId
+    : undefined;
+  const submittedAttachmentDraftKey = submittedAttachmentFileId
+    ? attachmentStorageKey(requestedHomeworkId, requestedCourseId, requestedUserId)
+    : undefined;
   submitting.value = true;
   try {
     const submitted = await submitHomework(requestedHomeworkId, {
       answerText: answerText.value.trim() || undefined,
       answerJson: homework.value?.type === 'OBJECTIVE' ? serializeObjectiveAnswers() : undefined,
+      fileIds: homework.value?.type === 'FILE' && uploadedAttachment.value
+        ? [uploadedAttachment.value.fileId]
+        : undefined,
       codeText: codeText.value.trim() || undefined,
       language: language.value.trim() || undefined
     });
+    if (
+      submitted.homeworkId === requestedHomeworkId
+      && submittedAttachmentDraftKey
+      && submittedAttachmentFileId
+    ) {
+      clearStoredAttachmentDraft(submittedAttachmentDraftKey, submittedAttachmentFileId);
+    }
     if (
       submitted.homeworkId !== requestedHomeworkId
       || !isCurrentSubmissionRequest(generation, editorGeneration, requestedHomeworkId)
@@ -755,10 +852,19 @@ async function submit() {
       }
     }
     clearDraft();
+    clearAttachmentState(true);
     resetForm();
   } catch (error) {
     if (isCurrentSubmissionRequest(generation, editorGeneration, requestedHomeworkId)) {
-      submitErrorMessage.value = localizedError(error, '作业提交失败，请检查内容后重试。');
+      const attachmentError = attachmentSubmissionError(error);
+      if (homework.value?.type === 'FILE' && attachmentError) {
+        clearAttachmentState(true);
+        submitErrorMessage.value = attachmentError;
+      } else if (homework.value?.type === 'FILE' && apiErrorCode(error) === 'HWK_5002') {
+        submitErrorMessage.value = '附件存储暂时不可用，请稍后重试提交。';
+      } else {
+        submitErrorMessage.value = localizedError(error, '作业提交失败，请检查内容后重试。');
+      }
     }
   } finally {
     if (isCurrentSubmissionRequest(generation, editorGeneration, requestedHomeworkId)) {
@@ -885,7 +991,7 @@ function validateForm() {
     return '请填写文本答案';
   }
   if (homework.value.type === 'FILE') {
-    return '附件上传通道尚未提供，当前不能提交文件作业';
+    return uploadedAttachment.value ? '' : '请先上传附件';
   }
   if (homework.value.type === 'CODE' && (!codeText.value.trim() || !language.value.trim())) {
     return '请填写代码和语言';
@@ -1011,21 +1117,137 @@ function serializedObjectiveAnswerValues(question: HomeworkQuestion) {
 
 function selectHomeworkFile(event: Event) {
   const input = event.target as HTMLInputElement;
-  selectedFileName.value = input.files?.[0]?.name ?? '';
+  fileRestoreStatus.value = '';
+  const file = input.files?.[0] ?? null;
+  const validationError = validateSelectedHomeworkFile(file);
+  if (validationError) {
+    clearSelectedHomeworkFile();
+    fileUploadError.value = validationError;
+    return;
+  }
+  selectedFile.value = file;
+  fileUploadError.value = '';
+}
+
+function validateSelectedHomeworkFile(file: File | null) {
+  if (!file) {
+    return '';
+  }
+  if (file.size <= 0) {
+    return '附件为空或文件内容无效，请重新选择有效文件。';
+  }
+  if (file.size > homeworkFileMaxSize) {
+    return '附件大小超过 10 MiB，请重新选择较小的文件。';
+  }
+  const extension = file.name.includes('.') ? file.name.split('.').pop()?.toLowerCase() : undefined;
+  if (!extension || !homeworkFileExtensions.has(extension)) {
+    return '不支持该附件类型，请重新选择允许的文件。';
+  }
+  return '';
+}
+
+function clearSelectedHomeworkFile() {
+  selectedFile.value = null;
+  if (fileInput.value) {
+    fileInput.value.value = '';
+  }
+}
+
+async function uploadSelectedHomeworkFile() {
+  const file = selectedFile.value;
+  if (!file || !homework.value || homework.value.type !== 'FILE' || submissionBlockedReason.value || fileUploading.value) {
+    return;
+  }
+  const request = ++attachmentRequestGeneration;
+  const homeworkId = props.homeworkId;
+  const generation = loadGeneration;
+  fileUploading.value = true;
+  fileUploadError.value = '';
+  fileRestoreStatus.value = '';
+  try {
+    const uploaded = await uploadHomeworkAttachment(homeworkId, file);
+    if (!isCurrentAttachmentRequest(request, generation, homeworkId)) {
+      return;
+    }
+    uploadedAttachment.value = uploaded;
+    persistHomeworkAttachment(uploaded);
+    scheduleAttachmentExpiry(uploaded);
+    fileRestoreStatus.value = '附件上传成功，可提交作业。';
+  } catch (error) {
+    if (isCurrentAttachmentRequest(request, generation, homeworkId)) {
+      const deterministicError = deterministicUploadError(error);
+      if (deterministicError) {
+        clearSelectedHomeworkFile();
+        fileUploadError.value = deterministicError;
+      } else {
+        fileUploadError.value = localizedError(error, '附件上传失败，请保留当前文件并重试。');
+      }
+    }
+  } finally {
+    if (request === attachmentRequestGeneration) {
+      fileUploading.value = false;
+    }
+  }
+}
+
+async function removeUploadedHomeworkFile() {
+  const uploaded = uploadedAttachment.value;
+  if (!uploaded || fileRemoving.value || submitting.value) {
+    return;
+  }
+  const request = ++attachmentRequestGeneration;
+  const homeworkId = props.homeworkId;
+  const generation = loadGeneration;
+  fileRemoving.value = true;
+  fileUploadError.value = '';
+  try {
+    await deleteHomeworkAttachment(homeworkId, uploaded.fileId);
+    if (!isCurrentAttachmentRequest(request, generation, homeworkId)) {
+      return;
+    }
+    clearAttachmentState(true);
+  } catch (error) {
+    if (isCurrentAttachmentRequest(request, generation, homeworkId)) {
+      const unavailableError = attachmentRemovalError(error);
+      if (unavailableError) {
+        clearAttachmentState(true);
+        fileUploadError.value = unavailableError;
+      } else {
+        fileUploadError.value = localizedError(error, '附件移除失败，请重试。');
+      }
+    }
+  } finally {
+    if (request === attachmentRequestGeneration) {
+      fileRemoving.value = false;
+    }
+  }
 }
 
 function resetForm() {
+  if (homework.value?.type === 'FILE' && uploadedAttachment.value) {
+    void removeUploadedHomeworkFile();
+    return;
+  }
   resetEditorState();
   submitErrorMessage.value = '';
 }
 
 function resetEditorState() {
   draftWatchSuspended = true;
+  clearAttachmentExpiryTimer();
   answerText.value = '';
   objectiveAnswers.value = {};
   codeText.value = '';
   language.value = '';
-  selectedFileName.value = '';
+  selectedFile.value = null;
+  uploadedAttachment.value = null;
+  fileUploadError.value = '';
+  fileRestoreStatus.value = '';
+  fileUploading.value = false;
+  fileRemoving.value = false;
+  if (fileInput.value) {
+    fileInput.value.value = '';
+  }
   syncDefaultCodeLanguage();
   draftStatusMessage.value = '';
   void nextTick(() => {
@@ -1120,6 +1342,159 @@ function restoreDraft() {
   });
 }
 
+async function restoreHomeworkAttachment(generation: number, homeworkId: number) {
+  if (props.mode !== 'submit' || homework.value?.type !== 'FILE') {
+    return;
+  }
+  let draft: HomeworkAttachmentDraft | undefined;
+  try {
+    const stored = window.sessionStorage.getItem(attachmentStorageKey(homeworkId));
+    draft = stored ? JSON.parse(stored) as HomeworkAttachmentDraft : undefined;
+  } catch {
+    window.sessionStorage.removeItem(attachmentStorageKey(homeworkId));
+    return;
+  }
+  if (!isFreshAttachmentDraft(draft)) {
+    window.sessionStorage.removeItem(attachmentStorageKey(homeworkId));
+    return;
+  }
+
+  const request = ++attachmentRequestGeneration;
+  fileUploadError.value = '';
+  fileRestoreStatus.value = '正在验证已上传附件…';
+  try {
+    const restored = await getHomeworkAttachment(homeworkId, draft.attachment.fileId);
+    if (!isCurrentAttachmentRequest(request, generation, homeworkId)) {
+      return;
+    }
+    uploadedAttachment.value = restored;
+    selectedFile.value = null;
+    persistHomeworkAttachment(restored);
+    scheduleAttachmentExpiry(restored);
+    fileRestoreStatus.value = '已恢复并验证此前上传的附件。';
+  } catch (error) {
+    if (isCurrentAttachmentRequest(request, generation, homeworkId)) {
+      uploadedAttachment.value = null;
+      fileRestoreStatus.value = '';
+      if (shouldForgetRestoredAttachment(error)) {
+        fileUploadError.value = localizedError(error, '已上传附件已不可用，请重新选择并上传。');
+        window.sessionStorage.removeItem(attachmentStorageKey(homeworkId));
+      } else if (apiErrorCode(error) === 'HWK_5002') {
+        fileUploadError.value = '附件存储暂时不可用，已保留恢复信息，请稍后刷新页面重试验证。';
+      } else {
+        fileUploadError.value = localizedError(
+          error,
+          '已上传附件验证暂时失败，已保留恢复信息，请稍后刷新页面重试验证。'
+        );
+      }
+    }
+  }
+}
+
+function persistHomeworkAttachment(attachment: HomeworkAttachmentUpload) {
+  const draft: HomeworkAttachmentDraft = {
+    version: 1,
+    savedAt: Date.now(),
+    attachment
+  };
+  try {
+    window.sessionStorage.setItem(attachmentStorageKey(props.homeworkId), JSON.stringify(draft));
+  } catch {
+    fileUploadError.value = '附件已上传，但本机暂时无法保存恢复信息；请不要刷新页面。';
+  }
+}
+
+function scheduleAttachmentExpiry(attachment: HomeworkAttachmentUpload) {
+  clearAttachmentExpiryTimer();
+  const expiresAt = new Date(attachment.expiresAt).getTime();
+  const delay = expiresAt - Date.now();
+  if (!Number.isFinite(delay) || delay <= 0) {
+    expireUploadedAttachmentIfNeeded();
+    return;
+  }
+  attachmentExpiryTimer = setTimeout(() => {
+    attachmentExpiryTimer = undefined;
+    if (uploadedAttachment.value?.fileId === attachment.fileId) {
+      expireUploadedAttachmentIfNeeded();
+    }
+  }, delay);
+}
+
+function expireUploadedAttachmentIfNeeded() {
+  const uploaded = uploadedAttachment.value;
+  if (!uploaded) {
+    return false;
+  }
+  const expiresAt = new Date(uploaded.expiresAt).getTime();
+  if (Number.isFinite(expiresAt) && Date.now() < expiresAt) {
+    return false;
+  }
+  clearAttachmentState(true);
+  fileUploadError.value = '附件已过期，请重新选择并上传。';
+  return true;
+}
+
+function clearAttachmentExpiryTimer() {
+  if (attachmentExpiryTimer) {
+    clearTimeout(attachmentExpiryTimer);
+    attachmentExpiryTimer = undefined;
+  }
+}
+
+function clearStoredAttachmentDraft(storageKey: string, expectedFileId: string) {
+  const stored = window.sessionStorage.getItem(storageKey);
+  if (!stored) {
+    return;
+  }
+  try {
+    const draft = JSON.parse(stored) as Partial<HomeworkAttachmentDraft>;
+    if (draft.attachment?.fileId === expectedFileId) {
+      window.sessionStorage.removeItem(storageKey);
+    }
+  } catch {
+    // A malformed value is not proven to belong to this completed request.
+  }
+}
+
+function isFreshAttachmentDraft(value: HomeworkAttachmentDraft | undefined): value is HomeworkAttachmentDraft {
+  if (
+    !value
+    || value.version !== 1
+    || !Number.isFinite(value.savedAt)
+    || Date.now() > value.savedAt + 24 * 60 * 60 * 1000
+    || !value.attachment
+    || typeof value.attachment.fileId !== 'string'
+    || !value.attachment.fileId.trim()
+    || typeof value.attachment.originalFilename !== 'string'
+    || typeof value.attachment.contentType !== 'string'
+    || !Number.isFinite(value.attachment.fileSize)
+    || typeof value.attachment.expiresAt !== 'string'
+    || value.attachment.status !== 'UPLOADED'
+    || typeof value.attachment.uploadedAt !== 'string'
+  ) {
+    return false;
+  }
+  const expiresAt = new Date(value.attachment.expiresAt).getTime();
+  const uploadedAt = new Date(value.attachment.uploadedAt).getTime();
+  return Number.isFinite(expiresAt) && Number.isFinite(uploadedAt) && Date.now() < expiresAt;
+}
+
+function clearAttachmentState(removeStoredDraft: boolean) {
+  clearAttachmentExpiryTimer();
+  selectedFile.value = null;
+  uploadedAttachment.value = null;
+  fileUploadError.value = '';
+  fileRestoreStatus.value = '';
+  fileUploading.value = false;
+  fileRemoving.value = false;
+  if (fileInput.value) {
+    fileInput.value.value = '';
+  }
+  if (removeStoredDraft) {
+    window.sessionStorage.removeItem(attachmentStorageKey(props.homeworkId));
+  }
+}
+
 function sanitizeObjectiveAnswers(value: unknown) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     return {};
@@ -1151,6 +1526,8 @@ function hasUnsavedAnswer() {
     answerText.value.trim()
     || codeText.value.trim()
     || Object.values(objectiveAnswers.value).some((answers) => answers.length > 0)
+    || (homework.value?.type === 'FILE' && selectedFile.value && !uploadedAttachment.value)
+    || (homework.value?.type === 'FILE' && uploadedAttachment.value)
   );
 }
 
@@ -1179,6 +1556,34 @@ function unregisterBeforeUnload() {
 
 function draftStorageKey(courseId: number, homeworkId: number) {
   return `oj:draft:v1:${currentUser.value?.id ?? 'anonymous'}:${courseId}:HWK:${homeworkId}`;
+}
+
+function attachmentStorageKey(
+  homeworkId: number,
+  courseId = props.courseId,
+  userId: number | string = currentUser.value?.id ?? 'anonymous'
+) {
+  return `oj:hwk-file-upload:v1:${userId}:${courseId}:${homeworkId}`;
+}
+
+function isCurrentAttachmentRequest(request: number, generation: number, homeworkId: number) {
+  return request === attachmentRequestGeneration
+    && generation === loadGeneration
+    && homeworkId === props.homeworkId
+    && props.mode === 'submit';
+}
+
+function formatFileSize(bytes: number) {
+  if (!Number.isFinite(bytes) || bytes < 0) {
+    return '大小未知';
+  }
+  if (bytes < 1024) {
+    return `${bytes} B`;
+  }
+  if (bytes < 1024 * 1024) {
+    return `${(bytes / 1024).toFixed(1)} KB`;
+  }
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
 function isCurrentLoad(generation: number) {
@@ -1213,6 +1618,47 @@ function restoreResume() {
 function localizedError(error: unknown, fallback: string) {
   const message = error instanceof Error ? error.message.trim() : '';
   return /[\u3400-\u9fff]/u.test(message) ? message : fallback;
+}
+
+function apiErrorCode(error: unknown) {
+  if (!error || typeof error !== 'object' || !('code' in error)) {
+    return '';
+  }
+  const code = (error as { code?: unknown }).code;
+  return typeof code === 'string' || typeof code === 'number' ? String(code) : '';
+}
+
+function deterministicUploadError(error: unknown) {
+  const messages: Record<string, string> = {
+    HWK_4005: '附件为空或文件内容无效，请重新选择有效文件。',
+    HWK_4031: '当前账号无权为该作业上传附件，请返回作业页确认权限。',
+    HWK_4131: '附件大小超过 10 MiB，请重新选择较小的文件。',
+    HWK_4151: '不支持该附件类型，请重新选择允许的文件。'
+  };
+  return messages[apiErrorCode(error)] ?? '';
+}
+
+function attachmentSubmissionError(error: unknown) {
+  const messages: Record<string, string> = {
+    HWK_4042: '附件不存在或不属于当前作业，请重新选择并上传。',
+    HWK_4091: '附件已过期或不可用，请重新选择并上传。',
+    HWK_4092: '附件已被提交绑定，不能重复使用，请重新选择并上传。'
+  };
+  return messages[apiErrorCode(error)] ?? '';
+}
+
+function shouldForgetRestoredAttachment(error: unknown) {
+  return ['HWK_4001', 'HWK_4031', 'HWK_4042', 'HWK_4091', 'HWK_4092'].includes(apiErrorCode(error));
+}
+
+function attachmentRemovalError(error: unknown) {
+  const messages: Record<string, string> = {
+    HWK_4031: '当前账号无权移除该附件，已清除本地恢复信息。',
+    HWK_4042: '附件已不存在，请重新选择并上传。',
+    HWK_4091: '附件已过期或不可用，请重新选择并上传。',
+    HWK_4092: '附件已绑定或不可移除，请重新选择并上传。'
+  };
+  return messages[apiErrorCode(error)] ?? '';
 }
 
 function formatDateTime(value: string) {
@@ -1510,6 +1956,61 @@ function formatDateTime(value: string) {
   min-width: 0;
 }
 
+.homework-student__file-field {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--oj-line, #d8deea);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--oj-surface, #ffffff) 88%, transparent);
+}
+
+.homework-student__file-field > label {
+  color: var(--oj-ink, #172033);
+  font-size: 0.86rem;
+  font-weight: 800;
+}
+
+.homework-student__file-field > small,
+.homework-student__file-summary span {
+  color: var(--oj-muted, #667085);
+  font-size: 0.78rem;
+  overflow-wrap: anywhere;
+}
+
+.homework-student__file-summary {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 11px 12px;
+  border: 1px solid color-mix(in srgb, var(--oj-brand, #2563eb) 24%, var(--oj-line, #d8deea));
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--oj-brand, #2563eb) 7%, transparent);
+}
+
+.homework-student__file-summary strong {
+  overflow-wrap: anywhere;
+}
+
+.homework-student__file-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.homework-student__file-actions button {
+  min-height: 40px;
+  padding: 8px 13px;
+  border: 1px solid var(--oj-brand, #2563eb);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--oj-brand, #2563eb) 8%, var(--oj-surface, #ffffff));
+  color: var(--oj-brand, #2563eb);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 800;
+}
+
 .homework-student__objective-editor,
 .homework-student__flow-actions {
   display: grid;
@@ -1792,6 +2293,15 @@ function formatDateTime(value: string) {
 
   .homework-student__history-link {
     justify-self: start;
+  }
+
+  .homework-student__file-field {
+    padding: 12px;
+  }
+
+  .homework-student__file-actions,
+  .homework-student__file-actions button {
+    width: 100%;
   }
 
   .homework-student__state {

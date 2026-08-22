@@ -10,6 +10,7 @@ import com.onlinejudge.hwk.domain.HomeworkSubmissionAttention;
 import com.onlinejudge.hwk.domain.HomeworkSubmissionSearchCriteria;
 import com.onlinejudge.hwk.domain.HomeworkSubmitStatus;
 import com.onlinejudge.hwk.service.HomeworkService;
+import com.onlinejudge.hwk.service.HomeworkAttachmentService;
 import com.onlinejudge.hwk.service.HomeworkStatisticsService;
 import com.onlinejudge.hwk.service.HomeworkSubmissionService;
 import jakarta.validation.Valid;
@@ -33,15 +34,18 @@ public class HomeworkController {
     private final HomeworkService homeworkService;
     private final HomeworkSubmissionService homeworkSubmissionService;
     private final HomeworkStatisticsService homeworkStatisticsService;
+    private final HomeworkAttachmentService homeworkAttachmentService;
 
     public HomeworkController(
             HomeworkService homeworkService,
             HomeworkSubmissionService homeworkSubmissionService,
-            HomeworkStatisticsService homeworkStatisticsService
+            HomeworkStatisticsService homeworkStatisticsService,
+            HomeworkAttachmentService homeworkAttachmentService
     ) {
         this.homeworkService = homeworkService;
         this.homeworkSubmissionService = homeworkSubmissionService;
         this.homeworkStatisticsService = homeworkStatisticsService;
+        this.homeworkAttachmentService = homeworkAttachmentService;
     }
 
     @PostMapping
@@ -110,7 +114,11 @@ public class HomeworkController {
                 homeworkSubmissionService.listMine(homeworkId, currentUser.id());
         return ApiResponse.ok(history.submissions()
                 .stream()
-                .map(submission -> HomeworkSubmissionResponse.fromStudentView(history.homework(), submission))
+                .map(submission -> HomeworkSubmissionResponse.fromStudentView(
+                        history.homework(),
+                        submission,
+                        homeworkAttachmentService.viewForSubmission(submission, history.homework().courseId())
+                ))
                 .toList());
     }
 
@@ -140,8 +148,12 @@ public class HomeworkController {
                         page,
                         size
                 );
+        com.onlinejudge.hwk.domain.Homework homework = homeworkService.detail(homeworkId, currentUser.id());
         return ApiResponse.ok(new PageResponse<>(
-                submissions.list().stream().map(HomeworkSubmissionResponse::fromTeacherView).toList(),
+                submissions.list().stream().map(submission -> HomeworkSubmissionResponse.fromTeacherView(
+                        submission,
+                        homeworkAttachmentService.viewForSubmission(submission, homework.courseId())
+                )).toList(),
                 submissions.total(),
                 submissions.page(),
                 submissions.size()
@@ -169,7 +181,8 @@ public class HomeworkController {
                 );
         HomeworkSubmissionResponse response = HomeworkSubmissionResponse.fromStudentView(
                 submitted.homework(),
-                submitted.submission()
+                submitted.submission(),
+                homeworkAttachmentService.viewForSubmission(submitted.submission(), submitted.homework().courseId())
         );
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.ok(response));
     }

@@ -1,5 +1,6 @@
-import { request } from '../http';
+import { request, requestBlob, type BlobResponse } from '../http';
 import type {
+  HomeworkAttachmentUpload,
   HomeworkDetail,
   HomeworkAttention,
   HomeworkEvaluationResult,
@@ -133,6 +134,43 @@ export function submitHomework(
     method: 'POST',
     body: payload
   });
+}
+
+export function uploadHomeworkAttachment(
+  homeworkId: number,
+  file: File
+): Promise<HomeworkAttachmentUpload> {
+  const formData = new FormData();
+  formData.append('file', file);
+  return request<HomeworkAttachmentUpload>(`/api/v1/homeworks/${homeworkId}/attachments`, {
+    method: 'POST',
+    body: formData
+  });
+}
+
+export function getHomeworkAttachment(
+  homeworkId: number,
+  fileId: string
+): Promise<HomeworkAttachmentUpload> {
+  return request<HomeworkAttachmentUpload>(
+    `/api/v1/homeworks/${homeworkId}/attachments/${encodeURIComponent(fileId)}`
+  );
+}
+
+export function deleteHomeworkAttachment(homeworkId: number, fileId: string): Promise<null> {
+  return request<null>(
+    `/api/v1/homeworks/${homeworkId}/attachments/${encodeURIComponent(fileId)}`,
+    { method: 'DELETE' }
+  );
+}
+
+export function downloadHomeworkSubmissionAttachment(
+  homeworkId: number,
+  submissionId: number
+): Promise<BlobResponse> {
+  return requestBlob(
+    `/api/v1/homeworks/${homeworkId}/submissions/${submissionId}/attachment/download`
+  );
 }
 
 export interface HomeworkSubmissionListQuery {

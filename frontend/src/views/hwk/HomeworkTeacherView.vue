@@ -134,7 +134,7 @@
             统计
           </RouterLink>
           <button
-            v-if="isEditable(rowStatus(row)) && rowType(row) !== 'FILE'"
+            v-if="isEditable(rowStatus(row))"
             :data-testid="`publish-homework-${rowId(row)}`"
             type="button"
             :disabled="pendingAction !== null"
@@ -142,13 +142,6 @@
           >
             {{ pendingLabel(rowId(row), 'publish', '发布') }}
           </button>
-          <span
-            v-if="isEditable(rowStatus(row)) && rowType(row) === 'FILE'"
-            class="contract-blocker"
-            :data-testid="`file-contract-blocked-${rowId(row)}`"
-          >
-            #214 附件提交契约待补齐，暂不可发布
-          </span>
           <button
             v-if="rowStatus(row) === 'PUBLISHED'"
             :data-testid="`close-homework-${rowId(row)}`"
@@ -465,11 +458,6 @@ function goToPage(nextPage: number) {
 
 async function runLifecycle(row: HomeworkRow, action: LifecycleAction) {
   if (pendingAction.value) return;
-  if (action === 'publish' && row.type === 'FILE') {
-    operationFeedback.value = '';
-    operationError.value = '#214 附件上传与安全提交链路完成前不可发布 FILE 作业。';
-    return;
-  }
   const copy = lifecycleCopy(action, row.title);
   operationFeedback.value = '';
   operationError.value = '';

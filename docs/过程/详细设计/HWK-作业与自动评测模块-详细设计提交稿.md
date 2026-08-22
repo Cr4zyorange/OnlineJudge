@@ -16,7 +16,7 @@
 
 本文档为“在线教学与实训平台”中作业与自动评测模块（HWK）的详细设计提交稿，用于提交给详细设计负责人，并合并到《软件详细设计说明书》第 3.5 节及后续接口清单、数据库清单、需求追踪矩阵中。
 
-本模块设计依据《软件需求规格说明书》《软件概要设计说明书》《软件详细设计说明书》底稿和《详细设计—各模块负责人分工》编写，重点覆盖作业创建与草稿逻辑删除、发布、题目与测试用例管理、学生提交、提交历史、自动评测、教师批阅、重评、反馈展示、单次作业统计、待处理名单和成绩推送等内容。
+本模块设计依据《软件需求规格说明书》《软件概要设计说明书》《软件详细设计说明书》底稿和《详细设计—各模块负责人分工》编写，重点覆盖作业创建与草稿逻辑删除、发布、题目与测试用例管理、FILE 附件上传/绑定/删除/受控下载、学生提交、提交历史、自动评测、教师批阅、重评、反馈展示、单次作业统计、待处理名单和成绩推送等内容。
 
 ### 0.1 设计边界
 
@@ -24,8 +24,8 @@ HWK 模块负责：
 
 1. 教师创建、编辑、逻辑删除草稿、发布、关闭和归档作业。
 2. 教师配置客观题题目和代码题测试用例。
-3. 学生查看作业详情并提交文本、附件、客观题答案或代码。
-4. 系统保存提交历史，标识最新提交和有效提交。
+3. 学生查看作业详情并提交文本、附件、客观题答案或代码；FILE 作业附件由 HWK 管理独立业务资产和授权。
+4. 系统保存提交历史，标识最新提交和有效提交，并将每份 FILE 提交绑定到唯一附件版本。
 5. 系统对客观题和代码题进行基础自动评测。
 6. 教师查看提交内容，进行人工批阅、评分、评语填写和重评。
 7. 学生查看允许公开的评测结果、最终成绩和教师反馈。
@@ -42,6 +42,7 @@ HWK 模块不负责：
 3. 实验任务与实验评测流程，该部分由 LAB 模块负责。
 4. 课程总评计算、成绩项权重配置、最终成绩发布总表，以及课程级/跨作业分析、自定义区间、趋势和统计快照，该部分由 GRD 模块负责。HWK 只提供单次作业、固定五档的即时统计，不维护 GRD 快照。
 5. 站内通知列表展示、通知已读状态和消息中心页面，该部分由 LRN 模块负责。
+6. 病毒扫描、内容净化、对象存储直传和全局容量配额；首版通过三重类型白名单、10 MiB 限制和受控下载降低风险。
 
 ### 0.2 首版实现范围
 
@@ -67,7 +68,7 @@ HWK 模块不负责：
 | 依赖模块 | AUTH、CRS、LRN |
 | 协作模块 | LAB、GRD |
 | 主要页面 | 作业列表页、作业详情页、作业发布页、作业提交页、批阅/提交队列页、反馈页、统计页 |
-| 主要数据表 | 作业表、客观题题目表、测试用例表、提交表、评测记录表、批阅日志表 |
+| 主要数据表 | 作业表、客观题题目表、测试用例表、提交表、附件资产表、评测记录表、批阅日志表 |
 | 测试编号前缀 | TC-HWK |
 
 ---
@@ -87,6 +88,7 @@ HWK 模块是平台中连接“课程学习任务”和“成绩评价”的核�
 | HWK → LRN | 学习过程与通知提醒 | 作业发布、作业变更、截止提醒、评测完成、成绩发布通知 | 业务事件推送 |
 | HWK ↔ LAB | 实训实验模块 | 共享评测 Worker 抽象、评测状态枚举、测试用例字段规范 | 共享评测服务接口，不直接访问对方业务表 |
 | HWK → GRD | 成绩评价与教学分析 | 作业最终得分、提交状态、评分状态、来源更新时间 | RESTful API 或成绩同步事件 |
+| HWK → FileStorageService | 低层文件存储 | 保存、读取、删除物理字节 | 仅复用存储抽象；HWK 自行持有 DB-HWK-08、所有权和访问授权，不调用 CRS/LAB 业务上传 API |
 
 ### 2.3 跨模块事件
 
@@ -110,10 +112,10 @@ HWK 模块是平台中连接“课程学习任务”和“成绩评价”的核�
 | UI-HWK-02 | 教师作业创建/编辑页 | 教师、助教 | 创建或修改作业基础信息 | 填写标题、说明、课程、章节、截止时间、作业类型、满分、提交限制、显示策略；保存草稿 | API-HWK-01、API-HWK-02 |
 | UI-HWK-03 | 作业发布管理页 | 教师、助教 | 管理作业发布状态与配置 | 发布作业、关闭作业、查看发布信息、进入题目配置和测试用例配置 | API-HWK-03、API-HWK-04、API-HWK-14、API-HWK-16 |
 | UI-HWK-04 | 学生作业详情页 | 学生 | 查看作业说明和提交要求 | 查看作业标题、说明、附件、截止时间、提交格式、当前提交状态；进入提交页或历史页 | API-HWK-06、API-HWK-08 |
-| UI-HWK-05 | 学生作业提交页 | 学生 | 完成作业提交 | 提交文本答案、客观题答案、附件或代码；查看提交成功时间和初始评测状态 | API-HWK-07 |
-| UI-HWK-06 | 提交历史页 | 学生、教师、助教 | 查看作业提交版本 | 学生查看本人历史提交；教师查看全班或指定学生提交；标识最新提交和有效提交 | API-HWK-08、API-HWK-09、API-HWK-10 |
+| UI-HWK-05 | 学生作业提交页 | 学生 | 完成作业提交 | FILE 作业选择并真实上传一个文件，展示 24 小时有效期、删除、失败保留和重试，再以一个 fileId 提交；其他类型提交文本、客观题或代码 | API-HWK-07、API-HWK-23 |
+| UI-HWK-06 | 提交历史页 | 学生、教师、助教 | 查看作业提交版本 | 学生查看本人历史提交；教师查看全班或指定学生提交；标识最新/有效提交；展示安全附件元数据并按权限下载准确版本 | API-HWK-08、API-HWK-09、API-HWK-10、API-HWK-24 |
 | UI-HWK-07 | 评测结果页 | 学生、教师、助教 | 展示自动评测结果和反馈 | 查看评测状态、得分、通过用例数、错误类型、反馈摘要和公开日志 | API-HWK-11 |
-| UI-HWK-08 | 教师批阅页 | 教师、助教 | 对提交进行人工批阅或重评 | 使用普通筛选或 `attention` 待评测/待批阅深链查看提交，填写人工分数与评语，触发重评；URL、刷新、前进和后退恢复筛选与页码 | API-HWK-09、API-HWK-10、API-HWK-12、API-HWK-13、API-HWK-19 |
+| UI-HWK-08 | 教师批阅页 | 教师、助教 | 对提交进行人工批阅或重评 | 使用普通筛选或 `attention` 深链查看提交；FILE 只展示安全元数据并通过受控接口下载；填写人工分数与评语，触发重评；URL、刷新、前进和后退恢复筛选与页码 | API-HWK-09、API-HWK-10、API-HWK-12、API-HWK-13、API-HWK-19、API-HWK-24 |
 | UI-HWK-09 | 作业统计页 | 教师、助教 | 查看单次作业完成情况、固定五档和三类跟进名单 | 查看提交率、评测/批阅进度、分数摘要、生成时间和固定五档；未提交走 API-HWK-15，待评测/待批阅走 API-HWK-09 attention；完成键盘、1440px 和 390px 验收 | API-HWK-09、API-HWK-15 |
 
 ### 3.2 页面流转图
@@ -136,7 +138,11 @@ graph TD
     T7 --> T9[发布作业成绩]
     B -->|学生| S1[学生作业列表]
     S1 --> S2[作业详情]
-    S2 --> S3[提交作业]
+    S2 --> S21{FILE 作业?}
+    S21 -->|是| S22[API-HWK-23 上传单文件]
+    S22 --> S23[取得 24h 有效 UUID]
+    S23 --> S3[API-HWK-07 原子绑定并提交]
+    S21 -->|否| S3[提交作业]
     S3 --> S4[提交成功]
     S4 --> S5[提交历史]
     S5 --> S6[评测结果与教师反馈]
@@ -157,6 +163,8 @@ graph TD
 9. 姓名服务失败时使用不含用户编号的安全占位文案，不得展示裸 `studentId`；403 时不得渲染缓存统计或名单。
 10. 教师总览仅对 DRAFT 展示删除入口；取消确认不发送请求，删除期间与编辑、发布等生命周期操作互斥。
 11. 删除失败保留原行、筛选和页码并允许重试；成功后刷新，当前页为空时回退到有效页；1440px 与 390px 视口均需验收。
+12. FILE 上传失败保留已选文件并允许重试；过期、越权、已绑定、超限和类型拒绝显示冻结错误提示，不生成或猜测 fileId。
+13. 历史和批阅页不显示/拼接存储地址，仅展示净化文件名、可信 MIME、字节数并通过 API-HWK-24 下载。
 
 ---
 
@@ -188,6 +196,8 @@ graph TD
 | API-HWK-20 | 查询评测日志 | GET | /api/v1/evaluations/{evaluationId}/logs | 教师/助教，且有课程管理权限 | FR-HWK-04、FR-HWK-05 |
 | API-HWK-21 | 查询批阅日志 | GET | /api/v1/submissions/{submissionId}/review-logs | 教师/助教，且有课程管理权限 | FR-HWK-05 |
 | API-HWK-22 | 删除草稿作业 | DELETE | /api/v1/homeworks/{homeworkId} | 教师/助教，且为作业所属课程管理者；作业必须仍为 DRAFT | FR-HWK-01 |
+| API-HWK-23 | 学生附件生命周期 | POST；GET；DELETE | /api/v1/homeworks/{homeworkId}/attachments；/api/v1/homeworks/{homeworkId}/attachments/{fileId} | POST/GET/DELETE 均为当前课程学生；GET/DELETE 仅上传本人，DELETE 仅未绑定且未过期 | FR-HWK-02 |
+| API-HWK-24 | 受控下载提交附件 | GET | /api/v1/homeworks/{homeworkId}/submissions/{submissionId}/attachment/download | 提交学生本人或作业所属课程管理者；每次重新鉴权 | FR-HWK-03、FR-HWK-05 |
 
 #### 4.1.1 API-HWK-09 attention 兼容增量
 
@@ -246,8 +256,31 @@ graph TD
 | 调用方 | 学生端 |
 | 主要入参 | answerText, answerJson, fileIds, codeText, language |
 | 主要出参 | submissionId, submitStatus, evaluationStatus, submittedAt |
-| 处理逻辑 | 校验学生身份和课程成员关系；校验作业状态、截止时间、提交次数和提交格式；保存提交记录；如果允许多次提交，则更新旧提交 isFinal=0，新提交 isFinal=1；客观题直接评分，代码题创建评测任务；文件题和文本题进入待批阅状态 |
-| 异常情况 | 作业不存在、未发布、已关闭、学生不属于课程、超过截止时间且不允许逾期、文件格式不合法、重复提交不允许 |
+| 处理逻辑 | 校验学生身份和课程成员关系；校验作业状态、截止时间、提交次数和提交格式；FILE 的 fileIds 必须恰好为一个 UUID，并按当前学生、课程、作业、UPLOADED、未过 24 小时条件锁定 DB-HWK-08；在同一事务中保存提交、更新旧/新 isFinal 并将附件转为 BOUND；客观题直接评分，代码题创建评测任务；文件题和文本题进入待批阅状态 |
+| 异常情况 | 作业不存在、未发布、已关闭、学生不属于课程、超过截止时间且不允许逾期、FILE 数量不为 1（HWK_4005）、附件不可见（HWK_4042）、过期（HWK_4091）、已绑定/删除/复用（HWK_4092）、重复提交不允许 |
+
+#### 4.2.2A 学生附件生命周期 API-HWK-23
+
+| 项目 | 内容 |
+| --- | --- |
+| 方法与路径 | `POST /api/v1/homeworks/{homeworkId}/attachments`；`GET/DELETE /api/v1/homeworks/{homeworkId}/attachments/{fileId}` |
+| 调用方 | 当前课程学生 |
+| 主要入参 | POST 为 multipart 单 `file`；GET/DELETE 为 homeworkId、服务器 UUID fileId |
+| 主要出参 | `fileId, originalFilename, contentType, fileSize, status, uploadedAt, expiresAt`；DELETE 返回删除结果 |
+| 处理逻辑 | 校验登录态、CRS 课程成员、FILE 作业及可提交状态；POST 只接受一个 1～10 MiB 文件，扩展、MIME、内容签名须同时匹配 `pdf, zip, docx, xlsx, pptx, txt, md, csv, png, jpg, jpeg`；生成 UUID 和服务端 storageKey，写入 UPLOADED 元数据，expiresAt=uploadedAt+24h；GET 仅返回本人当前作业的安全元数据；DELETE 仅本人当前作业未绑定 UPLOADED 资产并转为 DELETED |
+| 安全约束 | 不返回/记录 storageKey、服务器路径或裸 URL；净化原始文件名；存储与元数据写入失败执行补偿 |
+| 异常情况 | HWK_4031、HWK_4042、HWK_4091、HWK_4092、HWK_4131、HWK_4151、HWK_5002 |
+
+#### 4.2.2B 受控下载提交附件 API-HWK-24
+
+| 项目 | 内容 |
+| --- | --- |
+| 方法与路径 | GET /api/v1/homeworks/{homeworkId}/submissions/{submissionId}/attachment/download |
+| 调用方 | 提交学生本人、课程管理者 |
+| 主要入参 | homeworkId, submissionId |
+| 主要出参 | 精确提交版本的二进制内容；可信 Content-Type、UTF-8 Content-Disposition、Content-Length、`X-Content-Type-Options: nosniff` |
+| 处理逻辑 | 每次请求重新校验登录态、课程关系、作业/提交/BOUND 附件归属；通过服务端 storageKey 读取物理文件；不生成静态或裸下载 URL |
+| 异常情况 | 非本人且非课程管理者 HWK_4031；提交/附件/绑定不可见 HWK_4042；存储读取失败 HWK_5002 |
 
 #### 4.2.3 查询评测结果 API-HWK-11
 
@@ -300,6 +333,8 @@ graph TD
 | SVC-HWK-10 | HomeworkEventPublisher | 向 LRN 和 GRD 发送作业事件和成绩来源事件 | 业务事件 DTO | 事件发送结果 |
 | SVC-HWK-11 | EvaluationWorkerClient | 与 LAB 共享评测 Worker 抽象，提交代码评测任务并接收回调 | 评测任务、语言、限制参数、测试用例 | 评测任务状态、评测结果 |
 | SVC-HWK-12 | HomeworkRepository/Mapper | 完成业务表访问；提供父表原子 `softDeleteDraft`，普通更新不得写删除标记且排除已删除记录；用条件聚合 SQL 和组合索引支持固定五档、有效范围和 attention 分页 | 实体对象、查询条件、CRS 活跃学生范围 | 数据库记录、聚合行、分页记录 |
+| SVC-HWK-13 | HomeworkAttachmentService | 编排 API-HWK-23/24，校验类型/大小/内容签名、24 小时状态、所有权、原子绑定和每次下载重鉴权；仅通过 FileStorageService 操作物理字节 | 当前用户、homeworkId、fileId/submissionId、multipart 文件 | 安全附件 DTO、下载资源、删除/绑定结果 |
+| SVC-HWK-14 | HomeworkAttachmentRepository | 按 fileId+作业+上传者+状态+有效期条件查询/原子绑定，保存 DB-HWK-08 生命周期 | 附件实体、绑定条件 | 附件记录、原子更新行数 |
 
 ### 5.1 服务调用关系
 
@@ -406,6 +441,7 @@ sequenceDiagram
 | DB-HWK-05 | t_hwk_evaluation | 作业评测记录表 | id, submission_id, homework_id, student_id, evaluation_type, status, score, passed_cases, total_cases, time_used_ms, memory_used_kb, feedback, log_url, started_at, finished_at | 保存每次自动评测或重评记录 |
 | DB-HWK-06 | t_hwk_review_log | 作业批阅日志表 | id, submission_id, homework_id, student_id, operation_type, old_score, new_score, comment, operator_id, reason, created_at | 保存批阅、重评、成绩发布和分数调整留痕 |
 | DB-HWK-07 | t_hwk_judge_config | 作业评测配置表 | id, homework_id, language_limit_json, time_limit_ms, memory_limit_kb, output_compare_mode, created_at, updated_at | 保存代码题统一评测配置，首版可简化为 homework 表中的 judge_config_id 引用 |
+| DB-HWK-08 | t_hwk_submission_attachment | 作业提交附件表 | id, file_id, homework_id, course_id, uploader_id, submission_id, original_filename, content_type, file_size, storage_key, status, uploaded_at, expires_at, bound_at, deleted_at, created_at, updated_at | 保存 HWK 自有附件资产、可信元数据、24 小时有效期和 UPLOADED/BOUND/DELETED 生命周期；storage_key 仅服务端可见 |
 
 ### 6.3 主要表结构说明
 
@@ -462,7 +498,7 @@ WHERE id = :homeworkId
 | submit_type | varchar(32) | 否 | 提交类型：TEXT/FILE/CODE/OBJECTIVE |
 | answer_text | text | 是 | 文本答案或代码文本 |
 | answer_json | text | 是 | 客观题答案 JSON |
-| file_url | varchar(500) | 是 | 附件路径或文件服务地址 |
+| file_url | varchar(500) | 是 | 兼容旧记录的内部引用；新 FILE 提交以 DB-HWK-08 绑定为准，不进入公开 DTO |
 | language | varchar(32) | 是 | 代码语言，如 C/C++/Java/Python |
 | submit_status | varchar(32) | 否 | 提交状态 |
 | evaluation_status | varchar(32) | 否 | 评测状态 |
@@ -489,7 +525,31 @@ idx_hwk_submission_attention(homework_id, is_final, is_deleted, submitted_at, id
 
 这两个索引直接对应真实查询：`effective` 覆盖统计有效范围，`attention` 在三个等值范围字段后放置稳定排序键 `submitted_at + id`，再覆盖其余组合筛选列。既有 `uk_hwk_submission_version(homework_id, student_id, version)` 已提供学生查询所需左前缀，不重复建索引；将多值状态列放在排序键前会破坏全局排序能力。组合索引通过新的增量迁移加入既有数据库并同步 fresh Compose schema；迁移测试验证索引名称和列顺序。
 
-#### 6.3.3 t_hwk_evaluation 作业评测记录表
+#### 6.3.3 DB-HWK-08 t_hwk_submission_attachment 作业提交附件表
+
+| 字段名 | 类型 | 是否为空 | 说明 |
+| --- | --- | --- | --- |
+| id | bigint | 否 | 内部主键 |
+| file_id | varchar(36) | 否 | 服务器生成 UUID，唯一且对外不透明 |
+| homework_id | bigint | 否 | 所属作业 |
+| course_id | bigint | 否 | 所属课程 |
+| uploader_id | bigint | 否 | 上传学生 |
+| submission_id | bigint | 是 | 绑定提交，唯一；UPLOADED 时为空 |
+| original_filename | varchar(255) | 否 | 净化显示文件名 |
+| content_type | varchar(127) | 否 | 服务端验证后的可信 MIME |
+| file_size | bigint | 否 | 1～10485760 字节 |
+| storage_key | varchar(500) | 否 | 服务端存储键，唯一且禁止公开 |
+| status | varchar(20) | 否 | UPLOADED/BOUND/DELETED |
+| uploaded_at | datetime | 否 | 上传时间 |
+| expires_at | datetime | 否 | UPLOADED 的 24 小时过期时间 |
+| bound_at | datetime | 是 | 绑定时间 |
+| deleted_at | datetime | 是 | 删除时间 |
+| created_at | datetime | 否 | 创建时间 |
+| updated_at | datetime | 否 | 更新时间 |
+
+索引与约束：`file_id`、`storage_key`、`submission_id` 分别唯一；按 `(homework_id, uploader_id, status, expires_at)` 建查询索引。状态必须与 submission/bound/deleted 时间一致。H2 增量迁移、迁移测试和 MySQL Compose fresh schema 必须同构。
+
+#### 6.3.4 t_hwk_evaluation 作业评测记录表
 
 | 字段名 | 类型 | 是否为空 | 说明 |
 | --- | --- | --- | --- |
@@ -527,6 +587,8 @@ idx_hwk_evaluation_status(status)
 6. 对学生隐藏的测试用例和标准答案不得通过学生端接口返回。
 7. API-HWK-22 只逻辑删除 DB-HWK-01 父记录；DB-HWK-02、03、07 和已有 DB-HWK-04、05、06 记录全部保留，不执行级联删除或替换。
 8. 普通更新只允许命中未删除父记录，不接受客户端或旧实体携带的删除标记，防止并发旧请求复活作业。
+9. DB-HWK-08 的 `file_id/storage_key/submission_id` 分别唯一；FILE 提交恰好关联一条 BOUND 附件，UPLOADED 不得有 submission_id，BOUND 必须有 submission_id/bound_at，DELETED 必须有 deleted_at。
+10. API-HWK-07 只可将当前学生、当前课程/作业、未过期的 UPLOADED 附件原子转为 BOUND；提交与绑定同事务成功或回滚。
 
 ---
 
@@ -585,13 +647,17 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    A[学生进入作业详情页] --> B[点击提交]
-    B --> C[前端按作业类型填写提交内容]
-    C --> D[后端校验登录与课程成员关系]
+    A[学生进入作业详情页] --> B{FILE 作业?}
+    B -->|是| C[API-HWK-23 上传单文件]
+    C --> C1[校验 10 MiB 与扩展/MIME/签名]
+    C1 --> C2[生成 UUID 与 24h UPLOADED 资产]
+    C2 --> C3[前端携带一个 fileId 提交]
+    B -->|否| C3[前端按类型填写提交内容]
+    C3 --> D[后端校验登录与课程成员关系]
     D --> E[校验作业状态、截止时间、提交次数]
     E --> F{提交是否合法}
     F -->|否| G[返回错误提示]
-    F -->|是| H[保存提交记录]
+    F -->|是| H[同事务保存提交并将附件绑定为 BOUND]
     H --> I{作业是否允许多次提交}
     I -->|是| J[旧提交 is_final=0 新提交 is_final=1]
     I -->|否| K[保留唯一有效提交]
@@ -612,6 +678,8 @@ flowchart TD
 3. 若超过截止时间且不允许逾期提交，直接拒绝提交。
 4. 若允许逾期提交，提交状态记为 LATE。
 5. 代码评测失败不删除提交记录，只更新评测状态为 SYSTEM_ERROR 或具体错误状态。
+6. FILE 的 fileIds 必须恰好为 1；附件必须属于当前学生、课程与作业，状态为 UPLOADED 且未超过 24 小时，已绑定/删除附件不得复用。
+7. 上传失败保留前端文件选择并允许重试；存储/元数据失败补偿，提交/绑定事务失败不得产生半绑定状态。
 
 ### 7.3 自动评测流程
 
@@ -729,8 +797,14 @@ stateDiagram-v2
 | HWK_4009 | EVALUATION_TASK_FAILED | 评测任务创建失败 | 评测任务创建失败，请稍后重试 | 提交保留，评测状态标记为 SYSTEM_ERROR |
 | HWK_4010 | EVALUATION_RESULT_NOT_VISIBLE | 学生试图查看未公开评分结果 | 当前结果尚未公开 | 返回无权限提示 |
 | HWK_4031 | COURSE_PERMISSION_DENIED | 教师无课程管理权限或学生非课程成员 | 无权访问该作业 | 返回 403 |
+| HWK_4042 | ATTACHMENT_NOT_FOUND | 附件、提交或绑定关系不存在/不可见 | 附件不存在或不可访问 | 返回 404，不暴露跨用户资源 |
+| HWK_4091 | ATTACHMENT_EXPIRED | UPLOADED 已超过 24 小时 | 附件已过期，请重新上传 | 返回 409 |
+| HWK_4092 | ATTACHMENT_STATE_CONFLICT | 附件已绑定、已删除或被重复复用 | 附件状态已变化，请重新上传 | 返回 409 |
 | HWK_4095 | HOMEWORK_DELETE_STATE_CONFLICT | 删除时作业为 NOT_OPEN、PUBLISHED、CLOSED、SCORE_PUBLISHED、ARCHIVED 或任一非 DRAFT 状态 | 仅草稿作业可删除 | 返回 409，保留作业和全部子数据 |
+| HWK_4131 | ATTACHMENT_TOO_LARGE | 文件大于 10 MiB | 文件不能超过 10 MiB | 返回 413，不写元数据 |
+| HWK_4151 | ATTACHMENT_TYPE_UNSUPPORTED | 扩展名或声明 MIME 不支持/不匹配 | 文件类型不受支持 | 返回 415，不写元数据；内容签名非法或损坏 ZIP/OOXML 结构返回 `400/HWK_4005` |
 | HWK_5001 | INTERNAL_ERROR | 未预期系统异常 | 系统异常，请稍后重试 | 记录错误日志并返回统一异常 |
+| HWK_5002 | ATTACHMENT_STORAGE_ERROR | 物理文件读写或补偿失败 | 附件服务暂时不可用，请重试 | 返回 500，回滚事务并记录日志 |
 
 ### 8.2 异常处理原则
 
@@ -740,7 +814,7 @@ stateDiagram-v2
 4. 评测 Worker 超时、异常退出或返回异常时，评测状态标记为 SYSTEM_ERROR，并保存日志地址或错误摘要。
 5. 教师重评失败时保留原评测结果，新评测记录标记为失败。
 6. 批阅日志写入失败时，人工评分操作应回滚，避免分数变化无留痕。
-7. 文件上传失败时不创建完整提交记录，或将提交标记为失败并提示重新上传，具体与文件模块统一。
+7. 文件上传失败不创建附件元数据和提交记录；若物理文件先写成功而元数据失败，执行补偿删除并返回 HWK_5002。前端保留选择并允许重试。
 8. 删除请求先校验课程权限与 DRAFT 状态，再执行父表原子条件更新；零影响行以当前记录区分 `HWK_4001` 与 `HWK_4095`。
 9. 普通更新、发布、关闭和成绩发布必须排除已删除父记录；删除与旧更新竞争时，旧更新失败并回滚对子配置的写入。
 
@@ -758,6 +832,8 @@ stateDiagram-v2
 | 删除草稿作业 | 不允许 | 允许，仅所属课程 DRAFT | 允许，仅具备课程管理权限且为 DRAFT | 仅具备该课程管理权限时允许 | 服务端校验课程管理权限、DRAFT 和未删除条件，不因管理员身份绕过课程范围 |
 | 发布/关闭作业 | 不允许 | 允许 | 允许，视课程角色配置 | 可管理 | 写入操作日志 |
 | 提交作业 | 允许，限本人 | 不允许代交 | 不允许代交 | 不允许代交 | studentId 从认证上下文获取 |
+| 上传/查询/删除未绑定附件 | 允许，限本人当前作业 | 不允许代传 | 不允许代传 | 不允许绕过学生边界 | 校验课程成员、作业、上传者、UPLOADED 和 24h；DELETE 仅本人未绑定资产 |
+| 下载已绑定附件 | 仅本人提交 | 所属课程允许 | 所属课程允许 | 仅具备课程管理权限时允许 | API-HWK-24 每次重鉴权并校验 homework/submission/BOUND 关系 |
 | 查看提交历史 | 仅本人 | 所属课程全部学生 | 所属课程全部学生 | 按权限查看 | 学生不得查看他人提交 |
 | 查看评测结果 | 仅本人且按可见策略 | 所属课程全部提交 | 所属课程全部提交 | 按权限查看 | 隐藏日志仅教师可见 |
 | 教师批阅 | 不允许 | 允许 | 允许，视课程角色配置 | 可管理 | 记录批阅日志 |
@@ -773,6 +849,7 @@ stateDiagram-v2
 4. 学生提交记录只能由本人、课程教师、助教或管理员查看。
 5. 批阅日志、重评原因和成绩调整记录仅教师端、管理员端或测试审查时可查看。
 6. 统计和待处理名单的姓名服务失败时使用安全占位文案，不回退展示裸 `studentId`；无权请求在服务端返回 403，不先返回部分统计。
+7. 附件公开 DTO、日志、DOM 与下载链接不包含 storageKey、服务器路径或裸 URL；文件名净化，下载设置可信响应头和 `nosniff`。
 
 ### 9.3 日志与审计
 
@@ -795,7 +872,7 @@ stateDiagram-v2
 3. 学生提交接口只负责提交记录落库和评测任务创建，不同步等待代码评测完成。
 4. 自动评测通过后台 Worker 异步执行，前端通过轮询或通知刷新结果。
 5. 作业统计由独立 `HomeworkStatisticsService` 编排，Repository 必须使用条件聚合 SQL 计算基础数量、原始分数摘要和固定五档，不得加载全部最终提交到应用内存。HWK 不维护统计快照；课程级和跨作业快照由 GRD 负责。
-6. 对附件和代码文件只保存文件路径或文件 ID，避免大文件直接存入业务表。
+6. 附件和代码文件物理字节不进入业务表；DB-HWK-08 保存 UUID、安全元数据和仅服务端 storageKey，公开 DTO 不返回路径。
 
 ### 10.2 可维护性设计
 
@@ -815,6 +892,7 @@ stateDiagram-v2
 4. 发布成绩、批阅分数和写入批阅日志应在事务中完成。
 5. 向 LRN 或 GRD 发送事件失败时，业务主数据保留，并记录事件发送失败状态，后续可重试。
 6. 草稿删除只更新父表 `is_deleted/updated_at`；删除条件和 DRAFT 状态在同一 SQL 中判定，普通更新受未删除条件保护，全部子数据和历史保持完整。
+7. FILE 提交记录与 DB-HWK-08 BOUND 更新同事务；元数据回滚后的立即物理删除失败时，`FileStorageService.deferDelete` 在存储根目录 `.pending-deletes` 持久 SHA-256 marker，`HomeworkAttachmentCleanupService` 定时重试并在成功后 ack。UPLOADED 资产 24 小时后不可绑定；整卷不可写与病毒扫描为残余风险。
 
 ---
 
@@ -825,16 +903,16 @@ stateDiagram-v2
 | 需求编号 | 详细设计编号 | 页面编号 | API 编号 | 数据表编号 | 测试编号 |
 | --- | --- | --- | --- | --- | --- |
 | FR-HWK-01 作业创建与发布 | DS-HWK-01 | UI-HWK-01、UI-HWK-02、UI-HWK-03 | API-HWK-01、API-HWK-02、API-HWK-03、API-HWK-04、API-HWK-16、API-HWK-18、API-HWK-22 | DB-HWK-01、DB-HWK-02、DB-HWK-03、DB-HWK-07 | TC-HWK-01、TC-HWK-02、TC-HWK-03、TC-HWK-19 |
-| FR-HWK-02 学生作业查看与提交 | DS-HWK-02 | UI-HWK-04、UI-HWK-05 | API-HWK-05、API-HWK-06、API-HWK-07、API-HWK-17 | DB-HWK-01、DB-HWK-02、DB-HWK-04 | TC-HWK-04、TC-HWK-05、TC-HWK-06 |
-| FR-HWK-03 提交历史管理 | DS-HWK-03 | UI-HWK-06 | API-HWK-08、API-HWK-09、API-HWK-10 | DB-HWK-04 | TC-HWK-07、TC-HWK-08 |
+| FR-HWK-02 学生作业查看与提交 | DS-HWK-02 | UI-HWK-04、UI-HWK-05 | API-HWK-05、API-HWK-06、API-HWK-07、API-HWK-17、API-HWK-23 | DB-HWK-01、DB-HWK-02、DB-HWK-04、DB-HWK-08 | TC-HWK-04～06、TC-HWK-20～24、TC-HWK-27、MAN-HWK-012 |
+| FR-HWK-03 提交历史管理 | DS-HWK-03 | UI-HWK-06 | API-HWK-08、API-HWK-09、API-HWK-10、API-HWK-24 | DB-HWK-04、DB-HWK-08 | TC-HWK-07、TC-HWK-08、TC-HWK-25、TC-HWK-26、MAN-HWK-012 |
 | FR-HWK-04 自动评测 | DS-HWK-04 | UI-HWK-05、UI-HWK-07、UI-HWK-08 | API-HWK-07、API-HWK-11、API-HWK-12、API-HWK-18、API-HWK-19、API-HWK-20 | DB-HWK-03、DB-HWK-04、DB-HWK-05 | TC-HWK-09、TC-HWK-10、TC-HWK-11、TC-HWK-12 |
-| FR-HWK-05 教师批阅与重评 | DS-HWK-05 | UI-HWK-08、UI-HWK-09 | API-HWK-09、API-HWK-10、API-HWK-12、API-HWK-13、API-HWK-21 | DB-HWK-04、DB-HWK-05、DB-HWK-06 | TC-HWK-13、TC-HWK-14、TC-HWK-15 |
+| FR-HWK-05 教师批阅与重评 | DS-HWK-05 | UI-HWK-08、UI-HWK-09 | API-HWK-09、API-HWK-10、API-HWK-12、API-HWK-13、API-HWK-21、API-HWK-24 | DB-HWK-04、DB-HWK-05、DB-HWK-06、DB-HWK-08 | TC-HWK-13～15、TC-HWK-25、TC-HWK-26、MAN-HWK-012 |
 | FR-HWK-06 作业反馈与结果展示 | DS-HWK-06 | UI-HWK-01、UI-HWK-04、UI-HWK-07、UI-HWK-09 | API-HWK-05、API-HWK-06、API-HWK-09、API-HWK-11、API-HWK-14、API-HWK-15 | DB-HWK-04、DB-HWK-05、DB-HWK-06 | TC-HWK-16、TC-HWK-17、TC-HWK-18 |
-| NFR-HWK-01 可靠性 | DS-HWK-N01 | UI-HWK-05、UI-HWK-08 | API-HWK-07、API-HWK-11、API-HWK-13 | DB-HWK-04、DB-HWK-05、DB-HWK-06 | TC-HWK-N01 |
+| NFR-HWK-01 可靠性 | DS-HWK-N01 | UI-HWK-05、UI-HWK-08 | API-HWK-07、API-HWK-11、API-HWK-13、API-HWK-23、API-HWK-24 | DB-HWK-04、DB-HWK-05、DB-HWK-06、DB-HWK-08 | TC-HWK-N01、TC-HWK-23、TC-HWK-24 |
 | NFR-HWK-02 性能 | DS-HWK-N02 | UI-HWK-01、UI-HWK-06、UI-HWK-09 | API-HWK-05、API-HWK-09、API-HWK-15 | DB-HWK-01、DB-HWK-04、DB-HWK-05 | TC-HWK-N02 |
-| NFR-HWK-03 可追踪性 | DS-HWK-N03 | UI-HWK-06、UI-HWK-08 | API-HWK-10、API-HWK-20、API-HWK-21 | DB-HWK-04、DB-HWK-05、DB-HWK-06 | TC-HWK-N03 |
-| NFR-HWK-04 安全性 | DS-HWK-N04 | 全部 HWK 页面 | 全部 HWK 接口 | DB-HWK-02、DB-HWK-03、DB-HWK-04、DB-HWK-05 | TC-HWK-N04 |
-| NFR-HWK-05 可测试性 | DS-HWK-N05 | 全部 HWK 页面 | 全部 HWK 接口 | 全部 HWK 数据表 | TC-HWK-N05 |
+| NFR-HWK-03 可追踪性 | DS-HWK-N03 | UI-HWK-06、UI-HWK-08 | API-HWK-10、API-HWK-20、API-HWK-21、API-HWK-23、API-HWK-24 | DB-HWK-04、DB-HWK-05、DB-HWK-06、DB-HWK-08 | TC-HWK-N03、TC-HWK-25 |
+| NFR-HWK-04 安全性 | DS-HWK-N04 | 全部 HWK 页面 | 全部 HWK 接口 | DB-HWK-02、DB-HWK-03、DB-HWK-04、DB-HWK-05、DB-HWK-08 | TC-HWK-N04、TC-HWK-21、TC-HWK-22、TC-HWK-26 |
+| NFR-HWK-05 可测试性 | DS-HWK-N05 | 全部 HWK 页面 | 全部 HWK 接口 | 全部 HWK 数据表 | TC-HWK-N05、TC-HWK-20～27、MAN-HWK-012 |
 
 ### 11.2 测试关注点
 
@@ -859,6 +937,14 @@ stateDiagram-v2
 | TC-HWK-17 | 未发布成绩控制 | 学生成绩发布前查看结果 | 不显示未公开最终分数 |
 | TC-HWK-18 | 作业统计与三类跟进名单 | 准备五档边界、非 100 满分、空分布、无分数、历史/删除/REJECTED/非当前学生、TEXT/FILE NONE、代码评测中/终态样本；查看统计并切换三类 Tab | 六个新增字段、五档、归一化和 `generatedAt` 正确，`scoredCount` 等于档位合计；评测/批阅语义和范围正确；名单服务端分页、稳定排序、URL 可恢复；SQL 聚合与组合索引生效 |
 | TC-HWK-19 | 草稿逻辑删除契约与教师入口 | 准备 DRAFT/全部非 DRAFT、权限用户、已删除作业、完整子数据和历史、并发旧更新及当前页唯一草稿；验证 API-HWK-22 成功/取消/403/404/409/并发防复活/子历史保留、UI-HWK-01 pending/失败保留/末页回退和 1440px/390px | 仅课程管理者删除 DRAFT；成功返回 `deleted=true` 和删除时间；HWK_4001/HWK_4031/HWK_4095 分类准确；普通更新不能复活；只软删父表；仅 DRAFT 显示入口，页面反馈及页码正确 |
+| TC-HWK-20 | 附件上传与可信元数据 | 上传合法白名单文件并查询元数据 | 返回服务器 UUID、净化文件名、可信 MIME、字节数、UPLOADED、24h 过期时间；无 storageKey/路径/裸 URL |
+| TC-HWK-21 | 上传与元数据权限 | 非成员、跨学生、跨课程/作业查询或删除 | 返回 HWK_4031/HWK_4042，且不泄露资源存在性或内部字段 |
+| TC-HWK-22 | 文件边界与签名白名单 | 空文件、>10 MiB、扩展/MIME/内容签名不一致、白名单各类型 | 空文件和内容签名/结构无效返回 HWK_4005，超限返回 HWK_4131，扩展名或声明 MIME 不支持/不匹配返回 HWK_4151；合法类型通过且单请求只有一个文件 |
+| TC-HWK-23 | FILE 提交原子绑定 | fileIds 为空/多值、过期、已绑定/删除、跨归属和合法 UUID | 非法返回冻结错误；合法提交与 BOUND 同事务，单提交单附件 |
+| TC-HWK-24 | 存储与事务补偿 | 模拟物理写入、元数据写入、提交事务、首次补偿删除与清理失败，并重建存储实例 | 返回 HWK_5002；无可见脏提交/半绑定；首次删除失败持久 marker，定时重试后删除对象并 ack；跨 `LocalDiskFileStorageService` 实例仍可恢复 |
+| TC-HWK-25 | 历史与详情安全元数据 | 查询多次 FILE 提交历史和具体版本 | 每个版本只返回自身 BOUND 附件安全元数据，不回退最新版本，不返回内部引用 |
+| TC-HWK-26 | 受控下载授权与内容 | 本人、课程管理者、非成员及跨提交下载；校验头与 SHA-256 | 仅前两者成功；每次重鉴权；精确版本、响应头安全、上传下载哈希一致 |
+| TC-HWK-27 | 前端上传/重试/提交闭环 | 合法/失败上传，删除与重试，提交及历史/批阅下载 | 失败保留选择、无假 fileId，状态、元数据和错误提示一致 |
 | TC-HWK-N02 | 统计性能与索引 | 使用大于单页的数据查询 API-HWK-09/15，并检查迁移元数据和查询实现 | 1 基分页、size 1～100 与聚合总数正确；Repository 使用 SQL 聚合，组合索引名称和列顺序正确，不加载全部最终提交到应用内存 |
 | TC-HWK-N04 | 权限安全 | 学生和无权限教师访问统计/attention，模拟姓名服务失败 | 返回 403 且不泄露统计、名单或学生标识；页面不展示裸 `studentId` |
 
@@ -871,7 +957,7 @@ stateDiagram-v2
 | TODO-HWK-01 | 课程教师/助教权限的具体权限码名称 | AUTH、CRS | 由后端总设计师统一权限码，例如 `HWK_MANAGE`、`HWK_REVIEW` |
 | TODO-HWK-02 | 当前活跃学生名单和课程权限接口保持稳定 | CRS | 统计以角色 STUDENT、成员状态 ACTIVE、未删除的 CRS 名单为唯一范围；空名单返回零统计，不回退到提交人集合 |
 | TODO-HWK-03 | 评测 Worker 的任务格式和回调格式 | LAB、后端总设计师 | LAB 与 HWK 共用 `EvaluationTaskDTO` 和 `EvaluationResultDTO` |
-| TODO-HWK-04 | 附件上传后的文件 ID、fileUrl 规范 | CRS、文件服务负责人 | 统一文件元数据结构，HWK 只保存文件 ID 或路径 |
+| DEC-HWK-04 | 附件上传、标识与下载规范已冻结 | FileStorageService、HWK | API-HWK-23/24 + DB-HWK-08；服务器 UUID、单文件/10 MiB/24h、三重白名单、UPLOADED→BOUND/DELETED；不复用 CRS/LAB 业务权限，不公开 storageKey/裸 URL |
 | TODO-HWK-05 | LRN 通知事件字段格式 | LRN | 统一事件名称、接收人范围和消息模板 |
 | TODO-HWK-06 | GRD 读取 HWK 来源成绩的方式 | GRD | 优先提供来源成绩查询接口，发布成绩时发送事件 |
 | TODO-HWK-07 | 助教是否允许发布成绩和触发重评 | AUTH、CRS、GRD | 根据课程成员角色确定，建议首版允许教师，助教权限可配置 |

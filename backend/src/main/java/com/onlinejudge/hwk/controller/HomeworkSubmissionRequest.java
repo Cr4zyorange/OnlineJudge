@@ -12,18 +12,6 @@ public record HomeworkSubmissionRequest(
         String language
 ) {
     CreateHomeworkSubmissionCommand toCommand() {
-        return new CreateHomeworkSubmissionCommand(answerText, answerJson, normalizeFileIds(fileIds), codeText, language);
-    }
-
-    private static String normalizeFileIds(List<String> fileIds) {
-        if (fileIds == null || fileIds.isEmpty()) {
-            return null;
-        }
-        String joined = fileIds.stream()
-                .filter(value -> value != null && !value.isBlank())
-                .map(String::trim)
-                .reduce((left, right) -> left + "," + right)
-                .orElse(null);
-        return joined == null || joined.isBlank() ? null : joined;
+        return new CreateHomeworkSubmissionCommand(answerText, answerJson, fileIds, codeText, language);
     }
 }

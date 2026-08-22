@@ -22,6 +22,16 @@ export interface BlobResponse {
   filename?: string;
 }
 
+export class ApiError extends Error {
+  constructor(
+    readonly code: string | number,
+    message: string
+  ) {
+    super(message);
+    this.name = 'ApiError';
+  }
+}
+
 interface ApiResponse<T> {
   code: string | number;
   message: string;
@@ -58,7 +68,7 @@ export async function requestBlob(url: string, options: RequestOptions = {}): Pr
     body: formatBody(options.body)
   });
   if (!response.ok) {
-    throw new Error(await errorMessage(response));
+    throw await responseError(response);
   }
   return {
     blob: await response.blob(),
@@ -111,18 +121,18 @@ async function unwrap<T>(response: Response): Promise<T> {
   const body = await readApiResponse<T>(response);
   if (!response.ok || !isSuccessCode(body.code)) {
     handleAuthFailure(body.code);
-    throw new Error(body.message || '接口请求失败');
+    throw new ApiError(body.code, body.message || '接口请求失败');
   }
   return body.data;
 }
 
-async function errorMessage(response: Response) {
+async function responseError(response: Response) {
   try {
     const body = await readApiResponse<unknown>(response);
     handleAuthFailure(body.code);
-    return body.message || '接口请求失败';
+    return new ApiError(body.code, body.message || '接口请求失败');
   } catch {
-    return response.statusText || '接口请求失败';
+    return new ApiError(response.status, response.statusText || '接口请求失败');
   }
 }
 

@@ -7,15 +7,26 @@ import org.springframework.stereotype.Service;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
+import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.stream.Stream;
 
 @Service
 @Primary
 public class LocalDiskFileStorageService implements FileStorageService {
+    private static final String PENDING_DELETE_DIRECTORY = ".pending-deletes";
+    private static final String PENDING_DELETE_SUFFIX = ".pending";
+    private static final long MAX_PENDING_MARKER_BYTES = 4096L;
+
     private final Path rootDirectory;
 
     public LocalDiskFileStorageService(@Value("${onlinejudge.storage.local-root:./data/uploads}") String rootDirectory) {
@@ -39,15 +50,16 @@ public class LocalDiskFileStorageService implements FileStorageService {
                     size,
                     targetPath.toUri().toString()
             );
-        } catch (IOException exception) {
+        } catch (IOException | RuntimeException exception) {
+            cleanupFailedStore(storageKey, exception);
             throw new IllegalStateException("文件存储失败", exception);
         }
     }
 
     @Override
     public StoredFile load(String storageKey) {
-        Path targetPath = rootDirectory.resolve(storageKey).normalize();
-        if (!targetPath.startsWith(rootDirectory) || !Files.exists(targetPath)) {
+        Path targetPath = resolveStoragePath(storageKey);
+        if (!Files.exists(targetPath)) {
             throw new IllegalStateException("文件不存在");
         }
         try {
@@ -69,14 +81,129 @@ public class LocalDiskFileStorageService implements FileStorageService {
         if (storageKey == null || storageKey.isBlank()) {
             return;
         }
-        Path targetPath = rootDirectory.resolve(storageKey).normalize();
-        if (!targetPath.startsWith(rootDirectory)) {
-            throw new IllegalStateException("文件路径不合法");
-        }
+        Path targetPath = resolveStoragePath(storageKey);
         try {
             Files.deleteIfExists(targetPath);
         } catch (IOException exception) {
             throw new IllegalStateException("文件删除失败", exception);
+        }
+    }
+
+    @Override
+    public void deferDelete(String storageKey) {
+        resolveStoragePath(storageKey);
+        Path pendingDirectory = pendingDeleteDirectory();
+        Path marker = pendingDirectory.resolve(pendingMarkerName(storageKey));
+        Path temporaryMarker = null;
+        try {
+            Files.createDirectories(pendingDirectory);
+            temporaryMarker = Files.createTempFile(pendingDirectory, ".pending-", ".tmp");
+            Files.writeString(temporaryMarker, storageKey, StandardCharsets.UTF_8);
+            try {
+                Files.move(
+                        temporaryMarker,
+                        marker,
+                        StandardCopyOption.ATOMIC_MOVE,
+                        StandardCopyOption.REPLACE_EXISTING
+                );
+            } catch (AtomicMoveNotSupportedException exception) {
+                Files.move(temporaryMarker, marker, StandardCopyOption.REPLACE_EXISTING);
+            }
+        } catch (IOException exception) {
+            throw new IllegalStateException("待删除文件记录失败", exception);
+        } finally {
+            if (temporaryMarker != null) {
+                try {
+                    Files.deleteIfExists(temporaryMarker);
+                } catch (IOException ignored) {
+                    // A successfully moved marker no longer has a temporary path to remove.
+                }
+            }
+        }
+    }
+
+    @Override
+    public List<String> pendingDeletes(int limit) {
+        if (limit <= 0) {
+            return List.of();
+        }
+        Path pendingDirectory = pendingDeleteDirectory();
+        if (!Files.isDirectory(pendingDirectory)) {
+            return List.of();
+        }
+
+        try (Stream<Path> paths = Files.list(pendingDirectory)) {
+            return paths
+                    .filter(path -> path.getFileName().toString().endsWith(PENDING_DELETE_SUFFIX))
+                    .map(this::readPendingStorageKey)
+                    .filter(Objects::nonNull)
+                    .limit(limit)
+                    .toList();
+        } catch (IOException exception) {
+            throw new IllegalStateException("待删除文件读取失败", exception);
+        }
+    }
+
+    @Override
+    public void completeDeferredDelete(String storageKey) {
+        resolveStoragePath(storageKey);
+        try {
+            Files.deleteIfExists(pendingDeleteDirectory().resolve(pendingMarkerName(storageKey)));
+        } catch (IOException exception) {
+            throw new IllegalStateException("待删除文件确认失败", exception);
+        }
+    }
+
+    private Path resolveStoragePath(String storageKey) {
+        if (storageKey == null || storageKey.isBlank()) {
+            throw new IllegalStateException("文件路径不合法");
+        }
+        Path targetPath = rootDirectory.resolve(storageKey).normalize();
+        if (!targetPath.startsWith(rootDirectory) || targetPath.equals(rootDirectory)) {
+            throw new IllegalStateException("文件路径不合法");
+        }
+        return targetPath;
+    }
+
+    private void cleanupFailedStore(String storageKey, Exception storeFailure) {
+        try {
+            delete(storageKey);
+        } catch (RuntimeException deleteFailure) {
+            try {
+                deferDelete(storageKey);
+            } catch (RuntimeException journalFailure) {
+                storeFailure.addSuppressed(deleteFailure);
+                storeFailure.addSuppressed(journalFailure);
+            }
+        }
+    }
+
+    private Path pendingDeleteDirectory() {
+        return rootDirectory.resolve(PENDING_DELETE_DIRECTORY);
+    }
+
+    private String readPendingStorageKey(Path marker) {
+        try {
+            if (!marker.normalize().startsWith(pendingDeleteDirectory())
+                    || !Files.isRegularFile(marker)
+                    || Files.size(marker) > MAX_PENDING_MARKER_BYTES) {
+                return null;
+            }
+            String storageKey = Files.readString(marker, StandardCharsets.UTF_8);
+            resolveStoragePath(storageKey);
+            return marker.getFileName().toString().equals(pendingMarkerName(storageKey)) ? storageKey : null;
+        } catch (IOException | RuntimeException ignored) {
+            return null;
+        }
+    }
+
+    private String pendingMarkerName(String storageKey) {
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256")
+                    .digest(storageKey.getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(digest) + PENDING_DELETE_SUFFIX;
+        } catch (NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("待删除文件记录失败", exception);
         }
     }
 

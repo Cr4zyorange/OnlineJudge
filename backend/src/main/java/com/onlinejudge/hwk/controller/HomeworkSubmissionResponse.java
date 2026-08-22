@@ -21,7 +21,8 @@ public record HomeworkSubmissionResponse(
         HomeworkType submitType,
         String answerText,
         String answerJson,
-        String fileUrl,
+        boolean hasAttachment,
+        HomeworkSubmissionAttachmentResponse attachment,
         String language,
         HomeworkSubmitStatus submitStatus,
         EvaluationStatus evaluationStatus,
@@ -39,6 +40,13 @@ public record HomeworkSubmissionResponse(
     }
 
     static HomeworkSubmissionResponse fromTeacherView(HomeworkSubmission submission) {
+        return fromTeacherView(submission, null);
+    }
+
+    static HomeworkSubmissionResponse fromTeacherView(
+            HomeworkSubmission submission,
+            com.onlinejudge.hwk.domain.HomeworkSubmissionAttachmentView attachment
+    ) {
         return new HomeworkSubmissionResponse(
                 submission.id(),
                 submission.homeworkId(),
@@ -46,7 +54,8 @@ public record HomeworkSubmissionResponse(
                 submission.submitType(),
                 submission.answerText(),
                 submission.answerJson(),
-                submission.fileUrl(),
+                attachment != null || hasLegacyAttachment(submission),
+                HomeworkSubmissionAttachmentResponse.from(attachment),
                 submission.language(),
                 submission.submitStatus(),
                 submission.evaluationStatus(),
@@ -62,6 +71,14 @@ public record HomeworkSubmissionResponse(
     }
 
     static HomeworkSubmissionResponse fromStudentView(Homework homework, HomeworkSubmission submission) {
+        return fromStudentView(homework, submission, null);
+    }
+
+    static HomeworkSubmissionResponse fromStudentView(
+            Homework homework,
+            HomeworkSubmission submission,
+            com.onlinejudge.hwk.domain.HomeworkSubmissionAttachmentView attachment
+    ) {
         boolean scorePublished = homework.status() == HomeworkStatus.SCORE_PUBLISHED
                 || homework.status() == HomeworkStatus.ARCHIVED;
         boolean evaluationVisible = homework.showEvaluationBeforePublish() || scorePublished;
@@ -72,7 +89,8 @@ public record HomeworkSubmissionResponse(
                 submission.submitType(),
                 submission.answerText(),
                 submission.answerJson(),
-                submission.fileUrl(),
+                attachment != null || hasLegacyAttachment(submission),
+                HomeworkSubmissionAttachmentResponse.from(attachment),
                 submission.language(),
                 submission.submitStatus(),
                 submission.evaluationStatus(),
@@ -85,5 +103,9 @@ public record HomeworkSubmissionResponse(
                 submission.isFinal(),
                 submission.submittedAt()
         );
+    }
+
+    private static boolean hasLegacyAttachment(HomeworkSubmission submission) {
+        return submission.fileUrl() != null && !submission.fileUrl().isBlank();
     }
 }

@@ -477,7 +477,6 @@ class HomeworkControllerTest {
                         .content(objectMapper.writeValueAsString(Map.of(
                                 "answerText", "I would solve it with dynamic programming.",
                                 "answerJson", "{\"q1\":\"B\"}",
-                                "fileIds", List.of("file-1"),
                                 "codeText", "",
                                 "language", ""
                         ))))

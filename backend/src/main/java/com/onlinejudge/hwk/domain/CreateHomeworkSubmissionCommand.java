@@ -1,9 +1,11 @@
 package com.onlinejudge.hwk.domain;
 
+import java.util.List;
+
 public record CreateHomeworkSubmissionCommand(
         String answerText,
         String answerJson,
-        String fileIds,
+        List<String> fileIds,
         String codeText,
         String language
 ) {
