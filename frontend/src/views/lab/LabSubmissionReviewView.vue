@@ -92,14 +92,68 @@
             <pre v-if="submission.code" class="code-panel" data-testid="submission-code"><code>{{ submission.code }}</code></pre>
             <p v-else class="empty-copy" data-testid="submission-code">该版本没有可展示的文本代码。</p>
 
+            <div v-if="submission.hasFile && submission.sourceFile" class="source-file-panel" data-testid="source-file-panel">
+              <div class="source-file-heading">
+                <div>
+                  <strong>本次提交包含源文件</strong>
+                  <p>仅展示安全元数据，下载将通过教师受控接口完成。</p>
+                </div>
+              </div>
+
+              <dl class="source-file-facts">
+                <div>
+                  <dt>文件名</dt>
+                  <dd data-testid="source-file-name">{{ submission.sourceFile.originalFilename }}</dd>
+                </div>
+                <div>
+                  <dt>内容类型</dt>
+                  <dd data-testid="source-file-content-type">{{ submission.sourceFile.contentType }}</dd>
+                </div>
+                <div>
+                  <dt>文件大小</dt>
+                  <dd data-testid="source-file-size">{{ formatFileSize(submission.sourceFile.fileSize) }}</dd>
+                </div>
+              </dl>
+
+              <div v-if="submission.sourceFile.downloadAvailable" class="action-row">
+                <button
+                  class="button button--secondary"
+                  data-action="download-source-file"
+                  type="button"
+                  :disabled="sourceFileDownloading"
+                  @click="downloadSourceFile"
+                >
+                  {{ sourceFileDownloading ? '正在下载…' : '下载源文件' }}
+                </button>
+              </div>
+              <p v-else class="inline-message inline-message--warning" role="status">
+                当前源文件暂不可下载。
+              </p>
+              <p
+                v-if="sourceFileDownloadError"
+                class="inline-message inline-message--error"
+                data-testid="source-file-download-error"
+                role="alert"
+              >
+                {{ sourceFileDownloadError }}
+              </p>
+              <p
+                v-if="sourceFileDownloadFeedback"
+                class="inline-message inline-message--success"
+                data-testid="source-file-download-feedback"
+                role="status"
+              >
+                {{ sourceFileDownloadFeedback }}
+              </p>
+            </div>
             <div
-              v-if="submission.hasFile"
+              v-else-if="submission.hasFile"
               class="source-file-blocker"
-              data-testid="source-file-blocker"
+              data-testid="source-file-metadata-unavailable"
               role="status"
             >
               <strong>本次提交包含源文件</strong>
-              <p>当前服务尚未提供教师受控下载入口，此页不会暴露存储标识；可继续核对报告、评测结果并评分。</p>
+              <p>该提交的源文件元数据暂不可用，请核对其他评测证据。</p>
             </div>
           </section>
 
@@ -343,13 +397,14 @@
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import PageHeader from '../../components/foundation/PageHeader.vue';
 import PageState from '../../components/foundation/PageState.vue';
 import StatusBadge from '../../components/foundation/StatusBadge.vue';
 import {
   downloadLabReport,
+  downloadLabSubmissionSource,
   evaluateLabSubmission,
   getLabDetail,
   getLabSubmissionDetail,
@@ -417,6 +472,9 @@ const studentName = ref('学生姓名暂不可用');
 const studentNameWarning = ref('');
 const pageLoading = ref(false);
 const pageError = ref('');
+const sourceFileDownloading = ref(false);
+const sourceFileDownloadError = ref('');
+const sourceFileDownloadFeedback = ref('');
 const reportDownloading = ref(false);
 const reportDownloadError = ref('');
 const reportDownloadFeedback = ref('');
@@ -430,6 +488,7 @@ const reevaluationSaving = ref(false);
 const reevaluationError = ref('');
 const reevaluationFeedback = ref('');
 let pageRequestId = 0;
+let sourceFileDownloadRequestId = 0;
 
 const reportScoreForm = reactive<NumericScoreForm>({ score: '', comment: '' });
 const submissionScoreForm = reactive<SubmissionScoreForm>({
@@ -456,8 +515,11 @@ watch(
   { immediate: true }
 );
 
+onBeforeUnmount(invalidateSourceFileDownload);
+
 async function loadPage() {
   const requestId = ++pageRequestId;
+  invalidateSourceFileDownload();
   pageLoading.value = true;
   pageError.value = '';
   studentNameWarning.value = '';
@@ -530,6 +592,53 @@ async function loadPage() {
     syncForms(submission.value);
   }
   pageLoading.value = false;
+}
+
+async function downloadSourceFile() {
+  const currentSubmission = submission.value;
+  const currentSourceFile = currentSubmission?.sourceFile;
+  if (
+    sourceFileDownloading.value
+    || !currentSubmission
+    || !currentSourceFile
+    || !currentSourceFile.downloadAvailable
+  ) {
+    return;
+  }
+
+  const labId = props.labId;
+  const submissionId = currentSubmission.submissionId;
+  const requestId = ++sourceFileDownloadRequestId;
+  sourceFileDownloading.value = true;
+  sourceFileDownloadError.value = '';
+  sourceFileDownloadFeedback.value = '';
+  try {
+    const { blob, filename } = await downloadLabSubmissionSource(labId, submissionId);
+    if (!isCurrentSourceFileDownload(requestId, labId, submissionId)) {
+      return;
+    }
+    const downloadFilename = filename || currentSourceFile.originalFilename;
+    const objectUrl = window.URL.createObjectURL(blob);
+    try {
+      const anchor = document.createElement('a');
+      anchor.href = objectUrl;
+      anchor.download = downloadFilename;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+    } finally {
+      window.URL.revokeObjectURL(objectUrl);
+    }
+    sourceFileDownloadFeedback.value = `源文件“${downloadFilename}”已开始下载`;
+  } catch (error) {
+    if (isCurrentSourceFileDownload(requestId, labId, submissionId)) {
+      sourceFileDownloadError.value = localizedLabError(error, '源文件下载失败，请重试');
+    }
+  } finally {
+    if (isCurrentSourceFileDownload(requestId, labId, submissionId)) {
+      sourceFileDownloading.value = false;
+    }
+  }
 }
 
 async function downloadReport() {
@@ -811,11 +920,41 @@ function formatReportFileType(fileType: LabReportSummary['fileType']) {
   }[fileType];
 }
 
+function formatFileSize(size: number) {
+  if (!Number.isFinite(size) || size < 0) {
+    return '大小未知';
+  }
+  if (size >= 1024 * 1024) {
+    return `${(size / 1024 / 1024).toFixed(1)} MB`;
+  }
+  if (size >= 1024) {
+    return `${(size / 1024).toFixed(1)} KB`;
+  }
+  return `${size} B`;
+}
+
+function isCurrentSourceFileDownload(requestId: number, labId: number, submissionId: number) {
+  return requestId === sourceFileDownloadRequestId
+    && props.labId === labId
+    && props.submissionId === submissionId
+    && submission.value?.labId === labId
+    && submission.value?.submissionId === submissionId;
+}
+
+function invalidateSourceFileDownload() {
+  sourceFileDownloadRequestId += 1;
+  sourceFileDownloading.value = false;
+  sourceFileDownloadError.value = '';
+  sourceFileDownloadFeedback.value = '';
+}
+
 function errorText(error: unknown, fallback: string) {
   return error instanceof Error && error.message.trim() ? error.message : fallback;
 }
 
 function clearActionMessages() {
+  sourceFileDownloadError.value = '';
+  sourceFileDownloadFeedback.value = '';
   reportDownloadError.value = '';
   reportDownloadFeedback.value = '';
   reportScoreError.value = '';
@@ -894,6 +1033,7 @@ function clearActionMessages() {
 .review-context h2,
 .card-heading h2,
 .card-heading p,
+.source-file-heading p,
 .source-file-blocker p,
 .evaluation-message,
 .empty-copy,
@@ -962,6 +1102,7 @@ function clearActionMessages() {
 
 .context-facts div,
 .evaluation-summary div,
+.source-file-facts div,
 .report-facts div {
   padding: 10px 12px;
   border: 1px solid var(--oj-line);
@@ -971,6 +1112,7 @@ function clearActionMessages() {
 
 .context-facts dt,
 .evaluation-summary dt,
+.source-file-facts dt,
 .report-facts dt,
 .case-io dt {
   color: var(--oj-muted);
@@ -980,6 +1122,7 @@ function clearActionMessages() {
 
 .context-facts dd,
 .evaluation-summary dd,
+.source-file-facts dd,
 .report-facts dd,
 .case-io dd {
   margin: 4px 0 0;
@@ -1045,11 +1188,40 @@ function clearActionMessages() {
   word-break: break-word;
 }
 
+.source-file-panel,
 .source-file-blocker,
 .evaluation-message,
 .inline-message {
   padding: 12px 14px;
   border-radius: calc(var(--oj-radius) - 4px);
+}
+
+.source-file-panel {
+  display: grid;
+  gap: 14px;
+  border: 1px solid rgba(28, 115, 90, 0.2);
+  background: rgba(28, 115, 90, 0.07);
+}
+
+.source-file-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--oj-ink);
+}
+
+.source-file-heading p {
+  margin-top: 5px;
+  color: var(--oj-ink-soft);
+  line-height: 1.6;
+}
+
+.source-file-facts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
 }
 
 .source-file-blocker {
@@ -1223,6 +1395,7 @@ function clearActionMessages() {
 
   .context-facts,
   .evaluation-summary,
+  .source-file-facts,
   .case-io,
   .score-pair {
     grid-template-columns: minmax(0, 1fr);
