@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import * as homeworkApi from '../../../src/api/hwk/homeworks';
 import {
   closeHomework,
   createHomework,
@@ -312,7 +313,106 @@ describe('homeworks api', () => {
       ['/api/v1/homeworks/11/statistics?page=2&size=2', 'GET']
     ]);
   });
+
+  it('uploads one homework attachment as authenticated multipart data', async () => {
+    const uploaded = attachmentUpload();
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(jsonResponse(uploaded));
+    const file = new File(['private report bytes'], '课程报告.pdf', { type: 'application/pdf' });
+
+    const result = await attachmentApi().uploadHomeworkAttachment(11, file);
+
+    expect(result).toEqual(uploaded);
+    expect(result).toMatchObject({
+      status: 'UPLOADED',
+      uploadedAt: '2026-08-22T10:00:00+08:00'
+    });
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe('/api/v1/homeworks/11/attachments');
+    expect(init.method).toBe('POST');
+    expect(init.body).toBeInstanceOf(FormData);
+    expect((init.body as FormData).get('file')).toBe(file);
+    expect(init.headers).toEqual({ Authorization: 'Bearer token-1' });
+  });
+
+  it('preserves the backend HWK error code for deterministic upload failures', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(new Response(JSON.stringify({
+      code: 'HWK_4131',
+      message: 'payload too large',
+      data: null
+    }), {
+      status: 413,
+      headers: { 'Content-Type': 'application/json' }
+    }));
+
+    await expect(attachmentApi().uploadHomeworkAttachment(
+      11,
+      new File(['oversized'], 'large.pdf', { type: 'application/pdf' })
+    )).rejects.toMatchObject({
+      code: 'HWK_4131',
+      message: 'payload too large'
+    });
+  });
+
+  it('revalidates and removes only the current homework upload by opaque file id', async () => {
+    const uploaded = attachmentUpload();
+    const fetchMock = vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(jsonResponse(uploaded))
+      .mockResolvedValueOnce(jsonResponse(null));
+
+    await expect(attachmentApi().getHomeworkAttachment(11, uploaded.fileId)).resolves.toEqual(uploaded);
+    await expect(attachmentApi().deleteHomeworkAttachment(11, uploaded.fileId)).resolves.toBeNull();
+
+    expect(fetchMock.mock.calls.map((call) => [call[0], (call[1] as RequestInit).method])).toEqual([
+      ['/api/v1/homeworks/11/attachments/85c3d5a0-2140-4d80-9000-000000000011', 'GET'],
+      ['/api/v1/homeworks/11/attachments/85c3d5a0-2140-4d80-9000-000000000011', 'DELETE']
+    ]);
+  });
+
+  it('downloads a submitted attachment only through the controlled blob route', async () => {
+    const blob = new Blob(['submitted report'], { type: 'application/pdf' });
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
+      ok: true,
+      headers: new Headers({
+        'Content-Disposition': "attachment; filename*=UTF-8''submitted-report.pdf"
+      }),
+      blob: async () => blob
+    } as Response);
+
+    await expect(attachmentApi().downloadHomeworkSubmissionAttachment(11, 91)).resolves.toEqual({
+      blob,
+      filename: 'submitted-report.pdf'
+    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/v1/homeworks/11/submissions/91/attachment/download',
+      expect.objectContaining({ method: 'GET' })
+    );
+  });
 });
+
+function attachmentApi() {
+  return homeworkApi as unknown as {
+    uploadHomeworkAttachment: (homeworkId: number, file: File) => Promise<ReturnType<typeof attachmentUpload>>;
+    getHomeworkAttachment: (homeworkId: number, fileId: string) => Promise<ReturnType<typeof attachmentUpload>>;
+    deleteHomeworkAttachment: (homeworkId: number, fileId: string) => Promise<null>;
+    downloadHomeworkSubmissionAttachment: (
+      homeworkId: number,
+      submissionId: number
+    ) => Promise<{ blob: Blob; filename?: string }>;
+  };
+}
+
+function attachmentUpload() {
+  return {
+    fileId: '85c3d5a0-2140-4d80-9000-000000000011',
+    originalFilename: '课程报告.pdf',
+    contentType: 'application/pdf',
+    fileSize: 20,
+    expiresAt: '2026-08-23T10:00:00+08:00',
+    status: 'UPLOADED',
+    uploadedAt: '2026-08-22T10:00:00+08:00'
+  };
+}
 
 function installLocalStorageMock() {
   const values = new Map<string, string>();

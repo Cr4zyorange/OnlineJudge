@@ -85,7 +85,7 @@ describe('HomeworkManageView', () => {
     })).toBe(false);
   });
 
-  it('makes the issue 214 publication blocker explicit for a FILE draft', async () => {
+  it('does not show an obsolete publication blocker for a FILE draft', async () => {
     vi.mocked(homeworkApi.getHomeworkDetail).mockResolvedValue(detail({
       title: '课程报告附件',
       type: 'FILE',
@@ -98,8 +98,9 @@ describe('HomeworkManageView', () => {
     const wrapper = mountView();
     await flushPromises();
 
-    expect(wrapper.get('[data-testid="file-contract-warning"]').text()).toContain('#214');
-    expect(wrapper.text()).toContain('附件上传与安全提交链路完成前不可发布');
+    expect(wrapper.find('[data-testid="file-contract-warning"]').exists()).toBe(false);
+    expect(wrapper.text()).not.toContain('#214');
+    expect(wrapper.text()).not.toContain('附件上传与安全提交链路完成前不可发布');
     const links = wrapper.findAllComponents(RouterLinkStub).map((link) => link.props('to'));
     expect(links).toContainEqual({ name: 'homework-edit', params: { courseId: 101, homeworkId: 7 } });
     expect(links).not.toContainEqual({

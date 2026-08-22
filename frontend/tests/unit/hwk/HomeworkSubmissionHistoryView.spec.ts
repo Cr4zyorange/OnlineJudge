@@ -1,16 +1,31 @@
 import { config, mount, RouterLinkStub } from '@vue/test-utils';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import HomeworkSubmissionHistoryView from '../../../src/views/hwk/HomeworkSubmissionHistoryView.vue';
 import * as homeworkApi from '../../../src/api/hwk/homeworks';
 import type { HomeworkReviewLog, HomeworkSubmissionSummary } from '../../../src/types/hwk';
 
-vi.mock('../../../src/api/hwk/homeworks');
+const downloadAttachmentMock = vi.hoisted(() => vi.fn());
+
+vi.mock('../../../src/api/hwk/homeworks', () => ({
+  getHomeworkSubmission: vi.fn(),
+  getHomeworkSubmissionReviewLogs: vi.fn(),
+  listHomeworkSubmissions: vi.fn(),
+  listMyHomeworkSubmissions: vi.fn(),
+  reevaluateHomeworkSubmission: vi.fn(),
+  reviewHomeworkSubmission: vi.fn(),
+  downloadHomeworkSubmissionAttachment: downloadAttachmentMock
+}));
 
 describe('HomeworkSubmissionHistoryView', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     config.global.stubs.RouterLink = RouterLinkStub;
     vi.mocked(homeworkApi.getHomeworkSubmissionReviewLogs).mockResolvedValue([]);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
   });
 
   it('loads student history and marks the current effective submission', async () => {
@@ -44,6 +59,36 @@ describe('HomeworkSubmissionHistoryView', () => {
 
     expect(homeworkApi.getHomeworkSubmission).toHaveBeenCalledWith(202);
     expect(wrapper.text()).toContain('second answer');
+  });
+
+  it('shows safe FILE metadata and downloads the selected student version through the blob endpoint', async () => {
+    const fileSubmission = submissionWithAttachment();
+    vi.mocked(homeworkApi.listMyHomeworkSubmissions).mockResolvedValueOnce([fileSubmission]);
+    vi.mocked(homeworkApi.getHomeworkSubmission).mockResolvedValueOnce(fileSubmission);
+    const blob = new Blob(['student attachment'], { type: 'application/pdf' });
+    downloadAttachmentMock.mockResolvedValueOnce({ blob, filename: 'server-approved-report.pdf' });
+    const browserDownload = stubBrowserDownload();
+
+    const wrapper = mount(HomeworkSubmissionHistoryView, {
+      props: { courseId: 101, homeworkId: 11, role: 'student' }
+    });
+    await flushPromises();
+    await wrapper.get('[data-submission-id="214"] button').trigger('click');
+    await flushPromises();
+
+    const panel = wrapper.get('[data-testid="homework-attachment-panel"]');
+    expect(panel.text()).toContain('课程报告.pdf');
+    expect(panel.text()).toContain('application/pdf');
+    expect(panel.text()).toContain('2.0 KB');
+    expect(wrapper.text()).not.toContain('private-file-token-must-not-render');
+    expect(wrapper.text()).not.toContain('private/storage/report.pdf');
+
+    await panel.get('[data-action="download-homework-attachment"]').trigger('click');
+    await flushPromises();
+
+    expect(downloadAttachmentMock).toHaveBeenCalledWith(11, 214);
+    expect(browserDownload.createObjectURL).toHaveBeenCalledWith(blob);
+    expect(browserDownload.downloadedFilename()).toBe('server-approved-report.pdf');
   });
 
   it('sorts student submissions newest first and keeps latest and effective markers independent', async () => {
@@ -603,7 +648,6 @@ function submission(overrides: Partial<HomeworkSubmissionSummary> = {}): Homewor
     submitType: 'TEXT',
     answerText: 'answer',
     answerJson: null,
-    fileUrl: null,
     language: null,
     submitStatus: 'SUBMITTED',
     evaluationStatus: 'NONE',
@@ -616,6 +660,35 @@ function submission(overrides: Partial<HomeworkSubmissionSummary> = {}): Homewor
     final: true,
     submittedAt: '2026-06-01T10:00:00',
     ...overrides
+  };
+}
+
+function submissionWithAttachment(): HomeworkSubmissionSummary {
+  return {
+    ...submission({ submissionId: 214, submitType: 'FILE', answerText: null }),
+    hasAttachment: true,
+    attachment: {
+      originalFilename: '课程报告.pdf',
+      contentType: 'application/pdf',
+      fileSize: 2048,
+      downloadAvailable: true
+    },
+    fileUrl: 'private-file-token-must-not-render',
+    storageKey: 'private/storage/report.pdf'
+  } as unknown as HomeworkSubmissionSummary;
+}
+
+function stubBrowserDownload() {
+  const createObjectURL = vi.fn(() => 'blob:homework-attachment');
+  const revokeObjectURL = vi.fn();
+  let downloadedFilename = '';
+  vi.stubGlobal('URL', { createObjectURL, revokeObjectURL });
+  vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
+    downloadedFilename = this.download;
+  });
+  return {
+    createObjectURL,
+    downloadedFilename: () => downloadedFilename
   };
 }
 

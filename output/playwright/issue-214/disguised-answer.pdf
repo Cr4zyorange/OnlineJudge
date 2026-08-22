@@ -1,0 +1,2 @@
+This is plain UTF-8 text intentionally disguised with a .pdf extension.
+The backend must reject it because the PDF signature is missing.

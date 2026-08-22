@@ -49,6 +49,7 @@ class DockerComposeContractTest {
         Path nginxConfig = Path.of("..", "deploy", "nginx", "default.conf");
         String config = Files.readString(nginxConfig);
 
+        assertThat(config).contains("client_max_body_size 55m;");
         assertThat(config).contains("location /api/");
         assertThat(config).contains("proxy_pass http://backend:8080;");
         assertThat(config).contains("try_files $uri $uri/ /index.html;");
