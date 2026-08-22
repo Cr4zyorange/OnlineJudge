@@ -1056,3 +1056,27 @@ node node_modules/vitest/vitest.mjs run tests/unit/grd/gradeItemsApi.spec.ts tes
 | TST08-MANUAL-008 | LRN 筛选分页与权限边界追加复核 | `taskType=HOMEWORK&page=0&size=1` 返回 `total=1`、`size=1`、记录类型 `HOMEWORK`；非成员 `manualboundary1104` 查询课程任务返回 0，查询课程进度和统计返回 403；学生访问教师聚合返回 403，教师访问聚合返回 200 且学生数为 1 | 通过 |
 | TST08-MANUAL-009 | LAB 实验报告上传下载追加复核 | 在干净 H2 `tst08_manual_followup` 创建需报告实验 `950202`，学生提交 `950204` 后上传 `tst08-report.pdf` 得到报告 `1`、版本 `1`；下载文件与上传内容一致，教师报告评分 28 分和评语保存成功 | 通过 |
 | TST08-MANUAL-010 | 保留的环境级事项 | 生产级安全扫描、生产实流量长稳、FAT/UAT 正式账号截图或测试记录编号不属于本地 DEV 可证明范围；当前 Docker 执行器实现仅支持 Python，Java 多语言端到端需在最终环境或设计调整中确认 | 有条件通过 |
+
+### 13.8 2026-08-22 Issue #214 HWK FILE 附件补充记录
+
+本节为 #214 的最新增量证据，将 HWK 契约范围扩展为 `API-HWK-01 ~ API-HWK-24`、`DB-HWK-01 ~ DB-HWK-08`、`TC-HWK-01 ~ TC-HWK-27` 和 `MAN-HWK-012`；本节数字与结论优先于本底稿中早期 #224/HWK 历史摘要。
+
+| 用例 | 契约/场景 | 实际证据 | 结论 |
+| --- | --- | --- | --- |
+| TC-HWK-20 | API-HWK-23 单 `file`、10 MiB、服务端 UUID、安全元数据、UPLOADED/24h | 真实 `fileId=9931efa8-57f9-4b18-9636-d14d96c43ad0`；页面/响应无 storageKey、路径或裸 URL | 通过 |
+| TC-HWK-21 | 课程成员、上传者、课程/作业归属和存在性隐藏 | 第二学生入课前上传 403/HWK_4031；入课后读取/绑定他人 UUID 404/HWK_4042 | 通过 |
+| TC-HWK-22 | 文件边界与三重校验：内容签名非法/损坏 ZIP/OOXML 为 HWK_4005；扩展名或声明 MIME 不支持/不匹配为 HWK_4151 | 伪装 PDF 真实上传返回 HTTP 400/HWK_4005 | 通过 |
+| TC-HWK-23 | FILE `fileIds` 恰好 1 个 UUID；提交与 UPLOADED→BOUND 同事务 | `homework=950312`、提交 201、`submission=950304` | 通过 |
+| TC-HWK-24 | 存储/补偿/清理与 DB-HWK-08 迁移 | 模拟存储 500/HWK_5002 后重试 201；`failedDatabaseInsertAndImmediateDeletePersistCleanupUntilRetrySucceeds` 覆盖 DB 回滚 + 首次删除失败 + journal 定时重试/ack；`deferredDeletionQueueSurvivesStorageServiceRestartAndClearsAfterSuccess` 覆盖跨存储实例持久；MySQL 9.6 fresh/重复迁移通过 | 通过 |
+| TC-HWK-25 | 历史/批阅仅返回精确绑定版本的安全附件摘要 | 学生历史与教师批阅显示 `submission=950304` 的同一附件 | 通过 |
+| TC-HWK-26 | API-HWK-24 每次重鉴权；仅提交者或课程管理者下载 | 学生/教师 SHA-256 均 `d1847d02cb36254509d0ec2df0eaf20805ce3f6aed4e25a809aea88f8d8568fa`；匿名 401/ERR-AUTH-04；他人提交 403/HWK_4031 | 通过 |
+| TC-HWK-27 | 上传/恢复失败保留、迟到响应/路由隔离、sessionStorage 不含 File/本地路径、失败重试/移除 | 前端 53 files / 545 tests、typecheck/build 通过；未绑定 `fileId=d3b0f3f1-e989-4a6f-8665-ba35daa29329` 恢复 GET 500/HWK_5002 时 session/UUID 保留，解除 mock 后 GET 200、DELETE 200 | 通过 |
+
+| 证据类别 | 实际结果 |
+| --- | --- |
+| 后端全量 | 340 total = 339 passed + 1 Docker-only skipped，0 failures/0 errors；#214 定向 9 类 94/94 |
+| 前端全量 | 53 files / 545 tests；typecheck/build 通过 |
+| 数据库 | 本机真实 MySQL 9.6；`compose-schema.sql` fresh schema 和 `20260822_03_create_hwk_submission_attachment.sql` 连续两次通过 |
+| MAN-HWK-012 | H2 真实服务；1440×1000/390×844 均 `scrollWidth=clientWidth`，无脚本 Console error；截图 `output/playwright/issue-214/01~10` |
+| 环境边界 | 当时 Docker daemon 不可用，因此容器启停/卷挂载路径未写为已通过；数据库契约以本机 MySQL 9.6 替代复核 |
+| 残余风险 | 回滚删除失败已有持久 journal 和定时重试；仍保留整个存储卷不可写时删除/marker 同时失败（异常不被吞掉）与未执行病毒扫描两项残余；三重白名单不能代替恶意载荷扫描/隔离 |

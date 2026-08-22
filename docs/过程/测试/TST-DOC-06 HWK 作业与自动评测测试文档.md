@@ -5,12 +5,12 @@
 | 文档名称 | HWK 作业与自动评测测试文档 |
 | 项目名称 | 在线教学与实训平台 |
 | 所属阶段 | 系统测试与验收测试 |
-| 报告版本 | V1.2 |
+| 报告版本 | V1.3 |
 | 编写日期 | 2026-08-22 |
 | 编写人 | HWK 模块负责人 |
-| 对应 issue | #157 TST-DOC-06；#225 HWK 作业统计分布与待处理名单契约；#224 HWK 草稿逻辑删除契约与教师端入口 |
-| 测试范围 | HWK 草稿逻辑删除、作业发布、提交、历史、自动评测、教师批阅、结果展示、单次作业固定五档、三类跟进名单、权限、安全、跨模块通知与成绩来源 |
-| 测试结论 | 2026-06-09 的 V1.0 基线和 #225 已执行结论保留；#224 已完成后端 290 tests（0 failures/0 errors/1 环境型 skipped）、前端 53 files/511 tests、typecheck/build 及 MAN-HWK-011 的 1440×900/390×844 真实 DELETE 验收 |
+| 对应 issue | #157 TST-DOC-06；#225 HWK 统计与待处理名单；#224 HWK 草稿逻辑删除；#214 HWK FILE 附件上传与安全提交 |
+| 测试范围 | HWK 作业发布、草稿删除、提交/历史/评测/批阅、统计与待处理名单；FILE 单附件上传、24h 恢复/清理、原子绑定/补偿、所有权、受控下载、权限、安全与响应式页面 |
+| 测试结论 | 既有 #224/#225 结论保留；#214 已完成后端 340 total = 339 passed + 1 Docker-only skipped（0 failures/0 errors）、定向 9 类 94/94、前端 53 files / 545 tests、typecheck/build、真实 MySQL 9.6 fresh/重复迁移与 MAN-HWK-012 `01~10` 真实浏览器验收 |
 
 ## 1 文档控制
 
@@ -21,6 +21,7 @@
 | V1.0 | 2026-06-09 | HWK 模块负责人 | 按 #152 统一结构整理 HWK 测试范围、用例、自动化覆盖、执行日志、手工验收点和残余风险 |
 | V1.1 | 2026-08-22 | HWK 模块负责人 | 按 #225 补充固定五档归一化分布、待评测/待批阅 attention、当前活跃学生范围、SQL 聚合/组合索引、权限、URL/隐私和响应式验收契约，并记录 RED/GREEN、全量回归与浏览器证据 |
 | V1.2 | 2026-08-22 | HWK 模块负责人 | 按 #224 补充 API-HWK-22、HWK_4095、TC-HWK-19、UI-HWK-01 删除入口、父表原子软删/子历史保留/普通更新防复活；记录全量自动化、typecheck/build 和 1440×900/390×844 浏览器证据 |
+| V1.3 | 2026-08-22 | HWK 模块负责人 | 按 #214 补充 API-HWK-23/24、DB-HWK-08、TC-HWK-20 ~ 27、MAN-HWK-012，回填后端 340/定向 94、前端 545、MySQL 9.6 与 `output/playwright/issue-214/01~10` 证据 |
 
 ### 1.2 审批记录
 
@@ -32,7 +33,7 @@
 
 ## 2 测试概述
 
-本文件用于记录 HWK 作业与自动评测模块在当前版本下的测试依据、测试环境、测试数据、测试用例、执行结果、手工验收清单、缺陷风险和验收结论。覆盖范围对齐 `FR-HWK-01 ~ FR-HWK-06`、`NFR-HWK-01 ~ NFR-HWK-05`、`UI-HWK-01 ~ UI-HWK-09`、`API-HWK-01 ~ API-HWK-22`、`DB-HWK-01 ~ DB-HWK-07`、`TC-HWK-01 ~ TC-HWK-19` 与 `TC-HWK-N01 ~ TC-HWK-N05`。
+本文件用于记录 HWK 作业与自动评测模块在当前版本下的测试依据、测试环境、测试数据、测试用例、执行结果、手工验收清单、缺陷风险和验收结论。覆盖范围对齐 `FR-HWK-01 ~ FR-HWK-06`、`NFR-HWK-01 ~ NFR-HWK-05`、`UI-HWK-01 ~ UI-HWK-09`、`API-HWK-01 ~ API-HWK-24`、`DB-HWK-01 ~ DB-HWK-08`、`TC-HWK-01 ~ TC-HWK-27` 与 `TC-HWK-N01 ~ TC-HWK-N05`。
 
 2026-06-09 的历史记录只覆盖 #225/#224 之前的基础流程。2026-08-22 已独立执行 #225 的统计契约和 #224 的 DRAFT 原子逻辑删除、403/404/409 分类、普通更新防复活、子历史保留、UI-HWK-01 交互及 1440×900/390×844 浏览器行为，并完成全量回归。真实 Docker 沙箱压力、真实 MySQL 容器迁移及 LRN/GRD 生产联调仍列为专项或部署验收项。
 
@@ -51,6 +52,7 @@
 | 9 | `database/migrations/20260530_01_create_hwk_homework.sql`、`20260601_01_create_hwk_submission.sql`、`20260602_01_create_hwk_evaluation.sql`、`20260602_02_create_hwk_review_log.sql` | HWK 数据表和迁移约束依据 |
 | 10 | GitHub Issue #225《补齐作业统计分布与待处理名单契约》 | API-HWK-09/15 兼容增量、状态口径、实现边界和验收项来源 |
 | 11 | GitHub Issue #224《补齐草稿作业逻辑删除契约与教师端入口》 | API-HWK-22、HWK_4095、TC-HWK-19、父表原子软删、子历史保留、普通更新防复活和 UI-HWK-01 验收来源 |
+| 12 | GitHub Issue #214《补齐 HWK FILE 作业附件上传与安全提交链路》 | API-HWK-23/24、DB-HWK-08、TC-HWK-20 ~ 27、MAN-HWK-012、附件状态机、受控下载与错误码契约来源 |
 
 ## 4 测试范围
 
@@ -75,8 +77,8 @@
 | 类别 | 编号范围 | 覆盖说明 |
 | --- | --- | --- |
 | 页面 | UI-HWK-01 ~ UI-HWK-09 | UI-HWK-01 的 DRAFT-only 删除、确认取消/pending/失败保留/末页回退由单测覆盖；1440×900/390×844 浏览器证据通过 |
-| 接口 | API-HWK-01 ~ API-HWK-22 | API-HWK-22 的真实 DELETE 200/deleted=true、403/HWK_4031、404/HWK_4001、409/HWK_4095 和并发分支通过 |
-| 数据表 | DB-HWK-01 ~ DB-HWK-07 | fresh/H2/存量 MySQL 脚本契约、两个组合索引名称和列顺序测试通过；真实 MySQL 容器待部署复核 |
+| 接口 | API-HWK-01 ~ API-HWK-24 | API-HWK-23 单 `file` 上传/GET/DELETE 和 API-HWK-24 受控下载的成功、鉴权、所有权、状态与存储错误通过 |
+| 数据表 | DB-HWK-01 ~ DB-HWK-08 | 既有契约保留；`t_hwk_submission_attachment` 的 UUID 唯一、UPLOADED/BOUND/DELETED、一提交一附件和 fresh/重复迁移已由 H2 与本机真实 MySQL 9.6 验证 |
 | 跨模块 | AUTH、CRS、LRN、GRD、LAB | AUTH/CRS 已有 Bearer 与成员联动测试；LRN 通知事件和 GRD HWK 来源成绩有自动化样本，完整环境联调待确认；代码评测复用公共评测抽象 |
 
 ### 4.3 不在本次自动化确认范围
@@ -129,6 +131,9 @@
 | #224 后端全量 | `cd backend && mvn test` | 290 tests，0 failures，0 errors，1 skipped；跳过项为 `DockerSandboxExecutorTest` 环境假设 |
 | #224 前端全量与构建 | `npm run test:unit`、`npm run typecheck`、`npm run build` | 53 files / 511 tests 全部通过；类型检查和生产构建通过 |
 | #224 浏览器验收 | 本地 H2 + Vite + fake sandbox，Playwright Chromium 验证 1440×900 与 390×844 的 DRAFT-only 入口、取消无请求和真实删除 | DELETE 200，响应 `deleted=true`；390px `documentWidth=innerWidth=390`；控制台 0 error/0 warning；4 张截图见 `output/playwright/issue-224/README.md` |
+| #214 完整自动化 | `mvn -q test`；#214 定向 9 类；`npm run test:unit`、`npm run typecheck`、`npm run build` | 后端全量 340 total = 339 passed + 1 Docker-only skipped，0 failures/0 errors；定向 9 类 94/94；前端 53 files / 545 tests，typecheck/build 通过 |
+| #214 数据库契约 | 本机真实 MySQL 9.6：`compose-schema.sql` fresh schema + `20260822_03_create_hwk_submission_attachment.sql` 连续执行两次 | 新建库与增量迁移路径均通过；Docker daemon 不可用，未声称容器启停/卷路径已通过 |
+| #214 浏览器验收 | H2 真实服务；教师/两学生/匿名；1440×1000/390×844；上传与恢复失败 mock | MAN-HWK-012 通过；伪装 PDF 400/HWK_4005；存储 500/HWK_5002 后重试 201；提交 201；恢复 GET 5002 保留 session/UUID，解除后 GET 200 + DELETE 200；越权被拒绝，两视口无溢出且无脚本 Console error；证据 `output/playwright/issue-214/01~10` |
 
 说明：前两行保留 2026-06-09 的 V1.0 基线。#225 的 RED 阶段分别观察到统计/attention 初始批次 7 failures + 6 errors、边界补充批次 2 failures + 1 error、迁移专项 3 failures + 1 error，以及前端 14 failures；修复后再执行上述 GREEN 与全量命令。真实 MySQL 8.4 容器未执行，原因是本机 Docker daemon socket 不存在。
 
@@ -155,6 +160,14 @@
 | TC-HWK-17 | FR-HWK-06；NFR-HWK-04 | API-HWK-08、10、11 | 学生成绩未发布 | 学生查询历史、详情和评测结果 | 不显示未公开最终分和教师评语 | `studentHistoryAndDetailHideUnpublishedScoresAndTeacherComment`、`objectiveHomeworkSubmissionShowsEvaluationButHidesUnpublishedFinalScore` 通过 | 通过 |
 | TC-HWK-18 | FR-HWK-05、06；NFR-HWK-02、04 | UI-HWK-08、09；API-HWK-09、15；DB-HWK-04、05 | 五档边界、非 100 满分、空分布、无分数、历史/删除/REJECTED/非当前学生、TEXT/FILE NONE、代码评测中/终态样本 | 教师查询统计并切换未提交、待评测、待批阅；验证分页、生成时间、URL、权限和姓名失败 | 保留旧字段并返回六个新增字段；五档固定且归一化正确，`scoredCount` 等于档位合计；评测/批阅/活跃学生口径准确；三类名单服务端分页稳定、URL 可恢复；学生/无权限教师 403 且无泄漏 | 后端聚合/Controller、前端 100 条 focused、全量回归与 9 张浏览器证据通过 | 通过 |
 | TC-HWK-19 | FR-HWK-01；NFR-HWK-01、03、04、05 | UI-HWK-01；API-HWK-22；DB-HWK-01~07；HWK_4001/HWK_4031/HWK_4095 | DRAFT/全部非 DRAFT、课程管理者/无权限用户、已删除作业、完整子数据和历史、删除前旧更新、当前页唯一草稿 | 验证成功、取消无请求、无权限、非 DRAFT、重复删除、删除与编辑/发布竞争、子历史保留、pending 互斥、失败保留、成功刷新/末页回退和 1440px/390px | 成功返回 `deleted=true` 与删除时间；403/404/409 分类准确；普通更新不能复活；只删除父表；仅 DRAFT 显示入口，页面反馈和页码正确 | `courseManagerSoftDeletesDraftAndPreservesHomeworkHistory`、`onlyDraftHomeworkCanBeDeleted`、`staleEditAndPublishCannotRestoreDeletedDraft`、三条并发分类服务测试、教师页删除交互/API 单测通过；后端 290 tests、前端 511 tests；4 张浏览器截图通过 | 通过 |
+| TC-HWK-20 | FR-HWK-02；NFR-HWK-03、04 | API-HWK-23；DB-HWK-08 | 课程学生、已发布 FILE 作业、合法白名单文件 | multipart 单 `file` 上传并查询 | 返回服务端 UUID、安全元数据、UPLOADED 与 24h 过期时间，不泄露内部存储引用 | 自动化与浏览器通过；真实 `fileId=9931efa8-57f9-4b18-9636-d14d96c43ad0` | 通过 |
+| TC-HWK-21 | FR-HWK-02；NFR-HWK-04 | API-HWK-23；HWK_4031/4042 | 非成员、他人学生、跨课程/作业 UUID | 上传、GET、DELETE 或绑定 | 只允许本人/本课程/本作业；格式合法但未知/跨归属 UUID 用 404 隐藏 | 第二学生入课前上传 403/HWK_4031；入课后他人 fileId 读取/绑定 404/HWK_4042 | 通过 |
+| TC-HWK-22 | FR-HWK-02；NFR-HWK-04 | API-HWK-23；HWK_4005/4131/4151 | 空文件、10 MiB 边界、11 类白名单、扩展/MIME/签名伪装 | 上传并核对错误和物理/元数据副作用 | 空文件或内容签名/结构无效为 HWK_4005；超限为 HWK_4131；扩展名或声明 MIME 不支持/不匹配为 HWK_4151 | 自动化通过；浏览器伪装 PDF 返回 400/HWK_4005 | 通过 |
+| TC-HWK-23 | FR-HWK-02；NFR-HWK-01、03 | API-HWK-07/23；DB-HWK-04/08 | FILE `fileIds` 空/多值/非 UUID、过期/重用/并发资产 | 提交并核对提交/资产状态 | 恰好一个 UUID；提交与 UPLOADED→BOUND 同事务，非法情况不产生孤儿提交 | 自动化通过；浏览器提交 201，`submission=950304` | 通过 |
+| TC-HWK-24 | NFR-HWK-01、03、05 | DB-HWK-08；迁移/补偿/清理 | 存储成功后 DB 失败、首次删除失败、跨存储实例、过期 UPLOADED/DELETED、H2/MySQL/Compose | 注入失败，运行持久 journal、迁移和清理 | DB 回滚不留有效元数据；立即删除失败持久 marker，定时重试成功后删对象并 ack；跨实例可恢复 | `failedDatabaseInsertAndImmediateDeletePersistCleanupUntilRetrySucceeds`、`deferredDeletionQueueSurvivesStorageServiceRestartAndClearsAfterSuccess` 通过；MySQL 9.6 fresh/重复迁移通过 | 通过 |
+| TC-HWK-25 | FR-HWK-03、05；NFR-HWK-03、04 | API-HWK-08/09/10；DB-HWK-08 | 多版本 FILE 提交与不可用资产 | 查询学生历史/教师详情 | 每个版本只返回精确绑定的安全附件摘要，不串版或泄露存储引用 | 自动化与 MAN-HWK-012 历史/批阅页通过 | 通过 |
+| TC-HWK-26 | FR-HWK-03、05；NFR-HWK-04 | API-HWK-24 | 提交者、课程管理者、匿名、他人提交 | 下载并核对鉴权、响应头和 SHA-256 | 每次重鉴权；仅提交者/课程管理者成功；精确版本且不泄露内部引用 | 学生/教师 SHA-256 均 `d1847d02cb36254509d0ec2df0eaf20805ce3f6aed4e25a809aea88f8d8568fa`；匿名 401，他人 403 | 通过 |
+| TC-HWK-27 | FR-HWK-02、03；NFR-HWK-05 | UI-HWK-05/06/08；API-HWK-23/24 | 上传/恢复失败、迟到响应、路由切换、sessionStorage | 选择→上传→失败保留/重试/移除→提交；刷新恢复 GET 失败后重载 | 无假 fileId/路由污染；sessionStorage 不含 File/本地路径；恢复失败保留 session/UUID | 前端 53 files / 545 tests；`fileId=d3b0f3f1-e989-4a6f-8665-ba35daa29329` 恢复 GET 500/HWK_5002 后保留，解除 mock 后 GET 200、DELETE 200 | 通过 |
 | TC-HWK-N01 | NFR-HWK-01 | API-HWK-03、07、11、13 | 模拟通知投递失败、评测失败、重复提交冲突 | 执行发布、提交、查询和批阅 | 主数据保持一致，错误以受控响应返回 | `publishKeepsHomeworkPublishedWhenNotificationDeliveryFails`、`submitReturnsControlledConflictWhenSubmissionVersionIsAlreadyUsed` 通过 | 通过 |
 | TC-HWK-N02 | NFR-HWK-02 | API-HWK-05、09、15；组合索引与增量迁移 | 数据量大于单页，包含活跃/退出学生和多版本提交 | 查询三类名单和统计，检查 Repository 查询及迁移元数据 | 1 基页码、size 1～100、稳定排序和聚合总数正确；统计为 SQL 聚合，不加载全部最终提交；组合索引存在且列顺序正确 | SQL 聚合、极大页码、fresh/H2/存量 MySQL 脚本契约 10 条通过；真实 MySQL EXPLAIN 待部署复核 | 有条件通过 |
 | TC-HWK-N03 | NFR-HWK-03 | API-HWK-10、20、21；DB-HWK-04、05、06 | 存在多次提交、评测、重评、批阅 | 查询详情、评测日志、批阅日志 | 提交和日志可追溯 | 迁移测试和控制器日志用例通过 | 通过 |
@@ -225,6 +238,7 @@ HWK-LOG-001 ~ HWK-LOG-013 为 2026-06-09 的 V1.0 历史日志；HWK-LOG-014 起
 | MAN-HWK-009 | HWK/LRN/GRD | 跨模块联调 | 发布作业、完成评测/批阅、发布成绩，查看通知中心、学习任务、成绩同步 | LRN 通知/提醒生成，GRD 可同步 HWK 来源成绩 | 待联调确认 |
 | MAN-HWK-010 | HWK/CRS | #225 统计与待处理响应式验收 | 使用有权限教师在 1440px 和 390px 下查看五档和三类 Tab，翻页、深链提交队列、刷新/前进/后退、键盘操作；再以学生访问并模拟姓名服务失败 | 五档和生成时间清晰，三类名单服务端分页稳定且 URL 恢复；窄屏无横向溢出；学生落到 403，姓名失败不展示裸 `studentId` | 通过；9 张截图及尺寸、URL、控制台记录见 `output/playwright/issue-225/README.md` |
 | MAN-HWK-011 | HWK/CRS | #224 草稿逻辑删除与响应式教师入口 | 使用有权限教师在 1440px/390px 查看 DRAFT 与非 DRAFT；验证取消无请求、确认删除和成功刷新；失败保留/pending/末页回退由组件测试覆盖 | 仅 DRAFT 显示入口；窄屏无溢出；反馈明确；成功后作业消失且页码有效，失败时原行、筛选和页码不丢失 | 通过；真实 `DELETE /api/v1/homeworks/950312` 返回 200、`deleted=true`，总数 3→2；1440×900/390×844 四张截图，390px 无溢出，控制台 0 error/0 warning；见 `output/playwright/issue-224/README.md` |
+| MAN-HWK-012 | HWK/CRS/AUTH | #214 FILE 附件上传与安全提交 | H2 真实服务；教师/两学生/匿名；验证伪装文件、存储失败重试、刷新恢复、提交、受控下载、越权、恢复 GET 失败保留/重载/删除，检查 1440×1000/390×844 布局与 Console | 伪装 PDF 400/HWK_4005；存储 500/HWK_5002 后重试 201；提交 201；学生/教师哈希一致；匿名/他人被拒绝；恢复 GET 5002 保留 session/UUID，解除后 GET 200 + DELETE 200；无溢出和脚本 Console error | 通过；自动化后端 340 total = 339 passed + 1 Docker-only skipped（0 failures/0 errors）、定向 9 类 94/94、前端 53 files / 545 tests + typecheck/build；MySQL 9.6 fresh/重复迁移通过；截图 `output/playwright/issue-214/01~10` |
 
 ## 10 缺陷、风险与处理建议
 
@@ -236,6 +250,7 @@ HWK-LOG-001 ~ HWK-LOG-013 为 2026-06-09 的 V1.0 历史日志；HWK-LOG-014 起
 | R-HWK-004 | Maven 和 Vitest 在普通沙箱下存在写入/子进程权限限制 | 本地验证流程 | 本地开发机可直接运行；受限环境下需使用已批准的提权命令 |
 | R-HWK-005 | 本机 Docker daemon socket 不存在，#225 存量迁移尚未在真实 MySQL 8.4 容器执行首次、重跑与 EXPLAIN | DB-HWK-04、TC-HWK-N02、部署升级 | 当前由 H2 执行测试、MySQL 脚本静态契约和 shell 语法覆盖；部署时按 `apply-compose-migration.sh` 入口实跑并保存输出 |
 | R-HWK-006 | #224 浏览器使用 H2 与 fake sandbox，未在生产数据库上复测条件 UPDATE/FOR UPDATE 的并发语义 | API-HWK-22、DB-HWK-01 | Repository/Service 自动化与 SQL 契约已覆盖并发分类和防复活；部署环境复测时补 MySQL 当前读证据，不影响本地验收结论 |
+| R-HWK-007 | #214 存储根目录整卷不可写时，物理删除和 `.pending-deletes` marker 可同时失败；病毒扫描未纳入本期 | TC-HWK-22/24、部署运维 | journal 失败不被吞掉；修复卷后使用配对 DB+完整卷（含隐藏 marker）受限对账。生产上线前补恶意载荷扫描/隔离与告警治理 |
 
 ## 11 验收结论
 

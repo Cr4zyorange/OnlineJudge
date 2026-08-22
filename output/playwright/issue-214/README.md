@@ -52,7 +52,8 @@
 - 后端 Maven：340 项，339 通过、1 跳过，0 failures / 0 errors；#214 定向 9 类 94/94 通过。
 - 前端 Vitest：53 个测试文件、545 项全部通过。
 - 前端 `vue-tsc --noEmit` 与生产构建均通过。
-- 真实 MySQL 9.6：完整 `database/mysql/compose-schema.sql` 成功导入，`20260822_03_create_hwk_submission_attachment.sql` 连续执行两次成功，表、索引与唯一约束符合设计。
+- 真实 MySQL 9.6：完整 `database/mysql/compose-schema.sql` 成功导入，`20260822_03_create_hwk_submission_attachment.sql` 连续执行两次成功；两份 9 MiB 并发上传得到 201 与 `409/HWK_4092`，DB active 行与物理对象均恰好 1 份，顺序替换后仍为 1 份。
+- Nginx 已显式设置 `client_max_body_size 55m;`，与 Spring 50MB/55MB 共享传输契约一致；HWK 业务上限仍为 10 MiB。
 - Docker daemon 当时不可用，因此没有重复运行容器启动路径；已用本机真实 MySQL 完成等价迁移验证。
 
 ## 截图索引
@@ -70,4 +71,4 @@
 
 ## 残余风险
 
-当前版本执行扩展名、严格 MIME、文件签名和 ZIP/OOXML 结构校验，但不包含恶意软件扫描。生产环境仍需接入病毒扫描或隔离服务；该项不影响本 issue 约定的上传、绑定、授权下载与孤儿清理闭环。
+当前版本执行扩展名、严格 MIME、文件签名和 ZIP/OOXML 结构校验，但不包含恶意软件扫描。生产环境仍需接入病毒扫描/隔离、网关限流与容量监控；允许重交时的 BOUND 历史需纳入存储规划。如果整个存储卷同时无法删除对象与写入 journal marker，补偿意图无法持久化，但该异常不会被静默吞掉。
