@@ -478,7 +478,7 @@ function submissionDetail(overrides: Partial<LabSubmissionDetail> = {}): LabSubm
   return {
     ...base,
     code: 'print("lab")',
-    fileId: null,
+    sourceFile: null,
     latestReport: null,
     latestScore: null,
     ...overrides

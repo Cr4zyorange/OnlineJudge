@@ -54,7 +54,14 @@ describe('LabSubmissionHistoryView', () => {
     vi.mocked(labApi.getLabSubmissionDetail).mockImplementation(async (_labId, submissionId) => (
       detail(submissionId === 199 ? current : latest, {
         code: submissionId === 199 ? "print('current version')" : "print('latest version')",
-        fileId: submissionId === 199 ? 'private/lab/199/report.zip' : null
+        sourceFile: submissionId === 199
+          ? {
+              originalFilename: 'report.zip',
+              contentType: 'application/zip',
+              fileSize: 2048,
+              downloadAvailable: true
+            }
+          : null
       })
     ));
 
@@ -461,7 +468,7 @@ function detail(
   return {
     ...item,
     code: "print('history detail')",
-    fileId: null,
+    sourceFile: null,
     latestReport: null,
     ...overrides
   };

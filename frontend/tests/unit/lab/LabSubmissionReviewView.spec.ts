@@ -247,6 +247,41 @@ describe('LabSubmissionReviewView', () => {
     expect(downloadLabSubmissionSourceMock).not.toHaveBeenCalled();
   });
 
+  it('shows safe metadata without a download action when controlled download is unavailable', async () => {
+    vi.mocked(labApi.getLabSubmissionDetail).mockResolvedValueOnce(submission({
+      sourceFile: sourceFile({ downloadAvailable: false })
+    }));
+
+    const wrapper = mountView();
+    await flushPromises();
+
+    expect(wrapper.get('[data-testid="source-file-panel"]').text()).toContain('实验源码.py');
+    expect(wrapper.get('[data-testid="source-file-panel"]').text()).toContain('当前源文件暂不可下载');
+    expect(wrapper.find('[data-action="download-source-file"]').exists()).toBe(false);
+    expect(downloadLabSubmissionSourceMock).not.toHaveBeenCalled();
+  });
+
+  it('ignores a source download response that arrives after the review unmounts', async () => {
+    const staleDownload = deferred<{ blob: Blob; filename?: string }>();
+    downloadLabSubmissionSourceMock.mockReturnValueOnce(staleDownload.promise);
+    const browserDownload = stubBrowserDownload();
+
+    const wrapper = mountView();
+    await flushPromises();
+    await wrapper.get('[data-action="download-source-file"]').trigger('click');
+    wrapper.unmount();
+
+    staleDownload.resolve({
+      blob: new Blob(['stale'], { type: 'text/x-python' }),
+      filename: 'unmounted-source.py'
+    });
+    await flushPromises();
+
+    expect(downloadLabSubmissionSourceMock).toHaveBeenCalledTimes(1);
+    expect(browserDownload.createObjectURL).not.toHaveBeenCalled();
+    expect(browserDownload.downloadedFilename()).toBe('');
+  });
+
   it('ignores a source download response that arrives after the review route changes', async () => {
     const staleDownload = deferred<{ blob: Blob; filename?: string }>();
     downloadLabSubmissionSourceMock.mockReturnValueOnce(staleDownload.promise);
