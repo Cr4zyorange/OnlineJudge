@@ -25,7 +25,7 @@ public class LocalDiskFileStorageService implements FileStorageService {
     @Override
     public StoredFile store(String filename, String contentType, InputStream content) {
         String safeFilename = sanitizeFilename(filename);
-        String storageKey = UUID.randomUUID() + "-" + safeFilename;
+        String storageKey = UUID.randomUUID() + safeExtension(safeFilename);
         Path targetPath = rootDirectory.resolve(storageKey).normalize();
 
         try {
@@ -69,8 +69,12 @@ public class LocalDiskFileStorageService implements FileStorageService {
         if (storageKey == null || storageKey.isBlank()) {
             return;
         }
+        Path targetPath = rootDirectory.resolve(storageKey).normalize();
+        if (!targetPath.startsWith(rootDirectory)) {
+            throw new IllegalStateException("文件路径不合法");
+        }
         try {
-            Files.deleteIfExists(rootDirectory.resolve(storageKey).normalize());
+            Files.deleteIfExists(targetPath);
         } catch (IOException exception) {
             throw new IllegalStateException("文件删除失败", exception);
         }
@@ -81,6 +85,27 @@ public class LocalDiskFileStorageService implements FileStorageService {
         if (value.isEmpty()) {
             return "submission.bin";
         }
-        return value.replace("\\", "_").replace("/", "_");
+        StringBuilder sanitized = new StringBuilder(Math.min(value.length(), 255));
+        for (int index = 0; index < value.length(); index++) {
+            char current = value.charAt(index);
+            sanitized.append(current == '/' || current == '\\' || Character.isISOControl(current) ? '_' : current);
+        }
+        if (sanitized.length() <= 255) {
+            return sanitized.toString();
+        }
+
+        int extensionIndex = sanitized.lastIndexOf(".");
+        String extension = extensionIndex > 0 && sanitized.length() - extensionIndex <= 20
+                ? sanitized.substring(extensionIndex)
+                : "";
+        return sanitized.substring(0, 255 - extension.length()) + extension;
+    }
+
+    private String safeExtension(String filename) {
+        int extensionIndex = filename.lastIndexOf('.');
+        if (extensionIndex <= 0 || filename.length() - extensionIndex > 20) {
+            return "";
+        }
+        return filename.substring(extensionIndex).toLowerCase(java.util.Locale.ROOT);
     }
 }

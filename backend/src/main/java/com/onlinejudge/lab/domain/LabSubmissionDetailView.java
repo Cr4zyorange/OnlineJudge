@@ -20,7 +20,7 @@ public record LabSubmissionDetailView(
         boolean isScoringBasis,
         boolean hasFile,
         String code,
-        String fileId,
+        LabSubmissionSourceFileView sourceFile,
         LabReportSummaryView latestReport,
         LabScoreSummaryView latestScore
 ) {

@@ -20,7 +20,13 @@ import com.onlinejudge.lab.domain.LabSubmissionDetailView;
 import com.onlinejudge.lab.domain.LabSubmissionHistoryItemView;
 import com.onlinejudge.lab.domain.LabSubmissionQuery;
 import com.onlinejudge.lab.domain.LabSubmissionRepository;
+import com.onlinejudge.lab.domain.LabSubmissionSourceDownload;
+import com.onlinejudge.lab.domain.LabSubmissionSourceFile;
+import com.onlinejudge.lab.domain.LabSubmissionSourceFileRepository;
+import com.onlinejudge.lab.domain.LabSubmissionSourceFileStatus;
+import com.onlinejudge.lab.domain.LabSubmissionSourceFileView;
 import com.onlinejudge.lab.domain.LabSubmitStatus;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -66,6 +72,7 @@ public class LabSubmissionService {
 
     private final LabExperimentRepository labExperimentRepository;
     private final LabSubmissionRepository labSubmissionRepository;
+    private final LabSubmissionSourceFileRepository labSubmissionSourceFileRepository;
     private final LabEvaluationRepository labEvaluationRepository;
     private final LabEvaluationResultRepository labEvaluationResultRepository;
     private final LabEvaluationService labEvaluationService;
@@ -77,6 +84,7 @@ public class LabSubmissionService {
     public LabSubmissionService(
             LabExperimentRepository labExperimentRepository,
             LabSubmissionRepository labSubmissionRepository,
+            LabSubmissionSourceFileRepository labSubmissionSourceFileRepository,
             LabEvaluationRepository labEvaluationRepository,
             LabEvaluationResultRepository labEvaluationResultRepository,
             LabEvaluationService labEvaluationService,
@@ -87,6 +95,7 @@ public class LabSubmissionService {
     ) {
         this.labExperimentRepository = labExperimentRepository;
         this.labSubmissionRepository = labSubmissionRepository;
+        this.labSubmissionSourceFileRepository = labSubmissionSourceFileRepository;
         this.labEvaluationRepository = labEvaluationRepository;
         this.labEvaluationService = labEvaluationService;
         this.labReportService = labReportService;
@@ -115,9 +124,10 @@ public class LabSubmissionService {
         if (hasFile(command)) {
             storedFile = fileStorageService.store(
                     command.fileName(),
-                    command.fileContentType(),
+                    trustedSourceContentType(command.fileContentType()),
                     new ByteArrayInputStream(command.fileBytes())
             );
+            registerFileRollbackCleanup(storedFile.storageKey());
         }
 
         EvaluationStatus evaluationStatus = experiment.autoEvaluate() ? EvaluationStatus.PENDING : EvaluationStatus.NONE;
@@ -141,6 +151,23 @@ public class LabSubmissionService {
         );
 
         LabSubmission savedSubmission = labSubmissionRepository.save(submission);
+        if (storedFile != null) {
+            labSubmissionSourceFileRepository.save(new LabSubmissionSourceFile(
+                    0L,
+                    savedSubmission.id(),
+                    savedSubmission.labId(),
+                    experiment.courseId(),
+                    savedSubmission.studentId(),
+                    storedFile.storageKey(),
+                    storedFile.originalFilename(),
+                    storedFile.contentType(),
+                    storedFile.size(),
+                    LabSubmissionSourceFileStatus.AVAILABLE,
+                    now,
+                    now,
+                    null
+            ));
+        }
         if (!experiment.autoEvaluate()) {
             return savedSubmission;
         }
@@ -192,9 +219,55 @@ public class LabSubmissionService {
         );
         LabSubmissionDetailView rawDetail = toDetail(
                 submission,
-                resolveSubmissionVersionFlags(flagsBySubmissionId, submission)
+                resolveSubmissionVersionFlags(flagsBySubmissionId, submission),
+                experiment.courseId()
         );
         return toVisibleSubmissionDetail(rawDetail, canManage, areScoresPublished(experiment));
+    }
+
+    public LabSubmissionSourceDownload downloadSubmissionSource(long labId, long submissionId, long userId) {
+        LabExperiment experiment = findExistingExperiment(labId);
+        if (!coursePermissionClient.canManageCourse(experiment.courseId(), userId)) {
+            throw new LabPermissionException("无课程管理权限");
+        }
+
+        LabSubmission submission = labSubmissionRepository.findById(submissionId)
+                .filter(item -> !item.deleted())
+                .filter(item -> item.labId() == labId)
+                .orElseThrow(() -> new LabNotFoundException("提交不存在"));
+        if (!hasFile(submission.fileId())) {
+            throw LabSourceFileException.noFile();
+        }
+
+        LabSubmissionSourceFile sourceFile = labSubmissionSourceFileRepository.findBySubmissionId(submissionId)
+                .orElseThrow(LabSourceFileException::unavailable);
+        if (!hasValidSourceBinding(sourceFile, submission, experiment.courseId())) {
+            throw new LabNotFoundException("提交不存在");
+        }
+        if (sourceFile.status() != LabSubmissionSourceFileStatus.AVAILABLE
+                || !hasTrustedMetadata(sourceFile, submission.language())) {
+            throw LabSourceFileException.unavailable();
+        }
+
+        StoredFile storedFile;
+        try {
+            storedFile = fileStorageService.load(sourceFile.storageKey());
+        } catch (RuntimeException exception) {
+            throw LabSourceFileException.storageFailure();
+        }
+        if (storedFile.resource() == null
+                || !storedFile.resource().exists()
+                || !storedFile.resource().isReadable()
+                || storedFile.size() != sourceFile.fileSize()) {
+            throw LabSourceFileException.storageFailure();
+        }
+
+        return new LabSubmissionSourceDownload(
+                sourceFile.originalFilename(),
+                sourceFile.contentType(),
+                sourceFile.fileSize(),
+                storedFile.resource()
+        );
     }
 
     public LabEvaluationResultView getSubmissionResult(long labId, long submissionId, long userId) {
@@ -255,7 +328,11 @@ public class LabSubmissionService {
         Map<Long, SubmissionVersionFlags> flagsBySubmissionId = buildSubmissionVersionFlags(
                 labSubmissionRepository.findByLabIdAndStudentId(labId, studentId)
         );
-        LabSubmissionDetailView rawDetail = toDetail(submission, resolveSubmissionVersionFlags(flagsBySubmissionId, submission));
+        LabSubmissionDetailView rawDetail = toDetail(
+                submission,
+                resolveSubmissionVersionFlags(flagsBySubmissionId, submission),
+                experiment.courseId()
+        );
         LabEvaluationResultView evaluationResult = getSubmissionResult(labId, submission.id(), canManage ? userId : studentId);
         boolean scorePublished = areScoresPublished(experiment);
         LabSubmissionDetailView visibleSubmission = toVisibleSubmissionDetail(rawDetail, canManage, scorePublished);
@@ -383,6 +460,11 @@ public class LabSubmissionService {
             return null;
         }
         return contentType.split(";", 2)[0].trim().toLowerCase(Locale.ROOT);
+    }
+
+    private String trustedSourceContentType(String contentType) {
+        String normalized = normalizeContentType(contentType);
+        return normalized == null ? MediaType.APPLICATION_OCTET_STREAM_VALUE : normalized;
     }
 
     private boolean isSupportedContentType(String normalizedLanguage, String contentType) {
@@ -531,7 +613,8 @@ public class LabSubmissionService {
 
     private LabSubmissionDetailView toDetail(
             LabSubmission submission,
-            SubmissionVersionFlags flags
+            SubmissionVersionFlags flags,
+            long courseId
     ) {
         LabReportSummaryView latestReport = labReportService.findLatestReportForSubmission(submission.id())
                 .orElse(null);
@@ -553,7 +636,7 @@ public class LabSubmissionService {
                 flags.isScoringBasis(),
                 hasFile(submission.fileId()),
                 submission.codeContent(),
-                submission.fileId(),
+                resolveTrustedSourceFileView(submission, courseId),
                 latestReport,
                 latestScore
         );
@@ -586,10 +669,75 @@ public class LabSubmissionService {
                 detail.isScoringBasis(),
                 detail.hasFile(),
                 detail.code(),
-                null,
+                detail.sourceFile() == null ? null : detail.sourceFile().withDownloadAvailable(false),
                 visibleReport,
                 scoresPublished ? detail.latestScore() : null
         );
+    }
+
+    private LabSubmissionSourceFileView resolveTrustedSourceFileView(LabSubmission submission, long courseId) {
+        if (!hasFile(submission.fileId())) {
+            return null;
+        }
+        return labSubmissionSourceFileRepository.findBySubmissionId(submission.id())
+                .filter(sourceFile -> sourceFile.status() == LabSubmissionSourceFileStatus.AVAILABLE)
+                .filter(sourceFile -> hasValidSourceBinding(sourceFile, submission, courseId))
+                .filter(sourceFile -> hasTrustedMetadata(sourceFile, submission.language()))
+                .map(sourceFile -> new LabSubmissionSourceFileView(
+                        sourceFile.originalFilename(),
+                        sourceFile.contentType(),
+                        sourceFile.fileSize(),
+                        true
+                ))
+                .orElse(null);
+    }
+
+    private boolean hasValidSourceBinding(
+            LabSubmissionSourceFile sourceFile,
+            LabSubmission submission,
+            long courseId
+    ) {
+        return sourceFile.submissionId() == submission.id()
+                && sourceFile.labId() == submission.labId()
+                && sourceFile.courseId() == courseId
+                && sourceFile.uploaderId() == submission.studentId()
+                && sourceFile.storageKey() != null
+                && sourceFile.storageKey().equals(submission.fileId());
+    }
+
+    private boolean hasTrustedMetadata(LabSubmissionSourceFile sourceFile, String language) {
+        if (!isSafeSourceFilename(sourceFile.originalFilename(), language)
+                || sourceFile.fileSize() < 0
+                || sourceFile.fileSize() > MAX_UPLOAD_SIZE_BYTES
+                || sourceFile.deletedAt() != null) {
+            return false;
+        }
+        String contentType = sourceFile.contentType();
+        if (contentType == null || contentType.isBlank() || contentType.length() > 128
+                || contentType.indexOf('\r') >= 0 || contentType.indexOf('\n') >= 0) {
+            return false;
+        }
+        try {
+            MediaType parsed = MediaType.parseMediaType(contentType);
+            return parsed.getParameters().isEmpty()
+                    && isSupportedContentType(language, parsed.toString().toLowerCase(Locale.ROOT));
+        } catch (IllegalArgumentException exception) {
+            return false;
+        }
+    }
+
+    private boolean isSafeSourceFilename(String filename, String language) {
+        if (filename == null || filename.isBlank() || filename.length() > 255
+                || filename.indexOf('/') >= 0 || filename.indexOf('\\') >= 0) {
+            return false;
+        }
+        for (int index = 0; index < filename.length(); index++) {
+            if (Character.isISOControl(filename.charAt(index))) {
+                return false;
+            }
+        }
+        Set<String> allowedExtensions = SOURCE_FILE_EXTENSIONS.get(language);
+        return allowedExtensions != null && allowedExtensions.contains(extractExtension(filename));
     }
 
     private LabReportSummaryView hideReportScore(LabReportSummaryView report) {
@@ -707,6 +855,20 @@ public class LabSubmissionService {
             @Override
             public void afterCommit() {
                 trigger.run();
+            }
+        });
+    }
+
+    private void registerFileRollbackCleanup(String storageKey) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCompletion(int status) {
+                if (status != TransactionSynchronization.STATUS_COMMITTED) {
+                    fileStorageService.delete(storageKey);
+                }
             }
         });
     }
