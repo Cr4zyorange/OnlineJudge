@@ -121,7 +121,29 @@
                 <div><dt>程序语言</dt><dd>{{ detail.language ?? '—' }}</dd></div>
                 <div><dt>得分</dt><dd>{{ formatScore(detail.finalScore ?? detail.autoScore) }}</dd></div>
               </dl>
-              <pre class="hwk-history__answer">{{ formatStudentAnswer(detail) }}</pre>
+              <section
+                v-if="detail.submitType === 'FILE' && detail.attachment"
+                class="hwk-history__attachment"
+                data-testid="homework-attachment-panel"
+              >
+                <strong>{{ detail.attachment.originalFilename }}</strong>
+                <span>{{ detail.attachment.contentType }} · {{ formatFileSize(detail.attachment.fileSize) }}</span>
+                <button
+                  v-if="detail.attachment.downloadAvailable"
+                  type="button"
+                  data-action="download-homework-attachment"
+                  :disabled="attachmentDownloading"
+                  @click="downloadSelectedAttachment"
+                >{{ attachmentDownloading ? '正在下载…' : '下载附件' }}</button>
+                <p v-else>当前附件暂不可下载。</p>
+                <p v-if="attachmentDownloadError" class="hwk-history__error" role="alert">{{ attachmentDownloadError }}</p>
+                <p v-if="attachmentDownloadFeedback" class="hwk-history__feedback" role="status">{{ attachmentDownloadFeedback }}</p>
+              </section>
+              <p
+                v-else-if="detail.submitType === 'FILE' && detail.hasAttachment"
+                class="hwk-history__detail-hint"
+              >附件元数据暂不可用，当前不能下载。</p>
+              <pre v-else class="hwk-history__answer">{{ formatStudentAnswer(detail) }}</pre>
               <p v-if="detail.comment" class="hwk-history__comment">评语：{{ detail.comment }}</p>
             </div>
             <p v-else class="hwk-history__detail-hint">选择“查看内容”对照某一次保存的答案。</p>
@@ -223,7 +245,25 @@
             <p>提交状态：{{ formatSubmitStatus(detail.submitStatus) }}</p>
             <p>评测状态：{{ formatEvaluationStatus(detail.evaluationStatus) }}</p>
             <p>复核状态：{{ formatReviewStatus(detail.reviewStatus) }}</p>
-            <p>附件：{{ detail.fileUrl ?? '无' }}</p>
+            <section
+              v-if="detail.submitType === 'FILE' && detail.attachment"
+              class="hwk-history__attachment"
+              data-testid="homework-attachment-panel"
+            >
+              <strong>{{ detail.attachment.originalFilename }}</strong>
+              <span>{{ detail.attachment.contentType }} · {{ formatFileSize(detail.attachment.fileSize) }}</span>
+              <button
+                v-if="detail.attachment.downloadAvailable"
+                type="button"
+                data-action="download-homework-attachment"
+                :disabled="attachmentDownloading"
+                @click="downloadSelectedAttachment"
+              >{{ attachmentDownloading ? '正在下载…' : '下载附件' }}</button>
+              <p v-else>当前附件暂不可下载。</p>
+              <p v-if="attachmentDownloadError" class="hwk-history__error" role="alert">{{ attachmentDownloadError }}</p>
+              <p v-if="attachmentDownloadFeedback" class="hwk-history__feedback" role="status">{{ attachmentDownloadFeedback }}</p>
+            </section>
+            <p v-else-if="detail.submitType === 'FILE' && detail.hasAttachment">附件元数据暂不可用，当前不能下载。</p>
             <p>语言：{{ detail.language ?? '无' }}</p>
             <pre class="hwk-history__answer">{{ detail.answerText || detail.answerJson || '本次提交没有文本内容' }}</pre>
             <p v-if="detail.comment">评语：{{ detail.comment }}</p>
@@ -280,6 +320,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { RouterLink } from 'vue-router';
 import {
+  downloadHomeworkSubmissionAttachment,
   getHomeworkSubmission,
   getHomeworkSubmissionReviewLogs,
   listHomeworkSubmissions,
@@ -340,6 +381,9 @@ const reviewComment = ref('');
 const reevaluationReason = ref('');
 const reevaluationSubmitting = ref(false);
 const reviewLogs = ref<HomeworkReviewLog[]>([]);
+const attachmentDownloading = ref(false);
+const attachmentDownloadError = ref('');
+const attachmentDownloadFeedback = ref('');
 const studentKeyword = ref('');
 const submitStatusFilter = ref<'' | HomeworkSubmitStatus>('');
 const evaluationStatusFilter = ref<'' | HomeworkEvaluationStatus>('');
@@ -364,6 +408,7 @@ let submissionsRequestVersion = 0;
 let detailRequestVersion = 0;
 let reviewLogsRequestVersion = 0;
 let mutationRequestVersion = 0;
+let attachmentDownloadRequestVersion = 0;
 
 const isTeacher = computed(() => props.role === 'teacher');
 const backHref = computed(() => isTeacher.value
@@ -454,6 +499,9 @@ function resetContextAndReload() {
   reviewComment.value = '';
   reevaluationReason.value = '';
   reviewLogs.value = [];
+  attachmentDownloading.value = false;
+  attachmentDownloadError.value = '';
+  attachmentDownloadFeedback.value = '';
   studentKeyword.value = '';
   submitStatusFilter.value = '';
   evaluationStatusFilter.value = '';
@@ -467,6 +515,7 @@ function invalidateContext() {
   detailRequestVersion += 1;
   reviewLogsRequestVersion += 1;
   mutationRequestVersion += 1;
+  attachmentDownloadRequestVersion += 1;
 }
 
 async function loadSubmissions() {
@@ -528,6 +577,7 @@ async function openDetail(submissionId: number) {
   const request = ++detailRequestVersion;
   const teacherContext = isTeacher.value;
   mutationRequestVersion += 1;
+  attachmentDownloadRequestVersion += 1;
   selectedSubmissionId.value = submissionId;
   detailLoading.value = true;
   detail.value = null;
@@ -538,6 +588,9 @@ async function openDetail(submissionId: number) {
   reevaluationSubmitting.value = false;
   reevaluationReason.value = '';
   reviewLogs.value = [];
+  attachmentDownloading.value = false;
+  attachmentDownloadError.value = '';
+  attachmentDownloadFeedback.value = '';
   try {
     const result = await getHomeworkSubmission(submissionId);
     if (!isCurrentRequest(context, request, detailRequestVersion)) {
@@ -572,6 +625,7 @@ async function applyFilters() {
   detailRequestVersion += 1;
   reviewLogsRequestVersion += 1;
   mutationRequestVersion += 1;
+  attachmentDownloadRequestVersion += 1;
   selectedSubmissionId.value = null;
   detail.value = null;
   detailLoading.value = false;
@@ -658,6 +712,39 @@ async function triggerReevaluation() {
   }
 }
 
+async function downloadSelectedAttachment() {
+  const current = detail.value;
+  if (!current?.attachment?.downloadAvailable || attachmentDownloading.value) {
+    return;
+  }
+  const context = contextVersion;
+  const request = ++attachmentDownloadRequestVersion;
+  const submissionId = current.submissionId;
+  const homeworkId = props.homeworkId;
+  attachmentDownloading.value = true;
+  attachmentDownloadError.value = '';
+  attachmentDownloadFeedback.value = '';
+  try {
+    const result = await downloadHomeworkSubmissionAttachment(homeworkId, submissionId);
+    if (
+      !isCurrentRequest(context, request, attachmentDownloadRequestVersion)
+      || detail.value?.submissionId !== submissionId
+    ) {
+      return;
+    }
+    triggerBrowserDownload(result.blob, result.filename || current.attachment.originalFilename);
+    attachmentDownloadFeedback.value = `已开始下载 ${result.filename || current.attachment.originalFilename}`;
+  } catch (error) {
+    if (isCurrentRequest(context, request, attachmentDownloadRequestVersion)) {
+      attachmentDownloadError.value = error instanceof Error ? error.message : '附件下载失败，请重试';
+    }
+  } finally {
+    if (request === attachmentDownloadRequestVersion) {
+      attachmentDownloading.value = false;
+    }
+  }
+}
+
 async function loadReviewLogs(submissionId: number, expectedContext = contextVersion) {
   const request = ++reviewLogsRequestVersion;
   reviewLogsLoading.value = true;
@@ -712,8 +799,24 @@ function formatStudentAnswer(submission: HomeworkSubmissionDetail) {
   }
   return submission.answerText
     || submission.answerJson
-    || submission.fileUrl
     || '本次提交没有可展示的文本内容';
+}
+
+function formatFileSize(bytes: number) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
+function triggerBrowserDownload(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
 }
 
 function formatObjectiveAnswer(value: string | null | undefined) {
@@ -1064,6 +1167,50 @@ const totalPages = computed(() => Math.max(1, Math.ceil(total.value / size.value
   white-space: pre-wrap;
 }
 
+.hwk-history__attachment {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  margin-top: 14px;
+  padding: 14px;
+  border: 1px solid color-mix(in srgb, var(--oj-brand) 24%, var(--oj-line));
+  border-radius: calc(var(--oj-radius) - 2px);
+  background: color-mix(in srgb, var(--oj-brand) 6%, var(--oj-surface-strong));
+}
+
+.hwk-history__attachment strong,
+.hwk-history__attachment span {
+  overflow-wrap: anywhere;
+}
+
+.hwk-history__attachment span {
+  color: var(--oj-muted);
+  font-size: 0.8rem;
+}
+
+.hwk-history__attachment button {
+  justify-self: start;
+  min-height: 40px;
+  padding: 8px 13px;
+  border: 1px solid var(--oj-brand);
+  border-radius: 9px;
+  background: var(--oj-brand);
+  color: #fff;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 800;
+}
+
+.hwk-history__attachment button:disabled {
+  cursor: wait;
+  opacity: 0.62;
+}
+
+.hwk-history__attachment p {
+  margin: 0;
+  line-height: 1.5;
+}
+
 .hwk-history__review,
 .hwk-history__review form,
 .hwk-history__logs,
@@ -1181,8 +1328,13 @@ const totalPages = computed(() => Math.max(1, Math.ceil(total.value / size.value
   }
 
   .hwk-history__row-actions a,
-  .hwk-history__row-actions button {
+  .hwk-history__row-actions button,
+  .hwk-history__attachment button {
     width: 100%;
+  }
+
+  .hwk-history__attachment button {
+    justify-self: stretch;
   }
 }
 </style>

@@ -15,15 +15,23 @@ import com.onlinejudge.lab.service.LabPermissionException;
 import com.onlinejudge.lab.service.LabStateException;
 import com.onlinejudge.lab.service.LabSubmissionValidationException;
 import com.onlinejudge.lab.service.LabValidationException;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+
+import java.util.regex.Pattern;
 
 @RestControllerAdvice
 public class ApiExceptionHandler {
+    private static final Pattern HOMEWORK_ATTACHMENT_UPLOAD_PATH = Pattern.compile(
+            "^/api/v1/homeworks/[0-9]+/attachments/?$"
+    );
+
     @ExceptionHandler(ApiException.class)
     public ResponseEntity<ApiResponse<Void>> handleApiException(ApiException exception) {
         return ResponseEntity.status(exception.status())
@@ -34,6 +42,19 @@ public class ApiExceptionHandler {
     public ResponseEntity<ApiResponse<Void>> handleUnreadableRequestBody(HttpMessageNotReadableException exception) {
         return ResponseEntity.badRequest()
                 .body(ApiResponse.error("AUTH_400", "请求参数不合法"));
+    }
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMaxUploadSizeExceeded(
+            MaxUploadSizeExceededException exception,
+            HttpServletRequest request
+    ) {
+        if (!HOMEWORK_ATTACHMENT_UPLOAD_PATH.matcher(request.getRequestURI()).matches()) {
+            return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE)
+                    .body(ApiResponse.error("413", "upload exceeds the configured limit"));
+        }
+        return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE)
+                .body(ApiResponse.error("HWK_4131", "attachment exceeds the upload limit"));
     }
 
     @ExceptionHandler(GradeItemPermissionException.class)

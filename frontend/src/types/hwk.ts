@@ -122,6 +122,23 @@ export interface HomeworkSubmissionPayload {
   language?: string;
 }
 
+export interface HomeworkAttachmentUpload {
+  fileId: string;
+  originalFilename: string;
+  contentType: string;
+  fileSize: number;
+  expiresAt: string;
+  status: 'UPLOADED';
+  uploadedAt: string;
+}
+
+export interface HomeworkSubmissionAttachment {
+  originalFilename: string;
+  contentType: string;
+  fileSize: number;
+  downloadAvailable: boolean;
+}
+
 export interface HomeworkReviewPayload {
   manualScore: number;
   finalScore: number;
@@ -135,7 +152,8 @@ export interface HomeworkSubmissionSummary {
   submitType?: HomeworkType;
   answerText?: string | null;
   answerJson?: string | null;
-  fileUrl?: string | null;
+  hasAttachment?: boolean;
+  attachment?: HomeworkSubmissionAttachment | null;
   language?: string | null;
   submitStatus: HomeworkSubmitStatus;
   evaluationStatus: HomeworkEvaluationStatus;

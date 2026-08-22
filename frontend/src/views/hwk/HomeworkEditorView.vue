@@ -140,12 +140,10 @@
 
         <div
           v-else-if="form.type === 'FILE'"
-          class="contract-notice"
-          data-testid="file-contract-notice"
-          role="note"
+          class="type-guidance"
         >
-          <strong>附件作业可保存为草稿</strong>
-          <p>#214 学生安全上传链路尚未就绪；当前不伪造上传入口，发布前需等待该契约完成。</p>
+          <strong>附件作业</strong>
+          <p>学生通过受控上传通道提交单个附件；文件归属和下载权限由服务端校验。</p>
         </div>
 
         <div v-else-if="form.type === 'OBJECTIVE'" class="card-list">
@@ -399,7 +397,7 @@
           <li :data-ready="deadlineIsFuture">截止时间晚于当前时间</li>
           <li data-testid="type-content-check" :data-ready="typeContentIsReady">
             {{ form.type === 'FILE'
-              ? '#214 学生安全上传契约未就绪，附件作业当前不可发布'
+              ? '附件提交契约已就绪'
               : '当前类型的题目或评测配置完整' }}
           </li>
         </ul>
@@ -563,7 +561,7 @@ const deadlineIsFuture = computed(() => {
 });
 const typeContentIsReady = computed(() => {
   if (form.type === 'TEXT') return true;
-  if (form.type === 'FILE') return false;
+  if (form.type === 'FILE') return true;
   if (form.type === 'OBJECTIVE') {
     return form.questions.length > 0
       && form.questions.every(questionIsReady)

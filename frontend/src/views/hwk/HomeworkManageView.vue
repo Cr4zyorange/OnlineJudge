@@ -41,15 +41,6 @@
         </template>
       </PageHeader>
 
-      <p
-        v-if="isFilePublicationBlocked"
-        class="notice notice--warning"
-        data-testid="file-contract-warning"
-        role="status"
-      >
-        HWK FILE 作业依赖 #214；附件上传与安全提交链路完成前不可发布。当前草稿仍可继续编辑。
-      </p>
-
       <SummaryStrip :items="summaryItems" aria-label="作业完成摘要" />
 
       <p v-if="statisticsWarning" class="notice notice--warning" data-testid="statistics-warning" role="status">
@@ -166,10 +157,6 @@ const canEdit = computed(() => detail.value?.status === 'DRAFT');
 const canProcessSubmissions = computed(() => Boolean(
   detail.value
   && ['PUBLISHED', 'CLOSED', 'SCORE_PUBLISHED', 'ARCHIVED'].includes(detail.value.status)
-));
-const isFilePublicationBlocked = computed(() => (
-  detail.value?.type === 'FILE'
-  && detail.value.status === 'DRAFT'
 ));
 const summaryItems = computed<SummaryStripItem[]>(() => [
   {

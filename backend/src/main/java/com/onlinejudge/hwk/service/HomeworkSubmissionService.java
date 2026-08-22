@@ -20,12 +20,14 @@ import com.onlinejudge.hwk.domain.HomeworkReviewOperationType;
 import com.onlinejudge.hwk.domain.HomeworkReviewStatus;
 import com.onlinejudge.hwk.domain.HomeworkStatus;
 import com.onlinejudge.hwk.domain.HomeworkSubmission;
+import com.onlinejudge.hwk.domain.HomeworkSubmissionAttachment;
 import com.onlinejudge.hwk.domain.HomeworkSubmissionRepository;
 import com.onlinejudge.hwk.domain.HomeworkSubmissionSearchCriteria;
 import com.onlinejudge.hwk.domain.HomeworkSubmitStatus;
 import com.onlinejudge.hwk.domain.HomeworkTestCase;
 import com.onlinejudge.hwk.domain.HomeworkType;
 import com.onlinejudge.integration.course.CoursePermissionClient;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -57,6 +59,26 @@ public class HomeworkSubmissionService {
     private final HomeworkReviewLogRepository reviewLogRepository;
     private final CoursePermissionClient coursePermissionClient;
     private final Evaluator evaluator;
+    private final HomeworkAttachmentService attachmentService;
+
+    @Autowired
+    public HomeworkSubmissionService(
+            HomeworkRepository homeworkRepository,
+            HomeworkSubmissionRepository submissionRepository,
+            HomeworkEvaluationRepository evaluationRepository,
+            HomeworkReviewLogRepository reviewLogRepository,
+            CoursePermissionClient coursePermissionClient,
+            Evaluator evaluator,
+            HomeworkAttachmentService attachmentService
+    ) {
+        this.homeworkRepository = homeworkRepository;
+        this.submissionRepository = submissionRepository;
+        this.evaluationRepository = evaluationRepository;
+        this.reviewLogRepository = reviewLogRepository;
+        this.coursePermissionClient = coursePermissionClient;
+        this.evaluator = evaluator;
+        this.attachmentService = attachmentService;
+    }
 
     public HomeworkSubmissionService(
             HomeworkRepository homeworkRepository,
@@ -66,12 +88,8 @@ public class HomeworkSubmissionService {
             CoursePermissionClient coursePermissionClient,
             Evaluator evaluator
     ) {
-        this.homeworkRepository = homeworkRepository;
-        this.submissionRepository = submissionRepository;
-        this.evaluationRepository = evaluationRepository;
-        this.reviewLogRepository = reviewLogRepository;
-        this.coursePermissionClient = coursePermissionClient;
-        this.evaluator = evaluator;
+        this(homeworkRepository, submissionRepository, evaluationRepository, reviewLogRepository,
+                coursePermissionClient, evaluator, null);
     }
 
     @Transactional
@@ -85,6 +103,9 @@ public class HomeworkSubmissionService {
         validateContent(homework, normalized);
 
         LocalDateTime now = LocalDateTime.now();
+        HomeworkSubmissionAttachment attachment = homework.type() == HomeworkType.FILE
+                ? requireAttachmentService().lockBindable(normalized.fileIds().get(0), homework, studentId, now)
+                : null;
         Optional<HomeworkSubmission> latestFinal = submissionRepository.findLatestFinalByHomeworkIdAndStudentId(homeworkId, studentId);
         if (latestFinal.isPresent() && !homework.allowResubmit()) {
             throw new HomeworkApiException("HWK_4006", "resubmit is not allowed", HttpStatus.CONFLICT);
@@ -106,7 +127,7 @@ public class HomeworkSubmissionService {
                 homework.type(),
                 submissionAnswerText(homework.type(), normalized),
                 normalized.answerJson(),
-                normalized.fileIds(),
+                null,
                 normalized.language(),
                 submitStatus,
                 evaluationStatus,
@@ -126,6 +147,9 @@ public class HomeworkSubmissionService {
         );
         try {
             HomeworkSubmission saved = submissionRepository.save(submission);
+            if (attachment != null) {
+                requireAttachmentService().bind(attachment, saved.id(), now);
+            }
             createInitialEvaluation(homework, saved, objectiveScore, now);
             return new SubmittedHomeworkSubmission(homework, saved);
         } catch (DataIntegrityViolationException exception) {
@@ -742,7 +766,7 @@ public class HomeworkSubmissionService {
         return new CreateHomeworkSubmissionCommand(
                 blankToNull(command.answerText()),
                 blankToNull(command.answerJson()),
-                blankToNull(command.fileIds()),
+                normalizeFileIds(command.fileIds()),
                 blankToNull(command.codeText()),
                 command.language() == null ? null : blankToNull(command.language().toLowerCase(Locale.ROOT))
         );
@@ -752,16 +776,21 @@ public class HomeworkSubmissionService {
         HomeworkType type = homework.type();
         boolean hasText = command.answerText() != null;
         boolean hasAnswerJson = command.answerJson() != null;
-        boolean hasFile = command.fileIds() != null;
+        boolean hasFileIdsField = command.fileIds() != null;
+        boolean hasFile = hasFileIdsField && !command.fileIds().isEmpty();
         boolean hasCode = command.codeText() != null;
+        if (type != HomeworkType.FILE && hasFileIdsField) {
+            throw invalidFormat("only file homework accepts attachment identifiers");
+        }
         if (type == HomeworkType.OBJECTIVE && !hasAnswerJson) {
             throw invalidFormat("objective homework requires answers");
         }
-        if (type == HomeworkType.TEXT && !hasText && !hasAnswerJson && !hasFile) {
+        if (type == HomeworkType.TEXT && !hasText && !hasAnswerJson) {
             throw invalidFormat("text homework requires answer content");
         }
-        if (type == HomeworkType.FILE && !hasFile) {
-            throw invalidFormat("file homework requires attachments");
+        if (type == HomeworkType.FILE && (!hasFile || command.fileIds().size() != 1
+                || command.fileIds().get(0) == null || command.fileIds().get(0).isBlank())) {
+            throw invalidFormat("file homework requires exactly one attachment");
         }
         if (type == HomeworkType.CODE && (!hasCode || command.language() == null)) {
             throw invalidFormat("code homework requires code and language");
@@ -808,6 +837,20 @@ public class HomeworkSubmissionService {
 
     private HomeworkApiException invalidFormat(String message) {
         return new HomeworkApiException("HWK_4005", message, HttpStatus.BAD_REQUEST);
+    }
+
+    private List<String> normalizeFileIds(List<String> fileIds) {
+        if (fileIds == null) {
+            return null;
+        }
+        return fileIds.stream().toList();
+    }
+
+    private HomeworkAttachmentService requireAttachmentService() {
+        if (attachmentService == null) {
+            throw invalidFormat("file attachment service is unavailable");
+        }
+        return attachmentService;
     }
 
     private static String blankToNull(String value) {

@@ -105,12 +105,30 @@
               class="content-panel content-panel--prose"
             >{{ formatObjectiveAnswer(submission.answerJson) }}</div>
             <div
-              v-else-if="effectiveType === 'FILE'"
-              class="attachment-blocker"
-              role="status"
+              v-else-if="effectiveType === 'FILE' && submission.attachment"
+              class="attachment-panel"
+              data-testid="homework-attachment-panel"
             >
-              <strong>本次提交包含附件</strong>
-              <p>当前服务尚未提供教师受控下载入口，本页不会显示存储地址；可继续核对提交状态并完成人工批阅。</p>
+              <strong>{{ submission.attachment.originalFilename }}</strong>
+              <span>{{ submission.attachment.contentType }} · {{ formatFileSize(submission.attachment.fileSize) }}</span>
+              <button
+                v-if="submission.attachment.downloadAvailable"
+                class="button button--secondary"
+                type="button"
+                data-action="download-homework-attachment"
+                :disabled="attachmentDownloading"
+                @click="downloadAttachment"
+              >{{ attachmentDownloading ? '正在下载…' : '下载附件' }}</button>
+              <p v-else>当前附件暂不可下载。</p>
+              <p v-if="attachmentDownloadError" class="inline-message inline-message--error" role="alert">
+                {{ attachmentDownloadError }}
+              </p>
+              <p v-if="attachmentDownloadFeedback" class="inline-message inline-message--success" role="status">
+                {{ attachmentDownloadFeedback }}
+              </p>
+            </div>
+            <div v-else-if="effectiveType === 'FILE' && submission.hasAttachment" class="not-applicable" role="status">
+              附件元数据暂不可用，当前不能下载；仍可继续完成人工批阅。
             </div>
             <p v-else class="empty-copy">本次提交没有可展示的内容。</p>
           </section>
@@ -332,9 +350,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue';
 import { RouterLink, useRoute } from 'vue-router';
 import {
+  downloadHomeworkSubmissionAttachment,
   getHomeworkDetail,
   getHomeworkSubmission,
   getHomeworkSubmissionEvaluation,
@@ -400,11 +419,15 @@ const reevaluationReason = ref('');
 const reevaluationError = ref('');
 const reevaluationFeedback = ref('');
 const reevaluationRefreshRequired = ref(false);
+const attachmentDownloading = ref(false);
+const attachmentDownloadError = ref('');
+const attachmentDownloadFeedback = ref('');
 const reviewForm = reactive<ReviewForm>({ manualScore: '', finalScore: '', reason: '' });
 let pageRequestId = 0;
 let evaluationRequestId = 0;
 let reviewLogsRequestId = 0;
 let mutationRequestId = 0;
+let attachmentDownloadRequestId = 0;
 
 const pageTitle = computed(() => homework.value ? `批阅：${homework.value.title}` : '作业提交批阅');
 const effectiveType = computed<HomeworkType>(() => submission.value?.submitType ?? homework.value?.type ?? 'TEXT');
@@ -445,6 +468,7 @@ watch(
     mutationRequestId += 1;
     evaluationRequestId += 1;
     reviewLogsRequestId += 1;
+    attachmentDownloadRequestId += 1;
   },
   { flush: 'sync' }
 );
@@ -457,6 +481,10 @@ watch(
   { immediate: true }
 );
 
+onBeforeUnmount(() => {
+  attachmentDownloadRequestId += 1;
+});
+
 async function loadPage() {
   const requestId = ++pageRequestId;
   const targetCourseId = props.courseId;
@@ -465,10 +493,14 @@ async function loadPage() {
   mutationRequestId += 1;
   evaluationRequestId += 1;
   reviewLogsRequestId += 1;
+  attachmentDownloadRequestId += 1;
   reviewSaving.value = false;
   reevaluationSaving.value = false;
   evaluationLoading.value = false;
   reviewLogsLoading.value = false;
+  attachmentDownloading.value = false;
+  attachmentDownloadError.value = '';
+  attachmentDownloadFeedback.value = '';
   reevaluationReason.value = '';
   reevaluationRefreshRequired.value = false;
   pageLoading.value = true;
@@ -652,6 +684,36 @@ async function loadReviewLogs(expectedPageRequestId = pageRequestId) {
   } finally {
     if (requestId === reviewLogsRequestId) {
       reviewLogsLoading.value = false;
+    }
+  }
+}
+
+async function downloadAttachment() {
+  const current = submission.value;
+  if (!current?.attachment?.downloadAvailable || attachmentDownloading.value) {
+    return;
+  }
+  const request = ++attachmentDownloadRequestId;
+  const submissionId = current.submissionId;
+  const homeworkId = props.homeworkId;
+  attachmentDownloading.value = true;
+  attachmentDownloadError.value = '';
+  attachmentDownloadFeedback.value = '';
+  try {
+    const result = await downloadHomeworkSubmissionAttachment(homeworkId, submissionId);
+    if (request !== attachmentDownloadRequestId || submission.value?.submissionId !== submissionId) {
+      return;
+    }
+    const filename = result.filename || current.attachment.originalFilename;
+    triggerBrowserDownload(result.blob, filename);
+    attachmentDownloadFeedback.value = `已开始下载 ${filename}`;
+  } catch (error) {
+    if (request === attachmentDownloadRequestId && submission.value?.submissionId === submissionId) {
+      attachmentDownloadError.value = errorMessage(error, '附件下载失败，请重试。');
+    }
+  } finally {
+    if (request === attachmentDownloadRequestId) {
+      attachmentDownloading.value = false;
     }
   }
 }
@@ -1021,6 +1083,23 @@ function formatDuration(value: number | null | undefined) {
   return value === null || value === undefined ? '未记录' : `${value} ms`;
 }
 
+function formatFileSize(bytes: number) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
+function triggerBrowserDownload(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+}
+
 function formatOptionalDateTime(value: string | null | undefined) {
   return value ? formatDateTime(value) : '尚未完成';
 }
@@ -1151,7 +1230,7 @@ function clearActionMessages() {
 .section-eyebrow,
 .card-heading h2,
 .card-heading p,
-.attachment-blocker p,
+.attachment-panel p,
 .audit-list p,
 .form-hint {
   margin: 0;
@@ -1288,7 +1367,7 @@ function clearActionMessages() {
   background: rgba(255, 255, 255, 0.55);
 }
 
-.attachment-blocker,
+.attachment-panel,
 .not-applicable,
 .evaluation-copy,
 .inline-message,
@@ -1297,7 +1376,6 @@ function clearActionMessages() {
   border-radius: calc(var(--oj-radius) - 4px);
 }
 
-.attachment-blocker,
 .not-applicable,
 .inline-message--warning {
   border: 1px solid rgba(194, 123, 0, 0.22);
@@ -1305,8 +1383,29 @@ function clearActionMessages() {
   color: #6b4103;
 }
 
-.attachment-blocker p {
-  margin-top: 5px;
+.attachment-panel {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  border: 1px solid color-mix(in srgb, var(--oj-brand) 24%, var(--oj-line));
+  background: color-mix(in srgb, var(--oj-brand) 7%, rgba(255, 255, 255, 0.5));
+}
+
+.attachment-panel strong,
+.attachment-panel span {
+  overflow-wrap: anywhere;
+}
+
+.attachment-panel span {
+  color: var(--oj-muted);
+  font-size: 0.8rem;
+}
+
+.attachment-panel .button {
+  justify-self: start;
+}
+
+.attachment-panel p {
   line-height: 1.6;
 }
 
@@ -1481,6 +1580,10 @@ function clearActionMessages() {
   .button,
   .review-link {
     width: 100%;
+  }
+
+  .attachment-panel .button {
+    justify-self: stretch;
   }
 }
 </style>
