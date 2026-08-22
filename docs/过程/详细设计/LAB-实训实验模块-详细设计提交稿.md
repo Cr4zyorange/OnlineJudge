@@ -54,6 +54,7 @@ LAB 模块是"在线教学与实训平台"的核心实践环节模块，承担�
 - LAB 不直接管理用户账号和课程成员关系，通过 AUTH 和 CRS 获取。
 - LAB 不负责成绩汇总与总评计算，评测与评分完成后由 GRD 读取或主动推送成绩数据。
 - LAB 不负责作业相关业务，作业的提交、评测、批阅由 HWK 模块独立管理。
+- LAB 提交源文件与实验报告、CRS 教学资源、HWK #214 FILE 作业附件保持独立业务所有权；仅复用底层 `FileStorageService`，不得复用其他模块的记录或下载权限。
 - LAB 的自动评测首版仅支持 IO 比对（标准输入输出匹配），不支持代码沙箱编译运行（如需 Docker 沙箱方案，属于后续扩展）。
 
 ---
@@ -69,7 +70,7 @@ LAB 模块是"在线教学与实训平台"的核心实践环节模块，承担�
 | UI-LAB-03 | 实验详情页（教师端） | 教师 | 管理实验、查看提交情况、评分 | 编辑实验信息、管理测试用例、查看学生提交列表、对学生提交评分 | API-LAB-03、API-LAB-04、API-LAB-15、API-LAB-09、API-LAB-13 |
 | UI-LAB-04 | 实验发布/编辑页 | 教师 | 创建或编辑实验任务 | 填写实验名称、描述、截止时间、上传附件、保存草稿或发布 | API-LAB-01、API-LAB-04、API-LAB-06 |
 | UI-LAB-05 | 提交历史页 | 学生 | 查看本人某次实验的全部提交记录 | 查看提交时间、提交版本、评测状态、评测得分、查看提交详情 | API-LAB-09、API-LAB-10 |
-| UI-LAB-06 | 评分页 | 教师 | 对学生提交进行评分 | 查看学生提交代码、评测结果、填写评分和评语、保存评分 | API-LAB-10、API-LAB-12、API-LAB-13 |
+| UI-LAB-06 | 提交批阅/评分页 | 教师 | 核对指定提交版本并完成评分 | 查看顶层 `hasFile` 与 nullable 四字段 `sourceFile`，固定 API-LAB-19 下载源文件，独立下载实验报告，处理 pending/重试/401/403/兼容阻塞并保存评分 | API-LAB-10、API-LAB-12、API-LAB-13、API-LAB-17、API-LAB-19 |
 | UI-LAB-07 | 实验结果页 | 学生 | 查看实验最终成绩和反馈 | 查看最终成绩、教师评语、评测通过率、各测试用例结果 | API-LAB-10、API-LAB-12 |
 | UI-LAB-08 | 实验统计页 | 教师 | 查看实验维度统计数据 | 查看提交率、平均分、分数分布、提交时间分布 | API-LAB-14 |
 
@@ -92,6 +93,8 @@ LAB 模块是"在线教学与实训平台"的核心实践环节模块，承担�
 - **学生提交列表区**：分页展示学生提交记录，显示学生姓名、提交时间、评测状态、评分状态。
 - **批量操作区**：支持按评测状态/评分状态筛选，快速跳转评分。
 
+**UI-LAB-06 提交批阅/评分页** 的源文件区只展示 `sourceFile.originalFilename/contentType/fileSize/downloadAvailable`。无文件为 `hasFile=false, sourceFile=null`；旧数据缺可信元数据或内部资产不可用为 `hasFile=true, sourceFile=null`。详情不返回下载 URL，教师端按已知 `labId/submissionId` 调固定 API-LAB-19；源文件与报告下载按钮、ID 和权限相互独立。
+
 ---
 
 ## 4 接口详细设计
@@ -100,28 +103,32 @@ LAB 模块是"在线教学与实训平台"的核心实践环节模块，承担�
 
 | 接口编号 | 接口名称 | 方法 | 路径 | 权限要求 | 对应需求 |
 | --- | --- | --- | --- | --- | --- |
-| API-LAB-01 | 创建实验 | POST | /api/courses/{courseId}/labs | 教师（课程管理权限） | FR-LAB-01 |
-| API-LAB-02 | 获取实验列表 | GET | /api/courses/{courseId}/labs | 学生、教师（课程成员） | FR-LAB-01 |
-| API-LAB-03 | 获取实验详情 | GET | /api/labs/{labId} | 学生、教师（课程成员） | FR-LAB-01 |
-| API-LAB-04 | 更新实验 | PUT | /api/labs/{labId} | 教师（课程管理权限） | FR-LAB-01 |
-| API-LAB-05 | 删除实验 | DELETE | /api/labs/{labId} | 教师（课程管理权限） | FR-LAB-01 |
-| API-LAB-06 | 发布实验 | POST | /api/labs/{labId}/publish | 教师（课程管理权限） | FR-LAB-01 |
-| API-LAB-07 | 截止实验 | POST | /api/labs/{labId}/close | 教师（课程管理权限） | FR-LAB-01 |
-| API-LAB-08 | 学生提交实验 | POST | /api/labs/{labId}/submissions | 学生（课程成员） | FR-LAB-02 |
-| API-LAB-09 | 获取提交列表 | GET | /api/labs/{labId}/submissions | 教师（课程管理权限）/ 学生（仅本人） | FR-LAB-03 |
-| API-LAB-10 | 获取提交详情 | GET | /api/labs/{labId}/submissions/{submissionId} | 教师 / 提交者本人 | FR-LAB-03 |
-| API-LAB-11 | 触发评测 | POST | /api/labs/{labId}/submissions/{submissionId}/evaluate | 教师、系统内部 | FR-LAB-04 |
-| API-LAB-12 | 获取评测结果 | GET | /api/labs/{labId}/submissions/{submissionId}/result | 教师 / 提交者本人 | FR-LAB-04 |
-| API-LAB-13 | 教师评分 | POST | /api/labs/{labId}/submissions/{submissionId}/score | 教师（课程管理权限） | FR-LAB-05 |
-| API-LAB-14 | 获取实验统计 | GET | /api/labs/{labId}/statistics | 教师（课程管理权限） | FR-LAB-07 |
-| API-LAB-15 | 管理测试用例 | POST/GET/PUT/DELETE | /api/labs/{labId}/testcases | 教师（课程管理权限） | FR-LAB-04 |
+| API-LAB-01 | 创建实验 | POST | /api/v1/courses/{courseId}/labs | 教师（课程管理权限） | FR-LAB-01 |
+| API-LAB-02 | 获取实验列表 | GET | /api/v1/courses/{courseId}/labs | 学生、教师（课程成员） | FR-LAB-01 |
+| API-LAB-03 | 获取实验详情 | GET | /api/v1/labs/{labId} | 学生、教师（课程成员） | FR-LAB-01 |
+| API-LAB-04 | 更新实验 | PUT | /api/v1/labs/{labId} | 教师（课程管理权限） | FR-LAB-01 |
+| API-LAB-05 | 删除实验 | DELETE | /api/v1/labs/{labId} | 教师（课程管理权限） | FR-LAB-01 |
+| API-LAB-06 | 发布实验 | POST | /api/v1/labs/{labId}/publish | 教师（课程管理权限） | FR-LAB-01 |
+| API-LAB-07 | 截止实验 | POST | /api/v1/labs/{labId}/close | 教师（课程管理权限） | FR-LAB-01 |
+| API-LAB-08 | 学生提交实验 | POST | /api/v1/labs/{labId}/submissions | 学生（课程成员） | FR-LAB-02 |
+| API-LAB-09 | 获取提交列表 | GET | /api/v1/labs/{labId}/submissions | 教师（课程管理权限）/ 学生（仅本人） | FR-LAB-03 |
+| API-LAB-10 | 获取提交详情 | GET | /api/v1/labs/{labId}/submissions/{submissionId} | 教师 / 提交者本人 | FR-LAB-03 |
+| API-LAB-11 | 触发评测 | POST | /api/v1/labs/{labId}/submissions/{submissionId}/evaluate | 教师、系统内部 | FR-LAB-04 |
+| API-LAB-12 | 获取评测结果 | GET | /api/v1/labs/{labId}/submissions/{submissionId}/result | 教师 / 提交者本人 | FR-LAB-04 |
+| API-LAB-13 | 教师评分 | POST | /api/v1/labs/{labId}/submissions/{submissionId}/score | 教师（课程管理权限） | FR-LAB-06 |
+| API-LAB-14 | 获取实验统计 | GET | /api/v1/labs/{labId}/statistics | 教师（课程管理权限） | FR-LAB-08 |
+| API-LAB-15 | 管理测试用例能力 | 随 API-LAB-01/04 整体提交 | 独立 `/testcases` CRUD 预留 | 教师（课程管理权限） | FR-LAB-04 |
+| API-LAB-16 | 提交实验报告 | POST | /api/v1/labs/{labId}/reports | 学生（课程成员） | FR-LAB-05 |
+| API-LAB-17 | 查询/独立下载实验报告能力 | GET | /api/v1/labs/{labId}/reports/{reportId} | 提交者本人或课程教师 | FR-LAB-05、FR-LAB-06 |
+| API-LAB-18 | 查询实验结果 | GET | /api/v1/labs/{labId}/results/{studentId} | 学生本人或课程教师 | FR-LAB-07 |
+| API-LAB-19 | 下载提交源文件 | GET | /api/v1/labs/{labId}/submissions/{submissionId}/source/download | 当前课程 `canManageCourse` 教师/管理员；学生本人排除 | FR-LAB-03、FR-LAB-06 |
 
 ### 4.2 核心接口详细说明
 
 #### API-LAB-01 创建实验
 
 - **方法**：POST
-- **路径**：`/api/courses/{courseId}/labs`
+- **路径**：`/api/v1/courses/{courseId}/labs`
 - **权限**：教师且拥有该课程管理权限
 - **请求参数**：
 
@@ -163,7 +170,7 @@ LAB 模块是"在线教学与实训平台"的核心实践环节模块，承担�
 #### API-LAB-08 学生提交实验
 
 - **方法**：POST
-- **路径**：`/api/labs/{labId}/submissions`
+- **路径**：`/api/v1/labs/{labId}/submissions`
 - **权限**：学生且为该课程成员
 - **请求格式**：multipart/form-data
 - **请求参数**：
@@ -177,9 +184,10 @@ LAB 模块是"在线教学与实训平台"的核心实践环节模块，承担�
 - **业务规则**：
   1. 校验实验状态为"进行中"（PUBLISHED 且未到截止时间）。
   2. 校验学生为课程成员。
-  3. 保存提交记录，提交状态置为"已提交"（SUBMITTED）。
-  4. 若实验配置了 autoEvaluate = true，自动触发评测（提交状态转为"评测中" EVALUATING）。
-  5. 若自动评测失败（如 IO 比对执行异常），状态转为"评测失败"（EVAL_FAILED），允许教师手动触发重新评测或直接评分。
+  3. 保存提交记录，提交状态置为"已提交"（SUBMITTED）；文件型提交还要保存物理对象，并按该提交版本写入 DB-LAB-09 的可信元数据。
+  4. 物理对象保存成功但数据库事务回滚时，调用物理对象补偿删除；仅在该删除成功时可认定没有留下孤儿文件，partial copy 或删除自身失败仍按运维残余处理。
+  5. 若实验配置了 autoEvaluate = true，自动触发评测（提交状态转为"评测中" EVALUATING）。
+  6. 若自动评测失败（如 IO 比对执行异常），状态转为"评测失败"（EVAL_FAILED），允许教师手动触发重新评测或直接评分。
 
 - **成功响应**：
 
@@ -197,10 +205,59 @@ LAB 模块是"在线教学与实训平台"的核心实践环节模块，承担�
 }
 ```
 
+#### API-LAB-10 获取提交详情
+
+- **方法**：GET
+- **路径**：`/api/v1/labs/{labId}/submissions/{submissionId}`
+- **权限**：提交者本人可以查看本人的提交详情；当前课程教师/管理员还必须通过 CRS `canManageCourse`。
+- **源文件公共 DTO**：详情 `data` 顶层仅增加 `hasFile`，`sourceFile` 仅允许为 `null` 或 `{originalFilename, contentType, fileSize, downloadAvailable}`；不得返回内部 `fileId`、`storageKey`、资产 `status` 或任何下载 URL。
+
+```json
+{
+  "code": "0",
+  "message": "success",
+  "data": {
+    "submissionId": 1,
+    "labId": 1,
+    "hasFile": true,
+    "sourceFile": {
+      "originalFilename": "链表实验.java",
+      "contentType": "text/x-java-source",
+      "fileSize": 2048,
+      "downloadAvailable": true
+    }
+  }
+}
+```
+
+- **兼容与授权语义**：
+  1. 没有源文件时返回 `hasFile=false, sourceFile=null`。
+  2. 旧记录只有 `lab_submission.file_id` 或内部资产不可安全使用时返回 `hasFile=true, sourceFile=null`，不得根据存储键或旧标识猜测文件名、类型和大小。
+  3. 存在可信元数据但当前详情调用者无下载权时仍可返回四字段对象，但 `downloadAvailable=false`；学生本人不因此获得 API-LAB-19 权限。
+  4. 教师端只可依据已知 `labId/submissionId` 拼接固定 API-LAB-19 路径，不得从详情响应取得 raw URL、静态 URL 或临时受控 URL。
+
+#### API-LAB-19 下载提交源文件
+
+- **方法**：GET
+- **路径**：`/api/v1/labs/{labId}/submissions/{submissionId}/source/download`
+- **权限**：仅当前课程中通过 CRS `canManageCourse` 的教师/管理员；学生（包括提交者本人）、匿名用户、非成员及其他课程教师均排除。
+- **校验顺序**：认证/教师或管理员角色 → 实验及其课程 → CRS `canManageCourse` → 提交与实验绑定 → DB-LAB-09 资产绑定/状态 → 物理对象。不同课程或实验/提交交叉 ID 不得泄露资产是否存在。
+- **成功响应**：后端直接流式返回文件；`Content-Disposition` 使用安全编码的可信 `original_filename`，`Content-Type` 使用可信 `content_type`，并在可确定时返回 `Content-Length`。响应体和 JSON 均不得包含内部存储路径或下载 URL。
+- **失败响应**：
+
+| 错误码 | 场景 | 说明 |
+| --- | --- | --- |
+| ERR-AUTH-04 / ERR-AUTH-05 | 未登录或登录态失效 | 统一认证失败，不进入资产检查 |
+| LAB-403-01 | 未通过 `canManageCourse` 或角色不允许 | 学生本人也返回权限拒绝 |
+| LAB-404-02 | 实验/提交不存在或交叉 ID 不匹配 | 不泄露其他范围内对象信息 |
+| LAB-404-03 | 授权范围确认后，该提交没有源文件资产 | 无源文件 |
+| LAB-409-03 | 旧记录缺可信元数据、资产已删除/非 AVAILABLE 或内部元数据无效 | 兼容或状态冲突，禁止降级读取其他版本 |
+| LAB-500-05 | 物理对象缺失、读取失败、完整性异常或存储服务失败 | 服务端记录内部原因，公共响应不暴露路径 |
+
 #### API-LAB-13 教师评分
 
 - **方法**：POST
-- **路径**：`/api/labs/{labId}/submissions/{submissionId}/score`
+- **路径**：`/api/v1/labs/{labId}/submissions/{submissionId}/score`
 - **权限**：教师且拥有该课程管理权限
 - **请求参数**：
 
@@ -218,7 +275,7 @@ LAB 模块是"在线教学与实训平台"的核心实践环节模块，承担�
 #### API-LAB-15 管理测试用例
 
 - **方法**：POST（创建）/ GET（列表）/ PUT（更新）/ DELETE（删除）
-- **路径**：`/api/labs/{labId}/testcases` 或 `/api/labs/{labId}/testcases/{testcaseId}`
+- **路径**：独立 `/testcases` CRUD 仅为预留；当前测试用例随 API-LAB-01/API-LAB-04 整体提交
 - **权限**：教师且拥有该课程管理权限
 - **测试用例结构**：
 
@@ -239,7 +296,7 @@ LAB 模块是"在线教学与实训平台"的核心实践环节模块，承担�
 | 服务编号 | 服务/组件名称 | 主要职责 | 输入 | 输出 |
 | --- | --- | --- | --- | --- |
 | SVC-LAB-01 | LabExperimentService | 实验的创建、更新、发布、截止、删除等生命周期管理 | 实验创建/更新请求 DTO、实验室 ID | 实验详情 VO、操作结果 |
-| SVC-LAB-02 | LabSubmissionService | 学生提交实验、查询提交历史、获取提交详情 | 提交请求（代码/文件）、实验室 ID、学生 ID | 提交记录 VO、提交列表 |
+| SVC-LAB-02 | LabSubmissionService | 学生提交实验、查询提交历史、获取提交详情；保存/读取源文件资产、生成安全 DTO、执行课程管理授权下载和存储补偿 | 提交请求（代码/文件）、实验/提交 ID、学生或当前用户 ID | 提交记录/列表/详情 VO 或受控文件流 |
 | SVC-LAB-03 | LabEvaluationService | 自动评测执行、评测结果记录、评测状态管理 | 提交 ID、测试用例列表 | 评测结果列表、通过/失败状态 |
 | SVC-LAB-04 | LabScoreService | 教师评分、评分更新、成绩同步至 GRD | 提交 ID、分数、评语 | 评分记录 VO |
 | SVC-LAB-05 | LabTestcaseService | 测试用例的 CRUD、公开/隐藏管理 | 测试用例 DTO、实验室 ID | 测试用例列表 |
@@ -253,24 +310,23 @@ LabExperimentController
   │     ├── LabExperimentMapper (MyBatis/数据库)
   │     ├── CourseFeignClient / CourseApiCaller (调用 CRS 校验课程权限)
   │     └── NotificationApiCaller (调用 LRN 发送通知)
-  ├── LabSubmissionController
-  │     └── LabSubmissionService
-  │           ├── LabSubmissionMapper
-  │           ├── LabEvaluationService (触发自动评测)
-  │           └── NotificationApiCaller (提交成功通知)
-  ├── LabEvaluationController
-  │     └── LabEvaluationService
+  ├── LabSubmissionService
+  │     ├── LabSubmissionRepository / JdbcLabSubmissionRepository
+  │     ├── LabSubmissionSourceFileRepository / JdbcLabSubmissionSourceFileRepository
+  │     ├── CoursePermissionClient (canManageCourse)
+  │     ├── FileStorageService
+  │     ├── LabEvaluationService (触发自动评测)
+  │     └── NotificationApiCaller (提交成功通知)
+  ├── LabEvaluationService
   │           ├── LabTestcaseMapper (获取测试用例)
   │           ├── LabSubmissionMapper (更新提交状态)
   │           └── LabEvaluationMapper (写入评测结果)
-  ├── LabScoreController
-  │     └── LabScoreService
+  ├── LabScoreService
   │           ├── LabSubmissionMapper
   │           ├── LabScoreMapper
   │           ├── NotificationApiCaller (评分完成通知)
   │           └── GradeApiCaller (推送成绩至 GRD)
-  └── LabStatisticsController
-        └── LabStatisticsService
+  └── LabStatisticsService
               ├── LabSubmissionMapper
               └── LabScoreMapper
 ```
@@ -294,6 +350,10 @@ LabExperimentController
 
 > **扩展说明**：首版评测执行采用进程级执行方式（Runtime.exec），设置超时时间（默认 10 秒）和内存限制。后续若需引入 Docker 沙箱隔离执行环境，仅需替换 `LabEvaluationService` 内部的执行器实现，不影响上层接口和业务流程。
 
+**SVC-LAB-02 LabSubmissionService（提交源文件资产职责）**
+
+实际实现没有拆分独立的源文件 service/controller/mapper。API-LAB-19 由 `LabExperimentController` 暴露；`LabSubmissionService` 通过领域接口 `LabSubmissionSourceFileRepository` 及其 JDBC 实现 `JdbcLabSubmissionSourceFileRepository` 承担源文件业务。新提交保存物理文件后，在业务事务中写 DB-LAB-09；事务回滚时调用补偿删除，只有删除成功时才可认定不留孤儿文件。API-LAB-10 只返回顶层 `hasFile` 和 nullable `sourceFile(originalFilename, contentType, fileSize, downloadAvailable)`，不返回内部状态或 URL。API-LAB-19 每次按认证/角色、实验、CRS `canManageCourse`、提交、资产、物理文件顺序校验；学生本人下载排除。`DELETED/deleted_at` 只冻结失效语义，#222 未实现资产删除/失效状态转移或物理清理流程；物理缺失和读取异常返回 LAB-500-05。
+
 **SVC-LAB-04 LabScoreService（评分服务）**
 
 评分服务负责教师人工评分和成绩同步：
@@ -316,9 +376,13 @@ LabExperimentController
 | --- | --- | --- | --- | --- |
 | DB-LAB-01 | lab_experiment | 实验表 | id, course_id, title, description, status, deadline, max_score, language, evaluation_mode, auto_evaluate, created_by | 存储实验基本信息和配置 |
 | DB-LAB-02 | lab_testcase | 测试用例表 | id, lab_id, input, expected_output, score_weight, is_public, order_num, deleted | 存储实验测试用例 |
-| DB-LAB-03 | lab_submission | 实验提交表 | id, lab_id, student_id, code_content, file_path, language, status, final_score, submitted_at | 存储学生提交记录 |
+| DB-LAB-03 | lab_submission | 实验提交表 | id, lab_id, student_id, code_content, file_id, language, status, final_score, submitted_at | 存储提交记录；file_id 仅作旧数据内部兼容 |
 | DB-LAB-04 | lab_evaluation | 评测结果表 | id, submission_id, testcase_id, actual_output, passed, error_message, executed_at | 存储每个测试用例的评测结果 |
 | DB-LAB-05 | lab_score | 评分记录表 | id, submission_id, teacher_id, score, comment, scored_at | 存储教师评分记录 |
+| DB-LAB-06 | lab_report | 实验报告表 | id, lab_id, student_id, submission_id, file_id, file_name, file_type, file_size, version | 独立保存报告资产和版本 |
+| DB-LAB-07 | lab_score_change_log | 评分变更日志表 | id, score_id, old_final_score, new_final_score, reason, operator_id | 保存改分留痕 |
+| DB-LAB-08 | lab_evaluation_result | 评测用例结果表 | id, submission_id, testcase_id, status, passed, score, actual_output | 保存测试用例级结果 |
+| DB-LAB-09 | lab_submission_source_file | 提交源文件资产表 | id, submission_id, lab_id, course_id, uploader_id, storage_key, original_filename, content_type, file_size, status, created_at, updated_at, deleted_at | 与提交版本一对一保存可信元数据和内部存储引用 |
 
 ### 6.2 数据表详细设计
 
@@ -383,7 +447,7 @@ LabExperimentController
 | lab_id | bigint | NOT NULL, INDEX | - | 所属实验 ID |
 | student_id | bigint | NOT NULL, INDEX | - | 提交学生 ID，关联 AUTH 用户表 |
 | code_content | text | NULL | - | 提交的源代码内容 |
-| file_path | varchar(500) | NULL | - | 提交的文件存储路径（与 code_content 二选一） |
+| file_id | varchar(128) | NULL | - | 历史文件标识，仅供内部兼容；不得进入公共 DTO，也不得据此猜测可信元数据 |
 | language | varchar(20) | NOT NULL | - | 编程语言 |
 | status | varchar(20) | NOT NULL, INDEX | SUBMITTED | 提交状态，见状态枚举 |
 | final_score | int | NULL | - | 最终成绩（教师评分后填入） |
@@ -439,6 +503,28 @@ LabExperimentController
 | scored_at | datetime | NOT NULL | CURRENT_TIMESTAMP | 评分时间 |
 | updated_at | datetime | NOT NULL | CURRENT_TIMESTAMP | 更新时间（支持修改评分） |
 
+#### DB-LAB-09 lab_submission_source_file（提交源文件资产表）
+
+| 字段名 | 类型 | 约束 | 默认值 | 说明 |
+| --- | --- | --- | --- | --- |
+| id | bigint | PK, AUTO_INCREMENT | - | 资产主键 |
+| submission_id | bigint | NOT NULL, UNIQUE, FK | - | 关联提交版本；一条提交至多一个源文件资产 |
+| lab_id | bigint | NOT NULL, FK, INDEX | - | 冗余保存并校验实验归属 |
+| course_id | bigint | NOT NULL, INDEX | - | 冗余保存授权课程范围 |
+| uploader_id | bigint | NOT NULL, INDEX | - | 上传学生 ID |
+| storage_key | varchar(500) | NOT NULL, UNIQUE | - | 服务端生成的内部存储键，禁止公开 |
+| original_filename | varchar(255) | NOT NULL | - | 存储/入库前已清理的业务文件名，下载前再次校验 |
+| content_type | varchar(128) | NOT NULL | - | 上传时校验并持久化的可信 MIME |
+| file_size | bigint | NOT NULL, CHECK >= 0 | - | 文件字节数 |
+| status | varchar(20) | NOT NULL, INDEX | AVAILABLE | 内部状态，仅允许 AVAILABLE / DELETED |
+| created_at | datetime | NOT NULL | CURRENT_TIMESTAMP | 创建时间 |
+| updated_at | datetime | NOT NULL | CURRENT_TIMESTAMP | 更新时间 |
+| deleted_at | datetime | NULL | - | 删除或失效时间 |
+
+**冻结约束与索引**：`uk_lab_submission_source_submission(submission_id)` 保证提交版本与资产一对一，`uk_lab_submission_source_storage_key(storage_key)` 防止物理对象误绑；`lab_id`、`course_id`、`uploader_id`、`status` 使用单列索引支撑归属、上传人和状态检查，不虚构组合索引。迁移中的检查约束为 `ck_lab_submission_source_size` 与 `ck_lab_submission_source_status`，外键为 `fk_lab_submission_source_submission` 与 `fk_lab_submission_source_lab`。H2、MySQL 与 compose schema 必须保持字段长度、唯一约束和状态语义一致。
+
+**生命周期与兼容规则**：新文件提交以 DB-LAB-09 为唯一可信元数据来源。物理对象保存成功后再在业务事务中写提交与资产；事务回滚时执行物理对象补偿删除，且仅在删除成功时可认定不留孤儿文件。`DELETED/deleted_at` 只冻结资产失效语义；#222 未实现资产删除/失效状态转移或物理清理流程，本期只拒绝人工构造或历史已有的不可用记录。partial copy、补偿删除失败后的孤儿扫描、告警、审计和可重试清理均属于后续运维风险，任何失败都不得静默改读旧 `file_id` 或其他提交版本。
+
 ### 6.3 表间关系
 
 ```text
@@ -447,6 +533,8 @@ lab_experiment (1) ──── (N) lab_testcase
        │ (1)
        │
        ├── (N) lab_submission
+       │           │
+       │           ├── (0..1) lab_submission_source_file
        │           │
        │           │ (1)
        │           ├── (N) lab_evaluation
@@ -496,18 +584,28 @@ sequenceDiagram
   participant P as 前端页面
   participant A as LAB Controller
   participant S as LabSubmissionService
+  participant F as FileStorageService
   participant E as LabEvaluationService
   participant D as MySQL 数据库
-  participant N as LRN 通知模块
 
   U->>P: 查看实验详情，编写代码
   P->>P: 前端校验（代码非空/文件已上传）
   U->>P: 点击提交
-  P->>A: POST /api/labs/{labId}/submissions
+  P->>A: POST /api/v1/labs/{labId}/submissions
   A->>A: AUTH 校验学生身份与课程成员权限
   A->>S: 校验实验状态（PUBLISHED 且未截止）
-  S->>D: 写入 lab_submission 记录（状态 SUBMITTED）
-  D-->>S: 返回 submissionId
+  opt 文件型提交
+    S->>F: 保存物理对象
+    F-->>S: 返回内部 storageKey
+  end
+  S->>D: 同一业务事务写 lab_submission 与 DB-LAB-09
+  alt 数据库事务失败且物理对象已保存
+    D-->>S: 回滚事务
+    S->>F: 补偿删除该物理对象
+    S-->>A: 返回提交失败
+  else 事务成功
+    D-->>S: 返回 submissionId
+  end
   alt 实验配置 autoEvaluate = true
     S->>E: 异步触发自动评测
     S->>D: 更新提交状态为 EVALUATING
@@ -578,6 +676,35 @@ flowchart TD
   N --> G
 ```
 
+#### 7.4.1 教师下载指定提交源文件
+
+```mermaid
+sequenceDiagram
+  participant T as 教师/管理员
+  participant P as UI-LAB-06
+  participant A as LAB Controller
+  participant C as CRS canManageCourse
+  participant S as LabSubmissionService
+  participant D as MySQL 数据库
+  participant F as FileStorageService
+
+  T->>P: 点击独立“下载源文件”入口
+  P->>A: GET /api/v1/labs/{labId}/submissions/{submissionId}/source/download
+  A->>A: 校验登录态和角色
+  A->>C: 校验当前课程 canManageCourse
+  C-->>A: 允许/拒绝
+  A->>S: 传入已授权用户与 labId/submissionId
+  S->>D: 校验实验、提交绑定及 DB-LAB-09 资产
+  D-->>S: 返回 AVAILABLE 可信资产或受控错误
+  S->>F: 按内部 storage_key 读取该版本物理对象
+  F-->>S: 返回文件流或读取失败
+  S-->>A: 文件流与安全响应头（不返回 URL/storageKey）
+  A-->>P: blob 响应
+  P-->>T: 触发浏览器保存；报告下载入口保持独立
+```
+
+校验必须在物理读取之前完成。匿名、学生本人、非成员及其他课程教师直接拒绝；授权范围确认后无资产为 LAB-404-03，旧数据/状态冲突为 LAB-409-03，物理缺失或读取失败为 LAB-500-05。不得降级读取其他提交版本、实验报告或 CRS 课程资源。
+
 ### 7.5 提交状态机
 
 图 3-4-5 实验提交状态机
@@ -634,17 +761,21 @@ stateDiagram-v2
 | LAB-400-03 | 参数异常 | 提交代码为空且未上传文件 | 前端校验代码编辑器和文件上传 | UI-LAB-02 |
 | LAB-400-04 | 参数异常 | 编程语言不在实验允许范围内 | 前端下拉选项限制 | UI-LAB-02 |
 | LAB-400-05 | 参数异常 | 教师评分超出 0 ~ maxScore 范围 | 前端输入框限制 + 后端校验 | UI-LAB-06 |
+| LAB-400-06 | 参数异常 | 提交源文件或实验报告的类型、大小不符合限制 | 上传前提示 + 后端独立校验，不混用两类资产规则 | UI-LAB-02、UI-LAB-06 |
 | LAB-403-01 | 权限异常 | 学生访问教师接口（如评分接口） | AUTH 统一鉴权拦截，返回 403 | UI-LAB-06 |
 | LAB-403-02 | 权限异常 | 非课程成员访问实验 | 校验 CRS 课程成员关系，返回 403 | 全部页面 |
 | LAB-403-03 | 权限异常 | 学生查看其他学生的提交 | 校验提交者与当前用户一致 | UI-LAB-05 |
 | LAB-404-01 | 数据异常 | 实验不存在 | 返回 404 提示 | 全部页面 |
 | LAB-404-02 | 数据异常 | 提交记录不存在 | 返回 404 提示 | UI-LAB-06 |
+| LAB-404-03 | 数据异常 | 已确认授权范围后，指定提交没有源文件资产 | 返回无源文件提示，不尝试其他版本 | UI-LAB-06 |
 | LAB-409-01 | 状态异常 | 实验已截止，不允许提交 | 返回状态错误码和提示 | UI-LAB-02 |
 | LAB-409-02 | 状态异常 | 实验已归档，不允许修改 | 返回状态错误码和提示 | UI-LAB-04 |
+| LAB-409-03 | 状态异常 | 旧记录缺可信元数据、源文件资产已删除/非 AVAILABLE 或内部元数据无效 | 返回兼容阻塞提示，不解析旧 file_id、不回退其他版本 | UI-LAB-06 |
 | LAB-500-01 | 评测异常 | 自动评测执行超时 | 提交状态置为 EVAL_FAILED，记录错误日志 | UI-LAB-02 |
 | LAB-500-02 | 评测异常 | 编译错误 | 提交状态置为 EVAL_FAILED，记录编译错误信息 | UI-LAB-02 |
 | LAB-500-03 | 评测异常 | 运行时内存超限 | 提交状态置为 EVAL_FAILED，记录错误信息 | UI-LAB-02 |
 | LAB-500-04 | 系统异常 | 评测服务内部错误 | 记录错误日志，提交状态置为 EVAL_FAILED | 后端 |
+| LAB-500-05 | 存储异常 | 可信资产存在但物理对象缺失、读取失败、完整性异常或存储服务失败 | 返回通用失败提示，内部诊断不得暴露 storage_key 或路径 | UI-LAB-06 |
 
 ### 8.2 异常处理流程
 
@@ -655,6 +786,9 @@ stateDiagram-v2
 | 评测执行超时 | 评测服务设置超时限制（默认 10s），超时后终止进程，状态置为 EVAL_FAILED | "评测超时，可能存在死循环，请优化代码" |
 | 教师修改已评分成绩 | 允许教师修改评分（更新 lab_score），记录更新时间和变更日志 | 评分更新成功 |
 | 并发评测同一提交 | 通过提交状态机保证状态单向转换，使用乐观锁或数据库行锁防止重复评测 | 无需用户感知 |
+| 学生或其他课程教师请求源文件 | 在读取资产前执行 AUTH 与 CRS `canManageCourse` 校验并拒绝 | "无权限下载该提交源文件" |
+| 旧提交缺可信源文件元数据 | 返回 LAB-409-03，不反解析旧 file_id 或存储键 | "该历史提交的源文件暂不可下载" |
+| 物理源文件缺失或读取失败 | 返回 LAB-500-05，不回退到其他提交版本 | "源文件暂时无法下载，请重试或联系管理员" |
 
 ---
 
@@ -664,15 +798,16 @@ stateDiagram-v2
 
 | 角色 | 允许操作 | 禁止操作 |
 | --- | --- | --- |
-| 学生 | 查看课程实验列表、查看实验详情、提交实验、查看本人提交历史和结果 | 创建/编辑/删除实验、管理测试用例、查看其他学生提交、评分 |
-| 教师（课程管理权限） | 创建/编辑/删除实验、发布/截止实验、管理测试用例、查看所有学生提交、评分、查看统计 | - |
-| 教师（非课程管理权限） | 查看实验列表和详情、查看本人负责的提交 | 创建/删除实验、修改测试用例 |
-| 管理员 | 平台级管理（通过 AUTH 模块），不直接操作 LAB 业务 | - |
+| 学生 | 查看课程实验列表、查看实验详情、提交实验、查看本人提交历史和结果 | 创建/编辑/删除实验、管理测试用例、查看其他学生提交、评分、调用 API-LAB-19 下载源文件（包括本人提交） |
+| 教师/管理员（当前课程 `canManageCourse`） | 创建/编辑/发布/截止实验、管理测试用例、查看学生提交、按指定版本下载源文件、评分、查看统计 | 访问其他课程资产、跨实验/提交 ID 读取文件 |
+| 教师（未通过当前课程 `canManageCourse`） | 按 CRS 成员规则查看允许的实验信息 | 创建/删除实验、修改测试用例、查看或下载学生提交源文件 |
+| 管理员（未通过当前课程 `canManageCourse`） | 平台级管理（通过 AUTH 模块） | 绕过课程业务授权直接下载 LAB 源文件 |
 
 ### 9.2 数据权限
 
 - 学生只能查看和操作**本人**的提交记录，接口层通过 `student_id = 当前用户 ID` 进行数据范围校验。
-- 教师只能查看和操作**本人课程**内的实验和提交，接口层通过 `lab.course_id IN (教师课程列表)` 进行数据范围校验。
+- API-LAB-19 不向学生开放；即使 `student_id = 当前用户 ID`，学生本人也不能下载源文件。
+- 教师/管理员下载源文件时必须针对目标实验的课程逐次调用 CRS `canManageCourse`，并核对 `labId -> courseId`、`submissionId -> labId`、资产 `submission_id/lab_id/course_id` 一致后才允许物理读取。
 - 测试用例中 `is_public = 0`（隐藏用例）仅教师和评测服务可访问，学生查询时过滤。
 
 ### 9.3 日志记录
@@ -686,11 +821,13 @@ stateDiagram-v2
 | 自动评测执行 | 评测日志 | 提交ID、评测开始时间、结束时间、结果状态 |
 | 教师评分/修改评分 | 审计日志 | 提交ID、评分分数、评语、教师ID、评分时间、是否为修改 |
 
+> #222 实际实现未新增源文件上传/下载审计表、显式 logger 或补偿失败重试队列。后续若增加下载审计，可记录提交/实验/课程/操作者/授权结果和下载结果，但不得记录文件内容、storage_key 或本地路径；本建议不作为本期已实现能力。
+
 ### 9.4 数据安全
 
-- 学生提交的代码内容存储在数据库 `lab_submission.code_content` 字段中，不暴露给其他学生。
+- 在线代码内容存储在数据库 `lab_submission.code_content`；文件型提交的可信元数据存储在 DB-LAB-09，内部 `storage_key` 和历史 `file_id` 均不进入公共 DTO。
 - 评测服务的标准输入输出存储在 `lab_testcase` 表中，隐藏用例（`is_public = 0`）的 `expected_output` 不通过学生端接口返回。
-- 文件存储（若使用文件上传方式提交）路径不直接暴露给前端，通过后端接口代理下载。
+- 文件路径、raw URL、静态 URL 和受控 URL均不返回前端。API-LAB-10 只返回顶层 `hasFile` 与 nullable 四字段 `sourceFile`；API-LAB-19 由后端鉴权后流式代理指定提交版本。
 
 ---
 
@@ -704,7 +841,7 @@ stateDiagram-v2
 | 提交列表查询 | 分页查询 + lab_id + student_id 索引 | 教师查看全班提交和学生查看本人提交分别走不同索引 |
 | 自动评测 | 异步执行，不阻塞用户请求 | 评测服务异步调用，前端通过轮询或状态查询获取评测结果 |
 | 评测超时控制 | 进程级超时（默认 10 秒） | 防止死循环或恶意代码占用资源 |
-| 代码存储 | 数据库 TEXT 字段存储（首版） | 首版直接存储在数据库；若后续代码量增大，可迁移至文件存储 + MinIO |
+| 提交内容存储 | 在线代码使用数据库 TEXT；文件型提交使用 FileStorageService + DB-LAB-09 | 不把内部存储键公开，不从旧 file_id 反推元数据 |
 | 统计查询 | 使用 SQL 聚合 + 缓存 | 统计数据不要求实时性，可接受分钟级延迟 |
 
 ### 10.2 可维护性设计
@@ -725,23 +862,23 @@ stateDiagram-v2
 | 需求编号 | 需求名称 | 页面编号 | API 编号 | 数据表编号 | 测试编号 |
 | --- | --- | --- | --- | --- | --- |
 | FR-LAB-01 | 实验创建与发布 | UI-LAB-01、UI-LAB-04 | API-LAB-01、API-LAB-02、API-LAB-03、API-LAB-04、API-LAB-05、API-LAB-06、API-LAB-07 | DB-LAB-01、DB-LAB-02 | TC-LAB-01 ~ TC-LAB-07 |
-| FR-LAB-02 | 学生实验查看与提交 | UI-LAB-02 | API-LAB-03、API-LAB-08 | DB-LAB-01、DB-LAB-03 | TC-LAB-08 ~ TC-LAB-11 |
-| FR-LAB-03 | 提交历史与版本管理 | UI-LAB-05 | API-LAB-09、API-LAB-10 | DB-LAB-03 | TC-LAB-12 ~ TC-LAB-14 |
-| FR-LAB-04 | 实验自动评测 | UI-LAB-02 | API-LAB-11、API-LAB-12 | DB-LAB-02、DB-LAB-04 | TC-LAB-15 ~ TC-LAB-20 |
-| FR-LAB-05 | 教师评分与评语 | UI-LAB-06 | API-LAB-13 | DB-LAB-05 | TC-LAB-21 ~ TC-LAB-24 |
-| FR-LAB-06 | 实验结果展示 | UI-LAB-07 | API-LAB-10、API-LAB-12 | DB-LAB-03、DB-LAB-04、DB-LAB-05 | TC-LAB-25 ~ TC-LAB-27 |
-| FR-LAB-07 | 实验统计查询 | UI-LAB-08 | API-LAB-14 | DB-LAB-03、DB-LAB-05 | TC-LAB-28 ~ TC-LAB-30 |
-| FR-LAB-08 | 实验报告管理 | UI-LAB-02、UI-LAB-07 | API-LAB-08、API-LAB-10 | DB-LAB-03 | TC-LAB-31 ~ TC-LAB-32 |
+| FR-LAB-02 | 学生实验查看与提交 | UI-LAB-02 | API-LAB-03、API-LAB-08、API-LAB-10 | DB-LAB-01、DB-LAB-03、DB-LAB-09 | TC-LAB-08 ~ TC-LAB-11、TC-LAB-34、TC-LAB-38 ~ TC-LAB-39、TC-LAB-41 |
+| FR-LAB-03 | 提交历史与版本管理 | UI-LAB-05、UI-LAB-06 | API-LAB-09、API-LAB-10、API-LAB-19 | DB-LAB-03、DB-LAB-09 | TC-LAB-12 ~ TC-LAB-14、TC-LAB-34 ~ TC-LAB-38、TC-LAB-41 |
+| FR-LAB-04 | 实验自动评测 | UI-LAB-02、UI-LAB-07 | API-LAB-11、API-LAB-12、API-LAB-15（能力编号） | DB-LAB-02、DB-LAB-04、DB-LAB-08 | TC-LAB-15 ~ TC-LAB-20 |
+| FR-LAB-05 | 实验报告管理 | UI-LAB-02、UI-LAB-06 | API-LAB-16、API-LAB-17 | DB-LAB-06 | TC-LAB-21 ~ TC-LAB-23 |
+| FR-LAB-06 | 教师评分与评语 | UI-LAB-06 | API-LAB-10、API-LAB-13、API-LAB-17、API-LAB-19 | DB-LAB-03、DB-LAB-05、DB-LAB-06、DB-LAB-07、DB-LAB-09 | TC-LAB-24 ~ TC-LAB-27、TC-LAB-35 ~ TC-LAB-40、MAN-LAB-011 |
+| FR-LAB-07 | 实验结果展示与学生反馈 | UI-LAB-07 | API-LAB-10、API-LAB-12、API-LAB-18 | DB-LAB-03、DB-LAB-04、DB-LAB-05、DB-LAB-06、DB-LAB-08 | TC-LAB-28 ~ TC-LAB-30 |
+| FR-LAB-08 | 实验统计与查询 | UI-LAB-08 | API-LAB-14 | DB-LAB-03、DB-LAB-04、DB-LAB-05、DB-LAB-06 | TC-LAB-06、TC-LAB-31 ~ TC-LAB-33 |
 
 ### 11.2 非功能需求追踪表
 
 | 需求编号 | 需求名称 | 设计对应 | 测试编号 |
 | --- | --- | --- | --- |
-| NFR-LAB-01 | 实验提交响应时间不超过 2 秒 | 异步评测不阻塞提交接口 | TC-LAB-N01 |
-| NFR-LAB-02 | 单次评测执行时间不超过 10 秒 | 评测超时控制机制 | TC-LAB-N02 |
-| NFR-LAB-03 | 学生只能查看本人提交 | 数据权限校验（student_id 范围限制） | TC-LAB-N03 |
-| NFR-LAB-04 | 教师评分后学生收到通知 | 评分完成后触发 LRN 通知 | TC-LAB-N04 |
-| NFR-LAB-05 | 评测失败时允许教师手动处理 | EVAL_FAILED 状态可重新评测或直接评分 | TC-LAB-N05 |
+| NFR-LAB-01 | 可靠性 | 提交与源文件资产按版本绑定；文件存储成功而事务失败时执行补偿删除；评测失败不删除提交记录 | TC-LAB-N01、TC-LAB-34 ~ TC-LAB-35、TC-LAB-38、TC-LAB-41 |
+| NFR-LAB-02 | 性能 | 提交接口异步触发评测，基础规模评测在 60 秒内返回结果或失败状态 | TC-LAB-N02 |
+| NFR-LAB-03 | 可追踪性 | 提交与源文件资产按提交版本保存上传人/时间/状态；评测、报告、评分和评分变更保留既有追踪信息；#222 不声称下载审计已落地 | TC-LAB-N03、TC-LAB-34 ~ TC-LAB-38、TC-LAB-41 |
+| NFR-LAB-04 | 安全性 | 当前用户来自认证上下文；源文件逐次校验 `canManageCourse` 与归属；公共 DTO/页面不泄漏内部键或 URL | TC-LAB-N04、TC-LAB-36 ~ TC-LAB-40、MAN-LAB-011 |
+| NFR-LAB-05 | 可测试性 | `Evaluator` 与 `FileStorageService` 可替换测试，元数据、授权、兼容、存储异常、迁移和 UI 状态可复现 | TC-LAB-N05、TC-LAB-34 ~ TC-LAB-41、MAN-LAB-011 |
 
 ### 11.3 关键测试场景
 
@@ -767,6 +904,16 @@ stateDiagram-v2
 | TC-LAB-18 | 评测失败后教师重新评测 | 单元测试 | P1 | 状态从 EVAL_FAILED 变为 EVALUATED |
 | TC-LAB-19 | 评测失败后教师直接评分 | 单元测试 | P1 | 状态从 EVAL_FAILED 变为 SCORED |
 | TC-LAB-20 | 学生多次提交版本递增 | 单元测试 | P1 | version 字段递增，历史记录保留 |
+| TC-LAB-34 | 源文件可信元数据与安全详情 DTO | 迁移/接口测试 | P0 | DB-LAB-09 与提交版本一对一；详情只返回顶层 `hasFile` 和四字段 nullable `sourceFile`，不泄漏内部标识或 URL |
+| TC-LAB-35 | 课程管理教师下载指定提交版本源文件 | 接口/文件测试 | P0 | 内容、Unicode 文件名、MIME、长度均与该版本一致 |
+| TC-LAB-36 | 匿名、学生本人、非成员和其他课程教师下载 | 认证/权限测试 | P0 | 返回稳定 401/403，且不读取物理文件或泄漏内部信息 |
+| TC-LAB-37 | 跨课程、跨实验、跨提交猜测 | 权限/异常测试 | P0 | 归属错配统一失败，不泄漏资产存在性或回退其他版本 |
+| TC-LAB-38 | 无文件、旧数据缺元数据、资产删除和物理文件缺失 | 兼容/异常测试 | P0 | DTO 阻塞态及 LAB-404-03/LAB-409-03/LAB-500-05 语义稳定 |
+| TC-LAB-39 | Unicode、路径穿越、MIME、响应头和存储异常防护 | 安全测试 | P0 | 安全响应头，无路径/头注入，异常不暴露 storage_key |
+| TC-LAB-40 | UI-LAB-06 源文件与报告独立下载状态 | 前端组件/API 测试 | P0 | 固定路径 blob 下载，pending 去重、失败重试、401/403，且两类资产互不替代 |
+| TC-LAB-41 | H2/MySQL/compose 迁移、一对一约束与事务补偿 | 迁移/事务测试 | P0 | 三套 schema 一致，唯一/状态约束生效，事务失败时成功补偿不留可访问孤儿文件 |
+
+`TC-LAB-34 ~ TC-LAB-41` 已取得 #222 后端定向 41/41 通过证据；其中 TC-LAB-41 由 `sourceUploadDeletesThePhysicalFileWhenTheDatabaseTransactionRollsBack` 直接覆盖，临时 CHECK 强制数据库写失败后，提交行和源文件元数据行均为 0，上传目录文件集合不变。`MAN-LAB-011` 已完成真实浏览器链路“学生提交源文件 → 当前课程可管理教师进入 UI-LAB-06 → 下载并核对指定版本 → 越权请求失败”，证据见测试文档与 `output/playwright/issue-222/01~06`。
 
 ---
 
@@ -779,19 +926,19 @@ stateDiagram-v2
 | LAB-C03 | 评分完成后是否允许 GRD 覆盖修改 | LAB、GRD | LAB 侧评分为最终成绩，GRD 不覆盖；若需调整由教师重新评分 | GRD 负责人 |
 | LAB-C04 | 通知触发格式与内容模板 | LAB、LRN | 需与 LRN 确认通知接口的字段格式（通知类型、标题、内容模板、接收人） | LRN 负责人 |
 | LAB-C05 | 课程成员校验接口的具体路径和返回格式 | LAB、CRS | 调用 CRS 接口 `GET /api/courses/{courseId}/members/check?userId={userId}`，返回布尔值和角色 | CRS 负责人 |
-| LAB-C06 | 文件存储方案 | LAB、CRS、HWK | 首版采用本地文件存储，通过后端接口代理下载，文件路径存入数据库 | 后端负责人 |
+| LAB-C06 | 文件存储与下载边界 | LAB、CRS、HWK | LAB 提交源文件由 DB-LAB-09 绑定提交版本并通过 API-LAB-19 受控下载；实验报告沿用 DB-LAB-06/API-LAB-17；CRS 资源下载、HWK #214 各自保留业务授权，仅可共享底层 FileStorageService | 后端负责人 |
 | LAB-C07 | 测试用例的标准输入输出是否支持文件 | LAB | 首版仅支持文本，不支持二进制文件输入输出 | 自行决策 |
 
 ---
 
 ## 13 模块提交结论
 
-本提交稿覆盖了 LAB 实训实验模块的完整详细设计，包括 8 个页面、15 个接口、6 个后端服务、5 张数据表、4 张关键流程图、2 个状态机、16 个错误码和 20+ 个测试场景。设计要点总结如下：
+本提交稿覆盖 LAB 实训实验模块 8 个既有页面、API-LAB-01 ~ API-LAB-19、DB-LAB-01 ~ DB-LAB-09 及既有状态机，并为 #222 新增 TC-LAB-34 ~ TC-LAB-41 与 MAN-LAB-011。#222 新增用例已纳入后端定向 41/41、完整后端 302 tests（其中 1 个 Docker-only skip）、完整前端 521 tests 及真实浏览器验收证据。设计要点总结如下：
 
 1. **评测方案**：首版采用 IO 比对评测，通过 `Evaluator` 接口抽象，后续可扩展 Docker 沙箱方案。
 2. **状态管理**：提交状态机（SUBMITTED → EVALUATING → EVALUATED/EVAL_FAILED → SCORED）和实验状态机（DRAFT → PUBLISHED → CLOSED → ARCHIVED）清晰定义。
 3. **跨模块协作**：依赖 AUTH（鉴权）、CRS（课程校验）、LRN（通知），向 GRD（成绩来源）和 LRN（通知触发）提供数据。
 4. **性能考量**：评测异步执行不阻塞提交请求，数据库按高频查询字段建立索引。
-5. **安全设计**：数据权限按角色和学生/教师范围隔离，隐藏测试用例不暴露给前端，操作日志完整记录。
+5. **安全设计**：数据权限按角色和课程范围隔离；源文件下载额外要求当前课程 `canManageCourse`，学生本人排除，隐藏测试用例和内部存储信息均不暴露给前端。
 
-本提交稿已准备就绪，可提交给详细设计负责人合并入《软件详细设计说明书》主文档。
+本提交稿的 #222 契约已与最终文档同步；定向 41/41、后端完整 302 tests（1 个 Docker-only skip）、前端 53 files/521 tests、typecheck/build 与 MAN-LAB-011 浏览器证据均已回填。

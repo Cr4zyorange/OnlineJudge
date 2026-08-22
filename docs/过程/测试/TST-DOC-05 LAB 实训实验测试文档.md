@@ -30,9 +30,9 @@
 
 ## 2 测试概述
 
-本文件用于记录 LAB 实训实验模块在当前版本下的测试依据、测试环境、测试数据、测试用例、执行结果、手工验收清单、缺陷风险和验收结论。覆盖范围对齐 `FR-LAB-01 ~ FR-LAB-08`、`NFR-LAB-01 ~ NFR-LAB-05`、`UI-LAB-01 ~ UI-LAB-08`、`API-LAB-01 ~ API-LAB-18`、`DB-LAB-01 ~ DB-LAB-07`、详细设计正式列出的 `TC-LAB-01 ~ TC-LAB-20` 与 `TC-LAB-31 ~ TC-LAB-33`，并结合现有实现补充连续追踪用例 `TC-LAB-21 ~ TC-LAB-30`、`TC-LAB-N01 ~ TC-LAB-N05`，以及为本 issue 统一整合而补充的 `IC-LAB-01 ~ IC-LAB-05`、`IC-LAB-N01 ~ IC-LAB-N05` 跨模块集成追踪编号。
+本文件用于记录 LAB 实训实验模块在当前版本下的测试依据、测试环境、测试数据、测试用例、执行结果、手工验收清单、缺陷风险和验收结论。覆盖范围对齐 `FR-LAB-01 ~ FR-LAB-08`、`NFR-LAB-01 ~ NFR-LAB-05`、`UI-LAB-01 ~ UI-LAB-08`、`API-LAB-01 ~ API-LAB-19`、`DB-LAB-01 ~ DB-LAB-09`、`TC-LAB-01 ~ TC-LAB-41`、`TC-LAB-N01 ~ TC-LAB-N05` 与 `MAN-LAB-001 ~ MAN-LAB-011`。#222 新增 TC-LAB-34 ~ TC-LAB-41 与 MAN-LAB-011，现已取得定向/完整自动化和真实浏览器证据；既有历史执行计数仍作为基线单独保留。
 
-当前仓库已经具备 LAB 后端 Spring Boot 自动化测试和前端 Vue/Vitest 单元测试。自动化覆盖了实验草稿创建、实验列表与详情、发布、截止、成绩发布、统计查询、学生代码与文件提交、多次提交版本递增、提交历史、自动评测通过/错误/超时/异常、教师重评、实验报告上传与下载、报告评分、提交评分与评分变更留痕、成绩发布前后结果展示、隐藏测试用例保护、课程成员与教师权限限制、事务回滚、迁移脚本与数据表约束，以及 LAB 向 LRN 通知和向 GRD 提供来源成绩的接口样本。真实浏览器完整端到端、真实 Docker 沙箱压力、LRN/GRD 统一环境联调仍列为手工或集成验收项。
+当前仓库已经具备 LAB 后端 Spring Boot 自动化测试和前端 Vue/Vitest 单元测试，既有基线覆盖实验创建、提交评测、报告、评分、结果、统计和跨模块样本。#222 的提交源文件可信元数据、API-LAB-10 安全 DTO、API-LAB-19 教师受控下载、DB-LAB-09、UI-LAB-06 双入口和事务补偿已由新增自动化与 MAN-LAB-011 验证。真实 Docker 沙箱压力和 LRN/GRD 统一环境联调仍按既有手工/集成验收项管理。
 
 ## 3 测试依据
 
@@ -54,7 +54,7 @@
 | 14 | `frontend/tests/unit/lab/LabStudentView.spec.ts` | 学生端实验详情、提交、断点恢复、评测结果、报告上传/下载、成绩展示自动化测试 |
 | 15 | `frontend/tests/unit/lab/LabSubmissionHistoryView.spec.ts` | 提交历史、空状态、失败提示自动化测试 |
 | 16 | `frontend/tests/unit/api/labs.spec.ts` | 报告下载、报告评分、实验统计 API wrapper 自动化测试 |
-| 17 | `database/migrations/20260525_02_create_lab_experiment.sql`、`20260526_01_create_lab_submission.sql`、`20260604_01_create_lab_report.sql`、`20260605_02_create_lab_score.sql`、`20260606_01_add_lab_published_at.sql` | LAB 数据表、索引、约束、迁移增量脚本依据 |
+| 17 | `database/migrations/20260525_02_create_lab_experiment.sql`、`20260526_01_create_lab_submission.sql`、`20260604_01_create_lab_report.sql`、`20260605_02_create_lab_score.sql`、`20260606_01_add_lab_published_at.sql`、`20260822_02_create_lab_submission_source_file.sql` | LAB 数据表、索引、约束、迁移增量脚本依据；DB-LAB-09 与补偿由 TC-LAB-41 验证 |
 
 ## 4 测试范围
 
@@ -63,27 +63,27 @@
 | 编号 | 测试对象 | 主要验证点 | 当前覆盖状态 |
 | --- | --- | --- | --- |
 | FR-LAB-01 | 实验创建与发布 | 教师创建草稿、读取列表、读取详情、编辑、发布、截止、删除草稿、发布通知 | 后端和前端自动化已覆盖 |
-| FR-LAB-02 | 学生实验查看与提交 | 学生查看已发布实验、提交代码或源文件、语言限制、截止限制、成员限制、前端表单校验 | 后端和前端自动化已覆盖 |
-| FR-LAB-03 | 提交历史与版本管理 | 学生历史记录、教师按学生和状态筛选、最新版本/当前有效版本/当前评分依据标识 | 后端和前端自动化已覆盖 |
+| FR-LAB-02 | 学生实验查看与提交 | 学生查看、代码/文件提交、可信元数据、类型/大小、存储后事务补偿 | TC-LAB-34/38/39/41 通过 |
+| FR-LAB-03 | 提交历史与版本管理 | 历史版本、API-LAB-10 安全 DTO、指定提交版本源文件核对 | TC-LAB-34 ~ 38/41 通过 |
 | FR-LAB-04 | 实验自动评测 | 自动评测受理、评测通过、错误答案、超时、编译错误、运行错误、教师重评、隐藏测试用例保护 | 后端和前端自动化已覆盖；真实沙箱压力待专项确认 |
 | FR-LAB-05 | 实验报告管理 | 学生上传报告、重复上传版本递增、教师查看报告、报告下载、报告评分、格式与大小限制 | 后端和前端自动化已覆盖 |
-| FR-LAB-06 | 教师评分与评语 | 教师填写人工分/报告分/最终分/评语、分数范围校验、变更原因必填、评分留痕 | 后端和前端自动化已覆盖 |
+| FR-LAB-06 | 教师评分与评语 | 查看安全源文件元数据；源文件/报告独立下载；`canManageCourse` 授权；评分与变更留痕 | TC-LAB-35 ~ 40/MAN-LAB-011 通过 |
 | FR-LAB-07 | 实验结果展示与学生反馈 | 成绩发布前隐藏教师评分与报告评分，发布后展示最终分、评语、报告反馈和评测摘要 | 后端和前端自动化已覆盖 |
 | FR-LAB-08 | 实验统计与查询 | 教师查看提交率、未提交名单、评测完成率、平均分、分数分布、逾期提交数 | 后端和前端自动化已覆盖 |
-| NFR-LAB-01 | 可靠性 | 提交先落库、评测失败不丢提交、评测异常保留记录、评分与成绩发布流程可重复执行 | 自动化覆盖核心分支 |
+| NFR-LAB-01 | 可靠性 | 提交与源文件按版本绑定，存储成功但事务失败时成功补偿删除，评测失败不丢提交 | TC-LAB-34/35/38/41 通过 |
 | NFR-LAB-02 | 性能 | 提交快速受理、评测异步处理、统计查询和列表查询支持基础规模样本 | 自动化覆盖基础样本；真实压测待补充 |
-| NFR-LAB-03 | 可追踪性 | 提交、评测、报告、评分、评分变更、成绩发布均可追踪 | 自动化已覆盖 |
-| NFR-LAB-04 | 安全性 | 当前用户来源、课程成员校验、学生仅访问本人数据、隐藏用例不向学生暴露 | 自动化已覆盖 |
-| NFR-LAB-05 | 可测试性 | 评测器和文件服务可替换、截止/重复/失败/超限场景可复现、事务边界可验证 | 自动化已覆盖 |
+| NFR-LAB-03 | 可追踪性 | 提交、源文件资产、评测、报告、评分和版本信息可追踪 | TC-LAB-34 ~ 38/41 通过 |
+| NFR-LAB-04 | 安全性 | `canManageCourse`、学生本人排除、归属校验、响应头与公共 DTO 无内部信息 | TC-LAB-36 ~ 40/MAN-LAB-011 通过 |
+| NFR-LAB-05 | 可测试性 | 评测器/文件服务可替换，元数据、权限、兼容、异常、迁移和 UI 状态可复现 | TC-LAB-34 ~ 41/MAN-LAB-011 通过 |
 
 ### 4.2 页面、接口、数据表覆盖
 
 | 类别 | 编号范围 | 覆盖说明 |
 | --- | --- | --- |
 | 页面 | `UI-LAB-01 ~ UI-LAB-08` | 前端测试覆盖教师实验管理页、学生实验详情页、提交历史页、评分与结果展示相关交互；真实浏览器视觉与完整端到端流程待手工验收 |
-| 接口 | `API-LAB-01 ~ API-LAB-18` | 后端 MockMvc 和前端 API wrapper 覆盖主要路由、请求方法、请求体、分页、权限、错误码和响应字段 |
-| 数据表 | `DB-LAB-01 ~ DB-LAB-07` | 迁移测试覆盖实验表、测试用例表、提交表、评测表、评分表、报告表、评分变更日志表的关键结构与写入 |
-| 跨模块 | AUTH、CRS、LRN、GRD、HWK | AUTH/CRS 提供当前用户与课程权限；LRN 接收实验发布/成绩发布通知；GRD 读取 LAB 来源成绩；HWK 共享公共评测抽象但不在本 issue 细测 |
+| 接口 | `API-LAB-01 ~ API-LAB-19` | API-LAB-10 新 DTO 与 API-LAB-19 已由 TC-LAB-34 ~ 40 验证 |
+| 数据表 | `DB-LAB-01 ~ DB-LAB-09` | DB-LAB-09 字段/约束、绑定与事务补偿由 TC-LAB-41 验证 |
+| 跨模块 | AUTH、CRS、LRN、GRD、CRS 文件、HWK #214 | API-LAB-19 只依赖 AUTH 与 CRS `canManageCourse`；LAB 报告、CRS 资源、HWK 文件保持业务边界，仅底层 FileStorageService 可共享 |
 
 ### 4.3 跨模块集成追踪编号
 
@@ -110,6 +110,7 @@
 | 真实 Docker 沙箱压力 | 自动化使用 fake sandbox 或可控样本，未执行真实 Docker 并发、资源限制和多语言压力 | 作为专项测试 `MAN-LAB-008` |
 | 大规模性能压测 | 自动化覆盖基础规模统计和异步评测轮询，不代表生产规模并发性能 | 作为专项测试 `MAN-LAB-009` |
 | LRN/GRD 统一环境联调 | 代码级通知事件和来源成绩样本已覆盖，但统一环境通知中心与成绩同步页仍需确认 | 作为跨模块联调用例 `MAN-LAB-010` |
+| LAB 源文件受控下载浏览器链路 | API-LAB-19、UI-LAB-06 双入口、学生本人排除和失败提示 | `MAN-LAB-011` 已完成；证据位于 `output/playwright/issue-222/01~06` |
 
 ## 5 测试环境
 
@@ -146,17 +147,22 @@
 | --- | --- | --- |
 | 后端 LAB 相关测试 | `mvn test "-Dtest=LabExperimentControllerTest,LabSubmissionControllerTest,LabExperimentMigrationTest,LabExperimentTransactionTest,LabEvaluationServiceTest"` | 47 条通过，0 失败，0 错误，0 跳过 |
 | 前端 LAB 单元测试 | `npm run test:unit -- tests/unit/api/labs.spec.ts tests/unit/lab/LabTeacherView.spec.ts tests/unit/lab/LabStudentView.spec.ts tests/unit/lab/LabSubmissionHistoryView.spec.ts` | 4 个测试文件通过，29 条测试通过 |
+| #222 后端定向回归 | `mvn test "-Dtest=LabSubmissionSourceFileMigrationTest,LabSubmissionControllerTest"` | 41/41 通过 |
+| 后端完整回归 | `mvn -q test` | 302 tests，0 failures，0 errors，1 个 Docker-only skip |
+| #222 前端完整验证 | `npm run test:unit`、`npm run typecheck`、`npm run build` | 53 files / 521 tests、类型检查、构建均通过 |
+
+前两行为 #222 之前既有基线；#222 使用后三行及 MAN-LAB-011 作为新增链路证据。
 
 ### 7.2 LAB 核心用例表
 
-| 用例编号 | 对应需求 | 覆盖对象 | 前置条件/测试数据 | 操作步骤 | 预期结果 | 实际结果 | 通过状态 |
-| --- | --- | --- | --- | --- | --- | --- | --- |
+| 用例编号 | 对应需求 | 覆盖对象 | 前置条件/测试数据 | 操作步骤 | 预期结果 | 自动化覆盖/证据 | 实际结果 | 通过状态 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | TC-LAB-01 | FR-LAB-01 | `UI-LAB-01`、`UI-LAB-04`、`API-LAB-01/02/03`、`DB-LAB-01/02` | 教师具备课程管理权限；准备标题、截止时间、语言、测试用例 | 创建实验草稿，读取列表和详情 | 返回实验 ID，状态为 `DRAFT`，测试用例随实验保存 | `teacherCreatesListsAndReadsLabThroughDocumentedApis`、教师端创建草稿用例覆盖 | 自动化覆盖 | 通过 |
 | TC-LAB-02 | FR-LAB-01 | `API-LAB-01`、异常码 `LAB-400-01/LAB-400-02` | 标题为空、截止时间非法、满分非法 | 提交非法创建请求 | 返回 400，页面保留输入并提示错误 | `controllerRejectsInvalidPayloadAndPermissionViolations`、教师端非法表单拦截用例覆盖 | 自动化覆盖 | 通过 |
 | TC-LAB-03 | FR-LAB-01 | `API-LAB-04/06/07`、`UI-LAB-04` | 已创建草稿实验 | 更新实验，发布实验，截止实验 | 草稿可更新；发布后状态为 `PUBLISHED`；截止后状态为 `CLOSED` | `teacherUpdatesPublishesClosesAndDeletesDraftLab`、教师端更新/发布/截止用例覆盖 | 自动化覆盖 | 通过 |
 | TC-LAB-04 | FR-LAB-01 | `API-LAB-06`、LRN 事件 | 已创建草稿实验，存在课程学生列表 | 教师发布实验 | 发送 `LAB_EXPERIMENT_PUBLISHED` 通知事件，学生可见 | `teacherUpdatesPublishesClosesAndDeletesDraftLab`、`studentCourseMemberCanReadPublishedLabsButCannotSeeHiddenExpectedOutput` | 自动化覆盖 | 通过 |
 | TC-LAB-05 | FR-LAB-01 | `API-LAB-05`、`UI-LAB-04` | 存在草稿实验 | 删除草稿实验 | 删除成功，草稿不再出现在教师列表 | `teacherUpdatesPublishesClosesAndDeletesDraftLab`、教师端删除草稿用例覆盖 | 自动化覆盖 | 通过 |
-| TC-LAB-06 | FR-LAB-01 | `API-LAB-14`、`UI-LAB-08` | 存在已发布实验和课程学生 | 查询实验统计 | 返回提交率、未提交名单、评测完成率、平均分和分数分布 | `teacherQueriesLabStatisticsWithUnsubmittedStudentsScoreDistributionAndLateCount`、教师端统计面板用例覆盖 | 自动化覆盖 | 通过 |
+| TC-LAB-06 | FR-LAB-08 | `API-LAB-14`、`UI-LAB-08` | 存在已发布实验和课程学生 | 查询实验统计 | 返回提交率、未提交名单、评测完成率、平均分和分数分布 | `teacherQueriesLabStatisticsWithUnsubmittedStudentsScoreDistributionAndLateCount`、教师端统计面板用例覆盖 | 自动化覆盖 | 通过 |
 | TC-LAB-07 | FR-LAB-01/07 | `API-LAB-18`、LRN 事件 | 实验已截止，教师准备发布成绩 | 发布实验成绩 | 状态变为 `SCORE_PUBLISHED`，发送成绩发布通知 | `teacherCanReleaseScoresAfterClosingLab`、教师端发布成绩用例覆盖 | 自动化覆盖 | 通过 |
 | TC-LAB-08 | FR-LAB-02 | `UI-LAB-02`、`API-LAB-03/08`、`DB-LAB-01/03` | 学生为课程成员，实验已发布 | 查看实验详情、提交代码 | 可看到说明和公开测试用例，提交成功并返回 `PENDING` 状态 | `loads published lab detail and submits code successfully`、`studentCanSubmitCodeTwiceAndVersionIncrements` | 自动化覆盖 | 通过 |
 | TC-LAB-09 | FR-LAB-02 | `API-LAB-08`、异常码 `LAB-400-03/LAB-400-04/LAB-409-01` | 提交内容为空、语言不支持、实验已截止 | 分别提交非法请求 | 返回对应错误码，且不生成有效提交 | `submissionRejectsMissingContentUnsupportedLanguageAndExpiredLab`、学生端前端校验用例覆盖 | 自动化覆盖 | 通过 |
@@ -184,6 +190,14 @@
 | TC-LAB-31 | FR-LAB-08 | `API-LAB-14`、`UI-LAB-08` | 多名学生中部分已提交、部分未提交，含逾期样本 | 查询实验统计 | 返回提交率、未提交名单、平均分、评测完成率、逾期提交数和分数分布 | `teacherQueriesLabStatisticsWithUnsubmittedStudentsScoreDistributionAndLateCount`、教师端统计图用例覆盖 | 自动化覆盖 | 通过 |
 | TC-LAB-32 | FR-LAB-08/NFR-LAB-04 | `API-LAB-14` | 学生尝试访问实验统计 | 查询统计 | 返回 403 | `studentCannotQueryLabStatistics` | 自动化覆盖 | 通过 |
 | TC-LAB-33 | FR-LAB-03/08 | 前端历史页与统计页 | 学生无提交历史；教师统计加载失败 | 打开页面 | 空状态和失败提示明确，不影响其余页面 | `shows an empty state when the student has no submissions yet`、`surfaces history loading failures on the page`、`shows a teacher-facing error when lab statistics loading fails` | 自动化覆盖 | 通过 |
+| TC-LAB-34 | FR-LAB-02/03、NFR-LAB-01/03/05 | API-LAB-10、DB-LAB-09 | 新文件、无文件、仅旧 file_id 三类提交 | 查询详情并检查 JSON | 顶层 `hasFile`；`sourceFile` 仅 null 或四字段对象，无 fileId/storageKey/status/URL | `studentCanSubmitSourceFileWhenCourseMember`、`teacherCanInspectTrustedSourceMetadataAndDownloadTheExactSubmissionVersion` | 定向 41/41 通过 | 通过 |
+| TC-LAB-35 | FR-LAB-03/06、NFR-LAB-01/03 | API-LAB-19、UI-LAB-06 | `canManageCourse` 教师与 Unicode 文件样本 | 固定路径下载指定版本并核对响应 | 内容、文件名、MIME、长度正确，无 URL/内部键 | 同上自动化；MAN-LAB-011 下载 200/84 B/SHA-256 一致 | 自动化与浏览器通过 | 通过 |
+| TC-LAB-36 | FR-LAB-03/06、NFR-LAB-04 | API-LAB-19 鉴权 | 匿名/失效会话/学生本人/非成员/其他课程教师 | 分别请求并监测存储读取 | 稳定 401/403，拒绝发生在物理读取前 | `sourceDownloadReauthorizesRoleAndCourseManagementWithoutLeakingStorageState`；MAN-LAB-011 403/401 | 自动化与真实请求通过 | 通过 |
+| TC-LAB-37 | FR-LAB-03/06、NFR-LAB-03/04 | API-LAB-19 归属 | 多课程、实验、提交和资产 | 组合交叉 ID 请求 | 读取前统一失败，不泄漏或回退其他版本 | `sourceDownloadRejectsCrossLabAndDeletedSubmissionBindingsAsTheSameMissingTarget` | 定向 41/41 通过 | 通过 |
+| TC-LAB-38 | FR-LAB-02/03/06、NFR-LAB-01/03/05 | API-LAB-10/19、三类新错误码 | 无文件/旧元数据/DELETED/物理缺失 | 查询详情并请求下载 | DTO 阻塞态及 LAB-404-03/409-03/500-05 稳定 | `sourceDownloadDistinguishesNoFileLegacyMetadataAndDeletedAssets`、`sourceDownloadReturnsStableStorageAndMetadataIntegrityErrors` | 定向 41/41 通过 | 通过 |
+| TC-LAB-39 | FR-LAB-02/06、NFR-LAB-04/05 | 上传、响应头、存储异常 | Unicode/换行/路径/MIME/超限/读取异常样本 | 上传并由教师下载 | 无路径/头注入或内部信息泄漏，400-06/500-05 稳定 | `sourceFilenameSanitizationPreventsPathAndHeaderInjectionWhileKeepingUnicode`；MAN-LAB-011 UTF-8 filename* | 自动化与浏览器通过 | 通过 |
+| TC-LAB-40 | FR-LAB-06、NFR-LAB-04/05 | UI-LAB-06 双入口 | 两类资产及 pending/401/403/失败响应 | 分别下载、重复点击并重试 | 源文件/报告状态独立，固定路径 blob，pending 去重且失败可恢复 | `LabSubmissionReviewView.spec.ts` 专项、`labs.spec.ts`；521/521、typecheck/build；MAN-LAB-011 | 前端自动化与浏览器通过 | 通过 |
+| TC-LAB-41 | FR-LAB-02/03、NFR-LAB-01/03/05 | H2/MySQL/compose、DB-LAB-09、事务 | 三套 schema、非法约束和事务失败样本 | 执行迁移/约束/补偿场景 | 字段与约束一致；事务失败时成功补偿不留可访问孤儿文件 | `sourceUploadDeletesThePhysicalFileWhenTheDatabaseTransactionRollsBack` 强制 DB 失败，断言提交/资产 0 行且目录集合不变 | 直接自动化通过；delete 自身失败的重试/审计不在范围 | 通过 |
 | TC-LAB-N01 | NFR-LAB-01 | 提交、评测、评分主链路 | 依次执行提交、评测异常、评分、成绩发布 | 提交先落库，异常不丢记录，成绩发布可重复执行 | `studentCanSubmitCodeTwiceAndVersionIncrements`、`evaluatorExceptionMarksSubmissionAsSystemErrorAndPreservesEvaluationRecord`、`teacherCanReleaseScoresAfterClosingLab` | 自动化覆盖 | 通过 |
 | TC-LAB-N02 | NFR-LAB-02 | 提交受理、异步评测、统计查询 | 观察提交初始状态、异步轮询、统计结果生成 | 提交快速返回 `PENDING/RUNNING`；统计接口返回结构稳定 | `loads published lab detail and submits code successfully`、`autoEvaluateSubmissionEventuallyReturnsAcceptedAndHidesHiddenCaseFromStudent`、`teacherQueriesLabStatisticsWithUnsubmittedStudentsScoreDistributionAndLateCount` | 自动化覆盖 | 通过 |
 | TC-LAB-N03 | NFR-LAB-03 | 提交、评测、报告、评分、变更留痕 | 完整执行提交、报告、评分、改分、发布成绩 | 所有关键动作均有版本或日志留痕 | `studentCanUploadReportTwiceAndTeacherCanViewLatestReportFromSubmissionDetail`、`teacherCanScoreSubmissionAndPersistScoreRecord`、`updatingSubmissionScoreRequiresReasonAndPersistsChangeLog`、迁移测试相关用例覆盖 | 自动化覆盖 | 通过 |
@@ -236,6 +250,7 @@
 | MAN-LAB-008 | LAB | 真实 Docker 沙箱专项测试 | 提交 AC/WA/编译错误/运行错误/超时/内存超限样本，多语言并发执行 | 状态、日志、资源限制和超时控制符合设计 | 待专项测试 |
 | MAN-LAB-009 | LAB | 基础性能样本 | 准备更多课程学生和实验提交，观察提交受理与统计接口响应时间 | 提交快速受理，统计查询在设计阈值内返回 | 待专项测试 |
 | MAN-LAB-010 | LAB/LRN/GRD | 跨模块联调 | 发布实验、提交、评分、发布成绩后检查通知中心和成绩同步 | LRN 能看到实验发布/成绩发布通知，GRD 能读取 LAB 来源成绩 | 待联调确认 |
+| MAN-LAB-011 | LAB/AUTH/CRS | 提交源文件受控下载 | student001 在实验 `950211` 上传 `student-source-林晓.py` 生成提交 `950204`；teacher001 在 UI-LAB-06 核对元数据并下载；学生 bearer 与匿名请求验证越权 | 指定版本内容/文件名/MIME 正确，两入口独立，越权失败，页面无 fileId/storageKey/路径/URL | 通过；页面显示 `text/x-python-script`、84 B，下载 200/Content-Length 84/UTF-8 filename*，上传/下载 SHA-256 均 `1aa9b0c2b985e0062b13b77eb0676eeae53ccb3064deae0ad88eff49bd6f7e17`；学生 403 `ERR-AUTH-05`、匿名 401 `ERR-AUTH-04`；教师控制台 0 errors/warnings；证据 `output/playwright/issue-222/01~06` |
 
 ## 10 缺陷、风险与处理建议
 
@@ -245,18 +260,19 @@
 | R-LAB-002 | 当前自动化评测使用 fake sandbox 或可控样本，不能替代真实 Docker 沙箱的资源隔离、并发和多语言压力验证。 | FR-LAB-04、NFR-LAB-02、NFR-LAB-04 | 在 DEV/FAT 环境补充真实沙箱专项测试并记录结果。 |
 | R-LAB-003 | 统一环境下 LRN 通知中心和 GRD 成绩页仍需验证 LAB 事件是否完整展示。 | FR-LAB-01、FR-LAB-07、FR-LAB-08 | 在模块联调阶段执行 `MAN-LAB-010` 并补充截图或验收记录。 |
 | R-LAB-004 | 真实浏览器视觉、上传控件行为、下载行为和跨页刷新体验不能完全由 Vitest 单测替代。 | UI-LAB-01 ~ UI-LAB-08 | 测试负责人整合时补跑浏览器端到端验收。 |
+| R-LAB-006 | #222 仅要求事务失败时成功补偿删除；补偿删除本身失败后的告警、审计和可重试清理机制未冻结为已实现能力。 | 文件生命周期/运维 | 不在本报告虚报；作为后续运维风险单独跟踪。 |
 
 ## 11 验收结论
 
 | 验收项 | 结论 | 说明 |
 | --- | --- | --- |
-| 功能覆盖 | 通过 | `FR-LAB-01 ~ FR-LAB-08` 均已建立追踪，并由后端/前端自动化测试覆盖核心行为 |
-| 接口覆盖 | 通过 | `API-LAB-01 ~ API-LAB-18` 已映射到控制器测试与前端 API wrapper，并完成目标命令验证 |
-| 页面覆盖 | 有条件通过 | 教师端、学生端、历史页、统计面板的关键交互已由 29 条前端单测覆盖；真实浏览器端到端仍需补充 |
-| 数据一致性 | 通过 | `DB-LAB-01 ~ DB-LAB-07` 已由迁移、事务、评分留痕和来源成绩样本测试覆盖 |
-| 权限与安全 | 通过 | 非成员访问、越权评分、他人提交查看、隐藏用例保护和发布前结果隐藏均已建立自动化验证 |
+| 功能覆盖 | 通过 | TC-LAB-01 ~ 41 已追踪；#222 后端定向 41/41、完整 302 tests 和前端 521/521 通过 |
+| 接口覆盖 | 通过 | API-LAB-10 安全 DTO 与 API-LAB-19 内容/响应头/权限/异常通过自动化和 MAN-LAB-011 |
+| 页面覆盖 | 通过 | UI-LAB-06 双入口、元数据、pending/失败/兼容状态通过 53 files/521 tests 与 1440/390 浏览器验证 |
+| 数据一致性 | 通过 | DB-LAB-09 可信字段、一对一绑定和强制事务失败物理补偿有直接自动化证据 |
+| 权限与安全 | 通过 | `canManageCourse`、学生本人排除、交叉 ID、响应头和无泄漏通过自动化；MAN-LAB-011 补充 200/403/401 |
 | 非功能 | 有条件通过 | 可靠性、可追踪性、安全性、可测试性已有自动化证据；真实性能和真实沙箱专项仍需补充 |
-| 最终结论 | 有条件通过 | LAB 测试文档已按统一模板完成并通过目标自动化验证，可交测试负责人整合；剩余工作集中在浏览器端到端、真实沙箱和统一环境联调 |
+| 最终结论 | 通过（保留运维限制） | #222 已取得完整自动化和真实浏览器证据；FileStorageService.delete 自身失败后的告警/审计/重试不在 #222 范围 |
 
 ## 12 附录
 
