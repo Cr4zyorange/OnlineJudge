@@ -1,18 +1,23 @@
 package com.onlinejudge.hwk.domain;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
 public interface HomeworkRepository {
     Homework save(Homework homework);
 
-    Homework update(Homework homework);
+    Optional<Homework> update(Homework homework);
 
-    Homework replaceQuestions(long homeworkId, List<HomeworkQuestion> questions);
+    Optional<Homework> replaceQuestions(long homeworkId, List<HomeworkQuestion> questions);
 
-    Homework replaceTestCases(long homeworkId, List<HomeworkTestCase> testCases);
+    Optional<Homework> replaceTestCases(long homeworkId, List<HomeworkTestCase> testCases);
+
+    boolean softDeleteDraft(long homeworkId, LocalDateTime deletedAt);
 
     Optional<Homework> findById(long homeworkId);
+
+    Optional<Homework> findByIdForUpdate(long homeworkId);
 
     List<Homework> findByCourseId(long courseId, HomeworkStatus status, String keyword, int page, int size);
 

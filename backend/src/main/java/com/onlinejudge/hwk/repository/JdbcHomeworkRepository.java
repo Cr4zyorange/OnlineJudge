@@ -12,6 +12,7 @@ import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
 import org.springframework.jdbc.support.KeyHolder;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.sql.PreparedStatement;
 import java.sql.Timestamp;
@@ -114,9 +115,9 @@ public class JdbcHomeworkRepository implements HomeworkRepository {
     }
 
     @Override
-    public Homework update(Homework homework) {
-        Long judgeConfigId = replaceJudgeConfig(homework.id(), homework.judgeConfig(), homework.updatedAt());
-        jdbcTemplate.update("""
+    @Transactional
+    public Optional<Homework> update(Homework homework) {
+        int affectedRows = jdbcTemplate.update("""
                 UPDATE t_hwk_homework
                 SET chapter_id = ?,
                     title = ?,
@@ -128,11 +129,9 @@ public class JdbcHomeworkRepository implements HomeworkRepository {
                     allow_resubmit = ?,
                     allow_late_submit = ?,
                     show_evaluation_before_publish = ?,
-                    judge_config_id = ?,
                     published_at = ?,
-                    is_deleted = ?,
                     updated_at = ?
-                WHERE id = ?
+                WHERE id = ? AND is_deleted = FALSE
                 """,
                 homework.chapterId(),
                 homework.title(),
@@ -144,31 +143,52 @@ public class JdbcHomeworkRepository implements HomeworkRepository {
                 homework.allowResubmit(),
                 homework.allowLateSubmit(),
                 homework.showEvaluationBeforePublish(),
-                judgeConfigId,
                 homework.publishedAt() == null ? null : Timestamp.valueOf(homework.publishedAt()),
-                homework.deleted(),
                 Timestamp.valueOf(homework.updatedAt()),
                 homework.id()
         );
+        if (affectedRows == 0) {
+            return Optional.empty();
+        }
+        replaceJudgeConfig(homework.id(), homework.judgeConfig(), homework.updatedAt());
         replaceQuestionRows(homework.id(), homework.questions());
         replaceTestCaseRows(homework.id(), homework.testCases());
-        return findById(homework.id()).orElseThrow(() -> new IllegalStateException("failed to reload updated homework"));
+        return findById(homework.id()).filter(updated -> !updated.deleted());
     }
 
     @Override
-    public Homework replaceQuestions(long homeworkId, List<HomeworkQuestion> questions) {
-        Homework existing = findById(homeworkId).orElseThrow(() -> new IllegalArgumentException("homework not found"));
+    @Transactional
+    public Optional<Homework> replaceQuestions(long homeworkId, List<HomeworkQuestion> questions) {
+        LocalDateTime updatedAt = LocalDateTime.now();
+        if (!touchActive(homeworkId, updatedAt)) {
+            return Optional.empty();
+        }
         replaceQuestionRows(homeworkId, questions);
-        touch(homeworkId, LocalDateTime.now());
-        return findById(homeworkId).orElse(existing);
+        return findById(homeworkId).filter(updated -> !updated.deleted());
     }
 
     @Override
-    public Homework replaceTestCases(long homeworkId, List<HomeworkTestCase> testCases) {
-        Homework existing = findById(homeworkId).orElseThrow(() -> new IllegalArgumentException("homework not found"));
+    @Transactional
+    public Optional<Homework> replaceTestCases(long homeworkId, List<HomeworkTestCase> testCases) {
+        LocalDateTime updatedAt = LocalDateTime.now();
+        if (!touchActive(homeworkId, updatedAt)) {
+            return Optional.empty();
+        }
         replaceTestCaseRows(homeworkId, testCases);
-        touch(homeworkId, LocalDateTime.now());
-        return findById(homeworkId).orElse(existing);
+        return findById(homeworkId).filter(updated -> !updated.deleted());
+    }
+
+    @Override
+    @Transactional
+    public boolean softDeleteDraft(long homeworkId, LocalDateTime deletedAt) {
+        return jdbcTemplate.update("""
+                        UPDATE t_hwk_homework
+                        SET is_deleted = TRUE, updated_at = ?
+                        WHERE id = ? AND status = 'DRAFT' AND is_deleted = FALSE
+                        """,
+                Timestamp.valueOf(deletedAt),
+                homeworkId
+        ) == 1;
     }
 
     @Override
@@ -179,6 +199,21 @@ public class JdbcHomeworkRepository implements HomeworkRepository {
                                created_by, published_at, is_deleted, created_at, updated_at
                         FROM t_hwk_homework
                         WHERE id = ?
+                        """,
+                HOMEWORK_ROW_MAPPER,
+                homeworkId
+        ).stream().findFirst().map(this::attachChildren);
+    }
+
+    @Override
+    public Optional<Homework> findByIdForUpdate(long homeworkId) {
+        return jdbcTemplate.query("""
+                        SELECT id, course_id, chapter_id, title, description, type, status, total_score, deadline,
+                               allow_resubmit, allow_late_submit, show_evaluation_before_publish, judge_config_id,
+                               created_by, published_at, is_deleted, created_at, updated_at
+                        FROM t_hwk_homework
+                        WHERE id = ?
+                        FOR UPDATE
                         """,
                 HOMEWORK_ROW_MAPPER,
                 homeworkId
@@ -374,7 +409,10 @@ public class JdbcHomeworkRepository implements HomeworkRepository {
     private Long replaceJudgeConfig(long homeworkId, HomeworkJudgeConfig judgeConfig, LocalDateTime now) {
         jdbcTemplate.update("DELETE FROM t_hwk_judge_config WHERE homework_id = ?", homeworkId);
         if (judgeConfig == null) {
-            jdbcTemplate.update("UPDATE t_hwk_homework SET judge_config_id = NULL WHERE id = ?", homeworkId);
+            jdbcTemplate.update(
+                    "UPDATE t_hwk_homework SET judge_config_id = NULL WHERE id = ? AND is_deleted = FALSE",
+                    homeworkId
+            );
             return null;
         }
         KeyHolder keyHolder = new GeneratedKeyHolder();
@@ -394,12 +432,20 @@ public class JdbcHomeworkRepository implements HomeworkRepository {
             return statement;
         }, keyHolder);
         long configId = Objects.requireNonNull(keyHolder.getKey()).longValue();
-        jdbcTemplate.update("UPDATE t_hwk_homework SET judge_config_id = ? WHERE id = ?", configId, homeworkId);
+        jdbcTemplate.update(
+                "UPDATE t_hwk_homework SET judge_config_id = ? WHERE id = ? AND is_deleted = FALSE",
+                configId,
+                homeworkId
+        );
         return configId;
     }
 
-    private void touch(long homeworkId, LocalDateTime updatedAt) {
-        jdbcTemplate.update("UPDATE t_hwk_homework SET updated_at = ? WHERE id = ?", Timestamp.valueOf(updatedAt), homeworkId);
+    private boolean touchActive(long homeworkId, LocalDateTime updatedAt) {
+        return jdbcTemplate.update(
+                "UPDATE t_hwk_homework SET updated_at = ? WHERE id = ? AND is_deleted = FALSE",
+                Timestamp.valueOf(updatedAt),
+                homeworkId
+        ) == 1;
     }
 
     private void bindHomework(PreparedStatement statement, Homework homework, Long judgeConfigId) throws java.sql.SQLException {

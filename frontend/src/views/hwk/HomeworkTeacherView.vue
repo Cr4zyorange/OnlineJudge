@@ -167,6 +167,16 @@
           >
             {{ pendingLabel(rowId(row), 'release', '发布成绩') }}
           </button>
+          <button
+            v-if="isEditable(rowStatus(row))"
+            class="danger-action"
+            :data-testid="`delete-homework-${rowId(row)}`"
+            type="button"
+            :disabled="pendingAction !== null"
+            @click="runLifecycleRow(row, 'delete')"
+          >
+            {{ pendingLabel(rowId(row), 'delete', '删除草稿') }}
+          </button>
         </div>
       </template>
     </DataTable>
@@ -199,6 +209,7 @@ import { computed, ref, watch } from 'vue';
 import { RouterLink } from 'vue-router';
 import {
   closeHomework,
+  deleteHomework,
   getHomeworkDetail,
   getHomeworkStatistics,
   listHomeworks,
@@ -215,7 +226,7 @@ import SummaryStrip, { type SummaryStripItem } from '../../components/foundation
 import type { HomeworkStatistics, HomeworkStatus, HomeworkSummary, HomeworkType } from '../../types/hwk';
 import { formatHomeworkStatus, formatHomeworkType } from './hwkDisplay';
 
-type LifecycleAction = 'publish' | 'close' | 'release';
+type LifecycleAction = 'publish' | 'close' | 'release' | 'delete';
 
 interface HomeworkRow extends DataTableRow {
   id: number;
@@ -489,6 +500,7 @@ async function runLifecycle(row: HomeworkRow, action: LifecycleAction) {
     if (action === 'publish') await publishHomework(row.id);
     if (action === 'close') await closeHomework(row.id);
     if (action === 'release') await publishHomeworkScores(row.id);
+    if (action === 'delete') await deleteHomework(row.id);
     operationFeedback.value = copy.success;
     await loadHomeworks();
   } catch (error) {
@@ -526,6 +538,11 @@ function lifecycleCopy(action: LifecycleAction, title: string) {
       confirm: `确认发布“${title}”的成绩？学生将看到最终分与公开反馈。`,
       success: `“${title}”成绩发布成功。`,
       failure: '成绩发布失败，请确认批阅状态后重试。'
+    },
+    delete: {
+      confirm: `确认删除草稿“${title}”？作业将从列表隐藏，但题目、用例与历史记录会保留。`,
+      success: `草稿“${title}”已删除。`,
+      failure: '草稿删除失败，请刷新状态后重试。'
     }
   }[action];
 }
@@ -656,6 +673,11 @@ function localizedError(error: unknown, fallback: string) {
 .homework-row-actions button:disabled {
   cursor: wait;
   opacity: 0.58;
+}
+
+.homework-row-actions .danger-action {
+  border-color: rgba(180, 35, 24, 0.28);
+  color: #8f2d24;
 }
 
 .contract-blocker {
