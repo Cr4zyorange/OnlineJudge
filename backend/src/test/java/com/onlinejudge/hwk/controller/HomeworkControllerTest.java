@@ -7,6 +7,8 @@ import com.onlinejudge.common.evaluation.EvaluationTask;
 import com.onlinejudge.common.evaluation.Evaluator;
 import com.onlinejudge.common.event.NotificationEvent;
 import com.onlinejudge.common.event.NotificationEventPublisher;
+import com.onlinejudge.hwk.domain.Homework;
+import com.onlinejudge.hwk.domain.HomeworkRepository;
 import com.onlinejudge.integration.grade.SourceGradeClient;
 import com.onlinejudge.integration.grade.SourceGradeType;
 import org.junit.jupiter.api.BeforeEach;
@@ -33,6 +35,7 @@ import static java.util.Map.entry;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.hasSize;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -101,6 +104,9 @@ class HomeworkControllerTest {
     private JdbcTemplate jdbcTemplate;
 
     @Autowired
+    private HomeworkRepository homeworkRepository;
+
+    @Autowired
     private RecordingNotificationEventPublisher notificationEventPublisher;
 
     @Autowired
@@ -155,6 +161,155 @@ class HomeworkControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.questions", hasSize(1)))
                 .andExpect(jsonPath("$.data.questions[0].stem").value("2 + 2 = ?"));
+    }
+
+    @Test
+    void courseManagerSoftDeletesDraftAndPreservesHomeworkHistory() throws Exception {
+        long homeworkId = createHomeworkAndReturnId(codePayload("[\"python\"]"));
+        jdbcTemplate.update("""
+                INSERT INTO t_hwk_question
+                (homework_id, question_type, stem, options_json, answer_json, score, sort_order, created_at, updated_at)
+                VALUES (?, 'JUDGE', '保留的历史题目', '[\"true\",\"false\"]', '[\"true\"]', 10, 1,
+                        CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                """, homeworkId);
+        long submissionId = insertSubmission(homeworkId, 601, "CODE", "SUBMITTED", "ACCEPTED", "REVIEWED",
+                100, BigDecimal.valueOf(100), 1, true, false, "2026-08-21 10:00:00");
+        insertEvaluation(submissionId, homeworkId, 601);
+        insertReviewLog(submissionId, homeworkId, 601);
+        jdbcTemplate.update(
+                "UPDATE t_hwk_homework SET updated_at = TIMESTAMP '2026-08-20 08:00:00' WHERE id = ?",
+                homeworkId
+        );
+
+        Map<String, List<Map<String, Object>>> before = childRows(homeworkId);
+        Long judgeConfigIdBefore = jdbcTemplate.queryForObject(
+                "SELECT judge_config_id FROM t_hwk_homework WHERE id = ?",
+                Long.class,
+                homeworkId
+        );
+        String updatedBefore = jdbcTemplate.queryForObject(
+                "SELECT CAST(updated_at AS VARCHAR) FROM t_hwk_homework WHERE id = ?",
+                String.class,
+                homeworkId
+        );
+
+        mockMvc.perform(delete("/api/v1/homeworks/{homeworkId}", homeworkId)
+                        .headers(teacherHeaders("101", "101")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"))
+                .andExpect(jsonPath("$.data.id").value(homeworkId))
+                .andExpect(jsonPath("$.data.status").value("DRAFT"))
+                .andExpect(jsonPath("$.data.deleted").value(true))
+                .andExpect(jsonPath("$.data.updatedAt").exists());
+
+        Map<String, Object> parent = jdbcTemplate.queryForMap(
+                "SELECT status, is_deleted, judge_config_id, CAST(updated_at AS VARCHAR) AS updated_at FROM t_hwk_homework WHERE id = ?",
+                homeworkId
+        );
+        assertThat(parent.get("status")).isEqualTo("DRAFT");
+        assertThat(((Number) parent.get("is_deleted")).intValue()).isEqualTo(1);
+        assertThat(((Number) parent.get("judge_config_id")).longValue()).isEqualTo(judgeConfigIdBefore);
+        assertThat(parent.get("updated_at")).isNotEqualTo(updatedBefore);
+        assertThat(childRows(homeworkId)).isEqualTo(before);
+
+        mockMvc.perform(get("/api/v1/homeworks")
+                        .headers(teacherHeaders("101", "101"))
+                        .param("courseId", "101"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.list", hasSize(0)));
+        mockMvc.perform(get("/api/v1/homeworks/{homeworkId}", homeworkId)
+                        .headers(teacherHeaders("101", "101")))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("HWK_4001"));
+        mockMvc.perform(delete("/api/v1/homeworks/{homeworkId}", homeworkId)
+                        .headers(teacherHeaders("101", "101")))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("HWK_4001"));
+    }
+
+    @Test
+    void draftDeletionRequiresCourseManagementPermission() throws Exception {
+        long homeworkId = createHomeworkAndReturnId(textPayload());
+
+        mockMvc.perform(delete("/api/v1/homeworks/{homeworkId}", homeworkId)
+                        .headers(studentHeaders("101")))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("HWK_4031"));
+
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT is_deleted FROM t_hwk_homework WHERE id = ?",
+                Boolean.class,
+                homeworkId
+        )).isFalse();
+    }
+
+    @Test
+    void onlyDraftHomeworkCanBeDeleted() throws Exception {
+        long homeworkId = createHomeworkAndReturnId(textPayload());
+
+        for (String statusName : List.of("NOT_OPEN", "PUBLISHED", "CLOSED", "SCORE_PUBLISHED", "ARCHIVED")) {
+            jdbcTemplate.update(
+                    "UPDATE t_hwk_homework SET status = ?, is_deleted = FALSE WHERE id = ?",
+                    statusName,
+                    homeworkId
+            );
+
+            mockMvc.perform(delete("/api/v1/homeworks/{homeworkId}", homeworkId)
+                            .headers(teacherHeaders("101", "101")))
+                    .andExpect(status().isConflict())
+                    .andExpect(jsonPath("$.code").value("HWK_4095"));
+        }
+
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT is_deleted FROM t_hwk_homework WHERE id = ?",
+                Boolean.class,
+                homeworkId
+        )).isFalse();
+    }
+
+    @Test
+    void staleEditAndPublishCannotRestoreDeletedDraft() throws Exception {
+        long editHomeworkId = createHomeworkAndReturnId(textPayload());
+        Homework staleEdit = homeworkRepository.findById(editHomeworkId).orElseThrow();
+        mockMvc.perform(delete("/api/v1/homeworks/{homeworkId}", editHomeworkId)
+                        .headers(teacherHeaders("101", "101")))
+                .andExpect(status().isOk());
+
+        homeworkRepository.update(staleEdit.update(
+                staleEdit.chapterId(),
+                "过期编辑不得复活作业",
+                staleEdit.description(),
+                staleEdit.type(),
+                staleEdit.totalScore(),
+                staleEdit.deadline(),
+                staleEdit.allowResubmit(),
+                staleEdit.allowLateSubmit(),
+                staleEdit.showEvaluationBeforePublish(),
+                LocalDateTime.now(),
+                staleEdit.questions(),
+                staleEdit.testCases(),
+                staleEdit.judgeConfig()
+        ));
+
+        long publishHomeworkId = createHomeworkAndReturnId(objectivePayload());
+        Homework stalePublish = homeworkRepository.findById(publishHomeworkId).orElseThrow();
+        mockMvc.perform(delete("/api/v1/homeworks/{homeworkId}", publishHomeworkId)
+                        .headers(teacherHeaders("101", "101")))
+                .andExpect(status().isOk());
+        homeworkRepository.update(stalePublish.publish(LocalDateTime.now()));
+
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+                "SELECT id, title, status, is_deleted FROM t_hwk_homework WHERE id IN (?, ?) ORDER BY id",
+                editHomeworkId,
+                publishHomeworkId
+        );
+        assertThat(rows).allSatisfy(row ->
+                assertThat(((Number) row.get("is_deleted")).intValue()).isEqualTo(1)
+        );
+        assertThat(rows.get(0).get("title")).isEqualTo(staleEdit.title());
+        assertThat(rows.get(0).get("status")).isEqualTo("DRAFT");
+        assertThat(rows.get(1).get("status")).isEqualTo("DRAFT");
+        assertThat(notificationEventPublisher.events()).isEmpty();
     }
 
     @Test
@@ -1529,6 +1684,54 @@ class HomeworkControllerTest {
                 deleted
         );
         return jdbcTemplate.queryForObject("SELECT MAX(id) FROM t_hwk_submission", Long.class);
+    }
+
+    private void insertEvaluation(long submissionId, long homeworkId, long studentId) {
+        jdbcTemplate.update("""
+                INSERT INTO t_hwk_evaluation
+                (submission_id, homework_id, student_id, evaluation_type, status, score, passed_cases, total_cases,
+                 time_used_ms, memory_used_kb, feedback, started_at, finished_at, created_at, updated_at)
+                VALUES (?, ?, ?, 'AUTO', 'ACCEPTED', 100, 1, 1, 20, 1024, '历史评测结果',
+                        CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                """, submissionId, homeworkId, studentId);
+    }
+
+    private void insertReviewLog(long submissionId, long homeworkId, long studentId) {
+        jdbcTemplate.update("""
+                INSERT INTO t_hwk_review_log
+                (submission_id, homework_id, student_id, operation_type, old_score, new_score,
+                 comment, operator_id, reason, created_at)
+                VALUES (?, ?, ?, 'REVIEW', NULL, 100, '历史批阅', 501, '保留历史', CURRENT_TIMESTAMP)
+                """, submissionId, homeworkId, studentId);
+    }
+
+    private Map<String, List<Map<String, Object>>> childRows(long homeworkId) {
+        return Map.of(
+                "questions", jdbcTemplate.queryForList(
+                        "SELECT id, stem, answer_json FROM t_hwk_question WHERE homework_id = ? ORDER BY id",
+                        homeworkId
+                ),
+                "testCases", jdbcTemplate.queryForList(
+                        "SELECT id, input_data, expected_output FROM t_hwk_test_case WHERE homework_id = ? ORDER BY id",
+                        homeworkId
+                ),
+                "judgeConfig", jdbcTemplate.queryForList(
+                        "SELECT id, language_limit_json, output_compare_mode FROM t_hwk_judge_config WHERE homework_id = ? ORDER BY id",
+                        homeworkId
+                ),
+                "submissions", jdbcTemplate.queryForList(
+                        "SELECT id, student_id, answer_text, submit_status FROM t_hwk_submission WHERE homework_id = ? ORDER BY id",
+                        homeworkId
+                ),
+                "evaluations", jdbcTemplate.queryForList(
+                        "SELECT id, submission_id, status, feedback FROM t_hwk_evaluation WHERE homework_id = ? ORDER BY id",
+                        homeworkId
+                ),
+                "reviewLogs", jdbcTemplate.queryForList(
+                        "SELECT id, submission_id, operation_type, reason FROM t_hwk_review_log WHERE homework_id = ? ORDER BY id",
+                        homeworkId
+                )
+        );
     }
 
     private Map<String, Object> objectivePayload() {

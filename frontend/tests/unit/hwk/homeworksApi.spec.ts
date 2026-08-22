@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   closeHomework,
   createHomework,
+  deleteHomework,
   getHomeworkDetail,
   getHomeworkEvaluationLogs,
   getHomeworkSubmissionReviewLogs,
@@ -44,7 +45,12 @@ describe('homeworks api', () => {
       .mockResolvedValueOnce(jsonResponse([{ ...testCasePayload(), id: 9, homeworkId: 11 }]))
       .mockResolvedValueOnce(jsonResponse(homeworkDetail({ id: 11 })))
       .mockResolvedValueOnce(jsonResponse(homeworkDetail({ id: 11, status: 'PUBLISHED' })))
-      .mockResolvedValueOnce(jsonResponse(homeworkDetail({ id: 11, status: 'CLOSED' })));
+      .mockResolvedValueOnce(jsonResponse(homeworkDetail({ id: 11, status: 'CLOSED' })))
+      .mockResolvedValueOnce(jsonResponse(homeworkDetail({
+        id: 11,
+        deleted: true,
+        updatedAt: '2026-08-22T12:25:04'
+      })));
 
     await expect(listHomeworks({ courseId: 101, status: 'DRAFT', keyword: 'array' }))
       .resolves.toEqual({ list: [], page: 1, size: 20, total: 0 });
@@ -56,6 +62,10 @@ describe('homeworks api', () => {
     await getHomeworkDetail(11);
     await publishHomework(11);
     await closeHomework(11);
+    await expect(deleteHomework(11)).resolves.toEqual(expect.objectContaining({
+      deleted: true,
+      updatedAt: '2026-08-22T12:25:04'
+    }));
 
     expect(fetchMock.mock.calls.map((call) => [call[0], (call[1] as RequestInit).method])).toEqual([
       ['/api/v1/homeworks?courseId=101&page=1&size=20&status=DRAFT&keyword=array', 'GET'],
@@ -66,7 +76,8 @@ describe('homeworks api', () => {
       ['/api/v1/homeworks/11/test-cases', 'GET'],
       ['/api/v1/homeworks/11', 'GET'],
       ['/api/v1/homeworks/11/publish', 'PUT'],
-      ['/api/v1/homeworks/11/close', 'PUT']
+      ['/api/v1/homeworks/11/close', 'PUT'],
+      ['/api/v1/homeworks/11', 'DELETE']
     ]);
   });
 

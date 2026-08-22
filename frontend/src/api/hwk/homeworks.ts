@@ -58,6 +58,12 @@ export function updateHomework(homeworkId: number, payload: HomeworkPayload): Pr
   });
 }
 
+export function deleteHomework(homeworkId: number): Promise<HomeworkDetail> {
+  return request<HomeworkDetail>(`/api/v1/homeworks/${homeworkId}`, {
+    method: 'DELETE'
+  });
+}
+
 export function getHomeworkDetail(homeworkId: number): Promise<HomeworkDetail> {
   return request<HomeworkDetail>(`/api/v1/homeworks/${homeworkId}`);
 }

@@ -32,7 +32,7 @@
 | UI-LAB-06 | LAB | 教师评分页面：查看提交并填写评分反馈 | 合并承载 | `/manage/submissions` — `LabSubmissionWorkspaceView.vue`；`/:submissionId` — `LabSubmissionReviewView.vue` | `router.spec.ts` workspace/review 契约；评分组件测试 |
 | UI-LAB-07 | LAB | 学生实验结果页面 | 已实现 | `/labs/:labId/result` 与 `/submissions/:submissionId/result` — `LabSubmissionResultView.vue` | `router.spec.ts` latest/historic result 契约 |
 | UI-LAB-08 | LAB | 教师实验统计页面 | 已实现 | `/courses/:courseId/labs/:labId/manage/statistics` — `LabStatisticsView.vue` | `router.spec.ts` statistics 契约；`LabStatisticsView.spec.ts` |
-| UI-HWK-01 | HWK | 作业中心页面：按角色、状态和关键词查看作业 | 合并承载 | `/courses/:courseId/homeworks` — `CourseHomeworkIndexView.vue`；管理态 `/homeworks/manage` — `HomeworkTeacherView.vue` | `router.ts` 的学生/教师作业入口 |
+| UI-HWK-01 | HWK | 作业中心页面：按角色、状态和关键词查看作业；教师总览仅对 DRAFT 提供 API-HWK-22 确认式逻辑删除，失败保留原行、成功刷新并在末页为空时回退 | 合并承载 | `/courses/:courseId/homeworks` — `CourseHomeworkIndexView.vue`；管理态 `/homeworks/manage` — `HomeworkTeacherView.vue` | `router.ts` 的学生/教师作业入口；`HomeworkTeacherView.spec.ts` 的删除可见性、确认/pending/失败保留/末页回退契约；1440px/390px 浏览器证据 |
 | UI-HWK-02 | HWK | 教师作业创建和编辑页面 | 已实现 | `/homeworks/new`、`/:homeworkId/edit` — `HomeworkEditorView.vue` | `router.spec.ts` create/edit 契约；`HomeworkEditorView.spec.ts` |
 | UI-HWK-03 | HWK | 作业发布管理页面 | 合并承载 | `/homeworks/manage` — `HomeworkTeacherView.vue`；`/:homeworkId/manage` — `HomeworkManageView.vue` | `router.spec.ts` manage 契约；管理组件测试 |
 | UI-HWK-04 | HWK | 学生作业详情页面 | 合并承载 | `/courses/:courseId/homeworks/:homeworkId` — `HomeworkStudentView.vue` | `router.spec.ts` homework-detail 契约；`HomeworkStudentView.spec.ts` |

@@ -95,4 +95,10 @@ public record Homework(
                 deadline, allowResubmit, allowLateSubmit, showEvaluationBeforePublish, judgeConfigId, createdBy,
                 publishedAt, deleted, createdAt, updatedAt, questions, testCases, judgeConfig);
     }
+
+    public Homework softDelete(LocalDateTime deletedAt) {
+        return new Homework(id, courseId, chapterId, title, description, type, status, totalScore,
+                deadline, allowResubmit, allowLateSubmit, showEvaluationBeforePublish, judgeConfigId, createdBy,
+                publishedAt, true, createdAt, deletedAt, questions, testCases, judgeConfig);
+    }
 }

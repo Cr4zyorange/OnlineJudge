@@ -100,7 +100,7 @@ public class HomeworkService {
         }
         validate(command);
         LocalDateTime now = LocalDateTime.now();
-        return repository.update(existing.update(
+        return requireActiveWrite(repository.update(existing.update(
                 command.chapterId(),
                 command.title().trim(),
                 command.description() == null ? "" : command.description().trim(),
@@ -114,7 +114,7 @@ public class HomeworkService {
                 normalizeQuestions(command.questions(), now),
                 normalizeTestCases(command.testCases(), now),
                 normalizeJudgeConfig(command.judgeConfig(), now)
-        ));
+        )));
     }
 
     public PageResponse<Homework> list(long userId, long courseId, HomeworkStatus status, String keyword, int page, int size) {
@@ -165,7 +165,10 @@ public class HomeworkService {
         requireManagePermission(existing.courseId(), teacherId);
         requireDraft(existing);
         validateQuestions(questions);
-        return repository.replaceQuestions(homeworkId, normalizeQuestions(questions, LocalDateTime.now()));
+        return requireActiveWrite(repository.replaceQuestions(
+                homeworkId,
+                normalizeQuestions(questions, LocalDateTime.now())
+        ));
     }
 
     @Transactional
@@ -174,7 +177,10 @@ public class HomeworkService {
         requireManagePermission(existing.courseId(), teacherId);
         requireDraft(existing);
         validateTestCases(testCases);
-        return repository.replaceTestCases(homeworkId, normalizeTestCases(testCases, LocalDateTime.now()));
+        return requireActiveWrite(repository.replaceTestCases(
+                homeworkId,
+                normalizeTestCases(testCases, LocalDateTime.now())
+        ));
     }
 
     public List<HomeworkTestCase> testCases(long homeworkId, long managerId) {
@@ -196,7 +202,7 @@ public class HomeworkService {
         if (existing.type() == HomeworkType.OBJECTIVE && existing.questions().isEmpty()) {
             throw new HomeworkApiException("HWK_4005", "objective homework requires at least one question", HttpStatus.BAD_REQUEST);
         }
-        Homework published = repository.update(existing.publish(LocalDateTime.now()));
+        Homework published = requireActiveWrite(repository.update(existing.publish(LocalDateTime.now())));
         try {
             notificationEventPublisher.publish(new NotificationEvent(
                     "homework-published-" + published.id() + "-" + published.updatedAt(),
@@ -223,7 +229,7 @@ public class HomeworkService {
         if (existing.status() != HomeworkStatus.PUBLISHED) {
             throw new HomeworkApiException("HWK_4093", "current homework state cannot be closed", HttpStatus.CONFLICT);
         }
-        return repository.update(existing.close(LocalDateTime.now()));
+        return requireActiveWrite(repository.update(existing.close(LocalDateTime.now())));
     }
 
     @Transactional
@@ -241,7 +247,7 @@ public class HomeworkService {
                 .filter(submission -> effectiveScore(submission).isPresent())
                 .toList();
         LocalDateTime now = LocalDateTime.now();
-        Homework published = repository.update(existing.publishScores(now));
+        Homework published = requireActiveWrite(repository.update(existing.publishScores(now)));
         for (HomeworkSubmission submission : scoredSubmissions) {
             reviewLogRepository.save(new HomeworkReviewLog(
                     0L,
@@ -261,6 +267,27 @@ public class HomeworkService {
         return published;
     }
 
+    @Transactional
+    public Homework deleteDraft(long homeworkId, long managerId) {
+        Homework existing = findExisting(homeworkId);
+        requireManagePermission(existing.courseId(), managerId);
+        if (existing.status() != HomeworkStatus.DRAFT) {
+            throw cannotDeleteDraft();
+        }
+        LocalDateTime deletedAt = LocalDateTime.now();
+        if (repository.softDeleteDraft(homeworkId, deletedAt)) {
+            return repository.findByIdForUpdate(homeworkId)
+                    .filter(Homework::deleted)
+                    .orElseThrow(this::homeworkNotFound);
+        }
+        Homework current = repository.findByIdForUpdate(homeworkId)
+                .orElseThrow(this::homeworkNotFound);
+        if (current.deleted()) {
+            throw homeworkNotFound();
+        }
+        throw cannotDeleteDraft();
+    }
+
     public List<HomeworkSubmission> finalSubmissions(long homeworkId) {
         return submissionRepository.findFinalByHomeworkId(homeworkId);
     }
@@ -278,7 +305,23 @@ public class HomeworkService {
     private Homework findExisting(long homeworkId) {
         return repository.findById(homeworkId)
                 .filter(homework -> !homework.deleted())
-                .orElseThrow(() -> new HomeworkApiException("HWK_4001", "homework not found", HttpStatus.NOT_FOUND));
+                .orElseThrow(this::homeworkNotFound);
+    }
+
+    private Homework requireActiveWrite(Optional<Homework> result) {
+        return result.filter(homework -> !homework.deleted()).orElseThrow(this::homeworkNotFound);
+    }
+
+    private HomeworkApiException homeworkNotFound() {
+        return new HomeworkApiException("HWK_4001", "homework not found", HttpStatus.NOT_FOUND);
+    }
+
+    private HomeworkApiException cannotDeleteDraft() {
+        return new HomeworkApiException(
+                "HWK_4095",
+                "only draft homework can be deleted",
+                HttpStatus.CONFLICT
+        );
     }
 
     private void requireManagePermission(long courseId, long userId) {

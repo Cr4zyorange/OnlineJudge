@@ -82,23 +82,33 @@ class HomeworkSubmissionServiceTest {
         }
 
         @Override
-        public Homework update(Homework homework) {
+        public Optional<Homework> update(Homework homework) {
             throw new UnsupportedOperationException();
         }
 
         @Override
-        public Homework replaceQuestions(long homeworkId, List<HomeworkQuestion> questions) {
+        public Optional<Homework> replaceQuestions(long homeworkId, List<HomeworkQuestion> questions) {
             throw new UnsupportedOperationException();
         }
 
         @Override
-        public Homework replaceTestCases(long homeworkId, List<HomeworkTestCase> testCases) {
+        public Optional<Homework> replaceTestCases(long homeworkId, List<HomeworkTestCase> testCases) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public boolean softDeleteDraft(long homeworkId, LocalDateTime deletedAt) {
             throw new UnsupportedOperationException();
         }
 
         @Override
         public Optional<Homework> findById(long homeworkId) {
             return homework.id() == homeworkId ? Optional.of(homework) : Optional.empty();
+        }
+
+        @Override
+        public Optional<Homework> findByIdForUpdate(long homeworkId) {
+            return findById(homeworkId);
         }
 
         @Override

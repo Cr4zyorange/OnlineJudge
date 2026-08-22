@@ -16,13 +16,13 @@
 
 本文档为“在线教学与实训平台”中作业与自动评测模块（HWK）的详细设计提交稿，用于提交给详细设计负责人，并合并到《软件详细设计说明书》第 3.5 节及后续接口清单、数据库清单、需求追踪矩阵中。
 
-本模块设计依据《软件需求规格说明书》《软件概要设计说明书》《软件详细设计说明书》底稿和《详细设计—各模块负责人分工》编写，重点覆盖作业发布、题目与测试用例管理、学生提交、提交历史、自动评测、教师批阅、重评、反馈展示、单次作业统计、待处理名单和成绩推送等内容。
+本模块设计依据《软件需求规格说明书》《软件概要设计说明书》《软件详细设计说明书》底稿和《详细设计—各模块负责人分工》编写，重点覆盖作业创建与草稿逻辑删除、发布、题目与测试用例管理、学生提交、提交历史、自动评测、教师批阅、重评、反馈展示、单次作业统计、待处理名单和成绩推送等内容。
 
 ### 0.1 设计边界
 
 HWK 模块负责：
 
-1. 教师创建、编辑、发布、关闭和归档作业。
+1. 教师创建、编辑、逻辑删除草稿、发布、关闭和归档作业。
 2. 教师配置客观题题目和代码题测试用例。
 3. 学生查看作业详情并提交文本、附件、客观题答案或代码。
 4. 系统保存提交历史，标识最新提交和有效提交。
@@ -32,6 +32,8 @@ HWK 模块负责：
 8. 教师查看单次作业的固定五档分数分布和未提交、待评测、待批阅名单。
 9. 向 LRN 模块发送作业发布、截止提醒、评测完成、成绩发布等事件。
 10. 向 GRD 模块提供作业成绩来源数据。
+
+草稿删除只改变 `t_hwk_homework` 父记录的逻辑删除标记，不属于作业状态迁移；题目、测试用例、判题配置、提交、评测、批阅和重评历史全部保留。本期不实现已发布作业删除、恢复或永久删除。
 
 HWK 模块不负责：
 
@@ -104,7 +106,7 @@ HWK 模块是平台中连接“课程学习任务”和“成绩评价”的核�
 
 | 页面编号 | 页面名称 | 使用角色 | 页面目标 | 主要操作 | 调用接口 |
 | --- | --- | --- | --- | --- | --- |
-| UI-HWK-01 | 作业中心页 | 学生、教师、助教 | 汇总展示用户可见的作业列表 | 学生查看待完成/已提交/已截止作业；教师查看草稿/已发布/已关闭作业；按课程、状态、关键词筛选 | API-HWK-05 |
+| UI-HWK-01 | 作业中心页 | 学生、教师、助教 | 汇总展示用户可见的作业列表 | 学生查看待完成/已提交/已截止作业；教师查看草稿/已发布/已关闭作业；按课程、状态、关键词筛选；仅对 DRAFT 确认式删除，失败保留、成功刷新并在末页为空时回退 | API-HWK-05、API-HWK-22 |
 | UI-HWK-02 | 教师作业创建/编辑页 | 教师、助教 | 创建或修改作业基础信息 | 填写标题、说明、课程、章节、截止时间、作业类型、满分、提交限制、显示策略；保存草稿 | API-HWK-01、API-HWK-02 |
 | UI-HWK-03 | 作业发布管理页 | 教师、助教 | 管理作业发布状态与配置 | 发布作业、关闭作业、查看发布信息、进入题目配置和测试用例配置 | API-HWK-03、API-HWK-04、API-HWK-14、API-HWK-16 |
 | UI-HWK-04 | 学生作业详情页 | 学生 | 查看作业说明和提交要求 | 查看作业标题、说明、附件、截止时间、提交格式、当前提交状态；进入提交页或历史页 | API-HWK-06、API-HWK-08 |
@@ -122,6 +124,10 @@ graph TD
     B -->|教师/助教| T1[教师作业列表]
     T1 --> T2[创建或编辑作业]
     T2 --> T3[保存草稿]
+    T3 --> T10{确认删除草稿?}
+    T10 -->|取消| T1
+    T10 -->|确认且仍为 DRAFT| T11[逻辑删除父作业并刷新]
+    T11 --> T1
     T2 --> T4[发布作业]
     T4 --> T5[作业发布管理页]
     T5 --> T6[提交列表/提交历史]
@@ -149,6 +155,8 @@ graph TD
 7. 统计页始终展示 `0-59`、`60-69`、`70-79`、`80-89`、`90-100` 五档，空分布也显示五个零值；三个跟进 Tab 均使用服务端分页，不由当前页数据推断全量名单。
 8. 统计页和提交队列把 Tab、筛选和页码写入 URL，刷新、前进/后退及深链进入后均可恢复。
 9. 姓名服务失败时使用不含用户编号的安全占位文案，不得展示裸 `studentId`；403 时不得渲染缓存统计或名单。
+10. 教师总览仅对 DRAFT 展示删除入口；取消确认不发送请求，删除期间与编辑、发布等生命周期操作互斥。
+11. 删除失败保留原行、筛选和页码并允许重试；成功后刷新，当前页为空时回退到有效页；1440px 与 390px 视口均需验收。
 
 ---
 
@@ -179,6 +187,7 @@ graph TD
 | API-HWK-19 | 查询代码题测试用例 | GET | /api/v1/homeworks/{homeworkId}/test-cases | 教师/助教，且有课程管理权限 | FR-HWK-04、FR-HWK-05 |
 | API-HWK-20 | 查询评测日志 | GET | /api/v1/evaluations/{evaluationId}/logs | 教师/助教，且有课程管理权限 | FR-HWK-04、FR-HWK-05 |
 | API-HWK-21 | 查询批阅日志 | GET | /api/v1/submissions/{submissionId}/review-logs | 教师/助教，且有课程管理权限 | FR-HWK-05 |
+| API-HWK-22 | 删除草稿作业 | DELETE | /api/v1/homeworks/{homeworkId} | 教师/助教，且为作业所属课程管理者；作业必须仍为 DRAFT | FR-HWK-01 |
 
 #### 4.1.1 API-HWK-09 attention 兼容增量
 
@@ -217,6 +226,17 @@ graph TD
 | 主要出参 | homeworkId, status, createdAt |
 | 处理逻辑 | 校验教师身份和课程权限；校验课程、章节、作业类型、截止时间和满分；创建 DRAFT 状态作业；保存附件和评测配置引用 |
 | 异常情况 | 无课程权限、课程不存在、截止时间不合法、作业类型不支持、满分配置不合法 |
+
+#### 4.2.1A 删除草稿作业 API-HWK-22
+
+| 项目 | 内容 |
+| --- | --- |
+| 方法与路径 | DELETE /api/v1/homeworks/{homeworkId} |
+| 调用方 | 教师端、助教端 |
+| 主要入参 | 路径参数 homeworkId；无请求体 |
+| 主要出参 | 复用 HomeworkResponse，`deleted=true`，`updatedAt` 为删除时间 |
+| 处理逻辑 | 读取未删除作业并校验课程管理权限；确认状态为 DRAFT；Repository 以 `id + status='DRAFT' + is_deleted=FALSE` 原子更新父表，不更新或删除任何子表或历史；返回删除后父作业快照 |
+| 异常情况 | 无权限 `403 / HWK_4031`；不存在或已删除 `404 / HWK_4001`；任何非 DRAFT 状态 `409 / HWK_4095`；原子更新零行时读取当前记录分类 |
 
 #### 4.2.2 提交作业 API-HWK-07
 
@@ -269,7 +289,7 @@ graph TD
 | 服务编号 | 服务/组件名称 | 主要职责 | 输入 | 输出 |
 | --- | --- | --- | --- | --- |
 | SVC-HWK-01 | HomeworkController | 接收作业相关 HTTP 请求，完成参数基础校验，调用业务服务 | HTTP 请求、认证上下文 | 统一 JSON 响应 |
-| SVC-HWK-02 | HomeworkService | 处理作业创建、修改、发布、关闭、归档和详情查询 | 作业 DTO、当前用户信息 | 作业实体、作业详情 DTO |
+| SVC-HWK-02 | HomeworkService | 处理作业创建、修改、草稿删除、发布、关闭、归档和详情查询；删除前校验课程管理权限与 DRAFT 状态并分类原子冲突 | 作业 DTO、当前用户信息 | 作业实体、作业详情 DTO |
 | SVC-HWK-03 | HomeworkQuestionService | 管理客观题题目，保存题干、选项、答案和分值 | 题目配置 DTO | 题目列表、题目数量 |
 | SVC-HWK-04 | HomeworkTestCaseService | 管理代码题测试用例，保存输入、期望输出、权重和隐藏状态 | 测试用例 DTO | 测试用例列表、用例数量 |
 | SVC-HWK-05 | HomeworkSubmissionService | 处理学生提交、提交历史、提交详情和有效版本标识 | 提交内容、作业配置、当前学生 | 提交记录、提交历史 |
@@ -279,7 +299,7 @@ graph TD
 | SVC-HWK-09 | HomeworkPermissionService | 封装课程成员校验、教师课程管理权限校验和提交访问权限校验 | 当前用户、courseId、homeworkId、submissionId | 权限校验结果 |
 | SVC-HWK-10 | HomeworkEventPublisher | 向 LRN 和 GRD 发送作业事件和成绩来源事件 | 业务事件 DTO | 事件发送结果 |
 | SVC-HWK-11 | EvaluationWorkerClient | 与 LAB 共享评测 Worker 抽象，提交代码评测任务并接收回调 | 评测任务、语言、限制参数、测试用例 | 评测任务状态、评测结果 |
-| SVC-HWK-12 | HomeworkRepository/Mapper | 完成业务表访问，并用条件聚合 SQL 和组合索引支持固定五档、有效范围和 attention 分页 | 实体对象、查询条件、CRS 活跃学生范围 | 数据库记录、聚合行、分页记录 |
+| SVC-HWK-12 | HomeworkRepository/Mapper | 完成业务表访问；提供父表原子 `softDeleteDraft`，普通更新不得写删除标记且排除已删除记录；用条件聚合 SQL 和组合索引支持固定五档、有效范围和 attention 分页 | 实体对象、查询条件、CRS 活跃学生范围 | 数据库记录、聚合行、分页记录 |
 
 ### 5.1 服务调用关系
 
@@ -420,6 +440,18 @@ idx_hwk_homework_deadline(deadline)
 idx_hwk_homework_created_by(created_by)
 ```
 
+父表草稿删除使用以下原子条件写入：
+
+```sql
+UPDATE t_hwk_homework
+SET is_deleted = TRUE, updated_at = :deletedAt
+WHERE id = :homeworkId
+  AND status = 'DRAFT'
+  AND is_deleted = FALSE;
+```
+
+普通修改、发布、关闭和成绩发布不得在 `SET` 中写入 `is_deleted`，并必须在 `WHERE` 中加入 `is_deleted = FALSE`。原子删除零行时读取当前记录，区分不存在/已删除与并发转为非 DRAFT；失败事务不得继续重建题目、测试用例或判题配置。
+
 #### 6.3.2 t_hwk_submission 作业提交表
 
 | 字段名 | 类型 | 是否为空 | 说明 |
@@ -493,6 +525,8 @@ idx_hwk_evaluation_status(status)
 4. 每次自动评测或重评都应生成独立评测记录，不覆盖旧评测记录。
 5. 批阅、重评、发布成绩、分数调整等关键操作必须写入 `t_hwk_review_log`。
 6. 对学生隐藏的测试用例和标准答案不得通过学生端接口返回。
+7. API-HWK-22 只逻辑删除 DB-HWK-01 父记录；DB-HWK-02、03、07 和已有 DB-HWK-04、05、06 记录全部保留，不执行级联删除或替换。
+8. 普通更新只允许命中未删除父记录，不接受客户端或旧实体携带的删除标记，防止并发旧请求复活作业。
 
 ---
 
@@ -525,6 +559,26 @@ flowchart TD
 2. 代码题必须至少配置一个测试用例。
 3. 客观题必须配置题目、答案和分值。
 4. 作业总分必须大于 0，题目分值之和原则上不超过总分。
+
+### 7.1A 教师删除草稿流程
+
+```mermaid
+flowchart TD
+    A[教师在 UI-HWK-01 查看作业] --> B{状态是否 DRAFT}
+    B -->|否| C[不展示删除入口]
+    B -->|是| D[点击删除草稿]
+    D --> E{确认删除?}
+    E -->|取消| F[不发送请求并保留原行]
+    E -->|确认| G[校验课程管理权限]
+    G --> H[原子更新父表 DRAFT 且未删除]
+    H -->|成功| I[返回 deleted=true 与删除时间]
+    I --> J[刷新列表并在必要时回退页码]
+    H -->|不存在或已删除| K[404 / HWK_4001]
+    H -->|已变为非 DRAFT| L[409 / HWK_4095]
+    G -->|无权限| M[403 / HWK_4031]
+```
+
+删除期间编辑、发布等生命周期按钮保持互斥 pending。删除只更新父作业；全部子数据和历史保持不变。普通更新的未删除条件保证删除先成功时，删除前发出的旧编辑或发布请求不能复活记录。
 5. 发布后修改截止时间、显示策略等重要信息时，需要记录日志并通知学生。
 
 ### 7.2 学生提交作业流程
@@ -614,6 +668,8 @@ flowchart TD
 ```mermaid
 stateDiagram-v2
     [*] --> DRAFT
+    DRAFT --> DELETED: 逻辑删除父记录
+    DELETED --> [*]
     DRAFT --> PUBLISHED: 教师发布
     PUBLISHED --> CLOSED: 教师关闭/到期后关闭
     CLOSED --> PUBLISHED: 教师重新开放
@@ -630,6 +686,8 @@ stateDiagram-v2
 | PUBLISHED | 是 | 是 | 部分可编辑 | 已发布阶段 |
 | CLOSED | 是 | 否 | 部分可编辑 | 关闭后不允许提交 |
 | ARCHIVED | 是，只读 | 否 | 否 | 归档保存历史 |
+
+说明：`DELETED` 仅为 `is_deleted=true` 的图示伪终态，不是 `HomeworkStatus` 枚举值，也不支持恢复或永久删除。
 
 ### 7.6 提交与评测状态机
 
@@ -671,6 +729,7 @@ stateDiagram-v2
 | HWK_4009 | EVALUATION_TASK_FAILED | 评测任务创建失败 | 评测任务创建失败，请稍后重试 | 提交保留，评测状态标记为 SYSTEM_ERROR |
 | HWK_4010 | EVALUATION_RESULT_NOT_VISIBLE | 学生试图查看未公开评分结果 | 当前结果尚未公开 | 返回无权限提示 |
 | HWK_4031 | COURSE_PERMISSION_DENIED | 教师无课程管理权限或学生非课程成员 | 无权访问该作业 | 返回 403 |
+| HWK_4095 | HOMEWORK_DELETE_STATE_CONFLICT | 删除时作业为 NOT_OPEN、PUBLISHED、CLOSED、SCORE_PUBLISHED、ARCHIVED 或任一非 DRAFT 状态 | 仅草稿作业可删除 | 返回 409，保留作业和全部子数据 |
 | HWK_5001 | INTERNAL_ERROR | 未预期系统异常 | 系统异常，请稍后重试 | 记录错误日志并返回统一异常 |
 
 ### 8.2 异常处理原则
@@ -682,6 +741,8 @@ stateDiagram-v2
 5. 教师重评失败时保留原评测结果，新评测记录标记为失败。
 6. 批阅日志写入失败时，人工评分操作应回滚，避免分数变化无留痕。
 7. 文件上传失败时不创建完整提交记录，或将提交标记为失败并提示重新上传，具体与文件模块统一。
+8. 删除请求先校验课程权限与 DRAFT 状态，再执行父表原子条件更新；零影响行以当前记录区分 `HWK_4001` 与 `HWK_4095`。
+9. 普通更新、发布、关闭和成绩发布必须排除已删除父记录；删除与旧更新竞争时，旧更新失败并回滚对子配置的写入。
 
 ---
 
@@ -694,6 +755,7 @@ stateDiagram-v2
 | 查询作业列表 | 可查询本人课程作业 | 可查询管理课程作业 | 可查询协助课程作业 | 可按平台权限查询 | 按课程成员关系过滤 |
 | 查看作业详情 | 仅已发布作业 | 所属课程全部作业 | 所属课程全部作业 | 按权限查看 | 学生不返回答案和隐藏用例 |
 | 创建/编辑作业 | 不允许 | 允许 | 允许，视课程角色配置 | 可管理 | 校验课程管理权限 |
+| 删除草稿作业 | 不允许 | 允许，仅所属课程 DRAFT | 允许，仅具备课程管理权限且为 DRAFT | 仅具备该课程管理权限时允许 | 服务端校验课程管理权限、DRAFT 和未删除条件，不因管理员身份绕过课程范围 |
 | 发布/关闭作业 | 不允许 | 允许 | 允许，视课程角色配置 | 可管理 | 写入操作日志 |
 | 提交作业 | 允许，限本人 | 不允许代交 | 不允许代交 | 不允许代交 | studentId 从认证上下文获取 |
 | 查看提交历史 | 仅本人 | 所属课程全部学生 | 所属课程全部学生 | 按权限查看 | 学生不得查看他人提交 |
@@ -716,7 +778,7 @@ stateDiagram-v2
 
 | 日志类型 | 记录时机 | 记录内容 | 存储位置 |
 | --- | --- | --- | --- |
-| 作业操作日志 | 创建、修改、发布、关闭、归档作业 | operatorId, homeworkId, operationType, beforeValue, afterValue, createdAt | 可复用审计日志或扩展日志 |
+| 作业操作日志 | 创建、修改、删除草稿、发布、关闭、归档作业 | operatorId, homeworkId, operationType, beforeValue, afterValue, createdAt | 可复用审计日志或扩展日志；#224 不新增通用生命周期审计模型 |
 | 提交日志 | 学生提交成功或失败 | studentId, homeworkId, submitStatus, submittedAt, failureReason | t_hwk_submission / 系统日志 |
 | 评测日志 | 评测开始、完成、失败、超时 | evaluationId, status, score, passedCases, errorType, logUrl | t_hwk_evaluation |
 | 批阅日志 | 教师评分、修改分数、触发重评、发布成绩 | submissionId, oldScore, newScore, operatorId, reason, createdAt | t_hwk_review_log |
@@ -743,6 +805,7 @@ stateDiagram-v2
 4. 对外事件通过 `HomeworkEventPublisher` 统一发送，便于后续替换为消息队列。
 5. 批阅和重评都生成日志记录，便于问题排查和测试验收。
 6. 数据表采用逻辑删除和公共时间字段，便于恢复和追踪历史数据。
+7. 普通更新不接收或写入 `is_deleted`，并统一带 `is_deleted=FALSE` 条件；草稿删除走独立原子 `softDeleteDraft`，避免通用更新复活父记录或重建子配置。
 
 ### 10.3 可靠性设计
 
@@ -751,6 +814,7 @@ stateDiagram-v2
 3. 评测失败不影响提交记录本身，教师仍可查看提交内容并人工处理。
 4. 发布成绩、批阅分数和写入批阅日志应在事务中完成。
 5. 向 LRN 或 GRD 发送事件失败时，业务主数据保留，并记录事件发送失败状态，后续可重试。
+6. 草稿删除只更新父表 `is_deleted/updated_at`；删除条件和 DRAFT 状态在同一 SQL 中判定，普通更新受未删除条件保护，全部子数据和历史保持完整。
 
 ---
 
@@ -760,7 +824,7 @@ stateDiagram-v2
 
 | 需求编号 | 详细设计编号 | 页面编号 | API 编号 | 数据表编号 | 测试编号 |
 | --- | --- | --- | --- | --- | --- |
-| FR-HWK-01 作业创建与发布 | DS-HWK-01 | UI-HWK-01、UI-HWK-02、UI-HWK-03 | API-HWK-01、API-HWK-02、API-HWK-03、API-HWK-04、API-HWK-16、API-HWK-18 | DB-HWK-01、DB-HWK-02、DB-HWK-03、DB-HWK-07 | TC-HWK-01、TC-HWK-02、TC-HWK-03 |
+| FR-HWK-01 作业创建与发布 | DS-HWK-01 | UI-HWK-01、UI-HWK-02、UI-HWK-03 | API-HWK-01、API-HWK-02、API-HWK-03、API-HWK-04、API-HWK-16、API-HWK-18、API-HWK-22 | DB-HWK-01、DB-HWK-02、DB-HWK-03、DB-HWK-07 | TC-HWK-01、TC-HWK-02、TC-HWK-03、TC-HWK-19 |
 | FR-HWK-02 学生作业查看与提交 | DS-HWK-02 | UI-HWK-04、UI-HWK-05 | API-HWK-05、API-HWK-06、API-HWK-07、API-HWK-17 | DB-HWK-01、DB-HWK-02、DB-HWK-04 | TC-HWK-04、TC-HWK-05、TC-HWK-06 |
 | FR-HWK-03 提交历史管理 | DS-HWK-03 | UI-HWK-06 | API-HWK-08、API-HWK-09、API-HWK-10 | DB-HWK-04 | TC-HWK-07、TC-HWK-08 |
 | FR-HWK-04 自动评测 | DS-HWK-04 | UI-HWK-05、UI-HWK-07、UI-HWK-08 | API-HWK-07、API-HWK-11、API-HWK-12、API-HWK-18、API-HWK-19、API-HWK-20 | DB-HWK-03、DB-HWK-04、DB-HWK-05 | TC-HWK-09、TC-HWK-10、TC-HWK-11、TC-HWK-12 |
@@ -794,6 +858,7 @@ stateDiagram-v2
 | TC-HWK-16 | 反馈展示 | 学生查看自己的反馈 | 根据配置展示评测摘要、成绩和教师评语 |
 | TC-HWK-17 | 未发布成绩控制 | 学生成绩发布前查看结果 | 不显示未公开最终分数 |
 | TC-HWK-18 | 作业统计与三类跟进名单 | 准备五档边界、非 100 满分、空分布、无分数、历史/删除/REJECTED/非当前学生、TEXT/FILE NONE、代码评测中/终态样本；查看统计并切换三类 Tab | 六个新增字段、五档、归一化和 `generatedAt` 正确，`scoredCount` 等于档位合计；评测/批阅语义和范围正确；名单服务端分页、稳定排序、URL 可恢复；SQL 聚合与组合索引生效 |
+| TC-HWK-19 | 草稿逻辑删除契约与教师入口 | 准备 DRAFT/全部非 DRAFT、权限用户、已删除作业、完整子数据和历史、并发旧更新及当前页唯一草稿；验证 API-HWK-22 成功/取消/403/404/409/并发防复活/子历史保留、UI-HWK-01 pending/失败保留/末页回退和 1440px/390px | 仅课程管理者删除 DRAFT；成功返回 `deleted=true` 和删除时间；HWK_4001/HWK_4031/HWK_4095 分类准确；普通更新不能复活；只软删父表；仅 DRAFT 显示入口，页面反馈及页码正确 |
 | TC-HWK-N02 | 统计性能与索引 | 使用大于单页的数据查询 API-HWK-09/15，并检查迁移元数据和查询实现 | 1 基分页、size 1～100 与聚合总数正确；Repository 使用 SQL 聚合，组合索引名称和列顺序正确，不加载全部最终提交到应用内存 |
 | TC-HWK-N04 | 权限安全 | 学生和无权限教师访问统计/attention，模拟姓名服务失败 | 返回 403 且不泄露统计、名单或学生标识；页面不展示裸 `studentId` |
 
