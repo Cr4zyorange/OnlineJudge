@@ -536,8 +536,10 @@ const routes: RouteRecordRaw[] = [
             component: () => import('../views/hwk/HomeworkStatisticsView.vue'),
             props: (route) => {
               const initialPage = positiveInteger(route.query.page);
+              const initialAttention = homeworkAttention(route.query.attention);
               return {
                 ...numberParams(route, 'courseId', 'homeworkId'),
+                ...(initialAttention === null ? {} : { initialAttention }),
                 ...(initialPage === null ? {} : { initialPage })
               };
             },
@@ -706,6 +708,11 @@ function numberParams(route: RouteLocationNormalized, ...keys: string[]) {
 function positiveInteger(value: unknown) {
   const parsed = Number(Array.isArray(value) ? value[0] : value);
   return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+}
+
+function homeworkAttention(value: unknown) {
+  const candidate = Array.isArray(value) ? value[0] : value;
+  return candidate === 'EVALUATION_PENDING' || candidate === 'REVIEW_PENDING' ? candidate : null;
 }
 
 function hasPlatformRole(user: AuthUser | null, accepted: string[]) {

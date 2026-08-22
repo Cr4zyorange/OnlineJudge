@@ -108,6 +108,12 @@ export type HomeworkEvaluationStatus =
   | 'TIME_LIMIT_EXCEEDED'
   | 'SYSTEM_ERROR';
 
+export type HomeworkAttention = 'EVALUATION_PENDING' | 'REVIEW_PENDING';
+
+export type HomeworkScoreBucket = '0-59' | '60-69' | '70-79' | '80-89' | '90-100';
+
+export type HomeworkScoreDistribution = Record<HomeworkScoreBucket, number>;
+
 export interface HomeworkSubmissionPayload {
   answerText?: string;
   answerJson?: string;
@@ -171,9 +177,15 @@ export interface HomeworkStatistics {
   unsubmittedCount: number;
   evaluatedCount: number;
   reviewedCount: number;
+  autoEvaluableCount: number;
+  pendingEvaluationCount: number;
+  pendingReviewCount: number;
+  scoredCount: number;
   averageScore: number | null;
   maxScore: number | null;
   minScore: number | null;
+  scoreDistribution: HomeworkScoreDistribution;
+  generatedAt: string;
   unsubmittedPage: number;
   unsubmittedSize: number;
   unsubmittedTotal: number;

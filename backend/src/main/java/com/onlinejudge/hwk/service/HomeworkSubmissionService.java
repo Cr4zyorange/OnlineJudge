@@ -38,6 +38,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.Optional;
 
 @Service
@@ -138,6 +139,7 @@ public class HomeworkSubmissionService {
         return new SubmissionHistory(homework, submissionRepository.findByHomeworkIdAndStudentId(homeworkId, studentId));
     }
 
+    @Transactional(readOnly = true)
     public PageResponse<HomeworkSubmission> listForManager(
             long homeworkId,
             long managerId,
@@ -149,7 +151,19 @@ public class HomeworkSubmissionService {
         requireManagePermission(homework.courseId(), managerId);
         int normalizedPage = Math.max(page, 1);
         int normalizedSize = Math.max(1, Math.min(size, 100));
-        return submissionRepository.findByHomeworkId(homeworkId, criteria, normalizedPage, normalizedSize);
+        HomeworkSubmissionSearchCriteria effectiveCriteria = criteria;
+        if (criteria != null && criteria.attention() != null) {
+            List<Long> activeStudentIds = coursePermissionClient.listCourseStudentIds(homework.courseId()).stream()
+                    .filter(Objects::nonNull)
+                    .distinct()
+                    .sorted()
+                    .toList();
+            if (activeStudentIds.isEmpty()) {
+                return new PageResponse<>(List.of(), 0, normalizedPage, normalizedSize);
+            }
+            effectiveCriteria = criteria.withActiveStudentIds(activeStudentIds);
+        }
+        return submissionRepository.findByHomeworkId(homeworkId, effectiveCriteria, normalizedPage, normalizedSize);
     }
 
     public SubmissionDetail detail(long submissionId, long userId) {
@@ -470,7 +484,8 @@ public class HomeworkSubmissionService {
         }
         LocalDateTime finishedAt = LocalDateTime.now();
         EvaluationStatus finalStatus = resolveCodeEvaluationStatus(caseEvaluations);
-        int score = caseEvaluations.stream().mapToInt(CaseEvaluation::score).sum();
+        long weightedScore = caseEvaluations.stream().mapToLong(CaseEvaluation::score).sum();
+        int score = (int) Math.min(Math.max(weightedScore, 0L), homework.totalScore());
         int passedCases = (int) caseEvaluations.stream().filter(CaseEvaluation::passed).count();
         String runLog = caseEvaluations.stream()
                 .map(CaseEvaluation::caseOutput)

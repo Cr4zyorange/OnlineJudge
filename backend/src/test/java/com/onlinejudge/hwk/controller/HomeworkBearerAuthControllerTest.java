@@ -16,6 +16,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.jdbc.Sql;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -71,6 +72,9 @@ class HomeworkBearerAuthControllerTest {
 
     @Autowired
     private CourseRepository courseRepository;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
 
     @BeforeEach
     void seedAuthRoles() {
@@ -208,6 +212,82 @@ class HomeworkBearerAuthControllerTest {
                 .andExpect(jsonPath("$.data.comment").value("reviewed by course teacher"));
     }
 
+    @Test
+    void statisticsAndAttentionUseOnlyActiveCrsStudentMemberships() throws Exception {
+        long teacherId = createUserWithRole("teacher-hwk-roster", "TEACHER");
+        long activeStudentId = createUserWithRole("active-hwk-roster", "STUDENT");
+        long pendingStudentId = createUserWithRole("pending-hwk-roster", "STUDENT");
+        long rejectedStudentId = createUserWithRole("rejected-hwk-roster", "STUDENT");
+        long removedStudentId = createUserWithRole("removed-hwk-roster", "STUDENT");
+        long deletedStudentId = createUserWithRole("deleted-hwk-roster", "STUDENT");
+        String teacherToken = sessionTokenService.createSession(teacherId).token();
+        long courseId = courseRepository.insert(new CourseCreateRequest(
+                "CRS statistics roster",
+                "Only active students define HWK statistics and attention queues.",
+                "2026 Spring",
+                "Programming",
+                null,
+                EnrollmentMode.PUBLIC,
+                null,
+                null,
+                null,
+                null,
+                CourseStatus.ACTIVE
+        ), teacherId).id();
+        courseRepository.insertMember(courseId, teacherId, CourseMemberRole.TEACHER, CourseMemberStatus.ACTIVE,
+                "CREATED", teacherId);
+        courseRepository.insertMember(courseId, activeStudentId, CourseMemberRole.STUDENT, CourseMemberStatus.ACTIVE,
+                "JOINED", teacherId);
+        courseRepository.insertMember(courseId, pendingStudentId, CourseMemberRole.STUDENT, CourseMemberStatus.PENDING,
+                "REQUEST", null);
+        courseRepository.insertMember(courseId, rejectedStudentId, CourseMemberRole.STUDENT, CourseMemberStatus.REJECTED,
+                "REQUEST", teacherId);
+        courseRepository.insertMember(courseId, removedStudentId, CourseMemberRole.STUDENT, CourseMemberStatus.REMOVED,
+                "JOINED", teacherId);
+        courseRepository.insertMember(courseId, deletedStudentId, CourseMemberRole.STUDENT, CourseMemberStatus.ACTIVE,
+                "JOINED", teacherId);
+        jdbcTemplate.update(
+                "UPDATE crs_course_member SET is_deleted = TRUE WHERE course_id = ? AND user_id = ?",
+                courseId,
+                deletedStudentId
+        );
+
+        String homeworkBody = mockMvc.perform(post("/api/v1/homeworks")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + teacherToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(textPayload(courseId))))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        long homeworkId = objectMapper.readTree(homeworkBody).path("data").path("id").asLong();
+        for (long studentId : java.util.List.of(
+                activeStudentId,
+                pendingStudentId,
+                rejectedStudentId,
+                removedStudentId,
+                deletedStudentId
+        )) {
+            insertPendingCodeSubmission(homeworkId, studentId);
+        }
+
+        mockMvc.perform(get("/api/v1/homeworks/{homeworkId}/statistics", homeworkId)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + teacherToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.totalStudentCount").value(1))
+                .andExpect(jsonPath("$.data.submittedCount").value(1))
+                .andExpect(jsonPath("$.data.autoEvaluableCount").value(1))
+                .andExpect(jsonPath("$.data.pendingEvaluationCount").value(1));
+
+        mockMvc.perform(get("/api/v1/homeworks/{homeworkId}/submissions", homeworkId)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + teacherToken)
+                        .param("attention", "EVALUATION_PENDING"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.total").value(1))
+                .andExpect(jsonPath("$.data.list", hasSize(1)))
+                .andExpect(jsonPath("$.data.list[0].studentId").value(activeStudentId));
+    }
+
     private long createUserWithRole(String username, String roleCode) {
         long userId = authRepository.createUser(
                 username,
@@ -221,6 +301,19 @@ class HomeworkBearerAuthControllerTest {
         );
         authRepository.assignRole(userId, roleCode, null);
         return userId;
+    }
+
+    private void insertPendingCodeSubmission(long homeworkId, long studentId) {
+        jdbcTemplate.update("""
+                INSERT INTO t_hwk_submission
+                (homework_id, student_id, submit_type, answer_text, answer_json, file_url, language,
+                 submit_status, evaluation_status, review_status, auto_score, manual_score, final_score,
+                 comment, version, is_final, submitted_at, reviewed_by, reviewed_at, created_at, updated_at,
+                 is_deleted)
+                VALUES (?, ?, 'CODE', NULL, NULL, NULL, 'java', 'SUBMITTED', 'PENDING', 'NEED_REVIEW',
+                        NULL, NULL, NULL, NULL, 1, TRUE, CURRENT_TIMESTAMP, NULL, NULL,
+                        CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, FALSE)
+                """, homeworkId, studentId);
     }
 
     private Map<String, Object> objectivePayload(long courseId) {

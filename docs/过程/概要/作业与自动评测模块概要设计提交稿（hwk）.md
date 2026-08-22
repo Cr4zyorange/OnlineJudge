@@ -67,7 +67,7 @@
 | CRS 课程与教学资源    | 课程信息、章节信息、课程成员关系      | 作业必须归属于课程，可选归属于章节。创建、发布、提交、查询前均需校验课程和成员关系。                |
 | LAB 实训实验模块     | 共享基础评测思路或评测服务抽象       | HWK 和 LAB 都存在代码评测场景，可共享评测 Worker 或评测接口抽象，但提交表和业务流程应分别维护。  |
 | LRN 学习过程与通知提醒  | 作业发布、截止提醒、评测完成、成绩发布事件 | HWK 只产生业务事件，不维护通知展示状态。通知生成、展示、已读未读由 LRN 统一处理。             |
-| GRD 成绩评价与教学分析  | 作业最终成绩、成绩发布时间、成绩来源    | HWK 提供作业成绩明细，GRD 负责课程成绩项归集、总评计算和统计分析。                     |
+| GRD 成绩评价与教学分析  | 作业最终成绩、成绩发布时间、成绩来源    | HWK 提供作业成绩明细及单次作业固定五档即时统计；GRD 负责课程成绩项归集、总评计算，以及课程级/跨作业、自定义区间、趋势和统计快照。 |
 | 文件存储服务         | 作业附件、学生提交附件、代码文件、评测日志 | 首版可使用本地文件系统，后续可替换为对象存储。HWK 保存文件引用路径，不直接关心底层存储实现。          |
 
 ---
@@ -122,7 +122,7 @@
 | 优先级  | P1（应实现）                                                                                                                                                                                                                                            |
 | 涉及角色 | 教师、助教                                                                                                                                                                                                                                              |
 | 核心功能 | 教师查看学生提交内容和自动评测结果，对主观题、文件题或综合作业进行人工评分和评语填写，并可对指定提交发起重评。                                                                                                                                                                                            |
-| 设计要点 | ① 教师批阅页按作业展示学生提交列表，支持按未提交、已提交、待评测、已评测、已批阅、逾期等状态筛选。<br>② 自动评测得分、教师人工评分和最终得分分开保存，避免成绩来源不清。<br>③ 对需要人工判断的内容，教师可填写 `manual_score` 和 `comment`，并确认 `final_score`。<br>④ 重评操作仅允许教师或助教触发，重评应生成新的评测记录，不删除旧评测记录。<br>⑤ 人工评分、修改分数、重评、成绩发布等关键操作需要记录操作人、操作时间和原因。 |
+| 设计要点 | ① 教师批阅页保留学生关键词、提交状态、评测状态和批阅状态筛选，并增加 `attention=EVALUATION_PENDING/REVIEW_PENDING`；不传 attention 时保持原行为。<br>② attention 名单仅含 CRS 当前活跃学生、未删除、`is_final=true` 且提交状态为 SUBMITTED/LATE 的记录，并采用服务端分页和稳定排序。待评测仅含 OBJECTIVE/CODE 的 NONE/PENDING/RUNNING；待批阅含 UNREVIEWED/NEED_REVIEW，TEXT/FILE 可直接进入，OBJECTIVE/CODE 仅在评测终态后进入。<br>③ 自动评测得分、教师人工评分和最终得分分开保存。<br>④ 重评生成新评测记录，不删除旧记录。<br>⑤ 人工评分、修改分数、重评、成绩发布等关键操作记录操作人、时间和原因。 |
 
 ### 3.6 FR-HWK-06 作业反馈与结果展示（P0）
 
@@ -132,7 +132,7 @@
 | 优先级  | P0（必须实现）                                                                                                                                                                                                                |
 | 涉及角色 | 学生、教师                                                                                                                                                                                                                   |
 | 核心功能 | 学生查看作业提交状态、评测结果、得分、教师评语和反馈摘要；教师查看作业整体完成情况和学生个体结果。                                                                                                                                                                       |
-| 设计要点 | ① 学生端展示提交时间、提交状态、评测状态、通过情况、反馈摘要、教师评语和已发布成绩。<br>② 若教师尚未发布成绩，学生只能查看被允许公开的评测反馈，不显示未发布最终分数。<br>③ 教师端展示作业提交人数、未提交人数、已评测人数、已批阅人数、平均分、最高分、最低分等基础统计。<br>④ 结果展示需区分自动得分、教师评分和最终得分。<br>⑤ 成绩发布后，HWK 向 LRN 发送成绩发布通知事件，并向 GRD 提供成绩数据。 |
+| 设计要点 | ① 学生端展示提交时间、提交状态、评测状态、通过情况、反馈摘要、教师评语和已发布成绩。<br>② 若教师尚未发布成绩，学生只能查看被允许公开的评测反馈，不显示未发布最终分数。<br>③ 教师端按 CRS 当前活跃学生统计单次作业的总人数、提交/未提交、可自动评测/已评测/待评测、已批阅/待批阅、已计分数、分数摘要、固定五档和生成时间；历史、删除、REJECTED 和非当前学生排除。<br>④ 固定五档为 `0-59`、`60-69`、`70-79`、`80-89`、`90-100`，使用 `finalScore ?? autoScore` 并按作业满分归一化；无分数不入桶，`scoredCount` 等于五档合计。<br>⑤ 未提交走统计接口，待评测/待批阅走提交列表 attention，均为服务端分页且 URL 可恢复。<br>⑥ 结果展示需区分自动得分、教师评分和最终得分。<br>⑦ 成绩发布后通知 LRN，并向 GRD 提供成绩数据；HWK 不维护课程级或跨作业统计快照。 |
 
 ---
 
@@ -141,10 +141,10 @@
 | 需求编号            | 需求描述                                       | 设计约束                                                                                                                                                             |
 | --------------- | ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | NFR-HWK-01（可靠性）  | 作业提交、评测任务和成绩结果不得因页面刷新或短暂异常而丢失。             | ① 学生提交成功前必须完成数据库落库。<br>② 代码评测任务状态需持久化，至少包括未评测、待评测、评测中、评测完成、评测失败。<br>③ 评测失败不影响提交记录本身，学生和教师仍可查看提交内容。<br>④ 成绩发布前应允许教师检查和修正异常结果。                                     |
-| NFR-HWK-02（性能）   | 作业查询和提交操作应保持较快响应，代码评测采用异步处理。               | ① 作业列表、提交列表、统计接口均采用分页查询。<br>② 学生代码提交接口只负责保存提交和创建评测任务，不同步等待完整评测结束。<br>③ 基础规模代码评测应在 60 秒内返回结果或失败状态。<br>④ 高频读取的作业列表和作业详情可根据全局缓存策略进行缓存。                              |
+| NFR-HWK-02（性能）   | 作业查询和提交操作应保持较快响应，代码评测采用异步处理。               | ① 作业列表、提交列表和三类跟进名单采用服务端分页。<br>② 单次作业统计由独立 `HomeworkStatisticsService` 编排，Repository 使用 SQL 聚合并由组合索引支持，不加载全部最终提交到应用内存。<br>③ 学生代码提交接口只保存提交和创建评测任务。<br>④ 基础规模代码评测应在 60 秒内返回结果或失败状态。 |
 | NFR-HWK-03（可追踪性） | 作业从发布到提交、评测、批阅、发布成绩的全过程应可追踪。               | ① 作业、提交、评测、批阅和成绩发布均保存创建时间、更新时间和操作者。<br>② 每次提交生成唯一提交记录，每次评测生成独立评测记录。<br>③ 重评和修改成绩必须记录日志。<br>④ 需求、页面、接口、数据表和测试用例之间应建立编号追踪关系。                                       |
-| NFR-HWK-04（安全性）  | 学生只能访问自己的提交和结果，教师只能管理授权课程下的作业，评测过程需具备基础隔离。 | ① API 层通过 JWT 获取当前用户身份，不允许前端直接传入 `studentId` 决定查询范围。<br>② 学生端查询强制添加当前用户过滤条件。<br>③ 教师端操作必须校验课程教师或助教权限。<br>④ 隐藏测试用例、标准答案和完整评测日志默认不对学生开放。<br>⑤ 代码运行需限制时间、内存和文件访问范围。 |
-| NFR-HWK-05（可测试性） | 本模块核心流程应便于单元测试、接口测试和系统演示测试。                | ① 创建作业、发布作业、提交作业、查看提交历史、自动评测、教师批阅、结果展示均对应独立接口。<br>② 自动评测服务应设计为可 Mock 的接口，便于测试正常、错误、超时和系统异常场景。<br>③ 逾期提交、重复提交、评测失败、成绩未发布等边界条件应能通过测试数据稳定复现。                        |
+| NFR-HWK-04（安全性）  | 学生只能访问自己的提交和结果，教师只能管理授权课程下的作业，评测过程需具备基础隔离。 | ① API 层通过 JWT 获取当前用户身份，不允许前端直接传入 `studentId` 决定查询范围。<br>② 学生端查询强制添加当前用户过滤条件。<br>③ 统计和 attention 名单仅允许课程管理者访问；学生和无权限教师返回 403 且不泄露统计或名单。<br>④ 姓名服务失败时不展示裸 `studentId`。<br>⑤ 隐藏测试用例、标准答案和完整评测日志默认不对学生开放。<br>⑥ 代码运行需限制时间、内存和文件访问范围。 |
+| NFR-HWK-05（可测试性） | 本模块核心流程应便于单元测试、接口测试和系统演示测试。                | ① 创建、发布、提交、历史、评测、批阅、结果和统计均对应独立接口。<br>② 自动评测服务可 Mock。<br>③ 固定五档边界、非 100 满分归一化、空分布、有效提交范围、待处理状态、分页、URL 恢复、权限和组合索引均可由稳定数据复现。 |
 
 ---
 
@@ -162,7 +162,7 @@
 | HWK-P06 | 提交历史页      | 学生、教师 | 学生查看个人历史提交；教师查看全班或指定学生的提交版本。               | FR-HWK-03                   | `GET /api/v1/homeworks/{homeworkId}/my-submissions`、`GET /api/v1/homeworks/{homeworkId}/submissions` |
 | HWK-P07 | 评测结果页      | 学生、教师 | 展示评测状态、得分、通过用例数、错误类型、反馈摘要和可公开日志。           | FR-HWK-04、FR-HWK-06          | `GET /api/v1/submissions/{submissionId}/evaluation`                                                  |
 | HWK-P08 | 教师批阅页      | 教师、助教 | 教师查看提交内容和评测结果，填写人工分数和评语，触发重评。              | FR-HWK-05                   | `PUT /api/v1/submissions/{submissionId}/review`、`POST /api/v1/submissions/{submissionId}/reevaluate` |
-| HWK-P09 | 作业统计页      | 教师、助教 | 查看提交率、未提交名单、评测完成率、已批阅人数和基础分数统计。            | FR-HWK-05、FR-HWK-06          | `GET /api/v1/homeworks/{homeworkId}/statistics`                                                      |
+| HWK-P09 | 作业统计页      | 教师、助教 | 查看提交率、评测/批阅进度、固定五档、生成时间，以及未提交/待评测/待批阅三个服务端分页 Tab；URL 可恢复，姓名失败不展示裸 ID。 | FR-HWK-05、FR-HWK-06 | `GET /api/v1/homeworks/{homeworkId}/statistics`、`GET /api/v1/homeworks/{homeworkId}/submissions?attention=...` |
 
 ### 5.2 页面流转图
 
@@ -236,7 +236,7 @@ graph TD
 | -------- | --------------------------------------------------- | ------- | -------------------------------------------------------------------------- | ----------------------------------------------------------- | -------------------------- |
 | 提交作业     | `POST /api/v1/homeworks/{homeworkId}/submissions`   | 学生端     | `answerText, answerJson, fileIds, codeText, language`                      | `submissionId, submitStatus, evaluationStatus, submittedAt` | 保存提交记录；客观题可自动评分，代码题进入评测流程。 |
 | 查询我的提交历史 | `GET /api/v1/homeworks/{homeworkId}/my-submissions` | 学生端     | `homeworkId`                                                               | `submissionList`                                            | 只返回当前学生自己的提交历史。            |
-| 查询作业提交列表 | `GET /api/v1/homeworks/{homeworkId}/submissions`    | 教师端     | `studentKeyword, submitStatus, evaluationStatus, reviewStatus, page, size` | `records, total`                                            | 教师查看全班提交记录。                |
+| 查询作业提交列表 | `GET /api/v1/homeworks/{homeworkId}/submissions`    | 教师端     | `studentKeyword, submitStatus, evaluationStatus, reviewStatus, attention, page, size` | `PageResponse(records, total, page, size)` | `attention` 可选 EVALUATION_PENDING/REVIEW_PENDING；未传时兼容原行为，传入时仅最终有效 SUBMITTED/LATE 并与旧筛选按 AND 组合；1 基分页、size 1～100、稳定排序。 |
 | 查询提交详情   | `GET /api/v1/submissions/{submissionId}`            | 学生端/教师端 | `submissionId`                                                             | `submissionDetail`                                          | 学生只能查看自己的提交，教师需校验课程权限。     |
 
 ### 6.4 自动评测与重评接口
@@ -253,7 +253,7 @@ graph TD
 | -------- | --------------------------------------------------- | --- | ---------------------------------- | ----------------------------------------------------------------------------------------------- | -------------------- |
 | 教师批阅提交   | `PUT /api/v1/submissions/{submissionId}/review`     | 教师端 | `manualScore, finalScore, comment` | `submissionId, reviewStatus, finalScore`                                                        | 保存教师评分和评语。           |
 | 批量发布作业成绩 | `PUT /api/v1/homeworks/{homeworkId}/scores/publish` | 教师端 | `publishScope`                     | `publishedCount, publishedAt`                                                                   | 发布后学生可见，并通知 LRN/GRD。 |
-| 查询作业统计   | `GET /api/v1/homeworks/{homeworkId}/statistics`     | 教师端 | `homeworkId`                       | `submittedCount, unsubmittedCount, evaluatedCount, reviewedCount, avgScore, maxScore, minScore` | 提供基础统计，复杂分析由 GRD 负责。 |
+| 查询作业统计   | `GET /api/v1/homeworks/{homeworkId}/statistics`     | 教师端 | `homeworkId, page, size` | 保留现有字段并新增 `autoEvaluableCount, pendingEvaluationCount, pendingReviewCount, scoredCount, scoreDistribution, generatedAt` | 未提交分页，聚合覆盖整份作业当前活跃学生；固定五档按满分归一化；单次作业以外的复杂分析由 GRD 负责。 |
 
 ### 6.6 跨模块事件接口
 
@@ -278,8 +278,8 @@ graph TD
 | chapterId                   | Long          | 所属章节编号，可为空                           |
 | title                       | String        | 作业标题                                 |
 | description                 | String        | 作业说明                                 |
-| type                        | Enum          | 作业类型：OBJECTIVE、FILE、CODE             |
-| status                      | Enum          | 作业状态：DRAFT、PUBLISHED、CLOSED、ARCHIVED |
+| type                        | Enum          | 运行时作业类型：OBJECTIVE、TEXT、FILE、CODE   |
+| status                      | Enum          | 运行时作业状态：DRAFT、NOT_OPEN、PUBLISHED、CLOSED、SCORE_PUBLISHED、ARCHIVED |
 | totalScore                  | BigDecimal    | 作业满分                                 |
 | deadline                    | LocalDateTime | 截止时间                                 |
 | allowResubmit               | Boolean       | 是否允许多次提交                             |
@@ -316,14 +316,16 @@ graph TD
 | answerJson       | Text          | 客观题答案 JSON                                             |
 | fileUrl          | String        | 提交附件路径                                                 |
 | language         | String        | 代码语言，非代码作业可为空                                          |
-| submitStatus     | Enum          | 提交状态：SUBMITTED、LATE、WITHDRAWN                          |
-| evaluationStatus | Enum          | 评测状态：NONE、PENDING、RUNNING、ACCEPTED、FAILED、SYSTEM_ERROR |
-| reviewStatus     | Enum          | 批阅状态：UNREVIEWED、REVIEWED、PUBLISHED                     |
+| submitStatus     | Enum          | 运行时提交状态：SUBMITTED、LATE、REJECTED；REJECTED 不属于有效提交 |
+| evaluationStatus | Enum          | 运行时评测状态：NONE、PENDING、RUNNING、ACCEPTED、WRONG_ANSWER、COMPILE_ERROR、RUNTIME_ERROR、TIME_LIMIT_EXCEEDED、SYSTEM_ERROR |
+| reviewStatus     | Enum          | 运行时批阅状态：UNREVIEWED、REVIEWED、NEED_REVIEW             |
 | autoScore        | BigDecimal    | 自动评测得分                                                 |
 | manualScore      | BigDecimal    | 教师人工评分                                                 |
 | finalScore       | BigDecimal    | 最终得分                                                   |
 | comment          | String        | 教师评语                                                   |
+| version          | Integer       | 同一学生同一作业的提交版本                                        |
 | isFinal          | Boolean       | 是否为当前有效提交                                              |
+| isDeleted        | Boolean       | 是否逻辑删除；统计和待处理名单排除                                     |
 | submittedAt      | LocalDateTime | 提交时间                                                   |
 | reviewedBy       | Long          | 批阅教师/助教编号                                              |
 | reviewedAt       | LocalDateTime | 批阅时间                                                   |
@@ -404,11 +406,15 @@ stateDiagram-v2
     RUNNING --> EVALUATION_FAILED: 编译错误/运行错误/超时/系统错误
     EVALUATION_FAILED --> PENDING: 教师触发重评
 
-    AUTO_GRADED --> REVIEWED: 教师确认或无需人工批阅
-    EVALUATED --> REVIEWED: 教师确认或补充分数
-    REVIEW_WAITING --> REVIEWED: 教师人工批阅
-    REVIEWED --> SCORE_PUBLISHED: 教师发布成绩
+    AUTO_GRADED --> REVIEWED: 无需人工批阅或已确认
+    EVALUATED --> NEED_REVIEW: 终态结果需要教师处理
+    EVALUATED --> REVIEWED: 终态结果无需人工处理
+    REVIEW_WAITING --> UNREVIEWED: 文件/文本题直接待批阅
+    UNREVIEWED --> REVIEWED: 教师人工批阅
+    NEED_REVIEW --> REVIEWED: 教师确认或补充分数
 ```
+
+说明：`SUBMITTED/LATE/REJECTED` 和 `UNREVIEWED/REVIEWED/NEED_REVIEW` 是当前运行时枚举，本期只组合查询，不修改枚举。成绩发布将作业 `HomeworkStatus` 更新为 `SCORE_PUBLISHED`，不属于 `ReviewStatus`。
 
 ---
 
@@ -425,8 +431,8 @@ stateDiagram-v2
 | chapter_id                     | bigint       | NULL, INDEX        | 所属章节编号                          |
 | title                          | varchar(100) | NOT NULL           | 作业标题                            |
 | description                    | text         | NULL               | 作业说明                            |
-| type                           | varchar(20)  | NOT NULL           | OBJECTIVE、FILE、CODE             |
-| status                         | varchar(20)  | NOT NULL           | DRAFT、PUBLISHED、CLOSED、ARCHIVED |
+| type                           | varchar(20)  | NOT NULL           | OBJECTIVE、TEXT、FILE、CODE       |
+| status                         | varchar(20)  | NOT NULL           | DRAFT、NOT_OPEN、PUBLISHED、CLOSED、SCORE_PUBLISHED、ARCHIVED |
 | total_score                    | decimal(6,2) | NOT NULL           | 满分                              |
 | deadline                       | datetime     | NOT NULL, INDEX    | 截止时间                            |
 | allow_resubmit                 | tinyint      | NOT NULL DEFAULT 1 | 是否允许多次提交                        |
@@ -454,7 +460,7 @@ stateDiagram-v2
 | created_at    | datetime      | NOT NULL           | 创建时间                                     |
 | updated_at    | datetime      | NOT NULL           | 更新时间                                     |
 
-### 8.3 t_homework_submission 作业提交表
+### 8.3 t_hwk_submission 作业提交表
 
 | 字段名               | 类型            | 约束                            | 说明                       |
 | ----------------- | ------------- | ----------------------------- | ------------------------ |
@@ -466,26 +472,30 @@ stateDiagram-v2
 | answer_json       | text          | NULL                          | 客观题答案 JSON               |
 | file_url          | varchar(500)  | NULL                          | 附件路径                     |
 | language          | varchar(50)   | NULL                          | 代码语言                     |
-| submit_status     | varchar(20)   | NOT NULL                      | SUBMITTED、LATE、WITHDRAWN |
+| submit_status     | varchar(20)   | NOT NULL                      | SUBMITTED、LATE、REJECTED；REJECTED 不进入统计或 attention |
 | evaluation_status | varchar(30)   | NOT NULL DEFAULT 'NONE'       | 评测状态                     |
 | review_status     | varchar(30)   | NOT NULL DEFAULT 'UNREVIEWED' | 批阅状态                     |
 | auto_score        | decimal(6,2)  | NULL                          | 自动评测得分                   |
 | manual_score      | decimal(6,2)  | NULL                          | 教师评分                     |
 | final_score       | decimal(6,2)  | NULL                          | 最终得分                     |
 | comment           | varchar(1000) | NULL                          | 教师评语                     |
+| version           | int           | NOT NULL DEFAULT 1            | 同一学生同一作业的提交版本            |
 | is_final          | tinyint       | NOT NULL DEFAULT 1            | 是否当前有效提交                 |
 | submitted_at      | datetime      | NOT NULL, INDEX               | 提交时间                     |
 | reviewed_by       | bigint        | NULL                          | 批阅人编号                    |
 | reviewed_at       | datetime      | NULL                          | 批阅时间                     |
 | created_at        | datetime      | NOT NULL                      | 创建时间                     |
 | updated_at        | datetime      | NOT NULL                      | 更新时间                     |
+| is_deleted        | tinyint       | NOT NULL DEFAULT 0            | 逻辑删除；统计和 attention 排除       |
 
 建议索引：
 
 ```sql
-CREATE INDEX idx_hw_submission_homework_student ON t_homework_submission(homework_id, student_id);
-CREATE INDEX idx_hw_submission_homework_status ON t_homework_submission(homework_id, submit_status, evaluation_status, review_status);
+CREATE INDEX idx_hwk_submission_effective ON t_hwk_submission(homework_id, is_final, is_deleted, submit_status, student_id);
+CREATE INDEX idx_hwk_submission_attention ON t_hwk_submission(homework_id, is_final, is_deleted, submitted_at, id, submit_status, student_id, submit_type, evaluation_status, review_status);
 ```
+
+`effective` 索引对应统计有效范围；`attention` 索引在等值范围字段后优先放置 `submitted_at + id`，使待处理分页可按同一索引逆序扫描，再以其余列覆盖组合过滤。既有唯一版本索引已经覆盖 `homework_id + student_id` 左前缀，不重复建索引。组合索引通过增量迁移加入既有数据库并由迁移测试验证索引名称和列顺序，同时同步 fresh Compose schema。
 
 ### 8.4 t_homework_evaluation 作业评测表
 

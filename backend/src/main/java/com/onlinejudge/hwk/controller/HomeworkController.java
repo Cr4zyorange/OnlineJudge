@@ -6,9 +6,11 @@ import com.onlinejudge.common.web.ApiResponse;
 import com.onlinejudge.common.web.PageResponse;
 import com.onlinejudge.hwk.domain.HomeworkReviewStatus;
 import com.onlinejudge.hwk.domain.HomeworkStatus;
+import com.onlinejudge.hwk.domain.HomeworkSubmissionAttention;
 import com.onlinejudge.hwk.domain.HomeworkSubmissionSearchCriteria;
 import com.onlinejudge.hwk.domain.HomeworkSubmitStatus;
 import com.onlinejudge.hwk.service.HomeworkService;
+import com.onlinejudge.hwk.service.HomeworkStatisticsService;
 import com.onlinejudge.hwk.service.HomeworkSubmissionService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -29,10 +31,16 @@ import java.util.List;
 public class HomeworkController {
     private final HomeworkService homeworkService;
     private final HomeworkSubmissionService homeworkSubmissionService;
+    private final HomeworkStatisticsService homeworkStatisticsService;
 
-    public HomeworkController(HomeworkService homeworkService, HomeworkSubmissionService homeworkSubmissionService) {
+    public HomeworkController(
+            HomeworkService homeworkService,
+            HomeworkSubmissionService homeworkSubmissionService,
+            HomeworkStatisticsService homeworkStatisticsService
+    ) {
         this.homeworkService = homeworkService;
         this.homeworkSubmissionService = homeworkSubmissionService;
+        this.homeworkStatisticsService = homeworkStatisticsService;
     }
 
     @PostMapping
@@ -103,6 +111,7 @@ public class HomeworkController {
             @RequestParam(required = false) HomeworkSubmitStatus submitStatus,
             @RequestParam(required = false) EvaluationStatus evaluationStatus,
             @RequestParam(required = false) HomeworkReviewStatus reviewStatus,
+            @RequestParam(required = false) HomeworkSubmissionAttention attention,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int size
     ) {
@@ -110,7 +119,13 @@ public class HomeworkController {
                 homeworkSubmissionService.listForManager(
                         homeworkId,
                         currentUser.id(),
-                        HomeworkSubmissionSearchCriteria.of(studentKeyword, submitStatus, evaluationStatus, reviewStatus),
+                        HomeworkSubmissionSearchCriteria.of(
+                                studentKeyword,
+                                submitStatus,
+                                evaluationStatus,
+                                reviewStatus,
+                                attention
+                        ),
                         page,
                         size
                 );
@@ -201,13 +216,15 @@ public class HomeworkController {
     }
 
     @GetMapping("/{homeworkId}/statistics")
-    public ApiResponse<HomeworkService.HomeworkStatistics> statistics(
+    public ApiResponse<HomeworkStatisticsResponse> statistics(
             @PathVariable long homeworkId,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int size,
             CurrentUser currentUser
     ) {
-        return ApiResponse.ok(homeworkService.statistics(homeworkId, currentUser.id(), page, size));
+        return ApiResponse.ok(HomeworkStatisticsResponse.from(
+                homeworkStatisticsService.statistics(homeworkId, currentUser.id(), page, size)
+        ));
     }
 
     private PageResponse<HomeworkResponse> mapPage(PageResponse<com.onlinejudge.hwk.domain.Homework> page) {

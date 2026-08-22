@@ -58,7 +58,7 @@
 
       <section class="summary-grid" aria-label="提交队列摘要">
         <article class="summary-card">
-          <span>全部提交</span>
+          <span>{{ queueTotalLabel }}</span>
           <strong>{{ total }}</strong>
           <small>个版本</small>
         </article>
@@ -93,6 +93,14 @@
           data-action="filter-submissions"
           @submit.prevent="applyFilters"
         >
+          <label class="field">
+            <span>待处理队列</span>
+            <select v-model="filters.attention" name="attention">
+              <option value="">全部提交</option>
+              <option value="EVALUATION_PENDING">待评测</option>
+              <option value="REVIEW_PENDING">待批阅</option>
+            </select>
+          </label>
           <label class="field">
             <span>学生姓名</span>
             <select
@@ -249,6 +257,7 @@ import { getTeacherLearningProgress } from '../../api/lrn/learningProgress';
 import PageHeader from '../../components/foundation/PageHeader.vue';
 import StatusBadge, { type StatusBadgeTone } from '../../components/foundation/StatusBadge.vue';
 import type {
+  HomeworkAttention,
   HomeworkDetail,
   HomeworkEvaluationStatus,
   HomeworkReviewStatus,
@@ -273,6 +282,7 @@ interface QueueFilters {
   submitStatus: '' | HomeworkSubmitStatus;
   evaluationStatus: '' | HomeworkEvaluationStatus;
   reviewStatus: '' | HomeworkReviewStatus;
+  attention: '' | HomeworkAttention;
 }
 
 const submitStatuses: HomeworkSubmitStatus[] = ['SUBMITTED', 'LATE', 'REJECTED'];
@@ -288,6 +298,7 @@ const evaluationStatuses: HomeworkEvaluationStatus[] = [
   'SYSTEM_ERROR'
 ];
 const reviewStatuses: HomeworkReviewStatus[] = ['UNREVIEWED', 'NEED_REVIEW', 'REVIEWED'];
+const attentionStatuses: HomeworkAttention[] = ['EVALUATION_PENDING', 'REVIEW_PENDING'];
 const pageSize = 20;
 const candidatePageSize = 100;
 
@@ -298,7 +309,8 @@ const filters = reactive<QueueFilters>({
   studentRef: studentRefFromQuery(route.query.studentRef),
   submitStatus: statusFromQuery(route.query.submit, submitStatuses),
   evaluationStatus: statusFromQuery(route.query.evaluation, evaluationStatuses),
-  reviewStatus: statusFromQuery(route.query.review, reviewStatuses)
+  reviewStatus: statusFromQuery(route.query.review, reviewStatuses),
+  attention: statusFromQuery(route.query.attention, attentionStatuses)
 });
 const homework = ref<HomeworkDetail | null>(null);
 const submissions = ref<HomeworkSubmissionSummary[]>([]);
@@ -328,7 +340,12 @@ const reviewedVersionCount = computed(() => (
 const pendingEvaluationCount = computed(() => submissions.value.filter((item) => (
   item.evaluationStatus === 'PENDING'
   || item.evaluationStatus === 'RUNNING'
+  || (
+    item.evaluationStatus === 'NONE'
+    && (item.submitType === 'OBJECTIVE' || item.submitType === 'CODE')
+  )
 )).length);
+const queueTotalLabel = computed(() => filters.attention ? '当前筛选结果' : '全部提交');
 const studentOptions = computed(() => {
   const students = Object.entries(studentNames.value)
     .map(([studentId, studentName]) => ({ id: Number(studentId), name: studentName }))
@@ -410,6 +427,7 @@ watch(
     route.query.submit,
     route.query.evaluation,
     route.query.review,
+    route.query.attention,
     route.query.page
   ],
   () => {
@@ -603,7 +621,7 @@ async function applyFilters() {
   }
   exactQueueCache = null;
   page.value = 1;
-  await syncQuery();
+  await syncQuery('push');
   await loadSubmissions();
 }
 
@@ -619,9 +637,10 @@ async function resetFilters() {
   filters.submitStatus = '';
   filters.evaluationStatus = '';
   filters.reviewStatus = '';
+  filters.attention = '';
   exactQueueCache = null;
   page.value = 1;
-  await syncQuery();
+  await syncQuery('push');
   await loadSubmissions();
 }
 
@@ -630,7 +649,7 @@ async function clearStudentFilter() {
   filters.studentRef = '';
   exactQueueCache = null;
   page.value = 1;
-  await syncQuery();
+  await syncQuery('push');
   await loadSubmissions();
 }
 
@@ -639,7 +658,7 @@ async function goToPage(nextPage: number) {
     return;
   }
   page.value = nextPage;
-  await syncQuery();
+  await syncQuery('push');
   const selectedStudent = selectedStudentOption.value;
   if (
     selectedStudent
@@ -696,7 +715,8 @@ function exactQueueCacheKey(homeworkId: number, studentRef: string) {
     studentRef,
     filters.submitStatus,
     filters.evaluationStatus,
-    filters.reviewStatus
+    filters.reviewStatus,
+    filters.attention
   ]);
 }
 
@@ -711,7 +731,8 @@ function buildApiQuery(
     ...(studentId === null ? {} : { studentKeyword: String(studentId) }),
     ...(filters.submitStatus ? { submitStatus: filters.submitStatus } : {}),
     ...(filters.evaluationStatus ? { evaluationStatus: filters.evaluationStatus } : {}),
-    ...(filters.reviewStatus ? { reviewStatus: filters.reviewStatus } : {})
+    ...(filters.reviewStatus ? { reviewStatus: filters.reviewStatus } : {}),
+    ...(filters.attention ? { attention: filters.attention } : {})
   };
 }
 
@@ -722,12 +743,14 @@ function buildSafeQuery() {
     ...(filters.submitStatus ? { submit: filters.submitStatus } : {}),
     ...(filters.evaluationStatus ? { evaluation: filters.evaluationStatus } : {}),
     ...(filters.reviewStatus ? { review: filters.reviewStatus } : {}),
+    ...(filters.attention ? { attention: filters.attention } : {}),
     ...(page.value > 1 ? { page: String(page.value) } : {})
   };
 }
 
-async function syncQuery() {
-  await router.replace({ query: buildSafeQuery() });
+async function syncQuery(mode: 'push' | 'replace' = 'replace') {
+  const target = { query: buildSafeQuery() };
+  await (mode === 'push' ? router.push(target) : router.replace(target));
 }
 
 function reviewRoute(submissionId: number) {
@@ -745,6 +768,7 @@ function restoreFiltersFromRoute() {
   filters.submitStatus = statusFromQuery(route.query.submit, submitStatuses);
   filters.evaluationStatus = statusFromQuery(route.query.evaluation, evaluationStatuses);
   filters.reviewStatus = statusFromQuery(route.query.review, reviewStatuses);
+  filters.attention = statusFromQuery(route.query.attention, attentionStatuses);
   page.value = pageFromQuery(route.query.page);
 }
 
@@ -755,6 +779,7 @@ function routeQueryMatchesState() {
     && filters.submitStatus === statusFromQuery(route.query.submit, submitStatuses)
     && filters.evaluationStatus === statusFromQuery(route.query.evaluation, evaluationStatuses)
     && filters.reviewStatus === statusFromQuery(route.query.review, reviewStatuses)
+    && filters.attention === statusFromQuery(route.query.attention, attentionStatuses)
     && page.value === pageFromQuery(route.query.page);
 }
 

@@ -2,7 +2,7 @@
 
 ## 1. 开发定位
 
-HWK 负责作业发布、题目配置、测试用例、学生提交、客观题和代码题自动评测、教师批阅、重评与反馈。它依赖 AUTH 当前用户、CRS 课程成员关系，并向 LRN 触发通知，向 GRD 提供作业成绩来源。
+HWK 负责作业发布、题目配置、测试用例、学生提交、客观题和代码题自动评测、教师批阅、重评与反馈，并提供单次作业的固定五档分数分布和待处理名单。它依赖 AUTH 当前用户、CRS 课程成员关系，并向 LRN 触发通知，向 GRD 提供作业成绩来源。课程级、跨作业、自定义区间、趋势和统计快照仍由 GRD 负责。
 
 HWK 与 LAB 共享评测抽象。评测状态枚举、`EvaluationResult`、错误反馈、资源限制和重评行为必须提前对齐。
 
@@ -21,11 +21,11 @@ HWK 与 LAB 共享评测抽象。评测状态枚举、`EvaluationResult`、错�
 1. 读 HWK 详细设计章节，确认 UI-HWK / API-HWK / SVC-HWK / DB-HWK / TC-HWK 编号
 2. 建作业、客观题、测试用例、提交、评测、批阅日志表
 3. 写作业创建、编辑、草稿、发布、截止时间和评分方式 API
-4. 写作业 Service、提交 Service、评测 Service、批阅 Service
-5. 写教师端作业列表、创建编辑、题目和测试用例配置页面
+4. 写作业 Service、提交 Service、评测 Service、批阅 Service、独立统计 Service
+5. 写教师端作业列表、创建编辑、题目和测试用例配置、提交队列和统计页面
 6. 写学生端作业详情、提交、历史、反馈页面
 7. 接入 AUTH 当前用户和 CRS 课程成员/教师权限校验
-8. 补截止、重复提交、未发布成绩、越权访问等异常处理
+8. 补截止、重复提交、未发布成绩、越权访问、待处理筛选和统计口径等异常处理
 9. 准备作业、题目、测试用例、提交、评分测试数据
 10. 联调 LRN 通知和 GRD 成绩来源
 ```
@@ -59,7 +59,7 @@ HWK 的 P0 路径是：
 | 作业评测记录表 | 客观题或代码题评测结果、状态和错误信息 |
 | 批阅/评分日志表 | 人工评分、教师评语、重评和修改留痕 |
 
-作业表需要表达草稿、未开始、已发布、已截止、成绩已发布、归档等状态。提交表要支持是否允许多次提交和当前有效提交。
+作业表需要表达草稿、未开始、已发布、已截止、成绩已发布、归档等状态。提交表要支持是否允许多次提交和当前有效提交，并使用 `idx_hwk_submission_effective(homework_id, is_final, is_deleted, submit_status, student_id)` 覆盖统计有效范围，使用 `idx_hwk_submission_attention(homework_id, is_final, is_deleted, submitted_at, id, submit_status, student_id, submit_type, evaluation_status, review_status)` 支撑待处理稳定分页及组合过滤。既有唯一版本索引已覆盖 `homework_id + student_id` 左前缀。索引变更必须使用增量迁移并由迁移测试验证，不能只修改已执行的历史迁移。
 
 ## 6. 后端 API 与 Service
 
@@ -90,7 +90,15 @@ HWK 的 P0 路径是：
 - 触发重评
 - 评分修改留痕
 
-Service 层建议拆分为 `HomeworkService`、`HomeworkQuestionService`、`HomeworkSubmissionService`、`HomeworkEvaluationService`、`HomeworkReviewService`。自动评测通过共享评测抽象调用，不在 HWK 内部单独复制一套执行器。
+统计和待处理实现：
+
+- API-HWK-15 保留原响应字段和 `page/size` 的未提交名单分页语义，兼容新增 `autoEvaluableCount`、`pendingEvaluationCount`、`pendingReviewCount`、`scoredCount`、`scoreDistribution`、`generatedAt`
+- `scoreDistribution` 固定返回 `0-59`、`60-69`、`70-79`、`80-89`、`90-100` 五档；按 `effectiveScore = finalScore ?? autoScore`，再以 `effectiveScore / totalScore × 100` 归一化后分桶；无分数不入桶，`scoredCount` 必须等于五档之和
+- API-HWK-09 增加可选 `attention=EVALUATION_PENDING|REVIEW_PENDING`；未传时保持原列表行为，传入时仍复用 `PageResponse`、1 基页码、`size` 1～100 和稳定排序
+- 统计和两类待处理名单只纳入 CRS 当前活跃学生、`is_final=true`、未删除且 `submitStatus` 为 `SUBMITTED/LATE` 的有效提交；历史版本、`REJECTED` 和非当前课程学生必须排除
+- `EVALUATION_PENDING` 仅包括 OBJECTIVE/CODE 的 NONE/PENDING/RUNNING；TEXT/FILE 的 NONE 不属于待评测。`REVIEW_PENDING` 包括 UNREVIEWED/NEED_REVIEW，其中 TEXT/FILE 可直接进入，OBJECTIVE/CODE 仅在评测终态后进入
+
+Service 层拆分为 `HomeworkService`、`HomeworkQuestionService`、`HomeworkSubmissionService`、`HomeworkEvaluationService`、`HomeworkReviewService` 和独立的 `HomeworkStatisticsService`。统计必须由 Repository 使用 SQL 聚合完成，不把全部最终提交加载到内存；自动评测通过共享评测抽象调用，不在 HWK 内部单独复制一套执行器。运行时状态沿用现有枚举：提交状态为 `SUBMITTED/LATE/REJECTED`，批阅状态为 `UNREVIEWED/REVIEWED/NEED_REVIEW`，本项开发不得新增或替换状态枚举。
 
 ## 7. 前端页面与交互
 
@@ -104,9 +112,11 @@ HWK 前端必须包含：
 | 作业提交页 | 支持文本、附件、代码提交和提交校验 |
 | 提交历史页 | 展示每次提交、最新提交、当前有效提交 |
 | 教师批阅页 | 教师查看提交、评测结果、人工评分和评语 |
+| 教师提交队列 | 支持普通筛选和 `attention` 待评测/待批阅深链；分页、刷新、前进和后退可恢复 URL 状态 |
+| 作业统计页 | 展示固定五档分布，以及未提交、待评测、待批阅三个服务端分页名单；支持键盘和窄屏访问 |
 | 作业反馈页 | 学生查看提交状态、评测结果、最终反馈 |
 
-页面必须展示成功、失败、加载、空状态，以及截止后不可提交、未发布成绩不可见、重复提交被拒绝等状态。
+页面必须展示成功、失败、加载、空状态，以及截止后不可提交、未发布成绩不可见、重复提交被拒绝等状态。统计页和提交队列从姓名服务补齐展示名；姓名服务失败时使用不含学号/用户编号的安全占位文案，不得裸露 `studentId`。
 
 ## 8. 权限、异常与跨模块事件
 
@@ -118,6 +128,7 @@ HWK 前端必须包含：
 - 不允许多次提交时二次提交被拒绝
 - 截止后提交按规则拒绝或标记迟交
 - 教师只能管理自己课程内作业
+- 学生和无课程管理权限的教师访问统计或待处理名单时返回 403，且响应不得泄露统计值、名单或学生标识
 - 重评和分数修改必须留痕
 
 跨模块事件：
@@ -137,6 +148,11 @@ HWK 前端必须包含：
 | 提交规则 | 不允许多次提交时二次提交被拒绝 |
 | 自动评测 | 客观题或代码题可生成评测记录 |
 | 教师批阅 | 教师可评分、写评语、触发重评 |
+| 作业统计 | 五档边界、非 100 满分归一化、空分布、生成时间和 `scoredCount` 总数一致 |
+| 待处理名单 | 未提交、待评测、待批阅均为服务端分页并稳定排序；TEXT/FILE、代码评测中和评测终态语义正确 |
+| 统计数据范围 | 仅当前 CRS 活跃学生的最终有效提交；历史、删除、REJECTED 和非当前学生均排除 |
+| 统计查询性能 | Repository 使用 SQL 聚合，组合索引由增量迁移和迁移测试证明 |
+| 统计页面验收 | URL 可恢复，姓名失败不泄露裸 ID，并完成 1440px 与 390px 浏览器检查 |
 | 学生反馈 | 学生只看到允许公开的评测和成绩 |
 | 权限边界 | 非成员、越权教师、截止后提交均处理正确 |
 | 成绩来源 | GRD 可读取或接收作业成绩 |

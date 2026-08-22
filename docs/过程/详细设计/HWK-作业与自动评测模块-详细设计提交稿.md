@@ -16,7 +16,7 @@
 
 本文档为“在线教学与实训平台”中作业与自动评测模块（HWK）的详细设计提交稿，用于提交给详细设计负责人，并合并到《软件详细设计说明书》第 3.5 节及后续接口清单、数据库清单、需求追踪矩阵中。
 
-本模块设计依据《软件需求规格说明书》《软件概要设计说明书》《软件详细设计说明书》底稿和《详细设计—各模块负责人分工》编写，重点覆盖作业发布、题目与测试用例管理、学生提交、提交历史、自动评测、教师批阅、重评、反馈展示和成绩推送等内容。
+本模块设计依据《软件需求规格说明书》《软件概要设计说明书》《软件详细设计说明书》底稿和《详细设计—各模块负责人分工》编写，重点覆盖作业发布、题目与测试用例管理、学生提交、提交历史、自动评测、教师批阅、重评、反馈展示、单次作业统计、待处理名单和成绩推送等内容。
 
 ### 0.1 设计边界
 
@@ -29,15 +29,16 @@ HWK 模块负责：
 5. 系统对客观题和代码题进行基础自动评测。
 6. 教师查看提交内容，进行人工批阅、评分、评语填写和重评。
 7. 学生查看允许公开的评测结果、最终成绩和教师反馈。
-8. 向 LRN 模块发送作业发布、截止提醒、评测完成、成绩发布等事件。
-9. 向 GRD 模块提供作业成绩来源数据。
+8. 教师查看单次作业的固定五档分数分布和未提交、待评测、待批阅名单。
+9. 向 LRN 模块发送作业发布、截止提醒、评测完成、成绩发布等事件。
+10. 向 GRD 模块提供作业成绩来源数据。
 
 HWK 模块不负责：
 
 1. 用户注册、登录、角色与权限基础数据维护，该部分由 AUTH 模块负责。
 2. 课程、章节、课程成员关系和课程资源基础数据维护，该部分由 CRS 模块负责。
 3. 实验任务与实验评测流程，该部分由 LAB 模块负责。
-4. 课程总评计算、成绩项权重配置和最终成绩发布总表，该部分由 GRD 模块负责。
+4. 课程总评计算、成绩项权重配置、最终成绩发布总表，以及课程级/跨作业分析、自定义区间、趋势和统计快照，该部分由 GRD 模块负责。HWK 只提供单次作业、固定五档的即时统计，不维护 GRD 快照。
 5. 站内通知列表展示、通知已读状态和消息中心页面，该部分由 LRN 模块负责。
 
 ### 0.2 首版实现范围
@@ -63,7 +64,7 @@ HWK 模块不负责：
 | 主要使用角色 | 学生、教师、助教 |
 | 依赖模块 | AUTH、CRS、LRN |
 | 协作模块 | LAB、GRD |
-| 主要页面 | 作业列表页、作业详情页、作业发布页、作业提交页、批阅页、反馈页 |
+| 主要页面 | 作业列表页、作业详情页、作业发布页、作业提交页、批阅/提交队列页、反馈页、统计页 |
 | 主要数据表 | 作业表、客观题题目表、测试用例表、提交表、评测记录表、批阅日志表 |
 | 测试编号前缀 | TC-HWK |
 
@@ -80,7 +81,7 @@ HWK 模块是平台中连接“课程学习任务”和“成绩评价”的核�
 | 依赖方向 | 模块 | 依赖内容 | 交互方式 |
 | --- | --- | --- | --- |
 | HWK → AUTH | 用户权限与平台安全 | 当前用户身份、角色、权限码、登录状态 | JWT 认证上下文、权限拦截器 |
-| HWK → CRS | 课程与教学资源 | 课程是否存在、章节是否存在、用户是否属于课程、教师是否有课程管理权限 | RESTful API 或服务接口 |
+| HWK → CRS | 课程与教学资源 | 课程是否存在、章节是否存在、用户是否属于课程、教师是否有课程管理权限，以及统计时的当前活跃学生名单 | RESTful API 或服务接口 |
 | HWK → LRN | 学习过程与通知提醒 | 作业发布、作业变更、截止提醒、评测完成、成绩发布通知 | 业务事件推送 |
 | HWK ↔ LAB | 实训实验模块 | 共享评测 Worker 抽象、评测状态枚举、测试用例字段规范 | 共享评测服务接口，不直接访问对方业务表 |
 | HWK → GRD | 成绩评价与教学分析 | 作业最终得分、提交状态、评分状态、来源更新时间 | RESTful API 或成绩同步事件 |
@@ -110,8 +111,8 @@ HWK 模块是平台中连接“课程学习任务”和“成绩评价”的核�
 | UI-HWK-05 | 学生作业提交页 | 学生 | 完成作业提交 | 提交文本答案、客观题答案、附件或代码；查看提交成功时间和初始评测状态 | API-HWK-07 |
 | UI-HWK-06 | 提交历史页 | 学生、教师、助教 | 查看作业提交版本 | 学生查看本人历史提交；教师查看全班或指定学生提交；标识最新提交和有效提交 | API-HWK-08、API-HWK-09、API-HWK-10 |
 | UI-HWK-07 | 评测结果页 | 学生、教师、助教 | 展示自动评测结果和反馈 | 查看评测状态、得分、通过用例数、错误类型、反馈摘要和公开日志 | API-HWK-11 |
-| UI-HWK-08 | 教师批阅页 | 教师、助教 | 对提交进行人工批阅或重评 | 筛选提交记录，查看提交内容和评测结果，填写人工分数与评语，触发重评 | API-HWK-09、API-HWK-10、API-HWK-12、API-HWK-13、API-HWK-19 |
-| UI-HWK-09 | 作业统计页 | 教师、助教 | 查看作业完成情况和基础统计 | 查看提交率、未提交名单、评测完成率、已批阅人数、平均分、最高分、最低分 | API-HWK-15 |
+| UI-HWK-08 | 教师批阅页 | 教师、助教 | 对提交进行人工批阅或重评 | 使用普通筛选或 `attention` 待评测/待批阅深链查看提交，填写人工分数与评语，触发重评；URL、刷新、前进和后退恢复筛选与页码 | API-HWK-09、API-HWK-10、API-HWK-12、API-HWK-13、API-HWK-19 |
+| UI-HWK-09 | 作业统计页 | 教师、助教 | 查看单次作业完成情况、固定五档和三类跟进名单 | 查看提交率、评测/批阅进度、分数摘要、生成时间和固定五档；未提交走 API-HWK-15，待评测/待批阅走 API-HWK-09 attention；完成键盘、1440px 和 390px 验收 | API-HWK-09、API-HWK-15 |
 
 ### 3.2 页面流转图
 
@@ -145,6 +146,9 @@ graph TD
 4. 学生提交成功后，页面先展示“提交成功/评测排队中”，再通过轮询或通知刷新评测结果。
 5. 教师批阅页应将自动得分、人工得分和最终得分分开展示，避免成绩来源混淆。
 6. 若教师未发布成绩，学生只能查看系统配置允许公开的评测摘要，不展示未发布最终分数。
+7. 统计页始终展示 `0-59`、`60-69`、`70-79`、`80-89`、`90-100` 五档，空分布也显示五个零值；三个跟进 Tab 均使用服务端分页，不由当前页数据推断全量名单。
+8. 统计页和提交队列把 Tab、筛选和页码写入 URL，刷新、前进/后退及深链进入后均可恢复。
+9. 姓名服务失败时使用不含用户编号的安全占位文案，不得展示裸 `studentId`；403 时不得渲染缓存统计或名单。
 
 ---
 
@@ -168,13 +172,38 @@ graph TD
 | API-HWK-12 | 触发重评 | POST | /api/v1/submissions/{submissionId}/reevaluate | 教师/助教，且有课程管理权限 | FR-HWK-04、FR-HWK-05 |
 | API-HWK-13 | 教师批阅提交 | PUT | /api/v1/submissions/{submissionId}/review | 教师/助教，且有课程管理权限 | FR-HWK-05、FR-HWK-06 |
 | API-HWK-14 | 批量发布作业成绩 | PUT | /api/v1/homeworks/{homeworkId}/scores/publish | 教师/助教，且有课程管理权限 | FR-HWK-05、FR-HWK-06 |
-| API-HWK-15 | 查询作业统计 | GET | /api/v1/homeworks/{homeworkId}/statistics | 教师/助教，且有课程管理权限 | FR-HWK-06 |
+| API-HWK-15 | 查询作业统计 | GET | /api/v1/homeworks/{homeworkId}/statistics?page={page}&size={size} | 教师/助教，且有课程管理权限 | FR-HWK-06 |
 | API-HWK-16 | 保存客观题题目 | PUT | /api/v1/homeworks/{homeworkId}/questions | 教师/助教，且有课程管理权限 | FR-HWK-01、FR-HWK-04 |
 | API-HWK-17 | 查询客观题题目 | GET | /api/v1/homeworks/{homeworkId}/questions | 教师/助教；学生端不返回标准答案 | FR-HWK-02、FR-HWK-04 |
 | API-HWK-18 | 保存代码题测试用例 | PUT | /api/v1/homeworks/{homeworkId}/test-cases | 教师/助教，且有课程管理权限 | FR-HWK-01、FR-HWK-04 |
 | API-HWK-19 | 查询代码题测试用例 | GET | /api/v1/homeworks/{homeworkId}/test-cases | 教师/助教，且有课程管理权限 | FR-HWK-04、FR-HWK-05 |
 | API-HWK-20 | 查询评测日志 | GET | /api/v1/evaluations/{evaluationId}/logs | 教师/助教，且有课程管理权限 | FR-HWK-04、FR-HWK-05 |
 | API-HWK-21 | 查询批阅日志 | GET | /api/v1/submissions/{submissionId}/review-logs | 教师/助教，且有课程管理权限 | FR-HWK-05 |
+
+#### 4.1.1 API-HWK-09 attention 兼容增量
+
+| 项目 | 内容 |
+| --- | --- |
+| 主要入参 | studentKeyword, submitStatus, evaluationStatus, reviewStatus, attention, page, size |
+| 主要出参 | `PageResponse<HomeworkSubmissionResponse>`，包含 records, total, page, size |
+| 兼容规则 | `attention` 可选值为 `EVALUATION_PENDING` 或 `REVIEW_PENDING`；未传时保持原提交列表行为，传入时与已有筛选按 AND 组合 |
+| 公共有效范围 | attention 只查询 CRS 当前活跃学生，且满足 `is_deleted=false`、`is_final=true`、`submit_status IN (SUBMITTED,LATE)`；历史、删除、REJECTED 和非当前学生排除 |
+| EVALUATION_PENDING | OBJECTIVE/CODE 且评测为 NONE/PENDING/RUNNING；TEXT/FILE 的 NONE 排除 |
+| REVIEW_PENDING | `review_status IN (UNREVIEWED,NEED_REVIEW)`；TEXT/FILE 可直接进入，OBJECTIVE/CODE 仅在 ACCEPTED、WRONG_ANSWER、COMPILE_ERROR、RUNTIME_ERROR、TIME_LIMIT_EXCEEDED、SYSTEM_ERROR 终态后进入 |
+| 分页、排序与权限 | 1 基页码，size 1～100，`submitted_at DESC, id DESC` 稳定排序；学生和无课程管理权限教师返回 403，不返回记录总数或学生标识 |
+
+#### 4.1.2 API-HWK-15 统计兼容增量
+
+| 项目 | 内容 |
+| --- | --- |
+| 兼容出参 | 保留 `homeworkId`、`courseId`、`totalStudentCount`、`submittedCount`、`unsubmittedCount`、`evaluatedCount`、`reviewedCount`、`averageScore`、`maxScore`、`minScore`、`unsubmittedPage`、`unsubmittedSize`、`unsubmittedTotal`、`unsubmittedStudentIds` |
+| 新增出参 | `autoEvaluableCount`、`pendingEvaluationCount`、`pendingReviewCount`、`scoredCount`、`scoreDistribution`、`generatedAt` |
+| 统计范围 | 总人数来自 CRS 当前活跃 STUDENT；提交只纳入该名单中的未删除、最终、SUBMITTED/LATE 记录。活跃名单为空时返回零统计，不回退到提交人集合 |
+| 评测/批阅 | `autoEvaluableCount` 仅 OBJECTIVE/CODE；其 NONE/PENDING/RUNNING 为待评测，六类终态为已评测；TEXT/FILE NONE 排除。待批阅与 API-HWK-09 REVIEW_PENDING 同口径，已批阅为 REVIEWED |
+| 分数 | `effectiveScore = finalScore ?? autoScore`；平均/最高/最低分保留作业原始分值口径，五档分布先按 `effectiveScore / totalScore × 100` 归一化 |
+| 固定五档 | 始终返回 `0-59:[0,60)`、`60-69:[60,70)`、`70-79:[70,80)`、`80-89:[80,90)`、`90-100:[90,100]`；空分布五档均为 0，`scoredCount` 等于档位合计 |
+| 分页、时间与权限 | `page` 从 1 开始、size 1～100，只分页未提交名单，聚合字段覆盖整份作业；返回 `generatedAt`；学生和无权限教师返回 403 且不泄露任何统计或名单 |
+| 实现约束 | 独立 `HomeworkStatisticsService` 读取活跃学生范围并调用 Repository 条件聚合 SQL，不加载全部最终提交到应用内存 |
 
 ### 4.2 主要接口说明
 
@@ -246,11 +275,11 @@ graph TD
 | SVC-HWK-05 | HomeworkSubmissionService | 处理学生提交、提交历史、提交详情和有效版本标识 | 提交内容、作业配置、当前学生 | 提交记录、提交历史 |
 | SVC-HWK-06 | HomeworkEvaluationService | 处理客观题评分、代码评测任务创建、评测结果回写和重评 | 提交记录、题目答案、测试用例、评测回调 | 评测记录、自动得分 |
 | SVC-HWK-07 | HomeworkReviewService | 处理教师批阅、人工评分、评语、最终得分确认和批阅日志 | 批阅 DTO、教师身份 | 批阅结果、日志记录 |
-| SVC-HWK-08 | HomeworkStatisticsService | 统计作业提交率、评测完成率、批阅完成率和分数分布 | homeworkId、查询条件 | 作业统计 DTO |
+| SVC-HWK-08 | HomeworkStatisticsService | 独立负责单次作业统计：读取 CRS 当前活跃学生范围，编排未提交分页，并调用 Repository SQL 聚合数量、分数摘要和固定五档；不得把逻辑留在 HomeworkService 或加载全部最终提交到内存 | homeworkId、page、size、当前课程管理者 | 兼容增量作业统计 DTO |
 | SVC-HWK-09 | HomeworkPermissionService | 封装课程成员校验、教师课程管理权限校验和提交访问权限校验 | 当前用户、courseId、homeworkId、submissionId | 权限校验结果 |
 | SVC-HWK-10 | HomeworkEventPublisher | 向 LRN 和 GRD 发送作业事件和成绩来源事件 | 业务事件 DTO | 事件发送结果 |
 | SVC-HWK-11 | EvaluationWorkerClient | 与 LAB 共享评测 Worker 抽象，提交代码评测任务并接收回调 | 评测任务、语言、限制参数、测试用例 | 评测任务状态、评测结果 |
-| SVC-HWK-12 | HomeworkRepository/Mapper | 完成作业、题目、提交、评测、日志等表的数据访问 | 实体对象、查询条件 | 数据库记录 |
+| SVC-HWK-12 | HomeworkRepository/Mapper | 完成业务表访问，并用条件聚合 SQL 和组合索引支持固定五档、有效范围和 attention 分页 | 实体对象、查询条件、CRS 活跃学生范围 | 数据库记录、聚合行、分页记录 |
 
 ### 5.1 服务调用关系
 
@@ -297,9 +326,13 @@ sequenceDiagram
 | 枚举值 | 说明 |
 | --- | --- |
 | DRAFT | 草稿，学生不可见 |
+| NOT_OPEN | 已发布但尚未到开放时间，学生可查看但不可提交 |
 | PUBLISHED | 已发布，课程学生可见 |
 | CLOSED | 已关闭，不允许继续提交 |
+| SCORE_PUBLISHED | 作业成绩已发布，可供学生查看并由 GRD 同步 |
 | ARCHIVED | 已归档，只读保留 |
+
+说明：以上为当前运行时持久化枚举，本期不修改；`OPEN` 若用于页面显示，仅为派生标签。
 
 #### 6.1.2 作业类型 HomeworkType
 
@@ -316,13 +349,13 @@ sequenceDiagram
 | --- | --- |
 | SUBMITTED | 正常提交 |
 | LATE | 逾期提交 |
-| WITHDRAWN | 已撤回或已失效 |
+| REJECTED | 被业务规则拒绝或不再作为有效提交；统计和 attention 排除 |
 
 #### 6.1.4 评测状态 EvaluationStatus
 
 | 枚举值 | 说明 |
 | --- | --- |
-| NONE | 无需自动评测 |
+| NONE | 尚未产生评测或无需自动评测；OBJECTIVE/CODE 在 attention 中视为待评测，TEXT/FILE 排除 |
 | PENDING | 等待评测 |
 | RUNNING | 评测中 |
 | ACCEPTED | 评测通过 |
@@ -330,7 +363,6 @@ sequenceDiagram
 | COMPILE_ERROR | 编译错误 |
 | RUNTIME_ERROR | 运行错误 |
 | TIME_LIMIT_EXCEEDED | 超出时间限制 |
-| MEMORY_LIMIT_EXCEEDED | 超出内存限制 |
 | SYSTEM_ERROR | 系统评测异常 |
 
 #### 6.1.5 批阅状态 ReviewStatus
@@ -338,9 +370,10 @@ sequenceDiagram
 | 枚举值 | 说明 |
 | --- | --- |
 | UNREVIEWED | 未批阅 |
-| REVIEWING | 批阅中 |
 | REVIEWED | 已批阅 |
-| SCORE_PUBLISHED | 成绩已发布 |
+| NEED_REVIEW | 自动评测终态后仍需教师处理；与 UNREVIEWED 一同构成待批阅候选 |
+
+说明：以上为当前运行时代码和数据库实际状态。Issue #225 只组合查询，不新增、替换或重命名枚举；成绩发布由 `HomeworkStatus.SCORE_PUBLISHED` 表达，不属于 `ReviewStatus`。
 
 ### 6.2 数据表清单
 
@@ -349,7 +382,7 @@ sequenceDiagram
 | DB-HWK-01 | t_hwk_homework | 作业表 | id, course_id, chapter_id, title, description, type, status, total_score, deadline, allow_resubmit, allow_late_submit, show_evaluation_before_publish, judge_config_id, created_by, published_at, is_deleted, created_at, updated_at | 保存作业基础信息和发布配置 |
 | DB-HWK-02 | t_hwk_question | 客观题题目表 | id, homework_id, question_type, stem, options_json, answer_json, score, sort_order | 保存客观题题干、选项、标准答案和分值 |
 | DB-HWK-03 | t_hwk_test_case | 作业测试用例表 | id, homework_id, input_data, expected_output, score_weight, is_hidden, time_limit_ms, memory_limit_kb, sort_order | 保存代码题测试用例，隐藏用例不对学生公开 |
-| DB-HWK-04 | t_hwk_submission | 作业提交表 | id, homework_id, student_id, submit_type, answer_text, answer_json, file_url, language, submit_status, evaluation_status, review_status, auto_score, manual_score, final_score, comment, is_final, submitted_at, reviewed_by, reviewed_at, created_at, updated_at | 保存学生提交内容、提交状态、评测状态和评分结果 |
+| DB-HWK-04 | t_hwk_submission | 作业提交表 | id, homework_id, student_id, submit_type, answer_text, answer_json, file_url, language, submit_status, evaluation_status, review_status, auto_score, manual_score, final_score, comment, version, is_final, submitted_at, reviewed_by, reviewed_at, created_at, updated_at, is_deleted | 保存学生提交内容、版本、有效性、提交状态、评测状态和评分结果 |
 | DB-HWK-05 | t_hwk_evaluation | 作业评测记录表 | id, submission_id, homework_id, student_id, evaluation_type, status, score, passed_cases, total_cases, time_used_ms, memory_used_kb, feedback, log_url, started_at, finished_at | 保存每次自动评测或重评记录 |
 | DB-HWK-06 | t_hwk_review_log | 作业批阅日志表 | id, submission_id, homework_id, student_id, operation_type, old_score, new_score, comment, operator_id, reason, created_at | 保存批阅、重评、成绩发布和分数调整留痕 |
 | DB-HWK-07 | t_hwk_judge_config | 作业评测配置表 | id, homework_id, language_limit_json, time_limit_ms, memory_limit_kb, output_compare_mode, created_at, updated_at | 保存代码题统一评测配置，首版可简化为 homework 表中的 judge_config_id 引用 |
@@ -366,7 +399,7 @@ sequenceDiagram
 | title | varchar(255) | 否 | 作业标题 |
 | description | text | 是 | 作业说明 |
 | type | varchar(32) | 否 | 作业类型：OBJECTIVE/FILE/CODE/TEXT |
-| status | varchar(32) | 否 | 作业状态：DRAFT/PUBLISHED/CLOSED/ARCHIVED |
+| status | varchar(32) | 否 | 作业状态：DRAFT/NOT_OPEN/PUBLISHED/CLOSED/SCORE_PUBLISHED/ARCHIVED |
 | total_score | decimal(6,2) | 否 | 作业总分 |
 | deadline | datetime | 否 | 截止时间 |
 | allow_resubmit | tinyint | 否 | 是否允许多次提交 |
@@ -406,20 +439,23 @@ idx_hwk_homework_created_by(created_by)
 | manual_score | decimal(6,2) | 是 | 教师人工评分 |
 | final_score | decimal(6,2) | 是 | 最终得分 |
 | comment | varchar(1000) | 是 | 教师评语 |
+| version | int | 否 | 同一学生同一作业的提交版本，从 1 递增 |
 | is_final | tinyint | 否 | 是否为当前有效提交 |
 | submitted_at | datetime | 否 | 提交时间 |
 | reviewed_by | bigint | 是 | 批阅教师编号 |
 | reviewed_at | datetime | 是 | 批阅时间 |
 | created_at | datetime | 否 | 创建时间 |
 | updated_at | datetime | 否 | 更新时间 |
+| is_deleted | tinyint | 否 | 逻辑删除；统计和 attention 排除 |
 
 建议索引：
 
 ```text
-idx_hwk_submission_homework_student(homework_id, student_id)
-idx_hwk_submission_homework_status(homework_id, submit_status, evaluation_status, review_status)
-idx_hwk_submission_is_final(homework_id, student_id, is_final)
+idx_hwk_submission_effective(homework_id, is_final, is_deleted, submit_status, student_id)
+idx_hwk_submission_attention(homework_id, is_final, is_deleted, submitted_at, id, submit_status, student_id, submit_type, evaluation_status, review_status)
 ```
+
+这两个索引直接对应真实查询：`effective` 覆盖统计有效范围，`attention` 在三个等值范围字段后放置稳定排序键 `submitted_at + id`，再覆盖其余组合筛选列。既有 `uk_hwk_submission_version(homework_id, student_id, version)` 已提供学生查询所需左前缀，不重复建索引；将多值状态列放在排序键前会破坏全局排序能力。组合索引通过新的增量迁移加入既有数据库并同步 fresh Compose schema；迁移测试验证索引名称和列顺序。
 
 #### 6.3.3 t_hwk_evaluation 作业评测记录表
 
@@ -609,7 +645,6 @@ stateDiagram-v2
     RUNNING --> COMPILE_ERROR: 编译错误
     RUNNING --> RUNTIME_ERROR: 运行错误
     RUNNING --> TIME_LIMIT_EXCEEDED: 超时
-    RUNNING --> MEMORY_LIMIT_EXCEEDED: 超内存
     RUNNING --> SYSTEM_ERROR: 系统异常
     ACCEPTED --> PENDING: 教师触发重评
     WRONG_ANSWER --> PENDING: 教师触发重评
@@ -665,6 +700,7 @@ stateDiagram-v2
 | 查看评测结果 | 仅本人且按可见策略 | 所属课程全部提交 | 所属课程全部提交 | 按权限查看 | 隐藏日志仅教师可见 |
 | 教师批阅 | 不允许 | 允许 | 允许，视课程角色配置 | 可管理 | 记录批阅日志 |
 | 触发重评 | 不允许 | 允许 | 允许，视课程角色配置 | 可管理 | 记录重评原因 |
+| 查看作业统计和待处理名单 | 不允许，返回 403 | 仅所属课程 | 仅协助课程 | 按平台权限 | 校验课程管理权限；403 不返回统计、名单或学生标识 |
 | 发布作业成绩 | 不允许 | 允许 | 允许，视课程角色配置 | 可管理 | 通知 LRN 和 GRD |
 
 ### 9.2 敏感数据保护
@@ -674,6 +710,7 @@ stateDiagram-v2
 3. 代码评测日志中的完整编译日志和运行日志默认仅教师端可查看，学生端仅展示摘要。
 4. 学生提交记录只能由本人、课程教师、助教或管理员查看。
 5. 批阅日志、重评原因和成绩调整记录仅教师端、管理员端或测试审查时可查看。
+6. 统计和待处理名单的姓名服务失败时使用安全占位文案，不回退展示裸 `studentId`；无权请求在服务端返回 403，不先返回部分统计。
 
 ### 9.3 日志与审计
 
@@ -691,11 +728,11 @@ stateDiagram-v2
 
 ### 10.1 性能设计
 
-1. 作业列表、提交列表、批阅列表和统计列表均采用分页查询。
-2. 常用查询字段建立索引，如 `course_id`、`homework_id`、`student_id`、`status`、`deadline`。
+1. 作业列表、提交列表、批阅列表和未提交/待评测/待批阅名单均采用服务端分页；页码从 1 开始，size 为 1～100。
+2. 统计查询使用 `idx_hwk_submission_effective` 覆盖最终有效提交范围；待处理列表使用 `idx_hwk_submission_attention`，以 `homework_id + is_final + is_deleted + submitted_at + id` 支撑稳定分页，后续列覆盖组合筛选。
 3. 学生提交接口只负责提交记录落库和评测任务创建，不同步等待代码评测完成。
 4. 自动评测通过后台 Worker 异步执行，前端通过轮询或通知刷新结果。
-5. 作业统计接口可优先使用 SQL 聚合完成首版统计，后续可加入缓存或统计快照。
+5. 作业统计由独立 `HomeworkStatisticsService` 编排，Repository 必须使用条件聚合 SQL 计算基础数量、原始分数摘要和固定五档，不得加载全部最终提交到应用内存。HWK 不维护统计快照；课程级和跨作业快照由 GRD 负责。
 6. 对附件和代码文件只保存文件路径或文件 ID，避免大文件直接存入业务表。
 
 ### 10.2 可维护性设计
@@ -728,7 +765,7 @@ stateDiagram-v2
 | FR-HWK-03 提交历史管理 | DS-HWK-03 | UI-HWK-06 | API-HWK-08、API-HWK-09、API-HWK-10 | DB-HWK-04 | TC-HWK-07、TC-HWK-08 |
 | FR-HWK-04 自动评测 | DS-HWK-04 | UI-HWK-05、UI-HWK-07、UI-HWK-08 | API-HWK-07、API-HWK-11、API-HWK-12、API-HWK-18、API-HWK-19、API-HWK-20 | DB-HWK-03、DB-HWK-04、DB-HWK-05 | TC-HWK-09、TC-HWK-10、TC-HWK-11、TC-HWK-12 |
 | FR-HWK-05 教师批阅与重评 | DS-HWK-05 | UI-HWK-08、UI-HWK-09 | API-HWK-09、API-HWK-10、API-HWK-12、API-HWK-13、API-HWK-21 | DB-HWK-04、DB-HWK-05、DB-HWK-06 | TC-HWK-13、TC-HWK-14、TC-HWK-15 |
-| FR-HWK-06 作业反馈与结果展示 | DS-HWK-06 | UI-HWK-01、UI-HWK-04、UI-HWK-07、UI-HWK-09 | API-HWK-05、API-HWK-06、API-HWK-11、API-HWK-14、API-HWK-15 | DB-HWK-04、DB-HWK-05、DB-HWK-06 | TC-HWK-16、TC-HWK-17、TC-HWK-18 |
+| FR-HWK-06 作业反馈与结果展示 | DS-HWK-06 | UI-HWK-01、UI-HWK-04、UI-HWK-07、UI-HWK-09 | API-HWK-05、API-HWK-06、API-HWK-09、API-HWK-11、API-HWK-14、API-HWK-15 | DB-HWK-04、DB-HWK-05、DB-HWK-06 | TC-HWK-16、TC-HWK-17、TC-HWK-18 |
 | NFR-HWK-01 可靠性 | DS-HWK-N01 | UI-HWK-05、UI-HWK-08 | API-HWK-07、API-HWK-11、API-HWK-13 | DB-HWK-04、DB-HWK-05、DB-HWK-06 | TC-HWK-N01 |
 | NFR-HWK-02 性能 | DS-HWK-N02 | UI-HWK-01、UI-HWK-06、UI-HWK-09 | API-HWK-05、API-HWK-09、API-HWK-15 | DB-HWK-01、DB-HWK-04、DB-HWK-05 | TC-HWK-N02 |
 | NFR-HWK-03 可追踪性 | DS-HWK-N03 | UI-HWK-06、UI-HWK-08 | API-HWK-10、API-HWK-20、API-HWK-21 | DB-HWK-04、DB-HWK-05、DB-HWK-06 | TC-HWK-N03 |
@@ -746,7 +783,7 @@ stateDiagram-v2
 | TC-HWK-05 | 学生提交作业 | 学生提交合法内容 | 生成提交记录，返回提交成功和提交时间 |
 | TC-HWK-06 | 截止后提交 | 不允许逾期时学生超时提交 | 返回截止错误，不生成有效提交 |
 | TC-HWK-07 | 提交历史 | 允许多次提交时学生提交多次 | 历史记录完整，最新提交 is_final=1 |
-| TC-HWK-08 | 教师查看提交 | 教师查看全班提交列表 | 可分页筛选提交状态、评测状态和批阅状态 |
+| TC-HWK-08 | 教师查看提交 | 不传 attention、分别传两类 attention，并与旧筛选组合 | 不传时兼容原行为；attention 仅含当前活跃学生的最终有效 SUBMITTED/LATE 提交，按 `submitted_at DESC, id DESC` 稳定分页，组合筛选按 AND 处理 |
 | TC-HWK-09 | 客观题自动评分 | 学生提交客观题答案 | 系统自动计算分数并生成评测记录 |
 | TC-HWK-10 | 代码题自动评测 | 学生提交代码 | 先返回 PENDING，评测结束后返回通过用例数和得分 |
 | TC-HWK-11 | 评测失败 | 模拟编译错误、运行错误、超时 | 评测状态正确记录，提交记录不丢失 |
@@ -756,8 +793,9 @@ stateDiagram-v2
 | TC-HWK-15 | 批阅日志 | 教师评分、重评、发布成绩 | 日志中记录操作人、时间、原因和分数变化 |
 | TC-HWK-16 | 反馈展示 | 学生查看自己的反馈 | 根据配置展示评测摘要、成绩和教师评语 |
 | TC-HWK-17 | 未发布成绩控制 | 学生成绩发布前查看结果 | 不显示未公开最终分数 |
-| TC-HWK-18 | 作业统计 | 教师查看作业统计页 | 展示提交人数、未提交人数、平均分等统计信息 |
-| TC-HWK-N04 | 权限安全 | 学生尝试查看他人提交或隐藏用例 | 返回无权限，不泄露敏感数据 |
+| TC-HWK-18 | 作业统计与三类跟进名单 | 准备五档边界、非 100 满分、空分布、无分数、历史/删除/REJECTED/非当前学生、TEXT/FILE NONE、代码评测中/终态样本；查看统计并切换三类 Tab | 六个新增字段、五档、归一化和 `generatedAt` 正确，`scoredCount` 等于档位合计；评测/批阅语义和范围正确；名单服务端分页、稳定排序、URL 可恢复；SQL 聚合与组合索引生效 |
+| TC-HWK-N02 | 统计性能与索引 | 使用大于单页的数据查询 API-HWK-09/15，并检查迁移元数据和查询实现 | 1 基分页、size 1～100 与聚合总数正确；Repository 使用 SQL 聚合，组合索引名称和列顺序正确，不加载全部最终提交到应用内存 |
+| TC-HWK-N04 | 权限安全 | 学生和无权限教师访问统计/attention，模拟姓名服务失败 | 返回 403 且不泄露统计、名单或学生标识；页面不展示裸 `studentId` |
 
 ---
 
@@ -766,7 +804,7 @@ stateDiagram-v2
 | 编号 | 待确认事项 | 相关模块 | 建议处理方式 |
 | --- | --- | --- | --- |
 | TODO-HWK-01 | 课程教师/助教权限的具体权限码名称 | AUTH、CRS | 由后端总设计师统一权限码，例如 `HWK_MANAGE`、`HWK_REVIEW` |
-| TODO-HWK-02 | 课程成员校验接口路径和返回字段 | CRS | CRS 提供 `courseId + userId -> memberRole/status` 查询能力 |
+| TODO-HWK-02 | 当前活跃学生名单和课程权限接口保持稳定 | CRS | 统计以角色 STUDENT、成员状态 ACTIVE、未删除的 CRS 名单为唯一范围；空名单返回零统计，不回退到提交人集合 |
 | TODO-HWK-03 | 评测 Worker 的任务格式和回调格式 | LAB、后端总设计师 | LAB 与 HWK 共用 `EvaluationTaskDTO` 和 `EvaluationResultDTO` |
 | TODO-HWK-04 | 附件上传后的文件 ID、fileUrl 规范 | CRS、文件服务负责人 | 统一文件元数据结构，HWK 只保存文件 ID 或路径 |
 | TODO-HWK-05 | LRN 通知事件字段格式 | LRN | 统一事件名称、接收人范围和消息模板 |

@@ -4,6 +4,7 @@ import com.onlinejudge.common.evaluation.EvaluationStatus;
 import com.onlinejudge.common.web.PageResponse;
 import com.onlinejudge.hwk.domain.HomeworkReviewStatus;
 import com.onlinejudge.hwk.domain.HomeworkSubmission;
+import com.onlinejudge.hwk.domain.HomeworkSubmissionAttention;
 import com.onlinejudge.hwk.domain.HomeworkSubmissionRepository;
 import com.onlinejudge.hwk.domain.HomeworkSubmissionSearchCriteria;
 import com.onlinejudge.hwk.domain.HomeworkSubmitStatus;
@@ -206,7 +207,7 @@ public class JdbcHomeworkSubmissionRepository implements HomeworkSubmissionRepos
             int page,
             int size
     ) {
-        int offset = Math.max(page - 1, 0) * size;
+        long offset = Math.max((long) page - 1L, 0L) * size;
         QueryFilter filter = buildFilter(homeworkId, criteria);
         String listSql = """
                         SELECT id, homework_id, student_id, submit_type, answer_text, answer_json, file_url, language,
@@ -261,6 +262,30 @@ public class JdbcHomeworkSubmissionRepository implements HomeworkSubmissionRepos
         StringBuilder where = new StringBuilder("WHERE homework_id = ? AND is_deleted = FALSE");
         List<Object> parameters = new ArrayList<>();
         parameters.add(homeworkId);
+        if (criteria != null && criteria.attention() != null) {
+            where.append(" AND is_final = TRUE AND submit_status IN ('SUBMITTED', 'LATE')");
+            appendActiveStudentFilter(where, parameters, criteria.activeStudentIds());
+            if (criteria.attention() == HomeworkSubmissionAttention.EVALUATION_PENDING) {
+                where.append("""
+                         AND submit_type IN ('OBJECTIVE', 'CODE')
+                         AND evaluation_status IN ('NONE', 'PENDING', 'RUNNING')
+                        """);
+            } else if (criteria.attention() == HomeworkSubmissionAttention.REVIEW_PENDING) {
+                where.append("""
+                         AND review_status IN ('UNREVIEWED', 'NEED_REVIEW')
+                         AND (
+                             submit_type IN ('TEXT', 'FILE')
+                             OR (
+                                 submit_type IN ('OBJECTIVE', 'CODE')
+                                 AND evaluation_status IN (
+                                     'ACCEPTED', 'WRONG_ANSWER', 'COMPILE_ERROR', 'RUNTIME_ERROR',
+                                     'TIME_LIMIT_EXCEEDED', 'SYSTEM_ERROR'
+                                 )
+                             )
+                         )
+                        """);
+            }
+        }
         if (criteria != null && criteria.studentKeyword() != null) {
             where.append(" AND CONCAT('', student_id) LIKE ?");
             parameters.add("%" + criteria.studentKeyword() + "%");
@@ -280,7 +305,27 @@ public class JdbcHomeworkSubmissionRepository implements HomeworkSubmissionRepos
         return new QueryFilter(where + " ", parameters);
     }
 
-    private static Object[] withPaging(List<Object> parameters, int size, int offset) {
+    private static void appendActiveStudentFilter(
+            StringBuilder where,
+            List<Object> parameters,
+            List<Long> activeStudentIds
+    ) {
+        if (activeStudentIds == null || activeStudentIds.isEmpty()) {
+            where.append(" AND 1 = 0");
+            return;
+        }
+        where.append(" AND student_id IN (");
+        for (int index = 0; index < activeStudentIds.size(); index++) {
+            if (index > 0) {
+                where.append(", ");
+            }
+            where.append('?');
+            parameters.add(activeStudentIds.get(index));
+        }
+        where.append(')');
+    }
+
+    private static Object[] withPaging(List<Object> parameters, int size, long offset) {
         List<Object> pagedParameters = new ArrayList<>(parameters);
         pagedParameters.add(size);
         pagedParameters.add(offset);

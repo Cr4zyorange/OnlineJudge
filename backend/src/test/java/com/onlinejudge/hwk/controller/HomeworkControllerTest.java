@@ -611,8 +611,12 @@ class HomeworkControllerTest {
                 .andExpect(jsonPath("$.data.totalStudentCount").value(3))
                 .andExpect(jsonPath("$.data.submittedCount").value(2))
                 .andExpect(jsonPath("$.data.unsubmittedCount").value(1))
+                .andExpect(jsonPath("$.data.autoEvaluableCount").value(2))
                 .andExpect(jsonPath("$.data.evaluatedCount").value(2))
+                .andExpect(jsonPath("$.data.pendingEvaluationCount").value(0))
+                .andExpect(jsonPath("$.data.pendingReviewCount").value(0))
                 .andExpect(jsonPath("$.data.reviewedCount").value(2))
+                .andExpect(jsonPath("$.data.scoredCount").value(2))
                 .andExpect(jsonPath("$.data.averageScore").value(70.00))
                 .andExpect(jsonPath("$.data.maxScore").value(100))
                 .andExpect(jsonPath("$.data.minScore").value(40))
@@ -620,7 +624,13 @@ class HomeworkControllerTest {
                 .andExpect(jsonPath("$.data.unsubmittedSize").value(20))
                 .andExpect(jsonPath("$.data.unsubmittedTotal").value(1))
                 .andExpect(jsonPath("$.data.unsubmittedStudentIds", hasSize(1)))
-                .andExpect(jsonPath("$.data.unsubmittedStudentIds[0]").value(603));
+                .andExpect(jsonPath("$.data.unsubmittedStudentIds[0]").value(603))
+                .andExpect(jsonPath("$.data.scoreDistribution['0-59']").value(1))
+                .andExpect(jsonPath("$.data.scoreDistribution['60-69']").value(0))
+                .andExpect(jsonPath("$.data.scoreDistribution['70-79']").value(0))
+                .andExpect(jsonPath("$.data.scoreDistribution['80-89']").value(0))
+                .andExpect(jsonPath("$.data.scoreDistribution['90-100']").value(1))
+                .andExpect(jsonPath("$.data.generatedAt").exists());
     }
 
     @Test
@@ -643,6 +653,219 @@ class HomeworkControllerTest {
                 .andExpect(jsonPath("$.data.unsubmittedStudentIds", hasSize(2)))
                 .andExpect(jsonPath("$.data.unsubmittedStudentIds[0]").value(604))
                 .andExpect(jsonPath("$.data.unsubmittedStudentIds[1]").value(605));
+    }
+
+    @Test
+    void statisticsUsesOnlyCurrentRosterFinalEffectiveSubmissionsAndNormalizesEveryBoundary() throws Exception {
+        long homeworkId = createHomeworkAndReturnId(textPayload());
+        jdbcTemplate.update("UPDATE t_hwk_homework SET total_score = 50 WHERE id = ?", homeworkId);
+        String submittedAt = "2026-08-22 10:00:00";
+
+        insertSubmission(homeworkId, 601, "TEXT", "SUBMITTED", "NONE", "REVIEWED", null,
+                new BigDecimal("29.99"), 1, true, false, submittedAt);
+        insertSubmission(homeworkId, 602, "TEXT", "SUBMITTED", "NONE", "REVIEWED", null,
+                new BigDecimal("30.00"), 1, true, false, submittedAt);
+        insertSubmission(homeworkId, 603, "TEXT", "SUBMITTED", "NONE", "REVIEWED", null,
+                new BigDecimal("34.99"), 1, true, false, submittedAt);
+        insertSubmission(homeworkId, 604, "TEXT", "SUBMITTED", "NONE", "REVIEWED", null,
+                new BigDecimal("35.00"), 1, true, false, submittedAt);
+        insertSubmission(homeworkId, 605, "TEXT", "SUBMITTED", "NONE", "REVIEWED", null,
+                new BigDecimal("39.99"), 1, true, false, submittedAt);
+        insertSubmission(homeworkId, 606, "TEXT", "SUBMITTED", "NONE", "REVIEWED", null,
+                new BigDecimal("40.00"), 1, true, false, submittedAt);
+        insertSubmission(homeworkId, 607, "TEXT", "SUBMITTED", "NONE", "REVIEWED", null,
+                new BigDecimal("44.99"), 1, true, false, submittedAt);
+        insertSubmission(homeworkId, 608, "TEXT", "SUBMITTED", "NONE", "REVIEWED", null,
+                new BigDecimal("45.00"), 1, true, false, submittedAt);
+        insertSubmission(homeworkId, 609, "TEXT", "LATE", "NONE", "REVIEWED", null,
+                new BigDecimal("50.00"), 1, true, false, submittedAt);
+
+        insertSubmission(homeworkId, 601, "TEXT", "SUBMITTED", "NONE", "REVIEWED", null,
+                new BigDecimal("50.00"), 2, false, false, submittedAt);
+        insertSubmission(homeworkId, 610, "TEXT", "REJECTED", "NONE", "REVIEWED", null,
+                new BigDecimal("50.00"), 1, true, false, submittedAt);
+        insertSubmission(homeworkId, 611, "TEXT", "SUBMITTED", "NONE", "REVIEWED", null,
+                new BigDecimal("50.00"), 1, true, true, submittedAt);
+        insertSubmission(homeworkId, 999, "TEXT", "SUBMITTED", "NONE", "REVIEWED", null,
+                new BigDecimal("50.00"), 1, true, false, submittedAt);
+
+        mockMvc.perform(get("/api/v1/homeworks/{homeworkId}/statistics", homeworkId)
+                        .headers(teacherHeaders("101", "101", "101:601,602,603,604,605,606,607,608,609,610,611")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.totalStudentCount").value(11))
+                .andExpect(jsonPath("$.data.submittedCount").value(9))
+                .andExpect(jsonPath("$.data.unsubmittedCount").value(2))
+                .andExpect(jsonPath("$.data.scoredCount").value(9))
+                .andExpect(jsonPath("$.data.scoreDistribution['0-59']").value(1))
+                .andExpect(jsonPath("$.data.scoreDistribution['60-69']").value(2))
+                .andExpect(jsonPath("$.data.scoreDistribution['70-79']").value(2))
+                .andExpect(jsonPath("$.data.scoreDistribution['80-89']").value(2))
+                .andExpect(jsonPath("$.data.scoreDistribution['90-100']").value(2))
+                .andExpect(jsonPath("$.data.unsubmittedStudentIds[0]").value(610))
+                .andExpect(jsonPath("$.data.unsubmittedStudentIds[1]").value(611));
+    }
+
+    @Test
+    void statisticsReturnsFixedZeroBucketsWhenCurrentRosterIsEmpty() throws Exception {
+        long homeworkId = createHomeworkAndReturnId(textPayload());
+        insertSubmission(homeworkId, 999, "TEXT", "SUBMITTED", "NONE", "UNREVIEWED", null,
+                new BigDecimal("100.00"), 1, true, false, "2026-08-22 10:00:00");
+
+        mockMvc.perform(get("/api/v1/homeworks/{homeworkId}/statistics", homeworkId)
+                        .headers(teacherHeaders("101", "101")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.totalStudentCount").value(0))
+                .andExpect(jsonPath("$.data.submittedCount").value(0))
+                .andExpect(jsonPath("$.data.unsubmittedCount").value(0))
+                .andExpect(jsonPath("$.data.scoredCount").value(0))
+                .andExpect(jsonPath("$.data.scoreDistribution['0-59']").value(0))
+                .andExpect(jsonPath("$.data.scoreDistribution['60-69']").value(0))
+                .andExpect(jsonPath("$.data.scoreDistribution['70-79']").value(0))
+                .andExpect(jsonPath("$.data.scoreDistribution['80-89']").value(0))
+                .andExpect(jsonPath("$.data.scoreDistribution['90-100']").value(0));
+    }
+
+    @Test
+    void statisticsCountsAutomaticEvaluationAndReviewAttentionByContract() throws Exception {
+        long homeworkId = createHomeworkAndReturnId(textPayload());
+        String submittedAt = "2026-08-22 10:00:00";
+        insertSubmission(homeworkId, 601, "OBJECTIVE", "SUBMITTED", "PENDING", "NEED_REVIEW", null,
+                null, 1, true, false, submittedAt);
+        insertSubmission(homeworkId, 602, "CODE", "SUBMITTED", "ACCEPTED", "NEED_REVIEW", 80,
+                new BigDecimal("90.00"), 1, true, false, submittedAt);
+        insertSubmission(homeworkId, 603, "TEXT", "SUBMITTED", "NONE", "UNREVIEWED", null,
+                new BigDecimal("70.00"), 1, true, false, submittedAt);
+        insertSubmission(homeworkId, 604, "FILE", "SUBMITTED", "NONE", "REVIEWED", null,
+                new BigDecimal("60.00"), 1, true, false, submittedAt);
+        insertSubmission(homeworkId, 605, "OBJECTIVE", "LATE", "SYSTEM_ERROR", "UNREVIEWED", 50,
+                null, 1, true, false, submittedAt);
+        insertSubmission(homeworkId, 606, "CODE", "SUBMITTED", "RUNNING", "REVIEWED", null,
+                new BigDecimal("40.00"), 1, true, false, submittedAt);
+
+        mockMvc.perform(get("/api/v1/homeworks/{homeworkId}/statistics", homeworkId)
+                        .headers(teacherHeaders("101", "101", "101:601,602,603,604,605,606")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.submittedCount").value(6))
+                .andExpect(jsonPath("$.data.autoEvaluableCount").value(4))
+                .andExpect(jsonPath("$.data.evaluatedCount").value(2))
+                .andExpect(jsonPath("$.data.pendingEvaluationCount").value(2))
+                .andExpect(jsonPath("$.data.pendingReviewCount").value(3))
+                .andExpect(jsonPath("$.data.reviewedCount").value(2))
+                .andExpect(jsonPath("$.data.scoredCount").value(5))
+                .andExpect(jsonPath("$.data.averageScore").value(62.00))
+                .andExpect(jsonPath("$.data.maxScore").value(90))
+                .andExpect(jsonPath("$.data.minScore").value(40))
+                .andExpect(jsonPath("$.data.generatedAt").exists());
+    }
+
+    @Test
+    void evaluationPendingAttentionUsesOnlyActiveFinalAutomaticSubmissionsWithStablePaging() throws Exception {
+        long homeworkId = createHomeworkAndReturnId(textPayload());
+        long firstId = insertSubmission(homeworkId, 601, "CODE", "SUBMITTED", "PENDING", "NEED_REVIEW", null,
+                null, 1, true, false, "2026-08-22 10:00:00");
+        long secondId = insertSubmission(homeworkId, 602, "OBJECTIVE", "LATE", "NONE", "UNREVIEWED", null,
+                null, 1, true, false, "2026-08-22 10:00:00");
+        long thirdId = insertSubmission(homeworkId, 603, "CODE", "SUBMITTED", "RUNNING", "NEED_REVIEW", null,
+                null, 1, true, false, "2026-08-22 09:00:00");
+        insertSubmission(homeworkId, 604, "TEXT", "SUBMITTED", "NONE", "UNREVIEWED", null,
+                null, 1, true, false, "2026-08-22 08:00:00");
+        insertSubmission(homeworkId, 605, "CODE", "SUBMITTED", "ACCEPTED", "NEED_REVIEW", 80,
+                null, 1, true, false, "2026-08-22 08:00:00");
+        insertSubmission(homeworkId, 606, "CODE", "SUBMITTED", "PENDING", "NEED_REVIEW", null,
+                null, 1, false, false, "2026-08-22 08:00:00");
+        insertSubmission(homeworkId, 607, "CODE", "REJECTED", "PENDING", "NEED_REVIEW", null,
+                null, 1, true, false, "2026-08-22 08:00:00");
+        insertSubmission(homeworkId, 608, "CODE", "SUBMITTED", "PENDING", "NEED_REVIEW", null,
+                null, 1, true, true, "2026-08-22 08:00:00");
+        insertSubmission(homeworkId, 999, "CODE", "SUBMITTED", "PENDING", "NEED_REVIEW", null,
+                null, 1, true, false, "2026-08-22 08:00:00");
+
+        org.springframework.http.HttpHeaders managerHeaders = teacherHeaders(
+                "101", "101", "101:601,602,603,604,605,606,607,608"
+        );
+        mockMvc.perform(get("/api/v1/homeworks/{homeworkId}/submissions", homeworkId)
+                        .headers(managerHeaders)
+                        .param("page", "1")
+                        .param("size", "100"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.total").value(8));
+
+        mockMvc.perform(get("/api/v1/homeworks/{homeworkId}/submissions", homeworkId)
+                        .headers(managerHeaders)
+                        .param("attention", "EVALUATION_PENDING")
+                        .param("page", "1")
+                        .param("size", "2"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.total").value(3))
+                .andExpect(jsonPath("$.data.list", hasSize(2)))
+                .andExpect(jsonPath("$.data.list[0].submissionId").value(secondId))
+                .andExpect(jsonPath("$.data.list[1].submissionId").value(firstId));
+
+        mockMvc.perform(get("/api/v1/homeworks/{homeworkId}/submissions", homeworkId)
+                        .headers(managerHeaders)
+                        .param("attention", "EVALUATION_PENDING")
+                        .param("page", "2")
+                        .param("size", "2"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.total").value(3))
+                .andExpect(jsonPath("$.data.list", hasSize(1)))
+                .andExpect(jsonPath("$.data.list[0].submissionId").value(thirdId));
+    }
+
+    @Test
+    void reviewPendingAttentionWaitsForAutomaticEvaluationTerminalState() throws Exception {
+        long homeworkId = createHomeworkAndReturnId(textPayload());
+        long textId = insertSubmission(homeworkId, 601, "TEXT", "SUBMITTED", "NONE", "UNREVIEWED", null,
+                null, 1, true, false, "2026-08-22 10:00:00");
+        long fileId = insertSubmission(homeworkId, 602, "FILE", "SUBMITTED", "NONE", "NEED_REVIEW", null,
+                null, 1, true, false, "2026-08-22 09:00:00");
+        long codeId = insertSubmission(homeworkId, 603, "CODE", "SUBMITTED", "ACCEPTED", "UNREVIEWED", 80,
+                null, 1, true, false, "2026-08-22 08:00:00");
+        long objectiveId = insertSubmission(homeworkId, 604, "OBJECTIVE", "LATE", "WRONG_ANSWER", "NEED_REVIEW", 40,
+                null, 1, true, false, "2026-08-22 07:00:00");
+        insertSubmission(homeworkId, 605, "CODE", "SUBMITTED", "PENDING", "NEED_REVIEW", null,
+                null, 1, true, false, "2026-08-22 06:00:00");
+        insertSubmission(homeworkId, 606, "OBJECTIVE", "SUBMITTED", "RUNNING", "UNREVIEWED", null,
+                null, 1, true, false, "2026-08-22 05:00:00");
+        insertSubmission(homeworkId, 607, "TEXT", "SUBMITTED", "NONE", "REVIEWED", null,
+                null, 1, true, false, "2026-08-22 04:00:00");
+
+        mockMvc.perform(get("/api/v1/homeworks/{homeworkId}/submissions", homeworkId)
+                        .headers(teacherHeaders("101", "101", "101:601,602,603,604,605,606,607"))
+                        .param("attention", "REVIEW_PENDING")
+                        .param("page", "1")
+                        .param("size", "20"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.total").value(4))
+                .andExpect(jsonPath("$.data.list", hasSize(4)))
+                .andExpect(jsonPath("$.data.list[0].submissionId").value(textId))
+                .andExpect(jsonPath("$.data.list[1].submissionId").value(fileId))
+                .andExpect(jsonPath("$.data.list[2].submissionId").value(codeId))
+                .andExpect(jsonPath("$.data.list[3].submissionId").value(objectiveId));
+    }
+
+    @Test
+    void statisticsAndAttentionQueuesRequireCourseManagementPermission() throws Exception {
+        long homeworkId = createHomeworkAndReturnId(textPayload());
+
+        mockMvc.perform(get("/api/v1/homeworks/{homeworkId}/statistics", homeworkId)
+                        .headers(studentHeaders("101")))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("HWK_4031"));
+        mockMvc.perform(get("/api/v1/homeworks/{homeworkId}/submissions", homeworkId)
+                        .headers(studentHeaders("101"))
+                        .param("attention", "REVIEW_PENDING"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("HWK_4031"));
+        mockMvc.perform(get("/api/v1/homeworks/{homeworkId}/statistics", homeworkId)
+                        .headers(teacherHeaders("202", "202")))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("HWK_4031"));
+        mockMvc.perform(get("/api/v1/homeworks/{homeworkId}/submissions", homeworkId)
+                        .headers(teacherHeaders("202", "202"))
+                        .param("attention", "EVALUATION_PENDING"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("HWK_4031"));
     }
 
     @Test
@@ -716,6 +939,52 @@ class HomeworkControllerTest {
                 String.class,
                 submissionId
         )).isEqualTo("verify fixed judge data");
+    }
+
+    @Test
+    void codeEvaluationNeverPersistsScoreAboveHomeworkTotal() throws Exception {
+        long homeworkId = createHomeworkAndReturnId(Map.ofEntries(
+                entry("courseId", 101),
+                entry("chapterId", 11),
+                entry("title", "HWK score boundary"),
+                entry("description", "Keep automatic scores within the homework total."),
+                entry("type", "CODE"),
+                entry("deadline", futureDeadline()),
+                entry("totalScore", 50),
+                entry("allowResubmit", true),
+                entry("allowLateSubmit", false),
+                entry("showEvaluationBeforePublish", true),
+                entry("languageLimitJson", "[\"python\"]"),
+                entry("timeLimitMs", 1000),
+                entry("memoryLimitKb", 65536),
+                entry("outputCompareMode", "EXACT"),
+                entry("testCases", List.of(Map.of(
+                        "inputData", "1 2",
+                        "expectedOutput", "3",
+                        "scoreWeight", 100,
+                        "hidden", false,
+                        "timeLimitMs", 1000,
+                        "memoryLimitKb", 65536,
+                        "sortOrder", 1
+                )))
+        ));
+        mockMvc.perform(put("/api/v1/homeworks/{homeworkId}/publish", homeworkId)
+                        .headers(teacherHeaders("101", "101", "101:601")))
+                .andExpect(status().isOk());
+        long submissionId = submitCodeAnswer(homeworkId, "print(input())", "python", studentHeaders("101"));
+
+        mockMvc.perform(get("/api/v1/submissions/{submissionId}/evaluation", submissionId)
+                        .headers(studentHeaders("101")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.evaluationStatus").value("ACCEPTED"))
+                .andExpect(jsonPath("$.data.score").value(50));
+
+        Map<String, Object> persistedScores = jdbcTemplate.queryForMap(
+                "SELECT auto_score, final_score FROM t_hwk_submission WHERE id = ?",
+                submissionId
+        );
+        assertThat((BigDecimal) persistedScores.get("auto_score")).isEqualByComparingTo("50.00");
+        assertThat((BigDecimal) persistedScores.get("final_score")).isEqualByComparingTo("50.00");
     }
 
     @Test
@@ -1219,6 +1488,47 @@ class HomeworkControllerTest {
                 .getResponse()
                 .getContentAsString();
         return objectMapper.readTree(body).path("data").path("submissionId").asLong();
+    }
+
+    private long insertSubmission(
+            long homeworkId,
+            long studentId,
+            String submitType,
+            String submitStatus,
+            String evaluationStatus,
+            String reviewStatus,
+            Integer autoScore,
+            BigDecimal finalScore,
+            int version,
+            boolean isFinal,
+            boolean deleted,
+            String submittedAt
+    ) {
+        jdbcTemplate.update("""
+                        INSERT INTO t_hwk_submission
+                        (homework_id, student_id, submit_type, answer_text, answer_json, file_url, language,
+                         submit_status, evaluation_status, review_status, auto_score, manual_score, final_score,
+                         comment, version, is_final, submitted_at, reviewed_by, reviewed_at, created_at, updated_at,
+                         is_deleted)
+                        VALUES (?, ?, ?, 'test answer', NULL, NULL, NULL, ?, ?, ?, ?, NULL, ?, NULL, ?, ?, ?,
+                                NULL, NULL, ?, ?, ?)
+                        """,
+                homeworkId,
+                studentId,
+                submitType,
+                submitStatus,
+                evaluationStatus,
+                reviewStatus,
+                autoScore,
+                finalScore,
+                version,
+                isFinal,
+                submittedAt,
+                submittedAt,
+                submittedAt,
+                deleted
+        );
+        return jdbcTemplate.queryForObject("SELECT MAX(id) FROM t_hwk_submission", Long.class);
     }
 
     private Map<String, Object> objectivePayload() {
