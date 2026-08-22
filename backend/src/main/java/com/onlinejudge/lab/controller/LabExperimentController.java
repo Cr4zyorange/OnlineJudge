@@ -272,6 +272,24 @@ public class LabExperimentController {
         ));
     }
 
+    @GetMapping("/labs/{labId}/submissions/{submissionId}/source/download")
+    public ResponseEntity<Resource> downloadSubmissionSource(
+            @PathVariable long labId,
+            @PathVariable long submissionId,
+            CurrentUser currentUser
+    ) {
+        requireTeacher(currentUser);
+        var source = labSubmissionService.downloadSubmissionSource(labId, submissionId, currentUser.id());
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(source.contentType()))
+                .contentLength(source.fileSize())
+                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment()
+                        .filename(source.originalFilename(), StandardCharsets.UTF_8)
+                        .build()
+                        .toString())
+                .body(source.resource());
+    }
+
     @GetMapping("/labs/{labId}/submissions/{submissionId}/result")
     public ApiResponse<LabEvaluationResultResponse> getSubmissionResult(
             @PathVariable long labId,

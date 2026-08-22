@@ -154,6 +154,10 @@ export function downloadLabReport(labId: number, reportId: number) {
   return requestBlob(`/api/v1/labs/${labId}/reports/${reportId}/download`);
 }
 
+export function downloadLabSubmissionSource(labId: number, submissionId: number) {
+  return requestBlob(`/api/v1/labs/${labId}/submissions/${submissionId}/source/download`);
+}
+
 export async function scoreLabReport(
   labId: number,
   reportId: number,

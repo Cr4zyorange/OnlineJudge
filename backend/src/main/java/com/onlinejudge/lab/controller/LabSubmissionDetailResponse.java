@@ -22,7 +22,7 @@ public record LabSubmissionDetailResponse(
         boolean isScoringBasis,
         boolean hasFile,
         String code,
-        String fileId,
+        LabSubmissionSourceFileResponse sourceFile,
         LabReportResponse latestReport,
         LabScoreResponse latestScore
 ) {
@@ -43,7 +43,7 @@ public record LabSubmissionDetailResponse(
                 detail.isScoringBasis(),
                 detail.hasFile(),
                 detail.code(),
-                detail.fileId(),
+                detail.sourceFile() == null ? null : LabSubmissionSourceFileResponse.from(detail.sourceFile()),
                 detail.latestReport() == null ? null : LabReportResponse.from(detail.latestReport()),
                 detail.latestScore() == null ? null : LabScoreResponse.from(detail.latestScore())
         );

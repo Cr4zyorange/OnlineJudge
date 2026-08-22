@@ -159,9 +159,16 @@ export interface LabSubmissionHistoryItem {
   hasFile: boolean;
 }
 
+export interface LabSubmissionSourceFile {
+  originalFilename: string;
+  contentType: string;
+  fileSize: number;
+  downloadAvailable: boolean;
+}
+
 export interface LabSubmissionDetail extends LabSubmissionHistoryItem {
   code: string | null;
-  fileId: string | null;
+  sourceFile: LabSubmissionSourceFile | null;
   latestReport: LabReportSummary | null;
   latestScore?: LabScoreSummary | null;
 }

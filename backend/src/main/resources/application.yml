@@ -13,6 +13,7 @@ spring:
         - file:../database/migrations/DB-CRS-05-course-announcement.sql
         - file:../database/migrations/20260525_02_create_lab_experiment.sql
         - file:../database/migrations/20260526_01_create_lab_submission.sql
+        - file:../database/migrations/20260822_02_create_lab_submission_source_file.sql
         - file:../database/migrations/20260604_01_create_lab_report.sql
         - file:../database/migrations/20260605_02_create_lab_score.sql
         - file:../database/migrations/20260601_01_create_lab_evaluation_result.sql

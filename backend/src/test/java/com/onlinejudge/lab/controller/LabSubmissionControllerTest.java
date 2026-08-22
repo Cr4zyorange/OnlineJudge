@@ -1,6 +1,7 @@
 package com.onlinejudge.lab.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.onlinejudge.common.storage.FileStorageService;
 import com.onlinejudge.integration.grade.SourceGradeClient;
 import com.onlinejudge.integration.grade.SourceGradeType;
 import org.junit.jupiter.api.BeforeEach;
@@ -13,7 +14,10 @@ import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.io.IOException;
 import java.math.BigDecimal;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -31,12 +35,15 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest(properties = {
         "spring.datasource.url=jdbc:h2:mem:lab_submission_controller;MODE=MySQL;DATABASE_TO_LOWER=TRUE;CASE_INSENSITIVE_IDENTIFIERS=TRUE;DB_CLOSE_DELAY=-1",
         "onlinejudge.evaluation.sandbox.mode=fake",
-        "onlinejudge.evaluation.fake.delay-ms=150"
+        "onlinejudge.evaluation.fake.delay-ms=150",
+        "onlinejudge.storage.local-root=target/test-uploads/lab-submission-controller"
 })
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
@@ -55,6 +62,9 @@ class LabSubmissionControllerTest {
     @Autowired
     private SourceGradeClient sourceGradeClient;
 
+    @Autowired
+    private FileStorageService fileStorageService;
+
     @BeforeEach
     void cleanTables() {
         deleteIfExists("DELETE FROM lab_evaluation_result");
@@ -62,6 +72,7 @@ class LabSubmissionControllerTest {
         deleteIfExists("DELETE FROM lab_score_change_log");
         deleteIfExists("DELETE FROM lab_score");
         deleteIfExists("DELETE FROM lab_report");
+        deleteIfExists("DELETE FROM lab_submission_source_file");
         deleteIfExists("DELETE FROM lab_submission");
         deleteIfExists("DELETE FROM lab_testcase");
         deleteIfExists("DELETE FROM lab_experiment");
@@ -143,6 +154,377 @@ class LabSubmissionControllerTest {
 
         org.assertj.core.api.Assertions.assertThat(storedFileId).isNotBlank();
         org.assertj.core.api.Assertions.assertThat(storedCode).isNull();
+    }
+
+    @Test
+    void teacherCanInspectTrustedSourceMetadataAndDownloadTheExactSubmissionVersion() throws Exception {
+        long labId = createPublishedLab(540L, false, LocalDateTime.now().plusDays(3));
+        byte[] sourceBytes = "print('林晓的版本 3')\n".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        long submissionId = createSourceSubmission(
+                labId,
+                "540",
+                "实验源码-林晓.py",
+                "text/x-python",
+                sourceBytes
+        );
+
+        mockMvc.perform(get("/api/v1/labs/{labId}/submissions/{submissionId}", labId, submissionId)
+                        .headers(teacherHeaders("540", "540", "601")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.hasFile").value(true))
+                .andExpect(jsonPath("$.data.fileId").doesNotExist())
+                .andExpect(jsonPath("$.data.sourceFile.originalFilename").value("实验源码-林晓.py"))
+                .andExpect(jsonPath("$.data.sourceFile.contentType").value("text/x-python"))
+                .andExpect(jsonPath("$.data.sourceFile.fileSize").value(sourceBytes.length))
+                .andExpect(jsonPath("$.data.sourceFile.downloadAvailable").value(true))
+                .andExpect(jsonPath("$.data.sourceFile.storageKey").doesNotExist());
+
+        mockMvc.perform(get("/api/v1/labs/{labId}/submissions/{submissionId}", labId, submissionId)
+                        .headers(studentHeaders("540", 601L)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.sourceFile.originalFilename").value("实验源码-林晓.py"))
+                .andExpect(jsonPath("$.data.sourceFile.downloadAvailable").value(false))
+                .andExpect(jsonPath("$.data.fileId").doesNotExist());
+
+        Map<String, Object> metadata = jdbcTemplate.queryForMap(
+                """
+                SELECT submission_id, lab_id, course_id, uploader_id, storage_key,
+                       original_filename, content_type, file_size, status
+                  FROM lab_submission_source_file
+                 WHERE submission_id = ?
+                """,
+                submissionId
+        );
+        org.assertj.core.api.Assertions.assertThat(metadata.get("SUBMISSION_ID")).isEqualTo(submissionId);
+        org.assertj.core.api.Assertions.assertThat(metadata.get("LAB_ID")).isEqualTo(labId);
+        org.assertj.core.api.Assertions.assertThat(metadata.get("COURSE_ID")).isEqualTo(540L);
+        org.assertj.core.api.Assertions.assertThat(metadata.get("UPLOADER_ID")).isEqualTo(601L);
+        org.assertj.core.api.Assertions.assertThat(metadata.get("STORAGE_KEY")).isNotNull();
+        org.assertj.core.api.Assertions.assertThat(metadata.get("ORIGINAL_FILENAME")).isEqualTo("实验源码-林晓.py");
+        org.assertj.core.api.Assertions.assertThat(metadata.get("CONTENT_TYPE")).isEqualTo("text/x-python");
+        org.assertj.core.api.Assertions.assertThat(metadata.get("FILE_SIZE")).isEqualTo((long) sourceBytes.length);
+        org.assertj.core.api.Assertions.assertThat(metadata.get("STATUS")).isEqualTo("AVAILABLE");
+
+        mockMvc.perform(get(
+                            "/api/v1/labs/{labId}/submissions/{submissionId}/source/download",
+                            labId,
+                            submissionId
+                        )
+                        .headers(teacherHeaders("540", "540", "601")))
+                .andExpect(status().isOk())
+                .andExpect(content().contentType("text/x-python"))
+                .andExpect(header().longValue(HttpHeaders.CONTENT_LENGTH, sourceBytes.length))
+                .andExpect(header().string(HttpHeaders.CONTENT_DISPOSITION, containsString("filename*=UTF-8''")))
+                .andExpect(header().string(HttpHeaders.CONTENT_DISPOSITION, containsString("%E5%AE%9E%E9%AA%8C")))
+                .andExpect(content().bytes(sourceBytes));
+    }
+
+    @Test
+    void sourceDownloadReauthorizesRoleAndCourseManagementWithoutLeakingStorageState() throws Exception {
+        long labId = createPublishedLab(541L, false, LocalDateTime.now().plusDays(3));
+        long submissionId = createSourceSubmission(
+                labId,
+                "541",
+                "solution.py",
+                "text/x-python",
+                "print('secure')".getBytes(java.nio.charset.StandardCharsets.UTF_8)
+        );
+
+        mockMvc.perform(get(
+                            "/api/v1/labs/{labId}/submissions/{submissionId}/source/download",
+                            labId,
+                            submissionId
+                        ))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(get(
+                            "/api/v1/labs/{labId}/submissions/{submissionId}/source/download",
+                            labId,
+                            submissionId
+                        )
+                        .headers(studentHeaders("541", 601L)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ERR-AUTH-05"));
+
+        String otherTeacherBody = mockMvc.perform(get(
+                            "/api/v1/labs/{labId}/submissions/{submissionId}/source/download",
+                            labId,
+                            submissionId
+                        )
+                        .headers(teacherHeaders("999", "999", "601")))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("LAB-403-01"))
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        org.assertj.core.api.Assertions.assertThat(otherTeacherBody)
+                .doesNotContain("storage", "solution.py", "lab_submission_source_file");
+
+        mockMvc.perform(get(
+                            "/api/v1/labs/{labId}/submissions/{submissionId}/source/download",
+                            labId,
+                            999999L
+                        )
+                        .headers(teacherHeaders("999", "999", "601")))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("LAB-403-01"));
+    }
+
+    @Test
+    void sourceDownloadRejectsCrossLabAndDeletedSubmissionBindingsAsTheSameMissingTarget() throws Exception {
+        long sourceLabId = createPublishedLab(542L, false, LocalDateTime.now().plusDays(3));
+        long otherLabId = createPublishedLab(542L, false, LocalDateTime.now().plusDays(3));
+        long submissionId = createSourceSubmission(
+                sourceLabId,
+                "542",
+                "bound.py",
+                "text/x-python",
+                "print('bound')".getBytes(java.nio.charset.StandardCharsets.UTF_8)
+        );
+
+        mockMvc.perform(get(
+                            "/api/v1/labs/{labId}/submissions/{submissionId}/source/download",
+                            otherLabId,
+                            submissionId
+                        )
+                        .headers(teacherHeaders("542", "542", "601")))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("LAB-404-01"));
+
+        jdbcTemplate.update("UPDATE lab_submission SET deleted = TRUE WHERE id = ?", submissionId);
+
+        mockMvc.perform(get(
+                            "/api/v1/labs/{labId}/submissions/{submissionId}/source/download",
+                            sourceLabId,
+                            submissionId
+                        )
+                        .headers(teacherHeaders("542", "542", "601")))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("LAB-404-01"));
+    }
+
+    @Test
+    void sourceDownloadDistinguishesNoFileLegacyMetadataAndDeletedAssets() throws Exception {
+        long labId = createPublishedLab(543L, false, LocalDateTime.now().plusDays(3));
+        long codeOnlySubmissionId = createCodeSubmission(labId, 601L, "543", "print('inline')", "python");
+
+        mockMvc.perform(get(
+                            "/api/v1/labs/{labId}/submissions/{submissionId}/source/download",
+                            labId,
+                            codeOnlySubmissionId
+                        )
+                        .headers(teacherHeaders("543", "543", "601")))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("LAB-404-03"));
+
+        long legacySubmissionId = createSourceSubmission(
+                labId,
+                "543",
+                "legacy.py",
+                "text/x-python",
+                "print('legacy')".getBytes(java.nio.charset.StandardCharsets.UTF_8)
+        );
+        jdbcTemplate.update(
+                "DELETE FROM lab_submission_source_file WHERE submission_id = ?",
+                legacySubmissionId
+        );
+
+        mockMvc.perform(get("/api/v1/labs/{labId}/submissions/{submissionId}", labId, legacySubmissionId)
+                        .headers(teacherHeaders("543", "543", "601")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.hasFile").value(true))
+                .andExpect(jsonPath("$.data.sourceFile").doesNotExist())
+                .andExpect(jsonPath("$.data.fileId").doesNotExist());
+        mockMvc.perform(get(
+                            "/api/v1/labs/{labId}/submissions/{submissionId}/source/download",
+                            labId,
+                            legacySubmissionId
+                        )
+                        .headers(teacherHeaders("543", "543", "601")))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("LAB-409-03"));
+
+        long deletedAssetSubmissionId = createSourceSubmission(
+                labId,
+                "543",
+                "deleted.py",
+                "text/x-python",
+                "print('deleted')".getBytes(java.nio.charset.StandardCharsets.UTF_8)
+        );
+        jdbcTemplate.update(
+                "UPDATE lab_submission_source_file SET status = 'DELETED', deleted_at = CURRENT_TIMESTAMP WHERE submission_id = ?",
+                deletedAssetSubmissionId
+        );
+
+        mockMvc.perform(get(
+                            "/api/v1/labs/{labId}/submissions/{submissionId}/source/download",
+                            labId,
+                            deletedAssetSubmissionId
+                        )
+                        .headers(teacherHeaders("543", "543", "601")))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("LAB-409-03"));
+    }
+
+    @Test
+    void sourceDownloadReturnsStableStorageAndMetadataIntegrityErrors() throws Exception {
+        long labId = createPublishedLab(544L, false, LocalDateTime.now().plusDays(3));
+        long missingPhysicalSubmissionId = createSourceSubmission(
+                labId,
+                "544",
+                "missing.py",
+                "text/x-python",
+                "print('missing')".getBytes(java.nio.charset.StandardCharsets.UTF_8)
+        );
+        String missingStorageKey = jdbcTemplate.queryForObject(
+                "SELECT storage_key FROM lab_submission_source_file WHERE submission_id = ?",
+                String.class,
+                missingPhysicalSubmissionId
+        );
+        fileStorageService.delete(missingStorageKey);
+
+        mockMvc.perform(get(
+                            "/api/v1/labs/{labId}/submissions/{submissionId}/source/download",
+                            labId,
+                            missingPhysicalSubmissionId
+                        )
+                        .headers(teacherHeaders("544", "544", "601")))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.code").value("LAB-500-05"));
+
+        long invalidMimeSubmissionId = createSourceSubmission(
+                labId,
+                "544",
+                "mime.py",
+                "text/x-python",
+                "print('mime')".getBytes(java.nio.charset.StandardCharsets.UTF_8)
+        );
+        jdbcTemplate.update(
+                "UPDATE lab_submission_source_file SET content_type = ? WHERE submission_id = ?",
+                "invalid mime\r\nX-Injected: true",
+                invalidMimeSubmissionId
+        );
+
+        mockMvc.perform(get(
+                            "/api/v1/labs/{labId}/submissions/{submissionId}/source/download",
+                            labId,
+                            invalidMimeSubmissionId
+                        )
+                        .headers(teacherHeaders("544", "544", "601")))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("LAB-409-03"));
+
+        long traversalSubmissionId = createSourceSubmission(
+                labId,
+                "544",
+                "traversal.py",
+                "text/x-python",
+                "print('traversal')".getBytes(java.nio.charset.StandardCharsets.UTF_8)
+        );
+        jdbcTemplate.update("UPDATE lab_submission SET file_id = ? WHERE id = ?", "../../outside.py", traversalSubmissionId);
+        jdbcTemplate.update(
+                "UPDATE lab_submission_source_file SET storage_key = ? WHERE submission_id = ?",
+                "../../outside.py",
+                traversalSubmissionId
+        );
+
+        mockMvc.perform(get(
+                            "/api/v1/labs/{labId}/submissions/{submissionId}/source/download",
+                            labId,
+                            traversalSubmissionId
+                        )
+                        .headers(teacherHeaders("544", "544", "601")))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.code").value("LAB-500-05"));
+    }
+
+    @Test
+    void sourceFilenameSanitizationPreventsPathAndHeaderInjectionWhileKeepingUnicode() throws Exception {
+        long labId = createPublishedLab(545L, false, LocalDateTime.now().plusDays(3));
+        byte[] sourceBytes = "print('safe')".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        long submissionId = createSourceSubmission(
+                labId,
+                "545",
+                "../..\\恶意\r\nInjected.py",
+                "text/x-python",
+                sourceBytes
+        );
+
+        String detailBody = mockMvc.perform(get(
+                            "/api/v1/labs/{labId}/submissions/{submissionId}",
+                            labId,
+                            submissionId
+                        )
+                        .headers(teacherHeaders("545", "545", "601")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.fileId").doesNotExist())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        String safeFilename = objectMapper.readTree(detailBody)
+                .path("data")
+                .path("sourceFile")
+                .path("originalFilename")
+                .asText();
+        org.assertj.core.api.Assertions.assertThat(safeFilename)
+                .isNotBlank()
+                .doesNotContain("/", "\\", "\r", "\n")
+                .endsWith(".py")
+                .contains("恶意");
+
+        mockMvc.perform(get(
+                            "/api/v1/labs/{labId}/submissions/{submissionId}/source/download",
+                            labId,
+                            submissionId
+                        )
+                        .headers(teacherHeaders("545", "545", "601")))
+                .andExpect(status().isOk())
+                .andExpect(header().string(HttpHeaders.CONTENT_DISPOSITION, containsString("filename*=UTF-8''")))
+                .andExpect(content().bytes(sourceBytes));
+    }
+
+    @Test
+    void sourceUploadDeletesThePhysicalFileWhenTheDatabaseTransactionRollsBack() throws Exception {
+        long labId = createPublishedLab(546L, false, LocalDateTime.now().plusDays(3));
+        Path uploadRoot = Path.of("target/test-uploads/lab-submission-controller").toAbsolutePath().normalize();
+        Set<String> filesBeforeRequest = storedFiles(uploadRoot);
+        jdbcTemplate.execute("""
+                ALTER TABLE lab_submission
+                    ADD CONSTRAINT ck_lab_submission_force_source_failure CHECK (file_id IS NULL)
+                """);
+
+        try {
+            MockMultipartFile sourceFile = new MockMultipartFile(
+                    "file",
+                    "rollback.py",
+                    "text/x-python",
+                    "print('must be deleted')".getBytes(java.nio.charset.StandardCharsets.UTF_8)
+            );
+            mockMvc.perform(multipart("/api/v1/labs/{labId}/submissions", labId)
+                            .file(sourceFile)
+                            .headers(studentHeaders("546"))
+                            .param("language", "python"))
+                    .andExpect(status().isInternalServerError());
+        } finally {
+            jdbcTemplate.execute("""
+                    ALTER TABLE lab_submission
+                        DROP CONSTRAINT ck_lab_submission_force_source_failure
+                    """);
+        }
+
+        Integer submissionRows = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM lab_submission WHERE lab_id = ?",
+                Integer.class,
+                labId
+        );
+        Integer sourceFileRows = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM lab_submission_source_file WHERE lab_id = ?",
+                Integer.class,
+                labId
+        );
+        org.assertj.core.api.Assertions.assertThat(submissionRows).isZero();
+        org.assertj.core.api.Assertions.assertThat(sourceFileRows).isZero();
+        org.assertj.core.api.Assertions.assertThat(storedFiles(uploadRoot)).isEqualTo(filesBeforeRequest);
     }
 
     @Test
@@ -993,7 +1375,7 @@ class LabSubmissionControllerTest {
                 .andExpect(jsonPath("$.data.latestScore.finalScore").value(95))
                 .andExpect(jsonPath("$.data.latestScore.comment").value("整体实现稳定"))
                 .andExpect(jsonPath("$.data.latestScore.hasChangeLogs").value(false))
-                .andExpect(jsonPath("$.data.fileId").value(internalFileId));
+                .andExpect(jsonPath("$.data.fileId").doesNotExist());
 
         mockMvc.perform(get("/api/v1/labs/{labId}/submissions/{submissionId}", labId, submissionId)
                         .headers(studentHeaders("525", 601L)))
@@ -1346,6 +1728,25 @@ class LabSubmissionControllerTest {
         return objectMapper.readTree(body).path("data").path("submissionId").asLong();
     }
 
+    private long createSourceSubmission(
+            long labId,
+            String courseIds,
+            String filename,
+            String contentType,
+            byte[] bytes
+    ) throws Exception {
+        MockMultipartFile sourceFile = new MockMultipartFile("file", filename, contentType, bytes);
+        String body = mockMvc.perform(multipart("/api/v1/labs/{labId}/submissions", labId)
+                        .file(sourceFile)
+                        .headers(studentHeaders(courseIds))
+                        .param("language", "python"))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        return objectMapper.readTree(body).path("data").path("submissionId").asLong();
+    }
+
     private long uploadReport(long labId, long submissionId, String courseIds) throws Exception {
         MockMultipartFile report = new MockMultipartFile(
                 "reportFile",
@@ -1392,6 +1793,18 @@ class LabSubmissionControllerTest {
             Thread.sleep(50);
         }
         org.assertj.core.api.Assertions.assertThat(actualStatus).isEqualTo(expectedStatus);
+    }
+
+    private Set<String> storedFiles(Path root) throws IOException {
+        if (Files.notExists(root)) {
+            return Set.of();
+        }
+        try (var paths = Files.list(root)) {
+            return paths
+                    .filter(Files::isRegularFile)
+                    .map(path -> path.getFileName().toString())
+                    .collect(java.util.stream.Collectors.toUnmodifiableSet());
+        }
     }
 
     private HttpHeaders teacherHeaders(String courseIds, String manageableCourseIds) {

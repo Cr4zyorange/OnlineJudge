@@ -611,7 +611,7 @@ describe('LabStudentView', () => {
       isScoringBasis: true,
       hasFile: false,
       code: "print('report upload')",
-      fileId: null,
+      sourceFile: null,
       latestReport: null
     });
     vi.mocked(labApi.uploadLabReport).mockResolvedValueOnce({
@@ -734,7 +734,7 @@ describe('LabStudentView', () => {
       isScoringBasis: true,
       hasFile: false,
       code: "print('report upload')",
-      fileId: null,
+      sourceFile: null,
       latestReport: null
     });
     vi.mocked(labApi.uploadLabReport).mockResolvedValueOnce({
@@ -845,7 +845,7 @@ describe('LabStudentView', () => {
       isScoringBasis: true,
       hasFile: false,
       code: "print('graded')",
-      fileId: null,
+      sourceFile: null,
       latestReport: {
         reportId: 814,
         submissionId: 140,
@@ -891,7 +891,7 @@ describe('LabStudentView', () => {
         isScoringBasis: true,
         hasFile: false,
         code: "print('graded')",
-        fileId: null,
+        sourceFile: null,
         latestReport: {
           reportId: 814,
           submissionId: 140,
@@ -1041,7 +1041,7 @@ describe('LabStudentView', () => {
         isScoringBasis: true,
         hasFile: false,
         code: "print('hidden score')",
-        fileId: null,
+        sourceFile: null,
         latestReport: {
           reportId: 915,
           submissionId: 150,
@@ -1168,7 +1168,7 @@ describe('LabStudentView', () => {
         isScoringBasis: true,
         hasFile: false,
         code: "print('published score')",
-        fileId: null,
+        sourceFile: null,
         latestReport: {
           reportId: 916,
           submissionId: 160,

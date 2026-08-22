@@ -14,12 +14,22 @@ import type {
 import type { LearningCourseProgressAggregate } from '../../../src/types/lrn';
 
 const useRouteMock = vi.hoisted(() => vi.fn());
+const downloadLabSubmissionSourceMock = vi.hoisted(() => vi.fn());
 
 vi.mock('vue-router', async (importOriginal) => {
   const actual = await importOriginal<typeof import('vue-router')>();
   return { ...actual, useRoute: useRouteMock };
 });
-vi.mock('../../../src/api/lab/labs');
+vi.mock('../../../src/api/lab/labs', () => ({
+  downloadLabReport: vi.fn(),
+  downloadLabSubmissionSource: downloadLabSubmissionSourceMock,
+  evaluateLabSubmission: vi.fn(),
+  getLabDetail: vi.fn(),
+  getLabSubmissionDetail: vi.fn(),
+  getLabSubmissionResult: vi.fn(),
+  scoreLabReport: vi.fn(),
+  scoreLabSubmission: vi.fn()
+}));
 vi.mock('../../../src/api/lrn/learningProgress');
 
 describe('LabSubmissionReviewView', () => {
@@ -102,13 +112,209 @@ describe('LabSubmissionReviewView', () => {
     expect(workspaceTarget.query).not.toHaveProperty('redirect');
   });
 
-  it('never exposes a source file identifier and explains the missing controlled teacher download', async () => {
+  it('renders only safe source metadata and the controlled teacher download action', async () => {
+    vi.mocked(labApi.getLabSubmissionDetail).mockResolvedValueOnce({
+      ...submission({
+        sourceFile: sourceFile({ originalFilename: '实验源码-林晓.py' })
+      }),
+      fileId: 'private-file-token-should-never-render',
+      sourceFile: {
+        ...sourceFile({ originalFilename: '实验源码-林晓.py' }),
+        storageKey: 'private/storage/source-v3.py',
+        localPath: '/srv/onlinejudge/private/source-v3.py'
+      }
+    } as unknown as LabSubmissionDetail);
+
     const wrapper = mountView();
     await flushPromises();
 
-    expect(wrapper.get('[data-testid="source-file-blocker"]').text())
-      .toContain('服务尚未提供教师受控下载入口');
+    const sourcePanel = wrapper.get('[data-testid="source-file-panel"]');
+    expect(sourcePanel.get('[data-testid="source-file-name"]').text()).toContain('实验源码-林晓.py');
+    expect(sourcePanel.get('[data-testid="source-file-content-type"]').text()).toContain('text/x-python');
+    expect(sourcePanel.get('[data-testid="source-file-size"]').text()).toContain('2.0 KB');
+    expect(sourcePanel.get('[data-action="download-source-file"]').text()).toContain('下载源文件');
     expect(wrapper.text()).not.toContain('private-file-token-should-never-render');
+    expect(wrapper.text()).not.toContain('private/storage/source-v3.py');
+    expect(wrapper.text()).not.toContain('/srv/onlinejudge/private/source-v3.py');
+  });
+
+  it('keeps storage identifiers out of the public submission contract', () => {
+    const publicSubmission = submission();
+
+    // @ts-expect-error fileId is a private storage identifier, not public submission metadata.
+    expect(publicSubmission.fileId).toBeUndefined();
+  });
+
+  it('deduplicates pending source downloads and prefers the blob response filename', async () => {
+    const sourceBlob = new Blob(['print("source")'], { type: 'text/x-python' });
+    const sourceDownload = deferred<{ blob: Blob; filename?: string }>();
+    const browserDownload = stubBrowserDownload();
+    downloadLabSubmissionSourceMock.mockReturnValueOnce(sourceDownload.promise);
+
+    const wrapper = mountView();
+    await flushPromises();
+
+    const button = wrapper.get('[data-action="download-source-file"]');
+    const firstClick = button.trigger('click');
+    const secondClick = button.trigger('click');
+    await Promise.all([firstClick, secondClick]);
+
+    expect(downloadLabSubmissionSourceMock).toHaveBeenCalledTimes(1);
+    expect(downloadLabSubmissionSourceMock).toHaveBeenCalledWith(7, 301);
+    expect(button.attributes('disabled')).toBeDefined();
+    expect(button.text()).toContain('正在下载');
+
+    sourceDownload.resolve({ blob: sourceBlob, filename: 'server-approved-source.py' });
+    await flushPromises();
+
+    expect(browserDownload.createObjectURL).toHaveBeenCalledWith(sourceBlob);
+    expect(browserDownload.downloadedFilename()).toBe('server-approved-source.py');
+    expect(wrapper.get('[data-testid="source-file-download-feedback"]').text()).toContain('已开始下载');
+    expect(button.attributes('disabled')).toBeUndefined();
+  });
+
+  it('falls back to the safe source metadata filename when the blob response has none', async () => {
+    downloadLabSubmissionSourceMock.mockResolvedValueOnce({
+      blob: new Blob(['print("fallback")'], { type: 'text/x-python' }),
+      filename: undefined
+    });
+    const browserDownload = stubBrowserDownload();
+    vi.mocked(labApi.getLabSubmissionDetail).mockResolvedValueOnce(submission({
+      sourceFile: sourceFile({ originalFilename: '学生提交源码.py' })
+    }));
+
+    const wrapper = mountView();
+    await flushPromises();
+    await wrapper.get('[data-action="download-source-file"]').trigger('click');
+    await flushPromises();
+
+    expect(browserDownload.downloadedFilename()).toBe('学生提交源码.py');
+    expect(wrapper.get('[data-testid="source-file-download-feedback"]').text())
+      .toContain('学生提交源码.py');
+  });
+
+  it('shows a recoverable source download error and allows an explicit retry', async () => {
+    const retryBlob = new Blob(['print("retry")'], { type: 'text/x-python' });
+    downloadLabSubmissionSourceMock
+      .mockRejectedValueOnce(new Error('源文件下载服务暂不可用'))
+      .mockResolvedValueOnce({ blob: retryBlob, filename: 'retry-source.py' });
+    const browserDownload = stubBrowserDownload();
+
+    const wrapper = mountView();
+    await flushPromises();
+    const button = wrapper.get('[data-action="download-source-file"]');
+
+    await button.trigger('click');
+    await flushPromises();
+
+    expect(wrapper.get('[data-testid="source-file-download-error"]').text())
+      .toContain('源文件下载服务暂不可用');
+    expect(button.attributes('disabled')).toBeUndefined();
+
+    await button.trigger('click');
+    await flushPromises();
+
+    expect(downloadLabSubmissionSourceMock).toHaveBeenCalledTimes(2);
+    expect(browserDownload.createObjectURL).toHaveBeenCalledWith(retryBlob);
+    expect(browserDownload.downloadedFilename()).toBe('retry-source.py');
+    expect(wrapper.find('[data-testid="source-file-download-error"]').exists()).toBe(false);
+    expect(wrapper.get('[data-testid="source-file-download-feedback"]').text()).toContain('已开始下载');
+  });
+
+  it('explains legacy source submissions whose safe metadata is unavailable', async () => {
+    vi.mocked(labApi.getLabSubmissionDetail).mockResolvedValueOnce(submission({ sourceFile: null }));
+
+    const wrapper = mountView();
+    await flushPromises();
+
+    expect(wrapper.get('[data-testid="source-file-metadata-unavailable"]').text())
+      .toContain('源文件元数据暂不可用');
+    expect(wrapper.find('[data-action="download-source-file"]').exists()).toBe(false);
+  });
+
+  it('hides all source download affordances when the submission has no file', async () => {
+    vi.mocked(labApi.getLabSubmissionDetail).mockResolvedValueOnce(submission({
+      hasFile: false,
+      sourceFile: null
+    }));
+
+    const wrapper = mountView();
+    await flushPromises();
+
+    expect(wrapper.find('[data-testid="source-file-panel"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="source-file-metadata-unavailable"]').exists()).toBe(false);
+    expect(wrapper.find('[data-action="download-source-file"]').exists()).toBe(false);
+    expect(downloadLabSubmissionSourceMock).not.toHaveBeenCalled();
+  });
+
+  it('shows safe metadata without a download action when controlled download is unavailable', async () => {
+    vi.mocked(labApi.getLabSubmissionDetail).mockResolvedValueOnce(submission({
+      sourceFile: sourceFile({ downloadAvailable: false })
+    }));
+
+    const wrapper = mountView();
+    await flushPromises();
+
+    expect(wrapper.get('[data-testid="source-file-panel"]').text()).toContain('实验源码.py');
+    expect(wrapper.get('[data-testid="source-file-panel"]').text()).toContain('当前源文件暂不可下载');
+    expect(wrapper.find('[data-action="download-source-file"]').exists()).toBe(false);
+    expect(downloadLabSubmissionSourceMock).not.toHaveBeenCalled();
+  });
+
+  it('ignores a source download response that arrives after the review unmounts', async () => {
+    const staleDownload = deferred<{ blob: Blob; filename?: string }>();
+    downloadLabSubmissionSourceMock.mockReturnValueOnce(staleDownload.promise);
+    const browserDownload = stubBrowserDownload();
+
+    const wrapper = mountView();
+    await flushPromises();
+    await wrapper.get('[data-action="download-source-file"]').trigger('click');
+    wrapper.unmount();
+
+    staleDownload.resolve({
+      blob: new Blob(['stale'], { type: 'text/x-python' }),
+      filename: 'unmounted-source.py'
+    });
+    await flushPromises();
+
+    expect(downloadLabSubmissionSourceMock).toHaveBeenCalledTimes(1);
+    expect(browserDownload.createObjectURL).not.toHaveBeenCalled();
+    expect(browserDownload.downloadedFilename()).toBe('');
+  });
+
+  it('ignores a source download response that arrives after the review route changes', async () => {
+    const staleDownload = deferred<{ blob: Blob; filename?: string }>();
+    downloadLabSubmissionSourceMock.mockReturnValueOnce(staleDownload.promise);
+    const browserDownload = stubBrowserDownload();
+
+    const wrapper = mountView();
+    await flushPromises();
+    await wrapper.get('[data-action="download-source-file"]').trigger('click');
+
+    vi.mocked(labApi.getLabDetail).mockResolvedValueOnce(lab({ id: 8 }));
+    vi.mocked(labApi.getLabSubmissionDetail).mockResolvedValueOnce(submission({
+      submissionId: 401,
+      labId: 8,
+      sourceFile: sourceFile({ originalFilename: 'new-route-source.py' })
+    }));
+    vi.mocked(labApi.getLabSubmissionResult).mockResolvedValueOnce(evaluation({ submissionId: 401 }));
+    await wrapper.setProps({ labId: 8, submissionId: 401 });
+    await flushPromises();
+
+    expect(wrapper.get('[data-testid="source-file-name"]').text()).toContain('new-route-source.py');
+    expect(wrapper.get('[data-action="download-source-file"]').attributes('disabled')).toBeUndefined();
+
+    staleDownload.resolve({
+      blob: new Blob(['stale'], { type: 'text/x-python' }),
+      filename: 'stale-route-source.py'
+    });
+    await flushPromises();
+
+    expect(downloadLabSubmissionSourceMock).toHaveBeenCalledTimes(1);
+    expect(browserDownload.createObjectURL).not.toHaveBeenCalled();
+    expect(browserDownload.downloadedFilename()).toBe('');
+    expect(wrapper.text()).not.toContain('stale-route-source.py');
+    expect(wrapper.find('[data-testid="source-file-download-feedback"]').exists()).toBe(false);
   });
 
   it('degrades only the student name when the roster service fails and does not leak a student id', async () => {
@@ -372,9 +578,26 @@ function submission(overrides: Partial<LabSubmissionDetail> = {}): LabSubmission
     isScoringBasis: true,
     hasFile: true,
     code: "print('review source')",
-    fileId: 'private-file-token-should-never-render',
+    sourceFile: sourceFile(),
     latestReport: report(),
     latestScore: score(),
+    ...overrides
+  };
+}
+
+interface SourceFileFixture {
+  originalFilename: string;
+  contentType: string;
+  fileSize: number;
+  downloadAvailable: boolean;
+}
+
+function sourceFile(overrides: Partial<SourceFileFixture> = {}): SourceFileFixture {
+  return {
+    originalFilename: '实验源码.py',
+    contentType: 'text/x-python',
+    fileSize: 2048,
+    downloadAvailable: true,
     ...overrides
   };
 }
@@ -473,4 +696,19 @@ function deferred<T>() {
     reject = rejectPromise;
   });
   return { promise, resolve, reject };
+}
+
+function stubBrowserDownload() {
+  const createObjectURL = vi.fn(() => 'blob:source-file');
+  const revokeObjectURL = vi.fn();
+  let downloadedFilename = '';
+  vi.stubGlobal('URL', { createObjectURL, revokeObjectURL });
+  vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
+    downloadedFilename = this.download;
+  });
+  return {
+    createObjectURL,
+    revokeObjectURL,
+    downloadedFilename: () => downloadedFilename
+  };
 }

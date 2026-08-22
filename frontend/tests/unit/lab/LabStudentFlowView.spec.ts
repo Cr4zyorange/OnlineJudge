@@ -1041,7 +1041,7 @@ function resultView(overrides: {
     submission: {
       ...current,
       code: "print('result')",
-      fileId: null,
+      sourceFile: null,
       latestReport: null,
       latestScore: null
     },
@@ -1059,7 +1059,7 @@ function submissionDetail(overrides: Partial<LabSubmissionDetail> = {}): LabSubm
   return {
     ...submission(overrides),
     code: "print('verified')",
-    fileId: null,
+    sourceFile: null,
     latestReport: null,
     latestScore: null,
     ...overrides
