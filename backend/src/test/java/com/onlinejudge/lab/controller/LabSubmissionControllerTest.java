@@ -14,7 +14,10 @@ import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.io.IOException;
 import java.math.BigDecimal;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -39,7 +42,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest(properties = {
         "spring.datasource.url=jdbc:h2:mem:lab_submission_controller;MODE=MySQL;DATABASE_TO_LOWER=TRUE;CASE_INSENSITIVE_IDENTIFIERS=TRUE;DB_CLOSE_DELAY=-1",
         "onlinejudge.evaluation.sandbox.mode=fake",
-        "onlinejudge.evaluation.fake.delay-ms=150"
+        "onlinejudge.evaluation.fake.delay-ms=150",
+        "onlinejudge.storage.local-root=target/test-uploads/lab-submission-controller"
 })
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
@@ -255,6 +259,15 @@ class LabSubmissionControllerTest {
                 .getContentAsString();
         org.assertj.core.api.Assertions.assertThat(otherTeacherBody)
                 .doesNotContain("storage", "solution.py", "lab_submission_source_file");
+
+        mockMvc.perform(get(
+                            "/api/v1/labs/{labId}/submissions/{submissionId}/source/download",
+                            labId,
+                            999999L
+                        )
+                        .headers(teacherHeaders("999", "999", "601")))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("LAB-403-01"));
     }
 
     @Test
@@ -468,6 +481,50 @@ class LabSubmissionControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(header().string(HttpHeaders.CONTENT_DISPOSITION, containsString("filename*=UTF-8''")))
                 .andExpect(content().bytes(sourceBytes));
+    }
+
+    @Test
+    void sourceUploadDeletesThePhysicalFileWhenTheDatabaseTransactionRollsBack() throws Exception {
+        long labId = createPublishedLab(546L, false, LocalDateTime.now().plusDays(3));
+        Path uploadRoot = Path.of("target/test-uploads/lab-submission-controller").toAbsolutePath().normalize();
+        Set<String> filesBeforeRequest = storedFiles(uploadRoot);
+        jdbcTemplate.execute("""
+                ALTER TABLE lab_submission
+                    ADD CONSTRAINT ck_lab_submission_force_source_failure CHECK (file_id IS NULL)
+                """);
+
+        try {
+            MockMultipartFile sourceFile = new MockMultipartFile(
+                    "file",
+                    "rollback.py",
+                    "text/x-python",
+                    "print('must be deleted')".getBytes(java.nio.charset.StandardCharsets.UTF_8)
+            );
+            mockMvc.perform(multipart("/api/v1/labs/{labId}/submissions", labId)
+                            .file(sourceFile)
+                            .headers(studentHeaders("546"))
+                            .param("language", "python"))
+                    .andExpect(status().isInternalServerError());
+        } finally {
+            jdbcTemplate.execute("""
+                    ALTER TABLE lab_submission
+                        DROP CONSTRAINT ck_lab_submission_force_source_failure
+                    """);
+        }
+
+        Integer submissionRows = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM lab_submission WHERE lab_id = ?",
+                Integer.class,
+                labId
+        );
+        Integer sourceFileRows = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM lab_submission_source_file WHERE lab_id = ?",
+                Integer.class,
+                labId
+        );
+        org.assertj.core.api.Assertions.assertThat(submissionRows).isZero();
+        org.assertj.core.api.Assertions.assertThat(sourceFileRows).isZero();
+        org.assertj.core.api.Assertions.assertThat(storedFiles(uploadRoot)).isEqualTo(filesBeforeRequest);
     }
 
     @Test
@@ -1736,6 +1793,18 @@ class LabSubmissionControllerTest {
             Thread.sleep(50);
         }
         org.assertj.core.api.Assertions.assertThat(actualStatus).isEqualTo(expectedStatus);
+    }
+
+    private Set<String> storedFiles(Path root) throws IOException {
+        if (Files.notExists(root)) {
+            return Set.of();
+        }
+        try (var paths = Files.list(root)) {
+            return paths
+                    .filter(Files::isRegularFile)
+                    .map(path -> path.getFileName().toString())
+                    .collect(java.util.stream.Collectors.toUnmodifiableSet());
+        }
     }
 
     private HttpHeaders teacherHeaders(String courseIds, String manageableCourseIds) {
