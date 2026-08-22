@@ -7,7 +7,7 @@ vi.mock('../../../src/api/http', () => ({
   requestBlob: vi.fn()
 }));
 
-describe('lab api report download', () => {
+describe('lab api blob downloads', () => {
   beforeEach(() => {
     vi.resetAllMocks();
   });
@@ -25,6 +25,25 @@ describe('lab api report download', () => {
     }).downloadLabReport(13, 801);
 
     expect(requestBlob).toHaveBeenCalledWith('/api/v1/labs/13/reports/801/download');
+    expect(result).toBe(response);
+  });
+
+  it('downloads a submission source through the controlled teacher blob endpoint', async () => {
+    const response = {
+      blob: new Blob(['print("source")'], { type: 'text/x-python' }),
+      filename: 'source-v3.py'
+    };
+    vi.mocked(requestBlob).mockResolvedValueOnce(response);
+
+    const labApiModule = await import('../../../src/api/lab/labs');
+    const result = await (labApiModule as {
+      downloadLabSubmissionSource: (
+        labId: number,
+        submissionId: number
+      ) => Promise<typeof response>;
+    }).downloadLabSubmissionSource(13, 301);
+
+    expect(requestBlob).toHaveBeenCalledWith('/api/v1/labs/13/submissions/301/source/download');
     expect(result).toBe(response);
   });
 
