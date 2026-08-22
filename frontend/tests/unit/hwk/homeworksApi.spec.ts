@@ -134,7 +134,8 @@ describe('homeworks api', () => {
       studentKeyword: '602',
       submitStatus: 'LATE',
       evaluationStatus: 'PENDING',
-      reviewStatus: 'NEED_REVIEW'
+      reviewStatus: 'NEED_REVIEW',
+      attention: 'EVALUATION_PENDING'
     })).resolves.toEqual({
       list: [submission],
       page: 2,
@@ -149,7 +150,7 @@ describe('homeworks api', () => {
     expect(fetchMock.mock.calls.map((call) => [call[0], (call[1] as RequestInit).method])).toEqual([
       ['/api/v1/homeworks/11/my-submissions', 'GET'],
       [
-        '/api/v1/homeworks/11/submissions?page=2&size=5&studentKeyword=602&submitStatus=LATE&evaluationStatus=PENDING&reviewStatus=NEED_REVIEW',
+        '/api/v1/homeworks/11/submissions?page=2&size=5&studentKeyword=602&submitStatus=LATE&evaluationStatus=PENDING&reviewStatus=NEED_REVIEW&attention=EVALUATION_PENDING',
         'GET'
       ],
       ['/api/v1/submissions/91', 'GET']
@@ -264,9 +265,21 @@ describe('homeworks api', () => {
       unsubmittedCount: 1,
       evaluatedCount: 2,
       reviewedCount: 2,
+      autoEvaluableCount: 2,
+      pendingEvaluationCount: 0,
+      pendingReviewCount: 0,
+      scoredCount: 2,
       averageScore: 70,
       maxScore: 100,
       minScore: 40,
+      scoreDistribution: {
+        '0-59': 1,
+        '60-69': 0,
+        '70-79': 0,
+        '80-89': 0,
+        '90-100': 1
+      },
+      generatedAt: '2026-08-22T10:30:00+08:00',
       unsubmittedPage: 2,
       unsubmittedSize: 2,
       unsubmittedTotal: 4,

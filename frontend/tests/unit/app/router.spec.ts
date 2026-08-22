@@ -207,14 +207,87 @@ describe('application router access contract', () => {
       }
     });
 
-    await router.push('/courses/42/homeworks/9/manage/statistics?page=3');
+    await router.push('/courses/42/homeworks/9/manage/statistics?attention=REVIEW_PENDING&page=3');
 
     expect(router.currentRoute.value.name).toBe('homework-statistics');
     expect(resolveDefaultProps(router.currentRoute.value)).toEqual({
       courseId: 42,
       homeworkId: 9,
+      initialAttention: 'REVIEW_PENDING',
       initialPage: 3
     });
+  });
+
+  it('ignores unsupported HWK statistics attention values on refresh', async () => {
+    const router = createAppRouter({
+      history: createMemoryHistory(),
+      services: {
+        loadCurrentUser: vi.fn().mockResolvedValue(user('TEACHER')),
+        loadCourse: vi.fn().mockResolvedValue(course({ manageable: true }))
+      }
+    });
+
+    await router.push('/courses/42/homeworks/9/manage/statistics?attention=STUDENT_ID_PENDING&page=2');
+
+    expect(resolveDefaultProps(router.currentRoute.value)).toEqual({
+      courseId: 42,
+      homeworkId: 9,
+      initialPage: 2
+    });
+  });
+
+  it('restores HWK statistics attention and page props across browser history', async () => {
+    const router = createAppRouter({
+      history: createMemoryHistory(),
+      services: {
+        loadCurrentUser: vi.fn().mockResolvedValue(user('TEACHER')),
+        loadCourse: vi.fn().mockResolvedValue(course({ manageable: true }))
+      }
+    });
+
+    await router.push('/courses/42/homeworks/9/manage/statistics?attention=EVALUATION_PENDING&page=2');
+    await router.push('/courses/42/homeworks/9/manage/statistics?attention=REVIEW_PENDING&page=3');
+
+    router.back();
+    await vi.waitFor(() => expect(router.currentRoute.value.query).toEqual({
+      attention: 'EVALUATION_PENDING',
+      page: '2'
+    }));
+    expect(resolveDefaultProps(router.currentRoute.value)).toEqual({
+      courseId: 42,
+      homeworkId: 9,
+      initialAttention: 'EVALUATION_PENDING',
+      initialPage: 2
+    });
+
+    router.forward();
+    await vi.waitFor(() => expect(router.currentRoute.value.query).toEqual({
+      attention: 'REVIEW_PENDING',
+      page: '3'
+    }));
+    expect(resolveDefaultProps(router.currentRoute.value)).toEqual({
+      courseId: 42,
+      homeworkId: 9,
+      initialAttention: 'REVIEW_PENDING',
+      initialPage: 3
+    });
+  });
+
+  it.each([
+    '/courses/42/homeworks/9/manage/statistics?attention=REVIEW_PENDING&page=2',
+    '/courses/42/homeworks/9/manage/submissions?attention=EVALUATION_PENDING&page=2'
+  ])('blocks a student from refreshed HWK attention deep link %s', async (path) => {
+    const router = createAppRouter({
+      history: createMemoryHistory(),
+      services: {
+        loadCurrentUser: vi.fn().mockResolvedValue(user('STUDENT')),
+        loadCourse: vi.fn().mockResolvedValue(course({ manageable: false }))
+      }
+    });
+
+    await router.push(path);
+
+    expect(router.currentRoute.value.name).toBe('forbidden');
   });
 
   it('routes a non-member course visit to 403', async () => {

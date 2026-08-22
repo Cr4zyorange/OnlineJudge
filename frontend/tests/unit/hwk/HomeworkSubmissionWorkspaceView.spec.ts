@@ -129,6 +129,77 @@ describe('HomeworkSubmissionWorkspaceView', () => {
     });
   });
 
+  it('restores an attention queue deep link and preserves it through review without leaking roster ids', async () => {
+    vi.mocked(homeworkApi.listHomeworkSubmissions).mockResolvedValueOnce(submissionPage({
+      page: 2,
+      total: 21,
+      list: [submission({
+        submissionId: 303,
+        studentId: 999,
+        evaluationStatus: 'RUNNING',
+        version: 1
+      })]
+    }));
+    vi.mocked(learningProgressApi.getTeacherLearningProgress)
+      .mockRejectedValueOnce(new Error('学生名单服务暂不可用'));
+
+    const { wrapper, router } = await mountView(
+      true,
+      '/courses/101/homeworks/11/manage/submissions?attention=EVALUATION_PENDING&page=2'
+    );
+
+    expect((wrapper.get('[name="attention"]').element as HTMLSelectElement).value)
+      .toBe('EVALUATION_PENDING');
+    expect(homeworkApi.listHomeworkSubmissions).toHaveBeenCalledWith(11, {
+      page: 2,
+      size: 20,
+      attention: 'EVALUATION_PENDING'
+    });
+    expect(router.currentRoute.value.query).toEqual({
+      attention: 'EVALUATION_PENDING',
+      page: '2'
+    });
+    expect(wrapper.get('.summary-grid').text()).toContain('当前筛选结果21个版本');
+    expect(wrapper.get('[data-testid="queue-list"]').text()).toContain('学生姓名暂不可用');
+    expect(wrapper.text()).not.toContain('999');
+
+    const reviewLink = wrapper.findAllComponents(RouterLinkStub)
+      .find((link) => routeTarget(link.props('to')).name === 'homework-submission-review');
+    expect(reviewLink?.props('to')).toEqual({
+      name: 'homework-submission-review',
+      params: { courseId: 101, homeworkId: 11, submissionId: 303 },
+      query: { attention: 'EVALUATION_PENDING', page: '2' }
+    });
+  });
+
+  it('adds user-selected attention filters to browser history and restores them on back', async () => {
+    vi.mocked(homeworkApi.listHomeworkSubmissions).mockImplementation(async (_homeworkId, query) => (
+      submissionPage({
+        total: query?.attention ? 1 : 21,
+        list: [submission({ evaluationStatus: query?.attention ? 'PENDING' : 'ACCEPTED' })]
+      })
+    ));
+    const { wrapper, router } = await mountView();
+
+    await wrapper.get('[name="attention"]').setValue('EVALUATION_PENDING');
+    await wrapper.get('[data-action="filter-submissions"]').trigger('submit');
+    await flushPromises();
+
+    expect(router.currentRoute.value.query).toEqual({ attention: 'EVALUATION_PENDING' });
+    expect(homeworkApi.listHomeworkSubmissions).toHaveBeenLastCalledWith(11, {
+      page: 1,
+      size: 20,
+      attention: 'EVALUATION_PENDING'
+    });
+
+    router.back();
+    await vi.waitFor(() => expect(router.currentRoute.value.query).toEqual({}));
+    await flushPromises();
+
+    expect((wrapper.get('[name="attention"]').element as HTMLSelectElement).value).toBe('');
+    expect(homeworkApi.listHomeworkSubmissions).toHaveBeenLastCalledWith(11, { page: 1, size: 20 });
+  });
+
   it('filters by a roster identity while exposing only its name and opaque reference in the URL', async () => {
     vi.mocked(homeworkApi.listHomeworkSubmissions)
       .mockResolvedValueOnce(submissionPage())
@@ -404,6 +475,19 @@ describe('HomeworkSubmissionWorkspaceView', () => {
 
     expect(wrapper.get('.summary-grid').text()).toContain('本页评测处理中0份');
   });
+
+  it.each(['OBJECTIVE', 'CODE'] as const)(
+    'counts NONE for %s submissions as evaluation pending',
+    async (submitType) => {
+      vi.mocked(homeworkApi.listHomeworkSubmissions).mockResolvedValueOnce(submissionPage({
+        total: 1,
+        list: [submission({ submitType, evaluationStatus: 'NONE' })]
+      }));
+      const { wrapper } = await mountView();
+
+      expect(wrapper.get('.summary-grid').text()).toContain('本页评测处理中1份');
+    }
+  );
 
   it('invalidates an old queue response as soon as homework props switch', async () => {
     const oldQueue = deferred<PageResponse<HomeworkSubmissionSummary>>();

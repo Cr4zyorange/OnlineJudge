@@ -79,6 +79,7 @@ describe('HomeworkSubmissionReviewView', () => {
         studentRef: '37090d82ef8c0fac',
         submit: 'LATE',
         review: 'UNREVIEWED',
+        attention: 'REVIEW_PENDING',
         page: '2',
         studentId: '601',
         studentKeyword: '601',
@@ -98,8 +99,23 @@ describe('HomeworkSubmissionReviewView', () => {
         studentRef: '37090d82ef8c0fac',
         submit: 'LATE',
         review: 'UNREVIEWED',
+        attention: 'REVIEW_PENDING',
         page: '2'
       }
+    });
+  });
+
+  it('drops unsupported attention values from the safe queue return link', async () => {
+    useRouteMock.mockReturnValue({ query: { attention: 'STUDENT_ID_PENDING', page: '2' } });
+    const wrapper = mountView();
+    await flushPromises();
+
+    const queueLink = wrapper.findAllComponents(RouterLinkStub)
+      .find((link) => routeTarget(link.props('to')).name === 'homework-submission-workspace');
+    expect(queueLink?.props('to')).toEqual({
+      name: 'homework-submission-workspace',
+      params: { courseId: 101, homeworkId: 11 },
+      query: { page: '2' }
     });
   });
 

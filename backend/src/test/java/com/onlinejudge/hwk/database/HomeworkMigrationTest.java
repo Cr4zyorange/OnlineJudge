@@ -5,7 +5,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.autoconfigure.jdbc.JdbcTest;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.core.io.FileSystemResource;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.datasource.init.ResourceDatabasePopulator;
 import org.springframework.test.context.jdbc.Sql;
 
 import java.nio.file.Files;
@@ -32,6 +34,18 @@ class HomeworkMigrationTest {
     );
     private static final Path REVIEW_LOG_MIGRATION_PATH = Path.of(
             "../database/migrations/20260602_02_create_hwk_review_log.sql"
+    );
+    private static final Path STATISTICS_ATTENTION_MIGRATION_PATH = Path.of(
+            "../database/migrations/20260822_01_add_hwk_statistics_attention_indexes.sql"
+    );
+    private static final Path H2_STATISTICS_ATTENTION_MIGRATION_PATH = Path.of(
+            "src/main/resources/h2-hwk-statistics-attention-indexes.sql"
+    );
+    private static final Path COMPOSE_MIGRATION_RUNNER_PATH = Path.of(
+            "../database/mysql/apply-compose-migration.sh"
+    );
+    private static final Path DEPLOYMENT_DOCUMENT_PATH = Path.of(
+            "../docs/最终提交/部署文档.md"
     );
 
     private final JdbcTemplate jdbcTemplate;
@@ -138,6 +152,84 @@ class HomeworkMigrationTest {
     @Test
     @Sql(scripts = {
             "file:../database/migrations/20260530_01_create_hwk_homework.sql",
+            "file:../database/migrations/20260601_01_create_hwk_submission.sql"
+    })
+    void freshSubmissionSchemaContainsStatisticsAndAttentionCompositeIndexes() {
+        assertIndexColumns(
+                "idx_hwk_submission_effective",
+                "homework_id", "is_final", "is_deleted", "submit_status", "student_id"
+        );
+        assertIndexColumns(
+                "idx_hwk_submission_attention",
+                "homework_id", "is_final", "is_deleted", "submitted_at", "id",
+                "submit_status", "student_id", "submit_type", "evaluation_status", "review_status"
+        );
+    }
+
+    @Test
+    @Sql(scripts = {
+            "file:../database/migrations/20260530_01_create_hwk_homework.sql",
+            "file:../database/migrations/20260601_01_create_hwk_submission.sql"
+    })
+    void h2StatisticsAttentionIndexUpgradeIsIdempotent() {
+        jdbcTemplate.execute("DROP INDEX IF EXISTS idx_hwk_submission_effective");
+        jdbcTemplate.execute("DROP INDEX IF EXISTS idx_hwk_submission_attention");
+        ResourceDatabasePopulator populator = new ResourceDatabasePopulator(
+                new FileSystemResource(H2_STATISTICS_ATTENTION_MIGRATION_PATH)
+        );
+
+        populator.execute(jdbcTemplate.getDataSource());
+        populator.execute(jdbcTemplate.getDataSource());
+
+        assertIndexColumns(
+                "idx_hwk_submission_effective",
+                "homework_id", "is_final", "is_deleted", "submit_status", "student_id"
+        );
+        assertIndexColumns(
+                "idx_hwk_submission_attention",
+                "homework_id", "is_final", "is_deleted", "submitted_at", "id",
+                "submit_status", "student_id", "submit_type", "evaluation_status", "review_status"
+        );
+    }
+
+    @Test
+    void mysqlStatisticsAttentionUpgradeIsGuardedAndAddsBothMissingIndexesAtomically() throws Exception {
+        String migrationSql = Files.readString(STATISTICS_ATTENTION_MIGRATION_PATH);
+
+        assertThat(migrationSql)
+                .contains("information_schema.statistics")
+                .contains("index_name = 'idx_hwk_submission_effective'")
+                .contains("index_name = 'idx_hwk_submission_attention'")
+                .contains("ELSEIF effective_index_count = 0")
+                .contains("ELSEIF attention_index_count = 0")
+                .containsPattern("(?is)ALTER\\s+TABLE\\s+t_hwk_submission\\s+"
+                        + "ADD\\s+INDEX\\s+idx_hwk_submission_effective.*?,\\s*"
+                        + "ADD\\s+INDEX\\s+idx_hwk_submission_attention")
+                .containsPattern("(?is)ADD\\s+INDEX\\s+idx_hwk_submission_attention\\s*\\(\\s*"
+                        + "homework_id\\s*,\\s*is_final\\s*,\\s*is_deleted\\s*,\\s*"
+                        + "submitted_at\\s*,\\s*id\\s*,\\s*submit_status\\s*,\\s*student_id\\s*,\\s*"
+                        + "submit_type\\s*,\\s*evaluation_status\\s*,\\s*review_status\\s*\\)")
+                .doesNotContainPattern("(?i)CREATE\\s+INDEX");
+    }
+
+    @Test
+    void composeRetainedVolumeHasAnExplicitVersionedMigrationEntryPoint() throws Exception {
+        String runner = Files.readString(COMPOSE_MIGRATION_RUNNER_PATH);
+        String deploymentDocument = Files.readString(DEPLOYMENT_DOCUMENT_PATH);
+
+        assertThat(runner)
+                .contains("database/migrations")
+                .contains("docker compose")
+                .contains("exec -T mysql");
+        assertThat(COMPOSE_MIGRATION_RUNNER_PATH).isExecutable();
+        assertThat(deploymentDocument)
+                .contains("apply-compose-migration.sh")
+                .contains("20260822_01_add_hwk_statistics_attention_indexes.sql");
+    }
+
+    @Test
+    @Sql(scripts = {
+            "file:../database/migrations/20260530_01_create_hwk_homework.sql",
             "file:../database/migrations/20260601_01_create_hwk_submission.sql",
             "file:../database/migrations/20260602_01_create_hwk_evaluation.sql"
     })
@@ -235,6 +327,20 @@ class HomeworkMigrationTest {
                         '2026-06-30 23:59:59', 1, 0, 1, ?, 501, NULL, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                 """, judgeConfigId);
         return jdbcTemplate.queryForObject("SELECT MAX(id) FROM t_hwk_homework", Long.class);
+    }
+
+    private void assertIndexColumns(String indexName, String... expectedColumns) {
+        List<String> columns = jdbcTemplate.queryForList("""
+                        SELECT LOWER(column_name)
+                        FROM information_schema.index_columns
+                        WHERE LOWER(table_name) = 't_hwk_submission'
+                          AND LOWER(index_name) = ?
+                        ORDER BY ordinal_position
+                        """,
+                String.class,
+                indexName.toLowerCase()
+        );
+        assertThat(columns).containsExactly(expectedColumns);
     }
 
     private long insertJudgeConfig(long homeworkId) {
