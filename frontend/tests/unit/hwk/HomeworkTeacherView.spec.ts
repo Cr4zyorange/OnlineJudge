@@ -81,7 +81,10 @@ describe('HomeworkTeacherView', () => {
       { name: 'homework-submission-workspace', params: { courseId: 101, homeworkId: 2 } },
       { name: 'homework-statistics', params: { courseId: 101, homeworkId: 2 } }
     ]));
-    expect(wrapper.text()).not.toContain('删除');
+    expect(wrapper.get('[data-testid="delete-homework-1"]').text()).toContain('删除草稿');
+    expect(wrapper.find('[data-testid="delete-homework-2"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="delete-homework-3"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="delete-homework-4"]').exists()).toBe(false);
   });
 
   it('keeps only the draft attention filter and scopes it explicitly to the current server page', async () => {
@@ -203,7 +206,7 @@ describe('HomeworkTeacherView', () => {
     await flushPromises();
     expect(homeworkApi.publishHomeworkScores).toHaveBeenCalledWith(3);
     expect(confirm).toHaveBeenLastCalledWith(expect.stringContaining('数据库设计'));
-    expect(wrapper.text()).not.toContain('删除草稿');
+    expect(wrapper.find('[data-testid="delete-homework-1"]').exists()).toBe(true);
   });
 
   it('keeps the homework row and action available after a lifecycle failure', async () => {
@@ -220,6 +223,103 @@ describe('HomeworkTeacherView', () => {
     expect(wrapper.get('[data-testid="publish-homework-1"]').attributes('disabled')).toBeUndefined();
   });
 
+  it('cancels draft deletion without sending a request', async () => {
+    vi.mocked(homeworkApi.listHomeworks).mockResolvedValueOnce(page([draft]));
+    vi.mocked(confirm).mockReturnValueOnce(false);
+    const wrapper = mountView();
+    await flushPromises();
+
+    await wrapper.get('[data-testid="delete-homework-1"]').trigger('click');
+    await flushPromises();
+
+    expect(confirm).toHaveBeenCalledWith(expect.stringContaining('软件需求草稿'));
+    expect(homeworkApi.deleteHomework).not.toHaveBeenCalled();
+    expect(wrapper.text()).toContain('软件需求草稿');
+  });
+
+  it('deduplicates draft deletion, disables lifecycle actions, and refreshes after success', async () => {
+    vi.mocked(homeworkApi.listHomeworks)
+      .mockResolvedValueOnce(page([draft]))
+      .mockResolvedValueOnce(page([]));
+    const deletePending = deferred<HomeworkDetail>();
+    vi.mocked(homeworkApi.deleteHomework).mockReturnValueOnce(deletePending.promise);
+    const wrapper = mountView();
+    await flushPromises();
+
+    const deleteButton = wrapper.get('[data-testid="delete-homework-1"]');
+    const publishButton = wrapper.get('[data-testid="publish-homework-1"]');
+    await deleteButton.trigger('click');
+    await deleteButton.trigger('click');
+
+    expect(homeworkApi.deleteHomework).toHaveBeenCalledTimes(1);
+    expect(deleteButton.attributes('disabled')).toBeDefined();
+    expect(deleteButton.text()).toContain('处理中');
+    expect(publishButton.attributes('disabled')).toBeDefined();
+
+    deletePending.resolve(homeworkDetail({ id: 1, title: draft.title, deleted: true }));
+    await flushPromises();
+
+    expect(wrapper.get('[data-testid="operation-feedback"]').text()).toContain('已删除');
+    expect(wrapper.find('[data-testid="delete-homework-1"]').exists()).toBe(false);
+    expect(homeworkApi.listHomeworks).toHaveBeenCalledTimes(2);
+  });
+
+  it('retains a draft after deletion failure and allows retry', async () => {
+    vi.mocked(homeworkApi.listHomeworks)
+      .mockResolvedValueOnce(page([draft]))
+      .mockResolvedValueOnce(page([]));
+    vi.mocked(homeworkApi.deleteHomework)
+      .mockRejectedValueOnce(new Error('草稿状态已变化，请刷新后重试'))
+      .mockResolvedValueOnce(homeworkDetail({ id: 1, title: draft.title, deleted: true }));
+    const wrapper = mountView();
+    await flushPromises();
+
+    await wrapper.get('[data-testid="delete-homework-1"]').trigger('click');
+    await flushPromises();
+    expect(wrapper.get('[data-testid="operation-error"]').text()).toContain('草稿状态已变化');
+    expect(wrapper.text()).toContain('软件需求草稿');
+    expect(wrapper.get('[data-testid="delete-homework-1"]').attributes('disabled')).toBeUndefined();
+
+    await wrapper.get('[data-testid="delete-homework-1"]').trigger('click');
+    await flushPromises();
+    expect(homeworkApi.deleteHomework).toHaveBeenCalledTimes(2);
+    expect(wrapper.find('[data-testid="delete-homework-1"]').exists()).toBe(false);
+  });
+
+  it('falls back to the last valid page after deleting the final row', async () => {
+    const firstPageItems = Array.from({ length: 20 }, (_, index) => homeworkSummary({
+      id: index + 1,
+      title: `作业 ${index + 1}`
+    }));
+    const finalDraft = homeworkSummary({ id: 21, title: '末页草稿' });
+    vi.mocked(homeworkApi.listHomeworks)
+      .mockResolvedValueOnce(page(firstPageItems, { page: 1, total: 21 }))
+      .mockResolvedValueOnce(page([finalDraft], { page: 2, total: 21 }))
+      .mockResolvedValueOnce(page([], { page: 2, total: 20 }))
+      .mockResolvedValueOnce(page(firstPageItems, { page: 1, total: 20 }));
+    vi.mocked(homeworkApi.deleteHomework).mockResolvedValueOnce(homeworkDetail({
+      id: 21,
+      title: finalDraft.title,
+      deleted: true
+    }));
+    const wrapper = mountView();
+    await flushPromises();
+
+    await wrapper.get('[data-action="next-homework-page"]').trigger('click');
+    await flushPromises();
+    await wrapper.get('[data-testid="delete-homework-21"]').trigger('click');
+    await flushPromises();
+
+    expect(homeworkApi.listHomeworks).toHaveBeenNthCalledWith(4, {
+      courseId: 101,
+      page: 1,
+      size: 20
+    });
+    expect(homeworkApi.deleteHomework).toHaveBeenCalledWith(21);
+    expect(wrapper.get('nav[aria-label="作业分页"]').text()).toContain('第 1 / 1 页');
+    expect(wrapper.find('[data-testid="delete-homework-21"]').exists()).toBe(false);
+  });
+
   it('does not offer draft-only or released-only actions for a NOT_OPEN legacy state', async () => {
     const notOpen = homeworkSummary({ id: 5, title: '等待开放的作业', status: 'NOT_OPEN', type: 'TEXT' });
     vi.mocked(homeworkApi.listHomeworks).mockResolvedValueOnce(page([notOpen]));
@@ -232,7 +332,19 @@ describe('HomeworkTeacherView', () => {
     expect(wrapper.find('[data-testid="publish-homework-5"]').exists()).toBe(false);
     expect(wrapper.find('[data-testid="submissions-homework-5"]').exists()).toBe(false);
     expect(wrapper.find('[data-testid="statistics-homework-5"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="delete-homework-5"]').exists()).toBe(false);
     expect(homeworkApi.getHomeworkStatistics).not.toHaveBeenCalled();
+  });
+
+  it('does not offer draft deletion for an archived homework', async () => {
+    const archived = homeworkSummary({ id: 7, title: '归档作业', status: 'ARCHIVED', type: 'TEXT' });
+    vi.mocked(homeworkApi.listHomeworks).mockResolvedValueOnce(page([archived]));
+    mockStatistics({ 7: statistics({ homeworkId: 7 }) });
+    const wrapper = mountView();
+    await flushPromises();
+
+    expect(wrapper.text()).toContain('归档作业');
+    expect(wrapper.find('[data-testid="delete-homework-7"]').exists()).toBe(false);
   });
 
   it('keeps FILE drafts editable but blocks publication until issue 214 supplies the upload contract', async () => {
@@ -244,6 +356,7 @@ describe('HomeworkTeacherView', () => {
     expect(wrapper.get('[data-testid="file-contract-blocked-5"]').text()).toContain('#214');
     expect(wrapper.find('[data-testid="publish-homework-5"]').exists()).toBe(false);
     expect(wrapper.find('[data-testid="edit-homework-5"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="delete-homework-5"]').exists()).toBe(true);
   });
 
   it('blocks direct publication of a legacy CODE draft that still enables unsupported sandbox languages', async () => {
