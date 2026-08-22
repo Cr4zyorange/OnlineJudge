@@ -940,6 +940,7 @@ function safeQueueQuery(query: Record<string, unknown>) {
   const submit = queryText(query.submit);
   const evaluationStatus = queryText(query.evaluation);
   const review = queryText(query.review);
+  const attention = queryText(query.attention);
   const page = queryText(query.page);
   if (keyword) {
     safe.keyword = keyword;
@@ -965,6 +966,9 @@ function safeQueueQuery(query: Record<string, unknown>) {
   }
   if (['UNREVIEWED', 'NEED_REVIEW', 'REVIEWED'].includes(review)) {
     safe.review = review;
+  }
+  if (['EVALUATION_PENDING', 'REVIEW_PENDING'].includes(attention)) {
+    safe.attention = attention;
   }
   if (Number.isInteger(Number(page)) && Number(page) > 1) {
     safe.page = String(Number(page));

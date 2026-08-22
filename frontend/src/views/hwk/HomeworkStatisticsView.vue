@@ -83,24 +83,35 @@
           <strong>{{ statistics.reviewedCount }}</strong>
           <small>人</small>
         </article>
+        <article class="summary-card" data-testid="summary-pending-evaluation">
+          <span>待评测</span>
+          <strong>{{ statistics.pendingEvaluationCount }}</strong>
+          <small>份</small>
+        </article>
+        <article class="summary-card" data-testid="summary-pending-review">
+          <span>待批阅</span>
+          <strong>{{ statistics.pendingReviewCount }}</strong>
+          <small>份</small>
+        </article>
+        <article class="summary-card" data-testid="summary-scored">
+          <span>已有成绩</span>
+          <strong>{{ statistics.scoredCount }}</strong>
+          <small>份</small>
+        </article>
         <article class="summary-card" data-testid="summary-submission-rate">
           <span>提交率</span>
           <strong>{{ percentLabel(statistics.submittedCount, statistics.totalStudentCount) }}</strong>
+        </article>
+        <article class="summary-card" data-testid="summary-evaluation-rate">
+          <span>评测完成率</span>
+          <strong>{{ applicablePercentLabel(statistics.evaluatedCount, statistics.autoEvaluableCount) }}</strong>
+          <small>{{ statistics.evaluatedCount }} / {{ statistics.autoEvaluableCount }}</small>
         </article>
         <article class="summary-card" data-testid="summary-review-rate">
           <span>批阅完成率</span>
           <strong>{{ percentLabel(statistics.reviewedCount, statistics.submittedCount) }}</strong>
         </article>
       </section>
-
-      <p
-        class="inline-warning statistics-semantics-note"
-        data-testid="statistics-semantics-note"
-        role="note"
-      >
-        当前接口只提供“已完成评测”原始计数，不使用提交数推导比率。
-        精确评测完成率由 #225 补充统计口径；本页仅计算提交率与批阅完成率。
-      </p>
 
       <div class="statistics-layout">
         <section class="work-surface score-panel" aria-labelledby="score-summary-title">
@@ -109,7 +120,7 @@
               <p>SCORE SUMMARY</p>
               <h2 id="score-summary-title">成绩概览</h2>
             </div>
-            <span>仅统计已有最终成绩</span>
+            <span data-testid="statistics-generated-at">生成于 {{ dateTimeLabel(statistics.generatedAt) }}</span>
           </div>
           <div class="score-grid">
             <article>
@@ -125,42 +136,75 @@
               <strong>{{ scoreLabel(statistics.minScore) }}</strong>
             </article>
           </div>
-          <p class="score-panel__note">
-            当前接口未提供分数段分布，因此这里只呈现真实汇总值，不生成推测数据。
-          </p>
+          <ul class="score-distribution" aria-label="成绩分布">
+            <li
+              v-for="bucket in scoreBuckets"
+              :key="bucket.key"
+              :data-score-bucket="bucket.key"
+            >
+              <span class="score-distribution__label">{{ bucket.label }}</span>
+              <span class="score-distribution__track" aria-hidden="true">
+                <span :style="{ width: `${bucketPercent(bucket.count)}%` }"></span>
+              </span>
+              <strong>{{ bucket.count }} 人</strong>
+            </li>
+          </ul>
+          <p class="score-panel__note">共 {{ statistics.scoredCount }} 份有效成绩；无成绩提交不进入分布。</p>
         </section>
 
-        <section class="work-surface follow-up-panel" aria-labelledby="unsubmitted-title">
+        <section class="work-surface follow-up-panel" :aria-labelledby="followUpTitleId">
+          <nav class="follow-up-tabs" aria-label="待处理名单">
+            <RouterLink
+              v-for="tab in followUpTabs"
+              :key="tab.key"
+              :to="tab.route"
+              :aria-current="tab.active ? 'page' : undefined"
+              :class="{ 'follow-up-tab--active': tab.active }"
+            >{{ tab.label }} {{ tab.count }}</RouterLink>
+          </nav>
           <div class="section-heading">
             <div>
               <p>FOLLOW UP</p>
-              <h2 id="unsubmitted-title">未提交学生</h2>
+              <h2 :id="followUpTitleId">{{ followUpTitle }}</h2>
             </div>
-            <span>{{ statistics.unsubmittedTotal }} 人</span>
+            <span>{{ followUpTotal }} 人</span>
           </div>
 
           <p v-if="studentNameWarning" class="inline-warning" role="status">
             {{ studentNameWarning }}
           </p>
 
-          <div v-if="unsubmittedStudents.length === 0" class="empty-follow-up">
-            <strong>全员已提交</strong>
-            <p>当前作业没有需要跟进的未提交学生。</p>
+          <div v-if="followUpStudents.length === 0" class="empty-follow-up">
+            <strong>{{ followUpEmptyTitle }}</strong>
+            <p>{{ followUpEmptyMessage }}</p>
           </div>
-          <ul v-else class="student-list" aria-label="未提交学生名单">
-            <li v-for="student in unsubmittedStudents" :key="student.id">
-              <span class="student-avatar" aria-hidden="true">{{ student.initial }}</span>
-              <div>
-                <strong>{{ student.name }}</strong>
-                <span>待提交</span>
-              </div>
+          <ul v-else class="student-list" :aria-label="followUpListLabel">
+            <li v-for="student in followUpStudents" :key="student.key">
+              <RouterLink
+                v-if="student.submissionId"
+                class="student-list__link"
+                :to="reviewRoute(student.submissionId)"
+              >
+                <span class="student-avatar" aria-hidden="true">{{ student.initial }}</span>
+                <span class="student-list__copy">
+                  <strong>{{ student.name }}</strong>
+                  <span>{{ student.status }}</span>
+                </span>
+              </RouterLink>
+              <template v-else>
+                <span class="student-avatar" aria-hidden="true">{{ student.initial }}</span>
+                <div>
+                  <strong>{{ student.name }}</strong>
+                  <span>{{ student.status }}</span>
+                </div>
+              </template>
             </li>
           </ul>
 
-          <nav v-if="totalPages > 1" class="pagination" aria-label="未提交学生分页">
+          <nav v-if="totalPages > 1" class="pagination" :aria-label="followUpPaginationLabel">
             <button
               type="button"
-              data-action="previous-unsubmitted-page"
+              :data-action="activeAttention ? 'previous-follow-up-page' : 'previous-unsubmitted-page'"
               :disabled="currentPage <= 1 || loading"
               @click="changePage(currentPage - 1)"
             >
@@ -169,7 +213,7 @@
             <span>第 {{ currentPage }} / {{ totalPages }} 页</span>
             <button
               type="button"
-              data-action="next-unsubmitted-page"
+              :data-action="activeAttention ? 'next-follow-up-page' : 'next-unsubmitted-page'"
               :disabled="currentPage >= totalPages || loading"
               @click="changePage(currentPage + 1)"
             >
@@ -178,7 +222,7 @@
           </nav>
 
           <RouterLink class="button button--primary follow-up-panel__queue" :to="submissionWorkspaceRoute">
-            进入提交队列
+            {{ activeAttention ? '在提交队列中继续处理' : '查看全部提交' }}
           </RouterLink>
         </section>
       </div>
@@ -189,17 +233,32 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import { RouterLink, useRouter } from 'vue-router';
-import { getHomeworkDetail, getHomeworkStatistics } from '../../api/hwk/homeworks';
+import {
+  getHomeworkDetail,
+  getHomeworkStatistics,
+  listHomeworkSubmissions
+} from '../../api/hwk/homeworks';
 import { getTeacherLearningProgress } from '../../api/lrn/learningProgress';
 import PageHeader from '../../components/foundation/PageHeader.vue';
 import PageState from '../../components/foundation/PageState.vue';
-import type { HomeworkDetail, HomeworkStatistics, HomeworkStatus, HomeworkType } from '../../types/hwk';
+import { formatEvaluationStatus, formatReviewStatus } from './hwkDisplay';
+import type {
+  HomeworkAttention,
+  HomeworkDetail,
+  HomeworkScoreBucket,
+  HomeworkStatistics,
+  HomeworkStatus,
+  HomeworkSubmissionSummary,
+  HomeworkType,
+  PageResponse
+} from '../../types/hwk';
 
 const props = withDefaults(defineProps<{
   courseId: number;
   homeworkId: number;
   pageSize?: number;
   initialPage?: number;
+  initialAttention?: HomeworkAttention;
 }>(), {
   pageSize: 20,
   initialPage: 1
@@ -208,12 +267,22 @@ const props = withDefaults(defineProps<{
 const router = useRouter();
 const detail = ref<HomeworkDetail | null>(null);
 const statistics = ref<HomeworkStatistics | null>(null);
+const attentionPage = ref<PageResponse<HomeworkSubmissionSummary> | null>(null);
 const studentNames = ref<Record<number, string>>({});
 const loading = ref(false);
 const errorMessage = ref('');
 const studentNameWarning = ref('');
 const currentPage = ref(normalizePage(props.initialPage));
+const activeAttention = ref<HomeworkAttention | null>(normalizeAttention(props.initialAttention));
 let activeRequestId = 0;
+
+const scoreBucketDefinitions: { key: HomeworkScoreBucket; label: string }[] = [
+  { key: '0-59', label: '0–59 分' },
+  { key: '60-69', label: '60–69 分' },
+  { key: '70-79', label: '70–79 分' },
+  { key: '80-89', label: '80–89 分' },
+  { key: '90-100', label: '90–100 分' }
+];
 
 const teacherDetailRoute = computed(() => ({
   name: 'homework-manage-detail',
@@ -221,25 +290,74 @@ const teacherDetailRoute = computed(() => ({
 }));
 const submissionWorkspaceRoute = computed(() => ({
   name: 'homework-submission-workspace',
-  params: { courseId: props.courseId, homeworkId: props.homeworkId }
+  params: { courseId: props.courseId, homeworkId: props.homeworkId },
+  ...(activeAttention.value ? { query: buildAttentionQuery(activeAttention.value, currentPage.value) } : {})
 }));
+const scoreBuckets = computed(() => scoreBucketDefinitions.map((bucket) => ({
+  ...bucket,
+  count: statistics.value?.scoreDistribution[bucket.key] ?? 0
+})));
+const maxBucketCount = computed(() => Math.max(1, ...scoreBuckets.value.map((bucket) => bucket.count)));
+const followUpTotal = computed(() => activeAttention.value
+  ? attentionPage.value?.total ?? 0
+  : statistics.value?.unsubmittedTotal ?? 0);
+const followUpSize = computed(() => activeAttention.value
+  ? attentionPage.value?.size ?? props.pageSize
+  : statistics.value?.unsubmittedSize ?? props.pageSize);
 const totalPages = computed(() => Math.max(
   1,
-  Math.ceil((statistics.value?.unsubmittedTotal ?? 0) / Math.max(1, statistics.value?.unsubmittedSize ?? props.pageSize))
+  Math.ceil(followUpTotal.value / Math.max(1, followUpSize.value))
 ));
 const unsubmittedStudents = computed(() => (statistics.value?.unsubmittedStudentIds ?? []).map((studentId) => {
   const synchronizedName = studentNames.value[studentId]?.trim();
   return {
-    id: studentId,
+    key: `unsubmitted-${studentId}`,
     name: synchronizedName || '姓名暂不可用',
-    initial: synchronizedName?.slice(0, 1) || '待'
+    initial: synchronizedName?.slice(0, 1) || '待',
+    status: '待提交',
+    submissionId: null
   };
 }));
+const attentionStudents = computed(() => (attentionPage.value?.list ?? []).map((submission) => {
+  const synchronizedName = studentNames.value[submission.studentId]?.trim();
+  return {
+    key: `submission-${submission.submissionId}`,
+    name: synchronizedName || '姓名暂不可用',
+    initial: synchronizedName?.slice(0, 1) || '待',
+    status: activeAttention.value === 'EVALUATION_PENDING'
+      ? formatEvaluationStatus(submission.evaluationStatus)
+      : formatReviewStatus(submission.reviewStatus),
+    submissionId: submission.submissionId
+  };
+}));
+const followUpStudents = computed(() => activeAttention.value ? attentionStudents.value : unsubmittedStudents.value);
+const followUpTitle = computed(() => activeAttention.value === 'EVALUATION_PENDING'
+  ? '待评测学生'
+  : activeAttention.value === 'REVIEW_PENDING' ? '待批阅学生' : '未提交学生');
+const followUpTitleId = computed(() => activeAttention.value === 'EVALUATION_PENDING'
+  ? 'evaluation-pending-title'
+  : activeAttention.value === 'REVIEW_PENDING' ? 'review-pending-title' : 'unsubmitted-title');
+const followUpListLabel = computed(() => activeAttention.value === 'EVALUATION_PENDING'
+  ? '待评测学生名单'
+  : activeAttention.value === 'REVIEW_PENDING' ? '待批阅学生名单' : '未提交学生名单');
+const followUpPaginationLabel = computed(() => `${followUpTitle.value}分页`);
+const followUpEmptyTitle = computed(() => activeAttention.value === 'EVALUATION_PENDING'
+  ? '暂无待评测提交'
+  : activeAttention.value === 'REVIEW_PENDING' ? '暂无待批阅提交' : '全员已提交');
+const followUpEmptyMessage = computed(() => activeAttention.value
+  ? '当前作业没有符合该待处理口径的有效提交。'
+  : '当前作业没有需要跟进的未提交学生。');
+const followUpTabs = computed(() => [
+  followUpTab(null, '未提交', statistics.value?.unsubmittedCount ?? 0),
+  followUpTab('EVALUATION_PENDING', '待评测', statistics.value?.pendingEvaluationCount ?? 0),
+  followUpTab('REVIEW_PENDING', '待批阅', statistics.value?.pendingReviewCount ?? 0)
+]);
 
 watch(
-  () => [props.courseId, props.homeworkId, props.pageSize, props.initialPage],
+  () => [props.courseId, props.homeworkId, props.pageSize, props.initialPage, props.initialAttention],
   () => {
     currentPage.value = normalizePage(props.initialPage);
+    activeAttention.value = normalizeAttention(props.initialAttention);
     void loadPage();
   },
   { immediate: true }
@@ -249,17 +367,30 @@ async function loadPage() {
   const requestId = ++activeRequestId;
   const targetCourseId = props.courseId;
   const targetHomeworkId = props.homeworkId;
+  const targetAttention = activeAttention.value;
+  const targetPage = currentPage.value;
   loading.value = true;
   errorMessage.value = '';
   studentNameWarning.value = '';
   detail.value = null;
   statistics.value = null;
+  attentionPage.value = null;
   studentNames.value = {};
 
-  const [detailResult, statisticsResult, progressResult] = await Promise.allSettled([
+  const [detailResult, statisticsResult, progressResult, attentionResult] = await Promise.allSettled([
     getHomeworkDetail(targetHomeworkId),
-    getHomeworkStatistics(targetHomeworkId, { page: currentPage.value, size: props.pageSize }),
-    getTeacherLearningProgress(targetCourseId)
+    getHomeworkStatistics(targetHomeworkId, {
+      page: targetAttention ? 1 : targetPage,
+      size: props.pageSize
+    }),
+    getTeacherLearningProgress(targetCourseId),
+    targetAttention
+      ? listHomeworkSubmissions(targetHomeworkId, {
+        attention: targetAttention,
+        page: targetPage,
+        size: props.pageSize
+      })
+      : Promise.resolve(null)
   ]);
 
   if (requestId !== activeRequestId) {
@@ -272,6 +403,11 @@ async function loadPage() {
   }
   if (statisticsResult.status === 'rejected') {
     errorMessage.value = errorLabel(statisticsResult.reason, '作业统计加载失败，请稍后重试');
+    loading.value = false;
+    return;
+  }
+  if (attentionResult.status === 'rejected') {
+    errorMessage.value = errorLabel(attentionResult.reason, '待处理名单加载失败，请稍后重试');
     loading.value = false;
     return;
   }
@@ -290,25 +426,35 @@ async function loadPage() {
     loading.value = false;
     return;
   }
-
-  const lastAvailablePage = Math.max(
-    1,
-    Math.ceil(statisticsResult.value.unsubmittedTotal / Math.max(1, statisticsResult.value.unsubmittedSize))
-  );
   if (
-    statisticsResult.value.unsubmittedTotal > 0
-    && currentPage.value > lastAvailablePage
-    && statisticsResult.value.unsubmittedStudentIds.length === 0
+    targetAttention
+    && attentionResult.value
+    && attentionResult.value.list.some((submission) => submission.homeworkId !== targetHomeworkId)
+  ) {
+    errorMessage.value = '待处理提交归属与当前页面不一致，请重新加载。';
+    loading.value = false;
+    return;
+  }
+
+  const attentionValue = targetAttention ? attentionResult.value : null;
+  const pageTotal = attentionValue?.total ?? statisticsResult.value.unsubmittedTotal;
+  const pageSize = attentionValue?.size ?? statisticsResult.value.unsubmittedSize;
+  const pageItems = attentionValue?.list ?? statisticsResult.value.unsubmittedStudentIds;
+  const lastAvailablePage = Math.max(1, Math.ceil(pageTotal / Math.max(1, pageSize)));
+  if (
+    pageTotal > 0
+    && targetPage > lastAvailablePage
+    && pageItems.length === 0
   ) {
     currentPage.value = lastAvailablePage;
-    await syncPageQuery(lastAvailablePage);
-    void loadPage();
+    await syncPageQuery(lastAvailablePage, 'replace');
     return;
   }
 
   detail.value = detailResult.value;
   statistics.value = statisticsResult.value;
-  currentPage.value = statisticsResult.value.unsubmittedPage;
+  attentionPage.value = attentionValue;
+  currentPage.value = attentionValue?.page ?? statisticsResult.value.unsubmittedPage;
 
   if (progressResult.status === 'fulfilled') {
     studentNames.value = Object.fromEntries(
@@ -319,7 +465,10 @@ async function loadPage() {
         ] as const)
         .filter((entry) => Boolean(entry[1]))
     );
-    if (statisticsResult.value.unsubmittedStudentIds.some((studentId) => !studentNames.value[studentId])) {
+    const visibleStudentIds = targetAttention
+      ? attentionValue?.list.map((submission) => submission.studentId) ?? []
+      : statisticsResult.value.unsubmittedStudentIds;
+    if (visibleStudentIds.some((studentId) => !studentNames.value[studentId])) {
       studentNameWarning.value = '部分学生姓名尚未同步，已使用待补充名称。';
     }
   } else {
@@ -334,12 +483,12 @@ async function changePage(page: number) {
     return;
   }
   currentPage.value = page;
-  await syncPageQuery(page);
-  void loadPage();
+  await syncPageQuery(page, 'push');
 }
 
-async function syncPageQuery(page: number) {
-  await router.replace({ query: page > 1 ? { page: String(page) } : {} });
+async function syncPageQuery(page: number, mode: 'push' | 'replace') {
+  const target = { query: buildAttentionQuery(activeAttention.value, page) };
+  await (mode === 'push' ? router.push(target) : router.replace(target));
 }
 
 function percentLabel(value: number, denominator: number) {
@@ -347,6 +496,14 @@ function percentLabel(value: number, denominator: number) {
     return '0%';
   }
   return `${numberLabel((value / denominator) * 100)}%`;
+}
+
+function applicablePercentLabel(value: number, denominator: number) {
+  return denominator <= 0 ? '不适用' : percentLabel(value, denominator);
+}
+
+function bucketPercent(count: number) {
+  return Math.max(0, Math.min(100, (count / maxBucketCount.value) * 100));
 }
 
 function scoreLabel(value: number | null) {
@@ -381,6 +538,35 @@ function typeLabel(type: HomeworkType) {
   return ({ OBJECTIVE: '客观题', FILE: '文件作业', CODE: '编程题', TEXT: '文本作业' } as const)[type];
 }
 
+function followUpTab(attention: HomeworkAttention | null, label: string, count: number) {
+  return {
+    key: attention ?? 'UNSUBMITTED',
+    label,
+    count,
+    active: activeAttention.value === attention,
+    route: {
+      name: 'homework-statistics',
+      params: { courseId: props.courseId, homeworkId: props.homeworkId },
+      query: buildAttentionQuery(attention, 1)
+    }
+  };
+}
+
+function reviewRoute(submissionId: number) {
+  return {
+    name: 'homework-submission-review',
+    params: { courseId: props.courseId, homeworkId: props.homeworkId, submissionId },
+    query: buildAttentionQuery(activeAttention.value, currentPage.value)
+  };
+}
+
+function buildAttentionQuery(attention: HomeworkAttention | null, page: number) {
+  return {
+    ...(attention ? { attention } : {}),
+    ...(page > 1 ? { page: String(page) } : {})
+  };
+}
+
 function displayableStudentName(studentId: number, value: string) {
   const name = value.trim();
   const compactName = name.replace(/\s+/gu, '');
@@ -395,6 +581,10 @@ function errorLabel(error: unknown, fallback: string) {
 
 function normalizePage(value: number) {
   return Number.isInteger(value) && value > 0 ? value : 1;
+}
+
+function normalizeAttention(value: HomeworkAttention | undefined): HomeworkAttention | null {
+  return value === 'EVALUATION_PENDING' || value === 'REVIEW_PENDING' ? value : null;
 }
 </script>
 
@@ -512,12 +702,37 @@ function normalizePage(value: number) {
 .score-grid strong { color: var(--oj-brand); font-size: 1.35rem; overflow-wrap: anywhere; }
 .score-panel__note { margin: 18px 0 0; color: var(--oj-muted); font-size: 0.85rem; line-height: 1.6; }
 
+.score-distribution {
+  display: grid;
+  gap: 12px;
+  margin: 22px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.score-distribution li {
+  display: grid;
+  grid-template-columns: minmax(76px, auto) minmax(120px, 1fr) minmax(44px, auto);
+  align-items: center;
+  gap: 12px;
+}
+
+.score-distribution__label { color: var(--oj-muted); font-size: 0.84rem; font-weight: 750; }
+.score-distribution__track { height: 12px; overflow: hidden; border-radius: 999px; background: rgba(22, 66, 60, 0.1); }
+.score-distribution__track span { display: block; height: 100%; border-radius: inherit; background: var(--oj-brand); }
+.score-distribution strong { color: var(--oj-brand); font-size: 0.86rem; text-align: right; }
+
 .inline-warning { padding: 10px 12px; border-radius: 10px; background: rgba(255, 243, 214, 0.84); color: #80540d; }
-.statistics-semantics-note { margin: 0; line-height: 1.65; }
+.follow-up-tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-bottom: 20px; }
+.follow-up-tabs a { padding: 9px 8px; border: 1px solid var(--oj-line); border-radius: 10px; color: var(--oj-brand); font-size: 0.82rem; font-weight: 750; text-align: center; text-decoration: none; }
+.follow-up-tabs .follow-up-tab--active { border-color: var(--oj-brand); background: rgba(220, 235, 230, 0.8); box-shadow: inset 0 0 0 1px rgba(22, 66, 60, 0.1); }
 .student-list { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
 .student-list li { display: flex; align-items: center; gap: 12px; padding: 11px; border-radius: 12px; background: rgba(245, 248, 247, 0.86); }
 .student-list li div { display: grid; gap: 2px; min-width: 0; }
 .student-list li span { color: var(--oj-muted); font-size: 0.8rem; }
+.student-list__link { display: flex; align-items: center; gap: 12px; width: 100%; color: inherit; text-decoration: none; }
+.student-list__copy { display: grid; gap: 2px; min-width: 0; }
+.student-list__copy strong { color: var(--oj-ink); font-size: 1rem; }
 .student-avatar { display: grid; place-items: center; flex: 0 0 34px; height: 34px; border-radius: 50%; background: var(--oj-brand); color: #fff !important; font-weight: 800; }
 .empty-follow-up { padding: 24px 12px; text-align: center; }
 .empty-follow-up p { color: var(--oj-muted); }
@@ -540,6 +755,8 @@ function normalizePage(value: number) {
   .score-grid { grid-template-columns: 1fr; }
   .context-strip { padding: 16px; }
   .section-heading { align-items: flex-start; flex-direction: column; }
+  .score-distribution li { grid-template-columns: minmax(68px, auto) minmax(70px, 1fr) minmax(42px, auto); gap: 8px; }
+  .follow-up-tabs { grid-template-columns: 1fr; }
   .pagination { align-items: stretch; flex-direction: column; text-align: center; }
 }
 </style>

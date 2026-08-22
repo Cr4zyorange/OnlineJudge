@@ -1,6 +1,7 @@
 import { request } from '../http';
 import type {
   HomeworkDetail,
+  HomeworkAttention,
   HomeworkEvaluationResult,
   HomeworkEvaluationStatus,
   HomeworkPayload,
@@ -133,6 +134,7 @@ export interface HomeworkSubmissionListQuery {
   submitStatus?: HomeworkSubmitStatus;
   evaluationStatus?: HomeworkEvaluationStatus;
   reviewStatus?: HomeworkReviewStatus;
+  attention?: HomeworkAttention;
   page?: number;
   size?: number;
 }
@@ -160,6 +162,9 @@ export function listHomeworkSubmissions(
   }
   if (query.reviewStatus) {
     params.set('reviewStatus', query.reviewStatus);
+  }
+  if (query.attention) {
+    params.set('attention', query.attention);
   }
   return request<PageResponse<HomeworkSubmissionSummary>>(
     `/api/v1/homeworks/${homeworkId}/submissions?${params.toString()}`
