@@ -401,6 +401,7 @@
 | TC-HWK-16 | FR-HWK-06 | UI-HWK-07；API-HWK-10、11、14 | 学生成绩已发布 | 学生查询详情和反馈 | 展示允许公开的评测摘要、成绩和教师评语 | `scorePublishExposesStudentFeedbackAndHomeworkSourceGrades` 通过 | 通过 |
 | TC-HWK-17 | FR-HWK-06；NFR-HWK-04 | API-HWK-08、10、11 | 学生成绩未发布 | 学生查询历史、详情和评测结果 | 不显示未公开最终分和教师评语 | `studentHistoryAndDetailHideUnpublishedScoresAndTeacherComment`、`objectiveHomeworkSubmissionShowsEvaluationButHidesUnpublishedFinalScore` 通过 | 通过 |
 | TC-HWK-18 | FR-HWK-06；NFR-HWK-02 | UI-HWK-09；API-HWK-15；DB-HWK-04、05 | 多名学生提交和未提交 | 教师查询统计和未提交名单分页 | 展示提交数、未提交数、平均分等统计 | `teacherQueriesHomeworkStatisticsWithUnsubmittedStudentsAndScoreSummary`、`teacherQueriesHomeworkStatisticsWithPaginatedUnsubmittedStudentsForNfrPerformance` 通过 | 通过 |
+| TC-HWK-19 | FR-HWK-01；NFR-HWK-01、03、04、05 | UI-HWK-01；API-HWK-22；DB-HWK-01~07；HWK_4001/HWK_4031/HWK_4095 | DRAFT/全部非 DRAFT、权限用户、已删除作业、完整子历史、删除前旧更新和末页唯一草稿 | 验证成功、取消无请求、403/404/409、并发防复活、父表软删/子历史保留和 UI 确认/pending/失败保留/末页回退 | 成功返回 `deleted=true`/删除时间；只删除父表；普通更新不能复活；仅 DRAFT 显示入口 | 后端 290 tests、前端 53 files/511 tests、typecheck/build 与 1440×900/390×844 浏览器真实 DELETE 通过 | 通过 |
 | TC-HWK-N01 | NFR-HWK-01 | API-HWK-03、07、11、13 | 模拟通知投递失败、评测失败、重复提交冲突 | 执行发布、提交、查询和批阅 | 主数据保持一致，错误以受控响应返回 | `publishKeepsHomeworkPublishedWhenNotificationDeliveryFails`、`submitReturnsControlledConflictWhenSubmissionVersionIsAlreadyUsed` 通过 | 通过 |
 | TC-HWK-N02 | NFR-HWK-02 | API-HWK-05、09、15；索引 | 作业列表、提交列表、统计使用分页参数和基础规模样本 | 查询列表和统计 | 返回分页结构，响应受控 | 后端分页统计用例、前端 API route 用例和 2026-06-12 本地压测批次通过 | 通过 |
 | TC-HWK-N03 | NFR-HWK-03 | API-HWK-10、20、21；DB-HWK-04、05、06 | 存在多次提交、评测、重评、批阅 | 查询详情、评测日志、批阅日志 | 提交和日志可追溯 | 迁移测试和控制器日志用例通过 | 通过 |
@@ -411,11 +412,11 @@
 
 | 测试文件 | 覆盖内容 | 结果 |
 | --- | --- | --- |
-| `frontend/tests/unit/hwk/homeworksApi.spec.ts` | API-HWK-01 ~ 21 路由构造、请求方法、参数、ApiResponse 解包 | 6 条通过 |
+| `frontend/tests/unit/hwk/homeworksApi.spec.ts` | API-HWK-01 ~ 22 路由构造、请求方法、参数、ApiResponse 解包；API-HWK-22 DELETE | 所属前端全量 53 files/511 tests 通过 |
 | `frontend/tests/unit/hwk/HomeworkStudentListView.spec.ts` | 学生作业列表、详情链接、空状态 | 2 条通过 |
 | `frontend/tests/unit/hwk/HomeworkStudentView.spec.ts` | 学生详情、文本提交、空提交校验、代码语言选择、评测结果、学习进度记录、断点恢复 | 7 条通过 |
 | `frontend/tests/unit/hwk/HomeworkSubmissionHistoryView.spec.ts` | 学生历史、教师分页列表、教师批阅、重评、筛选、空状态 | 6 条通过 |
-| `frontend/tests/unit/hwk/HomeworkTeacherView.spec.ts` | 教师创建/编辑、代码题测试用例校验、发布/关闭、批阅入口、统计、成绩发布 | 7 条通过 |
+| `frontend/tests/unit/hwk/HomeworkTeacherView.spec.ts` | 教师创建/编辑、发布/关闭、批阅/统计/成绩发布；DRAFT-only 删除、取消、pending、失败保留和末页回退 | 所属前端全量 53 files/511 tests 通过 |
 
 ### 7.6 GRD 测试用例汇总
 
@@ -707,6 +708,7 @@
 | MAN-HWK-007 | HWK/LAB | 真实代码评测沙箱 | 使用真实 Docker 沙箱提交 Python/Java 代码，包含 AC、WA、编译错误、超时 | 状态、日志、资源限制和隐藏用例显示策略正确 | 有条件通过；真实 Docker Python 执行器测试通过，HWK 真实提交/批阅链路已在 `950302`/`950304` 验证；当前 Docker 执行器实现仅支持 Python，Java 样本需在最终环境或设计调整中确认 |
 | MAN-HWK-008 | HWK | 基础性能 | 准备大批量作业、提交和未提交学生，查询列表/统计 | 分页正常，响应时间满足测试负责人设定阈值 | 本地压测通过 |
 | MAN-HWK-009 | HWK/LRN/GRD | 跨模块联调 | 发布作业、完成评测/批阅、发布成绩，查看通知中心、学习任务、成绩同步 | LRN 通知/提醒生成，GRD 可同步 HWK 来源成绩 | 通过；2026-06-12 本地 DEV 批阅 `950304` 后 GRD 同步返回 `syncedCount=2`，作业成绩发布接口返回 `SCORE_PUBLISHED` |
+| MAN-HWK-011 | HWK/CRS | #224 草稿逻辑删除与响应式教师入口 | 在 1440×900/390×844 验证仅 DRAFT 显示入口、取消无请求、真实 DELETE 和成功刷新；其余失败/pending/末页回退由单测覆盖 | 删除成功、无横向溢出、控制台干净，非 DRAFT 无入口 | 通过；DELETE 200/deleted=true，总数 3→2；390px documentWidth=innerWidth=390；0 error/0 warning；4 张截图见 `output/playwright/issue-224/README.md` |
 
 ### 9.6 GRD 手工测试与联调确认
 
@@ -789,12 +791,12 @@
 | 验收项 | 结论 | 说明 |
 | --- | --- | --- |
 | 功能覆盖 | 通过 | FR-HWK-01 ~ FR-HWK-06 均有自动化覆盖，2026-06-12 本地 DEV 浏览器补充作业创建、发布、提交、批阅和发布成绩 |
-| 接口覆盖 | 通过 | API-HWK-01 ~ API-HWK-21 的主路由、权限和错误分支由后端/前端自动化覆盖 |
-| 页面覆盖 | 通过 | Vue 单测覆盖主要页面状态和交互，2026-06-12 本地 DEV 浏览器补充教师/学生页面流程 |
-| 数据一致性 | 通过 | DB-HWK-01 ~ DB-HWK-07 关键约束、提交版本、评测和日志记录已由迁移测试覆盖 |
+| 接口覆盖 | 通过 | API-HWK-01 ~ API-HWK-22 的主路由、权限和错误分支由后端/前端自动化覆盖；API-HWK-22 真实 DELETE 200/deleted=true |
+| 页面覆盖 | 通过 | Vue 单测覆盖删除确认/pending/失败/末页回退；MAN-HWK-011 完成 1440×900/390×844 响应式验证 |
+| 数据一致性 | 通过 | DB-HWK-01 ~ DB-HWK-07 关键约束、父表原子软删、普通更新防复活和子历史保留通过 |
 | 权限与安全 | 通过 | 非成员、他人提交、隐藏用例、私有日志、未发布成绩均有自动化覆盖 |
 | 非功能 | 有条件通过 | 可靠性、可追踪性、安全性、可测试性已覆盖；本地压测和真实 Docker 基础专项已补充，完整页面端到端仍需验收 |
-| 最终结论 | 有条件通过 | 当前文档可交给测试负责人整合；MAN-HWK-001 ~ MAN-HWK-009 本地 DEV 验收记录已补，FAT/UAT 留痕待补 |
+| 最终结论 | 有条件通过 | #224 后端 290 tests、前端 511 tests、typecheck/build 与 MAN-HWK-011 通过；生产 MySQL/FAT/UAT 留痕仍按环境项补充 |
 
 ### 11.6 GRD 验收结论
 

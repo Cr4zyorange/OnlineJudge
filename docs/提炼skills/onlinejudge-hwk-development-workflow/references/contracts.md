@@ -46,12 +46,15 @@ rg -n "request<|LabTeacherView|StudentGradeView|GradeItemConfigView|Homework" fr
 | API-HWK-19 | GET | `/api/v1/homeworks/{homeworkId}/test-cases` | course manager |
 | API-HWK-20 | GET | `/api/v1/evaluations/{evaluationId}/logs` | course manager |
 | API-HWK-21 | GET | `/api/v1/submissions/{submissionId}/review-logs` | course manager |
+| API-HWK-22 | DELETE | `/api/v1/homeworks/{homeworkId}` | course manager; DRAFT only |
+
+API-HWK-22 reuses `HomeworkResponse` and returns `deleted=true` plus deletion-time `updatedAt`. Return `403 / HWK_4031` without course-management permission, `404 / HWK_4001` when absent/already deleted, and `409 / HWK_4095` for every non-DRAFT status.
 
 ## UI Pages
 
 | ID | Page | Must Handle |
 | --- | --- | --- |
-| UI-HWK-01 | homework center | loading, empty, failed, role-filtered list; students see pending/submitted/closed history; teachers see draft/published/closed |
+| UI-HWK-01 | homework center | loading, empty, failed, role-filtered list; students see pending/submitted/closed history; teachers see draft/published/closed; only DRAFT shows confirmable delete, cancel sends no request, pending is mutually exclusive, failure retains row, success refreshes and falls back from an empty last page; verify 1440/390 |
 | UI-HWK-02 | teacher create/edit | validation, draft save, update failure |
 | UI-HWK-03 | publish management | publish/close, config completeness errors, question/test-case links |
 | UI-HWK-04 | student detail | invisible draft, deadline, submit rule, current status |
@@ -65,7 +68,7 @@ rg -n "request<|LabTeacherView|StudentGradeView|GradeItemConfigView|Homework" fr
 
 | ID | Table | Key Contract |
 | --- | --- | --- |
-| DB-HWK-01 | `t_hwk_homework` | metadata, course/chapter, type, status, deadline, submit rules, display policy, `judge_config_id` |
+| DB-HWK-01 | `t_hwk_homework` | metadata, course/chapter, type, status, deadline, submit rules, display policy, `judge_config_id`; draft delete atomically updates only parent `is_deleted/updated_at` with `id + DRAFT + is_deleted=FALSE` |
 | DB-HWK-02 | `t_hwk_question` | objective question stem/options/answer/score/order; answers hidden from students |
 | DB-HWK-03 | `t_hwk_test_case` | code IO cases, hidden/public flag, limits and score weight |
 | DB-HWK-04 | `t_hwk_submission` | student answer/file/code, submit/evaluation/review status, scores, `is_final` |
@@ -89,6 +92,7 @@ ReviewStatus: UNREVIEWED, REVIEWED, NEED_REVIEW
 ```
 
 Do not introduce a second incompatible status vocabulary in frontend types.
+Logical deletion is orthogonal to `HomeworkStatus`; do not add `DELETED`. API-HWK-22 only accepts DRAFT, so NOT_OPEN and every published/closed/score-published/archived state return HWK_4095.
 
 ## Error Codes
 
@@ -105,7 +109,15 @@ Preserve stable HWK semantics:
 - `HWK_4009 EVALUATION_TASK_FAILED`
 - `HWK_4010 EVALUATION_RESULT_NOT_VISIBLE`
 - `HWK_4031 COURSE_PERMISSION_DENIED`
+- `HWK_4095 HOMEWORK_DELETE_STATE_CONFLICT`
 - `HWK_5001 INTERNAL_ERROR`
+
+## Draft Delete Integrity
+
+- Delete only the `t_hwk_homework` parent row logically. Preserve questions, test cases, judge config, submissions, evaluations, review logs, and reevaluation history.
+- Ordinary update/publish/close/score-publish SQL must not set `is_deleted` and must include `is_deleted=FALSE`, so a stale entity cannot resurrect a deleted draft.
+- When the atomic delete affects zero rows, classify the current row: absent/deleted is HWK_4001; present but non-DRAFT is HWK_4095.
+- Trace through FR-HWK-01, UI-HWK-01, API-HWK-22, DB-HWK-01, and TC-HWK-19.
 
 ## Cross-Module Contracts
 
