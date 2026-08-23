@@ -32,7 +32,7 @@ const notificationPage: NotificationPage = {
       isRead: true,
       sourceModule: 'GRD',
       sourceId: 801,
-      actionUrl: '/courses/101/grades?role=student',
+      actionUrl: '/courses/101?page=grades&role=student',
       createdAt: '2026-06-02 10:00:00',
       readAt: '2026-06-02 10:05:00'
     }
