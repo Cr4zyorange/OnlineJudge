@@ -28,6 +28,25 @@ describe('PlatformNav', () => {
 
     expect(wrapper.find('[data-testid="platform-nav-admin"]').exists()).toBe(false);
   });
+
+  it('keeps notification and logout labels complete in the compact mobile navigation', async () => {
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ path: '/:pathMatch(.*)*', component: { template: '<div />' } }]
+    });
+    await router.push('/courses');
+    await router.isReady();
+    currentUser.value = user('STUDENT');
+
+    const wrapper = mount(PlatformNav, { global: { plugins: [router] } });
+
+    expect(
+      wrapper.get('[data-testid="platform-nav-notifications"] .platform-nav__mobile-label').text()
+    ).toBe('通知');
+    expect(
+      wrapper.get('button[aria-label="退出登录"] .platform-nav__mobile-label').text()
+    ).toBe('退出');
+  });
 });
 
 function user(role: 'ADMIN' | 'STUDENT') {
