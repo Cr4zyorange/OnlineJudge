@@ -8,6 +8,10 @@ export function sanitizeInternalActionUrl(actionUrl: string | null) {
     if (target.origin !== window.location.origin || !isKnownApplicationPath(target.pathname)) {
       return null;
     }
+    if (/^\/courses\/[1-9]\d*$/.test(target.pathname) && target.searchParams.get('page') === 'grades') {
+      target.pathname = `${target.pathname}/grades`;
+      target.searchParams.delete('page');
+    }
     target.searchParams.delete('role');
     return `${target.pathname}${target.search}${target.hash}`;
   } catch {

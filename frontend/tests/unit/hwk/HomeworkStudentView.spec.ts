@@ -970,7 +970,9 @@ describe('HomeworkStudentView', () => {
     vi.setSystemTime(new Date('2026-08-23T09:59:59.900+08:00'));
     currentUser.value = studentUser();
     vi.mocked(homeworkApi.getHomeworkDetail).mockResolvedValueOnce(homeworkDetail({ type: 'FILE' }));
-    attachmentApiMocks.uploadHomeworkAttachment.mockResolvedValueOnce(attachmentUpload());
+    attachmentApiMocks.uploadHomeworkAttachment.mockResolvedValueOnce(attachmentUpload({
+      expiresAt: '2026-08-23T10:00:00+08:00'
+    }));
     const wrapper = mount(HomeworkStudentView, {
       props: { courseId: 101, homeworkId: 11, mode: 'submit' }
     });
@@ -1575,7 +1577,7 @@ function attachmentUpload(overrides: Partial<HomeworkAttachmentUpload> = {}): Ho
     originalFilename: '课程报告.pdf',
     contentType: 'application/pdf',
     fileSize: 20,
-    expiresAt: '2026-08-23T10:00:00+08:00',
+    expiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
     status: 'UPLOADED',
     uploadedAt: '2026-08-22T10:00:00+08:00',
     ...overrides

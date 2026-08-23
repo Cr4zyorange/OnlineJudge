@@ -13,7 +13,7 @@
       <div class="platform-nav__account">
         <RouterLink to="/notifications" data-testid="platform-nav-notifications" aria-label="消息通知">
           <span class="platform-nav__desktop-label">通知</span>
-          <span class="platform-nav__mobile-label" aria-hidden="true">知</span>
+          <span class="platform-nav__mobile-label" aria-hidden="true">通知</span>
         </RouterLink>
         <RouterLink class="platform-nav__avatar" to="/profile" data-testid="platform-nav-profile" aria-label="个人中心">
           {{ avatarText }}
@@ -25,7 +25,7 @@
           @click="handleLogout"
         >
           <span class="platform-nav__desktop-label">{{ logoutPending ? '退出中' : '退出' }}</span>
-          <span class="platform-nav__mobile-label" aria-hidden="true">{{ logoutPending ? '…' : '退' }}</span>
+          <span class="platform-nav__mobile-label" aria-hidden="true">{{ logoutPending ? '…' : '退出' }}</span>
         </button>
       </div>
     </nav>
