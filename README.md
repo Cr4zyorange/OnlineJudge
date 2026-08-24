@@ -85,51 +85,51 @@ curl -i -X POST http://127.0.0.1:5173/api/v1/auth/login \
 │       │   ├── java/com/onlinejudge/
 │       │   │   ├── auth/                        # AUTH 用户权限与平台安全模块
 │       │   │   │   ├── controller/              # 登录、注册、用户、角色、权限、审计等 REST API 入口
-│       │   │   │   ├── service/                 # AuthService、UserService、RoleService、PermissionService 等业务服务
+│       │   │   │   ├── service/                 # AuthService、SessionTokenService、RoleService、AccessControlService 等业务服务
 │       │   │   │   ├── repository/              # AUTH JDBC Repository/DAO
 │       │   │   │   ├── mapper/                  # AUTH 数据访问接口或占位目录
 │       │   │   │   └── domain/                  # 用户、角色、权限、会话、审计日志等实体、DTO、VO、枚举
 │       │   │   ├── crs/                         # CRS 课程与教学资源模块
 │       │   │   │   ├── controller/              # 课程、章节、资源、成员、公告等 REST API 入口
-│       │   │   │   ├── service/                 # CourseService、ChapterService、ResourceService、MemberService 等业务服务
+│       │   │   │   ├── service/                 # CourseService、ChapterService、ResourceService、AnnouncementService 等业务服务
 │       │   │   │   ├── mapper/                  # CRS JDBC Repository/DAO 接口
 │       │   │   │   └── domain/                  # 课程、章节、资源、课程成员、公告等实体、DTO、VO、枚举
 │       │   │   ├── lrn/                         # LRN 学习过程与通知提醒模块
 │       │   │   │   ├── controller/              # 学习任务、学习进度、学习行为、通知、提醒规则 API 入口
-│       │   │   │   ├── service/                 # LearningTaskService、NotificationService、ReminderRuleService 等业务服务
+│       │   │   │   ├── service/                 # LearningTaskService、LearningProgressService、NotificationService、ReminderRuleService 等业务服务
 │       │   │   │   ├── repository/              # LRN JDBC Repository/DAO 实现
 │       │   │   │   ├── mapper/                  # LRN 数据访问接口或占位目录
 │       │   │   │   └── domain/                  # 学习任务、进度、记录、通知、提醒规则等实体、DTO、VO、枚举
 │       │   │   ├── lab/                         # LAB 实训实验模块
-│       │   │   │   ├── controller/              # 实验、提交、评测、报告、评分、统计、测试用例 API 入口
-│       │   │   │   ├── service/                 # LabExperimentService、LabEvaluationService、LabScoreService 等业务服务
+│       │   │   │   ├── controller/              # 实验、提交、评测、报告、评分、统计等 API 入口
+│       │   │   │   ├── service/                 # LabExperimentService、LabSubmissionService、LabEvaluationService、LabScoreService 等业务服务
 │       │   │   │   ├── repository/              # LAB JDBC Repository/DAO 实现
 │       │   │   │   ├── mapper/                  # LAB 数据访问接口或占位目录
 │       │   │   │   └── domain/                  # 实验、测试用例、提交、评测、报告、评分等实体、DTO、VO、枚举
 │       │   │   ├── hwk/                         # HWK 作业与自动评测模块
 │       │   │   │   ├── controller/              # 作业、题目、提交、评测、批阅、统计 API 入口
-│       │   │   │   ├── service/                 # HomeworkService、HomeworkEvaluationService、HomeworkReviewService 等业务服务
+│       │   │   │   ├── service/                 # HomeworkService、HomeworkSubmissionService、HomeworkSourceGradeClient 等业务服务
 │       │   │   │   ├── repository/              # HWK JDBC Repository/DAO 实现
 │       │   │   │   ├── mapper/                  # HWK 数据访问接口或占位目录
 │       │   │   │   └── domain/                  # 作业、题目、测试用例、提交、评测、批阅日志等实体、DTO、VO、枚举
 │       │   │   ├── grd/                         # GRD 成绩评价与教学分析模块
 │       │   │   │   ├── controller/              # 成绩项、成绩同步、成绩发布、异议复核、教学分析 API 入口
-│       │   │   │   ├── service/                 # GradeItemService、GradeCalculationService、GradeAnalysisService 等业务服务
+│       │   │   │   ├── service/                 # GradeItemService、GradeRecordService、GradeAnalysisService、GradeReviewService 等业务服务
 │       │   │   │   ├── repository/              # GRD JDBC Repository/DAO 实现
 │       │   │   │   ├── mapper/                  # GRD 数据访问接口或占位目录
 │       │   │   │   └── domain/                  # 成绩项、成绩记录、总评、发布记录、复核申请、分析快照等实体、DTO、VO、枚举
 │       │   │   ├── common/                      # 全局复用基础设施
-│       │   │   │   ├── config/                  # Spring、JDBC、跨域、异步任务、对象存储等公共配置
-│       │   │   │   ├── security/                # 认证上下文、JWT/会话解析、统一权限拦截和安全工具
+│       │   │   │   ├── config/                  # Spring MVC、JDBC、跨域、异步任务等公共配置
+│       │   │   │   ├── security/                # 认证上下文、Bearer 会话解析、统一权限拦截和安全工具
 │       │   │   │   ├── web/                     # 统一响应结构、分页参数、请求上下文和通用 Controller 支撑
 │       │   │   │   ├── exception/               # 统一异常、错误码、异常处理器和错误响应转换
-│       │   │   │   ├── storage/                 # FileStorageService 文件存储抽象及本地/对象存储实现
-│       │   │   │   ├── event/                   # NotificationEventPublisher、SourceGradePublisher 等业务事件抽象
+│       │   │   │   ├── storage/                 # FileStorageService 文件存储抽象及本地磁盘实现
+│       │   │   │   ├── event/                   # NotificationEventPublisher、NotificationEvent 等业务事件抽象
 │       │   │   │   └── evaluation/              # EvaluationTask、Evaluator、SandboxExecutor、EvaluationResult 共享评测抽象
 │       │   │   └── integration/                 # 跨模块代理与客户端
-│       │   │       ├── auth/                    # 调用 AUTH 能力的认证、角色、权限客户端
+│       │   │       ├── auth/                    # AUTH 集成客户端预留目录
 │       │   │       ├── course/                  # CoursePermissionClient 及课程成员、课程权限查询客户端
-│       │   │       ├── notification/            # 调用 LRN 通知事件接口的客户端
+│       │   │       ├── notification/            # 通知接口客户端预留目录
 │       │   │       └── grade/                   # 调用 GRD 来源成绩同步接口的客户端
 │       │   └── resources/
 │       │       ├── mapper/
@@ -153,8 +153,8 @@ curl -i -X POST http://127.0.0.1:5173/api/v1/auth/login \
 │   │   ├── app/                                 # 应用入口、根组件挂载和页面导航组合
 │   │   ├── assets/                              # 图片、样式、字体等静态资源
 │   │   ├── components/
-│   │   │   ├── common/                          # 表格、表单、上传、分页、状态标签等通用组件
-│   │   │   └── layout/                          # 登录后框架、侧边栏、顶部导航、角色菜单布局
+│   │   │   ├── common/                          # 通用组件预留目录；当前共享组件位于 components 根目录
+│   │   │   └── layout/                          # 布局组件预留目录；当前导航组件位于 components 根目录
 │   │   ├── router/                              # 轻量页面导航配置占位
 │   │   ├── stores/                              # 本地存储辅助和页面局部状态约定占位
 │   │   ├── api/
@@ -175,15 +175,15 @@ curl -i -X POST http://127.0.0.1:5173/api/v1/auth/login \
 │   │   └── utils/                               # 请求封装、权限判断、时间格式化、文件处理等工具函数
 │   └── tests/
 │       ├── unit/                                # 前端组件、API 封装、工具函数和页面状态单元测试
-│       └── e2e/                                 # 学生端、教师端、管理端关键流程端到端测试
+│       └── e2e/                                 # 端到端测试预留目录
 ├── database/
 │   ├── migrations/                              # MySQL 表结构迁移脚本，按 DB-AUTH/CRS/LRN/LAB/HWK/GRD 编号组织
-│   ├── seeds/                                   # 演示环境初始用户、课程、实验、作业、成绩等种子数据
-│   └── fixtures/                                # 测试用数据集、评测用例、接口测试夹具
+│   ├── seeds/                                   # 种子数据预留目录；当前演示数据由后端初始化器幂等写入
+│   └── fixtures/                                # 测试夹具预留目录
 ├── scripts/
 │   ├── dev/                                     # 本地开发启动、环境检查、数据重置脚本
 │   ├── test/                                    # 后端、前端、接口、集成测试辅助脚本
-│   └── deploy/                                  # 构建、打包、发布辅助脚本
+│   └── deploy/                                  # 部署验收脚本，如 verify-compose.sh
 ├── deploy/
 │   ├── docker/                                  # Dockerfile、docker-compose 等容器化配置
 │   ├── nginx/                                   # 前端静态资源代理和后端 API 反向代理配置
