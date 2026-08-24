@@ -11,6 +11,10 @@ Docker Compose 教学部署与本地开发是两条不同链路：
 
 如果你要验证 issue `DEP-01` 对应的一键部署方案，请直接阅读 [docs/最终提交/部署文档.md](docs/最终提交/部署文档.md)。
 
+小学期正式提交的六目录聚合入口位于 [submission/README.md](submission/README.md)。该目录只维护交付物映射和待补清单，不在开发期复制或搬移现有源码、文档、部署脚本和测试材料；版本冻结后再按映射生成最终压缩包。
+
+小学期项目协作统一执行 [GitHub 协作与评审规范](docs/过程/项目管理/GitHub协作与评审规范.md) 和 [每日站会与汇报工作规范](docs/过程/项目管理/每日站会与汇报工作规范.md)。所有 PR 由项目负责人终审，微信群提交个人日报，Notion 保存核实后的小组日报，GitHub 保存工程证据。
+
 ### 1. 一键启动
 
 仓库提供本地开发一键启动脚本，会同时启动 Spring Boot 后端和 Vite 前端；首次运行时如果 `frontend/node_modules` 不存在，会先执行前端依赖安装。
@@ -192,7 +196,8 @@ curl -i -X POST http://127.0.0.1:5173/api/v1/auth/login \
 │   ├── api/                                     # REST API 契约测试和接口回归用例
 │   ├── integration/                             # AUTH、CRS、LRN、LAB、HWK、GRD 跨模块集成测试
 │   └── system/                                  # 面向验收演示的学生端、教师端、管理端系统测试
-└── docs/                                        # 需求、概要设计、详细设计、开发流程和项目协作文档
+├── docs/                                        # 需求、概要设计、详细设计、开发流程和项目协作文档
+└── submission/                                  # 小学期最终提交六目录的聚合映射、归档标准和缺口清单
 ```
 
 ### 模块目录和详细设计的对应关系
@@ -207,6 +212,8 @@ curl -i -X POST http://127.0.0.1:5173/api/v1/auth/login \
 | GRD | `backend/src/main/java/com/onlinejudge/grd` | `frontend/src/views/grd`、`frontend/src/api/grd` | `database/migrations` 中 `grd` 相关脚本 | `backend/src/test/java/com/onlinejudge/grd` | 成绩项配置、来源成绩同步、总评计算、成绩发布、异议复核、教学分析 |
 
 ## GitHub 提交规范
+
+本节保留分支与提交速查；Issue、PR、Codex/Copilot 辅助评审、项目负责人终审和证据回填的完整流程，以 [GitHub 协作与评审规范](docs/过程/项目管理/GitHub协作与评审规范.md) 为准。
 
 为保证开发、测试、预发布和生产分支边界清晰，提交代码时统一遵守以下规范。本仓库实际使用 `dev` 作为开发集成分支，它等价于常见 Git Flow 中的 `develop`；不要另起一个平行的 `develop` 分支。
 
