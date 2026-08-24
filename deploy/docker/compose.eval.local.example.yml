@@ -1,0 +1,14 @@
+services:
+  backend:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/backend.eval.Dockerfile
+    environment:
+      ONLINEJUDGE_EVALUATION_DOCKER_COMMAND: docker
+      JAVA_TOOL_OPTIONS: "-Djava.io.tmpdir=${SANDBOX_WORKDIR:-/tmp/onlinejudge-sandbox}"
+      ONLINEJUDGE_EVALUATION_DOCKER_PYTHON_IMAGE: ${ONLINEJUDGE_EVALUATION_DOCKER_PYTHON_IMAGE:-python:3.12-alpine}
+      ONLINEJUDGE_EVALUATION_DOCKER_CPU_LIMIT: ${ONLINEJUDGE_EVALUATION_DOCKER_CPU_LIMIT:-1.0}
+      ONLINEJUDGE_EVALUATION_DOCKER_PIDS_LIMIT: ${ONLINEJUDGE_EVALUATION_DOCKER_PIDS_LIMIT:-64}
+      ONLINEJUDGE_EVALUATION_DOCKER_TMPFS_SIZE: ${ONLINEJUDGE_EVALUATION_DOCKER_TMPFS_SIZE:-16m}
+    volumes:
+      - ${SANDBOX_WORKDIR:-/tmp/onlinejudge-sandbox}:${SANDBOX_WORKDIR:-/tmp/onlinejudge-sandbox}

@@ -90,4 +90,23 @@ class DockerComposeContractTest {
         assertThat(backendDockerfile).contains("--mount=type=cache,target=/root/.m2");
         assertThat(backendDockerfile).contains("-Dmaven.test.skip=true package");
     }
+
+    @Test
+    void enhancedEvaluationUsesLinuxDockerCliImageAndOneSharedSandboxPath() throws IOException {
+        Path composeOverride = Path.of("..", "deploy", "docker", "compose.eval.local.example.yml");
+        Path dockerfile = Path.of("..", "deploy", "docker", "backend.eval.Dockerfile");
+        String compose = Files.readString(composeOverride);
+        String backendEvalDockerfile = Files.readString(dockerfile);
+
+        assertThat(compose).contains("dockerfile: deploy/docker/backend.eval.Dockerfile");
+        assertThat(compose).contains("JAVA_TOOL_OPTIONS: \"-Djava.io.tmpdir=${SANDBOX_WORKDIR:-/tmp/onlinejudge-sandbox}\"");
+        assertThat(compose).contains("${SANDBOX_WORKDIR:-/tmp/onlinejudge-sandbox}:${SANDBOX_WORKDIR:-/tmp/onlinejudge-sandbox}");
+        assertThat(compose).doesNotContain("DOCKER_CLI_PATH");
+        assertThat(compose).doesNotContain("DOCKER_CLI_CONTAINER_PATH");
+
+        assertThat(backendEvalDockerfile).contains("FROM docker:27.5.1-cli");
+        assertThat(backendEvalDockerfile).contains("openjdk21-jre-headless");
+        assertThat(backendEvalDockerfile).contains("COPY --from=build /workspace/backend/target/onlinejudge-backend-0.1.0-SNAPSHOT.jar app.jar");
+        assertThat(backendEvalDockerfile).contains("ENTRYPOINT [\"java\", \"-jar\", \"/opt/onlinejudge/app.jar\"");
+    }
 }

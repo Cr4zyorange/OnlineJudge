@@ -1,0 +1,15 @@
+sequenceDiagram
+  actor Student as 学生
+  participant System as OnlineJudgeForSE 系统边界
+  Student->>System: 打开实验详情
+  System-->>Student: 返回实验说明、截止时间和提交要求
+  Student->>System: OP-LAB-04 提交实验代码、附件或报告
+  alt 提交受理
+    System-->>Student: 返回提交成功和评测中状态
+    Student->>System: 查询实验评测结果
+    System-->>Student: OP-LAB-05 返回评测状态、得分和失败摘要
+    Student->>System: 查看实验反馈
+    System-->>Student: OP-LAB-06 返回可见反馈、教师评语或最终得分
+  else 提交失败
+    System-->>Student: 返回逾期、格式错误、无权限或评测异常提示
+  end

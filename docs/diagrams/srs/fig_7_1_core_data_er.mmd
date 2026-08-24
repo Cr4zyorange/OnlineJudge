@@ -1,0 +1,33 @@
+---
+config:
+  layout: elk
+---
+erDiagram
+    direction TB
+    USER ||--o{ USER_ROLE : has
+    ROLE ||--o{ USER_ROLE : assigned_to
+    ROLE ||--o{ PERMISSION : grants
+    USER ||--o{ COURSE_MEMBER : joins
+    COURSE ||--o{ COURSE_CONFIG : owns
+    COURSE ||--o{ CHAPTER : contains
+    COURSE ||--o{ ANNOUNCEMENT : publishes
+    COURSE ||--o{ RESOURCE : contains
+    COURSE ||--o{ LAB : contains
+    COURSE ||--o{ HOMEWORK : contains
+    COURSE ||--o{ GRADE_ITEM : defines
+    CHAPTER ||--o{ RESOURCE : groups
+    CHAPTER ||--o{ LAB : groups
+    USER ||--o{ LEARNING_RECORD : generates
+    USER ||--o{ TASK_CENTER : receives
+    USER ||--o{ NOTIFICATION : receives
+    USER ||--o{ NOTIFICATION_PREFERENCE : configures
+    LAB ||--o{ LAB_SUBMISSION : receives
+    LAB_SUBMISSION ||--o{ LAB_REPORT : includes
+    LAB_SUBMISSION ||--o{ AUTO_EVALUATION : produces
+    HOMEWORK ||--o{ HOMEWORK_SUBMISSION : receives
+    HOMEWORK_SUBMISSION ||--o{ AUTO_EVALUATION : produces
+    COURSE ||--o{ GRADE_RECORD : summarizes
+    GRADE_ITEM ||--o{ GRADE_RECORD : composes
+    COURSE ||--o{ GRADE_PUBLISH_LOG : publishes
+    GRADE_RECORD ||--o{ GRADE_CHANGE_LOG : changes
+    REMINDER_RULE ||--o{ NOTIFICATION : triggers
