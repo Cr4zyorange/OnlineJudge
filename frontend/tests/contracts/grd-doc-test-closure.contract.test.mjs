@@ -76,6 +76,8 @@ test('GRD uses the shared E2E runner for main, alternative, and exception paths'
 test('GRD SSD branches and responses match the implemented API contracts', () => {
   const gradeItemSsd = readRepositoryFile('docs/diagrams/srs/fig_4_20_grade_item_config_ssd.mmd');
   const gradeReviewSsd = readRepositoryFile('docs/diagrams/srs/fig_4_22_grade_review_ssd.mmd');
+  const gradeFlowSsd = readRepositoryFile('docs/diagrams/srs/fig_4_15_grade_flow_ssd.mmd');
+  const gradeReviewSequence = readRepositoryFile('docs/diagrams/grd/fig_3_6_12_grade_review_sequence.mmd');
   const srs = readRepositoryFile('docs/最终提交/软件需求规格说明书.md');
   const gradeItemUseCase = srs.slice(
     srs.indexOf('## 4.11 UC-GR-02'),
@@ -83,12 +85,25 @@ test('GRD SSD branches and responses match the implemented API contracts', () =>
   );
 
   assert.doesNotMatch(gradeItemSsd, /来源任务存在|来源不存在/);
-  assert.match(gradeItemSsd, /来源编号/);
+  assert.match(gradeItemSsd, /LAB\/HWK.*来源编号.*正整数/);
   assert.doesNotMatch(gradeItemUseCase, /来源存在性|来源不存在/);
+  assert.match(gradeItemUseCase, /LAB\/HWK.*来源编号.*正整数/);
+  assert.match(gradeItemUseCase, /OTHER_COURSE_ITEM.*来源编号.*可为空/);
   assert.doesNotMatch(srs, /\| OP-GR-01 \|[^\n]*来源不存在/);
 
   assert.doesNotMatch(gradeReviewSsd, /教师通知状态/);
   assert.match(gradeReviewSsd, /requestId.*PENDING.*submittedAt/);
+
+  const syncOperation = gradeFlowSsd.indexOf('OP-GR-02');
+  const sourceFailure = gradeFlowSsd.indexOf('来源同步失败');
+  const publishOperation = gradeFlowSsd.indexOf('OP-GR-03');
+  assert.ok(syncOperation >= 0 && sourceFailure > syncOperation && publishOperation > sourceFailure);
+
+  assert.doesNotMatch(gradeReviewSequence, /GradeRecordService/);
+  assert.match(gradeReviewSequence, /GradeRecord(?:<br\/>)?Repository/);
+  assert.match(gradeReviewSequence, /CourseGradeSummary(?:<br\/>)?Repository/);
+  assert.match(gradeReviewSequence, /GradeChangeLog(?:<br\/>)?Repository/);
+  assert.match(gradeReviewSequence, /applyApprovedAdjustment/);
 });
 
 test('GRD mutating lifecycle only runs through the disposable database wrapper', () => {
