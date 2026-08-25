@@ -1,0 +1,12 @@
+Targeted Vitest files: 13
+Tests: 112
+Passed: 112
+Failures: 0
+Errors: 0
+Skipped: 0
+Duration: 12.76s
+Result: PASS
+
+Typecheck: PASS
+Build: PASS (189 modules transformed, 5.09s)
+Shared E2E contract: 3/3 PASS

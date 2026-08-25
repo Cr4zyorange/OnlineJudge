@@ -1,0 +1,13 @@
+Command scope: 16 targeted Maven test classes
+Reports: 16
+Tests: 45
+Passed: 45
+Failures: 0
+Errors: 0
+Skipped: 0
+Result: PASS
+
+Cross-module details:
+- LrnCrossModuleEventIntegrationTest: 2/2 PASS (real LAB/HWK publish -> LRN)
+- GrdLrnIntegrationTest: 1/1 PASS (real GRD publish/change/review -> LRN)
+- Remaining LRN Controller/Service/Migration/INT tests: 42/42 PASS
