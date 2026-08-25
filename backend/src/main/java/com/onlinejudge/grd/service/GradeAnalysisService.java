@@ -260,16 +260,14 @@ public class GradeAnalysisService {
                                 studentId,
                                 null,
                                 ScoreStatus.MISSING,
-                                summary == null ? null : summary.updatedAt(),
-                                courseTotalSourceState(summary)
+                                summary == null ? null : summary.updatedAt()
                         );
                     }
                     return new ScoreRow(
                             studentId,
                             summary.finalScore(),
                             ScoreStatus.COMPLETED,
-                            summary.updatedAt(),
-                            courseTotalSourceState(summary)
+                            summary.updatedAt()
                     );
                 })
                 .toList();
@@ -283,7 +281,7 @@ public class GradeAnalysisService {
                 .map(studentId -> {
                     GradeRecord record = recordsByStudent.get(studentId);
                     if (record == null) {
-                        return new ScoreRow(studentId, null, ScoreStatus.MISSING, null, "ABSENT");
+                        return new ScoreRow(studentId, null, ScoreStatus.MISSING, null);
                     }
                     if ((record.gradeStatus() == GradeStatus.SCORED || record.gradeStatus() == GradeStatus.ADJUSTED)
                             && record.rawScore() != null) {
@@ -291,16 +289,14 @@ public class GradeAnalysisService {
                                 studentId,
                                 record.rawScore(),
                                 ScoreStatus.COMPLETED,
-                                record.updatedAt(),
-                                gradeItemSourceState(record)
+                                record.updatedAt()
                         );
                     }
                     return new ScoreRow(
                             studentId,
                             null,
                             toScoreStatus(record.gradeStatus()),
-                            record.updatedAt(),
-                            gradeItemSourceState(record)
+                            record.updatedAt()
                     );
                 })
                 .toList();
@@ -336,37 +332,6 @@ public class GradeAnalysisService {
         } catch (NoSuchAlgorithmException exception) {
             throw new IllegalStateException("SHA-256 algorithm is unavailable", exception);
         }
-    }
-
-    private String courseTotalSourceState(CourseGradeSummary summary) {
-        if (summary == null) {
-            return "ABSENT";
-        }
-        return String.join(",",
-                summary.finalStatus().name(),
-                decimalValue(summary.finalScore()),
-                summary.publishStatus().name(),
-                summary.calculationBatchId() == null ? "-" : summary.calculationBatchId().toString(),
-                timeValue(summary.updatedAt())
-        );
-    }
-
-    private String gradeItemSourceState(GradeRecord record) {
-        return String.join(",",
-                record.sourceType().name(),
-                record.sourceId() == null ? "-" : record.sourceId().toString(),
-                record.gradeStatus().name(),
-                decimalValue(record.rawScore()),
-                decimalValue(record.weightedScore()),
-                record.publishStatus().name(),
-                timeValue(record.sourceUpdatedAt()),
-                timeValue(record.calculatedAt()),
-                timeValue(record.updatedAt())
-        );
-    }
-
-    private String decimalValue(BigDecimal value) {
-        return value == null ? "-" : value.stripTrailingZeros().toPlainString();
     }
 
     private String timeValue(LocalDateTime value) {
@@ -475,8 +440,7 @@ public class GradeAnalysisService {
             long studentId,
             BigDecimal score,
             ScoreStatus status,
-            LocalDateTime updatedAt,
-            String sourceState
+            LocalDateTime updatedAt
     ) {
     }
 
