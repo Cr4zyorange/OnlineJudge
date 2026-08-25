@@ -77,8 +77,11 @@ test('GRD SSD branches and responses match the implemented API contracts', () =>
   const gradeItemSsd = readRepositoryFile('docs/diagrams/srs/fig_4_20_grade_item_config_ssd.mmd');
   const gradeReviewSsd = readRepositoryFile('docs/diagrams/srs/fig_4_22_grade_review_ssd.mmd');
   const gradeFlowSsd = readRepositoryFile('docs/diagrams/srs/fig_4_15_grade_flow_ssd.mmd');
+  const studentGradeSequence = readRepositoryFile('docs/diagrams/grd/fig_3_6_11_student_grade_query_sequence.mmd');
   const gradeReviewSequence = readRepositoryFile('docs/diagrams/grd/fig_3_6_12_grade_review_sequence.mmd');
   const srs = readRepositoryFile('docs/最终提交/软件需求规格说明书.md');
+  const detailedDesign = readRepositoryFile('docs/最终提交/软件详细设计说明书.md');
+  const processDetailedDesign = readRepositoryFile('docs/过程/详细设计/GRD-成绩评价与教学分析-详细设计提交稿.md');
   const gradeItemUseCase = srs.slice(
     srs.indexOf('## 4.11 UC-GR-02'),
     srs.indexOf('## 4.12 UC-GR-03')
@@ -104,6 +107,18 @@ test('GRD SSD branches and responses match the implemented API contracts', () =>
   assert.match(gradeReviewSequence, /CourseGradeSummary(?:<br\/>)?Repository/);
   assert.match(gradeReviewSequence, /GradeChangeLog(?:<br\/>)?Repository/);
   assert.match(gradeReviewSequence, /applyApprovedAdjustment/);
+
+  const membershipCheck = studentGradeSequence.indexOf('isCourseMember');
+  const accessException = studentGradeSequence.indexOf('StudentGradeAccessException');
+  const summaryLookup = studentGradeSequence.indexOf('Service->>SummaryRepo');
+  const publishException = studentGradeSequence.indexOf('GradePublishException');
+  const recordLookup = studentGradeSequence.indexOf('Service->>RecordRepo');
+  assert.ok(membershipCheck >= 0 && accessException > membershipCheck && summaryLookup > accessException);
+  assert.ok(publishException > summaryLookup && recordLookup > publishException);
+  assert.match(studentGradeSequence, /StudentGradeAccessException.*ERR-GRD-02.*403/);
+  assert.match(studentGradeSequence, /GradePublishException.*ERR-GRD-04.*400/);
+  assert.match(detailedDesign, /\| ERR-GRD-04 \|[^\n]*未发布/);
+  assert.match(processDetailedDesign, /\| ERR-GRD-04 \|[^\n]*未发布/);
 });
 
 test('GRD mutating lifecycle only runs through the disposable database wrapper', () => {
