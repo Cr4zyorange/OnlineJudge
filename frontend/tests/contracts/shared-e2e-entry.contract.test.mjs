@@ -47,7 +47,7 @@ test('shared fixture, real-application smoke and local runbook are present', () 
   assert.match(fixture, /failureEvidenceName/);
   assert.match(smoke, /\/api\/v1\/system\/health/);
   assert.match(smoke, /OnlineJudgeForSE/);
-  assert.match(runbook, /docker compose -f \.\.\/deploy\/docker\/compose\.yml up -d --build/);
+  assert.match(runbook, /docker compose -f deploy\/docker\/compose\.yml up -d --build/);
   assert.match(runbook, /E2E_BASE_URL/);
   assert.match(runbook, /test:e2e --/);
   assert.match(runbook, /playwright-report/);
