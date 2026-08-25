@@ -87,9 +87,14 @@ test('GRD SSD branches and responses match the implemented API contracts', () =>
   const gradeTestReport = readRepositoryFile('docs/过程/测试/TST-DOC-07 GRD 成绩评价与教学分析测试文档.md');
   const apiExceptionHandler = readRepositoryFile('backend/src/main/java/com/onlinejudge/common/exception/ApiExceptionHandler.java');
   const globalExceptionHandler = readRepositoryFile('backend/src/main/java/com/onlinejudge/common/exception/GlobalExceptionHandler.java');
+  const notificationPublisher = readRepositoryFile('backend/src/main/java/com/onlinejudge/lrn/service/PersistentNotificationEventPublisher.java');
   const gradeItemUseCase = srs.slice(
     srs.indexOf('## 4.11 UC-GR-02'),
     srs.indexOf('## 4.12 UC-GR-03')
+  );
+  const gradeReviewUseCase = srs.slice(
+    srs.indexOf('## 4.13 UC-GR-04'),
+    srs.indexOf('## 4.14 UC-GR-05')
   );
 
   assert.doesNotMatch(gradeItemSsd, /来源任务存在|来源不存在/);
@@ -110,6 +115,13 @@ test('GRD SSD branches and responses match the implemented API contracts', () =>
 
   assert.doesNotMatch(gradeReviewSsd, /教师通知状态/);
   assert.match(gradeReviewSsd, /requestId.*PENDING.*submittedAt/);
+  assert.doesNotMatch(gradeReviewSsd, /异步持久化/);
+  assert.match(gradeReviewSsd, /同步 best-effort 持久化.*失败.*不改变.*响应/);
+  assert.match(gradeReviewUseCase, /同步 best-effort.*失败.*不改变.*响应/);
+  assert.match(gradeTestReport, /同步 best-effort.*失败.*不改变.*响应/);
+  assert.doesNotMatch(notificationPublisher, /@Async/);
+  assert.match(notificationPublisher, /notificationService\.createNotifications/);
+  assert.match(notificationPublisher, /catch \(RuntimeException ex\)/);
 
   const syncOperation = gradeFlowSsd.indexOf('OP-GR-02');
   const sourceFailure = gradeFlowSsd.indexOf('来源同步失败');
@@ -175,7 +187,13 @@ test('GRD mutating lifecycle only runs through the disposable database wrapper',
   const packageJson = JSON.parse(readRepositoryFile('frontend/package.json'));
 
   assert.match(runner, /mktemp -d/);
+  assert.match(runner, /exec env -i/);
+  assert.match(runner, /SPRING_PROFILES_ACTIVE=/);
   assert.match(runner, /SPRING_DATASOURCE_URL/);
+  assert.match(runner, /SPRING_DATASOURCE_DRIVER_CLASS_NAME=org\.h2\.Driver/);
+  assert.match(runner, /SPRING_DATASOURCE_USERNAME=sa/);
+  assert.match(runner, /SPRING_DATASOURCE_PASSWORD=/);
+  assert.match(runner, /SPRING_SQL_INIT_MODE=always/);
   assert.match(runner, /trap cleanup/);
   assert.match(runner, /openssl rand -hex/);
   assert.match(runner, /E2E_GRD_DISPOSABLE_PROOF_FILE/);
