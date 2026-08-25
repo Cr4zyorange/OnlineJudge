@@ -451,6 +451,7 @@ GRD 从 LAB/HWK 读取或接收来源成绩时，只依赖以下字段，不依�
 | completionRate | BigDecimal | 完成率 |
 | distributionJson | Text | 预设分数区间分布 JSON |
 | sourceDataTime | LocalDateTime | 统计对应的成绩数据时间点 |
+| sourceFingerprint | String | 当前有效学生集合和目标成绩数据的 SHA-256 来源版本指纹 |
 | calculatedAt | LocalDateTime | 统计计算时间 |
 
 ### 6.9 成绩发布状态机
@@ -645,6 +646,7 @@ CREATE INDEX idx_grade_review_student_status ON t_grade_review_request(course_id
 | completion_rate | decimal(6,4) | NULL | 完成率 |
 | distribution_json | text | NULL | 分数区间分布 JSON |
 | source_data_time | datetime | NOT NULL | 统计对应成绩数据时间点 |
+| source_fingerprint | varchar(64) | NULL | 来源版本 SHA-256；历史快照兼容为空，新增快照必须写入 |
 | calculated_at | datetime | NOT NULL | 统计计算时间 |
 
 ---
