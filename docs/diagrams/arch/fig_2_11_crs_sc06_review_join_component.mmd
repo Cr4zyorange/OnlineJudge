@@ -1,0 +1,27 @@
+sequenceDiagram
+  participant Browser as Browser
+  participant Frontend as Vue 前端组件
+  participant Gateway as Nginx/API 网关
+  participant API as Spring Boot API
+  participant CRS as CRS 成员组件
+  participant LRN as LRN 通知组件
+  participant DB as MySQL 数据库
+  Browser->>Frontend: 学生申请审批制课程
+  Frontend->>Gateway: POST /api/v1/courses/{id}/join
+  Gateway->>API: 反向代理 /api/v1
+  API->>CRS: 调用 CourseService.join
+  CRS->>DB: 校验并创建 PENDING 成员
+  DB-->>CRS: 返回待审核成员
+  CRS-->>API: 返回等待审核状态
+  API-->>Frontend: 学生看到待审核提示
+  Browser->>Frontend: 教师审批学生申请
+  Frontend->>Gateway: PUT /api/v1/courses/{id}/members/{uid}
+  Gateway->>API: 反向代理
+  API->>CRS: 调用 CourseService.updateMember
+  CRS->>DB: 校验状态流转并置为 ACTIVE/REJECTED
+  DB-->>CRS: 返回成员关系
+  alt 审批通过
+    CRS->>LRN: 发送审批结果通知事件
+  end
+  CRS-->>API: 返回成员响应
+  API-->>Frontend: 审批前后学生权限随成员状态变化

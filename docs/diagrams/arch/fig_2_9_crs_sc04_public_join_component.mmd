@@ -1,0 +1,19 @@
+sequenceDiagram
+  participant Browser as Browser
+  participant Frontend as Vue 前端组件
+  participant Gateway as Nginx/API 网关
+  participant API as Spring Boot API
+  participant CRS as CRS 成员组件
+  participant DB as MySQL 数据库
+  Browser->>Frontend: 课程列表选择公开课并加入
+  Frontend->>Gateway: POST /api/v1/courses/{id}/join
+  Gateway->>API: 反向代理 /api/v1
+  API->>CRS: 调用 CourseService.join
+  CRS->>DB: 校验课程状态、容量与重复加入
+  DB-->>CRS: 返回校验结果
+  CRS->>DB: 创建 ACTIVE 课程成员
+  DB-->>CRS: 返回成员关系
+  CRS-->>API: 返回课程权限结果
+  API-->>Gateway: 统一响应
+  Gateway-->>Frontend: JSON 响应
+  Frontend-->>Browser: 进入课程主页并开放资源与任务

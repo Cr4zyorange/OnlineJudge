@@ -1,0 +1,24 @@
+sequenceDiagram
+  participant User as 学生/教师
+  participant Ctrl as CourseController
+  participant Svc as AnnouncementService
+  participant CourseSvc as CourseService
+  participant CourseRepo as CourseRepository
+  participant AnnounceRepo as AnnouncementRepository
+  participant TaskSvc as LearningTaskService
+  participant DB as MySQL 数据库
+  User->>Ctrl: GET /api/v1/courses/{courseId}/home-summary
+  Ctrl->>Svc: homeSummary(courseId, user)
+  Svc->>Svc: requireActiveMembership(courseId, user)
+  Svc->>CourseSvc: detail(courseId, user)
+  CourseSvc->>CourseRepo: findById + findMember
+  CourseRepo->>DB: SELECT crs_course / crs_course_member
+  DB-->>CourseRepo: Course + CourseMember
+  CourseSvc-->>Svc: CourseResponse
+  Svc->>AnnounceRepo: listByCourse(courseId)
+  AnnounceRepo->>DB: SELECT crs_announcement
+  DB-->>AnnounceRepo: List<Announcement>
+  Svc->>TaskSvc: listTasks(userId, LearningTaskQuery(courseId))
+  TaskSvc-->>Svc: 最近任务摘要
+  Svc-->>Ctrl: CourseHomeSummaryResponse
+  Ctrl-->>User: 课程信息/置顶公告/最近任务摘要
