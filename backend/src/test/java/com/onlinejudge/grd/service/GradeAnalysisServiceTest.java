@@ -46,6 +46,7 @@ class GradeAnalysisServiceTest {
         assertThat(second.generatedAt()).isEqualTo(first.generatedAt());
         assertThat(second.sourceDataTime()).isEqualTo(first.sourceDataTime());
         assertThat(snapshotRepository.size()).isEqualTo(1);
+        assertThat(summaryRepository.findByCourseIdCallCount()).isEqualTo(1);
     }
 
     @Test
@@ -69,6 +70,26 @@ class GradeAnalysisServiceTest {
         assertThat(second.generatedAt()).isEqualTo(first.generatedAt());
         assertThat(second.sourceDataTime()).isEqualTo(first.sourceDataTime());
         assertThat(snapshotRepository.size()).isEqualTo(1);
+        assertThat(recordRepository.findByCourseIdCallCount()).isEqualTo(1);
+    }
+
+    @Test
+    void sourceFingerprintCarriesAnExplicitAnalysisContractVersion() {
+        InMemoryGradeAnalysisSnapshotRepository snapshotRepository = new InMemoryGradeAnalysisSnapshotRepository();
+        InMemoryCourseGradeSummaryRepository summaryRepository = new InMemoryCourseGradeSummaryRepository();
+        GradeAnalysisService service = new GradeAnalysisService(
+                new InMemoryGradeItemRepository(),
+                new InMemoryGradeRecordRepository(),
+                summaryRepository,
+                snapshotRepository,
+                permissionClient(601L)
+        );
+        summaryRepository.upsert(summary(101L, 601L, "84.00", FinalStatus.CALCULATED));
+
+        service.analyzeCourseGrades(101L, 501L, "COURSE_TOTAL", null);
+
+        assertThat(snapshotRepository.findLatest(101L, "COURSE_TOTAL", null).orElseThrow().sourceFingerprint())
+                .startsWith("GRD_ANALYSIS_V2:");
     }
 
     @Test
@@ -330,6 +351,7 @@ class GradeAnalysisServiceTest {
         recordRepository.upsert(record(101L, 604L, 11L, null, GradeStatus.UNSUBMITTED));
 
         GradeItemCompletionResult result = service.getGradeItemCompletion(101L, 11L, 501L);
+        GradeItemCompletionResult reused = service.getGradeItemCompletion(101L, 11L, 501L);
 
         assertThat(result.gradeItemId()).isEqualTo(11L);
         assertThat(result.totalStudentCount()).isEqualTo(5);
@@ -342,6 +364,8 @@ class GradeAnalysisServiceTest {
         assertThat(result.completionRate()).isEqualByComparingTo("0.4000");
         assertThat(result.sourceDataTime()).isNotNull();
         assertThat(result.generatedAt()).isNotNull();
+        assertThat(reused.generatedAt()).isEqualTo(result.generatedAt());
+        assertThat(recordRepository.findByCourseIdCallCount()).isEqualTo(1);
         assertThat(snapshotRepository.findLatest(101L, "GRADE_ITEM", 11L)).isPresent();
     }
 
@@ -501,6 +525,7 @@ class GradeAnalysisServiceTest {
 
     private static final class InMemoryGradeRecordRepository implements GradeRecordRepository {
         private long nextId = 1L;
+        private int findByCourseIdCallCount;
         private final List<GradeRecord> records = new ArrayList<>();
 
         @Override
@@ -522,11 +547,17 @@ class GradeAnalysisServiceTest {
 
         @Override
         public List<GradeRecord> findByCourseId(long courseId) {
+            findByCourseIdCallCount++;
             return records.stream().filter(record -> record.courseId() == courseId).toList();
+        }
+
+        int findByCourseIdCallCount() {
+            return findByCourseIdCallCount;
         }
     }
 
     private static final class InMemoryCourseGradeSummaryRepository implements CourseGradeSummaryRepository {
+        private int findByCourseIdCallCount;
         private final List<CourseGradeSummary> summaries = new ArrayList<>();
 
         @Override
@@ -547,7 +578,12 @@ class GradeAnalysisServiceTest {
 
         @Override
         public List<CourseGradeSummary> findByCourseId(long courseId) {
+            findByCourseIdCallCount++;
             return summaries.stream().filter(summary -> summary.courseId() == courseId).toList();
+        }
+
+        int findByCourseIdCallCount() {
+            return findByCourseIdCallCount;
         }
     }
 
