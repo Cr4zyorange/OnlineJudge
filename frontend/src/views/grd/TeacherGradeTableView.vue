@@ -102,7 +102,7 @@
       </div>
       <p v-if="analysisLoading">加载中</p>
       <p v-else-if="analysisError" class="grade-table__error">{{ analysisError }}</p>
-      <template v-else-if="analysis">
+      <template v-else-if="analysis && analysis.completedCount > 0">
         <p class="grade-table__analysis-target">
           {{ analysis.targetType === 'COURSE_TOTAL' ? '课程总评' : gradeItemName(analysis.gradeItemId) }}
         </p>
@@ -137,6 +137,15 @@
           </li>
         </ul>
         <p class="grade-table__timestamp">数据时间点 {{ analysis.sourceDataTime }}</p>
+        <p class="grade-table__timestamp">生成时间 {{ analysis.generatedAt }}</p>
+      </template>
+      <template v-else-if="analysis">
+        <p class="grade-table__analysis-empty">暂无可统计成绩</p>
+        <p class="grade-table__analysis-counts">
+          共 {{ analysis.totalStudentCount }} 人，缺失 {{ analysis.missingCount }}，未提交 {{ analysis.unsubmittedCount }}，待评分 {{ analysis.ungradedCount }}
+        </p>
+        <p class="grade-table__timestamp">数据时间点 {{ analysis.sourceDataTime }}</p>
+        <p class="grade-table__timestamp">生成时间 {{ analysis.generatedAt }}</p>
       </template>
       <p v-else>暂无统计结果</p>
     </section>
@@ -425,14 +434,13 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { listGradeItems } from '../../api/grd/gradeItems';
 import PageState from '../../components/foundation/PageState.vue';
 import {
   adjustGradeRecord,
   adjustCourseFinalScore,
   getCourseGradeAnalysis,
-  getGradeItemCompletion,
   type GradeTableQuery,
   listGradePublishRecords,
   listCourseGradeReviewRequests,
@@ -447,7 +455,6 @@ import type {
   CourseGradeRow,
   GradeAnalysisResult,
   GradeAnalysisTargetType,
-  GradeItemCompletionResult,
   GradeItem,
   GradeChangeLog,
   GradePublishRecord,
@@ -507,6 +514,7 @@ const analysisLoading = ref(false);
 const analysisError = ref('');
 const analysisTargetType = ref<GradeAnalysisTargetType>('COURSE_TOTAL');
 const analysisGradeItemIdInput = ref('');
+let analysisRequestVersion = 0;
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / size.value)));
 const selectedRecord = computed(() => selectedRow.value?.records.find((record) => record.id === selectedRecordId.value) ?? null);
 
@@ -518,6 +526,26 @@ onMounted(async () => {
     refreshAnalysis(),
     refreshReviewRequests()
   ]);
+});
+
+watch(
+  [analysisTargetType, analysisGradeItemIdInput],
+  () => invalidateAnalysis(),
+  { flush: 'sync' }
+);
+
+watch(
+  () => props.courseId,
+  async () => {
+    invalidateAnalysis();
+    analysisTargetType.value = 'COURSE_TOTAL';
+    analysisGradeItemIdInput.value = '';
+    await Promise.all([loadGradeItems(), refreshAnalysis()]);
+  }
+);
+
+onUnmounted(() => {
+  analysisRequestVersion += 1;
 });
 
 async function loadGradeItems() {
@@ -780,46 +808,47 @@ async function processReview(requestId: number, action: 'APPROVE' | 'REJECT') {
 }
 
 async function refreshAnalysis() {
+  const requestVersion = ++analysisRequestVersion;
+  const courseId = props.courseId;
+  const targetType = analysisTargetType.value;
+  const gradeItemId = Number(analysisGradeItemIdInput.value);
   analysisLoading.value = true;
   analysisError.value = '';
+  analysis.value = null;
   try {
-    if (analysisTargetType.value === 'GRADE_ITEM') {
-      const gradeItemId = Number(analysisGradeItemIdInput.value);
+    if (targetType === 'GRADE_ITEM') {
       if (!Number.isInteger(gradeItemId) || gradeItemId <= 0) {
         throw new Error('请选择成绩项');
       }
-      analysis.value = completionToAnalysis(await getGradeItemCompletion(props.courseId, gradeItemId));
-      return;
+      const result = await getCourseGradeAnalysis(courseId, {
+        targetType,
+        gradeItemId
+      });
+      if (requestVersion === analysisRequestVersion) {
+        analysis.value = result;
+      }
+    } else {
+      const result = await getCourseGradeAnalysis(courseId, { targetType });
+      if (requestVersion === analysisRequestVersion) {
+        analysis.value = result;
+      }
     }
-    analysis.value = await getCourseGradeAnalysis(props.courseId, {
-      targetType: analysisTargetType.value
-    });
   } catch (error) {
-    analysisError.value = error instanceof Error ? error.message : '教学分析加载失败';
+    if (requestVersion === analysisRequestVersion) {
+      analysisError.value = error instanceof Error ? error.message : '教学分析加载失败';
+    }
   } finally {
-    analysisLoading.value = false;
+    if (requestVersion === analysisRequestVersion) {
+      analysisLoading.value = false;
+    }
   }
 }
 
-function completionToAnalysis(completion: GradeItemCompletionResult): GradeAnalysisResult {
-  return {
-    targetType: 'GRADE_ITEM',
-    gradeItemId: completion.gradeItemId,
-    totalStudentCount: completion.totalStudentCount,
-    submittedCount: completion.submittedCount,
-    completedCount: completion.completedCount,
-    missingCount: completion.missingCount,
-    unsubmittedCount: completion.unsubmittedCount,
-    ungradedCount: completion.ungradedCount,
-    averageScore: completion.averageScore,
-    maxScore: null,
-    minScore: null,
-    passRate: '0.0000',
-    completionRate: completion.completionRate,
-    distribution: [],
-    sourceDataTime: completion.sourceDataTime,
-    generatedAt: completion.generatedAt
-  };
+function invalidateAnalysis() {
+  analysisRequestVersion += 1;
+  analysis.value = null;
+  analysisError.value = '';
+  analysisLoading.value = false;
 }
 
 function refreshSelectedRow() {
