@@ -6,11 +6,13 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.jdbc.Sql;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.Map;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -26,6 +28,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Sql(
         statements = {
                 "DELETE FROM t_course_grade_summary",
+                "DELETE FROM t_grade_analysis_snapshot",
                 "DELETE FROM t_grade_review_request",
                 "DELETE FROM t_grade_change_log",
                 "DELETE FROM t_grade_publish_record",
@@ -121,6 +124,9 @@ class GradeRecordControllerTest {
 
     @Autowired
     private ObjectMapper objectMapper;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
 
     @Test
     void teacherSyncsMissingLabSourceAsMissingWithoutDemoFallback() throws Exception {
@@ -390,6 +396,12 @@ class GradeRecordControllerTest {
                 .andExpect(jsonPath("$.data.sourceDataTime").isNotEmpty())
                 .andExpect(jsonPath("$.data.generatedAt").isNotEmpty());
 
+        mockMvc.perform(get("/api/v1/courses/101/grade-analysis?targetType=COURSE_TOTAL")
+                        .headers(teacherHeaders("101")))
+                .andExpect(status().isOk());
+
+        assertThat(snapshotCount(101L, "COURSE_TOTAL", null)).isEqualTo(1);
+
         mockMvc.perform(get("/api/v1/courses/101/grade-analysis?targetType=GRADE_ITEM&gradeItemId={gradeItemId}", homeworkItemId)
                         .headers(teacherHeaders("101")))
                 .andExpect(status().isOk())
@@ -401,6 +413,16 @@ class GradeRecordControllerTest {
                 .andExpect(jsonPath("$.data.ungradedCount").value(1))
                 .andExpect(jsonPath("$.data.averageScore").value(80.00))
                 .andExpect(jsonPath("$.data.completionRate").value(0.3333));
+
+        mockMvc.perform(get("/api/v1/courses/101/grade-analysis?targetType=GRADE_ITEM&gradeItemId={gradeItemId}", homeworkItemId)
+                        .headers(teacherHeaders("101")))
+                .andExpect(status().isOk());
+
+        assertThat(snapshotCount(101L, "GRADE_ITEM", homeworkItemId)).isEqualTo(1);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM t_grade_analysis_snapshot WHERE source_fingerprint IS NOT NULL",
+                Integer.class
+        )).isEqualTo(2);
     }
 
     @Test
@@ -426,6 +448,12 @@ class GradeRecordControllerTest {
                 .andExpect(jsonPath("$.data.completionRate").value(0.3333))
                 .andExpect(jsonPath("$.data.sourceDataTime").isNotEmpty())
                 .andExpect(jsonPath("$.data.generatedAt").isNotEmpty());
+
+        mockMvc.perform(get("/api/v1/courses/101/grade-items/{gradeItemId}/completion", homeworkItemId)
+                        .headers(teacherHeaders("101")))
+                .andExpect(status().isOk());
+
+        assertThat(snapshotCount(101L, "GRADE_ITEM", homeworkItemId)).isEqualTo(1);
     }
 
     @Test
@@ -437,6 +465,23 @@ class GradeRecordControllerTest {
                         .header("X-Manageable-Course-Ids", "101"))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("ERR-AUTH-05"));
+    }
+
+    private int snapshotCount(long courseId, String targetType, Long gradeItemId) {
+        return jdbcTemplate.queryForObject(
+                """
+                        SELECT COUNT(*)
+                          FROM t_grade_analysis_snapshot
+                         WHERE course_id = ?
+                           AND target_type = ?
+                           AND ((? IS NULL AND grade_item_id IS NULL) OR grade_item_id = ?)
+                        """,
+                Integer.class,
+                courseId,
+                targetType,
+                gradeItemId,
+                gradeItemId
+        );
     }
 
     @Test

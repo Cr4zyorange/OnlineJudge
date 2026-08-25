@@ -214,6 +214,7 @@ class GradeItemMigrationTest {
                 "COURSE_TOTAL",
                 null,
                 now.minusMinutes(1),
+                "6a6d0f3f657c0f61b92f7fd105a149781039605365c671414bbc27f6536fa72e",
                 new BigDecimal("78.00"),
                 new BigDecimal("92.00"),
                 new BigDecimal("58.00"),
@@ -232,6 +233,7 @@ class GradeItemMigrationTest {
                     assertThat(snapshot.courseId()).isEqualTo(saved.courseId());
                     assertThat(snapshot.targetType()).isEqualTo(saved.targetType());
                     assertThat(snapshot.gradeItemId()).isNull();
+                    assertThat(snapshot.sourceFingerprint()).isEqualTo(saved.sourceFingerprint());
                     assertThat(snapshot.averageScore()).isEqualByComparingTo(saved.averageScore());
                     assertThat(snapshot.maxScore()).isEqualByComparingTo(saved.maxScore());
                     assertThat(snapshot.minScore()).isEqualByComparingTo(saved.minScore());
