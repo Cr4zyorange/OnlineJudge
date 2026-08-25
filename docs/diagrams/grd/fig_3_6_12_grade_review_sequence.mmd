@@ -1,0 +1,39 @@
+sequenceDiagram
+  actor Student as 学生
+  actor Teacher as 教师
+  participant StudentView as StudentGradeView
+  participant TeacherView as TeacherGradeTableView
+  participant Controller as GradeReviewController
+  participant Service as GradeReviewService
+  participant Permission as CoursePermissionClient
+  participant ReviewRepo as GradeReviewRequestRepository
+  participant GradeService as GradeRecordService
+  participant Event as GradeEventPublisher
+  participant LRN as LRN通知
+  Student->>StudentView: 填写异议理由
+  StudentView->>Controller: POST /courses/{courseId}/grade-review-requests
+  Controller->>Service: submitReviewRequest(courseId,studentId,command)
+  Service->>Permission: 校验课程成员与本人已发布成绩
+  Service->>ReviewRepo: findPendingByTarget(...)
+  alt 已存在 PENDING 申请
+    Service-->>Controller: GradeReviewDuplicateException
+    Controller-->>StudentView: 重复申请提示
+  else 可提交
+    Service->>ReviewRepo: save(PENDING)
+    Service->>Event: GRADE_REVIEW_REQUESTED
+    Event->>LRN: 持久化教师通知
+    Service-->>StudentView: PENDING 申请
+  end
+  Teacher->>TeacherView: 处理待复核申请
+  TeacherView->>Controller: PUT /grade-review-requests/{requestId}/process
+  Controller->>Service: processReviewRequest(requestId,teacherId,command)
+  Service->>Permission: 校验课程成绩管理权限
+  alt APPROVE
+    Service->>GradeService: 调整单项/总评并写变更日志
+    Service->>ReviewRepo: update(APPROVED)
+  else REJECT
+    Service->>ReviewRepo: update(REJECTED)
+  end
+  Service->>Event: GRADE_REVIEW_PROCESSED
+  Event->>LRN: 持久化学生通知
+  Service-->>TeacherView: 处理结果与留痕

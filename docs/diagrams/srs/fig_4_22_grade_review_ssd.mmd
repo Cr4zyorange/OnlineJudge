@@ -1,0 +1,14 @@
+sequenceDiagram
+  actor Student as 学生
+  actor Teacher as 教师
+  participant System as OnlineJudgeForSE 系统边界
+  Student->>System: OP-GR-05 提交本人已发布成绩异议
+  alt 目标可复核且无重复 PENDING 申请
+    System-->>Student: 返回 PENDING 申请和教师通知状态
+    System-->>Teacher: 待处理复核申请可见
+    Teacher->>System: OP-GR-05 同意修改或驳回复核申请
+    System-->>Teacher: 返回处理状态和成绩变更留痕
+    System-->>Student: 复核结果和通知可见
+  else 未发布/非本人/重复申请/无权限
+    System-->>Student: 返回受控错误且不创建重复申请
+  end

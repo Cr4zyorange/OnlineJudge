@@ -1,0 +1,18 @@
+stateDiagram-v2
+  direction TB
+  state "无快照" as NO_SNAPSHOT
+  state "计算中" as CALCULATING
+  state "当前快照" as CURRENT
+  state "当前空态快照" as CURRENT_EMPTY
+  state "快照失效" as STALE
+  state "计算失败" as FAILED
+
+  [*] --> NO_SNAPSHOT: 首次查询
+  NO_SNAPSHOT --> CALCULATING: 校验通过
+  CALCULATING --> CURRENT: 生成统计结果
+  CALCULATING --> CURRENT_EMPTY: 仅有空态计数
+  CALCULATING --> FAILED: 读取或计算失败
+  CURRENT --> STALE
+  CURRENT_EMPTY --> STALE
+  STALE --> CALCULATING: 重算
+  FAILED --> CALCULATING: 重试

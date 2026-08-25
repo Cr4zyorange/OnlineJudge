@@ -1,0 +1,23 @@
+sequenceDiagram
+  actor Student as 学生
+  participant View as StudentGradeView
+  participant Controller as GradeRecordController
+  participant Service as GradeRecordService
+  participant Course as CoursePermissionClient
+  participant SummaryRepo as CourseGradeSummaryRepository
+  participant RecordRepo as GradeRecordRepository
+  Student->>View: 打开课程成绩页
+  View->>Controller: GET /courses/{courseId}/my-grades
+  Controller->>Service: getMyPublishedGrades(courseId,currentUser.id)
+  Service->>Course: requireCourseMember(courseId,studentId)
+  Course-->>Service: 成员校验结果
+  Service->>SummaryRepo: findByCourseAndStudent(courseId,studentId)
+  alt 总评不存在或未发布
+    Service-->>Controller: StudentGradeAccessException
+    Controller-->>View: 未发布/无权限响应，不含分数字段
+  else 总评已发布
+    Service->>RecordRepo: findPublishedByCourseAndStudent(courseId,studentId)
+    RecordRepo-->>Service: 本人成绩项明细
+    Service-->>Controller: CourseGradeRow
+    Controller-->>View: 已发布总评、明细和发布时间
+  end

@@ -1,0 +1,27 @@
+sequenceDiagram
+  actor Teacher as 教师
+  participant View as TeacherGradeTableView
+  participant Controller as GradeAnalysisController
+  participant Service as GradeAnalysisService
+  participant Permission as CoursePermissionClient
+  participant MemberRepo as CourseMemberRepository
+  participant Version as GradeAnalysisSourceVersionStore
+  participant SnapshotRepo as GradeAnalysisSnapshotRepository
+  participant GradeRepo as GradeRecord/CourseGradeSummaryRepository
+  Teacher->>View: 选择课程总评或成绩项维度
+  View->>Controller: GET /courses/{courseId}/grade-analysis
+  Controller->>Service: analyzeCourseGrades(courseId,teacherId,targetType,gradeItemId)
+  Service->>Permission: 校验课程成绩管理权限
+  Service->>MemberRepo: 读取当前有效学生集合
+  Service->>Version: 读取目标来源版本与数据时间
+  Service->>SnapshotRepo: 按课程和目标读取最近快照
+  alt 契约/学生集合/来源版本指纹一致且计数完整
+    SnapshotRepo-->>Service: 返回可复用快照
+  else 快照缺失或失效
+    Service->>GradeRepo: 读取目标成绩记录
+    GradeRepo-->>Service: 分数与缺失状态
+    Service->>Service: 计算指标、分布和空态计数
+    Service->>SnapshotRepo: 保存新快照
+  end
+  Service-->>Controller: GradeAnalysisResult + sourceDataTime
+  Controller-->>View: 指标或可解释空态
