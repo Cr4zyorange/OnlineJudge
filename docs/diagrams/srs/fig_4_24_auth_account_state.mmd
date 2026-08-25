@@ -1,0 +1,12 @@
+stateDiagram-v2
+  [*] --> PENDING: 注册创建账号
+  PENDING --> ACTIVE: 激活账号
+  ACTIVE --> FROZEN: 连续失败达到阈值或管理员冻结
+  FROZEN --> ACTIVE: 锁定到期或管理员解冻
+  ACTIVE --> DISABLED: 管理员禁用
+  FROZEN --> DISABLED: 管理员禁用
+  DISABLED --> ACTIVE: 管理员启用
+  PENDING --> DISABLED: 管理员禁用
+  DISABLED --> [*]
+  ACTIVE --> [*]
+  FROZEN --> [*]

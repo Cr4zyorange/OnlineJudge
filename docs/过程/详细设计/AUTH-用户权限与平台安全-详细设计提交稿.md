@@ -541,3 +541,31 @@ stateDiagram-v2
 
 AUTH 模块详细设计已覆盖页面设计、接口设计、服务组件、数据库表、核心流程、状态机、异常处理、安全权限、性能可维护性和需求追踪。本文档可作为用户权限与平台安全模块负责人提交给详细设计负责人的独立模块稿，后续可合并至《软件详细设计说明书》第 3.1、4、5、6、7、9 章对应位置。
 
+## 14 D2 业务场景闭环补充
+
+### 14.1 业务场景清单与分类
+
+按 Issue #261 盘点，AUTH 模块确认四个独立业务场景，其余为 `include` 公共子流程或备选/异常路径，不新增正式 UC 编号：
+
+| 场景 | 名称 | 分类 | 服务编排 |
+| --- | --- | --- | --- |
+| S1 `UC-AUTH-01-R` | 注册、登录、退出与持续鉴权 | 独立场景 | AuthService + PasswordSecurityService + SessionTokenService + AuditLogService |
+| S2 `UC-AUTH-01-P` | 个人资料与密码安全 | 独立场景 | UserService + PasswordSecurityService + SessionTokenService + AuditLogService |
+| S3 `UC-AUTH-01-A` | 管理员用户、角色与权限管理 | 独立场景 | AccessControlService + UserService + RoleService + PermissionService + AuditLogService |
+| S4 `UC-AUTH-01-S` | 安全异常处理与关键操作审计 | 独立场景 | AccessControlService + SessionTokenService + AuditLogService |
+
+### 14.2 详细层图组
+
+详细层对象/服务级顺序图与状态图/活动图已整合进《软件详细设计说明书》3.1 节“详细层业务场景图组”，图号如下：
+
+| 场景 | 服务级顺序图 | 状态图/活动图 |
+| --- | --- | --- |
+| S1 | 图 3-7 | 复用图 3-5 账号状态机、图 3-6 会话状态机 |
+| S2 | 图 3-8 | 图 3-9 修改密码活动图 |
+| S3 | 图 3-10 | 图 3-11 角色权限调整活动图 |
+| S4 | 图 3-12 | 图 3-13 鉴权与越权拦截活动图 |
+
+### 14.3 三层图完整映射
+
+需求层（SRS 4.17）、概要层（概要设计说明书 5.1.2）、详细层（详细设计说明书 3.1）的完整图号映射见 `docs/过程/测试/TST-DOC-02-AUTH-业务场景清单与测试闭环.md` 第 3 章。
+

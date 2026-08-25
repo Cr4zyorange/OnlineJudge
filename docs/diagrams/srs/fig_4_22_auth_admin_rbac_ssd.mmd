@@ -1,0 +1,16 @@
+sequenceDiagram
+  actor Admin as 管理员
+  participant System as OnlineJudgeForSE 系统边界
+  Admin->>System: 查询用户列表/角色列表/权限点列表
+  System-->>Admin: 返回分页列表
+  Admin->>System: 创建用户（账号、密码、用户类型、初始角色）
+  System-->>Admin: 返回创建结果（不暴露密码）
+  Admin->>System: 调整用户角色（userId、roleIds）
+  System-->>Admin: 返回用户最新角色
+  Admin->>System: 调整角色权限（roleId、permissionIds）
+  System-->>Admin: 返回角色最新权限
+  Admin->>System: 禁用/启用账号（userId、accountStatus）
+  System-->>Admin: 返回账号最新状态并作废该用户会话
+  Note over System: 每次变更均校验管理员权限并写入审计日志
+  Admin->>System: 查询审计日志（操作人/类型/时间/结果）
+  System-->>Admin: 返回分页审计记录
