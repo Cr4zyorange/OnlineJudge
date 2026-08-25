@@ -134,8 +134,10 @@
                 v-if="safeActionUrl(notification.actionUrl)"
                 class="notification-card__link"
                 :href="safeActionUrl(notification.actionUrl) ?? undefined"
+                :aria-disabled="openingNotificationId === notification.notificationId ? 'true' : undefined"
+                @click.prevent="openNotification(notification)"
               >
-                查看详情
+                {{ openingNotificationId === notification.notificationId ? '正在打开' : '查看详情' }}
               </a>
               <div v-else class="notification-card__recovery">
                 <span class="notification-card__unavailable">入口已失效</span>
@@ -180,11 +182,13 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
+import { useRouter } from 'vue-router';
 import { deleteNotification, listNotifications, markNotificationsRead } from '../../api/lrn/notifications';
 import PageState from '../../components/foundation/PageState.vue';
 import type { NotificationItem, NotificationPage, NotificationType } from '../../types/lrn';
 import { sanitizeInternalActionUrl } from './internalActionUrl';
 
+const router = useRouter();
 const loading = ref(false);
 const errorMessage = ref('');
 const notificationPage = ref<NotificationPage | null>(null);
@@ -196,6 +200,7 @@ const page = ref(1);
 const size = ref(20);
 const selectedIds = ref<number[]>([]);
 const feedbackMessage = ref('');
+const openingNotificationId = ref<number | null>(null);
 
 const notifications = computed(() => notificationPage.value?.records ?? []);
 const totalPages = computed(() => {
@@ -274,6 +279,30 @@ async function markAllRead() {
     feedbackMessage.value = `已标记 ${result.updatedCount} 条通知`;
     selectedIds.value = [];
   });
+}
+
+async function openNotification(notification: NotificationItem) {
+  const actionUrl = safeActionUrl(notification.actionUrl);
+  if (!actionUrl || openingNotificationId.value !== null) {
+    return;
+  }
+
+  openingNotificationId.value = notification.notificationId;
+  errorMessage.value = '';
+  feedbackMessage.value = '';
+  try {
+    if (!notification.isRead) {
+      await markNotificationsRead({
+        notificationIds: [notification.notificationId],
+        readAll: false
+      });
+    }
+    await router.push(actionUrl);
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : '通知打开失败';
+  } finally {
+    openingNotificationId.value = null;
+  }
 }
 
 async function deleteNotificationById(notificationId: number) {
