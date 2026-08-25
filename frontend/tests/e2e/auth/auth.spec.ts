@@ -55,8 +55,7 @@ test.describe('@auth AUTH real-application scenarios', () => {
     await page.locator('input[name="password"]').fill(account.password);
     await page.locator('form[data-auth-form="login"] button[type="submit"]').click();
 
-    await expect(page.locator('.auth-feedback.error')).toContainText('账号状态异常');
-    await page.goto('/account-disabled');
+    await expect(page).toHaveURL(/\/account-disabled$/);
     await expect(page.getByRole('heading', { name: '账号状态异常' })).toBeVisible();
   });
 
@@ -75,8 +74,7 @@ test.describe('@auth AUTH real-application scenarios', () => {
     await page.locator('input[name="password"]').fill(account.password);
     await page.locator('form[data-auth-form="login"] button[type="submit"]').click();
 
-    await expect(page.locator('.auth-feedback.error')).toContainText('账号状态异常');
-    await page.goto('/account-disabled');
+    await expect(page).toHaveURL(/\/account-disabled$/);
     await expect(page.getByRole('heading', { name: '账号状态异常' })).toBeVisible();
   });
 

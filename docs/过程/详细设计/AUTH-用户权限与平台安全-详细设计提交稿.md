@@ -545,25 +545,25 @@ AUTH 模块详细设计已覆盖页面设计、接口设计、服务组件、数
 
 ### 14.1 业务场景清单与分类
 
-按 Issue #261 盘点，AUTH 模块确认四个独立业务场景，其余为 `include` 公共子流程或备选/异常路径，不新增正式 UC 编号：
+按 Issue #261 盘点，AUTH 模块确认 11 个独立业务场景（本地编号 `SC-AUTH-01` ~ `SC-AUTH-11`），其余为 `include` 公共子流程或备选/异常路径，不新增正式 UC 编号；详细清单与映射见 `docs/过程/测试/TST-DOC-02-AUTH-业务场景清单与测试闭环.md`。
 
-| 场景 | 名称 | 分类 | 服务编排 |
-| --- | --- | --- | --- |
-| S1 `UC-AUTH-01-R` | 注册、登录、退出与持续鉴权 | 独立场景 | AuthService + PasswordSecurityService + SessionTokenService + AuditLogService |
-| S2 `UC-AUTH-01-P` | 个人资料与密码安全 | 独立场景 | UserService + PasswordSecurityService + SessionTokenService + AuditLogService |
-| S3 `UC-AUTH-01-A` | 管理员用户、角色与权限管理 | 独立场景 | AccessControlService + UserService + RoleService + PermissionService + AuditLogService |
-| S4 `UC-AUTH-01-S` | 安全异常处理与关键操作审计 | 独立场景 | AccessControlService + SessionTokenService + AuditLogService |
+| 场景 | 名称 | 服务编排（当前实现） |
+| --- | --- | --- |
+| SC-AUTH-01 | 学生自助注册 | AuthService + PasswordSecurityService + AuthRepository |
+| SC-AUTH-02 | 账号密码登录 | AuthService + PasswordSecurityService + SessionTokenService + AuthAuditService + AuthRepository |
+| SC-AUTH-03 | 退出登录 | AuthService + SessionTokenService + AuthAuditService + AuthRepository |
+| SC-AUTH-04 | 持续鉴权与当前用户上下文 | AuthRequiredInterceptor + TokenCurrentUserProvider + SessionTokenService + AccessControlService + AuthRepository |
+| SC-AUTH-05 | 个人资料查看与修改 | UserProfileController + AuthService + AuthRepository |
+| SC-AUTH-06 | 修改密码 | UserProfileController + AuthService + PasswordSecurityService + SessionTokenService + AuthAuditService + AuthRepository |
+| SC-AUTH-07 | 管理员用户与账号状态管理 | AuthAdminController + RoleService + AuthService + SessionTokenService + AuthAuditService + AuthRepository |
+| SC-AUTH-08 | 用户角色分配 | AuthAdminController + RoleService + AuthAuditService + AuthRepository |
+| SC-AUTH-09 | 角色与角色权限维护 | AuthAdminController + RoleService + AuthAuditService + AuthRepository |
+| SC-AUTH-10 | 安全异常拦截 | AuthRequiredInterceptor + TokenCurrentUserProvider + SessionTokenService + AccessControlService + AuthAuditService |
+| SC-AUTH-11 | 关键操作审计写入与查询 | AuthAuditService + RoleService + AuthRepository |
 
 ### 14.2 详细层图组
 
-详细层对象/服务级顺序图与状态图/活动图已整合进《软件详细设计说明书》3.1 节“详细层业务场景图组”，图号如下：
-
-| 场景 | 服务级顺序图 | 状态图/活动图 |
-| --- | --- | --- |
-| S1 | 图 3-7 | 复用图 3-5 账号状态机、图 3-6 会话状态机 |
-| S2 | 图 3-8 | 图 3-9 修改密码活动图 |
-| S3 | 图 3-10 | 图 3-11 角色权限调整活动图 |
-| S4 | 图 3-12 | 图 3-13 鉴权与越权拦截活动图 |
+详细层对象/服务级顺序图与状态图/活动图已整合进《软件详细设计说明书》3.1 节“详细层业务场景图组”：SC-AUTH-01 ~ SC-AUTH-11 对应图 3-7 ~ 3-17，共享活动图对应图 3-18 ~ 3-20，账号/会话状态机复用图 3-5、图 3-6。图内对象按当前实现绘制，设计编号 `SVC-AUTH-*` 与实现类映射见该节说明。
 
 ### 14.3 三层图完整映射
 

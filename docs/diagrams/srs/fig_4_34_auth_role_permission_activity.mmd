@@ -1,9 +1,8 @@
 flowchart TD
-  Start[管理员进入用户/角色/权限管理] --> CheckAdmin{操作者是否为管理员}
+  Start[管理员提交用户角色或角色权限调整] --> CheckAdmin{操作者是否为管理员}
   CheckAdmin -->|否| Denied[返回无权限访问并记录越权]
   CheckAdmin -->|是| Choose[选择目标用户或角色]
-  Choose --> Select[选择角色列表或权限点列表]
-  Select --> Validate{目标用户/角色/权限是否存在且可用}
+  Choose --> Validate{目标用户/角色/权限是否存在且可用}
   Validate -->|否| NotFound[返回用户/角色/权限不存在]
   Validate -->|是| Update[更新用户角色或角色权限关系]
   Update --> Audit[记录调整人与调整结果审计日志]

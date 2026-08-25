@@ -1,0 +1,10 @@
+sequenceDiagram
+  actor User as 学生/教师/管理员
+  participant System as OnlineJudgeForSE 系统边界
+  User->>System: 未登录/令牌无效/过期/撤销访问受保护资源
+  System-->>User: 返回“登录已失效，请重新登录”
+  User->>System: 已登录但越权访问无权限资源
+  System-->>User: 返回“无权限访问”
+  User->>System: 账号被禁用/锁定后继续访问
+  System-->>User: 返回“账号状态异常，请联系管理员”
+  Note over System: 越权访问按需记录 ACCESS_DENIED 审计

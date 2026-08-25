@@ -658,27 +658,25 @@ stateDiagram-v2
 
 ### 14.1 业务场景清单与分类
 
-按 Issue #261 盘点，AUTH 模块确认四个独立业务场景，其余为 `include` 公共子流程或备选/异常路径，不新增正式 UC 编号：
+按 Issue #261 盘点，AUTH 模块确认 11 个独立业务场景（本地编号 `SC-AUTH-01` ~ `SC-AUTH-11`），其余为 `include` 公共子流程或备选/异常路径，不新增正式 UC 编号；详细清单与映射见 `docs/过程/测试/TST-DOC-02-AUTH-业务场景清单与测试闭环.md`。
 
-| 场景 | 名称 | 分类 | include 公共子流程 | 备选/异常路径 |
-| --- | --- | --- | --- | --- |
-| S1 `UC-AUTH-01-R` | 注册、登录、退出与持续鉴权 | 独立场景 | C1 账号密码校验；C2 会话签发与校验；C3 角色菜单加载；C4 审计写入 | E1 错误凭据；E2 禁用/冻结；E3 失败锁定；E4 令牌失效 |
-| S2 `UC-AUTH-01-P` | 个人资料与密码安全 | 独立场景 | C1；C4 | E6 输入校验失败；原密码错误；新旧密码相同 |
-| S3 `UC-AUTH-01-A` | 管理员用户、角色与权限管理 | 独立场景 | C4；C5 统一认证与权限拦截 | E5 越权访问；目标用户/角色/权限不存在 |
-| S4 `UC-AUTH-01-S` | 安全异常处理与关键操作审计 | 独立场景 | C4；C5 | E2、E3、E4、E5；E7 审计写入失败 |
+| 场景 | 名称 | include 公共子流程 | 备选/异常路径 |
+| --- | --- | --- | --- |
+| SC-AUTH-01 | 学生自助注册 | C1 账号与密码校验 | E1 账号已存在；E6 输入校验失败 |
+| SC-AUTH-02 | 账号密码登录 | C1；C2 会话签发与校验；C3 角色菜单加载；C4 审计写入 | E1 错误凭据；E2 禁用/冻结；E3 失败锁定 |
+| SC-AUTH-03 | 退出登录 | C2；C4 | E4 令牌失效 |
+| SC-AUTH-04 | 持续鉴权与当前用户上下文 | C2；C5 统一认证与权限拦截 | E4；E5 越权访问；E2 |
+| SC-AUTH-05 | 个人资料查看与修改 | C1（格式校验） | E6 |
+| SC-AUTH-06 | 修改密码 | C1；C2；C4 | E6；原密码错误；新旧密码相同 |
+| SC-AUTH-07 | 管理员用户与账号状态管理 | C2；C4；C5 | E5；目标用户不存在 |
+| SC-AUTH-08 | 用户角色分配 | C4；C5 | E5；用户/角色不可用 |
+| SC-AUTH-09 | 角色与角色权限维护 | C4；C5 | E5；角色/权限不可用 |
+| SC-AUTH-10 | 安全异常拦截 | C2；C4；C5 | E2、E3、E4、E5 |
+| SC-AUTH-11 | 关键操作审计写入与查询 | C4；C5 | E7 审计写入失败 |
 
 ### 14.2 概要层图组
 
-概要层组件级顺序图与状态图/活动图已整合进《软件概要设计说明书》5.1.2 节，图号如下：
-
-| 场景 | 组件级顺序图 | 状态图/活动图 |
-| --- | --- | --- |
-| S1 | 图 5-2 | 图 5-6 组件级账号状态机 |
-| S2 | 图 5-3 | 图 5-7 修改密码组件活动图 |
-| S3 | 图 5-4 | 图 5-8 角色权限调整组件活动图 |
-| S4 | 图 5-5 | 图 5-9 鉴权拦截组件活动图 |
-
-组件划分与本文档 1.2 节一致：`AuthService`、`UserService`、`RoleService`、`PermissionService`、`AccessControlService`、`SessionTokenService`、`PasswordSecurityService`、`AuditLogService`。
+概要层组件级顺序图与状态图/活动图已整合进《软件概要设计说明书》5.1.2 节：SC-AUTH-01 ~ SC-AUTH-11 对应图 5-2 ~ 5-12，共享状态/活动图对应图 5-13 ~ 5-17。组件名称对齐当前实现：`AuthController`、`UserProfileController`、`AuthAdminController`、`AuthService`、`RoleService`、`PasswordSecurityService`、`SessionTokenService`、`AuthAuditService`、`AccessControlService`、`AuthRequiredInterceptor`、`TokenCurrentUserProvider`、`AuthRepository`。
 
 ### 14.3 三层图完整映射
 
