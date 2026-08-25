@@ -5,7 +5,7 @@
 | 文档名称 | GRD 成绩评价与教学分析测试文档 |
 | 项目名称 | 在线教学与实训平台 |
 | 所属阶段 | 系统测试与验收测试 |
-| 报告版本 | V1.3 |
+| 报告版本 | V1.4 |
 | 编写日期 | 2026-08-25 |
 | 编写人 | GRD 模块负责人 |
 | 对应 issue | #158、#266 D2-GRD 业务场景文档与测试闭环 |
@@ -22,6 +22,7 @@
 | V1.1 | 2026-08-25 | GRD 模块负责人 | 按 #266 补齐来源超时/删除回归、真实 LAB/HWK → GRD → LRN 共享 E2E、权限与幂等边界，并回填当前基线证据 |
 | V1.2 | 2026-08-25 | GRD 模块负责人 | 按 PR #270 评审意见对齐成绩项/异议响应真实契约，并将变异型 E2E 收口到自动清理的 disposable H2 包装入口 |
 | V1.3 | 2026-08-25 | GRD 模块负责人 | 按 PR #270 二轮评审明确 OTHER_COURSE_ITEM 可空编号、同步/发布失败边界和复核调整的真实仓储依赖 |
+| V1.4 | 2026-08-25 | GRD 模块负责人 | 按 PR #270 三轮评审区分非课程成员 403 与课程成员成绩未发布 400 的异常契约 |
 
 ### 1.2 审批记录
 
@@ -137,7 +138,7 @@
 | TC-GR-02 | FR-GR-02 | UI-GRD-02；API-GRD-06 ~ 09；DB-GRD-02、03、05 | 课程内有学生名单；LAB/HWK 来源成绩含已评分、缺失、未提交、未评分状态 | 教师同步来源成绩并查询成绩总表和学生明细 | 生成成绩记录、计算加权分和总评，缺失状态可见 | `teacherSyncsLabAndHomeworkSourceGradesThenCalculatesFinalScores`、`TeacherGradeTableView.spec.ts` 同步用例通过 | 通过 |
 | TC-GR-03 | FR-GR-03 | UI-GRD-02、03、04、08；API-GRD-08 ~ 14；DB-GRD-02、03、07 | 已有成绩记录和课程总评；教师填写调整原因 | 查询总表、进入学生明细、调整单项成绩和总评、查询变更记录 | 分数更新，已发布成绩不回退未发布，变更记录保存旧值、新值、原因和操作人 | `teacherAdjustsGradeRecordWithReasonAndQueriesChangeLogsThroughApi`、`teacherAdjustsCourseFinalScoreWithReasonAndKeepsChangeLog`、前端明细调整用例通过 | 通过 |
 | TC-GR-04 | FR-GR-04 | UI-GRD-05；API-GRD-12 ~ 14；DB-GRD-02、03、04、07 | 成绩已计算且可发布；存在选中学生范围 | 教师发布成绩，重复执行同一范围发布，查询发布记录 | 发布后学生可见，记录发布批次，重复发布幂等，不重复通知 | `teacherPublishesSelectedGradesAndEmitsGradePublishedEvent`、`repeatedPublishUsesRangeIdempotencyKeyAndDoesNotNotifyAgain`、前端发布记录用例通过 | 通过 |
-| TC-GR-05 | FR-GR-05 | UI-GRD-06；API-GRD-15；DB-GRD-02、03 | 学生为课程成员；存在已发布和未发布成绩 | 学生查询我的课程成绩 | 只返回本人已发布成绩；未发布成绩不泄露分数字段 | `teacherPublishesSelectedStudentGradesThenStudentCanQueryPublishedResultThroughApi`、`StudentGradeView.spec.ts` 通过 | 通过 |
+| TC-GR-05 | FR-GR-05 | UI-GRD-06；API-GRD-15；DB-GRD-02、03 | 准备非课程成员、课程成员未发布成绩和本人已发布成绩 | 学生查询我的课程成绩 | 非成员返回 ERR-GRD-02/403；课程成员未发布返回 ERR-GRD-04/400 且不泄露分数字段；已发布只返回本人数据 | `nonMemberStudentCannotQueryPublishedCourseGradesThroughApi`、真实 E2E 未发布断言、`StudentGradeView.spec.ts` 通过 | 通过 |
 | TC-GR-06 | FR-GR-06 | UI-GRD-07；API-GRD-16、17；DB-GRD-08、02、03 | 成绩记录包含多分数段、缺失、未评分、未提交样本 | 教师查询课程总评分析和成绩项完成情况 | 返回均分、最高分、最低分、及格率、完成率、分布和来源时间点 | `GradeAnalysisServiceTest`、`teacherQueriesCourseGradeAnalysisThroughApi`、`teacherQueriesGradeItemCompletionThroughApi`、前端分析用例通过 | 通过 |
 | TC-GR-07 | FR-GR-07 | UI-GRD-09、10；API-GRD-18 ~ 21；DB-GRD-06、07 | 学生已有已发布成绩；教师具备课程权限 | 学生提交异议，教师筛选并处理，同意修改或驳回 | 申请状态流转，重复 PENDING 申请被拒绝，同意修改写入变更记录并通知学生 | `GradeReviewServiceTest`、`studentSubmitsGradeReviewAndTeacherProcessesItThroughApi`、前端复核处理用例通过 | 通过 |
 | TC-GR-08 | NFR-GR-01 | API-GRD-06、07、12；DB-GRD-02 ~ 05 | 模拟来源刷新、发布、重复发布和大班发布范围 | 同步、重算、发布、重复发布 | 数据事务边界稳定，发布幂等，发布范围摘要有长度边界 | `syncSourceGradesDeclaresTransactionalBoundaryForSyncAndRecalculation`、发布幂等和大班发布用例通过 | 通过 |
@@ -214,6 +215,7 @@
 | GRD-266-LOG-008 | `git diff --check` | 通过 |
 | GRD-266-LOG-009 | disposable 失败清理自测：错误教师密码 + 端口 18081 | Playwright 按预期非零退出；包装脚本停止后端，端口无监听，临时 H2 目录无残留 |
 | GRD-266-LOG-010 | PR #270 二轮契约回归 | 先扩展契约断言并确认 4 passed / 1 failed；修正 OTHER_COURSE_ITEM、同步失败和复核仓储依赖后 5 passed / 0 failed |
+| GRD-266-LOG-011 | PR #270 三轮异常映射回归 | 先扩展契约断言并确认 4 passed / 1 failed；区分非成员 ERR-GRD-02/403 与成员未发布 ERR-GRD-04/400 后 5 passed / 0 failed |
 
 ## 9 手工测试与联调确认
 
