@@ -449,9 +449,14 @@ GRD 从 LAB/HWK 读取或接收来源成绩时，只依赖以下字段，不依�
 | minScore | BigDecimal | 最低分 |
 | passRate | BigDecimal | 及格率 |
 | completionRate | BigDecimal | 完成率 |
+| totalStudentCount | Integer | 当前有效学生总数；历史快照可为空 |
+| completedCount | Integer | 已完成且有分数人数；历史快照可为空 |
+| missingCount | Integer | 缺失人数；历史快照可为空 |
+| unsubmittedCount | Integer | 未提交人数；历史快照可为空 |
+| ungradedCount | Integer | 已提交未评分人数；历史快照可为空 |
 | distributionJson | Text | 预设分数区间分布 JSON |
 | sourceDataTime | LocalDateTime | 统计对应的成绩数据时间点 |
-| sourceFingerprint | String | 当前有效学生集合和目标成绩数据的 SHA-256 来源版本指纹 |
+| sourceFingerprint | String | `GRD_ANALYSIS_V2:<SHA-256>`，覆盖统计契约、有效学生集合和 Repository 来源版本 |
 | calculatedAt | LocalDateTime | 统计计算时间 |
 
 ### 6.9 成绩发布状态机
@@ -644,10 +649,28 @@ CREATE INDEX idx_grade_review_student_status ON t_grade_review_request(course_id
 | min_score | decimal(6,2) | NULL | 最低分 |
 | pass_rate | decimal(6,4) | NULL | 及格率 |
 | completion_rate | decimal(6,4) | NULL | 完成率 |
+| total_student_count | int | NULL | 当前有效学生总数；历史快照可为空 |
+| completed_count | int | NULL | 已完成且有分数人数；历史快照可为空 |
+| missing_count | int | NULL | 缺失人数；历史快照可为空 |
+| unsubmitted_count | int | NULL | 未提交人数；历史快照可为空 |
+| ungraded_count | int | NULL | 已提交未评分人数；历史快照可为空 |
 | distribution_json | text | NULL | 分数区间分布 JSON |
 | source_data_time | datetime | NOT NULL | 统计对应成绩数据时间点 |
-| source_fingerprint | varchar(64) | NULL | 来源版本 SHA-256；历史快照兼容为空，新增快照必须写入 |
+| source_fingerprint | varchar(96) | NULL | `GRD_ANALYSIS_V2:<SHA-256>`；历史快照兼容为空，新增快照必须写入 |
 | calculated_at | datetime | NOT NULL | 统计计算时间 |
+
+### 7.9 t_grade_analysis_source_version 统计来源版本表
+
+| 字段名 | 类型 | 约束 | 说明 |
+| --- | --- | --- | --- |
+| course_id | bigint | PK | 所属课程编号 |
+| target_type | varchar(30) | PK | COURSE_TOTAL、GRADE_ITEM |
+| grade_item_key | bigint | PK | COURSE_TOTAL 固定为 0，GRADE_ITEM 使用成绩项编号 |
+| source_version | bigint | NOT NULL | 成绩或总评每次成功写入后单调递增 |
+| source_data_time | datetime | NULL | 最近一次来源写入的数据时间 |
+| updated_at | datetime | NOT NULL | 版本行更新时间 |
+
+统计查询先比较有效学生集合和此轻量来源版本；只有指纹不一致时才读取并聚合完整成绩记录。成绩记录与课程总评的运行期写入必须经过 Repository，并在同一事务内递增对应来源版本。
 
 ---
 
