@@ -8,9 +8,19 @@ LAB 模块的设计边界如下：
 
 - **包含**：实验创建与发布、学生查看与提交实验、提交历史与版本管理、实验自动评测、教师评分与评语、实验结果展示、实验统计查询、测试用例管理。
 - **不包含**：用户注册登录与权限管理（AUTH）、课程与成员关系维护（CRS）、学习进度记录（LRN）、作业评测业务（HWK）、最终总评计算与成绩发布（GRD）。LAB 仅通过接口调用上述模块获取基础数据。
-- **评测方案**：首版采用 IO 比对评测方案（标准输入输出匹配），不引入 Docker 沙箱执行环境。评测能力是否与 HWK 共享，需与 HWK 负责人进一步确认（见第 12 节待确认事项）。
+- **评测方案**：采用 Docker 沙箱执行与 IO 比对。LAB 与 HWK 复用 `EvaluationTask`、`Evaluator`、`SandboxExecutor` 和 `EvaluationResult` 抽象，各自保留提交、评分和来源成绩边界；Docker 在执行后必须清理容器和临时文件。
 
 ---
+
+## 0.1 Issue #265 实现基线（覆盖旧草案表述）
+
+本节用于消除本文早期草案与最终设计、现有实现之间的冲突。若与本文第 7、8、12、13 节旧描述不一致，以本节和《软件详细设计说明书》3.4 节为准。
+
+- **正式用例边界**：仅保留 `UC-LAB-01 教师创建并发布实验` 与 `UC-LAB-02 学生提交实验并查看评测结果`；报告、教师评分/反馈、统计、成绩发布及 `API-LAB-19` 受控下载均为 UC-LAB-02 扩展流程，不新增或改号正式 UC。
+- **状态边界**：实验持久化状态为 `DRAFT/PUBLISHED/CLOSED/SCORE_PUBLISHED/ARCHIVED`；`NOT_OPEN/OPEN` 仅是页面推导标签。提交记录状态为 `SUBMITTED/SCORED`，评测状态为 `NONE/PENDING/RUNNING/ACCEPTED/WRONG_ANSWER/COMPILE_ERROR/RUNTIME_ERROR/TIME_LIMIT_EXCEEDED/SYSTEM_ERROR`，不再使用 `EVALUATING/EVALUATED/EVAL_FAILED`。
+- **服务边界**：`LabExperimentService` 管理创建、发布、截止和成绩发布；`LabSubmissionService` 管理提交、可信源文件资产与受控下载；`LabEvaluationService` 调用共享 Docker 沙箱；`LabReportService` 管理报告；`LabScoreService` 管理评分和变更日志；`LabStatisticsService` 聚合统计；`LabSourceGradeService` 只向 GRD 提供 `SourceGradeDTO`。
+- **跨模块事件**：发布实验发送 `LAB_EXPERIMENT_PUBLISHED`；提交评分发送 `LAB_SUBMISSION_SCORED`；发布成绩发送 `EXPERIMENT_SCORE_PUBLISHED`。LAB 只通过 `NotificationEventPublisher` 交给 LRN，LRN 负责通知落库；GRD 只消费已发布成绩的来源 DTO，不读取 LAB 内部表。
+- **真实环境前提**：Docker 评测验收先拉取 `python:3.12-alpine`（或 `ONLINEJUDGE_EVALUATION_DOCKER_PYTHON_IMAGE`），否则首次拉取占用固定编译阶段时限会造成伪 `TIME_LIMIT_EXCEEDED`。该预热是测试/部署前置条件，不改变生产评测契约。
 
 ## 1 模块基本信息
 
@@ -35,7 +45,7 @@ LAB 模块是"在线教学与实训平台"的核心实践环节模块，承担�
 
 1. **实验管理**：教师可在课程内创建实验任务，编辑实验描述、要求、截止时间，上传实验附件（如参考代码、数据文件），管理实验状态（草稿、已发布、进行中、已截止、已归档）。
 2. **学生提交**：学生在实验详情页查看实验要求，编写代码或上传文件，提交实验结果。支持多次提交，保留提交历史，学生可查看每次提交的评测结果。
-3. **自动评测**：教师可为实验配置测试用例（标准输入、期望输出），学生提交后系统自动执行 IO 比对评测，判定通过或失败，给出测试用例级别的反馈。
+3. **自动评测**：教师可为实验配置测试用例（标准输入、期望输出），学生提交后系统通过 Docker 沙箱执行编译、运行和 IO 比对，判定通过或失败，给出测试用例级别的反馈。
 4. **教师评分**：教师可在自动评测基础上进行人工评分和评语填写，支持调整分数和撰写个性化反馈。
 5. **结果展示**：学生可查看实验的最终成绩（综合自动评测结果与教师评分）、教师评语、提交历史和每次评测的详细反馈。
 6. **统计查询**：教师可查看实验维度的提交率、平均分、分数分布等统计数据。
@@ -55,7 +65,7 @@ LAB 模块是"在线教学与实训平台"的核心实践环节模块，承担�
 - LAB 不负责成绩汇总与总评计算，评测与评分完成后由 GRD 读取或主动推送成绩数据。
 - LAB 不负责作业相关业务，作业的提交、评测、批阅由 HWK 模块独立管理。
 - LAB 提交源文件与实验报告、CRS 教学资源、HWK #214 FILE 作业附件保持独立业务所有权；仅复用底层 `FileStorageService`，不得复用其他模块的记录或下载权限。
-- LAB 的自动评测首版仅支持 IO 比对（标准输入输出匹配），不支持代码沙箱编译运行（如需 Docker 沙箱方案，属于后续扩展）。
+- LAB 自动评测通过共享 `Evaluator` 抽象接入 Docker 沙箱，执行编译、运行、IO 比对及时间/内存限制；评测容器和临时文件在每轮结束后清理。
 
 ---
 
@@ -186,8 +196,8 @@ LAB 模块是"在线教学与实训平台"的核心实践环节模块，承担�
   2. 校验学生为课程成员。
   3. 保存提交记录，提交状态置为"已提交"（SUBMITTED）；文件型提交还要保存物理对象，并按该提交版本写入 DB-LAB-09 的可信元数据。
   4. 物理对象保存成功但数据库事务回滚时，调用物理对象补偿删除；仅在该删除成功时可认定没有留下孤儿文件，partial copy 或删除自身失败仍按运维残余处理。
-  5. 若实验配置了 autoEvaluate = true，自动触发评测（提交状态转为"评测中" EVALUATING）。
-  6. 若自动评测失败（如 IO 比对执行异常），状态转为"评测失败"（EVAL_FAILED），允许教师手动触发重新评测或直接评分。
+  5. 若实验配置了 autoEvaluate = true，自动触发评测；提交记录保持 SUBMITTED，评测状态按 PENDING -> RUNNING 流转。
+  6. 若自动评测失败，按实际结果写入 COMPILE_ERROR、RUNTIME_ERROR、TIME_LIMIT_EXCEEDED 或 SYSTEM_ERROR，保留提交记录并允许教师重新评测或直接评分。
 
 - **成功响应**：
 
@@ -199,7 +209,8 @@ LAB 模块是"在线教学与实训平台"的核心实践环节模块，承担�
     "submissionId": 1,
     "labId": 1,
     "studentId": 100,
-    "status": "EVALUATING",
+    "status": "SUBMITTED",
+    "evaluationStatus": "PENDING",
     "submittedAt": "2026-05-17T14:30:00"
   }
 }
@@ -335,7 +346,7 @@ LabExperimentController
 
 **SVC-LAB-03 LabEvaluationService（自动评测服务）**
 
-评测服务是 LAB 模块的核心组件，首版采用 IO 比对评测方案，流程如下：
+评测服务是 LAB 模块的核心组件，通过共享 `Evaluator` 抽象和 Docker 沙箱执行编译、运行及 IO 比对，流程如下：
 
 1. 接收提交 ID，查询提交记录和对应的实验信息。
 2. 从 `lab_testcase` 表获取该实验的所有测试用例（区分公开和隐藏）。
@@ -345,10 +356,10 @@ LabExperimentController
    - 捕获程序标准输出，与 `expectedOutput` 进行比对。
    - 记录每个测试用例的通过/失败状态和实际输出。
 4. 汇总评测结果，计算自动评测分数（通过的测试用例权重之和）。
-5. 更新提交状态为"评测完成"（EVALUATED），写入评测结果。
-6. 若执行过程中发生异常（编译错误、运行超时、内存超限），标记该测试用例为"异常"并记录错误信息。
+5. 写入评测终态（ACCEPTED、WRONG_ANSWER 或异常终态）和评测结果。
+6. 若执行过程中发生异常（编译错误、运行超时、内存超限或沙箱异常），按实际结果记录终态并保存错误信息。
 
-> **扩展说明**：首版评测执行采用进程级执行方式（Runtime.exec），设置超时时间（默认 10 秒）和内存限制。后续若需引入 Docker 沙箱隔离执行环境，仅需替换 `LabEvaluationService` 内部的执行器实现，不影响上层接口和业务流程。
+> **实现约束**：默认使用 Docker 沙箱，超时上限为 60 秒，内存限制由本地评测配置传入；`LabEvaluationService` 只编排任务和结果，不直接承担容器生命周期。
 
 **SVC-LAB-02 LabSubmissionService（提交源文件资产职责）**
 
@@ -358,7 +369,7 @@ LabExperimentController
 
 评分服务负责教师人工评分和成绩同步：
 
-1. 校验提交记录状态（建议允许在"评测完成"和"评测失败"状态下评分）。
+1. 校验提交记录评测状态（允许在评测终态或无自动评测结果时评分）。
 2. 校验分数范围（0 ~ 实验满分）。
 3. 写入评分记录（包含教师 ID、分数、评语、评分时间）。
 4. 更新提交记录的最终成绩字段。
@@ -473,10 +484,10 @@ LabExperimentController
 | 枚举值 | 中文说明 | 说明 |
 | --- | --- | --- |
 | SUBMITTED | 已提交 | 刚提交，等待评测 |
-| EVALUATING | 评测中 | 正在执行自动评测 |
-| EVALUATED | 评测完成 | 自动评测完成，等待教师评分 |
-| EVAL_FAILED | 评测失败 | 自动评测异常，允许手动触发或直接评分 |
-| SCORED | 已评分 | 教师已完成评分 |
+| SUBMITTED | 已提交 | 提交记录已保存，等待评测任务 |
+| SCORED | 已评分 | 教师已完成评分；评测结果由 evaluationStatus 表示 |
+
+**评测状态枚举**：`NONE / PENDING / RUNNING / ACCEPTED / WRONG_ANSWER / COMPILE_ERROR / RUNTIME_ERROR / TIME_LIMIT_EXCEEDED / SYSTEM_ERROR`。
 
 #### DB-LAB-04 lab_evaluation（评测结果表）
 
@@ -608,11 +619,12 @@ sequenceDiagram
   end
   alt 实验配置 autoEvaluate = true
     S->>E: 异步触发自动评测
-    S->>D: 更新提交状态为 EVALUATING
+    S->>D: 写入 evaluationStatus=PENDING
+    E->>D: 获取任务后更新 evaluationStatus=RUNNING
     E->>D: 查询测试用例列表
     D-->>E: 返回测试用例
     loop 逐个测试用例
-      E->>E: 执行代码，IO 比对
+      E->>E: 启动 Docker 沙箱，编译、执行并 IO 比对
       E->>D: 写入 lab_evaluation 评测结果
     end
     E->>D: 更新提交状态和 auto_score
@@ -632,8 +644,9 @@ sequenceDiagram
 flowchart TD
   A[收到评测请求<br/>submissionId] --> B[查询提交记录和实验信息]
   B --> C[查询该实验的全部测试用例]
-  C --> D[更新提交状态为 EVALUATING]
-  D --> E[按 order_num 顺序遍历测试用例]
+  C --> D[更新 evaluationStatus=PENDING]
+  D --> E0[Worker 获取任务并更新 evaluationStatus=RUNNING]
+  E0 --> E[按 order_num 顺序遍历测试用例]
   E --> F[获取学生代码和测试用例输入]
   F --> G[根据 language 选择执行器]
   G --> H{编译/执行是否成功?}
@@ -648,8 +661,8 @@ flowchart TD
   N -- 是 --> E
   N -- 否 --> O[汇总评测结果<br/>计算 auto_score]
   O --> P{是否有评测异常?}
-  P -- 全部正常 --> Q[更新提交状态为 EVALUATED<br/>写入 auto_score]
-  P -- 存在异常 --> R[更新提交状态为 EVAL_FAILED<br/>写入 auto_score（仅计算通过部分）]
+  P -- 全部正常 --> Q[更新 evaluationStatus=ACCEPTED<br/>写入 auto_score]
+  P -- 存在异常 --> R[更新评测终态<br/>COMPILE_ERROR/RUNTIME_ERROR/TIME_LIMIT_EXCEEDED/SYSTEM_ERROR]
   Q --> S[结束]
   R --> S
 ```
@@ -712,13 +725,21 @@ sequenceDiagram
 ```mermaid
 stateDiagram-v2
     [*] --> SUBMITTED: 学生提交实验
-    SUBMITTED --> EVALUATING: 系统触发自动评测<br/>（autoEvaluate = true）
-    SUBMITTED --> SCORED: 教师直接评分<br/>（跳过自动评测）
-    EVALUATING --> EVALUATED: 自动评测全部完成
-    EVALUATING --> EVAL_FAILED: 评测过程发生异常
-    EVALUATED --> SCORED: 教师完成评分
-    EVAL_FAILED --> EVALUATING: 教师/系统重新触发评测
-    EVAL_FAILED --> SCORED: 教师直接评分<br/>（不依赖评测结果）
+    SUBMITTED --> PENDING: 系统创建评测任务
+    PENDING --> RUNNING: Worker 获取任务
+    SUBMITTED --> SCORED: 教师直接评分
+    RUNNING --> ACCEPTED: 全部用例通过
+    RUNNING --> WRONG_ANSWER: 输出不匹配
+    RUNNING --> COMPILE_ERROR: 编译失败
+    RUNNING --> RUNTIME_ERROR: 运行异常或资源限制
+    RUNNING --> TIME_LIMIT_EXCEEDED: 超过时间限制
+    RUNNING --> SYSTEM_ERROR: 沙箱或系统异常
+    ACCEPTED --> SCORED: 教师完成评分
+    WRONG_ANSWER --> SCORED: 教师完成评分
+    COMPILE_ERROR --> SCORED: 教师直接评分或重评
+    RUNTIME_ERROR --> SCORED: 教师直接评分或重评
+    TIME_LIMIT_EXCEEDED --> SCORED: 教师直接评分或重评
+    SYSTEM_ERROR --> PENDING: 教师/系统重新评测
     SCORED --> [*]
 ```
 
@@ -727,13 +748,12 @@ stateDiagram-v2
 | 当前状态 | 目标状态 | 触发条件 | 操作 |
 | --- | --- | --- | --- |
 | - | SUBMITTED | 学生调用提交接口 | 写入提交记录 |
-| SUBMITTED | EVALUATING | autoEvaluate = true | 异步调用评测服务 |
+| SUBMITTED | PENDING | autoEvaluate = true | 异步创建评测任务 |
+| PENDING | RUNNING | Worker 获取任务 | 启动 Docker 沙箱 |
 | SUBMITTED | SCORED | 教师直接评分 | 写入评分记录 |
-| EVALUATING | EVALUATED | 评测全部完成 | 写入评测结果和 auto_score |
-| EVALUATING | EVAL_FAILED | 评测异常 | 记录异常信息 |
-| EVALUATED | SCORED | 教师评分 | 写入评分记录 |
-| EVAL_FAILED | EVALUATING | 手动重新评测 | 重置评测状态，重新执行 |
-| EVAL_FAILED | SCORED | 教师直接评分 | 写入评分记录（基于教师判断） |
+| RUNNING | ACCEPTED / WRONG_ANSWER / COMPILE_ERROR / RUNTIME_ERROR / TIME_LIMIT_EXCEEDED / SYSTEM_ERROR | 评测结束 | 写入评测结果和 auto_score |
+| 评测终态 | SCORED | 教师评分 | 写入评分记录 |
+| SYSTEM_ERROR | PENDING | 手动重新评测 | 重置评测状态，重新执行 |
 
 ### 7.6 实验状态机
 
@@ -771,10 +791,10 @@ stateDiagram-v2
 | LAB-409-01 | 状态异常 | 实验已截止，不允许提交 | 返回状态错误码和提示 | UI-LAB-02 |
 | LAB-409-02 | 状态异常 | 实验已归档，不允许修改 | 返回状态错误码和提示 | UI-LAB-04 |
 | LAB-409-03 | 状态异常 | 旧记录缺可信元数据、源文件资产已删除/非 AVAILABLE 或内部元数据无效 | 返回兼容阻塞提示，不解析旧 file_id、不回退其他版本 | UI-LAB-06 |
-| LAB-500-01 | 评测异常 | 自动评测执行超时 | 提交状态置为 EVAL_FAILED，记录错误日志 | UI-LAB-02 |
-| LAB-500-02 | 评测异常 | 编译错误 | 提交状态置为 EVAL_FAILED，记录编译错误信息 | UI-LAB-02 |
-| LAB-500-03 | 评测异常 | 运行时内存超限 | 提交状态置为 EVAL_FAILED，记录错误信息 | UI-LAB-02 |
-| LAB-500-04 | 系统异常 | 评测服务内部错误 | 记录错误日志，提交状态置为 EVAL_FAILED | 后端 |
+| LAB-500-01 | 评测异常 | 自动评测执行超时 | 评测状态置为 TIME_LIMIT_EXCEEDED，记录错误日志 | UI-LAB-02 |
+| LAB-500-02 | 评测异常 | 编译错误 | 评测状态置为 COMPILE_ERROR，记录编译错误信息 | UI-LAB-02 |
+| LAB-500-03 | 评测异常 | 运行时内存超限 | 评测状态置为 RUNTIME_ERROR，记录错误信息 | UI-LAB-02 |
+| LAB-500-04 | 系统异常 | 评测服务内部错误 | 记录错误日志，评测状态置为 SYSTEM_ERROR | 后端 |
 | LAB-500-05 | 存储异常 | 可信资产存在但物理对象缺失、读取失败、完整性异常或存储服务失败 | 返回通用失败提示，内部诊断不得暴露 storage_key 或路径 | UI-LAB-06 |
 
 ### 8.2 异常处理流程
@@ -782,8 +802,8 @@ stateDiagram-v2
 | 异常场景 | 处理流程 | 用户提示 |
 | --- | --- | --- |
 | 学生在截止后提交 | 后端校验实验状态和截止时间，拒绝提交 | "该实验已截止，无法提交" |
-| 提交代码编译失败 | 评测服务捕获编译错误，记录到评测结果表，提交状态为 EVAL_FAILED | "代码编译失败，请检查后重新提交" |
-| 评测执行超时 | 评测服务设置超时限制（默认 10s），超时后终止进程，状态置为 EVAL_FAILED | "评测超时，可能存在死循环，请优化代码" |
+| 提交代码编译失败 | Docker 沙箱捕获编译错误，记录到评测结果表，评测状态为 COMPILE_ERROR | "代码编译失败，请检查后重新提交" |
+| 评测执行超时 | Docker 沙箱设置超时限制（默认 60s），超时后终止容器，状态置为 TIME_LIMIT_EXCEEDED | "评测超时，可能存在死循环，请优化代码" |
 | 教师修改已评分成绩 | 允许教师修改评分（更新 lab_score），记录更新时间和变更日志 | 评分更新成功 |
 | 并发评测同一提交 | 通过提交状态机保证状态单向转换，使用乐观锁或数据库行锁防止重复评测 | 无需用户感知 |
 | 学生或其他课程教师请求源文件 | 在读取资产前执行 AUTH 与 CRS `canManageCourse` 校验并拒绝 | "无权限下载该提交源文件" |
@@ -840,7 +860,7 @@ stateDiagram-v2
 | 实验列表查询 | 分页查询 + course_id + status 索引 | 避免全表扫描，每页默认 20 条 |
 | 提交列表查询 | 分页查询 + lab_id + student_id 索引 | 教师查看全班提交和学生查看本人提交分别走不同索引 |
 | 自动评测 | 异步执行，不阻塞用户请求 | 评测服务异步调用，前端通过轮询或状态查询获取评测结果 |
-| 评测超时控制 | 进程级超时（默认 10 秒） | 防止死循环或恶意代码占用资源 |
+| 评测超时控制 | Docker 沙箱超时（默认 60 秒）和内存限制 | 防止死循环或恶意代码占用资源 |
 | 提交内容存储 | 在线代码使用数据库 TEXT；文件型提交使用 FileStorageService + DB-LAB-09 | 不把内部存储键公开，不从旧 file_id 反推元数据 |
 | 统计查询 | 使用 SQL 聚合 + 缓存 | 统计数据不要求实时性，可接受分钟级延迟 |
 
@@ -888,21 +908,21 @@ stateDiagram-v2
 | TC-LAB-02 | 教师创建实验（名称为空） | 单元测试 | P0 | 返回 LAB-400-01 错误码 |
 | TC-LAB-03 | 教师发布实验 | 单元测试 | P0 | 状态变为 PUBLISHED，触发 LRN 通知 |
 | TC-LAB-04 | 非课程教师创建实验 | 权限测试 | P0 | 返回 403 权限不足 |
-| TC-LAB-05 | 学生提交实验（正常） | 单元测试 | P0 | 创建提交记录，状态 EVALUATING |
+| TC-LAB-05 | 学生提交实验（正常） | 单元测试 | P0 | 创建提交记录，status=SUBMITTED，evaluationStatus=PENDING |
 | TC-LAB-06 | 学生在截止后提交 | 状态测试 | P0 | 返回 LAB-409-01 错误码 |
 | TC-LAB-07 | 非课程成员提交实验 | 权限测试 | P0 | 返回 403 权限不足 |
 | TC-LAB-08 | 自动评测 IO 比对通过 | 单元测试 | P0 | 所有测试用例 PASSED，auto_score 正确 |
 | TC-LAB-09 | 自动评测 IO 比对失败 | 单元测试 | P0 | 部分用例 FAILED，auto_score 按通过权重计算 |
-| TC-LAB-10 | 评测超时处理 | 异常测试 | P1 | 状态 EVAL_FAILED，记录超时错误信息 |
-| TC-LAB-11 | 评测编译错误 | 异常测试 | P1 | 状态 EVAL_FAILED，记录编译错误信息 |
+| TC-LAB-10 | 评测超时处理 | 异常测试 | P1 | evaluationStatus=TIME_LIMIT_EXCEEDED，记录超时错误信息 |
+| TC-LAB-11 | 评测编译错误 | 异常测试 | P1 | evaluationStatus=COMPILE_ERROR，记录编译错误信息 |
 | TC-LAB-12 | 教师评分（正常） | 单元测试 | P0 | 写入评分记录，状态 SCORED，触发通知 |
 | TC-LAB-13 | 教师评分超出范围 | 参数测试 | P0 | 返回 LAB-400-05 错误码 |
 | TC-LAB-14 | 教师修改已评分成绩 | 单元测试 | P1 | 更新评分记录，记录变更日志 |
 | TC-LAB-15 | 学生查看本人提交 | 权限测试 | P0 | 返回本人提交详情 |
 | TC-LAB-16 | 学生查看他人提交 | 权限测试 | P0 | 返回 403 权限不足 |
 | TC-LAB-17 | 实验统计查询 | 单元测试 | P1 | 返回提交率、平均分、分数分布 |
-| TC-LAB-18 | 评测失败后教师重新评测 | 单元测试 | P1 | 状态从 EVAL_FAILED 变为 EVALUATED |
-| TC-LAB-19 | 评测失败后教师直接评分 | 单元测试 | P1 | 状态从 EVAL_FAILED 变为 SCORED |
+| TC-LAB-18 | 系统异常后教师重新评测 | 单元测试 | P1 | evaluationStatus 从 SYSTEM_ERROR 变为 PENDING |
+| TC-LAB-19 | 评测异常后教师直接评分 | 单元测试 | P1 | submission.status 变为 SCORED，保留评测终态 |
 | TC-LAB-20 | 学生多次提交版本递增 | 单元测试 | P1 | version 字段递增，历史记录保留 |
 | TC-LAB-34 | 源文件可信元数据与安全详情 DTO | 迁移/接口测试 | P0 | DB-LAB-09 与提交版本一对一；详情只返回顶层 `hasFile` 和四字段 nullable `sourceFile`，不泄漏内部标识或 URL |
 | TC-LAB-35 | 课程管理教师下载指定提交版本源文件 | 接口/文件测试 | P0 | 内容、Unicode 文件名、MIME、长度均与该版本一致 |
@@ -933,12 +953,12 @@ stateDiagram-v2
 
 ## 13 模块提交结论
 
-本提交稿覆盖 LAB 实训实验模块 8 个既有页面、API-LAB-01 ~ API-LAB-19、DB-LAB-01 ~ DB-LAB-09 及既有状态机，并为 #222 新增 TC-LAB-34 ~ TC-LAB-41 与 MAN-LAB-011。#222 新增用例已纳入后端定向 41/41、完整后端 302 tests（其中 1 个 Docker-only skip）、完整前端 521 tests 及真实浏览器验收证据。设计要点总结如下：
+本提交稿覆盖 LAB 实训实验模块 8 个既有页面、API-LAB-01 ~ API-LAB-19、DB-LAB-01 ~ DB-LAB-09 及既有状态机，并为 #222 新增 TC-LAB-34 ~ TC-LAB-41 与 MAN-LAB-011。#265 将 Docker 真机矩阵、共享 Playwright 闭环和过程/最终设计追踪纳入验收。设计要点总结如下：
 
-1. **评测方案**：首版采用 IO 比对评测，通过 `Evaluator` 接口抽象，后续可扩展 Docker 沙箱方案。
-2. **状态管理**：提交状态机（SUBMITTED → EVALUATING → EVALUATED/EVAL_FAILED → SCORED）和实验状态机（DRAFT → PUBLISHED → CLOSED → ARCHIVED）清晰定义。
-3. **跨模块协作**：依赖 AUTH（鉴权）、CRS（课程校验）、LRN（通知），向 GRD（成绩来源）和 LRN（通知触发）提供数据。
+1. **评测方案**：Docker 沙箱通过共享 `Evaluator` 抽象执行编译、运行、IO 比对与资源限制；真实矩阵覆盖 AC、编译错误、运行错误、超时、内存限制和容器清理。
+2. **状态管理**：提交写入 `SUBMITTED`，评测状态使用 `PENDING/RUNNING` 与明确终态；实验状态为 `DRAFT → PUBLISHED → CLOSED → SCORE_PUBLISHED → ARCHIVED`。
+3. **跨模块协作**：依赖 AUTH（鉴权）、CRS（课程校验），通过 `NotificationEventPublisher` 向 LRN 发送事件；`LabSourceGradeService` 仅向 GRD 提供已发布成绩的来源 DTO。
 4. **性能考量**：评测异步执行不阻塞提交请求，数据库按高频查询字段建立索引。
 5. **安全设计**：数据权限按角色和课程范围隔离；源文件下载额外要求当前课程 `canManageCourse`，学生本人排除，隐藏测试用例和内部存储信息均不暴露给前端。
 
-本提交稿的 #222 契约已与最终文档同步；定向 41/41、后端完整 302 tests（1 个 Docker-only skip）、前端 53 files/521 tests、typecheck/build 与 MAN-LAB-011 浏览器证据均已回填。
+本提交稿的 #222 契约已与最终文档同步；#265 的执行报告、图源和可复现命令见 `TST-DOC-05 LAB 实训实验测试文档.md` 第 13 节与 `scripts/test/verify-issue-265.ps1`。

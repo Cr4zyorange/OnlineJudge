@@ -291,3 +291,65 @@ npm run test:unit -- tests/unit/api/labs.spec.ts tests/unit/lab/LabTeacherView.s
 ```powershell
 git diff --check
 ```
+
+## 13 Issue #265 LAB 文档与测试闭环
+
+### 13.1 验收范围与用例归属
+
+本节以 `origin/dev` 的 `758afd98ba2caad5a00fb6e12413c48f0156b2fb` 为实现与文档校准基线。正式场景仅保留 `UC-LAB-01 教师创建并发布实验` 和 `UC-LAB-02 学生提交实验并查看评测结果`：实验报告、评测异常、教师评分/反馈、统计、成绩发布、LRN 通知、GRD 来源成绩与 `API-LAB-19` 受控下载均为 UC-LAB-02 的扩展流程，不修改 API、数据库、DTO、状态枚举或共享 Playwright runner。
+
+| 场景编号 | 用例 | 主成功路径 | 备选/异常路径 | 自动化证据 |
+| --- | --- | --- | --- | --- |
+| E2E-LAB-265-01 | UC-LAB-01 | 教师创建草稿，配置 Python、MIXED 评分、报告要求、公开/隐藏用例并发布 | 非课程管理者/字段无效被拒绝；发布后发送 `LAB_EXPERIMENT_PUBLISHED` | `LabExperimentControllerTest`，`issue-265-lab-lifecycle.spec.ts` |
+| E2E-LAB-265-02 | UC-LAB-02 | 学生只看到公开用例，提交源文件后收到评测结果，上传报告 | 非成员、已截止、格式错误和评测异常均受控返回；学生不看到隐藏用例 | `LabSubmissionControllerTest`，`LabEvaluationServiceTest`，共享 Playwright 用例 |
+| E2E-LAB-265-03 | UC-LAB-02 扩展 | 教师查看提交、下载指定源文件、评分报告和提交、截止并发布成绩；学生查看最终反馈 | 学生访问教师提交页和 API-LAB-19 均为 403；未发布成绩不暴露最终分 | `LabSubmissionControllerTest`，共享 Playwright 用例 |
+| E2E-LAB-265-04 | UC-LAB-02 扩展 | 教师查看提交数、评测完成数、均分和分布；GRD 获取已发布来源成绩 | 学生查询统计为 403；未发布实验不向 GRD 暴露来源成绩 | `LabExperimentControllerTest`，`releasedLabScoresExposeSourceGradesForGrdSync` |
+| TC-LAB-42 | UC-LAB-02 评测矩阵 | 真 Docker 沙箱依次执行 AC、编译错误、运行错误、超时和内存限制样本 | Docker daemon 不可用返回 `SYSTEM_ERROR`；中途断连不在本机破坏性复现 | `DockerSandboxExecutorTest` |
+
+### 13.2 端到端可追踪矩阵
+
+| 需求 | UI | API | SVC | DB | TC | E2E | MAN |
+| --- | --- | --- | --- | --- | --- | --- |
+| FR-LAB-01 创建/发布 | UI-LAB-01/04 | API-LAB-01/04/06/07 | LabExperimentService | DB-LAB-01/02 | TC-LAB-01~07 | E2E-LAB-265-01 | MAN-LAB-001 |
+| FR-LAB-02 查看/提交 | UI-LAB-02 | API-LAB-03/08/10 | LabSubmissionService | DB-LAB-01/03/09 | TC-LAB-08~11、34、38~39、41 | E2E-LAB-265-02 | MAN-LAB-002 |
+| FR-LAB-03 历史/版本 | UI-LAB-05/06 | API-LAB-09/10/19 | LabSubmissionService | DB-LAB-03/09 | TC-LAB-12~14、34~40 | E2E-LAB-265-03 | MAN-LAB-011 |
+| FR-LAB-04 Docker 评测 | UI-LAB-02/07 | API-LAB-11/12/15 | LabEvaluationService、DockerSandboxExecutor | DB-LAB-02/04/08 | TC-LAB-15~20、42 | E2E-LAB-265-02 | MAN-LAB-008 |
+| FR-LAB-05 实验报告 | UI-LAB-02/06 | API-LAB-16/17 | LabReportService | DB-LAB-06 | TC-LAB-21~23 | E2E-LAB-265-02/03 | MAN-LAB-003 |
+| FR-LAB-06 评分/评语 | UI-LAB-06 | API-LAB-13/17/19 | LabScoreService | DB-LAB-05/06/07/09 | TC-LAB-24~27、35~40 | E2E-LAB-265-03 | MAN-LAB-004/011 |
+| FR-LAB-07 结果/反馈 | UI-LAB-07 | API-LAB-12/18 | LabSubmissionService、LabScoreService | DB-LAB-03/04/05/06/08 | TC-LAB-28~30 | E2E-LAB-265-02/03 | MAN-LAB-005 |
+| FR-LAB-08 统计 | UI-LAB-08 | API-LAB-14 | LabStatisticsService | DB-LAB-03/04/05/06 | TC-LAB-06、31~33 | E2E-LAB-265-04 | MAN-LAB-006 |
+| NFR-LAB-01 可靠性 | 全部 LAB 页面 | API-LAB-08/11/13 | 提交、评测、评分服务 | DB-LAB-03~08 | TC-LAB-N01、42 | E2E-LAB-265-02/03 | MAN-LAB-008 |
+| NFR-LAB-02 性能 | UI-LAB-02/08 | API-LAB-08/11/14 | LabEvaluationService、LabStatisticsService | DB-LAB-04 | TC-LAB-N02、42 | E2E-LAB-265-02/04 | MAN-LAB-009 |
+| NFR-LAB-03 可追踪性 | UI-LAB-05/06 | API-LAB-09/10/13/16/19 | LabSubmissionService、LabScoreService | DB-LAB-03~09 | TC-LAB-N03、34~41 | E2E-LAB-265-03 | MAN-LAB-004/011 |
+| NFR-LAB-04 安全性 | UI-LAB-02/06/07 | API-LAB-09/10/12/18/19 | CoursePermissionClient、LabSubmissionService | DB-LAB-02/03/04/08/09 | TC-LAB-N04、36~40 | E2E-LAB-265-02/03 | MAN-LAB-007/011 |
+| NFR-LAB-05 可测试性 | 全部 LAB 页面 | API-LAB-01~19 | Evaluator、FileStorageService 可替换 | DB-LAB-01~09 | TC-LAB-N05、42 | E2E-LAB-265-01~04 | MAN-LAB-008 |
+
+### 13.3 执行入口与报告
+
+统一入口为：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/test/verify-issue-265.ps1
+```
+
+该脚本校验三份 Compose 配置（`compose.yml`、`compose.eval.yml`、`compose.eval.local.example.yml`），并以三份文件的覆盖组合启动评测环境；其中本地评测覆盖提供 Docker CLI，评测覆盖提供 socket 与沙箱配置。随后脚本预拉取真实 Docker 评测镜像、运行后端行为/迁移/事务测试、真实 Docker 矩阵、沙箱容器清理、前端 LAB 单测、类型检查、构建和共享 Playwright 流程，并在结束时清理 Compose 容器、卷和孤儿容器。`-SkipCompose`、`-SkipE2E` 和 `-KeepEnvironment` 仅用于诊断，不应用于最终验收。
+
+| 编号 | 时间 | 执行内容 | 结果 | 说明 |
+| --- | --- | --- | --- | --- |
+| LAB-265-001 | 2026-08-25 | 目标后端测试：Controller、迁移、事务、评测服务与 Docker executor | PASS | 目标套件 60 tests，0 failures/errors，2 个 Docker-only skip；随后真机 smoke 6/6 通过 |
+| LAB-265-002 | 2026-08-25 | 真 Docker：AC、编译错误、运行错误、超时、64 MiB 内存限制、清理 | PASS | `OJ_DOCKER_SANDBOX_TEST=true` 下 `DockerSandboxExecutorTest` 6 tests 通过；每轮后 `oj-lab-` 容器为空 |
+| LAB-265-003 | 2026-08-25 | 首次冷镜像 Docker smoke | FAIL（已缓解） | 未预拉取 `python:3.12-alpine` 时，镜像拉取占用固定编译阶段时限而得到伪 `TIME_LIMIT_EXCEEDED`；验证脚本已把 `docker pull` 固化为前置步骤，不修改生产契约 |
+| LAB-265-004 | 2026-08-25 | 共享 Playwright：教师发布到学生查看结果 | PASS | `tests/e2e/lab/issue-265-lab-lifecycle.spec.ts` 覆盖发布、提交、评测、报告、评分、反馈、隐藏用例、权限、截止、统计和受控下载 |
+| LAB-265-005 | 2026-08-25 | Mermaid 源与 SVG、`git diff --check`、凭据/临时产物检查 | PASS | 3 份 Mermaid 源已渲染为非空 SVG，`git diff --check` 通过；本 issue 文件未发现凭据或临时产物 |
+| LAB-265-008 | 2026-08-25 | LAB 前端定向单测、类型检查与生产构建 | PASS | Vitest 5 files/58 tests 通过；`vue-tsc --noEmit` 与 `vite build` 通过 |
+| LAB-265-006 | 2026-08-25 | Docker daemon 在评测中途断连 | BLOCKED | 本机不以停止 daemon 的方式破坏正在执行的评测；现有可控模拟断连测试已覆盖 `SYSTEM_ERROR`，真实断连仅在可丢弃 FAT 主机复测 |
+| LAB-265-007 | 2026-08-25 | `npm run test:e2e:verify-failure` | FAIL（既有基线） | `frontend/scripts/verify-e2e-failure.mjs:42` 未观察到预期的故意断言失败；不属于 #265，未在本分支修改共享 runner |
+| LAB-265-009 | 2026-08-25 | 三文件 Compose 评测环境：Docker CLI、socket、8088、真实 E2E | PASS | 两文件组合暴露“容器内无 Docker CLI”的配置缺口；纳入 `compose.eval.local.example.yml` 后容器内 Docker 29.3.1 可用，Compose 服务健康，Playwright 1 passed |
+
+### 13.4 图与安全检查
+
+- `docs/diagrams/srs/fig_4_13_lab_submission_ssd.mmd`：覆盖提交、Docker 评测异常、报告、教师评分/反馈、GRD/LRN 和 API-LAB-19。
+- `docs/diagrams/srs/fig_lab_publish_overview_interaction.mmd`：UC-LAB-01 概要交互图。
+- `docs/diagrams/srs/fig_lab_publish_service_sequence.mmd`：UC-LAB-01 Controller/Service/权限/仓储/通知对象顺序图。
+- 对应 SVG 位于 `docs/最终提交/assets/`，由 Mermaid CLI 渲染并检查非空输出。
+- 扫描范围仅限本 issue 新增或修改文件；不提交 `node_modules`、Docker 临时容器、评测工作目录、token、密码或本机配置。
