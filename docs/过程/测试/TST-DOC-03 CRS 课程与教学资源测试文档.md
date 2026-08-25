@@ -23,8 +23,9 @@
 
 | 测试类别          | 命令                                                         | 执行结果                          |
 | ----------------- | ------------------------------------------------------------ | --------------------------------- |
-| 后端 CRS 相关测试 | `mvn "-Dtest=CourseControllerTest,AuthCrsIntegrationTest,HeaderCoursePermissionClientTest" test` | 31 条通过，0 失败，0 错误，0 跳过 |
-| 前端单元测试      | `npm run test:unit`                                          | 32 个测试文件通过，170 条测试通过 |
+| 后端 CRS 相关测试 | `mvn "-Dtest=CourseControllerTest,AuthCrsIntegrationTest,HeaderCoursePermissionClientTest,CrsClosureE2EApiTest" test` | 36 条通过，0 失败，0 错误，0 跳过 |
+| 真实 MySQL 并发/约束 | `OJ_MYSQL_TEST=true mvn -Dtest=CrsMysqlConcurrencyTest test`（本地 MySQL 9.6） | 4 条通过，0 失败，0 错误，0 跳过 |
+| 前端单元测试      | `npm run test:unit`                                          | 53 个测试文件通过，555 条测试通过 |
 
 #### 7.2.2 CRS 用例表
 
@@ -36,6 +37,8 @@
 | TC-CR-04  | FR-CR-04  | 教师上传、更新、删除资源，成员下载资源               | `API-CRS-10`、`API-CRS-11`、`API-CRS-12`、`API-CRS-13`、资源下载接口、`DB-CRS-03` | 中     | 通过       |
 | TC-CR-05  | FR-CR-05  | 课程成员列表、学生名单、角色调整、移除成员、权限校验 | `API-CRS-15`、`API-CRS-16`、`API-CRS-17`、`API-CRS-18`、`API-CRS-19`、`DB-CRS-04` | 高     | 通过       |
 | TC-CR-06  | FR-CR-06  | 教师发布、编辑、置顶、删除公告，成员查看置顶优先     | `API-CRS-20`、`API-CRS-21`、`API-CRS-22`、`DB-CRS-05`、LRN 近期任务 | 中     | 通过       |
+| TC-CR-07  | FR-CR-01 ~ FR-CR-06 | CRS 主流程闭环（建课/章节/资源/公告，三模式加入，审批前后权限，非法邀请码/满员/重复加入/资源失败） | `CrsClosureE2EApiTest`、`scripts/test/crs-e2e-http.ps1`、共享 E2E 入口 `frontend/tests/e2e/`（#267 runner） | 高     | 通过       |
+| TC-CR-08  | FR-CR-04、FR-CR-05、NFR-CR-02/03 | 真实 MySQL 并发加入/审批与唯一约束、满员约束 | `CrsMysqlConcurrencyTest`、`DB-CRS-01 ~ DB-CRS-05`、`uq_crs_course_member` | 高     | 通过（MySQL 9.6，H2 不替代） |
 | TC-CR-N01 | NFR-CR-01 | 未登录、越权、移除成员访问资源被拒绝                 | 安全与权限控制                                               | 高     | 通过       |
 | TC-CR-N02 | NFR-CR-02 | 课程列表分页参数归一化                               | 分页与稳定性                                                 | 中     | 通过       |
 | TC-CR-N03 | NFR-CR-03 | 105 门课程、105 个资源基础规模列表响应               | 基础性能样本                                                 | 中     | 通过       |
@@ -62,6 +65,9 @@
 | CRS-LOG-002 | 2026-06-08 16:44 | `AuthCrsIntegrationTest`           | AUTH 与 CRS 登录态、权限上下文和课程访问协作                 | 2 条通过  |
 | CRS-LOG-003 | 2026-06-08 16:44 | `HeaderCoursePermissionClientTest` | Header 课程权限客户端的成员/教师/角色判断                    | 6 条通过  |
 | CRS-LOG-004 | 2026-06-08 16:44 | Maven 汇总                         | `Tests run: 31, Failures: 0, Errors: 0, Skipped: 0`          | 构建成功  |
+| CRS-LOG-010 | 2026-08-25 16:23 | `CrsClosureE2EApiTest`             | CRS 主流程闭环：建课、章节、资源、公告、三模式加入、审批权限、异常分支 | 1 条通过 |
+| CRS-LOG-011 | 2026-08-25 16:23 | `CrsMysqlConcurrencyTest`（`OJ_MYSQL_TEST=true`，MySQL 9.6） | 真实 MySQL：迁移与唯一约束、并发加入、并发审批、满员约束 | 4 条通过 |
+| CRS-LOG-012 | 2026-08-25 16:23 | Maven 全量（含真实 MySQL 环境变量） | `Tests run: 357, Failures: 0, Errors: 0, Skipped: 1`（Docker 沙箱专用跳过） | 构建成功  |
 
 #### 8.2.2 前端 CRS 执行日志
 
@@ -71,6 +77,7 @@
 | CRS-LOG-006 | 2026-06-08 16:43 | `frontend/tests/unit/app/courseMain.spec.ts`       | 课程入口路由挂载                                             | 1 条通过  |
 | CRS-LOG-007 | 2026-06-08 16:43 | `frontend/tests/unit/api/http.spec.ts`             | CRS 资源下载依赖的共享 HTTP 鉴权、multipart 与错误处理       | 10 条通过 |
 | CRS-LOG-008 | 2026-06-08 16:43 | Vitest 汇总                                        | `Test Files 32 passed (32)`、`Tests 170 passed (170)`        | 构建成功  |
+| CRS-LOG-013 | 2026-08-25 16:08 | Vitest 汇总（补测后）                               | `Test Files 53 passed (53)`、`Tests 550 passed (550)`        | 构建成功  |
 
 #### 8.2.3 CRS 性能与规模样本
 
@@ -90,6 +97,7 @@
 | MAN-CRS-004 | CRS  | 章节管理                       | 教师新增多级章节并调整顺序，学生查看章节树      | 教师可维护，学生只读，顺序正确                       | 通过 |
 | MAN-CRS-005 | CRS  | 资源上传下载                   | 教师上传 PDF/文档，学生下载；尝试上传不支持文件 | 合法文件可下载，不支持文件被拒绝                     | 通过 |
 | MAN-CRS-006 | CRS  | 公告管理与置顶                 | 教师发布两条公告并置顶其中一条，学生查看        | 置顶公告优先展示，编辑/删除后列表刷新                | 通过 |
+| MAN-CRS-007 | CRS  | 真实 MySQL + HTTP + 页面端到端闭环 | 执行 `crs-e2e-http.ps1`，headless Chrome 采集学生/教师课程页 | 19/19 断言 PASS，页面渲染真实课程、公告与最近任务 | 通过 |
 
 ### 9.3 CRS 手工联调补测记录
 
@@ -116,6 +124,9 @@
 | 功能覆盖     | 通过 | CRS 的课程、选课、章节、资源、成员、公告均有自动化覆盖；其他模块核心单元测试通过 |
 | 接口覆盖     | 通过 | CRS 后端相关接口、权限和异常矩阵通过 MockMvc 验证            |
 | 前端覆盖     | 通过 | CRS 页面 18 条单测通过，全前端 170 条单测通过                |
+| 前端覆盖（补测） | 通过 | CRS 页面 24 条单测通过，全前端 555 条单测通过，生产构建通过；typecheck 依赖 `@playwright/test` 安装（本机离线 BLOCKED-02） |
 | 数据一致性   | 通过 | CRS 课程、成员、章节、资源、公告及 LRN 近期任务关联在测试中验证 |
+| 真实数据库   | 通过 | MySQL 9.6 并发加入/审批与唯一约束 4/4 通过；H2 结果不替代该项 |
+| 端到端闭环   | 通过 | 共享 E2E 入口（#267 runner）接口闭环 19/19；4 张真实页面截图 |
 | 非功能与安全 | 通过 | 已覆盖基础分页、权限、文件限制和异常映射；已执行人工安全/浏览器验收 |
 | 最终结论     | 通过 | 无                                                           |
