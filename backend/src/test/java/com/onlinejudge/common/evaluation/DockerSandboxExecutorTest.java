@@ -79,6 +79,38 @@ class DockerSandboxExecutorTest {
     }
 
     @Test
+    void dockerExecutorClassifiesRealAcceptanceFailureLimitsAndCleanupWhenExplicitlyEnabled() throws Exception {
+        Assumptions.assumeTrue("true".equalsIgnoreCase(System.getenv("OJ_DOCKER_SANDBOX_TEST")));
+        Assumptions.assumeTrue(dockerDaemonAvailable());
+
+        DockerSandboxExecutor executor = new DockerSandboxExecutor(
+                "docker",
+                "python:3.12-alpine",
+                1.0,
+                64,
+                "16m"
+        );
+
+        assertThat(executeRealCase(executor, "accepted", "print('ok')", 30_000, 65_536).status())
+                .isEqualTo(EvaluationStatus.ACCEPTED);
+        assertThat(executeRealCase(executor, "compile", "print(", 30_000, 65_536).status())
+                .isEqualTo(EvaluationStatus.COMPILE_ERROR);
+        assertThat(executeRealCase(executor, "runtime", "raise RuntimeError('issue-265')", 30_000, 65_536).status())
+                .isEqualTo(EvaluationStatus.RUNTIME_ERROR);
+        assertThat(executeRealCase(executor, "timeout", "while True: pass", 2_000, 65_536).status())
+                .isEqualTo(EvaluationStatus.TIME_LIMIT_EXCEEDED);
+        assertThat(executeRealCase(
+                executor,
+                "memory",
+                "chunks = []\nwhile True:\n    chunks.append(bytearray(1024 * 1024))",
+                30_000,
+                65_536
+        ).status()).isEqualTo(EvaluationStatus.RUNTIME_ERROR);
+
+        assertNoSandboxContainersRemain();
+    }
+
+    @Test
     void unavailableDockerDaemonIsReportedAsSystemError(@TempDir Path tempDir) throws Exception {
         Path dockerCommand = createDaemonUnavailableCommand(tempDir);
         DockerSandboxExecutor executor = new DockerSandboxExecutor(
@@ -171,6 +203,37 @@ class DockerSandboxExecutorTest {
     private boolean dockerDaemonAvailable() throws Exception {
         Process process = new ProcessBuilder("docker", "info").start();
         return process.waitFor(3, java.util.concurrent.TimeUnit.SECONDS) && process.exitValue() == 0;
+    }
+
+    private SandboxExecutionResult executeRealCase(
+            DockerSandboxExecutor executor,
+            String caseName,
+            String source,
+            int timeLimitMs,
+            int memoryLimitKb
+    ) {
+        return executor.execute(new EvaluationTask(
+                "issue-265-" + caseName,
+                "LAB",
+                1L,
+                1L,
+                1L,
+                1L,
+                "python",
+                source,
+                Map.of("stdin", "", "timeLimitMs", Integer.toString(timeLimitMs), "memoryLimitKb", Integer.toString(memoryLimitKb)),
+                LocalDateTime.now()
+        ));
+    }
+
+    private void assertNoSandboxContainersRemain() throws Exception {
+        Process process = new ProcessBuilder(
+                "docker", "ps", "-a", "--format", "{{.Names}}", "--filter", "name=oj-lab-"
+        ).start();
+        String names = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+        assertThat(process.waitFor(3, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+        assertThat(process.exitValue()).isZero();
+        assertThat(names.trim()).isEmpty();
     }
 
     private Path createDaemonUnavailableCommand(Path tempDir) throws Exception {
