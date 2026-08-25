@@ -242,7 +242,8 @@ public class DockerSandboxExecutor implements SandboxExecutor {
             return false;
         }
         String normalized = stderr.toLowerCase(java.util.Locale.ROOT);
-        return normalized.contains("cannot connect to the docker daemon")
+        return normalized.contains("failed to connect to the docker api")
+                || normalized.contains("cannot connect to the docker daemon")
                 || normalized.contains("is the docker daemon running")
                 || normalized.contains("error during connect")
                 || normalized.contains("dockerdesktoplinuxengine")
