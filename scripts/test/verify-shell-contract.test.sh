@@ -6,14 +6,15 @@ repo_root="$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"
 verifier="$repo_root/scripts/test/verify-shell-contract.sh"
 fixture_root="$(mktemp -d "${TMPDIR:-/tmp}/onlinejudge-shell-contract-test.XXXXXX")"
 target_checkout="$fixture_root/target-checkout"
-target_branch="$(git -C "$repo_root" branch --show-current)"
+source_head="$(git -C "$repo_root" rev-parse HEAD)"
 
 cleanup() {
   rm -rf -- "$fixture_root"
 }
 trap cleanup EXIT INT TERM
 
-git clone --quiet --no-local --branch "$target_branch" --single-branch "$repo_root" "$target_checkout"
+git clone --quiet --no-local --no-checkout "$repo_root" "$target_checkout"
+git -C "$target_checkout" checkout --quiet --detach "$source_head"
 git -C "$target_checkout" config user.name 'Shell Contract Test'
 git -C "$target_checkout" config user.email 'shell-contract-test@example.invalid'
 
