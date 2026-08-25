@@ -3,9 +3,16 @@
 set -euo pipefail
 
 repo_root="$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"
-checkout_root="${1:-$repo_root}"
+requested_checkout="${1:-$repo_root}"
 carriage_return="$(printf '\r')"
 checked=0
+
+if [[ "$(git -C "$requested_checkout" rev-parse --is-inside-work-tree 2>/dev/null || true)" != "true" ]]; then
+  printf 'shell-contract: not a Git worktree: %s\n' "$requested_checkout" >&2
+  exit 1
+fi
+
+checkout_root="$(git -C "$requested_checkout" rev-parse --show-toplevel)"
 
 while IFS= read -r -d '' script; do
   checked=$((checked + 1))
@@ -26,8 +33,8 @@ while IFS= read -r -d '' script; do
     exit 1
   }
 
-  text_attr="$(git -C "$repo_root" check-attr text -- "$script")"
-  eol_attr="$(git -C "$repo_root" check-attr eol -- "$script")"
+  text_attr="$(git -C "$checkout_root" check-attr text -- "$script")"
+  eol_attr="$(git -C "$checkout_root" check-attr eol -- "$script")"
   [[ "$text_attr" == "$script: text: set" ]] || {
     printf 'shell-contract: expected text attribute for %s, got: %s\n' "$script" "$text_attr" >&2
     exit 1
@@ -36,7 +43,7 @@ while IFS= read -r -d '' script; do
     printf 'shell-contract: expected LF attribute for %s, got: %s\n' "$script" "$eol_attr" >&2
     exit 1
   }
-done < <(git -C "$repo_root" ls-files -z -- '*.sh')
+done < <(git -C "$checkout_root" ls-files -z -- '*.sh')
 
 [[ "$checked" -gt 0 ]] || {
   printf 'shell-contract: no tracked shell scripts found\n' >&2
