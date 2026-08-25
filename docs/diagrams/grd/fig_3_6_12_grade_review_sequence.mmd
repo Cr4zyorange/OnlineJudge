@@ -53,29 +53,49 @@ sequenceDiagram
   Teacher->>TeacherView: 处理待复核申请
   TeacherView->>Controller: PUT /grade-review-requests/{requestId}/process
   Controller->>Service: processReviewRequest(requestId,teacherId,command)
-  Service->>Permission: canManageCourseGrade(courseId,teacherId)
-  alt APPROVE
-    Service->>Service: applyApprovedAdjustment(...)
-    alt 总评复核
-      Service->>SummaryRepo: findByCourseId(courseId)
-      SummaryRepo-->>Service: 已发布总评
-      Service->>SummaryRepo: update(adjusted)
-      Service->>ChangeLogRepo: save(FINAL_ADJUST)
-    else 单项复核
-      Service->>RecordRepo: findByCourseId(courseId)
-      RecordRepo-->>Service: 已发布成绩记录
-      Service->>ItemRepo: findById(gradeItemId)
-      Service->>RecordRepo: update(adjusted)
-      Service->>ChangeLogRepo: save(RECORD_ADJUST)
-      Service->>RecordRepo: findByCourseId(courseId)
-      Service->>ItemRepo: findByCourseId(courseId)
-      Service->>SummaryRepo: update(重新计算的总评)
+  Service->>ReviewRepo: findById(requestId)
+  alt 申请不存在
+    ReviewRepo-->>Service: Optional.empty
+    Service-->>Controller: GradeItemNotFoundException
+    Controller-->>TeacherView: 申请不存在提示
+  else 申请存在
+    ReviewRepo-->>Service: request(courseId,status,target)
+    Service->>Permission: canManageCourseGrade(courseId,teacherId)
+    alt 无课程成绩管理权限
+      Permission-->>Service: false
+      Service-->>Controller: GradeReviewPermissionException
+      Controller-->>TeacherView: 无处理权限提示
+    else 有课程成绩管理权限
+      Permission-->>Service: true
+      alt 申请不是 PENDING
+        Service-->>Controller: GradeReviewValidationException
+        Controller-->>TeacherView: 申请已处理提示
+      else 申请为 PENDING
+        alt APPROVE
+          Service->>Service: applyApprovedAdjustment(...)
+          alt 总评复核
+            Service->>SummaryRepo: findByCourseId(courseId)
+            SummaryRepo-->>Service: 已发布总评
+            Service->>SummaryRepo: update(adjusted)
+            Service->>ChangeLogRepo: save(FINAL_ADJUST)
+          else 单项复核
+            Service->>RecordRepo: findByCourseId(courseId)
+            RecordRepo-->>Service: 已发布成绩记录
+            Service->>ItemRepo: findById(gradeItemId)
+            Service->>RecordRepo: update(adjusted)
+            Service->>ChangeLogRepo: save(RECORD_ADJUST)
+            Service->>RecordRepo: findByCourseId(courseId)
+            Service->>ItemRepo: findByCourseId(courseId)
+            Service->>SummaryRepo: update(重新计算的总评)
+          end
+          Service->>ReviewRepo: update(APPROVED)
+        else REJECT
+          Service->>ReviewRepo: update(REJECTED)
+        end
+        Service->>Event: publish(GRADE_REVIEW_PROCESSED)
+        Event->>LRN: 持久化学生通知
+        Service-->>Controller: GradeReviewProcessResult
+        Controller-->>TeacherView: 处理结果与留痕
+      end
     end
-    Service->>ReviewRepo: update(APPROVED)
-  else REJECT
-    Service->>ReviewRepo: update(REJECTED)
   end
-  Service->>Event: publish(GRADE_REVIEW_PROCESSED)
-  Event->>LRN: 持久化学生通知
-  Service-->>Controller: GradeReviewProcessResult
-  Controller-->>TeacherView: 处理结果与留痕
