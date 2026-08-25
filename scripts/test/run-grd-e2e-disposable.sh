@@ -10,6 +10,9 @@ e2e_port="${E2E_GRD_PORT:-18080}"
 temp_dir=""
 backend_pid=""
 backend_log=""
+proof_file=""
+proof_token=""
+disposable_base_url="http://127.0.0.1:$e2e_port"
 
 fail() {
   printf 'run-grd-e2e-disposable: %s\n' "$1" >&2
@@ -52,7 +55,7 @@ cleanup() {
 [[ "$e2e_port" =~ ^[1-9][0-9]{3,4}$ ]] || fail 'E2E_GRD_PORT must be an integer from 1000 to 99999'
 ((e2e_port <= 65535)) || fail 'E2E_GRD_PORT must not exceed 65535'
 
-for command_name in java mvn npm curl mktemp; do
+for command_name in java mvn npm curl mktemp openssl; do
   command -v "$command_name" >/dev/null 2>&1 || fail "$command_name is required"
 done
 
@@ -62,7 +65,7 @@ backend_log="$temp_dir/backend.log"
 trap cleanup EXIT
 trap 'exit 130' INT TERM
 
-if curl --silent --fail --max-time 1 "http://127.0.0.1:$e2e_port/api/v1/system/health" >/dev/null 2>&1; then
+if curl --silent --fail --max-time 1 "$disposable_base_url/api/v1/system/health" >/dev/null 2>&1; then
   fail "port $e2e_port already serves an application; choose another E2E_GRD_PORT"
 fi
 
@@ -86,7 +89,7 @@ backend_pid=$!
 
 backend_ready=0
 for _ in {1..120}; do
-  if curl --silent --fail --max-time 1 "http://127.0.0.1:$e2e_port/api/v1/system/health" >/dev/null 2>&1; then
+  if curl --silent --fail --max-time 1 "$disposable_base_url/api/v1/system/health" >/dev/null 2>&1; then
     backend_ready=1
     break
   fi
@@ -99,9 +102,16 @@ done
 
 [[ "$backend_ready" -eq 1 ]] || fail 'isolated backend did not become healthy within 30 seconds'
 
+proof_file="$temp_dir/disposable-proof"
+proof_token="$(openssl rand -hex 32)"
+[[ "$proof_token" =~ ^[0-9a-f]{64}$ ]] || fail 'failed to generate disposable proof token'
+printf '%s\n%s\n%s\n' "$proof_token" "$disposable_base_url" "$backend_pid" >"$proof_file"
+chmod 600 "$proof_file"
+
 (
   cd "$frontend_dir"
-  E2E_BASE_URL="http://127.0.0.1:$e2e_port" \
-  E2E_GRD_DISPOSABLE_RUN=1 \
+  E2E_BASE_URL="$disposable_base_url" \
+  E2E_GRD_DISPOSABLE_PROOF_FILE="$proof_file" \
+  E2E_GRD_DISPOSABLE_TOKEN="$proof_token" \
     npm run test:e2e -- tests/e2e/grd/grade-lifecycle.spec.ts --workers=1
 )

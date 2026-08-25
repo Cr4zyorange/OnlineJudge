@@ -79,6 +79,7 @@ test('GRD SSD branches and responses match the implemented API contracts', () =>
   const gradeFlowSsd = readRepositoryFile('docs/diagrams/srs/fig_4_15_grade_flow_ssd.mmd');
   const studentGradeSequence = readRepositoryFile('docs/diagrams/grd/fig_3_6_11_student_grade_query_sequence.mmd');
   const gradeReviewSequence = readRepositoryFile('docs/diagrams/grd/fig_3_6_12_grade_review_sequence.mmd');
+  const gradeAnalysisSequence = readRepositoryFile('docs/diagrams/grd/fig_3_6_13_grade_analysis_sequence.mmd');
   const srs = readRepositoryFile('docs/最终提交/软件需求规格说明书.md');
   const detailedDesign = readRepositoryFile('docs/最终提交/软件详细设计说明书.md');
   const processDetailedDesign = readRepositoryFile('docs/过程/详细设计/GRD-成绩评价与教学分析-详细设计提交稿.md');
@@ -107,6 +108,15 @@ test('GRD SSD branches and responses match the implemented API contracts', () =>
   assert.match(gradeReviewSequence, /CourseGradeSummary(?:<br\/>)?Repository/);
   assert.match(gradeReviewSequence, /GradeChangeLog(?:<br\/>)?Repository/);
   assert.match(gradeReviewSequence, /applyApprovedAdjustment/);
+  assert.doesNotMatch(gradeReviewSequence, /校验课程成员与本人已发布成绩/);
+  assert.match(gradeReviewSequence, /isCourseMember/);
+  assert.match(gradeReviewSequence, /originalPublishedScore/);
+
+  assert.doesNotMatch(gradeAnalysisSequence, /CourseMemberRepository|GradeAnalysisSourceVersionStore/);
+  assert.match(gradeAnalysisSequence, /listCourseStudentIds/);
+  assert.match(gradeAnalysisSequence, /GradeRecord(?:<br\/>)?Repository/);
+  assert.match(gradeAnalysisSequence, /CourseGradeSummary(?:<br\/>)?Repository/);
+  assert.match(gradeAnalysisSequence, /findAnalysisSourceVersion/);
 
   const membershipCheck = studentGradeSequence.indexOf('isCourseMember');
   const accessException = studentGradeSequence.indexOf('StudentGradeAccessException');
@@ -133,9 +143,14 @@ test('GRD mutating lifecycle only runs through the disposable database wrapper',
   assert.match(runner, /mktemp -d/);
   assert.match(runner, /SPRING_DATASOURCE_URL/);
   assert.match(runner, /trap cleanup/);
-  assert.match(runner, /E2E_GRD_DISPOSABLE_RUN=1/);
+  assert.match(runner, /openssl rand -hex/);
+  assert.match(runner, /E2E_GRD_DISPOSABLE_PROOF_FILE/);
+  assert.match(runner, /E2E_GRD_DISPOSABLE_TOKEN/);
   assert.match(runner, /tests\/e2e\/grd\/grade-lifecycle\.spec\.ts/);
-  assert.match(spec, /process\.env\.E2E_GRD_DISPOSABLE_RUN/);
+  assert.doesNotMatch(spec, /process\.env\.E2E_GRD_DISPOSABLE_RUN/);
+  assert.match(spec, /timingSafeEqual/);
+  assert.match(spec, /realpathSync/);
+  assert.match(spec, /process\.kill/);
   assert.match(spec, /test\.skip/);
   assert.equal(packageJson.scripts['test:e2e:grd:disposable'], 'bash ../scripts/test/run-grd-e2e-disposable.sh');
   assert.match(e2eReadme, /npm run test:e2e:grd:disposable/);

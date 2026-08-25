@@ -1,4 +1,7 @@
 import type { APIRequestContext, APIResponse, TestInfo } from '@playwright/test';
+import { timingSafeEqual } from 'node:crypto';
+import { readFileSync, realpathSync, statSync } from 'node:fs';
+import { basename, dirname, isAbsolute, relative } from 'node:path';
 import { expect, test } from '../fixtures';
 
 type ApiEnvelope<T> = {
@@ -40,9 +43,11 @@ const DEMO_TEACHER = {
   password: process.env.E2E_TEACHER_PASSWORD || 'Teacher001@pass'
 };
 
+const hasDisposableProof = verifyDisposableProof();
+
 test.describe('@grd GRD real source lifecycle', () => {
   test.skip(
-    process.env.E2E_GRD_DISPOSABLE_RUN !== '1',
+    !hasDisposableProof,
     'Mutating GRD lifecycle must run through npm run test:e2e:grd:disposable'
   );
 
@@ -290,6 +295,54 @@ test.describe('@grd GRD real source lifecycle', () => {
     expect(anonymousGrades.status(), await responseLabel(anonymousGrades, 'reject anonymous grade access')).toBe(401);
   });
 });
+
+function verifyDisposableProof(): boolean {
+  const proofFile = process.env.E2E_GRD_DISPOSABLE_PROOF_FILE?.trim();
+  const suppliedToken = process.env.E2E_GRD_DISPOSABLE_TOKEN?.trim();
+  const baseUrl = process.env.E2E_BASE_URL?.trim();
+  if (!proofFile || !suppliedToken || !baseUrl || !/^[0-9a-f]{64}$/.test(suppliedToken)) {
+    return false;
+  }
+
+  try {
+    const proofPath = realpathSync(proofFile);
+    const tempRoot = realpathSync(process.env.TMPDIR?.trim() || '/tmp');
+    const relativeProof = relative(tempRoot, proofPath);
+    if (relativeProof.startsWith('..') || isAbsolute(relativeProof)) {
+      return false;
+    }
+    if (basename(proofPath) !== 'disposable-proof'
+      || !basename(dirname(proofPath)).startsWith('onlinejudge-grd-e2e.')) {
+      return false;
+    }
+
+    const proofStat = statSync(proofPath);
+    if ((proofStat.mode & 0o077) !== 0
+      || (typeof process.getuid === 'function' && proofStat.uid !== process.getuid())) {
+      return false;
+    }
+
+    const [storedToken, storedBaseUrl, storedBackendPid] = readFileSync(proofPath, 'utf8').trim().split('\n');
+    const suppliedTokenBytes = Buffer.from(suppliedToken, 'utf8');
+    const storedTokenBytes = Buffer.from(storedToken || '', 'utf8');
+    if (storedTokenBytes.length !== suppliedTokenBytes.length
+      || !timingSafeEqual(storedTokenBytes, suppliedTokenBytes)) {
+      return false;
+    }
+    if (storedBaseUrl !== baseUrl || !/^http:\/\/127\.0\.0\.1:\d+$/.test(baseUrl)) {
+      return false;
+    }
+
+    const backendPid = Number(storedBackendPid);
+    if (!Number.isSafeInteger(backendPid) || backendPid <= 0) {
+      return false;
+    }
+    process.kill(backendPid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 async function registerStudent(request: APIRequestContext, marker: string): Promise<AuthSession> {
   const username = marker.replaceAll('-', '').slice(0, 40);
