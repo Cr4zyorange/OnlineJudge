@@ -39,6 +39,8 @@ npm run test:e2e:grd:disposable
 E2E_BROWSER_CHANNEL=chrome npm run test:e2e:grd:disposable
 ```
 
+包装脚本以空环境启动后端，仅保留命令查找路径，并显式固定空 active profile、H2 驱动、`sa`/空密码、`spring.sql.init.mode=always`、课程 schema 初始化和演示数据初始化。调用者即使导出了 Compose/MySQL 的 Spring 环境变量，也不会污染 disposable 后端。
+
 直接通过 `npm run test:e2e`、手工设置运行标志或传入任意 `E2E_BASE_URL` 时，变异型 GRD 生命周期用例会跳过。包装脚本会在权限收紧的临时目录中生成一次性随机 token 和 proof 文件；用例同时校验 proof 归属、权限、token、loopback URL 与仍存活的隔离后端 PID，不能只靠一个可继承的环境标志放行。可用 `E2E_GRD_PORT` 覆盖 disposable 后端端口；端口已被服务占用时包装脚本会拒绝启动，不会复用现有应用。
 
 公共运行器契约与“断言失败必须非零退出”可重复验证：

@@ -5,7 +5,7 @@ sequenceDiagram
   Student->>System: OP-GR-05 提交本人已发布成绩异议
   alt 目标可复核且无重复 PENDING 申请
     System-->>Student: 返回 requestId、PENDING 和 submittedAt
-    Note over Student,System: 教师通知异步持久化，不进入本次响应
+    Note over Student,System: 教师通知在响应前同步 best-effort 持久化；失败只记日志，不改变申请与响应
     System-->>Teacher: 待处理复核申请可查询
     Teacher->>System: OP-GR-05 同意修改或驳回复核申请
     System-->>Teacher: 返回处理状态和成绩变更留痕
