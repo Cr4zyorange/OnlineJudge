@@ -897,6 +897,64 @@ describe('TeacherGradeTableView', () => {
     expect(wrapper.text()).not.toContain('60.00');
   });
 
+  it('keeps the new course grade items when the previous course list arrives late', async () => {
+    vi.mocked(gradeRecordsApi.listCourseGrades).mockResolvedValue({ records: [], total: 0, page: 1, size: 20 });
+    vi.mocked(gradeRecordsApi.listGradePublishRecords).mockResolvedValue({ records: [], total: 0, page: 1, size: 20 });
+    vi.mocked(gradeRecordsApi.getCourseGradeAnalysis)
+      .mockResolvedValueOnce(analysisResult({ targetType: 'COURSE_TOTAL', gradeItemId: null }))
+      .mockResolvedValueOnce(analysisResult({ targetType: 'COURSE_TOTAL', gradeItemId: null }))
+      .mockResolvedValueOnce(analysisResult({ gradeItemId: 20 }));
+
+    const oldCourseItems = deferred<Awaited<ReturnType<typeof gradeItemsApi.listGradeItems>>>();
+    const newCourseItems = deferred<Awaited<ReturnType<typeof gradeItemsApi.listGradeItems>>>();
+    vi.mocked(gradeItemsApi.listGradeItems)
+      .mockReturnValueOnce(oldCourseItems.promise)
+      .mockReturnValueOnce(newCourseItems.promise);
+
+    const wrapper = mount(TeacherGradeTableView, { props: { courseId: 101 } });
+    await wrapper.setProps({ courseId: 202 });
+    newCourseItems.resolve([{
+      id: 20,
+      courseId: 202,
+      name: '新课程实验',
+      sourceType: 'LAB',
+      sourceId: 320,
+      fullScore: '100.00',
+      weight: '1.00',
+      includedInFinal: true,
+      enabled: true,
+      sortOrder: 1
+    }]);
+    await flushPromises();
+
+    await wrapper.get('[data-testid="analysis-target-type"]').setValue('GRADE_ITEM');
+    const analysisGradeItemSelect = wrapper.get('[data-testid="analysis-grade-item-id"]');
+    expect(analysisGradeItemSelect.text()).toContain('新课程实验');
+    await analysisGradeItemSelect.setValue('20');
+    await wrapper.get('[data-testid="analysis-form"]').trigger('submit');
+    await flushPromises();
+    expect(wrapper.get('[data-testid="grade-analysis-panel"]').text()).toContain('新课程实验');
+
+    oldCourseItems.resolve([{
+      id: 10,
+      courseId: 101,
+      name: '旧课程实验',
+      sourceType: 'LAB',
+      sourceId: 310,
+      fullScore: '100.00',
+      weight: '1.00',
+      includedInFinal: true,
+      enabled: true,
+      sortOrder: 1
+    }]);
+    await flushPromises();
+
+    expect(analysisGradeItemSelect.text()).toContain('新课程实验');
+    expect(analysisGradeItemSelect.text()).not.toContain('旧课程实验');
+    expect(wrapper.get('[data-testid="grade-analysis-panel"]').text()).toContain('新课程实验');
+    expect(wrapper.get('[data-testid="grade-analysis-panel"]').text()).not.toContain('成绩项已不可用');
+  });
+
   it('filters grade review requests by approved status and renders processed results without action buttons', async () => {
     vi.mocked(gradeRecordsApi.listCourseGrades).mockResolvedValue({
       records: [],
