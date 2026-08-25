@@ -4,8 +4,10 @@ sequenceDiagram
   Teacher->>System: OP-GR-02 同步来源成绩并生成总评
   alt 来源同步与重算成功
     System-->>Teacher: 返回成绩总表和发布前校验结果
-  else 来源同步失败、规则非法或权限不足
-    System-->>Teacher: 返回失败原因和可重试提示，不生成不可解释总评
+  else 来源同步失败：提供方抛出未映射异常
+    System-->>Teacher: HTTP 500，code=500，系统错误，请联系管理员；事务回滚
+  else 规则非法或权限不足
+    System-->>Teacher: 返回 ERR-GRD-03/400 或 ERR-GRD-01/403
   end
   Teacher->>System: OP-GR-03 发布成绩
   alt 发布成功

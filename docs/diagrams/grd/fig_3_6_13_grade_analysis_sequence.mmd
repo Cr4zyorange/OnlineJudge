@@ -11,30 +11,37 @@ sequenceDiagram
   Teacher->>View: 选择课程总评或成绩项维度
   View->>Controller: GET /courses/{courseId}/grade-analysis
   Controller->>Service: analyzeCourseGrades(courseId,teacherId,targetType,gradeItemId)
-  Service->>Permission: canManageCourseGrade(courseId,teacherId)
-  opt GRADE_ITEM 维度
-    Service->>ItemRepo: findById(gradeItemId) 并校验课程
-  end
-  Service->>Permission: listCourseStudentIds(courseId)
-  Permission-->>Service: 当前有效学生编号
-  alt GRADE_ITEM 维度
-    Service->>RecordRepo: findAnalysisSourceVersion(courseId,gradeItemId)
-  else COURSE_TOTAL 维度
-    Service->>SummaryRepo: findAnalysisSourceVersion(courseId)
-  end
-  Service->>SnapshotRepo: findLatest(courseId,targetType,gradeItemId)
-  alt 契约/学生集合/来源版本指纹一致且计数完整
-    SnapshotRepo-->>Service: 返回可复用快照
-  else 快照缺失或失效
-    alt GRADE_ITEM 维度
-      Service->>RecordRepo: findByCourseId(courseId)
-      RecordRepo-->>Service: 课程成绩记录集合
-    else COURSE_TOTAL 维度
-      Service->>SummaryRepo: findByCourseId(courseId)
-      SummaryRepo-->>Service: 课程总评集合
+  Service->>Permission: canManageCourse(courseId,teacherId)
+  alt 无课程管理权限
+    Permission-->>Service: false
+    Service-->>Controller: GradeItemPermissionException (ERR-GRD-01, 403)
+    Controller-->>View: 无教学分析权限提示
+  else 有课程管理权限
+    Permission-->>Service: true
+    opt GRADE_ITEM 维度
+      Service->>ItemRepo: findById(gradeItemId) 并校验课程
     end
-    Service->>Service: 计算指标、分布和空态计数
-    Service->>SnapshotRepo: save(新快照)
+    Service->>Permission: listCourseStudentIds(courseId)
+    Permission-->>Service: 当前有效学生编号
+    alt GRADE_ITEM 维度
+      Service->>RecordRepo: findAnalysisSourceVersion(courseId,gradeItemId)
+    else COURSE_TOTAL 维度
+      Service->>SummaryRepo: findAnalysisSourceVersion(courseId)
+    end
+    Service->>SnapshotRepo: findLatest(courseId,targetType,gradeItemId)
+    alt 契约/学生集合/来源版本指纹一致且计数完整
+      SnapshotRepo-->>Service: 返回可复用快照
+    else 快照缺失或失效
+      alt GRADE_ITEM 维度
+        Service->>RecordRepo: findByCourseId(courseId)
+        RecordRepo-->>Service: 课程成绩记录集合
+      else COURSE_TOTAL 维度
+        Service->>SummaryRepo: findByCourseId(courseId)
+        SummaryRepo-->>Service: 课程总评集合
+      end
+      Service->>Service: 计算指标、分布和空态计数
+      Service->>SnapshotRepo: save(新快照)
+    end
+    Service-->>Controller: GradeAnalysisResult + sourceDataTime
+    Controller-->>View: 指标或可解释空态
   end
-  Service-->>Controller: GradeAnalysisResult + sourceDataTime
-  Controller-->>View: 指标或可解释空态
