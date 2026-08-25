@@ -72,3 +72,41 @@ test('GRD uses the shared E2E runner for main, alternative, and exception paths'
   assert.match(spec, /\/api\/v1\/courses\/\$\{courseId\}\/grade-review-requests/);
   assert.match(spec, /\/api\/v1\/notifications/);
 });
+
+test('GRD SSD branches and responses match the implemented API contracts', () => {
+  const gradeItemSsd = readRepositoryFile('docs/diagrams/srs/fig_4_20_grade_item_config_ssd.mmd');
+  const gradeReviewSsd = readRepositoryFile('docs/diagrams/srs/fig_4_22_grade_review_ssd.mmd');
+  const srs = readRepositoryFile('docs/最终提交/软件需求规格说明书.md');
+  const gradeItemUseCase = srs.slice(
+    srs.indexOf('## 4.11 UC-GR-02'),
+    srs.indexOf('## 4.12 UC-GR-03')
+  );
+
+  assert.doesNotMatch(gradeItemSsd, /来源任务存在|来源不存在/);
+  assert.match(gradeItemSsd, /来源编号/);
+  assert.doesNotMatch(gradeItemUseCase, /来源存在性|来源不存在/);
+  assert.doesNotMatch(srs, /\| OP-GR-01 \|[^\n]*来源不存在/);
+
+  assert.doesNotMatch(gradeReviewSsd, /教师通知状态/);
+  assert.match(gradeReviewSsd, /requestId.*PENDING.*submittedAt/);
+});
+
+test('GRD mutating lifecycle only runs through the disposable database wrapper', () => {
+  const runnerPath = 'scripts/test/run-grd-e2e-disposable.sh';
+  assert.equal(existsSync(resolve(repositoryRoot, runnerPath)), true, `missing ${runnerPath}`);
+
+  const runner = readRepositoryFile(runnerPath);
+  const spec = readRepositoryFile('frontend/tests/e2e/grd/grade-lifecycle.spec.ts');
+  const e2eReadme = readRepositoryFile('frontend/tests/e2e/README.md');
+  const packageJson = JSON.parse(readRepositoryFile('frontend/package.json'));
+
+  assert.match(runner, /mktemp -d/);
+  assert.match(runner, /SPRING_DATASOURCE_URL/);
+  assert.match(runner, /trap cleanup/);
+  assert.match(runner, /E2E_GRD_DISPOSABLE_RUN=1/);
+  assert.match(runner, /tests\/e2e\/grd\/grade-lifecycle\.spec\.ts/);
+  assert.match(spec, /process\.env\.E2E_GRD_DISPOSABLE_RUN/);
+  assert.match(spec, /test\.skip/);
+  assert.equal(packageJson.scripts['test:e2e:grd:disposable'], 'bash ../scripts/test/run-grd-e2e-disposable.sh');
+  assert.match(e2eReadme, /npm run test:e2e:grd:disposable/);
+});

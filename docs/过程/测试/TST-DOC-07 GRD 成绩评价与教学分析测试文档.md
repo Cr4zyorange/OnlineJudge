@@ -5,7 +5,7 @@
 | 文档名称 | GRD 成绩评价与教学分析测试文档 |
 | 项目名称 | 在线教学与实训平台 |
 | 所属阶段 | 系统测试与验收测试 |
-| 报告版本 | V1.1 |
+| 报告版本 | V1.2 |
 | 编写日期 | 2026-08-25 |
 | 编写人 | GRD 模块负责人 |
 | 对应 issue | #158、#266 D2-GRD 业务场景文档与测试闭环 |
@@ -20,6 +20,7 @@
 | --- | --- | --- | --- |
 | V1.0 | 2026-06-10 | GRD 模块负责人 | 按 #152 统一结构整理 GRD 测试范围、测试数据、用例追踪、自动化执行日志、手工验收点和残余风险 |
 | V1.1 | 2026-08-25 | GRD 模块负责人 | 按 #266 补齐来源超时/删除回归、真实 LAB/HWK → GRD → LRN 共享 E2E、权限与幂等边界，并回填当前基线证据 |
+| V1.2 | 2026-08-25 | GRD 模块负责人 | 按 PR #270 评审意见对齐成绩项/异议响应真实契约，并将变异型 E2E 收口到自动清理的 disposable H2 包装入口 |
 
 ### 1.2 审批记录
 
@@ -33,7 +34,7 @@
 
 本文件用于记录 GRD 成绩评价与教学分析模块在当前版本下的测试依据、测试环境、测试数据、测试用例、执行结果、手工验收清单、缺陷风险和验收结论。覆盖范围对齐 `FR-GR-01 ~ FR-GR-07`、`NFR-GR-01 ~ NFR-GR-05`、`UI-GRD-01 ~ UI-GRD-10`、`API-GRD-01 ~ API-GRD-21`、`DB-GRD-01 ~ DB-GRD-08`、`TC-GR-01 ~ TC-GR-12`。
 
-当前已执行 GRD 后端 Spring Boot 自动化测试、前端 Vue/Vitest 单元测试、文档/E2E 契约测试，并在独立 H2 文件库中通过共享 Playwright runner 调用真实 AUTH、CRS、LAB、HWK、GRD、LRN API。闭环覆盖教师和学生真实登录、课程和成员创建、LAB/HWK 提交与评分、成绩项同步和重算、缺失成绩、完整/部分发布、学生查询、异议复核、LRN 发布/复核通知、重复同步/发布幂等、权限拒绝和异常参数。页面视觉状态与生产级性能压测仍列为专项验收项。
+当前已执行 GRD 后端 Spring Boot 自动化测试、前端 Vue/Vitest 单元测试、文档/E2E 契约测试，并通过 disposable 包装入口在独立临时 H2 文件库中调用真实 AUTH、CRS、LAB、HWK、GRD、LRN API。包装脚本在成功、失败和中断时均停止后端并删除临时数据，直接共享环境运行时该变异型场景跳过。闭环覆盖教师和学生真实登录、课程和成员创建、LAB/HWK 提交与评分、成绩项同步和重算、缺失成绩、完整/部分发布、学生查询、异议复核、LRN 发布/复核通知、重复同步/发布幂等、权限拒绝和异常参数。页面视觉状态与生产级性能压测仍列为专项验收项。
 
 ## 3 测试依据
 
@@ -58,7 +59,7 @@
 
 | 编号 | 测试对象 | 主要验证点 | 当前覆盖状态 |
 | --- | --- | --- | --- |
-| FR-GR-01 | 成绩项配置与计算规则 | 成绩项查询、创建、修改、停用、规则校验、权重和来源合法性 | 后端和前端自动化已覆盖 |
+| FR-GR-01 | 成绩项配置与计算规则 | 成绩项查询、创建、修改、停用、规则校验、权重、来源类型和正整数编号 | 后端和前端自动化已覆盖；来源可用性由同步测试覆盖 |
 | FR-GR-02 | 成绩汇总与总评生成 | 同步 LAB/HWK 来源成绩、缺失/未评分状态、加权分和总评计算 | 后端、前端和真实来源 API E2E 已覆盖 |
 | FR-GR-03 | 教师成绩管理 | 教师总表、学生明细、单项成绩调整、总评调整、变更记录 | 后端和前端自动化已覆盖 |
 | FR-GR-04 | 成绩发布与状态控制 | 发布前检查、发布记录、发布后学生可见、重复发布幂等、发布后调整留痕 | 后端、前端和真实 API E2E 已覆盖 |
@@ -122,8 +123,8 @@
 | --- | --- | --- |
 | 后端 GRD 相关测试 | `mvn test -Dtest=GradeItemControllerTest,GradeRecordControllerTest,GradeItemMigrationTest,GradeAnalysisServiceTest,GradeItemServiceTest,GradeRecordServiceTest,GradeReviewServiceTest,GrdLrnIntegrationTest` | 8 个测试类通过，63 条通过，0 失败，0 错误，0 跳过 |
 | 前端 GRD 单元测试 | `node node_modules/vitest/vitest.mjs run tests/unit/grd/gradeItemsApi.spec.ts tests/unit/grd/gradeRecordsApi.spec.ts tests/unit/grd/GradeItemConfigView.spec.ts tests/unit/grd/TeacherGradeTableView.spec.ts tests/unit/grd/App.spec.ts src/views/grd/StudentGradeView.spec.ts --pool=threads` | 6 个测试文件通过，40 条测试通过 |
-| GRD 文档/E2E 契约 | `node --test tests/contracts/grd-doc-test-closure.contract.test.mjs` | 3 条通过，0 失败 |
-| 真实跨模块 E2E | `E2E_BASE_URL=http://127.0.0.1:18080 E2E_FAILURE_ARTIFACTS=off E2E_BROWSER_CHANNEL=chrome npm run test:e2e -- tests/e2e/grd/grade-lifecycle.spec.ts --workers=1` | 1 条闭环场景通过，0 失败 |
+| GRD 文档/E2E 契约 | `node --test tests/contracts/grd-doc-test-closure.contract.test.mjs` | 5 条通过，0 失败 |
+| 真实跨模块 E2E | `E2E_BROWSER_CHANNEL=chrome npm run test:e2e:grd:disposable` | 1 条 disposable 闭环场景通过，0 失败；临时后端和 H2 数据自动清理 |
 
 说明：前端测试运行时 Node 输出 `--localstorage-file` 未提供有效路径的警告，测试断言全部通过；该警告不影响 GRD 页面、路由和 API 用例结果。
 
@@ -131,7 +132,7 @@
 
 | 用例编号 | 对应需求 | 覆盖对象 | 前置条件/测试数据 | 操作步骤 | 预期结果 | 实际结果 | 通过状态 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| TC-GR-01 | FR-GR-01 | UI-GRD-01；API-GRD-01 ~ 05、07；DB-GRD-01、05 | 教师具备课程管理权限；准备 LAB/HWK 来源任务、满分、权重、排序数据 | 查询、创建、修改、停用成绩项，执行规则校验 | 合法规则保存成功；非法权重、重复名称、非法来源被拒绝 | `GradeItemControllerTest`、`GradeItemServiceTest`、`GradeItemConfigView.spec.ts`、`gradeItemsApi.spec.ts` 通过 | 通过 |
+| TC-GR-01 | FR-GR-01 | UI-GRD-01；API-GRD-01 ~ 05、07；DB-GRD-01、05 | 教师具备课程管理权限；准备 LAB/HWK 来源编号、满分、权重、排序数据 | 查询、创建、修改、停用成绩项，执行规则校验 | 合法规则保存成功；非法权重、重复名称、不支持的来源类型或非正数编号被拒绝；任务可用性在同步时确认 | `GradeItemControllerTest`、`GradeItemServiceTest`、`GradeItemConfigView.spec.ts`、`gradeItemsApi.spec.ts` 通过 | 通过 |
 | TC-GR-02 | FR-GR-02 | UI-GRD-02；API-GRD-06 ~ 09；DB-GRD-02、03、05 | 课程内有学生名单；LAB/HWK 来源成绩含已评分、缺失、未提交、未评分状态 | 教师同步来源成绩并查询成绩总表和学生明细 | 生成成绩记录、计算加权分和总评，缺失状态可见 | `teacherSyncsLabAndHomeworkSourceGradesThenCalculatesFinalScores`、`TeacherGradeTableView.spec.ts` 同步用例通过 | 通过 |
 | TC-GR-03 | FR-GR-03 | UI-GRD-02、03、04、08；API-GRD-08 ~ 14；DB-GRD-02、03、07 | 已有成绩记录和课程总评；教师填写调整原因 | 查询总表、进入学生明细、调整单项成绩和总评、查询变更记录 | 分数更新，已发布成绩不回退未发布，变更记录保存旧值、新值、原因和操作人 | `teacherAdjustsGradeRecordWithReasonAndQueriesChangeLogsThroughApi`、`teacherAdjustsCourseFinalScoreWithReasonAndKeepsChangeLog`、前端明细调整用例通过 | 通过 |
 | TC-GR-04 | FR-GR-04 | UI-GRD-05；API-GRD-12 ~ 14；DB-GRD-02、03、04、07 | 成绩已计算且可发布；存在选中学生范围 | 教师发布成绩，重复执行同一范围发布，查询发布记录 | 发布后学生可见，记录发布批次，重复发布幂等，不重复通知 | `teacherPublishesSelectedGradesAndEmitsGradePublishedEvent`、`repeatedPublishUsesRangeIdempotencyKeyAndDoesNotNotifyAgain`、前端发布记录用例通过 | 通过 |
@@ -205,17 +206,18 @@
 | GRD-266-LOG-001 | `GradeRecordServiceTest` | 13 passed / 0 failed / 0 errors / 0 skipped |
 | GRD-266-LOG-002 | GRD Controller、Service、Migration、`GrdLrnIntegrationTest` 共 8 类 | 63 passed / 0 failed / 0 errors / 0 skipped；Maven BUILD SUCCESS |
 | GRD-266-LOG-003 | 6 个 GRD Vitest 文件 | 6 files passed / 40 tests passed |
-| GRD-266-LOG-004 | 文档/E2E 契约 | 3 passed / 0 failed |
-| GRD-266-LOG-005 | 独立后端 18080 + 共享 Playwright runner + 系统 Chrome | 1 real API lifecycle passed / 0 failed；耗时 2.5s |
+| GRD-266-LOG-004 | 文档/E2E 契约 | 5 passed / 0 failed |
+| GRD-266-LOG-005 | disposable 包装入口 + 临时 H2 + 共享 Playwright runner + 系统 Chrome | 1 real API lifecycle passed / 0 failed；退出后后端和临时数据均清理 |
 | GRD-266-LOG-006 | `npm run typecheck` | 通过 |
 | GRD-266-LOG-007 | `npm run build` | Vite 生产构建通过，189 modules transformed |
 | GRD-266-LOG-008 | `git diff --check` | 通过 |
+| GRD-266-LOG-009 | disposable 失败清理自测：错误教师密码 + 端口 18081 | Playwright 按预期非零退出；包装脚本停止后端，端口无监听，临时 H2 目录无残留 |
 
 ## 9 手工测试与联调确认
 
 | 手测编号 | 模块 | 场景 | 操作要点 | 预期结果 | 当前结果 |
 | --- | --- | --- | --- | --- | --- |
-| MAN-GRD-001 | GRD/AUTH/CRS | 教师配置成绩项 | 浏览器登录教师账号，进入课程成绩项配置页，创建 LAB/HWK 来源成绩项并校验权重 | 成绩项保存成功，非法权重和非法来源提示明确 | 待手工验收 |
+| MAN-GRD-001 | GRD/AUTH/CRS | 教师配置成绩项 | 浏览器登录教师账号，进入课程成绩项配置页，创建 LAB/HWK 来源成绩项并校验权重 | 成绩项保存成功，非法权重、来源类型或非正数编号提示明确；来源任务可用性在同步时反馈 | 待手工验收 |
 | MAN-GRD-002 | GRD/LAB/HWK | 同步来源成绩并计算总评 | 准备真实实验/作业评分，教师触发同步和重算 | 成绩记录、加权分、缺失状态、总评与 LAB/HWK 来源一致 | 真实 API E2E 已通过 |
 | MAN-GRD-003 | GRD | 教师成绩总表与学生明细 | 教师筛选分页查看成绩总表，打开学生明细，查看来源任务和状态 | 总表分页、筛选、明细、缺失状态和来源信息正确 | 待手工验收 |
 | MAN-GRD-004 | GRD/LRN | 成绩发布与学生可见 | 教师发布成绩，学生刷新个人成绩页，通知中心查看成绩发布通知 | 发布记录保存，学生只能看到本人已发布成绩，LRN 通知可见 | API 与通知查询 E2E 已通过；页面视觉待验收 |
@@ -257,7 +259,7 @@ mvn test -Dtest=GradeItemControllerTest,GradeRecordControllerTest,GradeItemMigra
 cd /Users/xigma/Library/CloudStorage/OneDrive-个人/github/OnlineJudge/frontend
 node node_modules/vitest/vitest.mjs run tests/unit/grd/gradeItemsApi.spec.ts tests/unit/grd/gradeRecordsApi.spec.ts tests/unit/grd/GradeItemConfigView.spec.ts tests/unit/grd/TeacherGradeTableView.spec.ts tests/unit/grd/App.spec.ts src/views/grd/StudentGradeView.spec.ts --pool=threads
 node --test tests/contracts/grd-doc-test-closure.contract.test.mjs
-E2E_BASE_URL=http://127.0.0.1:18080 E2E_FAILURE_ARTIFACTS=off E2E_BROWSER_CHANNEL=chrome npm run test:e2e -- tests/e2e/grd/grade-lifecycle.spec.ts --workers=1
+E2E_BROWSER_CHANNEL=chrome npm run test:e2e:grd:disposable
 ```
 
 ### 12.2 本次执行摘要
@@ -266,7 +268,7 @@ E2E_BASE_URL=http://127.0.0.1:18080 E2E_FAILURE_ARTIFACTS=off E2E_BROWSER_CHANNE
 | --- | --- |
 | 后端 GRD 自动化测试 | 8 个测试类，63 passed / 0 failed / 0 errors / 0 skipped |
 | 前端 GRD 自动化测试 | 6 files passed / 40 tests passed |
-| 文档/E2E 契约 | 3 passed / 0 failed |
+| 文档/E2E 契约 | 5 passed / 0 failed |
 | 真实跨模块 E2E | 1 passed / 0 failed；LAB/HWK → GRD → LRN 主成功、备选、异常、权限和幂等边界 |
 | 自动化覆盖 | 成绩项、规则校验、来源同步/超时/删除/缺失、总评计算、成绩调整、完整/部分发布、学生查询、教学分析、异议复核、权限、日志、通知、快照 |
 | 手工/专项状态 | 真实 API 联调已完成；待补 UI 视觉验收和生产规模性能记录 |

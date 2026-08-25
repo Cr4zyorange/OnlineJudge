@@ -41,6 +41,11 @@ const DEMO_TEACHER = {
 };
 
 test.describe('@grd GRD real source lifecycle', () => {
+  test.skip(
+    process.env.E2E_GRD_DISPOSABLE_RUN !== '1',
+    'Mutating GRD lifecycle must run through npm run test:e2e:grd:disposable'
+  );
+
   test('@grd-main @grd-alternative @grd-exception runs LAB/HWK -> GRD -> LRN with real APIs', async ({ request }, testInfo) => {
     test.setTimeout(120_000);
 

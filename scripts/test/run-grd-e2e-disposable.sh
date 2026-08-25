@@ -1,0 +1,107 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+repo_root="$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"
+backend_dir="$repo_root/backend"
+frontend_dir="$repo_root/frontend"
+backend_jar="$backend_dir/target/onlinejudge-backend-0.1.0-SNAPSHOT.jar"
+e2e_port="${E2E_GRD_PORT:-18080}"
+temp_dir=""
+backend_pid=""
+backend_log=""
+
+fail() {
+  printf 'run-grd-e2e-disposable: %s\n' "$1" >&2
+  exit 1
+}
+
+cleanup() {
+  local status=$?
+  trap - EXIT INT TERM
+
+  if [[ -n "$backend_pid" ]] && kill -0 "$backend_pid" 2>/dev/null; then
+    kill "$backend_pid" 2>/dev/null || true
+    for _ in {1..50}; do
+      kill -0 "$backend_pid" 2>/dev/null || break
+      sleep 0.1
+    done
+    if kill -0 "$backend_pid" 2>/dev/null; then
+      kill -9 "$backend_pid" 2>/dev/null || true
+    fi
+    wait "$backend_pid" 2>/dev/null || true
+  fi
+
+  if [[ "$status" -ne 0 && -n "$backend_log" && -s "$backend_log" ]]; then
+    printf '%s\n' '--- disposable GRD backend log (tail) ---' >&2
+    tail -n 120 "$backend_log" >&2
+  fi
+
+  if [[ -n "$temp_dir" && -d "$temp_dir" ]]; then
+    if [[ "$(basename -- "$temp_dir")" == onlinejudge-grd-e2e.* ]]; then
+      rm -rf -- "$temp_dir"
+    else
+      printf 'run-grd-e2e-disposable: refusing to remove unexpected temp path: %s\n' "$temp_dir" >&2
+      status=1
+    fi
+  fi
+
+  exit "$status"
+}
+
+[[ "$e2e_port" =~ ^[1-9][0-9]{3,4}$ ]] || fail 'E2E_GRD_PORT must be an integer from 1000 to 99999'
+((e2e_port <= 65535)) || fail 'E2E_GRD_PORT must not exceed 65535'
+
+for command_name in java mvn npm curl mktemp; do
+  command -v "$command_name" >/dev/null 2>&1 || fail "$command_name is required"
+done
+
+umask 077
+temp_dir="$(mktemp -d "${TMPDIR:-/tmp}/onlinejudge-grd-e2e.XXXXXX")"
+backend_log="$temp_dir/backend.log"
+trap cleanup EXIT
+trap 'exit 130' INT TERM
+
+if curl --silent --fail --max-time 1 "http://127.0.0.1:$e2e_port/api/v1/system/health" >/dev/null 2>&1; then
+  fail "port $e2e_port already serves an application; choose another E2E_GRD_PORT"
+fi
+
+(
+  cd "$backend_dir"
+  mvn -q -DskipTests package
+)
+
+[[ -f "$backend_jar" ]] || fail "backend jar not found: $backend_jar"
+
+(
+  cd "$backend_dir"
+  exec env \
+    SPRING_DATASOURCE_URL="jdbc:h2:file:$temp_dir/onlinejudge;MODE=MySQL;DATABASE_TO_LOWER=TRUE;CASE_INSENSITIVE_IDENTIFIERS=TRUE;AUTO_SERVER=TRUE" \
+    SERVER_ADDRESS=127.0.0.1 \
+    SERVER_PORT="$e2e_port" \
+    ONLINEJUDGE_STORAGE_LOCAL_ROOT="$temp_dir/uploads" \
+    java -jar "$backend_jar"
+) >"$backend_log" 2>&1 &
+backend_pid=$!
+
+backend_ready=0
+for _ in {1..120}; do
+  if curl --silent --fail --max-time 1 "http://127.0.0.1:$e2e_port/api/v1/system/health" >/dev/null 2>&1; then
+    backend_ready=1
+    break
+  fi
+  if ! kill -0 "$backend_pid" 2>/dev/null; then
+    wait "$backend_pid" 2>/dev/null || true
+    fail 'isolated backend exited before becoming healthy'
+  fi
+  sleep 0.25
+done
+
+[[ "$backend_ready" -eq 1 ]] || fail 'isolated backend did not become healthy within 30 seconds'
+
+(
+  cd "$frontend_dir"
+  E2E_BASE_URL="http://127.0.0.1:$e2e_port" \
+  E2E_GRD_DISPOSABLE_RUN=1 \
+    npm run test:e2e -- tests/e2e/grd/grade-lifecycle.spec.ts --workers=1
+)

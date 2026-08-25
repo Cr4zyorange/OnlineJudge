@@ -29,6 +29,18 @@ npm run test:e2e -- tests/e2e/shared/application.smoke.spec.ts
 npm run test:e2e -- --grep @smoke
 ```
 
+GRD 成绩生命周期会创建用户、课程、LAB/HWK、提交、成绩、复核和通知，因此禁止直接指向默认 Compose/MySQL 或任意共享环境运行。只能使用仓库提供的 disposable 包装命令；该命令构建后端、在临时目录启动独立 H2 文件库、运行共享 Playwright spec，并通过 `trap` 在成功、失败或中断时停止后端和删除全部临时数据：
+
+```bash
+# Chromium 已由 Playwright 安装时
+npm run test:e2e:grd:disposable
+
+# 本机只安装了 Chrome 时
+E2E_BROWSER_CHANNEL=chrome npm run test:e2e:grd:disposable
+```
+
+直接通过 `npm run test:e2e` 或传入任意 `E2E_BASE_URL` 时，变异型 GRD 生命周期用例会跳过。可用 `E2E_GRD_PORT` 覆盖 disposable 后端端口；端口已被服务占用时包装脚本会拒绝启动，不会复用现有应用。
+
 公共运行器契约与“断言失败必须非零退出”可重复验证：
 
 ```bash
