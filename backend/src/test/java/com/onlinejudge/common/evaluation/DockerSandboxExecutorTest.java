@@ -15,6 +15,11 @@ import java.util.Set;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class DockerSandboxExecutorTest {
+    private static final String DOCKER_API_UNAVAILABLE_ERROR =
+            "failed to connect to the docker API at unix:///var/run/docker.sock; "
+                    + "check if the path is correct and if the daemon is running: "
+                    + "dial unix /var/run/docker.sock: connect: no such file or directory";
+
     @Test
     void dockerCommandUsesContainerIsolationAndResourceLimits() {
         DockerSandboxExecutor executor = new DockerSandboxExecutor(
@@ -99,7 +104,7 @@ class DockerSandboxExecutorTest {
 
         assertThat(result.status()).isEqualTo(EvaluationStatus.SYSTEM_ERROR);
         assertThat(result.message()).isEqualTo("Docker 沙箱不可用");
-        assertThat(result.runLog()).contains("Cannot connect to the Docker daemon");
+        assertThat(result.runLog()).contains("failed to connect to the docker API");
     }
 
     @Test
@@ -128,7 +133,7 @@ class DockerSandboxExecutorTest {
 
         assertThat(result.status()).isEqualTo(EvaluationStatus.SYSTEM_ERROR);
         assertThat(result.message()).isEqualTo("Docker 沙箱不可用");
-        assertThat(result.runLog()).contains("Cannot connect to the Docker daemon");
+        assertThat(result.runLog()).contains("failed to connect to the docker API");
     }
 
     @Test
@@ -172,14 +177,14 @@ class DockerSandboxExecutorTest {
         return createFailingDockerCommand(
                 tempDir,
                 "docker-daemon-unavailable.cmd",
-                "Cannot connect to the Docker daemon. Is the docker daemon running?"
+                DOCKER_API_UNAVAILABLE_ERROR
         );
     }
 
     private Path createRunPhaseDaemonUnavailableCommand(Path tempDir) throws Exception {
         boolean windows = System.getProperty("os.name").toLowerCase().contains("win");
         Path command = tempDir.resolve(windows ? "run-phase-daemon-unavailable.cmd" : "run-phase-daemon-unavailable.sh");
-        String errorMessage = "Cannot connect to the Docker daemon. Is the docker daemon running?";
+        String errorMessage = DOCKER_API_UNAVAILABLE_ERROR;
         String script = windows
                 ? "@echo off\r\nif exist \"%~dp0compile-succeeded\" goto daemonUnavailable\r\necho compiled>\"%~dp0compile-succeeded\"\r\nexit /b 0\r\n:daemonUnavailable\r\necho "
                 + errorMessage + " 1>&2\r\nexit /b 1\r\n"
