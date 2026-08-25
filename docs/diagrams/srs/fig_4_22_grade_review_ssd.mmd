@@ -4,8 +4,9 @@ sequenceDiagram
   participant System as OnlineJudgeForSE 系统边界
   Student->>System: OP-GR-05 提交本人已发布成绩异议
   alt 目标可复核且无重复 PENDING 申请
-    System-->>Student: 返回 PENDING 申请和教师通知状态
-    System-->>Teacher: 待处理复核申请可见
+    System-->>Student: 返回 requestId、PENDING 和 submittedAt
+    Note over Student,System: 教师通知异步持久化，不进入本次响应
+    System-->>Teacher: 待处理复核申请可查询
     Teacher->>System: OP-GR-05 同意修改或驳回复核申请
     System-->>Teacher: 返回处理状态和成绩变更留痕
     System-->>Student: 复核结果和通知可见

@@ -2,8 +2,8 @@ sequenceDiagram
   actor Teacher as 教师
   participant System as OnlineJudgeForSE 系统边界
   Teacher->>System: OP-GR-01 保存成绩项与计算规则
-  alt 规则合法且来源任务存在
+  alt 字段与规则合法（来源编号为正数）
     System-->>Teacher: 返回成绩项、规则校验结果和重算提示
-  else 权重/满分/来源/权限非法
+  else 字段/规则/权限非法
     System-->>Teacher: 返回受控错误且不修改既有规则
   end
