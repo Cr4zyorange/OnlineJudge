@@ -103,6 +103,35 @@ class DockerSandboxExecutorTest {
     }
 
     @Test
+    void unavailableDockerDaemonDuringRunIsReportedAsSystemError(@TempDir Path tempDir) throws Exception {
+        Path dockerCommand = createRunPhaseDaemonUnavailableCommand(tempDir);
+        DockerSandboxExecutor executor = new DockerSandboxExecutor(
+                dockerCommand.toString(),
+                "python:3.12-alpine",
+                1.0,
+                64,
+                "16m"
+        );
+
+        SandboxExecutionResult result = executor.execute(new EvaluationTask(
+                "daemon-unavailable-during-run",
+                "LAB",
+                1L,
+                1L,
+                1L,
+                1L,
+                "python",
+                "print('valid python')",
+                Map.of("stdin", "", "timeLimitMs", "3000", "memoryLimitKb", "65536"),
+                LocalDateTime.now()
+        ));
+
+        assertThat(result.status()).isEqualTo(EvaluationStatus.SYSTEM_ERROR);
+        assertThat(result.message()).isEqualTo("Docker 沙箱不可用");
+        assertThat(result.runLog()).contains("Cannot connect to the Docker daemon");
+    }
+
+    @Test
     void ordinaryCompilerFailureRemainsCompileError(@TempDir Path tempDir) throws Exception {
         Path dockerCommand = createFailingDockerCommand(
                 tempDir,
@@ -145,6 +174,26 @@ class DockerSandboxExecutorTest {
                 "docker-daemon-unavailable.cmd",
                 "Cannot connect to the Docker daemon. Is the docker daemon running?"
         );
+    }
+
+    private Path createRunPhaseDaemonUnavailableCommand(Path tempDir) throws Exception {
+        boolean windows = System.getProperty("os.name").toLowerCase().contains("win");
+        Path command = tempDir.resolve(windows ? "run-phase-daemon-unavailable.cmd" : "run-phase-daemon-unavailable.sh");
+        String errorMessage = "Cannot connect to the Docker daemon. Is the docker daemon running?";
+        String script = windows
+                ? "@echo off\r\nif exist \"%~dp0compile-succeeded\" goto daemonUnavailable\r\necho compiled>\"%~dp0compile-succeeded\"\r\nexit /b 0\r\n:daemonUnavailable\r\necho "
+                + errorMessage + " 1>&2\r\nexit /b 1\r\n"
+                : "#!/bin/sh\nscript_dir=$(dirname \"$0\")\nif [ -f \"$script_dir/compile-succeeded\" ]; then\n  echo '"
+                + errorMessage + "' >&2\n  exit 1\nfi\ntouch \"$script_dir/compile-succeeded\"\nexit 0\n";
+        Files.writeString(command, script, StandardCharsets.UTF_8);
+        if (!windows) {
+            Files.setPosixFilePermissions(command, Set.of(
+                    PosixFilePermission.OWNER_READ,
+                    PosixFilePermission.OWNER_WRITE,
+                    PosixFilePermission.OWNER_EXECUTE
+            ));
+        }
+        return command;
     }
 
     private Path createFailingDockerCommand(Path tempDir, String fileName, String errorMessage) throws Exception {
