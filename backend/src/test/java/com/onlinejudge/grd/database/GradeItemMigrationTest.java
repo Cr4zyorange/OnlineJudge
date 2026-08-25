@@ -22,6 +22,8 @@ import org.springframework.context.annotation.Import;
 import org.springframework.test.context.jdbc.Sql;
 
 import java.math.BigDecimal;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.time.LocalDateTime;
 
@@ -292,5 +294,31 @@ class GradeItemMigrationTest {
                     assertThat(Duration.between(saved.generatedAt(), snapshot.generatedAt()).abs())
                             .isLessThanOrEqualTo(Duration.ofNanos(1_000));
                 });
+    }
+
+    @Test
+    void mysqlSchemasPreserveVersionedFingerprintsCountsAndSourceVersions() throws Exception {
+        String fingerprintMigration = Files.readString(Path.of(
+                "../database/migrations/20260825_01_add_grd_analysis_source_fingerprint.sql"
+        ));
+        String sourceVersionMigration = Files.readString(Path.of(
+                "../database/migrations/20260825_02_add_grd_analysis_source_version.sql"
+        ));
+        String cleanSchema = Files.readString(Path.of("../database/mysql/compose-schema.sql"));
+
+        assertThat(fingerprintMigration)
+                .contains("ADD COLUMN source_fingerprint VARCHAR(96)")
+                .contains("MODIFY COLUMN source_fingerprint VARCHAR(96)");
+        assertThat(sourceVersionMigration)
+                .contains("total_student_count INT NULL")
+                .contains("completed_count INT NULL")
+                .contains("missing_count INT NULL")
+                .contains("unsubmitted_count INT NULL")
+                .contains("ungraded_count INT NULL")
+                .contains("CREATE TABLE IF NOT EXISTS t_grade_analysis_source_version");
+        assertThat(cleanSchema)
+                .contains("source_fingerprint VARCHAR(96) NULL")
+                .contains("total_student_count INT NULL")
+                .contains("CREATE TABLE IF NOT EXISTS t_grade_analysis_source_version");
     }
 }
