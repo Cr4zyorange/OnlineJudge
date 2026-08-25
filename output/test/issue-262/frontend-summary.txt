@@ -1,10 +1,10 @@
 Targeted Vitest files: 13
-Tests: 112
-Passed: 112
+Tests: 115
+Passed: 115
 Failures: 0
 Errors: 0
 Skipped: 0
-Duration: 12.76s
+Duration: 15.18s
 Result: PASS
 
 Typecheck: PASS

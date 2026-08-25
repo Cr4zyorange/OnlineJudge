@@ -1,21 +1,23 @@
 Entry: http://127.0.0.1:5173
 Browser: Google Chrome 151.0.7922.138
-Spec: frontend/tests/e2e/lrn/lrn-business-closure.spec.ts
-Tests: 3
-Passed: 2
-Failures: 1
+Specs: frontend/tests/e2e/lrn/lrn-business-closure.spec.ts + notification-read-on-open.spec.ts
+Tests: 4
+Passed: 4
+Failures: 0
 Errors: 0
 Skipped: 0
-Duration: 6.5s
-Result: FAIL
+Duration: 18.5s
+Result: PASS
 
 PASS:
+- real LAB/HWK/GRD changes create isolated notifications with auditable lifecycle
 - student opens every LRN page and saves reminder preferences on seeded real data
 - notification list reports a short disconnection and refreshes after recovery
+- marks a real LAB notification read before navigating and keeps repeated opens idempotent
 
-FAIL:
-- real LAB/HWK/GRD changes create isolated notifications with auditable lifecycle
-- exact assertion: after a valid LAB notification jump, expected isRead=true but received false
-- defect: https://github.com/Cr4zyorange/OnlineJudge/issues/269
+NOTE:
+- The first combined run had a setup-only timeout while loading `/` (3 passed / 1 failed).
+- The timed-out scenario passed alone, then the complete four-test suite passed cleanly.
+- Defect #269 is fixed in the #262 branch per owner instruction.
 
 Sensitive browser artifacts remain ignored under frontend/test-results/ and are not committed.
