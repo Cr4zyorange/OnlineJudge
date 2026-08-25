@@ -2,6 +2,7 @@ package com.onlinejudge.grd.repository;
 
 import com.onlinejudge.grd.domain.GradeRecord;
 import com.onlinejudge.grd.domain.GradeRecordRepository;
+import com.onlinejudge.grd.domain.GradeAnalysisSourceVersion;
 import com.onlinejudge.grd.domain.GradeStatus;
 import com.onlinejudge.grd.domain.PublishStatus;
 import com.onlinejudge.grd.domain.SourceType;
@@ -10,6 +11,7 @@ import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
 import org.springframework.jdbc.support.KeyHolder;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.sql.PreparedStatement;
 import java.sql.Timestamp;
@@ -40,12 +42,15 @@ public class JdbcGradeRecordRepository implements GradeRecordRepository {
     );
 
     private final JdbcTemplate jdbcTemplate;
+    private final JdbcGradeAnalysisSourceVersionStore sourceVersionStore;
 
     public JdbcGradeRecordRepository(JdbcTemplate jdbcTemplate) {
         this.jdbcTemplate = jdbcTemplate;
+        this.sourceVersionStore = new JdbcGradeAnalysisSourceVersionStore(jdbcTemplate);
     }
 
     @Override
+    @Transactional
     public GradeRecord upsert(GradeRecord record) {
         Optional<GradeRecord> existing = findByStudentAndItem(record.courseId(), record.studentId(), record.gradeItemId());
         if (existing.isPresent()) {
@@ -73,7 +78,9 @@ public class JdbcGradeRecordRepository implements GradeRecordRepository {
                     Timestamp.valueOf(record.updatedAt()),
                     existing.get().id()
             );
-            return findById(existing.get().id()).orElseThrow();
+            GradeRecord saved = findById(existing.get().id()).orElseThrow();
+            sourceVersionStore.bumpGradeItem(saved.courseId(), saved.gradeItemId(), saved.updatedAt());
+            return saved;
         }
 
         KeyHolder keyHolder = new GeneratedKeyHolder();
@@ -103,10 +110,13 @@ public class JdbcGradeRecordRepository implements GradeRecordRepository {
             return statement;
         }, keyHolder);
         long id = Objects.requireNonNull(keyHolder.getKey()).longValue();
-        return findById(id).orElseThrow();
+        GradeRecord saved = findById(id).orElseThrow();
+        sourceVersionStore.bumpGradeItem(saved.courseId(), saved.gradeItemId(), saved.updatedAt());
+        return saved;
     }
 
     @Override
+    @Transactional
     public GradeRecord update(GradeRecord record) {
         jdbcTemplate.update("""
                         UPDATE t_grade_record
@@ -132,7 +142,9 @@ public class JdbcGradeRecordRepository implements GradeRecordRepository {
                 Timestamp.valueOf(record.updatedAt()),
                 record.id()
         );
-        return findById(record.id()).orElseThrow();
+        GradeRecord saved = findById(record.id()).orElseThrow();
+        sourceVersionStore.bumpGradeItem(saved.courseId(), saved.gradeItemId(), saved.updatedAt());
+        return saved;
     }
 
     @Override
@@ -162,6 +174,11 @@ public class JdbcGradeRecordRepository implements GradeRecordRepository {
                 ROW_MAPPER,
                 id
         ).stream().findFirst();
+    }
+
+    @Override
+    public GradeAnalysisSourceVersion findAnalysisSourceVersion(long courseId, long gradeItemId) {
+        return sourceVersionStore.findGradeItem(courseId, gradeItemId);
     }
 
     private Optional<GradeRecord> findByStudentAndItem(long courseId, long studentId, long gradeItemId) {

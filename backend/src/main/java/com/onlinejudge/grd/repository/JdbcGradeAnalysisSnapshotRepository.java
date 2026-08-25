@@ -27,6 +27,11 @@ public class JdbcGradeAnalysisSnapshotRepository implements GradeAnalysisSnapsho
             resultSet.getBigDecimal("min_score"),
             resultSet.getBigDecimal("pass_rate"),
             resultSet.getBigDecimal("completion_rate"),
+            resultSet.getObject("total_student_count", Integer.class),
+            resultSet.getObject("completed_count", Integer.class),
+            resultSet.getObject("missing_count", Integer.class),
+            resultSet.getObject("unsubmitted_count", Integer.class),
+            resultSet.getObject("ungraded_count", Integer.class),
             resultSet.getString("distribution_json"),
             resultSet.getLong("generated_by"),
             resultSet.getTimestamp("generated_at").toLocalDateTime()
@@ -46,8 +51,9 @@ public class JdbcGradeAnalysisSnapshotRepository implements GradeAnalysisSnapsho
                     INSERT INTO t_grade_analysis_snapshot
                     (course_id, target_type, grade_item_id, source_data_time, source_fingerprint,
                      average_score, max_score, min_score, pass_rate, completion_rate,
+                     total_student_count, completed_count, missing_count, unsubmitted_count, ungraded_count,
                      distribution_json, generated_by, generated_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """, new String[]{"id"});
             statement.setLong(1, snapshot.courseId());
             statement.setString(2, snapshot.targetType());
@@ -59,9 +65,14 @@ public class JdbcGradeAnalysisSnapshotRepository implements GradeAnalysisSnapsho
             statement.setBigDecimal(8, snapshot.minScore());
             statement.setBigDecimal(9, snapshot.passRate());
             statement.setBigDecimal(10, snapshot.completionRate());
-            statement.setString(11, snapshot.distributionJson());
-            statement.setLong(12, snapshot.generatedBy());
-            statement.setTimestamp(13, Timestamp.valueOf(snapshot.generatedAt()));
+            statement.setObject(11, snapshot.totalStudentCount());
+            statement.setObject(12, snapshot.completedCount());
+            statement.setObject(13, snapshot.missingCount());
+            statement.setObject(14, snapshot.unsubmittedCount());
+            statement.setObject(15, snapshot.ungradedCount());
+            statement.setString(16, snapshot.distributionJson());
+            statement.setLong(17, snapshot.generatedBy());
+            statement.setTimestamp(18, Timestamp.valueOf(snapshot.generatedAt()));
             return statement;
         }, keyHolder);
         return snapshot.withId(Objects.requireNonNull(keyHolder.getKey()).longValue());
@@ -72,6 +83,7 @@ public class JdbcGradeAnalysisSnapshotRepository implements GradeAnalysisSnapsho
         return jdbcTemplate.query("""
                         SELECT id, course_id, target_type, grade_item_id, source_data_time, source_fingerprint,
                                average_score, max_score, min_score, pass_rate, completion_rate,
+                               total_student_count, completed_count, missing_count, unsubmitted_count, ungraded_count,
                                distribution_json, generated_by, generated_at
                         FROM t_grade_analysis_snapshot
                         WHERE course_id = ?

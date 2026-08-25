@@ -423,12 +423,17 @@ CREATE TABLE IF NOT EXISTS t_grade_analysis_snapshot (
     target_type VARCHAR(30) NOT NULL,
     grade_item_id BIGINT NULL,
     source_data_time DATETIME NOT NULL,
-    source_fingerprint VARCHAR(64) NULL,
+    source_fingerprint VARCHAR(96) NULL,
     average_score DECIMAL(6,2) NULL,
     max_score DECIMAL(6,2) NULL,
     min_score DECIMAL(6,2) NULL,
     pass_rate DECIMAL(6,4) NULL,
     completion_rate DECIMAL(6,4) NULL,
+    total_student_count INT NULL,
+    completed_count INT NULL,
+    missing_count INT NULL,
+    unsubmitted_count INT NULL,
+    ungraded_count INT NULL,
     distribution_json TEXT NULL,
     generated_by BIGINT NOT NULL,
     generated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -442,6 +447,19 @@ CREATE INDEX idx_grade_analysis_snapshot_source
     ON t_grade_analysis_snapshot (
         course_id, target_type, grade_item_id, source_fingerprint, generated_at
     );
+
+CREATE TABLE IF NOT EXISTS t_grade_analysis_source_version (
+    course_id BIGINT NOT NULL,
+    target_type VARCHAR(30) NOT NULL,
+    grade_item_key BIGINT NOT NULL,
+    source_version BIGINT NOT NULL,
+    source_data_time DATETIME NULL,
+    updated_at DATETIME NOT NULL,
+    PRIMARY KEY (course_id, target_type, grade_item_key)
+);
+
+CREATE INDEX idx_grade_analysis_source_version_updated
+    ON t_grade_analysis_source_version (updated_at);
 
 
 -- Source: database/migrations/20260525_02_create_lab_experiment.sql
