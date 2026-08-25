@@ -1,0 +1,11 @@
+sequenceDiagram
+  actor Student as 学生
+  participant System as 在线教学平台
+  Student->>System: 查看并保存提醒规则/偏好
+  System-->>Student: 返回有效规则状态
+  System->>System: 扫描即将截止 LAB/HWK 与未提交成员
+  alt 符合规则且偏好允许
+    System-->>Student: 生成站内提醒
+  else 已提交/关闭非必要提醒/写入失败
+    System->>System: 跳过或记录失败批次供复测
+  end

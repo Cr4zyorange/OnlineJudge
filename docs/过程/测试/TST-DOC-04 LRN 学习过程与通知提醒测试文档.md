@@ -5,12 +5,12 @@
 | 文档名称 | LRN 学习过程与通知提醒测试文档 |
 | 项目名称 | 在线教学与实训平台 |
 | 所属阶段 | 系统测试与验收测试 |
-| 报告版本 | V1.0 |
+| 报告版本 | V1.1 |
 | 编写日期 | 2026-06-10 |
 | 编写人 | LRN 模块负责人 |
-| 对应 issue | #155 TST-DOC-04 LRN 学习过程与通知提醒测试文档编写 |
+| 对应 issue | #155；#262 D2-LRN 业务场景文档与测试闭环 |
 | 测试范围 | 学习任务中心、学习进度、学习行为仪表盘、通知分类推送、通知已读/删除、提醒规则与通知偏好 |
-| 测试结论 | LRN 后端目标测试和前端目标测试已通过；真实浏览器端到端、跨模块生产事件投递和通知推送时延需测试负责人统一联调确认 |
+| 测试结论 | 历史结果仅作线索；#262 以最新执行 SHA 的 `output/test/issue-262/README.md` 为准，未逐项计时的性能项不得写 PASS |
 
 ## 1 文档控制
 
@@ -19,6 +19,7 @@
 | 版本 | 日期 | 修订人 | 修订说明 |
 | --- | --- | --- | --- |
 | V1.0 | 2026-06-10 | LRN 模块负责人 | 按 #155 和 TST-DOC-01 统一规范整理 LRN 测试范围、用例、自动化覆盖、执行日志、手工验收点和残余风险 |
+| V1.1 | 2026-08-25 | @luoZiHui-maker | 按 #262 增加场景/子流程闭环、真实 LAB/HWK/GRD 事件测试、共享 E2E 依赖和当前 SHA 证据规则 |
 
 ### 1.2 审批记录
 
@@ -34,6 +35,16 @@
 
 当前已执行 LRN 后端 Spring Boot 目标测试、LRN 前端 Vue/Vitest 目标测试和部分 CRS/LAB/HWK/GRD 跨模块触发测试。自动化覆盖了任务聚合与分页、学习进度保存和断点续传、教师课程进度聚合、学习行为统计和上报限流、通知分类生成和当前用户隔离、已读/删除状态日志、提醒规则保存、截止提醒扫描、失败记录与关键迁移约束。真实浏览器完整端到端、WebSocket 或轮询触达时延、生产跨模块事件链路仍列为手工或联调验收项。
 
+### 2.1 #262 场景与证据口径
+
+`LRN-SC-01 ~ LRN-SC-05` 对应任务中心、继续学习/进度、个人统计、通知管理/跳转、提醒配置/触达；`LRN-SUB-01 ~ LRN-SUB-05` 对应成员过滤、进度/行为/离线恢复、跨模块事件幂等、提醒扫描与失败日志、通知状态与安全跳转。它们全部归属正式 `UC-LRN-01`。教师课程学习统计为**候选独立场景**，本轮不新增 UC 编号。
+
+真实跨模块后端链由 `LrnCrossModuleEventIntegrationTest` 覆盖 LAB/HWK 发布入口，由 `GrdLrnIntegrationTest` 覆盖 GRD 发布/变更/复核入口；浏览器层必须复用 #267 的唯一 Playwright fixtures。每次结论只用 PASS / FAIL / BLOCKED，并在 `output/test/issue-262/README.md` 写明环境、执行 SHA、总数、通过、失败、错误、跳过和失败原因。无逐项计时原始证据时，NFR-LN-01/02 性能项保持 BLOCKED，不得沿用历史“通过”。
+
+### 2.2 #262 第一轮结果（2026-08-25）
+
+执行基线为 `origin/dev@758afd98ba2caad5a00fb6e12413c48f0156b2fb`，需求审查锚点保留为 `8f8e4fc70341c701c25786f12efbffaeca2a3c5f`。后端 45/45 PASS、前端单元 112/112 PASS、共享 E2E 契约 3/3 PASS、LRN Playwright 2/3 PASS；总体结论 **FAIL**。真实 LAB/HWK/GRD 事件均成功生成通知，但点击有效 LAB 通知跳转后仍为未读，已登记 [#269](https://github.com/Cr4zyorange/OnlineJudge/issues/269)。完整矩阵、环境和页面证据见 `output/test/issue-262/README.md`。未执行逐项性能计时，NFR-LN-01/02 相关性能结论为 **BLOCKED**。
+
 ## 3 测试依据
 
 | 序号 | 文档/代码依据 | 用途 |
@@ -46,10 +57,11 @@
 | 6 | `docs/过程/概要/学习过程与通知提醒 - 概要设计.md` | LRN 概要流程、通知链路和提醒规则补充 |
 | 7 | `docs/过程/详细设计/LRN-学习过程与通知提醒-详细设计提交稿.md` | LRN 详细接口、数据库表和追踪矩阵补充 |
 | 8 | `backend/src/test/java/com/onlinejudge/lrn` | LRN 后端控制器、服务、迁移和异常自动化测试 |
-| 9 | `backend/src/test/java/com/onlinejudge/integration/GrdLrnIntegrationTest.java`、`IntDemoDataInitializerTest.java` | GRD/LRN 通知事件和 INT 演示闭环联调样本 |
+| 9 | `backend/src/test/java/com/onlinejudge/integration/LrnCrossModuleEventIntegrationTest.java`、`GrdLrnIntegrationTest.java`、`IntDemoDataInitializerTest.java` | LAB/HWK/GRD 真实入口生成 LRN 通知及 INT 演示闭环样本 |
 | 10 | `frontend/tests/unit/lrn` | LRN 前端页面和 API wrapper 单元测试 |
 | 11 | `frontend/tests/unit/CourseManagementView.spec.ts`、`frontend/tests/unit/lab/LabStudentView.spec.ts`、`frontend/tests/unit/hwk/HomeworkStudentView.spec.ts` | CRS/LAB/HWK 触发 LRN 进度和行为记录的前端联动测试 |
 | 12 | `database/migrations/20260530_01_create_lrn_learning_task.sql`、`20260531_01_create_lrn_learning_progress.sql`、`20260602_01_create_lrn_learning_record.sql`、`20260603_01_create_lrn_notification.sql`、`20260605_01_create_lrn_reminder_rule.sql` | LRN 数据表和迁移约束依据 |
+| 13 | `docs/diagrams/lrn/manifest.json`、`frontend/tests/e2e/lrn/lrn-business-closure.spec.ts` | 五个场景三层图组与共享 Playwright 业务验收入口 |
 
 ## 4 测试范围
 
@@ -257,7 +269,7 @@
 
 ```bash
 cd backend
-mvn -q "-Dtest=LearningTaskControllerTest,LearningTaskMigrationTest,LearningTaskDefaultConfigurationTest,LearningProgressControllerTest,LearningProgressMigrationTest,LearningRecordControllerTest,LearningRecordMigrationTest,NotificationControllerTest,NotificationMigrationTest,ReminderRuleControllerTest,ReminderRuleFailureLoggingTest,ReminderRuleServiceTest,ReminderRuleMigrationTest,GrdLrnIntegrationTest,IntDemoDataInitializerTest" test
+mvn -q "-Dtest=LearningTaskControllerTest,LearningTaskMigrationTest,LearningTaskDefaultConfigurationTest,LearningProgressControllerTest,LearningProgressMigrationTest,LearningRecordControllerTest,LearningRecordMigrationTest,NotificationControllerTest,NotificationMigrationTest,ReminderRuleControllerTest,ReminderRuleFailureLoggingTest,ReminderRuleServiceTest,ReminderRuleMigrationTest,LrnCrossModuleEventIntegrationTest,GrdLrnIntegrationTest,IntDemoDataInitializerTest" test
 ```
 
 #### 11.3.2 前端目标测试命令
@@ -267,7 +279,14 @@ cd frontend
 npm run test:unit -- tests/unit/lrn/LearningTaskCenterView.spec.ts tests/unit/lrn/LearningProgressView.spec.ts tests/unit/lrn/LearningStatisticsView.spec.ts tests/unit/lrn/NotificationCenterView.spec.ts tests/unit/lrn/ReminderRuleSettingsView.spec.ts tests/unit/lrn/learningTasksApi.spec.ts tests/unit/lrn/learningProgressApi.spec.ts tests/unit/lrn/learningRecordsApi.spec.ts tests/unit/lrn/notificationsApi.spec.ts tests/unit/lrn/reminderRulesApi.spec.ts tests/unit/CourseManagementView.spec.ts tests/unit/lab/LabStudentView.spec.ts tests/unit/hwk/HomeworkStudentView.spec.ts
 ```
 
-#### 11.3.3 LRN 页面和接口快速索引
+#### 11.3.3 共享 E2E 命令
+
+```bash
+cd frontend
+E2E_BASE_URL=http://127.0.0.1:5173 E2E_BROWSER_CHANNEL=chrome npm run test:e2e -- tests/e2e/lrn/lrn-business-closure.spec.ts
+```
+
+#### 11.3.4 LRN 页面和接口快速索引
 
 | 页面 | 前端页面文件 | 主要接口 |
 | --- | --- | --- |
@@ -277,6 +296,6 @@ npm run test:unit -- tests/unit/lrn/LearningTaskCenterView.spec.ts tests/unit/lr
 | UI-LRN-04 消息通知中心页 | `frontend/src/views/lrn/NotificationCenterView.vue` | `GET /api/v1/notifications`、`PUT /api/v1/notifications/read`、`DELETE /api/v1/notifications/{notificationId}`、`POST /api/v1/notifications/events` |
 | UI-LRN-05 提醒规则设置页 | `frontend/src/views/lrn/ReminderRuleSettingsView.vue` | `GET /api/v1/reminder-rules`、`PUT /api/v1/reminder-rules` |
 
-#### 11.3.4 交付说明
+#### 11.3.5 交付说明
 
 本 issue 仅交付测试文档，不修改业务代码。测试负责人整合时可直接抽取本文件的 `6.3`、`7.3`、`8.3`、`9.3`、`10.3` 和 `11.3` 小节合入总测试报告，并在 FAT/UAT 后补充手工测试实际结果、缺陷编号和最终审批记录。
