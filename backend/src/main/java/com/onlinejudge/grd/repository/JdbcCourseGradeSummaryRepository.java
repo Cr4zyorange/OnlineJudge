@@ -2,6 +2,7 @@ package com.onlinejudge.grd.repository;
 
 import com.onlinejudge.grd.domain.CourseGradeSummary;
 import com.onlinejudge.grd.domain.CourseGradeSummaryRepository;
+import com.onlinejudge.grd.domain.GradeAnalysisSourceVersion;
 import com.onlinejudge.grd.domain.FinalStatus;
 import com.onlinejudge.grd.domain.PublishStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -9,6 +10,7 @@ import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
 import org.springframework.jdbc.support.KeyHolder;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.sql.PreparedStatement;
 import java.sql.Timestamp;
@@ -33,12 +35,15 @@ public class JdbcCourseGradeSummaryRepository implements CourseGradeSummaryRepos
     );
 
     private final JdbcTemplate jdbcTemplate;
+    private final JdbcGradeAnalysisSourceVersionStore sourceVersionStore;
 
     public JdbcCourseGradeSummaryRepository(JdbcTemplate jdbcTemplate) {
         this.jdbcTemplate = jdbcTemplate;
+        this.sourceVersionStore = new JdbcGradeAnalysisSourceVersionStore(jdbcTemplate);
     }
 
     @Override
+    @Transactional
     public CourseGradeSummary upsert(CourseGradeSummary summary) {
         Optional<CourseGradeSummary> existing = findByStudent(summary.courseId(), summary.studentId());
         if (existing.isPresent()) {
@@ -60,7 +65,9 @@ public class JdbcCourseGradeSummaryRepository implements CourseGradeSummaryRepos
                     Timestamp.valueOf(summary.updatedAt()),
                     existing.get().id()
             );
-            return findById(existing.get().id()).orElseThrow();
+            CourseGradeSummary saved = findById(existing.get().id()).orElseThrow();
+            sourceVersionStore.bumpCourseTotal(saved.courseId(), saved.updatedAt());
+            return saved;
         }
 
         KeyHolder keyHolder = new GeneratedKeyHolder();
@@ -83,10 +90,13 @@ public class JdbcCourseGradeSummaryRepository implements CourseGradeSummaryRepos
             return statement;
         }, keyHolder);
         long id = Objects.requireNonNull(keyHolder.getKey()).longValue();
-        return findById(id).orElseThrow();
+        CourseGradeSummary saved = findById(id).orElseThrow();
+        sourceVersionStore.bumpCourseTotal(saved.courseId(), saved.updatedAt());
+        return saved;
     }
 
     @Override
+    @Transactional
     public CourseGradeSummary update(CourseGradeSummary summary) {
         jdbcTemplate.update("""
                         UPDATE t_course_grade_summary
@@ -106,7 +116,9 @@ public class JdbcCourseGradeSummaryRepository implements CourseGradeSummaryRepos
                 Timestamp.valueOf(summary.updatedAt()),
                 summary.id()
         );
-        return findById(summary.id()).orElseThrow();
+        CourseGradeSummary saved = findById(summary.id()).orElseThrow();
+        sourceVersionStore.bumpCourseTotal(saved.courseId(), saved.updatedAt());
+        return saved;
     }
 
     @Override
@@ -134,6 +146,11 @@ public class JdbcCourseGradeSummaryRepository implements CourseGradeSummaryRepos
                 ROW_MAPPER,
                 id
         ).stream().findFirst();
+    }
+
+    @Override
+    public GradeAnalysisSourceVersion findAnalysisSourceVersion(long courseId) {
+        return sourceVersionStore.findCourseTotal(courseId);
     }
 
     private Optional<CourseGradeSummary> findByStudent(long courseId, long studentId) {

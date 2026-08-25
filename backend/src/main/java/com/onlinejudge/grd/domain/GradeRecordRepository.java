@@ -11,4 +11,8 @@ public interface GradeRecordRepository {
     Optional<GradeRecord> findById(long id);
 
     List<GradeRecord> findByCourseId(long courseId);
+
+    default GradeAnalysisSourceVersion findAnalysisSourceVersion(long courseId, long gradeItemId) {
+        return GradeAnalysisSourceVersion.initial();
+    }
 }

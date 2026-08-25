@@ -22,6 +22,8 @@ import org.springframework.context.annotation.Import;
 import org.springframework.test.context.jdbc.Sql;
 
 import java.math.BigDecimal;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.time.LocalDateTime;
 
@@ -166,8 +168,44 @@ class GradeItemMigrationTest {
 
         assertThat(record.id()).isPositive();
         assertThat(gradeRecordRepository.findByCourseId(303L)).containsExactly(record);
+        assertThat(gradeRecordRepository.findAnalysisSourceVersion(303L, 1L).version()).isEqualTo(1L);
         assertThat(summary.id()).isPositive();
         assertThat(courseGradeSummaryRepository.findByCourseId(303L)).containsExactly(summary);
+        assertThat(courseGradeSummaryRepository.findAnalysisSourceVersion(303L).version()).isEqualTo(1L);
+
+        gradeRecordRepository.upsert(new GradeRecord(
+                0L,
+                303L,
+                601L,
+                1L,
+                SourceType.LAB,
+                301L,
+                new BigDecimal("95.00"),
+                new BigDecimal("38.00"),
+                GradeStatus.ADJUSTED,
+                PublishStatus.UNPUBLISHED,
+                null,
+                now.plusMinutes(1),
+                now.plusMinutes(1),
+                null,
+                now,
+                now.plusMinutes(1)
+        ));
+        courseGradeSummaryRepository.upsert(new CourseGradeSummary(
+                0L,
+                303L,
+                601L,
+                new BigDecimal("90.00"),
+                FinalStatus.ADJUSTED,
+                PublishStatus.UNPUBLISHED,
+                0L,
+                null,
+                now,
+                now.plusMinutes(1)
+        ));
+
+        assertThat(gradeRecordRepository.findAnalysisSourceVersion(303L, 1L).version()).isEqualTo(2L);
+        assertThat(courseGradeSummaryRepository.findAnalysisSourceVersion(303L).version()).isEqualTo(2L);
     }
 
     @Test
@@ -214,11 +252,17 @@ class GradeItemMigrationTest {
                 "COURSE_TOTAL",
                 null,
                 now.minusMinutes(1),
+                "GRD_ANALYSIS_V2:6a6d0f3f657c0f61b92f7fd105a149781039605365c671414bbc27f6536fa72e",
                 new BigDecimal("78.00"),
                 new BigDecimal("92.00"),
                 new BigDecimal("58.00"),
                 new BigDecimal("0.6667"),
                 new BigDecimal("0.7500"),
+                4,
+                3,
+                1,
+                0,
+                0,
                 "[{\"label\":\"0-59\",\"count\":1}]",
                 501L,
                 now
@@ -232,11 +276,17 @@ class GradeItemMigrationTest {
                     assertThat(snapshot.courseId()).isEqualTo(saved.courseId());
                     assertThat(snapshot.targetType()).isEqualTo(saved.targetType());
                     assertThat(snapshot.gradeItemId()).isNull();
+                    assertThat(snapshot.sourceFingerprint()).isEqualTo(saved.sourceFingerprint());
                     assertThat(snapshot.averageScore()).isEqualByComparingTo(saved.averageScore());
                     assertThat(snapshot.maxScore()).isEqualByComparingTo(saved.maxScore());
                     assertThat(snapshot.minScore()).isEqualByComparingTo(saved.minScore());
                     assertThat(snapshot.passRate()).isEqualByComparingTo(saved.passRate());
                     assertThat(snapshot.completionRate()).isEqualByComparingTo(saved.completionRate());
+                    assertThat(snapshot.totalStudentCount()).isEqualTo(4);
+                    assertThat(snapshot.completedCount()).isEqualTo(3);
+                    assertThat(snapshot.missingCount()).isEqualTo(1);
+                    assertThat(snapshot.unsubmittedCount()).isZero();
+                    assertThat(snapshot.ungradedCount()).isZero();
                     assertThat(snapshot.distributionJson()).isEqualTo(saved.distributionJson());
                     assertThat(snapshot.generatedBy()).isEqualTo(saved.generatedBy());
                     assertThat(Duration.between(saved.sourceDataTime(), snapshot.sourceDataTime()).abs())
@@ -244,5 +294,31 @@ class GradeItemMigrationTest {
                     assertThat(Duration.between(saved.generatedAt(), snapshot.generatedAt()).abs())
                             .isLessThanOrEqualTo(Duration.ofNanos(1_000));
                 });
+    }
+
+    @Test
+    void mysqlSchemasPreserveVersionedFingerprintsCountsAndSourceVersions() throws Exception {
+        String fingerprintMigration = Files.readString(Path.of(
+                "../database/migrations/20260825_01_add_grd_analysis_source_fingerprint.sql"
+        ));
+        String sourceVersionMigration = Files.readString(Path.of(
+                "../database/migrations/20260825_02_add_grd_analysis_source_version.sql"
+        ));
+        String cleanSchema = Files.readString(Path.of("../database/mysql/compose-schema.sql"));
+
+        assertThat(fingerprintMigration)
+                .contains("ADD COLUMN source_fingerprint VARCHAR(96)")
+                .contains("MODIFY COLUMN source_fingerprint VARCHAR(96)");
+        assertThat(sourceVersionMigration)
+                .contains("total_student_count INT NULL")
+                .contains("completed_count INT NULL")
+                .contains("missing_count INT NULL")
+                .contains("unsubmitted_count INT NULL")
+                .contains("ungraded_count INT NULL")
+                .contains("CREATE TABLE IF NOT EXISTS t_grade_analysis_source_version");
+        assertThat(cleanSchema)
+                .contains("source_fingerprint VARCHAR(96) NULL")
+                .contains("total_student_count INT NULL")
+                .contains("CREATE TABLE IF NOT EXISTS t_grade_analysis_source_version");
     }
 }

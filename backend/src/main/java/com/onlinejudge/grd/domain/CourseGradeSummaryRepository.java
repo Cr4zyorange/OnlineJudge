@@ -11,4 +11,8 @@ public interface CourseGradeSummaryRepository {
     Optional<CourseGradeSummary> findById(long id);
 
     List<CourseGradeSummary> findByCourseId(long courseId);
+
+    default GradeAnalysisSourceVersion findAnalysisSourceVersion(long courseId) {
+        return GradeAnalysisSourceVersion.initial();
+    }
 }
