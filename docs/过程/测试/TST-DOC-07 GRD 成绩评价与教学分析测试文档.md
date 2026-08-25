@@ -5,7 +5,7 @@
 | 文档名称 | GRD 成绩评价与教学分析测试文档 |
 | 项目名称 | 在线教学与实训平台 |
 | 所属阶段 | 系统测试与验收测试 |
-| 报告版本 | V1.2 |
+| 报告版本 | V1.3 |
 | 编写日期 | 2026-08-25 |
 | 编写人 | GRD 模块负责人 |
 | 对应 issue | #158、#266 D2-GRD 业务场景文档与测试闭环 |
@@ -21,6 +21,7 @@
 | V1.0 | 2026-06-10 | GRD 模块负责人 | 按 #152 统一结构整理 GRD 测试范围、测试数据、用例追踪、自动化执行日志、手工验收点和残余风险 |
 | V1.1 | 2026-08-25 | GRD 模块负责人 | 按 #266 补齐来源超时/删除回归、真实 LAB/HWK → GRD → LRN 共享 E2E、权限与幂等边界，并回填当前基线证据 |
 | V1.2 | 2026-08-25 | GRD 模块负责人 | 按 PR #270 评审意见对齐成绩项/异议响应真实契约，并将变异型 E2E 收口到自动清理的 disposable H2 包装入口 |
+| V1.3 | 2026-08-25 | GRD 模块负责人 | 按 PR #270 二轮评审明确 OTHER_COURSE_ITEM 可空编号、同步/发布失败边界和复核调整的真实仓储依赖 |
 
 ### 1.2 审批记录
 
@@ -59,7 +60,7 @@
 
 | 编号 | 测试对象 | 主要验证点 | 当前覆盖状态 |
 | --- | --- | --- | --- |
-| FR-GR-01 | 成绩项配置与计算规则 | 成绩项查询、创建、修改、停用、规则校验、权重、来源类型和正整数编号 | 后端和前端自动化已覆盖；来源可用性由同步测试覆盖 |
+| FR-GR-01 | 成绩项配置与计算规则 | 成绩项查询、创建、修改、停用、规则校验、权重和来源类型；LAB/HWK 正整数编号、OTHER_COURSE_ITEM 可空编号 | 后端和前端自动化已覆盖；LAB/HWK 来源可用性由同步测试覆盖 |
 | FR-GR-02 | 成绩汇总与总评生成 | 同步 LAB/HWK 来源成绩、缺失/未评分状态、加权分和总评计算 | 后端、前端和真实来源 API E2E 已覆盖 |
 | FR-GR-03 | 教师成绩管理 | 教师总表、学生明细、单项成绩调整、总评调整、变更记录 | 后端和前端自动化已覆盖 |
 | FR-GR-04 | 成绩发布与状态控制 | 发布前检查、发布记录、发布后学生可见、重复发布幂等、发布后调整留痕 | 后端、前端和真实 API E2E 已覆盖 |
@@ -132,7 +133,7 @@
 
 | 用例编号 | 对应需求 | 覆盖对象 | 前置条件/测试数据 | 操作步骤 | 预期结果 | 实际结果 | 通过状态 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| TC-GR-01 | FR-GR-01 | UI-GRD-01；API-GRD-01 ~ 05、07；DB-GRD-01、05 | 教师具备课程管理权限；准备 LAB/HWK 来源编号、满分、权重、排序数据 | 查询、创建、修改、停用成绩项，执行规则校验 | 合法规则保存成功；非法权重、重复名称、不支持的来源类型或非正数编号被拒绝；任务可用性在同步时确认 | `GradeItemControllerTest`、`GradeItemServiceTest`、`GradeItemConfigView.spec.ts`、`gradeItemsApi.spec.ts` 通过 | 通过 |
+| TC-GR-01 | FR-GR-01 | UI-GRD-01；API-GRD-01 ~ 05、07；DB-GRD-01、05 | 教师具备课程管理权限；准备 LAB/HWK 来源编号或 OTHER_COURSE_ITEM、满分、权重、排序数据 | 查询、创建、修改、停用成绩项，执行规则校验 | 合法规则保存成功；OTHER_COURSE_ITEM 可不关联任务；非法权重、重复名称、不支持的来源类型或 LAB/HWK 非正数编号被拒绝；LAB/HWK 任务可用性在同步时确认 | `GradeItemControllerTest`、`GradeItemServiceTest`、`GradeItemConfigView.spec.ts`、`gradeItemsApi.spec.ts` 通过 | 通过 |
 | TC-GR-02 | FR-GR-02 | UI-GRD-02；API-GRD-06 ~ 09；DB-GRD-02、03、05 | 课程内有学生名单；LAB/HWK 来源成绩含已评分、缺失、未提交、未评分状态 | 教师同步来源成绩并查询成绩总表和学生明细 | 生成成绩记录、计算加权分和总评，缺失状态可见 | `teacherSyncsLabAndHomeworkSourceGradesThenCalculatesFinalScores`、`TeacherGradeTableView.spec.ts` 同步用例通过 | 通过 |
 | TC-GR-03 | FR-GR-03 | UI-GRD-02、03、04、08；API-GRD-08 ~ 14；DB-GRD-02、03、07 | 已有成绩记录和课程总评；教师填写调整原因 | 查询总表、进入学生明细、调整单项成绩和总评、查询变更记录 | 分数更新，已发布成绩不回退未发布，变更记录保存旧值、新值、原因和操作人 | `teacherAdjustsGradeRecordWithReasonAndQueriesChangeLogsThroughApi`、`teacherAdjustsCourseFinalScoreWithReasonAndKeepsChangeLog`、前端明细调整用例通过 | 通过 |
 | TC-GR-04 | FR-GR-04 | UI-GRD-05；API-GRD-12 ~ 14；DB-GRD-02、03、04、07 | 成绩已计算且可发布；存在选中学生范围 | 教师发布成绩，重复执行同一范围发布，查询发布记录 | 发布后学生可见，记录发布批次，重复发布幂等，不重复通知 | `teacherPublishesSelectedGradesAndEmitsGradePublishedEvent`、`repeatedPublishUsesRangeIdempotencyKeyAndDoesNotNotifyAgain`、前端发布记录用例通过 | 通过 |
@@ -212,12 +213,13 @@
 | GRD-266-LOG-007 | `npm run build` | Vite 生产构建通过，189 modules transformed |
 | GRD-266-LOG-008 | `git diff --check` | 通过 |
 | GRD-266-LOG-009 | disposable 失败清理自测：错误教师密码 + 端口 18081 | Playwright 按预期非零退出；包装脚本停止后端，端口无监听，临时 H2 目录无残留 |
+| GRD-266-LOG-010 | PR #270 二轮契约回归 | 先扩展契约断言并确认 4 passed / 1 failed；修正 OTHER_COURSE_ITEM、同步失败和复核仓储依赖后 5 passed / 0 failed |
 
 ## 9 手工测试与联调确认
 
 | 手测编号 | 模块 | 场景 | 操作要点 | 预期结果 | 当前结果 |
 | --- | --- | --- | --- | --- | --- |
-| MAN-GRD-001 | GRD/AUTH/CRS | 教师配置成绩项 | 浏览器登录教师账号，进入课程成绩项配置页，创建 LAB/HWK 来源成绩项并校验权重 | 成绩项保存成功，非法权重、来源类型或非正数编号提示明确；来源任务可用性在同步时反馈 | 待手工验收 |
+| MAN-GRD-001 | GRD/AUTH/CRS | 教师配置成绩项 | 浏览器登录教师账号，进入课程成绩项配置页，创建 LAB/HWK 或 OTHER_COURSE_ITEM 成绩项并校验权重 | 成绩项保存成功；OTHER_COURSE_ITEM 无需任务编号；非法权重、来源类型或 LAB/HWK 非正数编号提示明确；LAB/HWK 来源任务可用性在同步时反馈 | 待手工验收 |
 | MAN-GRD-002 | GRD/LAB/HWK | 同步来源成绩并计算总评 | 准备真实实验/作业评分，教师触发同步和重算 | 成绩记录、加权分、缺失状态、总评与 LAB/HWK 来源一致 | 真实 API E2E 已通过 |
 | MAN-GRD-003 | GRD | 教师成绩总表与学生明细 | 教师筛选分页查看成绩总表，打开学生明细，查看来源任务和状态 | 总表分页、筛选、明细、缺失状态和来源信息正确 | 待手工验收 |
 | MAN-GRD-004 | GRD/LRN | 成绩发布与学生可见 | 教师发布成绩，学生刷新个人成绩页，通知中心查看成绩发布通知 | 发布记录保存，学生只能看到本人已发布成绩，LRN 通知可见 | API 与通知查询 E2E 已通过；页面视觉待验收 |

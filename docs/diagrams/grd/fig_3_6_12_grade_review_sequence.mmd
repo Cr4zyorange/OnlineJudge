@@ -1,13 +1,16 @@
 sequenceDiagram
   actor Student as 学生
   actor Teacher as 教师
-  participant StudentView as StudentGradeView
-  participant TeacherView as TeacherGradeTableView
-  participant Controller as GradeReviewController
-  participant Service as GradeReviewService
-  participant Permission as CoursePermissionClient
-  participant ReviewRepo as GradeReviewRequestRepository
-  participant GradeService as GradeRecordService
+  participant StudentView as StudentGrade<br/>View
+  participant TeacherView as TeacherGradeTable<br/>View
+  participant Controller as GradeReview<br/>Controller
+  participant Service as GradeReview<br/>Service
+  participant Permission as CoursePermission<br/>Client
+  participant ReviewRepo as GradeReviewRequest<br/>Repository
+  participant ItemRepo as GradeItem<br/>Repository
+  participant RecordRepo as GradeRecord<br/>Repository
+  participant SummaryRepo as CourseGradeSummary<br/>Repository
+  participant ChangeLogRepo as GradeChangeLog<br/>Repository
   participant Event as GradeEventPublisher
   participant LRN as LRN通知
   Student->>StudentView: 填写异议理由
@@ -29,7 +32,19 @@ sequenceDiagram
   Controller->>Service: processReviewRequest(requestId,teacherId,command)
   Service->>Permission: 校验课程成绩管理权限
   alt APPROVE
-    Service->>GradeService: 调整单项/总评并写变更日志
+    Service->>Service: applyApprovedAdjustment(...)
+    alt 总评复核
+      Service->>SummaryRepo: 查询已发布总评并 update(adjusted)
+      Service->>ChangeLogRepo: save(FINAL_ADJUST)
+    else 单项复核
+      Service->>RecordRepo: 查询已发布成绩记录
+      Service->>ItemRepo: 查询成绩项满分与权重
+      Service->>RecordRepo: update(adjusted)
+      Service->>ChangeLogRepo: save(RECORD_ADJUST)
+      Service->>RecordRepo: 查询学生课程成绩记录
+      Service->>ItemRepo: 查询计入总评的成绩项
+      Service->>SummaryRepo: update(重新计算的总评)
+    end
     Service->>ReviewRepo: update(APPROVED)
   else REJECT
     Service->>ReviewRepo: update(REJECTED)
