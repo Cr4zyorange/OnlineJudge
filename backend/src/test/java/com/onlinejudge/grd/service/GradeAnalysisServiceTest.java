@@ -18,13 +18,210 @@ import org.junit.jupiter.api.Test;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class GradeAnalysisServiceTest {
+    @Test
+    void unchangedCourseTotalAnalysisReusesTheLatestSnapshot() {
+        InMemoryGradeAnalysisSnapshotRepository snapshotRepository = new InMemoryGradeAnalysisSnapshotRepository();
+        InMemoryCourseGradeSummaryRepository summaryRepository = new InMemoryCourseGradeSummaryRepository();
+        GradeAnalysisService service = new GradeAnalysisService(
+                new InMemoryGradeItemRepository(),
+                new InMemoryGradeRecordRepository(),
+                summaryRepository,
+                snapshotRepository,
+                permissionClient(601L)
+        );
+        summaryRepository.upsert(summary(101L, 601L, "84.00", FinalStatus.CALCULATED));
+
+        GradeAnalysisResult first = service.analyzeCourseGrades(101L, 501L, "COURSE_TOTAL", null);
+        GradeAnalysisResult second = service.analyzeCourseGrades(101L, 501L, "COURSE_TOTAL", null);
+
+        assertThat(second.generatedAt()).isEqualTo(first.generatedAt());
+        assertThat(second.sourceDataTime()).isEqualTo(first.sourceDataTime());
+        assertThat(snapshotRepository.size()).isEqualTo(1);
+    }
+
+    @Test
+    void unchangedGradeItemAnalysisReusesTheLatestSnapshot() {
+        InMemoryGradeAnalysisSnapshotRepository snapshotRepository = new InMemoryGradeAnalysisSnapshotRepository();
+        InMemoryGradeRecordRepository recordRepository = new InMemoryGradeRecordRepository();
+        InMemoryGradeItemRepository itemRepository = new InMemoryGradeItemRepository();
+        GradeAnalysisService service = new GradeAnalysisService(
+                itemRepository,
+                recordRepository,
+                new InMemoryCourseGradeSummaryRepository(),
+                snapshotRepository,
+                permissionClient(601L)
+        );
+        itemRepository.add(item(11L, 101L));
+        recordRepository.upsert(record(101L, 601L, 11L, "90.00", GradeStatus.SCORED));
+
+        GradeAnalysisResult first = service.analyzeCourseGrades(101L, 501L, "GRADE_ITEM", 11L);
+        GradeAnalysisResult second = service.analyzeCourseGrades(101L, 501L, "GRADE_ITEM", 11L);
+
+        assertThat(second.generatedAt()).isEqualTo(first.generatedAt());
+        assertThat(second.sourceDataTime()).isEqualTo(first.sourceDataTime());
+        assertThat(snapshotRepository.size()).isEqualTo(1);
+    }
+
+    @Test
+    void changedCourseTotalCreatesANewSnapshotFromTheUpdatedSummary() {
+        InMemoryGradeAnalysisSnapshotRepository snapshotRepository = new InMemoryGradeAnalysisSnapshotRepository();
+        InMemoryCourseGradeSummaryRepository summaryRepository = new InMemoryCourseGradeSummaryRepository();
+        GradeAnalysisService service = new GradeAnalysisService(
+                new InMemoryGradeItemRepository(),
+                new InMemoryGradeRecordRepository(),
+                summaryRepository,
+                snapshotRepository,
+                permissionClient(601L)
+        );
+        LocalDateTime firstSourceTime = LocalDateTime.of(2026, 8, 25, 9, 0);
+        LocalDateTime changedSourceTime = firstSourceTime.plusMinutes(5);
+        summaryRepository.upsert(summaryAt(101L, 601L, "84.00", FinalStatus.CALCULATED, firstSourceTime));
+        GradeAnalysisResult first = service.analyzeCourseGrades(101L, 501L, "COURSE_TOTAL", null);
+
+        summaryRepository.upsert(summaryAt(101L, 601L, "92.00", FinalStatus.ADJUSTED, changedSourceTime));
+        GradeAnalysisResult changed = service.analyzeCourseGrades(101L, 501L, "COURSE_TOTAL", null);
+
+        assertThat(changed.averageScore()).isEqualByComparingTo("92.00");
+        assertThat(changed.sourceDataTime()).isEqualTo(changedSourceTime);
+        assertThat(changed.generatedAt()).isNotEqualTo(first.generatedAt());
+        assertThat(snapshotRepository.size()).isEqualTo(2);
+    }
+
+    @Test
+    void changedGradeItemStatusCreatesANewSnapshotEvenWhenBothScoresAreMissing() {
+        InMemoryGradeAnalysisSnapshotRepository snapshotRepository = new InMemoryGradeAnalysisSnapshotRepository();
+        InMemoryGradeRecordRepository recordRepository = new InMemoryGradeRecordRepository();
+        InMemoryGradeItemRepository itemRepository = new InMemoryGradeItemRepository();
+        GradeAnalysisService service = new GradeAnalysisService(
+                itemRepository,
+                recordRepository,
+                new InMemoryCourseGradeSummaryRepository(),
+                snapshotRepository,
+                permissionClient(601L)
+        );
+        itemRepository.add(item(11L, 101L));
+        LocalDateTime firstSourceTime = LocalDateTime.of(2026, 8, 25, 9, 0);
+        LocalDateTime changedSourceTime = firstSourceTime.plusMinutes(5);
+        recordRepository.upsert(recordAt(101L, 601L, 11L, null, GradeStatus.UNSUBMITTED, firstSourceTime));
+        GradeAnalysisResult first = service.analyzeCourseGrades(101L, 501L, "GRADE_ITEM", 11L);
+
+        recordRepository.upsert(recordAt(101L, 601L, 11L, null, GradeStatus.UNGRADED, changedSourceTime));
+        GradeAnalysisResult changed = service.analyzeCourseGrades(101L, 501L, "GRADE_ITEM", 11L);
+
+        assertThat(first.unsubmittedCount()).isEqualTo(1);
+        assertThat(changed.unsubmittedCount()).isZero();
+        assertThat(changed.ungradedCount()).isEqualTo(1);
+        assertThat(changed.sourceDataTime()).isEqualTo(changedSourceTime);
+        assertThat(snapshotRepository.size()).isEqualTo(2);
+    }
+
+    @Test
+    void changedActiveStudentRosterInvalidatesAnOtherwiseEmptyCourseSnapshot() {
+        InMemoryGradeAnalysisSnapshotRepository snapshotRepository = new InMemoryGradeAnalysisSnapshotRepository();
+        MutableCoursePermissionClient permissionClient = new MutableCoursePermissionClient();
+        permissionClient.setStudentIds(101L, 601L);
+        GradeAnalysisService service = new GradeAnalysisService(
+                new InMemoryGradeItemRepository(),
+                new InMemoryGradeRecordRepository(),
+                new InMemoryCourseGradeSummaryRepository(),
+                snapshotRepository,
+                permissionClient
+        );
+        GradeAnalysisResult first = service.analyzeCourseGrades(101L, 501L, "COURSE_TOTAL", null);
+        GradeAnalysisResult reused = service.analyzeCourseGrades(101L, 501L, "COURSE_TOTAL", null);
+
+        permissionClient.setStudentIds(101L, 601L, 602L);
+        GradeAnalysisResult addedStudent = service.analyzeCourseGrades(101L, 501L, "COURSE_TOTAL", null);
+        permissionClient.setStudentIds(101L, 602L);
+        GradeAnalysisResult removedStudent = service.analyzeCourseGrades(101L, 501L, "COURSE_TOTAL", null);
+
+        assertThat(reused.generatedAt()).isEqualTo(first.generatedAt());
+        assertThat(addedStudent.totalStudentCount()).isEqualTo(2);
+        assertThat(addedStudent.missingCount()).isEqualTo(2);
+        assertThat(addedStudent.sourceDataTime()).isAfter(first.sourceDataTime());
+        assertThat(removedStudent.totalStudentCount()).isEqualTo(1);
+        assertThat(removedStudent.sourceDataTime()).isAfter(addedStudent.sourceDataTime());
+        assertThat(snapshotRepository.size()).isEqualTo(3);
+    }
+
+    @Test
+    void missingUnsubmittedAndUngradedRowsHaveStableSnapshotReuse() {
+        InMemoryGradeAnalysisSnapshotRepository snapshotRepository = new InMemoryGradeAnalysisSnapshotRepository();
+        InMemoryGradeRecordRepository recordRepository = new InMemoryGradeRecordRepository();
+        InMemoryGradeItemRepository itemRepository = new InMemoryGradeItemRepository();
+        GradeAnalysisService service = new GradeAnalysisService(
+                itemRepository,
+                recordRepository,
+                new InMemoryCourseGradeSummaryRepository(),
+                snapshotRepository,
+                permissionClient(601L, 602L, 603L, 604L)
+        );
+        itemRepository.add(item(11L, 101L));
+        LocalDateTime sourceTime = LocalDateTime.of(2026, 8, 25, 9, 0);
+        recordRepository.upsert(recordAt(101L, 602L, 11L, null, GradeStatus.UNSUBMITTED, sourceTime));
+        recordRepository.upsert(recordAt(101L, 603L, 11L, null, GradeStatus.UNGRADED, sourceTime));
+        recordRepository.upsert(recordAt(101L, 604L, 11L, null, GradeStatus.MISSING, sourceTime));
+
+        GradeAnalysisResult first = service.analyzeCourseGrades(101L, 501L, "GRADE_ITEM", 11L);
+        GradeAnalysisResult second = service.analyzeCourseGrades(101L, 501L, "GRADE_ITEM", 11L);
+
+        assertThat(second.missingCount()).isEqualTo(2);
+        assertThat(second.unsubmittedCount()).isEqualTo(1);
+        assertThat(second.ungradedCount()).isEqualTo(1);
+        assertThat(second.generatedAt()).isEqualTo(first.generatedAt());
+        assertThat(second.sourceDataTime()).isEqualTo(sourceTime);
+        assertThat(snapshotRepository.size()).isEqualTo(1);
+    }
+
+    @Test
+    void snapshotsRemainIsolatedByCourseTargetAndGradeItem() {
+        InMemoryGradeAnalysisSnapshotRepository snapshotRepository = new InMemoryGradeAnalysisSnapshotRepository();
+        InMemoryGradeRecordRepository recordRepository = new InMemoryGradeRecordRepository();
+        InMemoryCourseGradeSummaryRepository summaryRepository = new InMemoryCourseGradeSummaryRepository();
+        InMemoryGradeItemRepository itemRepository = new InMemoryGradeItemRepository();
+        MutableCoursePermissionClient permissionClient = new MutableCoursePermissionClient();
+        permissionClient.setStudentIds(101L, 601L);
+        permissionClient.setStudentIds(202L, 701L);
+        GradeAnalysisService service = new GradeAnalysisService(
+                itemRepository,
+                recordRepository,
+                summaryRepository,
+                snapshotRepository,
+                permissionClient
+        );
+        itemRepository.add(item(11L, 101L));
+        itemRepository.add(item(12L, 101L));
+        itemRepository.add(item(21L, 202L));
+        summaryRepository.upsert(summary(101L, 601L, "80.00", FinalStatus.CALCULATED));
+        recordRepository.upsert(record(101L, 601L, 11L, "81.00", GradeStatus.SCORED));
+        recordRepository.upsert(record(101L, 601L, 12L, "82.00", GradeStatus.SCORED));
+        recordRepository.upsert(record(202L, 701L, 21L, "91.00", GradeStatus.SCORED));
+
+        service.analyzeCourseGrades(101L, 501L, "COURSE_TOTAL", null);
+        service.analyzeCourseGrades(101L, 501L, "GRADE_ITEM", 11L);
+        service.analyzeCourseGrades(101L, 501L, "GRADE_ITEM", 12L);
+        service.analyzeCourseGrades(202L, 501L, "GRADE_ITEM", 21L);
+        service.analyzeCourseGrades(101L, 501L, "COURSE_TOTAL", null);
+        service.analyzeCourseGrades(101L, 501L, "GRADE_ITEM", 11L);
+        service.analyzeCourseGrades(101L, 501L, "GRADE_ITEM", 12L);
+        service.analyzeCourseGrades(202L, 501L, "GRADE_ITEM", 21L);
+
+        assertThat(snapshotRepository.size()).isEqualTo(4);
+        assertThat(snapshotRepository.findLatest(101L, "COURSE_TOTAL", null)).isPresent();
+        assertThat(snapshotRepository.findLatest(101L, "GRADE_ITEM", 11L)).isPresent();
+        assertThat(snapshotRepository.findLatest(101L, "GRADE_ITEM", 12L)).isPresent();
+        assertThat(snapshotRepository.findLatest(202L, "GRADE_ITEM", 21L)).isPresent();
+    }
+
     @Test
     void teacherCalculatesCourseTotalAnalysisFromCourseRosterAndFinalScores() {
         InMemoryGradeAnalysisSnapshotRepository snapshotRepository = new InMemoryGradeAnalysisSnapshotRepository();
@@ -198,7 +395,17 @@ class GradeAnalysisServiceTest {
     }
 
     private GradeRecord record(long courseId, long studentId, long gradeItemId, String score, GradeStatus status) {
-        LocalDateTime now = LocalDateTime.now();
+        return recordAt(courseId, studentId, gradeItemId, score, status, LocalDateTime.now());
+    }
+
+    private GradeRecord recordAt(
+            long courseId,
+            long studentId,
+            long gradeItemId,
+            String score,
+            GradeStatus status,
+            LocalDateTime updatedAt
+    ) {
         BigDecimal rawScore = score == null ? null : new BigDecimal(score);
         return new GradeRecord(
                 0L,
@@ -212,16 +419,25 @@ class GradeAnalysisServiceTest {
                 status,
                 PublishStatus.UNPUBLISHED,
                 null,
-                now,
-                now,
+                updatedAt,
+                updatedAt,
                 null,
-                now,
-                now
+                updatedAt,
+                updatedAt
         );
     }
 
     private CourseGradeSummary summary(long courseId, long studentId, String finalScore, FinalStatus status) {
-        LocalDateTime now = LocalDateTime.now();
+        return summaryAt(courseId, studentId, finalScore, status, LocalDateTime.now());
+    }
+
+    private CourseGradeSummary summaryAt(
+            long courseId,
+            long studentId,
+            String finalScore,
+            FinalStatus status,
+            LocalDateTime updatedAt
+    ) {
         return new CourseGradeSummary(
                 0L,
                 courseId,
@@ -231,9 +447,27 @@ class GradeAnalysisServiceTest {
                 PublishStatus.UNPUBLISHED,
                 1L,
                 null,
-                now,
-                now
+                updatedAt,
+                updatedAt
         );
+    }
+
+    private static final class MutableCoursePermissionClient implements CoursePermissionClient {
+        private final Map<Long, List<Long>> studentIdsByCourse = new LinkedHashMap<>();
+
+        void setStudentIds(long courseId, Long... studentIds) {
+            studentIdsByCourse.put(courseId, List.of(studentIds));
+        }
+
+        @Override
+        public boolean canManageCourse(long courseId, long userId) {
+            return true;
+        }
+
+        @Override
+        public List<Long> listCourseStudentIds(long courseId) {
+            return studentIdsByCourse.getOrDefault(courseId, List.of());
+        }
     }
 
     private static final class InMemoryGradeItemRepository implements GradeItemRepository {
@@ -335,6 +569,10 @@ class GradeAnalysisServiceTest {
                     .filter(snapshot -> snapshot.targetType().equals(targetType))
                     .filter(snapshot -> gradeItemId == null || gradeItemId.equals(snapshot.gradeItemId()))
                     .reduce((first, second) -> second);
+        }
+
+        int size() {
+            return snapshots.size();
         }
     }
 }
