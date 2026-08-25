@@ -7,15 +7,6 @@
 默认验证真实 Compose 应用入口 `http://127.0.0.1:8088`，不启动静态测试页或假 API。在仓库根目录执行：
 
 ```bash
-docker compose -f ../deploy/docker/compose.yml up -d --build
-cd ../frontend
-npm ci
-npm exec playwright install chromium
-```
-
-如果当前终端已在仓库根目录，去掉上述命令中的 `../`：
-
-```bash
 docker compose -f deploy/docker/compose.yml up -d --build
 cd frontend
 npm ci
@@ -55,13 +46,13 @@ npm run test:e2e:verify-failure
 - `waitForBusinessState(locator, expected)` 等待页面的可观察业务状态，不用固定 sleep。
 - `failureEvidenceName(suffix)` 产生不含账号或凭据的稳定失败证据名称。
 
-可覆盖的账号变量为 `E2E_STUDENT_ACCOUNT/PASSWORD`、`E2E_TEACHER_ACCOUNT/PASSWORD`和 `E2E_ADMIN_ACCOUNT/PASSWORD`。不得将真实个人账号、Token、Cookie 或本机环境文件提交到仓库。
+可覆盖的账号变量为 `E2E_STUDENT_ACCOUNT/PASSWORD`、`E2E_TEACHER_ACCOUNT/PASSWORD` 和 `E2E_ADMIN_ACCOUNT/PASSWORD`。不得将真实个人账号、Token、Cookie 或本机环境文件提交到仓库。
 
 ## 报告与敏感信息
 
 - 人类可读 HTML 报告：`frontend/playwright-report/`。
 - 失败截图、trace 和 video：`frontend/test-results/`；仅失败时保留。
-- 两个目录均被 Git 忽略，不使用已跟踪的 `output/playwright/`人工证据目录。
+- 两个目录均被 Git 忽略，不使用已跟踪的 `output/playwright/` 人工证据目录。
 - 查看报告：`npm exec playwright show-report`。
 - 失败产物可记录表单输入和网络请求。除公开演示账号外，使用外部敏感凭据时必须设置 `E2E_FAILURE_ARTIFACTS=off`，且用例标题、断言和附件不得包含凭据值。
 
