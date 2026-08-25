@@ -6,6 +6,15 @@ import type { NotificationPage } from '../../../src/types/lrn';
 
 vi.mock('../../../src/api/lrn/notifications');
 
+const { routerPush } = vi.hoisted(() => ({
+  routerPush: vi.fn()
+}));
+
+vi.mock('vue-router', async (importOriginal) => ({
+  ...await importOriginal<typeof import('vue-router')>(),
+  useRouter: () => ({ push: routerPush })
+}));
+
 const notificationPage: NotificationPage = {
   records: [
     {
@@ -97,6 +106,63 @@ describe('NotificationCenterView', () => {
     expect(wrapper.text()).toContain('入口已失效');
     expect(wrapper.find('a[href="#"]').exists()).toBe(false);
     expect(wrapper.get('[data-testid="notification-fallback-12"]').attributes('href')).toBe('/learning/tasks');
+  });
+
+  it('marks an unread notification before navigating to its valid business page', async () => {
+    vi.mocked(notificationsApi.listNotifications).mockResolvedValueOnce(notificationPage);
+    vi.mocked(notificationsApi.markNotificationsRead).mockResolvedValueOnce({ updatedCount: 1 });
+    routerPush.mockResolvedValueOnce(undefined);
+
+    const wrapper = mount(NotificationCenterView);
+    await flushPromises();
+
+    await wrapper.get('a[href="/courses/101/homeworks/501"]').trigger('click');
+    await flushPromises();
+
+    expect(notificationsApi.markNotificationsRead).toHaveBeenCalledWith({
+      notificationIds: [10],
+      readAll: false
+    });
+    expect(routerPush).toHaveBeenCalledWith('/courses/101/homeworks/501');
+    expect(vi.mocked(notificationsApi.markNotificationsRead).mock.invocationCallOrder[0])
+      .toBeLessThan(routerPush.mock.invocationCallOrder[0]);
+  });
+
+  it('keeps the user in the notification center when marking read fails', async () => {
+    vi.mocked(notificationsApi.listNotifications).mockResolvedValueOnce(notificationPage);
+    vi.mocked(notificationsApi.markNotificationsRead).mockRejectedValueOnce(new Error('标记已读失败'));
+
+    const wrapper = mount(NotificationCenterView);
+    await flushPromises();
+
+    await wrapper.get('a[href="/courses/101/homeworks/501"]').trigger('click');
+    await flushPromises();
+
+    expect(wrapper.text()).toContain('标记已读失败');
+    expect(routerPush).not.toHaveBeenCalled();
+  });
+
+  it('does not submit duplicate read mutations while the same notification is opening', async () => {
+    let finishMarkRead: ((value: { updatedCount: number }) => void) | undefined;
+    vi.mocked(notificationsApi.listNotifications).mockResolvedValueOnce(notificationPage);
+    vi.mocked(notificationsApi.markNotificationsRead).mockImplementationOnce(() => new Promise((resolve) => {
+      finishMarkRead = resolve;
+    }));
+    routerPush.mockResolvedValueOnce(undefined);
+
+    const wrapper = mount(NotificationCenterView);
+    await flushPromises();
+
+    const link = wrapper.get('a[href="/courses/101/homeworks/501"]');
+    await link.trigger('click');
+    await link.trigger('click');
+
+    expect(notificationsApi.markNotificationsRead).toHaveBeenCalledTimes(1);
+
+    finishMarkRead?.({ updatedCount: 1 });
+    await flushPromises();
+
+    expect(routerPush).toHaveBeenCalledTimes(1);
   });
 
   it('replaces an obsolete same-origin route with a recoverable course destination', async () => {
