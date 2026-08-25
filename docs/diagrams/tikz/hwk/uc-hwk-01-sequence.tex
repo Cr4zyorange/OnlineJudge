@@ -1,0 +1,29 @@
+\documentclass[tikz,border=8pt]{standalone}
+\input{hwk-tikz-style.tex}
+\begin{document}
+\begin{tikzpicture}
+  \def\DiagramDepth{9.2}
+  \node[hwk title] at (5,1.15) {UC-HWK-01 学生提交作业并触发自动评测（系统顺序图）};
+  \hwkparticipant{Student}{0}{学生}{\DiagramDepth}
+  \hwkparticipant{Teacher}{3.2}{教师}{\DiagramDepth}
+  \hwkparticipant{System}{10}{OnlineJudgeForSE}{\DiagramDepth}
+  \hwkactivation{System}{.55}{8.85}
+
+  \hwkmessage{Student}{System}{.8}{OP-HWK-02 提交作业(homeworkId, submission)}
+  \draw[hwk fragment] (-.45,-1.55) rectangle (10.75,-8.55);
+  \node[hwk fragment label] at (-.35,-1.63) {alt 作业开放、成员和提交格式合法};
+  \hwkreturn{System}{Student}{1.85}{提交回执、版本和当前状态}
+  \hwkself{System}{2.35}{OP-HWK-03 触发自动评测}
+  \draw[hwk fragment] (-.2,-3.15) rectangle (10.5,-7.45);
+  \node[hwk fragment label] at (-.1,-3.23) {alt 自动评测完成 / 评测异常或待人工批阅};
+  \hwkreturn{System}{Student}{3.65}{可见评测状态、自动分和反馈摘要}
+  \hwkreturn{System}{Student}{4.55}{失败或待批阅状态（提交保留）}
+  \draw[hwk fragment] (2.75,-5.05) rectangle (10.25,-7.15);
+  \node[hwk fragment label] at (2.85,-5.13) {opt 教师批阅或重评};
+  \hwkmessage{Teacher}{System}{5.65}{OP-HWK-04 提交评分、评语或重评理由}
+  \hwkreturn{System}{Teacher}{6.25}{批阅/重评结果与审计日志}
+  \hwkreturn{System}{Student}{6.85}{OP-HWK-05 可见反馈与结果}
+  \node[hwk fragment label] at (-.35,-7.62) {else 逾期、非成员、格式非法或附件不可绑定};
+  \hwkreturn{System}{Student}{8.05}{稳定错误码和受控提示}
+\end{tikzpicture}
+\end{document}

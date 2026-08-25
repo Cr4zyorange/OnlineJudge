@@ -1,0 +1,37 @@
+\documentclass[tikz,border=8pt]{standalone}
+\input{hwk-tikz-style.tex}
+\begin{document}
+\begin{tikzpicture}
+  \tikzset{hwk participant/.append style={font=\scriptsize,text width=3.1cm}}
+  \def\DiagramDepth{11.2}
+  \node[hwk title] at (14,1.15) {UC-HWK-02 教师创建并发布作业（对象顺序图）};
+  \hwkparticipant{Teacher}{0}{教师}{\DiagramDepth}
+  \hwkparticipant{View}{4}{Homework\ Editor View}{\DiagramDepth}
+  \hwkparticipant{Controller}{8}{Homework\ Controller}{\DiagramDepth}
+  \hwkparticipant{Service}{12}{Homework\ Service}{\DiagramDepth}
+  \hwkparticipant{Permission}{16}{CoursePermission\ Client}{\DiagramDepth}
+  \hwkparticipant{Repository}{20}{JdbcHomework\ Repository}{\DiagramDepth}
+  \hwkparticipant{Config}{24}{Question/TestCase\ Repository}{\DiagramDepth}
+  \hwkparticipant{Event}{28}{NotificationEvent\ Publisher}{\DiagramDepth}
+
+  \hwkmessage{Teacher}{View}{.7}{填写配置并保存草稿}
+  \hwkmessage{View}{Controller}{1.3}{POST/PUT /api/v1/homeworks}
+  \hwkmessage{Controller}{Service}{1.9}{create/update(command, currentUser)}
+  \hwkmessage{Service}{Permission}{2.5}{canManageCourse(userId, courseId)}
+  \hwkreturn{Permission}{Service}{3.05}{允许或拒绝}
+  \hwkmessage{Service}{Repository}{3.65}{保存 DRAFT 且排除已删除记录}
+  \hwkmessage{Service}{Config}{4.25}{保存题目或测试用例}
+  \hwkreturn{Service}{Controller}{4.9}{Homework}
+  \hwkreturn{Controller}{View}{5.45}{HomeworkResponse}
+  \hwkmessage{Teacher}{View}{6.15}{确认发布}
+  \hwkmessage{View}{Controller}{6.75}{PUT /api/v1/homeworks/\{id\}/publish}
+  \hwkmessage{Controller}{Service}{7.35}{publish(homeworkId, currentUser)}
+  \hwkmessage{Service}{Permission}{7.95}{复核课程管理权限}
+  \hwkmessage{Service}{Config}{8.55}{校验类型配置完整性}
+  \draw[hwk fragment] (11.45,-8.95) rectangle (28.75,-10.65);
+  \node[hwk fragment label] at (11.55,-9.03) {alt 合法且未删除 / 权限、配置或状态冲突};
+  \hwkmessage{Service}{Repository}{9.55}{原子更新 PUBLISHED/publishedAt}
+  \hwkmessage{Service}{Event}{10.1}{publish(HOMEWORK\_PUBLISHED)}
+  \hwkreturn{Service}{Controller}{10.75}{结果或稳定 HWK 错误码}
+\end{tikzpicture}
+\end{document}

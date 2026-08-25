@@ -1,0 +1,34 @@
+\documentclass[tikz,border=8pt]{standalone}
+\input{hwk-tikz-style.tex}
+\begin{document}
+\begin{tikzpicture}[x=1cm]
+  \def\DiagramDepth{10.5}
+  \node[hwk title] at (10,1.15) {UC-HWK-01 学生提交作业并触发自动评测（组件顺序图）};
+  \hwkparticipant{Student}{0}{学生}{\DiagramDepth}
+  \hwkparticipant{FE}{3}{Vue HWK 页面}{\DiagramDepth}
+  \hwkparticipant{API}{7}{HWK API}{\DiagramDepth}
+  \hwkparticipant{Perm}{11}{课程权限边界}{\DiagramDepth}
+  \hwkparticipant{Store}{15}{文件存储边界}{\DiagramDepth}
+  \hwkparticipant{DB}{19}{HWK 数据表}{\DiagramDepth}
+  \hwkparticipant{Eval}{23}{共享评测边界}{\DiagramDepth}
+
+  \hwkmessage{Student}{FE}{.7}{打开作业并提交内容}
+  \draw[hwk fragment] (2.45,-1.35) rectangle (19.7,-4.15);
+  \node[hwk fragment label] at (2.55,-1.43) {opt FILE 作业};
+  \hwkmessage{FE}{API}{1.8}{上传单附件}
+  \hwkmessage{API}{Perm}{2.35}{校验成员与作业归属}
+  \hwkmessage{API}{Store}{2.9}{写入物理对象}
+  \hwkmessage{API}{DB}{3.45}{保存 UPLOADED 安全元数据}
+  \hwkreturn{API}{FE}{3.95}{返回 fileId}
+  \hwkmessage{FE}{API}{4.7}{提交 TEXT/OBJECTIVE/CODE/fileId}
+  \hwkmessage{API}{Perm}{5.3}{校验成员、状态、截止与次数}
+  \hwkmessage{API}{DB}{5.9}{保存版本并维护唯一有效提交}
+  \draw[hwk fragment] (6.45,-6.35) rectangle (23.7,-8.8);
+  \node[hwk fragment label] at (6.55,-6.43) {alt OBJECTIVE/CODE / TEXT/FILE};
+  \hwkmessage{API}{Eval}{6.95}{自动评分或创建评测任务}
+  \hwkreturn{Eval}{API}{7.55}{初始/最终评测状态}
+  \hwkmessage{API}{DB}{8.25}{标记待人工批阅}
+  \hwkreturn{API}{FE}{9.15}{提交回执和可见状态}
+  \hwkreturn{FE}{Student}{9.75}{结果、错误或恢复提示}
+\end{tikzpicture}
+\end{document}
