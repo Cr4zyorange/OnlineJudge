@@ -5,12 +5,12 @@
 | 文档名称 | HWK 作业与自动评测测试文档 |
 | 项目名称 | 在线教学与实训平台 |
 | 所属阶段 | 系统测试与验收测试 |
-| 报告版本 | V1.3 |
-| 编写日期 | 2026-08-22 |
+| 报告版本 | V1.4 |
+| 编写日期 | 2026-08-25 |
 | 编写人 | HWK 模块负责人 |
-| 对应 issue | #157 TST-DOC-06；#225 HWK 统计与待处理名单；#224 HWK 草稿逻辑删除；#214 HWK FILE 附件上传与安全提交 |
+| 对应 issue | #264 HWK 业务场景文档与测试闭环；#157 TST-DOC-06；#225 HWK 统计与待处理名单；#224 HWK 草稿逻辑删除；#214 HWK FILE 附件上传与安全提交 |
 | 测试范围 | HWK 作业发布、草稿删除、提交/历史/评测/批阅、统计与待处理名单；FILE 单附件上传、24h 恢复/清理、原子绑定/补偿、所有权、受控下载、权限、安全与响应式页面 |
-| 测试结论 | 既有 #224/#225 结论保留；#214 已完成后端 340 total = 339 passed + 1 Docker-only skipped（0 failures/0 errors）、定向 9 类 94/94、前端 53 files / 545 tests、typecheck/build、真实 MySQL 9.6 fresh/重复迁移与 MAN-HWK-012 `01~10` 真实浏览器验收 |
+| 测试结论 | #264 在 `origin/dev@758afd9` 完成 HWK 场景与三层图闭环；后端 HWK 101/101、前端 HWK 182/182、后端全量 368（1 Docker-only skipped）、前端全量 551/551、typecheck/build 和文档契约通过；直接复用 #267 / PR #268 共享入口的 HWK E2E 2/2 PASS，LRN 通知落库与 GRD 成绩消费真实边界 PASS |
 
 ## 1 文档控制
 
@@ -22,6 +22,7 @@
 | V1.1 | 2026-08-22 | HWK 模块负责人 | 按 #225 补充固定五档归一化分布、待评测/待批阅 attention、当前活跃学生范围、SQL 聚合/组合索引、权限、URL/隐私和响应式验收契约，并记录 RED/GREEN、全量回归与浏览器证据 |
 | V1.2 | 2026-08-22 | HWK 模块负责人 | 按 #224 补充 API-HWK-22、HWK_4095、TC-HWK-19、UI-HWK-01 删除入口、父表原子软删/子历史保留/普通更新防复活；记录全量自动化、typecheck/build 和 1440×900/390×844 浏览器证据 |
 | V1.3 | 2026-08-22 | HWK 模块负责人 | 按 #214 补充 API-HWK-23/24、DB-HWK-08、TC-HWK-20 ~ 27、MAN-HWK-012，回填后端 340/定向 94、前端 545、MySQL 9.6 与 `output/playwright/issue-214/01~10` 证据 |
+| V1.4 | 2026-08-25 | HWK 模块负责人 | 按 #264 拆分 UC-HWK-01/02 需求层 SSD，补概要组件顺序图、详细对象顺序图和业务场景分类；记录文档契约 RED→GREEN、当前基线自动化统计、共享 HWK E2E 2/2 及 LRN/GRD 真实边界 PASS |
 
 ### 1.2 审批记录
 
@@ -206,6 +207,8 @@ HWK-LOG-001 ~ HWK-LOG-013 为 2026-06-09 的 V1.0 历史日志；HWK-LOG-014 起
 | HWK-LOG-016 | 2026-08-22 | 迁移 RED 10 条 | attention 索引列序、重试安全与存量 Compose 升级入口 | 3 failures + 1 error，按预期失败 |
 | HWK-LOG-017 | 2026-08-22 | `mvn test` | #225 GREEN 后端全量回归 | 283 条执行，0 失败，0 错误，1 条 Docker 专项跳过，BUILD SUCCESS |
 | HWK-LOG-018 | 2026-08-22 | `HomeworkMigrationTest`、`sh -n` | fresh/H2 索引、MySQL 守卫/原子/重试契约和升级脚本语法 | 10 条通过；shell 语法通过 |
+| HWK-LOG-023 | 2026-08-25 | 11 个 `com.onlinejudge.hwk` 测试类 | #264 当前基线 HWK Controller/Service/Repository/迁移/附件定向回归 | 101 条通过；0 失败、0 错误、0 跳过；BUILD SUCCESS |
+| HWK-LOG-024 | 2026-08-25 | `mvn test` | #264 后端全量回归 | 368 条执行；0 失败、0 错误、1 条 Docker-only 跳过；BUILD SUCCESS |
 
 ### 8.2 前端 HWK 执行日志
 
@@ -222,6 +225,10 @@ HWK-LOG-001 ~ HWK-LOG-013 为 2026-06-09 的 V1.0 历史日志；HWK-LOG-014 起
 | HWK-LOG-020 | 2026-08-22 | 前端 focused GREEN | 统计、队列、批阅、API、路由契约 | 5 files / 100 tests 通过 |
 | HWK-LOG-021 | 2026-08-22 | `npm run test:unit`、`typecheck`、`build` | 前端全量、类型与生产构建 | 53 files / 506 tests、类型检查、189 modules 构建通过 |
 | HWK-LOG-022 | 2026-08-22 | Playwright Chromium | H2 + Vite + fake sandbox，1440/390、深链、键盘、403、姓名 503 | 9 张截图通过，见 `output/playwright/issue-225/README.md` |
+| HWK-LOG-025 | 2026-08-25 | Vitest `tests/unit/hwk` | #264 当前基线 HWK 页面、API、权限、异常和附件定向回归 | 11 files / 182 tests；全部通过 |
+| HWK-LOG-026 | 2026-08-25 | Vitest 全量、`vue-tsc --noEmit`、Vite build | #264 前端全量回归、类型检查和生产构建 | 53 files / 551 tests、类型检查、189 modules 构建全部通过 |
+| HWK-LOG-027 | 2026-08-25 | `verify-hwk-doc-test-closure.test.sh`、Tectonic 0.17.0 | 拆分 SSD、TikZ 三层图、场景分类与 E2E 存在性契约 | 图组 RED 因教师发布 SSD 缺失失败；规范调整后旧图号断言再次 RED；E2E RED 因 HWK 场景文件缺失失败；GREEN 通过；6/6 TikZ 可编译且 PNG 目视通过 |
+| HWK-LOG-028 | 2026-08-25 | Playwright `homework-lifecycle.spec.ts` | 教师页面创建/发布→学生 TEXT 提交→教师批阅/发布成绩→学生结果；OBJECTIVE/CODE/FILE、评测/附件异常、过期、越权、重评；LRN/GRD 真实 API 边界 | 2/2 PASS；Spring Boot + Vite + 系统 Chrome；LRN 按 HWK sourceId 查到发布/成绩通知，GRD 同步返回受影响成绩项/学生/同步数均大于 0 |
 
 ## 9 手工测试与联调确认
 
@@ -244,9 +251,9 @@ HWK-LOG-001 ~ HWK-LOG-013 为 2026-06-09 的 V1.0 历史日志；HWK-LOG-014 起
 
 | 风险编号 | 风险说明 | 影响范围 | 建议处理 |
 | --- | --- | --- | --- |
-| R-HWK-001 | 当前未执行真实浏览器端到端验收 | UI-HWK-01 ~ UI-HWK-09 | 测试负责人整合后按 MAN-HWK-001 ~ MAN-HWK-006 补跑 |
+| R-HWK-001 | #264 已执行共享 Playwright 主链路与异常链路 2/2；MAN-HWK-001 ~ MAN-HWK-006 的全页面、多视口人工走查仍需在发布候选环境复核 | UI-HWK-01 ~ UI-HWK-09 | 发布候选环境按 MAN-HWK-001 ~ MAN-HWK-006 补充视觉与会话异常走查，不影响本次自动化闭环结论 |
 | R-HWK-002 | 当前未执行真实 Docker 沙箱并发和资源限制专项测试 | FR-HWK-04、NFR-HWK-01、NFR-HWK-02、NFR-HWK-04 | 使用真实沙箱环境补充多语言、错误、超时和并发样本 |
-| R-HWK-003 | LRN/GRD 跨模块生产环境联调尚未记录完整结果 | FR-HWK-06、NFR-HWK-03 | 在统一测试环境执行作业发布、成绩发布、通知中心和成绩同步闭环 |
+| R-HWK-003 | #264 已通过真实本地服务验证 LRN 通知与 GRD 成绩同步边界；生产环境联调尚未记录完整结果 | FR-HWK-06、NFR-HWK-03 | 在统一测试环境复跑作业发布、成绩发布、通知中心和成绩同步闭环 |
 | R-HWK-004 | Maven 和 Vitest 在普通沙箱下存在写入/子进程权限限制 | 本地验证流程 | 本地开发机可直接运行；受限环境下需使用已批准的提权命令 |
 | R-HWK-005 | 本机 Docker daemon socket 不存在，#225 存量迁移尚未在真实 MySQL 8.4 容器执行首次、重跑与 EXPLAIN | DB-HWK-04、TC-HWK-N02、部署升级 | 当前由 H2 执行测试、MySQL 脚本静态契约和 shell 语法覆盖；部署时按 `apply-compose-migration.sh` 入口实跑并保存输出 |
 | R-HWK-006 | #224 浏览器使用 H2 与 fake sandbox，未在生产数据库上复测条件 UPDATE/FOR UPDATE 的并发语义 | API-HWK-22、DB-HWK-01 | Repository/Service 自动化与 SQL 契约已覆盖并发分类和防复活；部署环境复测时补 MySQL 当前读证据，不影响本地验收结论 |
@@ -262,13 +269,13 @@ HWK-LOG-001 ~ HWK-LOG-013 为 2026-06-09 的 V1.0 历史日志；HWK-LOG-014 起
 | 数据一致性 | 有条件通过 | 父表原子软删、普通更新防复活、六类子记录保留自动化通过；真实 MySQL 并发当前读仍按部署环境复核 |
 | 权限与安全 | 通过 | 草稿删除无权限 403、非 DRAFT 409、重复删除 404；既有统计权限和隐私证据保持通过 |
 | 非功能 | 有条件通过 | 分页、稳定排序、SQL 聚合、索引和可重复性通过；生产压测、真实 MySQL EXPLAIN 和真实沙箱专项仍待补 |
-| 最终结论 | #224/#225 通过 | #224 后端 290 tests、前端 511 tests、typecheck/build 与 MAN-HWK-011 通过；Docker/MySQL 环境项按已披露风险复核，不冒充已执行 |
+| 最终结论 | #264 通过 | HWK 后端 101 tests、前端 HWK 182 tests、全量后端 368 tests（1 个 Docker-only skipped）、全量前端 551 tests、共享 E2E 2/2、共享入口契约 3/3、typecheck/build 与文档闭环契约均通过；真实 Docker 沙箱和生产环境项按已披露风险复核，不冒充已执行 |
 
 ## 12 附录
 
 ### 12.1 执行命令
 
-V1.0 历史命令保留如下；#224/#225 的实际全量与专项命令附在其后。
+V1.0 历史命令保留如下；#224/#225 的历史结果与 #264 的实际全量、专项和共享 E2E 命令附在其后。
 
 ```powershell
 cd D:\repos\OnlineJudge\backend
@@ -292,7 +299,7 @@ cd ..
 sh -n database/mysql/apply-compose-migration.sh
 ```
 
-### 12.2 V1.0 历史执行摘要与 #224/#225 状态
+### 12.2 V1.0 历史执行摘要与 #224/#225/#264 状态
 
 | 项目 | 摘要 |
 | --- | --- |
@@ -305,4 +312,6 @@ sh -n database/mysql/apply-compose-migration.sh
 | #224 后端 | 290 tests / 0 failures / 0 errors / 1 skipped；跳过项为 Docker 沙箱环境假设 |
 | #224 前端 | 53 files / 511 tests；typecheck 与生产 build 通过 |
 | #224 浏览器 | MAN-HWK-011 通过；真实 DELETE 200/deleted=true；1440×900/390×844 四张截图见 `output/playwright/issue-224/README.md` |
-| 手工/联调状态 | #224/#225 已验收；真实 MySQL 容器、真实沙箱和 LRN/GRD 生产联调仍按风险项复核 |
+| #264 自动化 | HWK 后端 101/101、HWK 前端 182/182；全量后端 368 tests（1 个 Docker-only skipped）、全量前端 551/551；共享入口契约 3/3；typecheck、189 modules build、文档闭环契约通过 |
+| #264 共享 E2E | 2/2 通过；复用 #267/#268 的 Playwright runner 与公共夹具，覆盖教师发布、学生四类提交、自动评测异常保留、附件拒绝、过期、越权、批阅/重评、LRN 通知和 GRD 同步 |
+| 手工/联调状态 | #224/#225 已验收；#264 真实本地 LRN/GRD 边界通过；真实 MySQL 容器、真实 Docker 沙箱和生产环境联调仍按风险项复核 |
