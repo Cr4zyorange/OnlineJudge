@@ -5,6 +5,7 @@ import com.onlinejudge.grd.domain.CourseGradeSummaryRepository;
 import com.onlinejudge.grd.domain.FinalStatus;
 import com.onlinejudge.grd.domain.GradeAnalysisSnapshot;
 import com.onlinejudge.grd.domain.GradeAnalysisSnapshotRepository;
+import com.onlinejudge.grd.domain.GradeAnalysisSourceVersion;
 import com.onlinejudge.grd.domain.GradeItem;
 import com.onlinejudge.grd.domain.GradeItemRepository;
 import com.onlinejudge.grd.domain.GradeRecord;
@@ -93,7 +94,30 @@ class GradeAnalysisServiceTest {
     }
 
     @Test
-    void changedCourseTotalCreatesANewSnapshotFromTheUpdatedSummary() {
+    void changedAnalysisContractVersionInvalidatesAnOtherwiseMatchingSnapshot() {
+        InMemoryGradeAnalysisSnapshotRepository snapshotRepository = new InMemoryGradeAnalysisSnapshotRepository();
+        InMemoryCourseGradeSummaryRepository summaryRepository = new InMemoryCourseGradeSummaryRepository();
+        GradeAnalysisService service = new GradeAnalysisService(
+                new InMemoryGradeItemRepository(),
+                new InMemoryGradeRecordRepository(),
+                summaryRepository,
+                snapshotRepository,
+                permissionClient(601L)
+        );
+        summaryRepository.upsert(summary(101L, 601L, "84.00", FinalStatus.CALCULATED));
+        service.analyzeCourseGrades(101L, 501L, "COURSE_TOTAL", null);
+        snapshotRepository.replaceLatestFingerprintContract("GRD_ANALYSIS_V1");
+
+        service.analyzeCourseGrades(101L, 501L, "COURSE_TOTAL", null);
+
+        assertThat(snapshotRepository.size()).isEqualTo(2);
+        assertThat(summaryRepository.findByCourseIdCallCount()).isEqualTo(2);
+        assertThat(snapshotRepository.findLatest(101L, "COURSE_TOTAL", null).orElseThrow().sourceFingerprint())
+                .startsWith("GRD_ANALYSIS_V2:");
+    }
+
+    @Test
+    void changedCourseTotalCreatesANewSnapshotEvenWhenUpdateTimestampIsUnchanged() {
         InMemoryGradeAnalysisSnapshotRepository snapshotRepository = new InMemoryGradeAnalysisSnapshotRepository();
         InMemoryCourseGradeSummaryRepository summaryRepository = new InMemoryCourseGradeSummaryRepository();
         GradeAnalysisService service = new GradeAnalysisService(
@@ -104,21 +128,21 @@ class GradeAnalysisServiceTest {
                 permissionClient(601L)
         );
         LocalDateTime firstSourceTime = LocalDateTime.of(2026, 8, 25, 9, 0);
-        LocalDateTime changedSourceTime = firstSourceTime.plusMinutes(5);
         summaryRepository.upsert(summaryAt(101L, 601L, "84.00", FinalStatus.CALCULATED, firstSourceTime));
         GradeAnalysisResult first = service.analyzeCourseGrades(101L, 501L, "COURSE_TOTAL", null);
 
-        summaryRepository.upsert(summaryAt(101L, 601L, "92.00", FinalStatus.ADJUSTED, changedSourceTime));
+        summaryRepository.upsert(summaryAt(101L, 601L, "92.00", FinalStatus.ADJUSTED, firstSourceTime));
         GradeAnalysisResult changed = service.analyzeCourseGrades(101L, 501L, "COURSE_TOTAL", null);
 
         assertThat(changed.averageScore()).isEqualByComparingTo("92.00");
-        assertThat(changed.sourceDataTime()).isEqualTo(changedSourceTime);
+        assertThat(changed.sourceDataTime()).isAfter(first.sourceDataTime());
         assertThat(changed.generatedAt()).isNotEqualTo(first.generatedAt());
         assertThat(snapshotRepository.size()).isEqualTo(2);
+        assertThat(summaryRepository.findByCourseIdCallCount()).isEqualTo(2);
     }
 
     @Test
-    void changedGradeItemStatusCreatesANewSnapshotEvenWhenBothScoresAreMissing() {
+    void changedGradeItemStatusCreatesANewSnapshotEvenWhenScoreAndUpdateTimestampAreUnchanged() {
         InMemoryGradeAnalysisSnapshotRepository snapshotRepository = new InMemoryGradeAnalysisSnapshotRepository();
         InMemoryGradeRecordRepository recordRepository = new InMemoryGradeRecordRepository();
         InMemoryGradeItemRepository itemRepository = new InMemoryGradeItemRepository();
@@ -131,29 +155,30 @@ class GradeAnalysisServiceTest {
         );
         itemRepository.add(item(11L, 101L));
         LocalDateTime firstSourceTime = LocalDateTime.of(2026, 8, 25, 9, 0);
-        LocalDateTime changedSourceTime = firstSourceTime.plusMinutes(5);
         recordRepository.upsert(recordAt(101L, 601L, 11L, null, GradeStatus.UNSUBMITTED, firstSourceTime));
         GradeAnalysisResult first = service.analyzeCourseGrades(101L, 501L, "GRADE_ITEM", 11L);
 
-        recordRepository.upsert(recordAt(101L, 601L, 11L, null, GradeStatus.UNGRADED, changedSourceTime));
+        recordRepository.upsert(recordAt(101L, 601L, 11L, null, GradeStatus.UNGRADED, firstSourceTime));
         GradeAnalysisResult changed = service.analyzeCourseGrades(101L, 501L, "GRADE_ITEM", 11L);
 
         assertThat(first.unsubmittedCount()).isEqualTo(1);
         assertThat(changed.unsubmittedCount()).isZero();
         assertThat(changed.ungradedCount()).isEqualTo(1);
-        assertThat(changed.sourceDataTime()).isEqualTo(changedSourceTime);
+        assertThat(changed.sourceDataTime()).isAfter(first.sourceDataTime());
         assertThat(snapshotRepository.size()).isEqualTo(2);
+        assertThat(recordRepository.findByCourseIdCallCount()).isEqualTo(2);
     }
 
     @Test
     void changedActiveStudentRosterInvalidatesAnOtherwiseEmptyCourseSnapshot() {
         InMemoryGradeAnalysisSnapshotRepository snapshotRepository = new InMemoryGradeAnalysisSnapshotRepository();
         MutableCoursePermissionClient permissionClient = new MutableCoursePermissionClient();
+        InMemoryCourseGradeSummaryRepository summaryRepository = new InMemoryCourseGradeSummaryRepository();
         permissionClient.setStudentIds(101L, 601L);
         GradeAnalysisService service = new GradeAnalysisService(
                 new InMemoryGradeItemRepository(),
                 new InMemoryGradeRecordRepository(),
-                new InMemoryCourseGradeSummaryRepository(),
+                summaryRepository,
                 snapshotRepository,
                 permissionClient
         );
@@ -172,6 +197,7 @@ class GradeAnalysisServiceTest {
         assertThat(removedStudent.totalStudentCount()).isEqualTo(1);
         assertThat(removedStudent.sourceDataTime()).isAfter(addedStudent.sourceDataTime());
         assertThat(snapshotRepository.size()).isEqualTo(3);
+        assertThat(summaryRepository.findByCourseIdCallCount()).isEqualTo(3);
     }
 
     @Test
@@ -527,16 +553,19 @@ class GradeAnalysisServiceTest {
         private long nextId = 1L;
         private int findByCourseIdCallCount;
         private final List<GradeRecord> records = new ArrayList<>();
+        private final Map<String, GradeAnalysisSourceVersion> sourceVersions = new LinkedHashMap<>();
 
         @Override
         public GradeRecord upsert(GradeRecord record) {
             GradeRecord saved = record.withId(nextId++);
             records.add(saved);
+            bumpSourceVersion(saved.courseId(), saved.gradeItemId(), saved.updatedAt());
             return saved;
         }
 
         @Override
         public GradeRecord update(GradeRecord record) {
+            bumpSourceVersion(record.courseId(), record.gradeItemId(), record.updatedAt());
             return record;
         }
 
@@ -554,20 +583,38 @@ class GradeAnalysisServiceTest {
         int findByCourseIdCallCount() {
             return findByCourseIdCallCount;
         }
+
+        @Override
+        public GradeAnalysisSourceVersion findAnalysisSourceVersion(long courseId, long gradeItemId) {
+            return sourceVersions.getOrDefault(sourceKey(courseId, gradeItemId), GradeAnalysisSourceVersion.initial());
+        }
+
+        private void bumpSourceVersion(long courseId, long gradeItemId, LocalDateTime sourceDataTime) {
+            String key = sourceKey(courseId, gradeItemId);
+            GradeAnalysisSourceVersion previous = sourceVersions.getOrDefault(key, GradeAnalysisSourceVersion.initial());
+            sourceVersions.put(key, new GradeAnalysisSourceVersion(previous.version() + 1, sourceDataTime));
+        }
+
+        private String sourceKey(long courseId, long gradeItemId) {
+            return courseId + ":" + gradeItemId;
+        }
     }
 
     private static final class InMemoryCourseGradeSummaryRepository implements CourseGradeSummaryRepository {
         private int findByCourseIdCallCount;
         private final List<CourseGradeSummary> summaries = new ArrayList<>();
+        private final Map<Long, GradeAnalysisSourceVersion> sourceVersions = new LinkedHashMap<>();
 
         @Override
         public CourseGradeSummary upsert(CourseGradeSummary summary) {
             summaries.add(summary);
+            bumpSourceVersion(summary.courseId(), summary.updatedAt());
             return summary;
         }
 
         @Override
         public CourseGradeSummary update(CourseGradeSummary summary) {
+            bumpSourceVersion(summary.courseId(), summary.updatedAt());
             return summary;
         }
 
@@ -584,6 +631,19 @@ class GradeAnalysisServiceTest {
 
         int findByCourseIdCallCount() {
             return findByCourseIdCallCount;
+        }
+
+        @Override
+        public GradeAnalysisSourceVersion findAnalysisSourceVersion(long courseId) {
+            return sourceVersions.getOrDefault(courseId, GradeAnalysisSourceVersion.initial());
+        }
+
+        private void bumpSourceVersion(long courseId, LocalDateTime sourceDataTime) {
+            GradeAnalysisSourceVersion previous = sourceVersions.getOrDefault(
+                    courseId,
+                    GradeAnalysisSourceVersion.initial()
+            );
+            sourceVersions.put(courseId, new GradeAnalysisSourceVersion(previous.version() + 1, sourceDataTime));
         }
     }
 
@@ -609,6 +669,33 @@ class GradeAnalysisServiceTest {
 
         int size() {
             return snapshots.size();
+        }
+
+        void replaceLatestFingerprintContract(String contractVersion) {
+            GradeAnalysisSnapshot latest = snapshots.remove(snapshots.size() - 1);
+            String fingerprint = latest.sourceFingerprint();
+            String digest = fingerprint.substring(fingerprint.indexOf(':') + 1);
+            snapshots.add(new GradeAnalysisSnapshot(
+                    latest.id(),
+                    latest.courseId(),
+                    latest.targetType(),
+                    latest.gradeItemId(),
+                    latest.sourceDataTime(),
+                    contractVersion + ":" + digest,
+                    latest.averageScore(),
+                    latest.maxScore(),
+                    latest.minScore(),
+                    latest.passRate(),
+                    latest.completionRate(),
+                    latest.totalStudentCount(),
+                    latest.completedCount(),
+                    latest.missingCount(),
+                    latest.unsubmittedCount(),
+                    latest.ungradedCount(),
+                    latest.distributionJson(),
+                    latest.generatedBy(),
+                    latest.generatedAt()
+            ));
         }
     }
 }

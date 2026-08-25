@@ -166,8 +166,44 @@ class GradeItemMigrationTest {
 
         assertThat(record.id()).isPositive();
         assertThat(gradeRecordRepository.findByCourseId(303L)).containsExactly(record);
+        assertThat(gradeRecordRepository.findAnalysisSourceVersion(303L, 1L).version()).isEqualTo(1L);
         assertThat(summary.id()).isPositive();
         assertThat(courseGradeSummaryRepository.findByCourseId(303L)).containsExactly(summary);
+        assertThat(courseGradeSummaryRepository.findAnalysisSourceVersion(303L).version()).isEqualTo(1L);
+
+        gradeRecordRepository.upsert(new GradeRecord(
+                0L,
+                303L,
+                601L,
+                1L,
+                SourceType.LAB,
+                301L,
+                new BigDecimal("95.00"),
+                new BigDecimal("38.00"),
+                GradeStatus.ADJUSTED,
+                PublishStatus.UNPUBLISHED,
+                null,
+                now.plusMinutes(1),
+                now.plusMinutes(1),
+                null,
+                now,
+                now.plusMinutes(1)
+        ));
+        courseGradeSummaryRepository.upsert(new CourseGradeSummary(
+                0L,
+                303L,
+                601L,
+                new BigDecimal("90.00"),
+                FinalStatus.ADJUSTED,
+                PublishStatus.UNPUBLISHED,
+                0L,
+                null,
+                now,
+                now.plusMinutes(1)
+        ));
+
+        assertThat(gradeRecordRepository.findAnalysisSourceVersion(303L, 1L).version()).isEqualTo(2L);
+        assertThat(courseGradeSummaryRepository.findAnalysisSourceVersion(303L).version()).isEqualTo(2L);
     }
 
     @Test
@@ -214,12 +250,17 @@ class GradeItemMigrationTest {
                 "COURSE_TOTAL",
                 null,
                 now.minusMinutes(1),
-                "6a6d0f3f657c0f61b92f7fd105a149781039605365c671414bbc27f6536fa72e",
+                "GRD_ANALYSIS_V2:6a6d0f3f657c0f61b92f7fd105a149781039605365c671414bbc27f6536fa72e",
                 new BigDecimal("78.00"),
                 new BigDecimal("92.00"),
                 new BigDecimal("58.00"),
                 new BigDecimal("0.6667"),
                 new BigDecimal("0.7500"),
+                4,
+                3,
+                1,
+                0,
+                0,
                 "[{\"label\":\"0-59\",\"count\":1}]",
                 501L,
                 now
@@ -239,6 +280,11 @@ class GradeItemMigrationTest {
                     assertThat(snapshot.minScore()).isEqualByComparingTo(saved.minScore());
                     assertThat(snapshot.passRate()).isEqualByComparingTo(saved.passRate());
                     assertThat(snapshot.completionRate()).isEqualByComparingTo(saved.completionRate());
+                    assertThat(snapshot.totalStudentCount()).isEqualTo(4);
+                    assertThat(snapshot.completedCount()).isEqualTo(3);
+                    assertThat(snapshot.missingCount()).isEqualTo(1);
+                    assertThat(snapshot.unsubmittedCount()).isZero();
+                    assertThat(snapshot.ungradedCount()).isZero();
                     assertThat(snapshot.distributionJson()).isEqualTo(saved.distributionJson());
                     assertThat(snapshot.generatedBy()).isEqualTo(saved.generatedBy());
                     assertThat(Duration.between(saved.sourceDataTime(), snapshot.sourceDataTime()).abs())
