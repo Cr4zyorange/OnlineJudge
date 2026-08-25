@@ -9,6 +9,7 @@ spring:
       mode: always
       schema-locations:
         - file:../database/migrations/20260525_01_create_grd_grade_item.sql
+        - classpath:h2-grd-analysis-source-fingerprint.sql
         - file:../database/migrations/DB-CRS-03-course-resource.sql
         - file:../database/migrations/DB-CRS-05-course-announcement.sql
         - file:../database/migrations/20260525_02_create_lab_experiment.sql

@@ -16,11 +16,17 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.Comparator;
+import java.util.HexFormat;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -66,28 +72,19 @@ public class GradeAnalysisService {
                 .map(ScoreRow::score)
                 .filter(score -> score != null)
                 .toList();
-        LocalDateTime now = LocalDateTime.now();
-        LocalDateTime sourceDataTime = rows.stream()
-                .map(ScoreRow::updatedAt)
-                .filter(updatedAt -> updatedAt != null)
-                .max(Comparator.naturalOrder())
-                .orElse(now);
+        LocalDateTime now = LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS);
         List<GradeScoreBucket> distribution = distribution(scores);
-        GradeAnalysisSnapshot snapshot = gradeAnalysisSnapshotRepository.save(new GradeAnalysisSnapshot(
-                0L,
+        GradeAnalysisSnapshot snapshot = resolveSnapshot(
                 courseId,
                 normalizedTargetType,
                 gradeItemId,
-                sourceDataTime,
-                average(scores),
-                max(scores),
-                min(scores),
-                passRate(scores),
-                rate(scores.size(), studentIds.size()),
-                distributionJson(distribution),
+                studentIds,
+                rows,
+                scores,
+                distribution,
                 teacherId,
                 now
-        ));
+        );
         return new GradeAnalysisResult(
                 snapshot.targetType(),
                 snapshot.gradeItemId(),
@@ -117,27 +114,19 @@ public class GradeAnalysisService {
                 .map(ScoreRow::score)
                 .filter(score -> score != null)
                 .toList();
-        LocalDateTime now = LocalDateTime.now();
-        LocalDateTime sourceDataTime = rows.stream()
-                .map(ScoreRow::updatedAt)
-                .filter(updatedAt -> updatedAt != null)
-                .max(Comparator.naturalOrder())
-                .orElse(now);
-        gradeAnalysisSnapshotRepository.save(new GradeAnalysisSnapshot(
-                0L,
+        LocalDateTime now = LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS);
+        List<GradeScoreBucket> distribution = distribution(scores);
+        GradeAnalysisSnapshot snapshot = resolveSnapshot(
                 courseId,
                 "GRADE_ITEM",
                 gradeItemId,
-                sourceDataTime,
-                average(scores),
-                max(scores),
-                min(scores),
-                passRate(scores),
-                rate(scores.size(), studentIds.size()),
-                distributionJson(distribution(scores)),
+                studentIds,
+                rows,
+                scores,
+                distribution,
                 teacherId,
                 now
-        ));
+        );
         return new GradeItemCompletionResult(
                 gradeItemId,
                 studentIds.size(),
@@ -146,11 +135,83 @@ public class GradeAnalysisService {
                 countByStatus(rows, ScoreStatus.MISSING),
                 countByStatus(rows, ScoreStatus.UNSUBMITTED),
                 countByStatus(rows, ScoreStatus.UNGRADED),
-                average(scores),
-                rate(scores.size(), studentIds.size()),
-                sourceDataTime,
-                now
+                snapshot.averageScore(),
+                snapshot.completionRate(),
+                snapshot.sourceDataTime(),
+                snapshot.generatedAt()
         );
+    }
+
+    private GradeAnalysisSnapshot resolveSnapshot(
+            long courseId,
+            String targetType,
+            Long gradeItemId,
+            Set<Long> studentIds,
+            List<ScoreRow> rows,
+            List<BigDecimal> scores,
+            List<GradeScoreBucket> distribution,
+            long teacherId,
+            LocalDateTime now
+    ) {
+        String sourceFingerprint = sourceFingerprint(courseId, targetType, gradeItemId, rows);
+        Optional<GradeAnalysisSnapshot> latest = gradeAnalysisSnapshotRepository.findLatest(
+                courseId,
+                targetType,
+                gradeItemId
+        );
+        if (latest.map(GradeAnalysisSnapshot::sourceFingerprint).filter(sourceFingerprint::equals).isPresent()) {
+            return latest.orElseThrow();
+        }
+        LocalDateTime sourceDataTime = nextSourceDataTime(rows, latest, now);
+        LocalDateTime generatedAt = nextGeneratedAt(latest, now);
+        return gradeAnalysisSnapshotRepository.save(new GradeAnalysisSnapshot(
+                0L,
+                courseId,
+                targetType,
+                gradeItemId,
+                sourceDataTime,
+                sourceFingerprint,
+                average(scores),
+                max(scores),
+                min(scores),
+                passRate(scores),
+                rate(scores.size(), studentIds.size()),
+                distributionJson(distribution),
+                teacherId,
+                generatedAt
+        ));
+    }
+
+    private LocalDateTime nextSourceDataTime(
+            List<ScoreRow> rows,
+            Optional<GradeAnalysisSnapshot> latest,
+            LocalDateTime now
+    ) {
+        LocalDateTime latestRowUpdate = rows.stream()
+                .map(ScoreRow::updatedAt)
+                .filter(updatedAt -> updatedAt != null)
+                .map(updatedAt -> updatedAt.truncatedTo(ChronoUnit.SECONDS))
+                .max(Comparator.naturalOrder())
+                .orElse(null);
+        if (latest.isEmpty()) {
+            return latestRowUpdate == null ? now : latestRowUpdate;
+        }
+        LocalDateTime previousSourceTime = latest.orElseThrow().sourceDataTime();
+        if (latestRowUpdate != null && latestRowUpdate.isAfter(previousSourceTime)) {
+            return latestRowUpdate;
+        }
+        LocalDateTime minimumNextSourceTime = previousSourceTime.plusSeconds(1);
+        return now.isAfter(minimumNextSourceTime) ? now : minimumNextSourceTime;
+    }
+
+    private LocalDateTime nextGeneratedAt(
+            Optional<GradeAnalysisSnapshot> latest,
+            LocalDateTime now
+    ) {
+        if (latest.isEmpty() || now.isAfter(latest.orElseThrow().generatedAt())) {
+            return now;
+        }
+        return latest.orElseThrow().generatedAt().plusSeconds(1);
     }
 
     private List<ScoreRow> courseTotalRows(long courseId, Set<Long> studentIds) {
@@ -160,9 +221,21 @@ public class GradeAnalysisService {
                 .map(studentId -> {
                     CourseGradeSummary summary = summariesByStudent.get(studentId);
                     if (summary == null || summary.finalScore() == null || summary.finalStatus() == FinalStatus.INCOMPLETE) {
-                        return new ScoreRow(null, ScoreStatus.MISSING, summary == null ? null : summary.updatedAt());
+                        return new ScoreRow(
+                                studentId,
+                                null,
+                                ScoreStatus.MISSING,
+                                summary == null ? null : summary.updatedAt(),
+                                courseTotalSourceState(summary)
+                        );
                     }
-                    return new ScoreRow(summary.finalScore(), ScoreStatus.COMPLETED, summary.updatedAt());
+                    return new ScoreRow(
+                            studentId,
+                            summary.finalScore(),
+                            ScoreStatus.COMPLETED,
+                            summary.updatedAt(),
+                            courseTotalSourceState(summary)
+                    );
                 })
                 .toList();
     }
@@ -175,22 +248,96 @@ public class GradeAnalysisService {
                 .map(studentId -> {
                     GradeRecord record = recordsByStudent.get(studentId);
                     if (record == null) {
-                        return new ScoreRow(null, ScoreStatus.MISSING, null);
+                        return new ScoreRow(studentId, null, ScoreStatus.MISSING, null, "ABSENT");
                     }
                     if ((record.gradeStatus() == GradeStatus.SCORED || record.gradeStatus() == GradeStatus.ADJUSTED)
                             && record.rawScore() != null) {
-                        return new ScoreRow(record.rawScore(), ScoreStatus.COMPLETED, record.updatedAt());
+                        return new ScoreRow(
+                                studentId,
+                                record.rawScore(),
+                                ScoreStatus.COMPLETED,
+                                record.updatedAt(),
+                                gradeItemSourceState(record)
+                        );
                     }
-                    return new ScoreRow(null, toScoreStatus(record.gradeStatus()), record.updatedAt());
+                    return new ScoreRow(
+                            studentId,
+                            null,
+                            toScoreStatus(record.gradeStatus()),
+                            record.updatedAt(),
+                            gradeItemSourceState(record)
+                    );
                 })
                 .toList();
     }
 
     private Set<Long> studentIdsForAnalysis(long courseId) {
-        Set<Long> studentIds = new LinkedHashSet<>(coursePermissionClient.listCourseStudentIds(courseId));
-        gradeRecordRepository.findByCourseId(courseId).forEach(record -> studentIds.add(record.studentId()));
-        courseGradeSummaryRepository.findByCourseId(courseId).forEach(summary -> studentIds.add(summary.studentId()));
-        return studentIds;
+        return coursePermissionClient.listCourseStudentIds(courseId).stream()
+                .filter(studentId -> studentId != null && studentId > 0)
+                .distinct()
+                .sorted()
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+    }
+
+    private String sourceFingerprint(
+            long courseId,
+            String targetType,
+            Long gradeItemId,
+            List<ScoreRow> rows
+    ) {
+        StringBuilder source = new StringBuilder()
+                .append("course=").append(courseId)
+                .append("|target=").append(targetType)
+                .append("|item=").append(gradeItemId == null ? "-" : gradeItemId);
+        rows.stream()
+                .sorted(Comparator.comparingLong(ScoreRow::studentId))
+                .forEach(row -> source
+                        .append("|student=").append(row.studentId())
+                        .append("|score=").append(decimalValue(row.score()))
+                        .append("|status=").append(row.status())
+                        .append("|updatedAt=").append(timeValue(row.updatedAt()))
+                        .append("|state=").append(row.sourceState()));
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            return HexFormat.of().formatHex(digest.digest(source.toString().getBytes(StandardCharsets.UTF_8)));
+        } catch (NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("SHA-256 algorithm is unavailable", exception);
+        }
+    }
+
+    private String courseTotalSourceState(CourseGradeSummary summary) {
+        if (summary == null) {
+            return "ABSENT";
+        }
+        return String.join(",",
+                summary.finalStatus().name(),
+                decimalValue(summary.finalScore()),
+                summary.publishStatus().name(),
+                summary.calculationBatchId() == null ? "-" : summary.calculationBatchId().toString(),
+                timeValue(summary.updatedAt())
+        );
+    }
+
+    private String gradeItemSourceState(GradeRecord record) {
+        return String.join(",",
+                record.sourceType().name(),
+                record.sourceId() == null ? "-" : record.sourceId().toString(),
+                record.gradeStatus().name(),
+                decimalValue(record.rawScore()),
+                decimalValue(record.weightedScore()),
+                record.publishStatus().name(),
+                timeValue(record.sourceUpdatedAt()),
+                timeValue(record.calculatedAt()),
+                timeValue(record.updatedAt())
+        );
+    }
+
+    private String decimalValue(BigDecimal value) {
+        return value == null ? "-" : value.stripTrailingZeros().toPlainString();
+    }
+
+    private String timeValue(LocalDateTime value) {
+        return value == null ? "-" : value.toString();
     }
 
     private GradeItem requireGradeItem(long courseId, Long gradeItemId) {
@@ -291,7 +438,13 @@ public class GradeAnalysisService {
         }
     }
 
-    private record ScoreRow(BigDecimal score, ScoreStatus status, LocalDateTime updatedAt) {
+    private record ScoreRow(
+            long studentId,
+            BigDecimal score,
+            ScoreStatus status,
+            LocalDateTime updatedAt,
+            String sourceState
+    ) {
     }
 
     private enum ScoreStatus {

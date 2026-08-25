@@ -21,6 +21,7 @@ public class JdbcGradeAnalysisSnapshotRepository implements GradeAnalysisSnapsho
             resultSet.getString("target_type"),
             resultSet.getObject("grade_item_id", Long.class),
             resultSet.getTimestamp("source_data_time").toLocalDateTime(),
+            resultSet.getString("source_fingerprint"),
             resultSet.getBigDecimal("average_score"),
             resultSet.getBigDecimal("max_score"),
             resultSet.getBigDecimal("min_score"),
@@ -43,22 +44,24 @@ public class JdbcGradeAnalysisSnapshotRepository implements GradeAnalysisSnapsho
         jdbcTemplate.update(connection -> {
             PreparedStatement statement = connection.prepareStatement("""
                     INSERT INTO t_grade_analysis_snapshot
-                    (course_id, target_type, grade_item_id, source_data_time, average_score, max_score,
-                     min_score, pass_rate, completion_rate, distribution_json, generated_by, generated_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    (course_id, target_type, grade_item_id, source_data_time, source_fingerprint,
+                     average_score, max_score, min_score, pass_rate, completion_rate,
+                     distribution_json, generated_by, generated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """, new String[]{"id"});
             statement.setLong(1, snapshot.courseId());
             statement.setString(2, snapshot.targetType());
             statement.setObject(3, snapshot.gradeItemId());
             statement.setTimestamp(4, Timestamp.valueOf(snapshot.sourceDataTime()));
-            statement.setBigDecimal(5, snapshot.averageScore());
-            statement.setBigDecimal(6, snapshot.maxScore());
-            statement.setBigDecimal(7, snapshot.minScore());
-            statement.setBigDecimal(8, snapshot.passRate());
-            statement.setBigDecimal(9, snapshot.completionRate());
-            statement.setString(10, snapshot.distributionJson());
-            statement.setLong(11, snapshot.generatedBy());
-            statement.setTimestamp(12, Timestamp.valueOf(snapshot.generatedAt()));
+            statement.setString(5, snapshot.sourceFingerprint());
+            statement.setBigDecimal(6, snapshot.averageScore());
+            statement.setBigDecimal(7, snapshot.maxScore());
+            statement.setBigDecimal(8, snapshot.minScore());
+            statement.setBigDecimal(9, snapshot.passRate());
+            statement.setBigDecimal(10, snapshot.completionRate());
+            statement.setString(11, snapshot.distributionJson());
+            statement.setLong(12, snapshot.generatedBy());
+            statement.setTimestamp(13, Timestamp.valueOf(snapshot.generatedAt()));
             return statement;
         }, keyHolder);
         return snapshot.withId(Objects.requireNonNull(keyHolder.getKey()).longValue());
@@ -67,7 +70,7 @@ public class JdbcGradeAnalysisSnapshotRepository implements GradeAnalysisSnapsho
     @Override
     public Optional<GradeAnalysisSnapshot> findLatest(long courseId, String targetType, Long gradeItemId) {
         return jdbcTemplate.query("""
-                        SELECT id, course_id, target_type, grade_item_id, source_data_time,
+                        SELECT id, course_id, target_type, grade_item_id, source_data_time, source_fingerprint,
                                average_score, max_score, min_score, pass_rate, completion_rate,
                                distribution_json, generated_by, generated_at
                         FROM t_grade_analysis_snapshot

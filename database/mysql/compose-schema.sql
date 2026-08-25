@@ -423,6 +423,7 @@ CREATE TABLE IF NOT EXISTS t_grade_analysis_snapshot (
     target_type VARCHAR(30) NOT NULL,
     grade_item_id BIGINT NULL,
     source_data_time DATETIME NOT NULL,
+    source_fingerprint VARCHAR(64) NULL,
     average_score DECIMAL(6,2) NULL,
     max_score DECIMAL(6,2) NULL,
     min_score DECIMAL(6,2) NULL,
@@ -436,6 +437,11 @@ CREATE TABLE IF NOT EXISTS t_grade_analysis_snapshot (
 
 CREATE INDEX idx_grade_analysis_snapshot_course
     ON t_grade_analysis_snapshot (course_id, target_type, grade_item_id, generated_at);
+
+CREATE INDEX idx_grade_analysis_snapshot_source
+    ON t_grade_analysis_snapshot (
+        course_id, target_type, grade_item_id, source_fingerprint, generated_at
+    );
 
 
 -- Source: database/migrations/20260525_02_create_lab_experiment.sql
