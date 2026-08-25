@@ -26,8 +26,10 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
+import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.servlet.HandlerMapping;
 
 import java.util.List;
 import java.util.regex.Pattern;
@@ -185,18 +187,22 @@ public class ApiExceptionHandler {
     }
 
     private String parameterErrorCode(HttpServletRequest request) {
-        String uri = request.getRequestURI();
-        if (uri.startsWith("/api/v1/auth/") || uri.startsWith("/api/v1/users/") || uri.startsWith("/api/v1/admin/")) {
+        Object handler = request.getAttribute(HandlerMapping.BEST_MATCHING_HANDLER_ATTRIBUTE);
+        if (!(handler instanceof HandlerMethod handlerMethod)) {
+            return "400";
+        }
+
+        String controllerPackage = handlerMethod.getBeanType().getPackageName();
+        if (controllerPackage.startsWith("com.onlinejudge.auth.")) {
             return "AUTH_400";
         }
-        if (uri.startsWith("/api/v1/courses/") && !isGradePath(uri)) {
+        if (controllerPackage.startsWith("com.onlinejudge.crs.")) {
             return "CRS_400";
         }
+        if (controllerPackage.startsWith("com.onlinejudge.lab.")) {
+            return "LAB-400-01";
+        }
         return "400";
-    }
-
-    private static boolean isGradePath(String uri) {
-        return uri.contains("/grade") || uri.contains("/my-grades");
     }
 
     private String unreadableBodyMessage(HttpMessageNotReadableException exception) {

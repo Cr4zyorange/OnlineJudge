@@ -23,6 +23,7 @@ import java.nio.charset.StandardCharsets;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -118,6 +119,42 @@ class RequestParsingBoundaryTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("400"))
                 .andExpect(jsonPath("$.message", containsString("publishStatus")));
+    }
+
+    @Test
+    void labQueryInvalidStatusUsesLabErrorCodeInsteadOfCrsErrorCode() throws Exception {
+        mockMvc.perform(get("/api/v1/courses/101/labs")
+                        .param("status", "BOGUS")
+                        .headers(teacherHeaders()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("LAB-400-01"))
+                .andExpect(jsonPath("$.code").value(not("CRS_400")))
+                .andExpect(jsonPath("$.message", containsString("status")));
+    }
+
+    @Test
+    void crsRootJsonInvalidStatusUsesCrsErrorCode() throws Exception {
+        mockMvc.perform(post("/api/v1/courses")
+                        .headers(teacherHeaders())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "name": "invalid-course-status",
+                                  "status": "BOGUS"
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("CRS_400"))
+                .andExpect(jsonPath("$.message", containsString("status")));
+    }
+
+    @Test
+    void crsChapterInvalidPathVariableUsesCrsErrorCode() throws Exception {
+        mockMvc.perform(delete("/api/v1/chapters/BOGUS")
+                        .headers(teacherHeaders()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("CRS_400"))
+                .andExpect(jsonPath("$.message", containsString("chapterId")));
     }
 
     @Test
