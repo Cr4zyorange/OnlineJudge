@@ -515,6 +515,7 @@ const analysisError = ref('');
 const analysisTargetType = ref<GradeAnalysisTargetType>('COURSE_TOTAL');
 const analysisGradeItemIdInput = ref('');
 let analysisRequestVersion = 0;
+let gradeItemsRequestVersion = 0;
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / size.value)));
 const selectedRecord = computed(() => selectedRow.value?.records.find((record) => record.id === selectedRecordId.value) ?? null);
 
@@ -546,18 +547,28 @@ watch(
 
 onUnmounted(() => {
   analysisRequestVersion += 1;
+  gradeItemsRequestVersion += 1;
 });
 
 async function loadGradeItems() {
+  const requestVersion = ++gradeItemsRequestVersion;
+  const courseId = props.courseId;
   gradeItemsLoading.value = true;
   gradeItemsError.value = '';
+  gradeItems.value = [];
   try {
-    gradeItems.value = (await listGradeItems(props.courseId)).filter((item) => item.enabled);
+    const result = await listGradeItems(courseId);
+    if (requestVersion === gradeItemsRequestVersion && courseId === props.courseId) {
+      gradeItems.value = result.filter((item) => item.enabled);
+    }
   } catch (error) {
-    gradeItems.value = [];
-    gradeItemsError.value = error instanceof Error ? error.message : '成绩项列表加载失败';
+    if (requestVersion === gradeItemsRequestVersion && courseId === props.courseId) {
+      gradeItemsError.value = error instanceof Error ? error.message : '成绩项列表加载失败';
+    }
   } finally {
-    gradeItemsLoading.value = false;
+    if (requestVersion === gradeItemsRequestVersion && courseId === props.courseId) {
+      gradeItemsLoading.value = false;
+    }
   }
 }
 
