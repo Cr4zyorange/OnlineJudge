@@ -81,6 +81,9 @@ public class DockerSandboxExecutor implements SandboxExecutor {
                 );
             }
             if (compileResult.exitCode() != 0) {
+                if (isDockerDaemonUnavailable(compileResult.stderr())) {
+                    return systemError("Docker 沙箱不可用", compileResult.stderr());
+                }
                 return new SandboxExecutionResult(
                         EvaluationStatus.COMPILE_ERROR,
                         "",
@@ -113,6 +116,9 @@ public class DockerSandboxExecutor implements SandboxExecutor {
                 );
             }
             if (runResult.exitCode() != 0) {
+                if (isDockerDaemonUnavailable(runResult.stderr())) {
+                    return systemError("Docker 沙箱不可用", runResult.stderr());
+                }
                 return new SandboxExecutionResult(
                         EvaluationStatus.RUNTIME_ERROR,
                         runResult.stdout(),
@@ -229,6 +235,19 @@ public class DockerSandboxExecutor implements SandboxExecutor {
 
     private SandboxExecutionResult systemError(String message, String log) {
         return new SandboxExecutionResult(EvaluationStatus.SYSTEM_ERROR, "", message, null, null, null, log);
+    }
+
+    private boolean isDockerDaemonUnavailable(String stderr) {
+        if (stderr == null || stderr.isBlank()) {
+            return false;
+        }
+        String normalized = stderr.toLowerCase(java.util.Locale.ROOT);
+        return normalized.contains("failed to connect to the docker api")
+                || normalized.contains("cannot connect to the docker daemon")
+                || normalized.contains("is the docker daemon running")
+                || normalized.contains("error during connect")
+                || normalized.contains("dockerdesktoplinuxengine")
+                || normalized.contains("dockerdesktopwindowsengine");
     }
 
     private String containerName(String taskId, String phase) {
