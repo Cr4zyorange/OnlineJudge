@@ -3,9 +3,48 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import TeacherGradeTableView from '../../../src/views/grd/TeacherGradeTableView.vue';
 import * as gradeRecordsApi from '../../../src/api/grd/gradeRecords';
 import * as gradeItemsApi from '../../../src/api/grd/gradeItems';
+import type { GradeAnalysisResult } from '../../../src/types/grd';
 
 vi.mock('../../../src/api/grd/gradeRecords');
 vi.mock('../../../src/api/grd/gradeItems');
+
+function analysisResult(overrides: Partial<GradeAnalysisResult> = {}): GradeAnalysisResult {
+  return {
+    targetType: 'GRADE_ITEM',
+    gradeItemId: 2,
+    totalStudentCount: 1,
+    submittedCount: 1,
+    completedCount: 1,
+    missingCount: 0,
+    unsubmittedCount: 0,
+    ungradedCount: 0,
+    averageScore: '92.00',
+    maxScore: '92.00',
+    minScore: '92.00',
+    passRate: '1.0000',
+    completionRate: '1.0000',
+    distribution: [
+      { label: '0-59', count: 0 },
+      { label: '60-69', count: 0 },
+      { label: '70-79', count: 0 },
+      { label: '80-89', count: 0 },
+      { label: '90-100', count: 1 }
+    ],
+    sourceDataTime: '2026-06-03T13:00:00',
+    generatedAt: '2026-06-03T13:00:01',
+    ...overrides
+  };
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((promiseResolve, promiseReject) => {
+    resolve = promiseResolve;
+    reject = promiseReject;
+  });
+  return { promise, resolve, reject };
+}
 
 describe('TeacherGradeTableView', () => {
   beforeEach(() => {
@@ -625,18 +664,28 @@ describe('TeacherGradeTableView', () => {
         ],
         sourceDataTime: '2026-06-03T10:00:00',
         generatedAt: '2026-06-03T10:00:01'
-      });
-    vi.mocked(gradeRecordsApi.getGradeItemCompletion)
+      })
       .mockResolvedValueOnce({
+        targetType: 'GRADE_ITEM',
         gradeItemId: 2,
-        totalStudentCount: 3,
-        submittedCount: 2,
+        totalStudentCount: 1,
+        submittedCount: 1,
         completedCount: 1,
-        missingCount: 1,
+        missingCount: 0,
         unsubmittedCount: 0,
-        ungradedCount: 1,
-        averageScore: '80.00',
-        completionRate: '0.3333',
+        ungradedCount: 0,
+        averageScore: '92.00',
+        maxScore: '92.00',
+        minScore: '92.00',
+        passRate: '1.0000',
+        completionRate: '1.0000',
+        distribution: [
+          { label: '0-59', count: 0 },
+          { label: '60-69', count: 0 },
+          { label: '70-79', count: 0 },
+          { label: '80-89', count: 0 },
+          { label: '90-100', count: 1 }
+        ],
         sourceDataTime: '2026-06-03T10:01:00',
         generatedAt: '2026-06-03T10:01:01'
       });
@@ -665,12 +714,245 @@ describe('TeacherGradeTableView', () => {
     await wrapper.get('[data-testid="analysis-form"]').trigger('submit');
     await flushPromises();
 
-    expect(gradeRecordsApi.getGradeItemCompletion).toHaveBeenCalledWith(101, 2);
+    expect(gradeRecordsApi.getCourseGradeAnalysis).toHaveBeenLastCalledWith(101, {
+      targetType: 'GRADE_ITEM',
+      gradeItemId: 2
+    });
+    expect(gradeRecordsApi.getGradeItemCompletion).not.toHaveBeenCalled();
     expect(wrapper.text()).toContain('单元测试作业');
     expect(wrapper.text()).not.toContain('成绩项 2');
-    expect(wrapper.text()).toContain('80.00');
-    expect(wrapper.text()).toContain('已提交 2');
-    expect(wrapper.text()).toContain('待评分 1');
+    expect(wrapper.text()).toContain('均分92.00');
+    expect(wrapper.text()).toContain('最高分92.00');
+    expect(wrapper.text()).toContain('最低分92.00');
+    expect(wrapper.text()).toContain('及格率100.00%');
+    expect(wrapper.text()).toContain('完成率100.00%');
+    expect(wrapper.text()).toContain('0-59：0');
+    expect(wrapper.text()).toContain('60-69：0');
+    expect(wrapper.text()).toContain('70-79：0');
+    expect(wrapper.text()).toContain('80-89：0');
+    expect(wrapper.text()).toContain('90-100：1');
+    expect(wrapper.text()).toContain('数据时间点 2026-06-03T10:01:00');
+    expect(wrapper.text()).toContain('生成时间 2026-06-03T10:01:01');
+  });
+
+  it('shows an explicit empty analysis state without fabricated zero percentages', async () => {
+    vi.mocked(gradeRecordsApi.listCourseGrades).mockResolvedValue({ records: [], total: 0, page: 1, size: 20 });
+    vi.mocked(gradeRecordsApi.listGradePublishRecords).mockResolvedValue({ records: [], total: 0, page: 1, size: 20 });
+    vi.mocked(gradeRecordsApi.getCourseGradeAnalysis).mockResolvedValue({
+      targetType: 'COURSE_TOTAL',
+      gradeItemId: null,
+      totalStudentCount: 3,
+      completedCount: 0,
+      missingCount: 1,
+      unsubmittedCount: 1,
+      ungradedCount: 1,
+      averageScore: null,
+      maxScore: null,
+      minScore: null,
+      passRate: '0.0000',
+      completionRate: '0.0000',
+      distribution: [
+        { label: '0-59', count: 0 },
+        { label: '60-69', count: 0 },
+        { label: '70-79', count: 0 },
+        { label: '80-89', count: 0 },
+        { label: '90-100', count: 0 }
+      ],
+      sourceDataTime: '2026-06-03T11:00:00',
+      generatedAt: '2026-06-03T11:00:01'
+    });
+
+    const wrapper = mount(TeacherGradeTableView, { props: { courseId: 101 } });
+    await flushPromises();
+
+    const panelText = wrapper.get('[data-testid="grade-analysis-panel"]').text();
+    expect(panelText).toContain('暂无可统计成绩');
+    expect(panelText).toContain('共 3 人');
+    expect(panelText).toContain('缺失 1');
+    expect(panelText).toContain('未提交 1');
+    expect(panelText).toContain('待评分 1');
+    expect(panelText).not.toContain('0.00%');
+    expect(panelText).not.toContain('0-59：0');
+  });
+
+  it('clears stale metrics and shows API errors for invalid items, forbidden access, and expired sessions', async () => {
+    vi.mocked(gradeRecordsApi.listCourseGrades).mockResolvedValue({ records: [], total: 0, page: 1, size: 20 });
+    vi.mocked(gradeRecordsApi.listGradePublishRecords).mockResolvedValue({ records: [], total: 0, page: 1, size: 20 });
+    vi.mocked(gradeRecordsApi.getCourseGradeAnalysis)
+      .mockResolvedValueOnce({
+        targetType: 'COURSE_TOTAL',
+        gradeItemId: null,
+        totalStudentCount: 1,
+        completedCount: 1,
+        missingCount: 0,
+        unsubmittedCount: 0,
+        ungradedCount: 0,
+        averageScore: '88.00',
+        maxScore: '88.00',
+        minScore: '88.00',
+        passRate: '1.0000',
+        completionRate: '1.0000',
+        distribution: [
+          { label: '0-59', count: 0 },
+          { label: '60-69', count: 0 },
+          { label: '70-79', count: 0 },
+          { label: '80-89', count: 1 },
+          { label: '90-100', count: 0 }
+        ],
+        sourceDataTime: '2026-06-03T12:00:00',
+        generatedAt: '2026-06-03T12:00:01'
+      })
+      .mockRejectedValueOnce(new Error('成绩项不存在或已停用'))
+      .mockRejectedValueOnce(new Error('无权限查看该课程教学分析'))
+      .mockRejectedValueOnce(new Error('登录状态已失效，请重新登录'));
+
+    const wrapper = mount(TeacherGradeTableView, { props: { courseId: 101 } });
+    await flushPromises();
+    expect(wrapper.text()).toContain('88.00');
+
+    await wrapper.get('[data-testid="analysis-target-type"]').setValue('GRADE_ITEM');
+    await wrapper.get('[data-testid="analysis-grade-item-id"]').setValue('2');
+    await wrapper.get('[data-testid="analysis-form"]').trigger('submit');
+    await flushPromises();
+    expect(wrapper.text()).toContain('成绩项不存在或已停用');
+    expect(wrapper.text()).not.toContain('88.00');
+
+    await wrapper.get('[data-testid="analysis-form"]').trigger('submit');
+    await flushPromises();
+    expect(wrapper.text()).toContain('无权限查看该课程教学分析');
+    expect(wrapper.text()).not.toContain('88.00');
+
+    await wrapper.get('[data-testid="analysis-form"]').trigger('submit');
+    await flushPromises();
+    expect(wrapper.text()).toContain('登录状态已失效，请重新登录');
+    expect(wrapper.text()).not.toContain('88.00');
+  });
+
+  it('ignores late responses after switching grade items', async () => {
+    vi.mocked(gradeRecordsApi.listCourseGrades).mockResolvedValue({ records: [], total: 0, page: 1, size: 20 });
+    vi.mocked(gradeRecordsApi.listGradePublishRecords).mockResolvedValue({ records: [], total: 0, page: 1, size: 20 });
+    vi.mocked(gradeRecordsApi.getCourseGradeAnalysis)
+      .mockResolvedValueOnce(analysisResult({ targetType: 'COURSE_TOTAL', gradeItemId: null, averageScore: '70.00' }));
+
+    const firstItem = deferred<ReturnType<typeof analysisResult>>();
+    const secondItem = deferred<ReturnType<typeof analysisResult>>();
+    vi.mocked(gradeRecordsApi.getCourseGradeAnalysis)
+      .mockReturnValueOnce(firstItem.promise)
+      .mockReturnValueOnce(secondItem.promise);
+
+    const wrapper = mount(TeacherGradeTableView, { props: { courseId: 101 } });
+    await flushPromises();
+    await wrapper.get('[data-testid="analysis-target-type"]').setValue('GRADE_ITEM');
+    await wrapper.get('[data-testid="analysis-grade-item-id"]').setValue('1');
+    await wrapper.get('[data-testid="analysis-form"]').trigger('submit');
+    await wrapper.get('[data-testid="analysis-grade-item-id"]').setValue('2');
+    await wrapper.get('[data-testid="analysis-form"]').trigger('submit');
+
+    secondItem.resolve(analysisResult({ gradeItemId: 2, averageScore: '92.00', maxScore: '92.00', minScore: '92.00' }));
+    await flushPromises();
+    expect(wrapper.text()).toContain('单元测试作业');
+    expect(wrapper.text()).toContain('92.00');
+
+    firstItem.resolve(analysisResult({ gradeItemId: 1, averageScore: '61.00', maxScore: '61.00', minScore: '61.00' }));
+    await flushPromises();
+    expect(wrapper.text()).toContain('单元测试作业');
+    expect(wrapper.text()).toContain('92.00');
+    expect(wrapper.text()).not.toContain('61.00');
+  });
+
+  it('reloads analysis for a new course and ignores the previous course response', async () => {
+    vi.mocked(gradeRecordsApi.listCourseGrades).mockResolvedValue({ records: [], total: 0, page: 1, size: 20 });
+    vi.mocked(gradeRecordsApi.listGradePublishRecords).mockResolvedValue({ records: [], total: 0, page: 1, size: 20 });
+    const oldCourse = deferred<GradeAnalysisResult>();
+    const newCourse = deferred<GradeAnalysisResult>();
+    vi.mocked(gradeRecordsApi.getCourseGradeAnalysis)
+      .mockReturnValueOnce(oldCourse.promise)
+      .mockReturnValueOnce(newCourse.promise);
+
+    const wrapper = mount(TeacherGradeTableView, { props: { courseId: 101 } });
+    await wrapper.setProps({ courseId: 202 });
+    newCourse.resolve(analysisResult({
+      targetType: 'COURSE_TOTAL',
+      gradeItemId: null,
+      averageScore: '95.00',
+      maxScore: '95.00',
+      minScore: '95.00'
+    }));
+    await flushPromises();
+
+    expect(gradeRecordsApi.getCourseGradeAnalysis).toHaveBeenLastCalledWith(202, {
+      targetType: 'COURSE_TOTAL'
+    });
+    expect(wrapper.text()).toContain('95.00');
+
+    oldCourse.resolve(analysisResult({
+      targetType: 'COURSE_TOTAL',
+      gradeItemId: null,
+      averageScore: '60.00',
+      maxScore: '60.00',
+      minScore: '60.00'
+    }));
+    await flushPromises();
+    expect(wrapper.text()).toContain('95.00');
+    expect(wrapper.text()).not.toContain('60.00');
+  });
+
+  it('keeps the new course grade items when the previous course list arrives late', async () => {
+    vi.mocked(gradeRecordsApi.listCourseGrades).mockResolvedValue({ records: [], total: 0, page: 1, size: 20 });
+    vi.mocked(gradeRecordsApi.listGradePublishRecords).mockResolvedValue({ records: [], total: 0, page: 1, size: 20 });
+    vi.mocked(gradeRecordsApi.getCourseGradeAnalysis)
+      .mockResolvedValueOnce(analysisResult({ targetType: 'COURSE_TOTAL', gradeItemId: null }))
+      .mockResolvedValueOnce(analysisResult({ targetType: 'COURSE_TOTAL', gradeItemId: null }))
+      .mockResolvedValueOnce(analysisResult({ gradeItemId: 20 }));
+
+    const oldCourseItems = deferred<Awaited<ReturnType<typeof gradeItemsApi.listGradeItems>>>();
+    const newCourseItems = deferred<Awaited<ReturnType<typeof gradeItemsApi.listGradeItems>>>();
+    vi.mocked(gradeItemsApi.listGradeItems)
+      .mockReturnValueOnce(oldCourseItems.promise)
+      .mockReturnValueOnce(newCourseItems.promise);
+
+    const wrapper = mount(TeacherGradeTableView, { props: { courseId: 101 } });
+    await wrapper.setProps({ courseId: 202 });
+    newCourseItems.resolve([{
+      id: 20,
+      courseId: 202,
+      name: '新课程实验',
+      sourceType: 'LAB',
+      sourceId: 320,
+      fullScore: '100.00',
+      weight: '1.00',
+      includedInFinal: true,
+      enabled: true,
+      sortOrder: 1
+    }]);
+    await flushPromises();
+
+    await wrapper.get('[data-testid="analysis-target-type"]').setValue('GRADE_ITEM');
+    const analysisGradeItemSelect = wrapper.get('[data-testid="analysis-grade-item-id"]');
+    expect(analysisGradeItemSelect.text()).toContain('新课程实验');
+    await analysisGradeItemSelect.setValue('20');
+    await wrapper.get('[data-testid="analysis-form"]').trigger('submit');
+    await flushPromises();
+    expect(wrapper.get('[data-testid="grade-analysis-panel"]').text()).toContain('新课程实验');
+
+    oldCourseItems.resolve([{
+      id: 10,
+      courseId: 101,
+      name: '旧课程实验',
+      sourceType: 'LAB',
+      sourceId: 310,
+      fullScore: '100.00',
+      weight: '1.00',
+      includedInFinal: true,
+      enabled: true,
+      sortOrder: 1
+    }]);
+    await flushPromises();
+
+    expect(analysisGradeItemSelect.text()).toContain('新课程实验');
+    expect(analysisGradeItemSelect.text()).not.toContain('旧课程实验');
+    expect(wrapper.get('[data-testid="grade-analysis-panel"]').text()).toContain('新课程实验');
+    expect(wrapper.get('[data-testid="grade-analysis-panel"]').text()).not.toContain('成绩项已不可用');
   });
 
   it('filters grade review requests by approved status and renders processed results without action buttons', async () => {
