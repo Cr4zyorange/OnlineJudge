@@ -85,6 +85,8 @@ test('GRD SSD branches and responses match the implemented API contracts', () =>
   const processDetailedDesign = readRepositoryFile('docs/过程/详细设计/GRD-成绩评价与教学分析-详细设计提交稿.md');
   const processOverview = readRepositoryFile('docs/过程/概要/成绩评价与教学分析模块概要设计提交稿（grd）.md');
   const gradeTestReport = readRepositoryFile('docs/过程/测试/TST-DOC-07 GRD 成绩评价与教学分析测试文档.md');
+  const apiExceptionHandler = readRepositoryFile('backend/src/main/java/com/onlinejudge/common/exception/ApiExceptionHandler.java');
+  const globalExceptionHandler = readRepositoryFile('backend/src/main/java/com/onlinejudge/common/exception/GlobalExceptionHandler.java');
   const gradeItemUseCase = srs.slice(
     srs.indexOf('## 4.11 UC-GR-02'),
     srs.indexOf('## 4.12 UC-GR-03')
@@ -113,6 +115,12 @@ test('GRD SSD branches and responses match the implemented API contracts', () =>
   const sourceFailure = gradeFlowSsd.indexOf('来源同步失败');
   const publishOperation = gradeFlowSsd.indexOf('OP-GR-03');
   assert.ok(syncOperation >= 0 && sourceFailure > syncOperation && publishOperation > sourceFailure);
+  assert.doesNotMatch(gradeFlowSsd, /失败原因和可重试提示/);
+  assert.match(gradeFlowSsd, /HTTP 500.*code=500.*系统错误，请联系管理员/);
+  assert.match(gradeItemUseCase, /HTTP 500.*code.*500.*系统错误，请联系管理员/);
+  assert.match(gradeTestReport, /HTTP 500.*code.*500.*系统错误，请联系管理员/);
+  assert.doesNotMatch(apiExceptionHandler, /IllegalStateException/);
+  assert.match(globalExceptionHandler, /@ExceptionHandler\(Exception\.class\)[\s\S]*ApiResponse\.error\("500", "系统错误，请联系管理员"\)/);
 
   assert.doesNotMatch(gradeReviewSequence, /GradeRecordService/);
   assert.match(gradeReviewSequence, /GradeRecord(?:<br\/>)?Repository/);
@@ -135,6 +143,14 @@ test('GRD SSD branches and responses match the implemented API contracts', () =>
   assert.match(gradeAnalysisSequence, /GradeRecord(?:<br\/>)?Repository/);
   assert.match(gradeAnalysisSequence, /CourseGradeSummary(?:<br\/>)?Repository/);
   assert.match(gradeAnalysisSequence, /findAnalysisSourceVersion/);
+  assert.doesNotMatch(gradeAnalysisSequence, /canManageCourseGrade/);
+  const analysisPermissionCheck = gradeAnalysisSequence.indexOf('canManageCourse(courseId,teacherId)');
+  const analysisPermissionException = gradeAnalysisSequence.indexOf('GradeItemPermissionException');
+  const analysisItemLookup = gradeAnalysisSequence.indexOf('Service->>ItemRepo');
+  const analysisStudentLookup = gradeAnalysisSequence.indexOf('listCourseStudentIds');
+  assert.ok(analysisPermissionCheck >= 0 && analysisPermissionException > analysisPermissionCheck);
+  assert.ok(analysisItemLookup > analysisPermissionException && analysisStudentLookup > analysisPermissionException);
+  assert.match(gradeAnalysisSequence, /GradeItemPermissionException.*ERR-GRD-01.*403/);
 
   const membershipCheck = studentGradeSequence.indexOf('isCourseMember');
   const accessException = studentGradeSequence.indexOf('StudentGradeAccessException');
