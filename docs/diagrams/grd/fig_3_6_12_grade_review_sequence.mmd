@@ -11,44 +11,71 @@ sequenceDiagram
   participant RecordRepo as GradeRecord<br/>Repository
   participant SummaryRepo as CourseGradeSummary<br/>Repository
   participant ChangeLogRepo as GradeChangeLog<br/>Repository
-  participant Event as GradeEventPublisher
+  participant Event as NotificationEvent<br/>Publisher
   participant LRN as LRN通知
   Student->>StudentView: 填写异议理由
   StudentView->>Controller: POST /courses/{courseId}/grade-review-requests
   Controller->>Service: submitReviewRequest(courseId,studentId,command)
-  Service->>Permission: 校验课程成员与本人已发布成绩
-  Service->>ReviewRepo: findPendingByTarget(...)
-  alt 已存在 PENDING 申请
-    Service-->>Controller: GradeReviewDuplicateException
-    Controller-->>StudentView: 重复申请提示
-  else 可提交
-    Service->>ReviewRepo: save(PENDING)
-    Service->>Event: GRADE_REVIEW_REQUESTED
-    Event->>LRN: 持久化教师通知
-    Service-->>StudentView: PENDING 申请
+  Service->>Permission: isCourseMember(courseId,studentId)
+  alt 非课程成员
+    Permission-->>Service: false
+    Service-->>Controller: GradeReviewPermissionException
+    Controller-->>StudentView: 无复核权限提示
+  else 课程成员
+    Permission-->>Service: true
+    Service->>Service: originalPublishedScore(...)
+    alt FINAL_SCORE
+      Service->>SummaryRepo: findByCourseId(courseId)
+      SummaryRepo-->>Service: 课程总评集合
+      Service->>Service: 筛选本人 PUBLISHED 总评
+    else GRADE_ITEM
+      Service->>RecordRepo: findByCourseId(courseId)
+      RecordRepo-->>Service: 课程成绩记录集合
+      Service->>Service: 筛选本人指定 PUBLISHED 成绩项
+    end
+    alt 复核目标未发布或不存在
+      Service-->>Controller: GradeReviewValidationException
+      Controller-->>StudentView: 只能复核本人已发布成绩
+    else 复核目标已发布
+      Service->>ReviewRepo: findPendingByTarget(...)
+      alt 已存在 PENDING 申请
+        Service-->>Controller: GradeReviewDuplicateException
+        Controller-->>StudentView: 重复申请提示
+      else 可提交
+        Service->>ReviewRepo: save(PENDING)
+        Service->>Event: publish(GRADE_REVIEW_REQUESTED)
+        Event->>LRN: 持久化教师通知
+        Service-->>Controller: GradeReviewSubmissionResult
+        Controller-->>StudentView: PENDING 申请
+      end
+    end
   end
   Teacher->>TeacherView: 处理待复核申请
   TeacherView->>Controller: PUT /grade-review-requests/{requestId}/process
   Controller->>Service: processReviewRequest(requestId,teacherId,command)
-  Service->>Permission: 校验课程成绩管理权限
+  Service->>Permission: canManageCourseGrade(courseId,teacherId)
   alt APPROVE
     Service->>Service: applyApprovedAdjustment(...)
     alt 总评复核
-      Service->>SummaryRepo: 查询已发布总评并 update(adjusted)
+      Service->>SummaryRepo: findByCourseId(courseId)
+      SummaryRepo-->>Service: 已发布总评
+      Service->>SummaryRepo: update(adjusted)
       Service->>ChangeLogRepo: save(FINAL_ADJUST)
     else 单项复核
-      Service->>RecordRepo: 查询已发布成绩记录
-      Service->>ItemRepo: 查询成绩项满分与权重
+      Service->>RecordRepo: findByCourseId(courseId)
+      RecordRepo-->>Service: 已发布成绩记录
+      Service->>ItemRepo: findById(gradeItemId)
       Service->>RecordRepo: update(adjusted)
       Service->>ChangeLogRepo: save(RECORD_ADJUST)
-      Service->>RecordRepo: 查询学生课程成绩记录
-      Service->>ItemRepo: 查询计入总评的成绩项
+      Service->>RecordRepo: findByCourseId(courseId)
+      Service->>ItemRepo: findByCourseId(courseId)
       Service->>SummaryRepo: update(重新计算的总评)
     end
     Service->>ReviewRepo: update(APPROVED)
   else REJECT
     Service->>ReviewRepo: update(REJECTED)
   end
-  Service->>Event: GRADE_REVIEW_PROCESSED
+  Service->>Event: publish(GRADE_REVIEW_PROCESSED)
   Event->>LRN: 持久化学生通知
-  Service-->>TeacherView: 处理结果与留痕
+  Service-->>Controller: GradeReviewProcessResult
+  Controller-->>TeacherView: 处理结果与留痕
