@@ -1,6 +1,7 @@
 package com.onlinejudge.common.exception;
 
 import com.onlinejudge.common.web.ApiResponse;
+import com.fasterxml.jackson.databind.JsonMappingException;
 import com.onlinejudge.grd.service.GradeAdjustmentException;
 import com.onlinejudge.grd.service.GradeItemPermissionException;
 import com.onlinejudge.grd.service.GradeItemNotFoundException;
@@ -16,17 +17,23 @@ import com.onlinejudge.lab.service.LabStateException;
 import com.onlinejudge.lab.service.LabSubmissionValidationException;
 import com.onlinejudge.lab.service.LabValidationException;
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
+import java.util.List;
 import java.util.regex.Pattern;
 
 @RestControllerAdvice
+@Order(Ordered.HIGHEST_PRECEDENCE)
 public class ApiExceptionHandler {
     private static final Pattern HOMEWORK_ATTACHMENT_UPLOAD_PATH = Pattern.compile(
             "^/api/v1/homeworks/[0-9]+/attachments/?$"
@@ -39,9 +46,27 @@ public class ApiExceptionHandler {
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
-    public ResponseEntity<ApiResponse<Void>> handleUnreadableRequestBody(HttpMessageNotReadableException exception) {
+    public ResponseEntity<ApiResponse<Void>> handleUnreadableRequestBody(
+            HttpMessageNotReadableException exception,
+            HttpServletRequest request
+    ) {
         return ResponseEntity.badRequest()
-                .body(ApiResponse.error("AUTH_400", "请求参数不合法"));
+                .body(ApiResponse.error(parameterErrorCode(request), unreadableBodyMessage(exception)));
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ApiResponse<Void>> handleTypeMismatch(
+            MethodArgumentTypeMismatchException exception,
+            HttpServletRequest request
+    ) {
+        return ResponseEntity.badRequest()
+                .body(ApiResponse.error(parameterErrorCode(request), "参数错误：" + exception.getName() + " 不合法"));
+    }
+
+    @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
+    public ResponseEntity<ApiResponse<Void>> handleUnsupportedMediaType(HttpMediaTypeNotSupportedException exception) {
+        return ResponseEntity.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE)
+                .body(ApiResponse.error("415", "不支持的媒体类型"));
     }
 
     @ExceptionHandler(MaxUploadSizeExceededException.class)
@@ -157,5 +182,38 @@ public class ApiExceptionHandler {
         String code = objectName.contains("lab") ? "LAB-400-01" : "ERR-GRD-03";
         return ResponseEntity.badRequest()
                 .body(ApiResponse.error(code, message));
+    }
+
+    private String parameterErrorCode(HttpServletRequest request) {
+        String uri = request.getRequestURI();
+        if (uri.startsWith("/api/v1/auth/") || uri.startsWith("/api/v1/users/") || uri.startsWith("/api/v1/admin/")) {
+            return "AUTH_400";
+        }
+        if (uri.startsWith("/api/v1/courses/") && !isGradePath(uri)) {
+            return "CRS_400";
+        }
+        return "400";
+    }
+
+    private static boolean isGradePath(String uri) {
+        return uri.contains("/grade") || uri.contains("/my-grades");
+    }
+
+    private String unreadableBodyMessage(HttpMessageNotReadableException exception) {
+        String field = firstJsonFieldName(exception);
+        return field == null ? "请求参数不合法" : "参数错误：" + field + " 不合法";
+    }
+
+    private static String firstJsonFieldName(HttpMessageNotReadableException exception) {
+        if (exception.getCause() instanceof JsonMappingException mapping) {
+            List<JsonMappingException.Reference> path = mapping.getPath();
+            if (path != null && !path.isEmpty()) {
+                String fieldName = path.get(path.size() - 1).getFieldName();
+                if (fieldName != null && !fieldName.isBlank()) {
+                    return fieldName;
+                }
+            }
+        }
+        return null;
     }
 }
