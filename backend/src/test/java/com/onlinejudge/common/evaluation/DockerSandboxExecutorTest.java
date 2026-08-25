@@ -2,10 +2,15 @@ package com.onlinejudge.common.evaluation;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Assumptions;
+import org.junit.jupiter.api.io.TempDir;
 
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.PosixFilePermission;
 import java.time.LocalDateTime;
 import java.util.Map;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -68,8 +73,95 @@ class DockerSandboxExecutorTest {
         assertThat(result.actualOutput().trim()).isEqualTo("5");
     }
 
+    @Test
+    void unavailableDockerDaemonIsReportedAsSystemError(@TempDir Path tempDir) throws Exception {
+        Path dockerCommand = createDaemonUnavailableCommand(tempDir);
+        DockerSandboxExecutor executor = new DockerSandboxExecutor(
+                dockerCommand.toString(),
+                "python:3.12-alpine",
+                1.0,
+                64,
+                "16m"
+        );
+
+        SandboxExecutionResult result = executor.execute(new EvaluationTask(
+                "daemon-unavailable",
+                "LAB",
+                1L,
+                1L,
+                1L,
+                1L,
+                "python",
+                "print('valid python')",
+                Map.of("stdin", "", "timeLimitMs", "3000", "memoryLimitKb", "65536"),
+                LocalDateTime.now()
+        ));
+
+        assertThat(result.status()).isEqualTo(EvaluationStatus.SYSTEM_ERROR);
+        assertThat(result.message()).isEqualTo("Docker 沙箱不可用");
+        assertThat(result.runLog()).contains("Cannot connect to the Docker daemon");
+    }
+
+    @Test
+    void ordinaryCompilerFailureRemainsCompileError(@TempDir Path tempDir) throws Exception {
+        Path dockerCommand = createFailingDockerCommand(
+                tempDir,
+                "syntax-error.cmd",
+                "SyntaxError: invalid syntax"
+        );
+        DockerSandboxExecutor executor = new DockerSandboxExecutor(
+                dockerCommand.toString(),
+                "python:3.12-alpine",
+                1.0,
+                64,
+                "16m"
+        );
+
+        SandboxExecutionResult result = executor.execute(new EvaluationTask(
+                "syntax-error",
+                "LAB",
+                1L,
+                1L,
+                1L,
+                1L,
+                "python",
+                "print('valid python')",
+                Map.of("stdin", "", "timeLimitMs", "3000", "memoryLimitKb", "65536"),
+                LocalDateTime.now()
+        ));
+
+        assertThat(result.status()).isEqualTo(EvaluationStatus.COMPILE_ERROR);
+        assertThat(result.compileLog()).contains("SyntaxError: invalid syntax");
+    }
+
     private boolean dockerDaemonAvailable() throws Exception {
         Process process = new ProcessBuilder("docker", "info").start();
         return process.waitFor(3, java.util.concurrent.TimeUnit.SECONDS) && process.exitValue() == 0;
+    }
+
+    private Path createDaemonUnavailableCommand(Path tempDir) throws Exception {
+        return createFailingDockerCommand(
+                tempDir,
+                "docker-daemon-unavailable.cmd",
+                "Cannot connect to the Docker daemon. Is the docker daemon running?"
+        );
+    }
+
+    private Path createFailingDockerCommand(Path tempDir, String fileName, String errorMessage) throws Exception {
+        boolean windows = System.getProperty("os.name").toLowerCase().contains("win");
+        String normalizedFileName = windows ? fileName : fileName.replace(".cmd", ".sh");
+        Path command = tempDir.resolve(normalizedFileName);
+        String script = windows
+                ? "@echo off\r\necho " + errorMessage + " 1>&2\r\nexit /b 1\r\n"
+                : "#!/bin/sh\necho '" + errorMessage + "' >&2\nexit 1\n";
+        Files.writeString(command, script, StandardCharsets.UTF_8);
+        if (!windows) {
+            Files.setPosixFilePermissions(command, Set.of(
+                    PosixFilePermission.OWNER_READ,
+                    PosixFilePermission.OWNER_WRITE,
+                    PosixFilePermission.OWNER_EXECUTE
+            ));
+        }
+        return command;
     }
 }
