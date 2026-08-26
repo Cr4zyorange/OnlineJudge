@@ -89,6 +89,9 @@ test('GRD SSD branches and responses match the implemented API contracts', () =>
   const globalExceptionHandler = readRepositoryFile('backend/src/main/java/com/onlinejudge/common/exception/GlobalExceptionHandler.java');
   const notificationPublisher = readRepositoryFile('backend/src/main/java/com/onlinejudge/lrn/service/PersistentNotificationEventPublisher.java');
   const gradeRecordService = readRepositoryFile('backend/src/main/java/com/onlinejudge/grd/service/GradeRecordService.java');
+  const gradeSyncResult = readRepositoryFile('backend/src/main/java/com/onlinejudge/grd/service/GradeSyncResult.java');
+  const gradeItemController = readRepositoryFile('backend/src/main/java/com/onlinejudge/grd/controller/GradeItemController.java');
+  const gradeItemConfigView = readRepositoryFile('frontend/src/views/grd/GradeItemConfigView.vue');
   const gradeReviewProcessResult = readRepositoryFile('backend/src/main/java/com/onlinejudge/grd/service/GradeReviewProcessResult.java');
   const gradePublishUseCase = srs.slice(
     srs.indexOf('## 4.8 UC-GR-01'),
@@ -118,6 +121,20 @@ test('GRD SSD branches and responses match the implemented API contracts', () =>
   }
   assert.match(gradeItemUseCase, /不存在或跨课程.{0,30}未发布或暂无成绩.{0,30}MISSING/);
   assert.match(gradeTestReport, /不存在或跨课程.{0,30}未发布或暂无成绩.{0,30}MISSING/);
+
+  assert.match(gradeFlowSsd, /calculationBatchId.*affectedItemCount.*affectedStudentCount.*syncedCount.*missingCount.*ungradedCount/);
+  assert.match(gradeFlowSsd, /单独查询.*成绩总表/);
+  assert.doesNotMatch(gradeFlowSsd, /返回成绩总表和发布前校验结果/);
+  assert.match(gradeSyncResult, /record GradeSyncResult\(\s*long calculationBatchId,\s*int affectedItemCount,\s*int affectedStudentCount,\s*int syncedCount,\s*int missingCount,\s*int ungradedCount\s*\)/);
+
+  assert.match(gradeItemSsd, /返回已保存成绩项/);
+  assert.doesNotMatch(gradeItemSsd, /返回成绩项、规则校验结果和重算提示/);
+  assert.match(gradeItemController, /ResponseEntity<ApiResponse<GradeItem>> createGradeItem[\s\S]*ApiResponse\.ok\(item\)/);
+  assert.match(gradeItemController, /ApiResponse<GradeRuleValidationResult> validateGradeRules/);
+  const submitStart = gradeItemConfigView.indexOf('async function submit()');
+  const submitEnd = gradeItemConfigView.indexOf('function editItem', submitStart);
+  const submitBody = gradeItemConfigView.slice(submitStart, submitEnd);
+  assert.doesNotMatch(submitBody, /validateGradeRules|recalculateCourseGrades/);
 
   assert.doesNotMatch(gradeReviewSsd, /教师通知状态/);
   assert.match(gradeReviewSsd, /requestId.*PENDING.*submittedAt/);
@@ -164,6 +181,8 @@ test('GRD SSD branches and responses match the implemented API contracts', () =>
   assert.match(gradeReviewSequence, /CourseGradeSummary(?:<br\/>)?Repository/);
   assert.match(gradeReviewSequence, /GradeChangeLog(?:<br\/>)?Repository/);
   assert.match(gradeReviewSequence, /applyApprovedAdjustment/);
+  assert.match(gradeReviewSequence, /Controller-->>TeacherView: GradeReviewProcessResult/);
+  assert.doesNotMatch(gradeReviewSequence, /Controller-->>TeacherView:.*留痕/);
   assert.doesNotMatch(gradeReviewSequence, /校验课程成员与本人已发布成绩/);
   assert.match(gradeReviewSequence, /isCourseMember/);
   assert.match(gradeReviewSequence, /originalPublishedScore/);
