@@ -20,6 +20,24 @@ interface GradeItem {
   id: number;
 }
 
+interface AuthUserRecord {
+  id: number;
+}
+
+interface GradeRecord {
+  gradeItemId: number;
+  sourceType: string;
+  sourceId: number | null;
+  rawScore: number | string | null;
+}
+
+interface CourseGradeTablePage {
+  records: Array<{
+    studentId: number;
+    records: GradeRecord[];
+  }>;
+}
+
 interface GradeSyncResult {
   affectedItemCount: number;
   affectedStudentCount: number;
@@ -78,6 +96,9 @@ test.describe('@hwk HWK 真实业务闭环', () => {
     await logout();
     await loginAs('student');
     const studentHeaders = await authorizationHeaders(page);
+    const student = await apiData<AuthUserRecord>(await request.get('/api/v1/auth/me', {
+      headers: studentHeaders
+    }));
     const publishedNotifications = await apiData<NotificationPage>(await request.get(
       '/api/v1/notifications?page=1&size=100',
       { headers: studentHeaders }
@@ -128,7 +149,7 @@ test.describe('@hwk HWK 真实业务闭环', () => {
             sourceId: homeworkId,
             fullScore: 100,
             weight: 0,
-            includedInFinal: false,
+            includedInFinal: true,
             sortOrder: 999
           }
         }
@@ -142,6 +163,19 @@ test.describe('@hwk HWK 真实业务闭环', () => {
       expect(syncResult.affectedItemCount).toBeGreaterThan(0);
       expect(syncResult.affectedStudentCount).toBeGreaterThan(0);
       expect(syncResult.syncedCount).toBeGreaterThan(0);
+
+      const gradeTable = await apiData<CourseGradeTablePage>(await request.get(
+        `/api/v1/courses/${COURSE_ID}/grades?gradeItemId=${gradeItemId}&page=1&size=100`,
+        { headers: teacherHeaders }
+      ));
+      const studentGradeRow = gradeTable.records.find((row) => row.studentId === student.id);
+      const gradeRecord = studentGradeRow?.records.find((record) => record.gradeItemId === gradeItemId);
+      expect(gradeRecord).toEqual(expect.objectContaining({
+        gradeItemId,
+        sourceType: 'HWK',
+        sourceId: homeworkId
+      }));
+      expect(Number(gradeRecord?.rawScore)).toBe(88);
     } finally {
       if (gradeItemId !== null) {
         await request.delete(`/api/v1/grade-items/${gradeItemId}`, { headers: teacherHeaders });

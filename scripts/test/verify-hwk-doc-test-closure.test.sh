@@ -58,6 +58,8 @@ do
   source="docs/diagrams/tikz/hwk/$diagram.tex"
   require_file "$source"
   require_text "$source" '\begin{tikzpicture}'
+  require_text "$source" '\hwkguard'
+  require_text "$source" '\hwkoperand'
   require_file "docs/最终提交/assets/tikz/hwk/$diagram.png"
 done
 require_file 'docs/diagrams/tikz/hwk/hwk-tikz-style.tex'
@@ -83,8 +85,14 @@ require_text "$detail" 'assets/tikz/hwk/uc-hwk-01-object-sequence.png'
 
 require_text "$closure" '教师批阅/重评 | 扩展路径'
 require_text "$closure" '共享 E2E #267 | PASS'
-require_text "$closure" 'GRD/LRN 真实链路 | PASS'
+require_text "$closure" 'GRD 来源成绩真实链路 | PASS'
+require_text "$closure" '通知投递失败设计/实现一致性 | FAIL'
+reject_text "$closure" '本 Issue 验收范围内无 BLOCKED 项'
 require_text "$e2e" '@hwk'
 require_text "$e2e" '教师创建发布作业后学生提交并获得已发布评语'
+require_text "$e2e" 'includedInFinal: true'
+require_text "$e2e" 'gradeItemId=${gradeItemId}'
+require_text "$e2e" 'sourceId: homeworkId'
+require_text "$e2e" 'Number(gradeRecord?.rawScore)'
 
 echo 'HWK document and test closure contract: PASS'
