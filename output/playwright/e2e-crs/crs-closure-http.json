@@ -1,0 +1,103 @@
+{
+  "environment": "real MySQL 9.6 + Spring Boot HTTP (http://127.0.0.1:8080)",
+  "total": 19,
+  "passed": 19,
+  "failed": 0,
+  "checks": [
+    {
+      "check": "teacher001 登录",
+      "status": "PASS",
+      "detail": "登录成功"
+    },
+    {
+      "check": "student001 登录",
+      "status": "PASS",
+      "detail": "登录成功"
+    },
+    {
+      "check": "教师创建公开课",
+      "status": "PASS",
+      "detail": "courseId=9506"
+    },
+    {
+      "check": "教师创建章节",
+      "status": "PASS",
+      "detail": "chapterId=950103"
+    },
+    {
+      "check": "教师上传资源",
+      "status": "PASS",
+      "detail": "status=OK"
+    },
+    {
+      "check": "学生公开加入 ACTIVE",
+      "status": "PASS",
+      "detail": "status=ACTIVE"
+    },
+    {
+      "check": "重复加入返回 409",
+      "status": "PASS",
+      "detail": "http=409"
+    },
+    {
+      "check": "学生读取章节树",
+      "status": "PASS",
+      "detail": "count=1"
+    },
+    {
+      "check": "学生下载资源",
+      "status": "PASS",
+      "detail": "status=200"
+    },
+    {
+      "check": "非法邀请码返回 400",
+      "status": "PASS",
+      "detail": "http=400"
+    },
+    {
+      "check": "正确邀请码加入 ACTIVE",
+      "status": "PASS",
+      "detail": "status=ACTIVE"
+    },
+    {
+      "check": "审批课加入 PENDING",
+      "status": "PASS",
+      "detail": "status=PENDING"
+    },
+    {
+      "check": "审批前访问课程被拒",
+      "status": "PASS",
+      "detail": "http=403"
+    },
+    {
+      "check": "教师审批通过",
+      "status": "PASS",
+      "detail": "status=ACTIVE"
+    },
+    {
+      "check": "审批后成员权限开放",
+      "status": "PASS",
+      "detail": "member=True"
+    },
+    {
+      "check": "满员课程拒绝加入",
+      "status": "PASS",
+      "detail": "http=409"
+    },
+    {
+      "check": "不支持类型上传被拒",
+      "status": "PASS",
+      "detail": "status=BadRequest"
+    },
+    {
+      "check": "教师发布置顶公告",
+      "status": "PASS",
+      "detail": "top=True"
+    },
+    {
+      "check": "课程首页摘要聚合",
+      "status": "PASS",
+      "detail": "course=9506"
+    }
+  ]
+}

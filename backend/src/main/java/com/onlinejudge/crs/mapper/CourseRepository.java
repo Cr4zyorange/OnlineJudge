@@ -258,8 +258,11 @@ public class CourseRepository {
                 """, memberMapper, courseId, status.name());
     }
 
-    public CourseMember updateMember(Long courseId, Long userId, CourseMemberRole role, CourseMemberStatus status, Long approvedBy) {
-        jdbcTemplate.update("""
+    public int updateMember(Long courseId, Long userId, CourseMemberRole role, CourseMemberStatus status,
+                            CourseMemberStatus expectedStatus, Long approvedBy) {
+        // compare-and-set：仅当成员仍处于调用方读取到的状态时才迁移，返回更新行数；
+        // 并发批准/拒绝/移除同时基于旧状态判断时，只有一个事务能成功。
+        return jdbcTemplate.update("""
                 UPDATE crs_course_member
                    SET role = ?,
                        join_status = ?,
@@ -267,9 +270,9 @@ public class CourseRepository {
                        joined_at = CASE WHEN ? = 'ACTIVE' THEN CURRENT_TIMESTAMP ELSE joined_at END,
                        left_at = CASE WHEN ? = 'REMOVED' THEN CURRENT_TIMESTAMP ELSE NULL END,
                        updated_at = CURRENT_TIMESTAMP
-                 WHERE course_id = ? AND user_id = ? AND is_deleted = FALSE
-                """, role.name(), status.name(), status.name(), approvedBy, status.name(), status.name(), courseId, userId);
-        return findMember(courseId, userId).orElseThrow();
+                 WHERE course_id = ? AND user_id = ? AND join_status = ? AND is_deleted = FALSE
+                """, role.name(), status.name(), status.name(), approvedBy, status.name(), status.name(),
+                courseId, userId, expectedStatus.name());
     }
 
     public long memberCount(Long courseId) {
@@ -280,13 +283,16 @@ public class CourseRepository {
     }
 
     public long activeStudentCount(Long courseId) {
-        return jdbcTemplate.queryForObject("""
-                SELECT COUNT(*) FROM crs_course_member
+        // 锁定读：容量判断与插入在同一事务内串行化，读取最新已提交行，避免“计数后插入”竞争窗口。
+        List<Long> activeIds = jdbcTemplate.queryForList("""
+                SELECT id FROM crs_course_member
                  WHERE course_id = ?
                    AND role = 'STUDENT'
                    AND join_status = 'ACTIVE'
                    AND is_deleted = FALSE
+                 FOR UPDATE
                 """, Long.class, courseId);
+        return activeIds.size();
     }
 
     public long activeTeacherCount(Long courseId) {
@@ -296,6 +302,18 @@ public class CourseRepository {
                    AND role = 'TEACHER'
                    AND join_status = 'ACTIVE'
                    AND is_deleted = FALSE
+                """, Long.class, courseId);
+    }
+
+    /**
+     * 对课程行加排他锁，使同一课程上的容量判断（join/审批激活）串行执行。
+     * 必须先于 {@link #activeStudentCount(Long)} 调用，避免成员区间锁互相等待造成死锁。
+     */
+    public void lockCourseForCapacity(Long courseId) {
+        jdbcTemplate.queryForObject("""
+                SELECT id FROM crs_course
+                 WHERE id = ? AND is_deleted = FALSE
+                 FOR UPDATE
                 """, Long.class, courseId);
     }
 

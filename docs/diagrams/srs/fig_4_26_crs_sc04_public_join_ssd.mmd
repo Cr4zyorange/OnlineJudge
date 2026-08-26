@@ -1,0 +1,11 @@
+sequenceDiagram
+  actor Student as 学生
+  participant System as OnlineJudgeForSE 系统边界
+  Student->>System: 查询课程列表并选择公开课程
+  System-->>Student: 返回可加入课程与加入要求
+  Student->>System: OP-CRS-04 提交加入请求
+  alt 加入成功
+    System-->>Student: 返回加入成功、ACTIVE 成员与课程主页入口
+  else 失败
+    System-->>Student: 返回课程关闭、人数已满或重复加入提示
+  end

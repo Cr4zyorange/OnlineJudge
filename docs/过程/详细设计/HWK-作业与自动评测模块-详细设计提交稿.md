@@ -1,4 +1,4 @@
-﻿# HWK-作业与自动评测模块-详细设计提交稿
+# HWK-作业与自动评测模块-详细设计提交稿
 
 课程名称：软件工程基础  
 项目名称：在线教学与实训平台  
@@ -94,7 +94,7 @@ HWK 模块是平台中连接“课程学习任务”和“成绩评价”的核�
 
 | 事件编号 | 事件名称 | 触发时机 | 接收模块 | 主要字段 |
 | --- | --- | --- | --- | --- |
-| EVT-HWK-01 | HOMEWORK_PUBLISHED | 教师发布作业后 | LRN | homeworkId, courseId, title, deadline, receiverScope |
+| EVT-HWK-01 | HOMEWORK_PUBLISHED | 教师发布作业时 | LRN | homeworkId, courseId, title, deadline, receiverScope；通过 `publishRequired` 同步必达，失败向上抛出并回滚发布事务 |
 | EVT-HWK-02 | HOMEWORK_UPDATED | 教师修改已发布作业的重要信息后 | LRN | homeworkId, courseId, title, updatedFields |
 | EVT-HWK-03 | HOMEWORK_DEADLINE_APPROACHING | 作业截止前定时扫描 | LRN | homeworkId, courseId, deadline, unsubmittedStudentIds |
 | EVT-HWK-04 | HOMEWORK_EVALUATION_FINISHED | 自动评测完成后 | LRN | homeworkId, submissionId, studentId, status |
@@ -176,7 +176,7 @@ graph TD
 | --- | --- | --- | --- | --- | --- |
 | API-HWK-01 | 创建作业 | POST | /api/v1/homeworks | 教师/助教，且具备课程管理权限 | FR-HWK-01 |
 | API-HWK-02 | 修改作业 | PUT | /api/v1/homeworks/{homeworkId} | 教师/助教，且为作业所属课程管理者 | FR-HWK-01 |
-| API-HWK-03 | 发布作业 | PUT | /api/v1/homeworks/{homeworkId}/publish | 教师/助教，且为作业所属课程管理者 | FR-HWK-01 |
+| API-HWK-03 | 发布作业 | PUT | /api/v1/homeworks/{homeworkId}/publish | 教师/助教，且为作业所属课程管理者；通知失败返回 `503/HWK_5003` 且状态回滚为 `DRAFT` | FR-HWK-01 |
 | API-HWK-04 | 关闭作业 | PUT | /api/v1/homeworks/{homeworkId}/close | 教师/助教，且为作业所属课程管理者 | FR-HWK-01 |
 | API-HWK-05 | 查询作业列表 | GET | /api/v1/homeworks | 已登录，按角色过滤数据 | FR-HWK-01、FR-HWK-02、FR-HWK-06 |
 | API-HWK-06 | 查询作业详情 | GET | /api/v1/homeworks/{homeworkId} | 已登录，学生需为课程成员，教师需有课程权限 | FR-HWK-02、FR-HWK-06 |
@@ -785,6 +785,7 @@ stateDiagram-v2
 | HWK_4151 | ATTACHMENT_TYPE_UNSUPPORTED | 扩展名或声明 MIME 不支持/不匹配 | 文件类型不受支持 | 返回 415，不写元数据；内容签名非法或损坏 ZIP/OOXML 结构返回 `400/HWK_4005` |
 | HWK_5001 | INTERNAL_ERROR | 未预期系统异常 | 系统异常，请稍后重试 | 记录错误日志并返回统一异常 |
 | HWK_5002 | ATTACHMENT_STORAGE_ERROR | 物理文件读写或补偿失败 | 附件服务暂时不可用，请重试 | 返回 500，回滚事务并记录日志 |
+| HWK_5003 | NOTIFICATION_DELIVERY_FAILED | 发布作业时 `HOMEWORK_PUBLISHED` 必达通知写入失败 | 通知服务暂时不可用，作业未发布，请稍后重试 | 返回 503，记录作业编号和异常链，回滚作业发布事务并保持 DRAFT |
 
 ### 8.2 异常处理原则
 
@@ -795,8 +796,9 @@ stateDiagram-v2
 5. 教师重评失败时保留原评测结果，新评测记录标记为失败。
 6. 批阅日志写入失败时，人工评分操作应回滚，避免分数变化无留痕。
 7. 文件上传失败不创建附件元数据和提交记录；若物理文件先写成功而元数据失败，执行补偿删除并返回 HWK_5002。前端保留选择并允许重试。
-8. 删除请求先校验课程权限与 DRAFT 状态，再执行父表原子条件更新；零影响行以当前记录区分 `HWK_4001` 与 `HWK_4095`。
-9. 普通更新、发布、关闭和成绩发布必须排除已删除父记录；删除与旧更新竞争时，旧更新失败并回滚对子配置的写入。
+8. `HOMEWORK_PUBLISHED` 使用必达发布契约；通知持久化异常不得被吞掉，必须转换为 `HWK_5003` 并触发作业发布事务整体回滚。普通通知仍可使用尽力而为发布契约。
+9. 删除请求先校验课程权限与 DRAFT 状态，再执行父表原子条件更新；零影响行以当前记录区分 `HWK_4001` 与 `HWK_4095`。
+10. 普通更新、发布、关闭和成绩发布必须排除已删除父记录；删除与旧更新竞争时，旧更新失败并回滚对子配置的写入。
 
 ---
 
@@ -899,7 +901,7 @@ stateDiagram-v2
 | 测试编号 | 测试目标 | 测试内容 | 预期结果 |
 | --- | --- | --- | --- |
 | TC-HWK-01 | 作业创建 | 教师创建客观题、文件题、代码题作业 | 作业保存为 DRAFT，字段正确落库 |
-| TC-HWK-02 | 作业发布 | 教师发布配置完整的作业 | 状态变为 PUBLISHED，学生可见，发送通知事件 |
+| TC-HWK-02 | 作业发布 | 教师发布配置完整的作业；分别模拟通知成功与失败 | 成功时状态变为 PUBLISHED、学生可见并发送通知；失败时返回 503/HWK_5003、状态保持 DRAFT 且不生成通知 |
 | TC-HWK-03 | 发布异常 | 代码题未配置测试用例即发布 | 返回配置错误，不允许发布 |
 | TC-HWK-04 | 学生查看作业 | 学生进入已发布作业详情页 | 正常显示说明和提交要求，不显示答案和隐藏用例 |
 | TC-HWK-05 | 学生提交作业 | 学生提交合法内容 | 生成提交记录，返回提交成功和提交时间 |

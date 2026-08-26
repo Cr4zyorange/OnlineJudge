@@ -1,0 +1,6 @@
+stateDiagram-v2
+  [*] --> VALID: 登录成功签发会话
+  VALID --> EXPIRED: 到达过期时间
+  VALID --> REVOKED: 退出/修改密码/账号禁用
+  EXPIRED --> [*]
+  REVOKED --> [*]

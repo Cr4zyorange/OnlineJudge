@@ -1488,19 +1488,20 @@ class HomeworkControllerTest {
     }
 
     @Test
-    void publishKeepsHomeworkPublishedWhenNotificationDeliveryFails() throws Exception {
+    void publishRollsBackHomeworkWhenRequiredNotificationDeliveryFails() throws Exception {
         notificationEventPublisher.failNextPublish();
         long homeworkId = createHomeworkAndReturnId(objectivePayload());
 
         mockMvc.perform(put("/api/v1/homeworks/{homeworkId}/publish", homeworkId)
                         .headers(teacherHeaders("101", "101", "101:7001")))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.status").value("PUBLISHED"));
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.code").value("HWK_5003"));
 
         mockMvc.perform(get("/api/v1/homeworks/{homeworkId}", homeworkId)
                         .headers(teacherHeaders("101", "101")))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.status").value("PUBLISHED"));
+                .andExpect(jsonPath("$.data.status").value("DRAFT"));
+        assertThat(notificationEventPublisher.events()).isEmpty();
     }
 
     @Test
