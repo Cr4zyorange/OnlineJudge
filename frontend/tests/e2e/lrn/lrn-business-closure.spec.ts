@@ -4,6 +4,9 @@ import { expect, test } from '../fixtures';
 const DEMO_COURSE_ID = 9501;
 const DEMO_GRADE_SUMMARY_ID = 950421;
 
+test.describe.configure({ timeout: 60_000 });
+test.use({ navigationTimeout: 30_000 });
+
 type ApiEnvelope<T> = { code: string; message: string; data: T };
 type CurrentUser = { id: number };
 type CreatedEntity = { id: number };
@@ -27,6 +30,10 @@ test.describe('@lrn UC-LRN-01 business closure', () => {
     const student = await apiData<CurrentUser>(await page.request.get('/api/v1/auth/me', {
       headers: firstStudentHeaders
     }));
+    const beforeBusinessEvents = await notificationPage(page, firstStudentHeaders);
+    const beforeGradeNotificationIds = new Set(beforeBusinessEvents.records
+      .filter((notice) => notice.sourceModule === 'GRD' && notice.sourceId === DEMO_GRADE_SUMMARY_ID)
+      .map((notice) => notice.notificationId));
 
     const forbidden = await page.request.post(`/api/v1/courses/${DEMO_COURSE_ID}/labs`, {
       headers: firstStudentHeaders,
@@ -60,12 +67,10 @@ test.describe('@lrn UC-LRN-01 business closure', () => {
 
     await loginAs('student');
     const studentHeaders = await authHeaders(page);
-    const list = await apiData<NotificationPage>(await page.request.get('/api/v1/notifications?size=100', {
-      headers: studentHeaders
-    }));
+    const list = await notificationPage(page, studentHeaders);
     const labNotice = findNotice(list, 'LAB', lab.id);
     const homeworkNotice = findNotice(list, 'HWK', homework.id);
-    const gradeNotice = findNotice(list, 'GRD', DEMO_GRADE_SUMMARY_ID);
+    const gradeNotice = findNewNotice(list, 'GRD', DEMO_GRADE_SUMMARY_ID, beforeGradeNotificationIds);
     expect([labNotice, homeworkNotice, gradeNotice]).toHaveLength(3);
     expect([labNotice, homeworkNotice, gradeNotice].every((notice) => !notice.isRead)).toBe(true);
 
@@ -73,21 +78,19 @@ test.describe('@lrn UC-LRN-01 business closure', () => {
     const labCard = page.getByTestId(`notification-card-${labNotice.notificationId}`);
     await expect(labCard).toContainText('Issue 262 LAB');
     await page.screenshot({
-      path: '../output/test/issue-262/evidence/notification-before-valid-jump.png',
+      path: test.info().outputPath('notification-before-valid-jump.png'),
       fullPage: true
     });
     await labCard.getByRole('link', { name: '查看详情' }).click();
     await expect(page).toHaveURL(new RegExp(`/courses/${DEMO_COURSE_ID}/labs/${lab.id}`));
     await expect(page.getByTestId('lab-detail-page')).toContainText(`Issue 262 LAB ${suffix}`);
     await page.screenshot({
-      path: '../output/test/issue-262/evidence/valid-jump-target.png',
+      path: test.info().outputPath('valid-jump-target.png'),
       fullPage: true
     });
 
     // UC-LRN-01 requires opening a valid target to mark the notification as read.
-    const afterJump = await apiData<NotificationPage>(await page.request.get('/api/v1/notifications?size=100', {
-      headers: studentHeaders
-    }));
+    const afterJump = await notificationPage(page, studentHeaders);
     expect(findNotice(afterJump, 'LAB', lab.id).isRead).toBe(true);
 
     await page.goto('/notifications');
@@ -97,11 +100,9 @@ test.describe('@lrn UC-LRN-01 business closure', () => {
     await page.getByTestId(`delete-notification-${homeworkNotice.notificationId}`).click();
     await expect(page.getByTestId(`notification-card-${homeworkNotice.notificationId}`)).toHaveCount(0);
 
-    const finalList = await apiData<NotificationPage>(await page.request.get('/api/v1/notifications?size=100', {
-      headers: studentHeaders
-    }));
+    const finalList = await notificationPage(page, studentHeaders);
     expect(finalList.records.some((notice) => notice.notificationId === homeworkNotice.notificationId)).toBe(false);
-    expect(findNotice(finalList, 'GRD', DEMO_GRADE_SUMMARY_ID).notificationId).toBe(gradeNotice.notificationId);
+    expect(finalList.records.some((notice) => notice.notificationId === gradeNotice.notificationId)).toBe(true);
     expect(student.id).toBeGreaterThan(0);
   });
 
@@ -163,9 +164,28 @@ async function expectOk(response: APIResponse) {
   await apiData<unknown>(response);
 }
 
+async function notificationPage(page: Page, headers: Record<string, string>) {
+  return apiData<NotificationPage>(await page.request.get('/api/v1/notifications?size=100', { headers }));
+}
+
 function findNotice(page: NotificationPage, sourceModule: string, sourceId: number) {
   const notice = page.records.find((record) => record.sourceModule === sourceModule && record.sourceId === sourceId);
   expect(notice, `missing ${sourceModule} notification for source ${sourceId}`).toBeDefined();
+  return notice!;
+}
+
+function findNewNotice(
+  page: NotificationPage,
+  sourceModule: string,
+  sourceId: number,
+  previousNotificationIds: Set<number>
+) {
+  const notice = page.records.find((record) => (
+    record.sourceModule === sourceModule
+      && record.sourceId === sourceId
+      && !previousNotificationIds.has(record.notificationId)
+  ));
+  expect(notice, `missing new ${sourceModule} notification for source ${sourceId}`).toBeDefined();
   return notice!;
 }
 

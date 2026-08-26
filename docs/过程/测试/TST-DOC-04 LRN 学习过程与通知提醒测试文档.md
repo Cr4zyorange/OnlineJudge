@@ -5,12 +5,12 @@
 | 文档名称 | LRN 学习过程与通知提醒测试文档 |
 | 项目名称 | 在线教学与实训平台 |
 | 所属阶段 | 系统测试与验收测试 |
-| 报告版本 | V1.1 |
+| 报告版本 | V1.2 |
 | 编写日期 | 2026-06-10 |
 | 编写人 | LRN 模块负责人 |
 | 对应 issue | #155；#262 D2-LRN 业务场景文档与测试闭环 |
 | 测试范围 | 学习任务中心、学习进度、学习行为仪表盘、通知分类推送、通知已读/删除、提醒规则与通知偏好 |
-| 测试结论 | 历史结果仅作线索；#262 以最新执行 SHA 的 `output/test/issue-262/README.md` 为准，未逐项计时的性能项不得写 PASS |
+| 测试结论 | #262 业务场景、权限、异常和真实 LAB/HWK/GRD 本地联合 E2E 为 PASS；NFR-LN-01/02 因无逐项计时证据保持 BLOCKED |
 
 ## 1 文档控制
 
@@ -20,6 +20,7 @@
 | --- | --- | --- | --- |
 | V1.0 | 2026-06-10 | LRN 模块负责人 | 按 #155 和 TST-DOC-01 统一规范整理 LRN 测试范围、用例、自动化覆盖、执行日志、手工验收点和残余风险 |
 | V1.1 | 2026-08-25 | @luoZiHui-maker | 按 #262 增加场景/子流程闭环、真实 LAB/HWK/GRD 事件测试、共享 E2E 依赖和当前 SHA 证据规则 |
+| V1.2 | 2026-08-26 | @luoZiHui-maker | 合入 #269 修复复测，补充默认 4-worker 联合 E2E、被测头提交、当前统计和最终 PASS/BLOCKED 结论 |
 
 ### 1.2 审批记录
 
@@ -33,7 +34,7 @@
 
 本文件用于记录 LRN 学习过程与通知提醒模块在当前版本下的测试依据、测试环境、测试数据、测试用例、执行结果、手工验收清单、缺陷风险和验收结论。覆盖范围对齐 `FR-LN-01 ~ FR-LN-06`、`NFR-LN-01 ~ NFR-LN-05`、`UI-LRN-01 ~ UI-LRN-05`、`API-LRN-01 ~ API-LRN-11`、`DB-LRN-01 ~ DB-LRN-07`、`TC-LN-01 ~ TC-LN-06` 与 `TC-LN-N01 ~ TC-LN-N05`。
 
-当前已执行 LRN 后端 Spring Boot 目标测试、LRN 前端 Vue/Vitest 目标测试和部分 CRS/LAB/HWK/GRD 跨模块触发测试。自动化覆盖了任务聚合与分页、学习进度保存和断点续传、教师课程进度聚合、学习行为统计和上报限流、通知分类生成和当前用户隔离、已读/删除状态日志、提醒规则保存、截止提醒扫描、失败记录与关键迁移约束。真实浏览器完整端到端、WebSocket 或轮询触达时延、生产跨模块事件链路仍列为手工或联调验收项。
+当前已执行 LRN 后端 Spring Boot、前端 Vue/Vitest、共享 E2E 契约及本地真实浏览器 Playwright 联合测试。自动化覆盖了任务聚合与分页、学习进度保存和断点续传、教师课程进度聚合、学习行为统计和上报限流、通知分类生成和当前用户隔离、已读/删除/有效跳转状态、提醒规则保存、截止提醒扫描、失败记录，以及 LAB/HWK/GRD 真实业务动作触发通知。WebSocket 或轮询触达时延、列表逐项响应时间和生产部署链路没有计时原始证据，相关性能项保持 BLOCKED。
 
 ### 2.1 #262 场景与证据口径
 
@@ -44,6 +45,10 @@
 ### 2.2 #262 第一轮结果（2026-08-25）
 
 执行基线为 `origin/dev@758afd98ba2caad5a00fb6e12413c48f0156b2fb`，需求审查锚点保留为 `8f8e4fc70341c701c25786f12efbffaeca2a3c5f`。后端 45/45 PASS、前端单元 112/112 PASS、共享 E2E 契约 3/3 PASS、LRN Playwright 2/3 PASS；总体结论 **FAIL**。真实 LAB/HWK/GRD 事件均成功生成通知，但点击有效 LAB 通知跳转后仍为未读，已登记 [#269](https://github.com/Cr4zyorange/OnlineJudge/issues/269)。完整矩阵、环境和页面证据见 `output/test/issue-262/README.md`。未执行逐项性能计时，NFR-LN-01/02 相关性能结论为 **BLOCKED**。
+
+### 2.3 #262 合并修复复测（2026-08-26）
+
+#269 已在本 PR 内按用户指定范围修复并复测。当前统计为后端 45/45 PASS、前端单元 115/115 PASS、共享 E2E 契约 3/3 PASS、文档契约 4/4 PASS、前端类型检查与构建 PASS、默认 4-worker LRN Playwright 联合命令 4/4 PASS。联合 E2E 从真实教师页面/API 业务入口发布 LAB/HWK、调整 GRD 成绩，并断言本次操作产生的新通知、目标通知未读→已读、重复打开幂等、删除、权限拒绝、断线刷新恢复和业务跳转。被测提交、命令、总数、失败/错误/跳过及原始输出统一记录在 `output/test/issue-262/`；NFR-LN-01/02 仍为 **BLOCKED**。
 
 ## 3 测试依据
 
@@ -69,16 +74,16 @@
 
 | 编号 | 测试对象 | 主要验证点 | 当前覆盖状态 |
 | --- | --- | --- | --- |
-| FR-LN-01 | 学习任务中心展示 | 聚合课程资源、实验、作业任务；按登录用户、课程成员、类型、状态、截止时间和分页返回 | 后端和前端自动化已覆盖；真实浏览器入口待手工确认 |
-| FR-LN-02 | 学习进度记录与展示 | 课程级、章节级进度；继续学习；断点续传；教师查看所教课程聚合进度 | 后端和前端自动化已覆盖；跨页面真实恢复待手工确认 |
+| FR-LN-01 | 学习任务中心展示 | 聚合课程资源、实验、作业任务；按登录用户、课程成员、类型、状态、截止时间和分页返回 | 后端、前端和真实浏览器入口已覆盖 |
+| FR-LN-02 | 学习进度记录与展示 | 课程级、章节级进度；继续学习；断点续传；教师查看所教课程聚合进度 | 后端、前端和真实页面继续学习入口已覆盖；复杂编辑器内部状态仍需专项验收 |
 | FR-LN-03 | 学习行为跟踪 | 学习时长、访问次数、任务完成统计；近 7 天趋势；离线队列回放；上报限流 | 后端和前端自动化已覆盖 |
-| FR-LN-04 | 通知分类推送与展示 | 任务、成绩、公告、系统通知分类；内部事件鉴权；幂等生成；列表筛选分页 | 后端和前端自动化已覆盖；真实跨模块投递待联调确认 |
-| FR-LN-05 | 通知触达与状态管理 | 未读、已读、删除、批量已读、通知跳转、状态日志和用户隔离 | 后端和前端自动化已覆盖；真实推送时延待联调确认 |
+| FR-LN-04 | 通知分类推送与展示 | 任务、成绩、公告、系统通知分类；内部事件鉴权；幂等生成；列表筛选分页 | 后端、前端和本地真实 LAB/HWK/GRD 联合 E2E 已覆盖 |
+| FR-LN-05 | 通知触达与状态管理 | 未读、已读、删除、批量已读、通知跳转、状态日志和用户隔离 | 后端、前端和真实浏览器跳转已覆盖；真实推送时延保持 BLOCKED |
 | FR-LN-06 | 定时提醒与规则配置 | 提醒规则、通知偏好、任务截止提醒、重复提醒防护、失败记录 | 后端和前端自动化已覆盖 |
 | NFR-LN-01 | 实时性 | 任务状态、学习进度、通知未读数快速刷新，通知推送延迟不超过设计阈值 | 接口链路自动化覆盖；真实推送时延待手工计时 |
 | NFR-LN-02 | 性能 | 任务列表、通知列表分页，批量操作和进度保存响应时间 | 自动化覆盖分页、size 上限和基础规模；压力测试待补充 |
 | NFR-LN-03 | 可靠性 | 断点续传、离线队列回放、通知幂等、失败扫描日志 | 自动化覆盖核心分支 |
-| NFR-LN-04 | 易用性 | 固定入口、主要路径不超过 2 步、空态/失败态/重试提示 | 前端单元测试覆盖关键状态；浏览器视觉待手工确认 |
+| NFR-LN-04 | 易用性 | 固定入口、主要路径不超过 2 步、空态/失败态/重试提示 | 前端单元和真实浏览器覆盖关键入口、空态/失败态与重试 |
 | NFR-LN-05 | 可追踪性 | 学习记录、通知读取和删除、提醒扫描失败均可追溯用户与时间 | 自动化覆盖状态日志和扫描日志 |
 
 ### 4.2 页面、接口、数据表覆盖
@@ -90,12 +95,11 @@
 | 数据表 | `DB-LRN-01 ~ DB-LRN-07` | 迁移测试覆盖任务、进度、行为、通知、通知状态日志、提醒规则、通知设置和提醒扫描日志的关键结构 |
 | 跨模块 | AUTH、CRS、LAB、HWK、GRD | AUTH 提供当前用户；CRS 提供课程成员和教师权限；LAB/HWK/CRS 触发学习进度和行为记录；GRD 事件生成成绩通知 |
 
-### 4.3 不在本次自动化确认范围
+### 4.3 本次仍未确认范围
 
 | 范围项 | 说明 | 处理方式 |
 | --- | --- | --- |
-| 真实浏览器端完整链路 | 需在本地或测试环境中完成登录、进入课程、打开资源/实验/作业、查看任务/进度/仪表盘/通知/提醒设置 | 列入 9.3 手工测试 |
-| 生产跨模块事件投递 | LAB/HWK/GRD/CRS 在真实业务动作后投递 LRN 通知事件需要多模块联合环境 | 列入联调待确认 |
+| 生产部署跨模块事件投递 | 本地 DEV 已从真实 LAB/HWK/GRD 业务入口完成联合 E2E；生产部署的内部 token、网络和调度配置不属于本 PR | 保留部署联调风险，不否定本地业务验收结果 |
 | 通知触达时延 | 设计要求通知推送和角标刷新有时延指标，单元测试不能证明真实网络和浏览器事件时延 | 列入手工计时和联调 |
 | 高并发压力 | 当前自动化覆盖基础分页和限流，不覆盖大量用户同时上报学习行为或批量通知推送 | 后续压力测试补充 |
 
@@ -135,8 +139,12 @@
 
 | 测试类别 | 命令 | 执行结果 |
 | --- | --- | --- |
-| 后端 LRN 目标测试 | `mvn -q "-Dtest=LearningTaskControllerTest,LearningTaskMigrationTest,LearningTaskDefaultConfigurationTest,LearningProgressControllerTest,LearningProgressMigrationTest,LearningRecordControllerTest,LearningRecordMigrationTest,NotificationControllerTest,NotificationMigrationTest,ReminderRuleControllerTest,ReminderRuleFailureLoggingTest,ReminderRuleServiceTest,ReminderRuleMigrationTest,GrdLrnIntegrationTest,IntDemoDataInitializerTest" test` | 15 个测试类、41 条测试通过，0 失败，0 错误，0 跳过 |
-| 前端 LRN 目标测试 | `npm run test:unit -- tests/unit/lrn/LearningTaskCenterView.spec.ts tests/unit/lrn/LearningProgressView.spec.ts tests/unit/lrn/LearningStatisticsView.spec.ts tests/unit/lrn/NotificationCenterView.spec.ts tests/unit/lrn/ReminderRuleSettingsView.spec.ts tests/unit/lrn/learningTasksApi.spec.ts tests/unit/lrn/learningProgressApi.spec.ts tests/unit/lrn/learningRecordsApi.spec.ts tests/unit/lrn/notificationsApi.spec.ts tests/unit/lrn/reminderRulesApi.spec.ts tests/unit/CourseManagementView.spec.ts tests/unit/lab/LabStudentView.spec.ts tests/unit/hwk/HomeworkStudentView.spec.ts` | 13 个测试文件、67 条测试通过 |
+| 后端 LRN 目标测试 | `mvn -q "-Dtest=LearningTaskControllerTest,LearningTaskMigrationTest,LearningTaskDefaultConfigurationTest,LearningProgressControllerTest,LearningProgressMigrationTest,LearningRecordControllerTest,LearningRecordMigrationTest,NotificationControllerTest,NotificationMigrationTest,ReminderRuleControllerTest,ReminderRuleFailureLoggingTest,ReminderRuleServiceTest,ReminderRuleMigrationTest,LrnCrossModuleEventIntegrationTest,GrdLrnIntegrationTest,IntDemoDataInitializerTest" test` | 16 个测试类、45/45 PASS，0 失败，0 错误，0 跳过 |
+| 前端 LRN 目标测试 | `npm run test:unit -- tests/unit/lrn/LearningTaskCenterView.spec.ts tests/unit/lrn/LearningProgressView.spec.ts tests/unit/lrn/LearningStatisticsView.spec.ts tests/unit/lrn/NotificationCenterView.spec.ts tests/unit/lrn/ReminderRuleSettingsView.spec.ts tests/unit/lrn/learningTasksApi.spec.ts tests/unit/lrn/learningProgressApi.spec.ts tests/unit/lrn/learningRecordsApi.spec.ts tests/unit/lrn/notificationsApi.spec.ts tests/unit/lrn/reminderRulesApi.spec.ts tests/unit/CourseManagementView.spec.ts tests/unit/lab/LabStudentView.spec.ts tests/unit/hwk/HomeworkStudentView.spec.ts` | 13 个测试文件、115/115 PASS，0 失败，0 错误，0 跳过 |
+| 共享 E2E 契约 | `npm run test:e2e:contract` | 3/3 PASS，0 失败，0 错误，0 跳过 |
+| LRN 文档契约 | `node scripts/test/verify-lrn-doc-test-closure.test.mjs` | 4/4 PASS，0 失败，0 错误，0 跳过 |
+| LRN Playwright 联合 E2E | `npm run test:e2e -- tests/e2e/lrn` | 默认 4 workers，4/4 PASS，0 失败，0 错误，0 跳过 |
+| 前端静态验证 | `npm run typecheck`、`npm run build` | PASS |
 
 #### 7.3.2 LRN 追踪矩阵
 
@@ -150,7 +158,7 @@
 | TC-LN-06 | FR-LN-06 | UI-LRN-05 | API-LRN-10、API-LRN-11 | DB-LRN-06、DB-LRN-07 | 提醒规则、通知偏好、截止提醒、失败记录 | 已覆盖 |
 | TC-LN-N01 | NFR-LN-01 | 全部 LRN 页面 | 全部 LRN 接口 | DB-LRN-01 ~ DB-LRN-07 | 登录态、课程权限、事件接口鉴权、用户数据隔离 | 已覆盖，真实推送时延待手工 |
 | TC-LN-N02 | NFR-LN-02 | UI-LRN-04 | API-LRN-09 | DB-LRN-04、DB-LRN-05 | 通知幂等、不重复生成、失败可记录 | 已覆盖 |
-| TC-LN-N03 | NFR-LN-03 | UI-LRN-01 ~ UI-LRN-05 | API-LRN-01 ~ API-LRN-11 | 全部 LRN 表 | 空态、失败态、重试、主流程入口可用 | 部分已覆盖，浏览器待验收 |
+| TC-LN-N03 | NFR-LN-03 | UI-LRN-01 ~ UI-LRN-05 | API-LRN-01 ~ API-LRN-11 | 全部 LRN 表 | 空态、失败态、重试、主流程入口可用 | 已覆盖，默认联合 E2E PASS |
 | TC-LN-N04 | NFR-LN-04 | UI-LRN-01、UI-LRN-04 | API-LRN-01、API-LRN-06 | DB-LRN-01、DB-LRN-04 | 分页上限、基础规模、列表响应 | 已覆盖，压力待补充 |
 | TC-LN-N05 | NFR-LN-05 | 全部 LRN 页面 | 全部 LRN 接口 | 全部 LRN 表 | Mock/测试接口、日志和状态可追踪 | 已覆盖 |
 
@@ -169,7 +177,7 @@
 | TC-LN-02-04 | FR-LN-02 | 非成员不能保存或查询课程进度 | 学生已登录但不是课程成员 | 非成员课程进度请求 | 调用保存和查询接口 | 返回权限错误，不写入进度 | 后端测试通过 | 通过 | `LearningProgressControllerTest.nonMemberCannotSaveOrQueryCourseProgress` |
 | TC-LN-02-05 | FR-LN-02 | 进度输入边界校验 | 学生已登录 | 无效百分比、缺失来源、非法状态 | 调用 `POST /api/v1/learning/progress` | 返回 400，不写入异常数据 | 后端测试通过 | 通过 | `LearningProgressControllerTest.invalidProgressPayloadIsRejected` |
 | TC-LN-02-06 | FR-LN-02 | 教师只能查看所教课程聚合进度 | 教师已登录且管理课程 | 所教课程和非所教课程 | 调用教师聚合进度接口 | 所教课程返回班级聚合，非教师或非所教课程被拒绝 | 后端和前端测试通过 | 通过 | `LearningProgressControllerTest.teacherCanViewAggregateProgressOnlyForManagedCourse`、`studentCannotViewTeacherAggregateProgress`、`LearningProgressView.spec.ts` |
-| TC-LN-02-07 | FR-LN-02 | CRS/LAB/HWK 页面继续学习恢复断点 | 已存在 `lastPosition` | CRS `chapterId`、LAB/HWK `resume` 查询参数 | 从学习进度页点击继续学习 | 目标页面按断点恢复章节、代码或作答上下文 | 前端单元测试通过；真实浏览器待手工确认 | 部分通过 | `CourseManagementView.spec.ts`、`LabStudentView.spec.ts`、`HomeworkStudentView.spec.ts` |
+| TC-LN-02-07 | FR-LN-02 | CRS/LAB/HWK 页面继续学习恢复断点 | 已存在 `lastPosition` | CRS `chapterId`、LAB/HWK `resume` 查询参数 | 从学习进度页点击继续学习 | 目标页面按断点恢复章节、代码或作答上下文 | 前端单元和真实页面继续学习入口通过；复杂编辑器内部状态未纳入本 E2E | PASS | `CourseManagementView.spec.ts`、`LabStudentView.spec.ts`、`HomeworkStudentView.spec.ts`、`lrn-business-closure.spec.ts` |
 | TC-LN-03-01 | FR-LN-03 | 学生上报学习行为并查看 7 天仪表盘 | 学生已登录且是课程成员 | 行为记录、时长、开始/结束时间 | 调用 `POST /api/v1/learning/records` 后查询 `GET /api/v1/learning/statistics` | 统计返回总时长、访问次数、完成任务数、7 天趋势和最近记录 | 后端和前端测试通过 | 通过 | `LearningRecordControllerTest.bearerTokenStudentCanReportBehaviorAndViewSevenDayDashboard`、`LearningStatisticsView.spec.ts` |
 | TC-LN-03-02 | FR-LN-03、NFR-LN-01 | 非成员不能上报或查询课程行为 | 学生已登录但不是课程成员 | 非成员课程行为记录 | 上报和查询统计 | 返回权限错误，不泄露统计 | 后端测试通过 | 通过 | `LearningRecordControllerTest.nonMemberCannotReportOrQueryCourseBehavior` |
 | TC-LN-03-03 | FR-LN-03 | 学习行为输入边界校验 | 学生已登录 | 非法时长、非法时间、缺失来源 | 调用 `POST /api/v1/learning/records` | 返回 400，不写入行为记录 | 后端测试通过 | 通过 | `LearningRecordControllerTest.invalidLearningRecordPayloadIsRejected` |
@@ -183,7 +191,7 @@
 | TC-LN-04-05 | FR-LN-04 | GRD 成绩事件生成 LRN 通知 | GRD 发布、变更或复核成绩 | LAB/HWK 成绩事件 | 执行 GRD/LRN 集成测试 | LRN 为相关学生生成成绩通知 | 后端集成测试通过 | 通过 | `GrdLrnIntegrationTest.grdGradeEventsCreateLrnNotificationsForPublishChangeAndReviewFlow` |
 | TC-LN-05-01 | FR-LN-05 | 单条和批量标记已读 | 用户已登录且有未读通知 | 当前用户通知 ID 列表 | 调用 `PUT /api/v1/notifications/read` 或页面批量已读 | 通知变为已读，写入状态日志，未读数更新 | 后端和前端测试通过 | 通过 | `NotificationControllerTest.readAndDeleteActionsAreScopedToCurrentUserAndLogged`、`NotificationCenterView.spec.ts`、`notificationsApi.spec.ts` |
 | TC-LN-05-02 | FR-LN-05 | 删除通知仅影响当前用户 | 用户已登录 | 当前用户通知和其他用户通知 | 调用 `DELETE /api/v1/notifications/{notificationId}` | 当前用户通知软删除且列表隐藏；其他用户通知不受影响；写状态日志 | 后端和前端测试通过 | 通过 | `NotificationControllerTest.readAndDeleteActionsAreScopedToCurrentUserAndLogged`、`readAndDeleteActionsRejectInvalidInputAndHideDeletedNotifications` |
-| TC-LN-05-03 | FR-LN-05 | 通知业务跳转 | 用户已登录且通知含 `actionUrl` | 指向任务、成绩、公告或系统页面的通知 | 在通知中心点击查看/跳转 | 跳转到对应业务页面，通知内容不丢失 | 前端组件测试覆盖链接渲染；真实浏览器待手工确认 | 部分通过 | `NotificationCenterView.spec.ts` |
+| TC-LN-05-03 | FR-LN-05 | 通知业务跳转 | 用户已登录且通知含 `actionUrl` | 指向任务、成绩、公告或系统页面的通知 | 在通知中心点击查看/跳转 | 有效通知先标记已读再跳转；重复打开不重复写已读；目标失效停留安全页面 | 前端组件和真实浏览器均通过 | PASS | `NotificationCenterView.spec.ts`、`notification-read-on-open.spec.ts`、`lrn-business-closure.spec.ts` |
 | TC-LN-05-04 | FR-LN-05、NFR-LN-05 | 通知状态日志留痕 | 用户执行已读和删除 | `lrn_notification_status_log` | 标记已读、删除通知后查询日志 | 日志记录旧状态、新状态、操作类型、用户和时间 | 后端测试通过 | 通过 | `NotificationControllerTest.readAndDeleteActionsAreScopedToCurrentUserAndLogged`、`NotificationMigrationTest.migrationCreatesNotificationStatusLogTable` |
 | TC-LN-06-01 | FR-LN-06 | 当前用户读取和保存提醒规则及通知偏好 | 用户已登录 | 多条提醒规则和偏好开关 | 调用 `GET/PUT /api/v1/reminder-rules` 或在设置页保存 | 返回并保存当前用户规则和偏好，必选规则不可被非法关闭 | 后端和前端测试通过 | 通过 | `ReminderRuleControllerTest.currentUserCanReadAndSaveReminderRulesAndNotificationSettings`、`ReminderRuleSettingsView.spec.ts` |
 | TC-LN-06-02 | FR-LN-06 | 提醒规则输入边界校验 | 用户已登录 | 无效 `aheadMinutes`、非法来源模块 | 调用 `PUT /api/v1/reminder-rules` | 返回 400，不写入非法规则 | 后端测试通过 | 通过 | `ReminderRuleControllerTest.savingReminderRulesRejectsInvalidAheadMinutesAndSourceContract` |
@@ -211,6 +219,7 @@
 | LRN-LOG-006 | 2026-06-10 15:54 | LRN 迁移与配置测试 | `lrn_learning_task`、`lrn_learning_progress`、`lrn_learning_record`、`lrn_notification`、`lrn_notification_status_log`、`lrn_reminder_rule`、`lrn_notification_setting`、扫描日志和默认迁移配置 | 7 条通过 |
 | LRN-LOG-007 | 2026-06-10 15:54 | `GrdLrnIntegrationTest`、`IntDemoDataInitializerTest` | GRD 成绩事件生成通知、INT 演示数据覆盖登录-课程-学习-LAB/HWK-GRD-通知闭环 | 3 条通过 |
 | LRN-LOG-008 | 2026-06-10 15:54 | Maven 汇总 | 目标命令共 15 个测试类 | 41 条通过，0 失败，0 错误，0 跳过 |
+| LRN-LOG-017 | 2026-08-26 | Maven 当前目标命令 | 增加 `LrnCrossModuleEventIntegrationTest`，复测 LRN Service/Controller/迁移及 LAB/HWK/GRD 集成 | 16 个测试类，45/45 PASS，0 失败，0 错误，0 跳过 |
 
 #### 8.3.2 前端 LRN 执行日志
 
@@ -223,12 +232,15 @@
 | LRN-LOG-013 | 2026-06-10 15:55 | `ReminderRuleSettingsView.spec.ts`、`reminderRulesApi.spec.ts` | 提醒规则展示、偏好保存、失败重试、API 调用 | 4 条通过 |
 | LRN-LOG-014 | 2026-06-10 15:55 | `CourseManagementView.spec.ts`、`LabStudentView.spec.ts`、`HomeworkStudentView.spec.ts` | CRS/LAB/HWK 页面触发 LRN 进度、行为记录和断点恢复 | 37 条通过 |
 | LRN-LOG-015 | 2026-06-10 15:55 | Vitest 汇总 | 目标命令共 13 个测试文件 | 67 条通过 |
+| LRN-LOG-018 | 2026-08-26 | Vitest 当前目标命令 | LRN 页面/API 与 CRS/LAB/HWK 联动复测 | 13 个测试文件，115/115 PASS，0 失败，0 错误，0 跳过 |
+| LRN-LOG-019 | 2026-08-26 | `npm run test:e2e -- tests/e2e/lrn` | 真实 LAB/HWK/GRD 通知、任务/统计/提醒页面、通知已读/删除/跳转、断线恢复 | 默认 4 workers，4/4 PASS，0 失败，0 错误，0 跳过 |
 
 #### 8.3.3 本次文档校验日志
 
 | 日志编号 | 时间 | 命令 | 执行内容 | 结果 |
 | --- | --- | --- | --- | --- |
 | LRN-LOG-016 | 2026-06-10 15:56 | `git diff --check` | 检查文档变更空白和补丁格式 | 通过 |
+| LRN-LOG-020 | 2026-08-26 | 文档契约、共享 E2E 契约、类型检查、构建、`git diff --check` | 校验图组、黑盒需求 SSD、共享入口、静态类型、生产构建和补丁格式 | PASS |
 
 ## 9 手动测试
 
@@ -236,16 +248,16 @@
 
 | 手工编号 | 关联用例 | 场景 | 前置条件 | 操作步骤 | 预期结果 | 当前状态 | 残余风险 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| LRN-MAN-001 | TC-LN-01 | 首页进入学习任务中心并查看分页 | 本地前后端启动，学生账号已登录并加入课程 | 从首页点击学习任务入口，切换状态/类型筛选，点击上一页/下一页 | 页面毛玻璃风格一致；任务为当前学生可见课程；分页可切换；空态/失败态清晰 | 待手工验收 | 入口样式和真实课程数据需浏览器确认 |
+| LRN-MAN-001 | TC-LN-01 | 首页进入学习任务中心并查看分页 | 本地前后端启动，学生账号已登录并加入课程 | 从首页点击学习任务入口，切换状态/类型筛选，点击上一页/下一页 | 页面毛玻璃风格一致；任务为当前学生可见课程；分页可切换；空态/失败态清晰 | PASS | Playwright 已确认入口、真实任务和类型筛选；大数据分页由单元/API 测试补充 |
 | LRN-MAN-002 | TC-LN-02 | 课程资源断点续传 | 学生已打开课程资源并产生进度 | 从学习进度页点击继续学习 | 回到课程页对应章节/资源位置，不进入错误课程 | 待手工验收 | jsdom 只能覆盖参数恢复，真实滚动/播放位置需浏览器确认 |
 | LRN-MAN-003 | TC-LN-02 | LAB/HWK 断点续传 | 学生在实验/作业中保存草稿或产生进度 | 从学习进度页点击继续学习到 LAB/HWK | 代码或作答上下文恢复，打开页面不会立即覆盖原断点 | 待手工验收 | 真实编辑器状态和复杂题型恢复需联调确认 |
 | LRN-MAN-004 | TC-LN-03 | 仪表盘数据随真实学习动作变化 | 学生进入 CRS/LAB/HWK 并完成访问或提交 | 打开学习仪表盘，观察总时长、访问次数、趋势和最近记录 | 统计与真实操作一致，失败时展示重试或缓存提示 | 待手工验收 | 学习时长依赖真实停留时间，需人工计时核对 |
-| LRN-MAN-005 | TC-LN-04、TC-LN-05 | 通知中心分类、已读、删除、跳转 | 账号存在任务、成绩、公告、系统通知 | 切换类型/未读筛选，批量已读，删除单条，点击业务跳转 | 未读数变化正确；删除后列表隐藏；跳转到对应业务页；其他用户通知不受影响 | 待手工验收 | 真实业务页面跳转和通知角标需浏览器确认 |
-| LRN-MAN-006 | TC-LN-04 | 跨模块真实事件生成通知 | CRS/LAB/HWK/GRD 模块在同一环境可用 | 发布公告、发布实验/作业、发布成绩或复核成绩 | LRN 收到事件并生成分类通知，重复操作不生成重复通知 | 联调待确认 | 生产事件触发时机和内部 token 配置需多模块确认 |
-| LRN-MAN-007 | TC-LN-06 | 提醒规则设置和截止提醒 | 学生有临近截止且未提交的 LAB/HWK | 修改提醒偏好，等待或触发提醒扫描 | 符合规则的未提交任务产生提醒；关闭非必要提醒后不再收到非必要提醒 | 待手工验收 | 定时任务执行周期和测试时间窗口需环境配合 |
+| LRN-MAN-005 | TC-LN-04、TC-LN-05 | 通知中心分类、已读、删除、跳转 | 账号存在任务、成绩、公告、系统通知 | 切换类型/未读筛选，批量已读，删除单条，点击业务跳转 | 未读数变化正确；删除后列表隐藏；跳转到对应业务页；其他用户通知不受影响 | PASS | 默认 4-worker Playwright 断言目标通知未读→已读、重复打开幂等、删除和真实 LAB 跳转 |
+| LRN-MAN-006 | TC-LN-04 | 跨模块真实事件生成通知 | CRS/LAB/HWK/GRD 模块在同一环境可用 | 发布公告、发布实验/作业、发布成绩或复核成绩 | LRN 收到事件并生成分类通知，重复操作不生成重复通知 | PASS | 本地 DEV 的 LAB/HWK 发布和 GRD 调整均生成本次新通知；生产部署配置仍属环境风险 |
+| LRN-MAN-007 | TC-LN-06 | 提醒规则设置和截止提醒 | 学生有临近截止且未提交的 LAB/HWK | 修改提醒偏好，等待或触发提醒扫描 | 符合规则的未提交任务产生提醒；关闭非必要提醒后不再收到非必要提醒 | PASS | 页面保存和后端扫描规则已覆盖；真实调度触达时延仍为 BLOCKED |
 | LRN-MAN-008 | TC-LN-N01 | 权限边界手工核对 | 准备学生 A、学生 B、教师、非成员账号 | 分别访问学习任务、进度、仪表盘、通知和提醒页面 | A/B 互不泄露数据；非成员被拒绝；学生不能查看教师聚合 | 待手工验收 | 自动化已覆盖主要分支，真实账号配置仍需核对 |
-| LRN-MAN-009 | TC-LN-N01、TC-LN-N04 | 会话过期和网络异常 | 删除 token 或关闭后端服务 | 打开 LRN 页面并执行刷新/保存/已读/删除操作 | 显示登录失效或网络失败提示，不展示其他用户缓存 | 待手工验收 | 真实浏览器 localStorage 和网络错误提示需确认 |
-| LRN-MAN-010 | TC-LN-N02、TC-LN-N03 | 通知触达时延和可靠性 | 测试环境支持通知轮询或推送 | 触发任务/成绩/公告通知并计时 | 通知列表和未读数在设计阈值内刷新，断线恢复后不丢通知 | 联调待确认 | 单元测试不能证明真实推送时延 |
+| LRN-MAN-009 | TC-LN-N01、TC-LN-N04 | 会话过期和网络异常 | 删除 token 或关闭后端服务 | 打开 LRN 页面并执行刷新/保存/已读/删除操作 | 显示登录失效或网络失败提示，不展示其他用户缓存 | PASS | Playwright 覆盖通知列表断线与刷新恢复；会话失效和缓存隔离由单元/API 测试覆盖 |
+| LRN-MAN-010 | TC-LN-N02、TC-LN-N03 | 通知触达时延和可靠性 | 测试环境支持通知轮询或推送 | 触发任务/成绩/公告通知并计时 | 通知列表和未读数在设计阈值内刷新，断线恢复后不丢通知 | BLOCKED | 联合 E2E 证明业务结果但没有逐项计时，不能据此判定 NFR-LN-01/02 PASS |
 
 ## 10 验收结论
 
@@ -253,12 +265,12 @@
 
 | 验收维度 | 结论 | 依据 | 残余风险/后续动作 |
 | --- | --- | --- | --- |
-| 功能完整性 | 基本通过 | `TC-LN-01 ~ TC-LN-06` 均有可执行用例，后端和前端目标测试通过 | 真实浏览器端到端和跨模块生产事件仍需测试负责人整合验收 |
+| 功能完整性 | PASS | `TC-LN-01 ~ TC-LN-06` 均有可执行用例，后端 45/45、前端 115/115、默认联合 E2E 4/4 PASS | 生产部署跨模块配置不在本地业务验收范围 |
 | 接口契约 | 通过 | `API-LRN-01 ~ API-LRN-11` 均有后端或前端测试覆盖 | 内部事件接口真实部署 token/IP 白名单策略需环境确认 |
 | 数据表和状态 | 通过 | `DB-LRN-01 ~ DB-LRN-07` 迁移和状态日志测试通过 | 生产库迁移顺序需在统一部署脚本中再次确认 |
 | 权限和隔离 | 通过 | 自动化覆盖 Bearer 登录态、课程成员、教师聚合和当前用户通知隔离 | 真实账号矩阵需手工复验 |
 | 异常和边界 | 通过 | 自动化覆盖未登录、非成员、非法参数、限流、内部 token 错误、提醒失败日志 | 高并发异常和真实网络波动需压力/联调补充 |
-| 非功能 | 部分通过 | 自动化覆盖分页、size 上限、幂等、离线队列、状态日志和失败重试 | 通知时延、列表响应时间和高并发压力需专项测试 |
+| 非功能 | BLOCKED | NFR-LN-03/04/05 的幂等、离线恢复、状态日志、失败重试和入口可用已有证据 | NFR-LN-01/02 缺少逐项计时与压力测试，不能写 PASS |
 | 测试文档交付 | 通过 | 本文件按 TST-DOC-01 和各模块负责人任务整理 6.3、7.3、8.3、9.3、10.3 内容 | 交由 @MontesquieuE 统一整合时需补充最终 FAT/UAT 实测结果 |
 
 ## 11 附录
@@ -281,10 +293,14 @@ npm run test:unit -- tests/unit/lrn/LearningTaskCenterView.spec.ts tests/unit/lr
 
 #### 11.3.3 共享 E2E 命令
 
-```bash
+```powershell
 cd frontend
-E2E_BASE_URL=http://127.0.0.1:5173 E2E_BROWSER_CHANNEL=chrome npm run test:e2e -- tests/e2e/lrn/lrn-business-closure.spec.ts
+$env:E2E_BASE_URL='http://127.0.0.1:5173'
+$env:E2E_BROWSER_CHANNEL='chrome'
+npm run test:e2e -- tests/e2e/lrn
 ```
+
+该命令不得附加 `--workers=1`，验收记录以 Playwright 默认 4-worker 联合执行 4/4 PASS 为准。
 
 #### 11.3.4 LRN 页面和接口快速索引
 
@@ -298,4 +314,4 @@ E2E_BASE_URL=http://127.0.0.1:5173 E2E_BROWSER_CHANNEL=chrome npm run test:e2e -
 
 #### 11.3.5 交付说明
 
-本 issue 仅交付测试文档，不修改业务代码。测试负责人整合时可直接抽取本文件的 `6.3`、`7.3`、`8.3`、`9.3`、`10.3` 和 `11.3` 小节合入总测试报告，并在 FAT/UAT 后补充手工测试实际结果、缺陷编号和最终审批记录。
+本 issue 交付 LRN 场景文档、三层图源/静态资产、后端/前端/共享 E2E 测试及用户指定并入 #262 的 #269 最小生产修复。测试负责人整合时可直接抽取本文件的 `6.3`、`7.3`、`8.3`、`9.3`、`10.3` 和 `11.3` 小节合入总测试报告；生产部署配置和 NFR-LN-01/02 专项计时仍需独立证据。

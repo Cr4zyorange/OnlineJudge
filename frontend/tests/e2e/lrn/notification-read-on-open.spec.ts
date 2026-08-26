@@ -3,6 +3,9 @@ import { expect, test } from '../fixtures';
 
 const DEMO_COURSE_ID = 9501;
 
+test.describe.configure({ timeout: 60_000 });
+test.use({ navigationTimeout: 30_000 });
+
 type ApiEnvelope<T> = { code: string; message: string; data: T };
 type CreatedEntity = { id: number };
 type NotificationRecord = {
@@ -40,6 +43,10 @@ test.describe('@lrn #269 notification read-on-open', () => {
     const beforeOpen = await notificationPage(page, studentHeaders);
     const notice = findNotice(beforeOpen, lab.id);
     expect(notice.isRead).toBe(false);
+    const beforeUnreadNotificationIds = new Set(beforeOpen.records
+      .filter((record) => !record.isRead)
+      .map((record) => record.notificationId));
+    expect(beforeUnreadNotificationIds.has(notice.notificationId)).toBe(true);
 
     let readMutationCount = 0;
     page.on('request', (request) => {
@@ -58,14 +65,17 @@ test.describe('@lrn #269 notification read-on-open', () => {
 
     const afterOpen = await notificationPage(page, studentHeaders);
     expect(findNotice(afterOpen, lab.id).isRead).toBe(true);
-    expect(afterOpen.unreadCount).toBe(beforeOpen.unreadCount - 1);
+    const afterUnreadNotificationIds = new Set(afterOpen.records
+      .filter((record) => !record.isRead)
+      .map((record) => record.notificationId));
+    expect(afterUnreadNotificationIds.has(notice.notificationId)).toBe(false);
     expect(readMutationCount).toBe(1);
 
     await page.goto('/notifications');
     const readCard = page.getByTestId(`notification-card-${notice.notificationId}`);
     await expect(readCard).not.toContainText('未读');
     await page.screenshot({
-      path: '../output/test/issue-262/evidence/notification-read-state-after-fix.png',
+      path: test.info().outputPath('notification-read-state-after-fix.png'),
       fullPage: true
     });
     await readCard.getByRole('link', { name: '查看详情' }).click();
@@ -73,7 +83,7 @@ test.describe('@lrn #269 notification read-on-open', () => {
     expect(readMutationCount).toBe(1);
 
     await page.screenshot({
-      path: '../output/test/issue-262/evidence/notification-read-on-open-after-fix.png',
+      path: test.info().outputPath('notification-read-on-open-after-fix.png'),
       fullPage: true
     });
   });

@@ -3,9 +3,10 @@ sequenceDiagram
   participant System as 在线教学平台
   Student->>System: 查看并保存提醒规则/偏好
   System-->>Student: 返回有效规则状态
-  System->>System: 扫描即将截止 LAB/HWK 与未提交成员
-  alt 符合规则且偏好允许
-    System-->>Student: 生成站内提醒
-  else 已提交/关闭非必要提醒/写入失败
-    System->>System: 跳过或记录失败批次供复测
+  alt 到达提醒时间且学生符合规则
+    System-->>Student: 展示对应 LAB/HWK 截止提醒和业务入口
+  else 学生已提交或已关闭非必要提醒
+    System-->>Student: 保持当前通知列表且不重复触达
+  else 提醒暂时不可用
+    System-->>Student: 展示可理解失败提示或稍后刷新结果
   end
