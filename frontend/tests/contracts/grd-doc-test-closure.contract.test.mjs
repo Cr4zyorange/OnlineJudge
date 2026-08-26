@@ -140,6 +140,10 @@ test('GRD SSD branches and responses match the implemented API contracts', () =>
   assert.match(gradeReviewSsd, /requestId.*PENDING.*submittedAt/);
   assert.doesNotMatch(gradeReviewSsd, /异步持久化/);
   assert.match(gradeReviewSsd, /同步 best-effort 持久化.*失败.*不改变.*响应/);
+  assert.doesNotMatch(gradeReviewSsd, /复核结果和通知可见/);
+  assert.match(gradeReviewSsd, /复核结果可查询/);
+  assert.match(gradeReviewSsd, /opt 通知持久化成功[\s\S]*复核结果通知可查询/);
+  assert.match(gradeReviewSsd, /通知.*失败.*复核结果.*可查询.*通知.*不可查询/);
   assert.match(gradeReviewUseCase, /同步 best-effort.*失败.*不改变.*响应/);
   assert.match(gradeTestReport, /同步 best-effort.*失败.*不改变.*响应/);
   assert.doesNotMatch(notificationPublisher, /@Async/);
@@ -247,6 +251,10 @@ test('GRD mutating lifecycle only runs through the disposable database wrapper',
   assert.match(runner, /\/api\/v1\/auth\/login/);
   assert.match(runner, /seeded_account_ready teacher001 Teacher001@pass/);
   assert.match(runner, /seeded_account_ready student001 Student001@pass/);
+  assert.match(runner, /E2E_TEACHER_ACCOUNT=teacher001/);
+  assert.match(runner, /E2E_TEACHER_PASSWORD=Teacher001@pass/);
+  assert.match(runner, /E2E_STUDENT_ACCOUNT=student001/);
+  assert.match(runner, /E2E_STUDENT_PASSWORD=Student001@pass/);
   const healthReady = runner.indexOf('[[ "$backend_ready" -eq 1 ]]');
   const seedReady = runner.indexOf('seeded_accounts_ready=0');
   const proofCreation = runner.indexOf('proof_file="$temp_dir/disposable-proof"');

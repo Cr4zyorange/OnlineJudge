@@ -145,6 +145,10 @@ chmod 600 "$proof_file"
 (
   cd "$frontend_dir"
   E2E_BASE_URL="$disposable_base_url" \
+  E2E_TEACHER_ACCOUNT=teacher001 \
+  E2E_TEACHER_PASSWORD=Teacher001@pass \
+  E2E_STUDENT_ACCOUNT=student001 \
+  E2E_STUDENT_PASSWORD=Student001@pass \
   E2E_GRD_DISPOSABLE_PROOF_FILE="$proof_file" \
   E2E_GRD_DISPOSABLE_TOKEN="$proof_token" \
     npm run test:e2e -- tests/e2e/grd/grade-lifecycle.spec.ts --workers=1
