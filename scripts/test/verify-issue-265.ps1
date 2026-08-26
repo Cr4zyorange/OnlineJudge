@@ -2,7 +2,8 @@
 param(
     [switch]$SkipCompose,
     [switch]$SkipE2E,
-    [switch]$KeepEnvironment
+    [switch]$KeepEnvironment,
+    [switch]$Diagnostic
 )
 
 Set-StrictMode -Version Latest
@@ -18,7 +19,13 @@ $composeFiles = @(
     (Join-Path $composeRoot 'compose.eval.local.example.yml')
 )
 $results = [System.Collections.Generic.List[object]]::new()
-$composeStarted = $false
+$composeProject = "oj265-$(([Guid]::NewGuid().ToString('N')).Substring(0, 12))"
+$composeOverrideFile = Join-Path ([IO.Path]::GetTempPath()) "$composeProject.override.yml"
+$composeCleanupRegistered = $false
+$composeReady = $false
+$previousE2EBaseUrl = [Environment]::GetEnvironmentVariable('E2E_BASE_URL', 'Process')
+$previousOjHttpPort = [Environment]::GetEnvironmentVariable('OJ_HTTP_PORT', 'Process')
+$isolatedPort = $null
 
 function Add-CheckResult {
     param(
@@ -66,6 +73,42 @@ function Invoke-Compose {
     }
 }
 
+function Get-DisposablePort {
+    $listener = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, 0)
+    try {
+        $listener.Start()
+        return ([System.Net.IPEndPoint]$listener.LocalEndpoint).Port
+    } finally {
+        $listener.Stop()
+    }
+}
+
+function New-ComposeOverride {
+    $override = @'
+services:
+  mysql:
+    container_name: !reset null
+  backend:
+    container_name: !reset null
+  frontend:
+    container_name: !reset null
+'@
+    [IO.File]::WriteAllText($composeOverrideFile, $override, [Text.UTF8Encoding]::new($false))
+}
+
+function Get-ComposeArguments {
+    param([string[]]$CommandArguments)
+
+    $arguments = @(
+        '-p', $composeProject,
+        '-f', $composeFiles[0],
+        '-f', $composeFiles[1],
+        '-f', $composeFiles[2],
+        '-f', $composeOverrideFile
+    )
+    return $arguments + $CommandArguments
+}
+
 function Test-DockerContainerCleanup {
     $leftovers = @(& docker ps -a --format '{{.Names}}' --filter 'name=oj-lab-' 2>$null)
     if ($LASTEXITCODE -ne 0) {
@@ -101,8 +144,14 @@ function Write-Summary {
 }
 
 try {
+    New-ComposeOverride
+    $isolatedPort = Get-DisposablePort
+    [Environment]::SetEnvironmentVariable('OJ_HTTP_PORT', [string]$isolatedPort, 'Process')
+    [Environment]::SetEnvironmentVariable('E2E_BASE_URL', "http://127.0.0.1:$isolatedPort", 'Process')
+
     $head = (& git -C $repoRoot rev-parse HEAD).Trim()
     Add-CheckResult -Status PASS -Name 'baseline' -Detail $head
+    Add-CheckResult -Status PASS -Name 'disposable Compose environment' -Detail "$composeProject on http://127.0.0.1:$isolatedPort"
 
     Invoke-Check -Name 'Docker daemon' -Action {
         & docker info --format '{{.ServerVersion}} {{.OSType}} {{.Architecture}}'
@@ -124,12 +173,7 @@ try {
     }
 
     Invoke-Check -Name 'Compose evaluation configuration' -Action {
-        $arguments = @()
-        foreach ($composeFile in $composeFiles) {
-            $arguments += @('-f', $composeFile)
-        }
-        $arguments += 'config'
-        Invoke-Compose -Arguments $arguments
+        Invoke-Compose -Arguments (Get-ComposeArguments @('config'))
     }
 
     Invoke-Check -Name 'LAB backend behavior and transaction tests' -Action {
@@ -149,9 +193,11 @@ try {
     if ($SkipCompose) {
         Add-CheckResult -Status BLOCKED -Name 'Compose application environment' -Detail 'skipped by -SkipCompose'
     } else {
+        # Register cleanup before startup so a partial `up --wait` still has a scoped teardown.
+        $script:composeCleanupRegistered = $true
         Invoke-Check -Name 'Compose application environment' -Action {
-            Invoke-Compose -Arguments @('-f', $composeFiles[0], '-f', $composeFiles[1], '-f', $composeFiles[2], 'up', '--build', '--wait', '-d')
-            $script:composeStarted = $true
+            Invoke-Compose -Arguments (Get-ComposeArguments @('up', '--build', '--wait', '-d'))
+            $script:composeReady = $true
         }
     }
 
@@ -178,13 +224,12 @@ try {
         Add-CheckResult -Status BLOCKED -Name 'LAB Playwright E2E' -Detail 'skipped by -SkipE2E'
     } elseif ($SkipCompose) {
         Add-CheckResult -Status BLOCKED -Name 'LAB Playwright E2E' -Detail 'requires the Compose application environment'
+    } elseif (-not $composeReady) {
+        Add-CheckResult -Status BLOCKED -Name 'LAB Playwright E2E' -Detail 'requires a healthy disposable Compose application environment'
     } else {
         Invoke-Check -Name 'LAB Playwright E2E' -Action {
             Push-Location $frontendRoot
             try {
-                if ([string]::IsNullOrWhiteSpace($env:E2E_BASE_URL)) {
-                    $env:E2E_BASE_URL = 'http://127.0.0.1:8088'
-                }
                 & npm run test:e2e -- tests/e2e/lab/issue-265-lab-lifecycle.spec.ts
             } finally {
                 Pop-Location
@@ -192,15 +237,24 @@ try {
         }
     }
 } finally {
-    if ($composeStarted -and -not $KeepEnvironment) {
-        Invoke-Check -Name 'Compose container cleanup' -Action {
-            Invoke-Compose -Arguments @('-f', $composeFiles[0], '-f', $composeFiles[1], '-f', $composeFiles[2], 'down', '--volumes', '--remove-orphans')
+    try {
+        if ($composeCleanupRegistered -and -not $KeepEnvironment) {
+            Invoke-Check -Name 'Compose container cleanup' -Action {
+                Invoke-Compose -Arguments (Get-ComposeArguments @('down', '--volumes', '--remove-orphans'))
+            }
         }
+    } finally {
+        if (Test-Path -LiteralPath $composeOverrideFile) {
+            Remove-Item -LiteralPath $composeOverrideFile -Force -ErrorAction SilentlyContinue
+        }
+        [Environment]::SetEnvironmentVariable('E2E_BASE_URL', $previousE2EBaseUrl, 'Process')
+        [Environment]::SetEnvironmentVariable('OJ_HTTP_PORT', $previousOjHttpPort, 'Process')
+        Write-Summary
     }
-
-    Write-Summary
 }
 
-if ($results.Status -contains 'FAIL') {
+$hasFail = $results.Status -contains 'FAIL'
+$hasBlocked = $results.Status -contains 'BLOCKED'
+if ($hasFail -or ($hasBlocked -and -not $Diagnostic)) {
     exit 1
 }
