@@ -200,6 +200,8 @@
 | SVC-LRN-04 | ReminderRuleService   | 管理用户提醒规则和通知偏好，定时扫描即将截止任务并触发提醒   | userId, ruleDTO            | 规则列表、成功/失败   |
 | SVC-LRN-05 | EventConsumerService  | 监听来自 LAB/HWK/GRD 的事件（MQ或直接调用），调用 NotificationService 创建通知 | ModuleEvent                | 通知ID列表            |
 
+应用内直接调用由 `PersistentNotificationEventPublisher` 提供两种明确契约。普通 `publish` 在存在活动来源事务时登记事务同步回调，`afterCommit` 回调只把不可变命令快照提交到 `notificationDeliveryExecutor`，不在仍绑定来源事务资源的回调线程中同步申请新连接；工作线程随后以 `REQUIRES_NEW` 调用 `NotificationService`。来源事务回滚时不执行回调；没有活动事务时立即开启独立事务落库。执行器拒绝或通知落库失败仅记录告警，不回滚已提交来源业务；队列为有界内存队列，持久重试/outbox 不在本次实现范围。必达 `publishRequired` 则同步调用 `NotificationService` 并加入来源事务，异常向上抛出；`HOMEWORK_PUBLISHED` 使用该契约以保证通知失败时作业发布整体回滚。
+
 ## 6 数据结构与数据库设计
 
 ### 6.1 表清单
@@ -374,7 +376,8 @@ stateDiagram-v2
 | 异常场景                     | 处理方式                                                    | 错误码 | HTTP状态码    |
 | ---------------------------- | ----------------------------------------------------------- | ------ | ------------- |
 | 任务快照数据过期且无法拉取   | 返回缓存旧数据，记录错误日志，提示“部分任务可能未更新”      | 30001  | 200（带警告） |
-| 通知事件接收失败（网络抖动） | 事件生产者重试3次，仍失败写入死信表                         | 30002  | 500           |
+| 普通通知调度或持久化失败 | after-commit 回调的执行器拒绝或工作线程独立事务失败时记录告警，不反向回滚来源业务；有界内存队列当前未实现持久重试/outbox | 30002  | 来源业务响应不反向改写 |
+| 必达通知持久化失败 | `publishRequired` 异常向上抛出并回滚来源事务；作业发布映射为 `503/HWK_5003` | HWK_5003 | 503 |
 | WebSocket连接断开            | 前端启用轮询（每30秒），后端仍保持推送队列                  | -      | -             |
 | 学习进度保存时唯一键冲突     | 使用 `ON DUPLICATE KEY UPDATE` 更新                         | 0      | 200           |
 | 用户尝试修改他人通知         | 接口层校验 `notification.user_id == currentUserId`，否则403 | 403    | 403           |

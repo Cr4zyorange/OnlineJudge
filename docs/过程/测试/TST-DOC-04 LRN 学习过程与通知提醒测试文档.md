@@ -50,6 +50,7 @@
 | 10 | `frontend/tests/unit/lrn` | LRN 前端页面和 API wrapper 单元测试 |
 | 11 | `frontend/tests/unit/CourseManagementView.spec.ts`、`frontend/tests/unit/lab/LabStudentView.spec.ts`、`frontend/tests/unit/hwk/HomeworkStudentView.spec.ts` | CRS/LAB/HWK 触发 LRN 进度和行为记录的前端联动测试 |
 | 12 | `database/migrations/20260530_01_create_lrn_learning_task.sql`、`20260531_01_create_lrn_learning_progress.sql`、`20260602_01_create_lrn_learning_record.sql`、`20260603_01_create_lrn_notification.sql`、`20260605_01_create_lrn_reminder_rule.sql` | LRN 数据表和迁移约束依据 |
+| 13 | `backend/src/test/java/com/onlinejudge/lrn/service/PersistentNotificationEventPublisherTransactionTest.java` | Spring/H2（连接池上限 1）与可控执行器验证 after-commit 回调仅排队、不在回调线程申请新连接；并覆盖来源回滚不排队、普通通知失败/执行器拒绝不污染来源事务、无外层事务即时落库、空事件跳过，以及必达通知成功同事务提交/失败整体回滚 |
 
 ## 4 测试范围
 
@@ -83,7 +84,7 @@
 | 范围项 | 说明 | 处理方式 |
 | --- | --- | --- |
 | 真实浏览器端完整链路 | 需在本地或测试环境中完成登录、进入课程、打开资源/实验/作业、查看任务/进度/仪表盘/通知/提醒设置 | 列入 9.3 手工测试 |
-| 生产跨模块事件投递 | LAB/HWK/GRD/CRS 在真实业务动作后投递 LRN 通知事件需要多模块联合环境 | 列入联调待确认 |
+| 生产跨模块事件投递 | 公共发布器的事务边界已由真实 Spring/H2 自动化确认；LAB/HWK/GRD/CRS 各真实业务动作的完整联合环境仍需联调 | 公共事务契约自动化确认，端到端联调继续保留 |
 | 通知触达时延 | 设计要求通知推送和角标刷新有时延指标，单元测试不能证明真实网络和浏览器事件时延 | 列入手工计时和联调 |
 | 高并发压力 | 当前自动化覆盖基础分页和限流，不覆盖大量用户同时上报学习行为或批量通知推送 | 后续压力测试补充 |
 
