@@ -82,6 +82,7 @@ test('GRD SSD branches and responses match the implemented API contracts', () =>
   const gradeAnalysisSequence = readRepositoryFile('docs/diagrams/grd/fig_3_6_13_grade_analysis_sequence.mmd');
   const gradeAnalysisState = readRepositoryFile('docs/diagrams/grd/fig_3_6_15_grade_analysis_state.mmd');
   const srs = readRepositoryFile('docs/最终提交/软件需求规格说明书.md');
+  const overviewDesign = readRepositoryFile('docs/最终提交/软件概要设计说明书.md');
   const detailedDesign = readRepositoryFile('docs/最终提交/软件详细设计说明书.md');
   const processDetailedDesign = readRepositoryFile('docs/过程/详细设计/GRD-成绩评价与教学分析-详细设计提交稿.md');
   const processOverview = readRepositoryFile('docs/过程/概要/成绩评价与教学分析模块概要设计提交稿（grd）.md');
@@ -94,6 +95,8 @@ test('GRD SSD branches and responses match the implemented API contracts', () =>
   const gradeItemController = readRepositoryFile('backend/src/main/java/com/onlinejudge/grd/controller/GradeItemController.java');
   const gradeItemConfigView = readRepositoryFile('frontend/src/views/grd/GradeItemConfigView.vue');
   const gradeItemService = readRepositoryFile('backend/src/main/java/com/onlinejudge/grd/service/GradeItemService.java');
+  const updateGradeItemRequest = readRepositoryFile('backend/src/main/java/com/onlinejudge/grd/controller/UpdateGradeItemRequest.java');
+  const updateGradeItemCommand = readRepositoryFile('backend/src/main/java/com/onlinejudge/grd/domain/UpdateGradeItemCommand.java');
   const gradeAnalysisService = readRepositoryFile('backend/src/main/java/com/onlinejudge/grd/service/GradeAnalysisService.java');
   const gradeReviewProcessResult = readRepositoryFile('backend/src/main/java/com/onlinejudge/grd/service/GradeReviewProcessResult.java');
   const gradePublishUseCase = srs.slice(
@@ -123,6 +126,26 @@ test('GRD SSD branches and responses match the implemented API contracts', () =>
   const sourceFingerprintImplementation = gradeAnalysisService.slice(
     gradeAnalysisService.indexOf('private String sourceFingerprint'),
     gradeAnalysisService.indexOf('private String timeValue')
+  );
+  const sourceGradeItemsImplementation = gradeRecordService.slice(
+    gradeRecordService.indexOf('private List<GradeItem> sourceGradeItems'),
+    gradeRecordService.indexOf('private GradeRecord toGradeRecord')
+  );
+  const recalculateImplementation = gradeRecordService.slice(
+    gradeRecordService.indexOf('public GradeRecalculationResult recalculateCourseGrades'),
+    gradeRecordService.indexOf('public CourseGradeTablePage listCourseGrades')
+  );
+  const finalRecalculateApi = detailedDesign.slice(
+    detailedDesign.indexOf('### 重新计算课程成绩 API-GRD-07'),
+    detailedDesign.indexOf('### 查询课程成绩总表 API-GRD-08')
+  );
+  const processRecalculateApi = processDetailedDesign.slice(
+    processDetailedDesign.indexOf('#### 4.2.3 重新计算课程成绩 API-GRD-07'),
+    processDetailedDesign.indexOf('#### 4.2.4 查询课程成绩总表 API-GRD-08')
+  );
+  const updateGradeItemImplementation = gradeItemService.slice(
+    gradeItemService.indexOf('public GradeItem updateGradeItem'),
+    gradeItemService.indexOf('public GradeItem deleteGradeItem')
   );
 
   assert.doesNotMatch(gradeItemSsd, /来源任务存在|来源不存在/);
@@ -237,12 +260,31 @@ test('GRD SSD branches and responses match the implemented API contracts', () =>
   assert.match(gradeAnalysisSequence, /GradeItemPermissionException.*ERR-GRD-01.*403/);
   assert.doesNotMatch(gradeAnalysisState, /规则/);
   assert.match(gradeAnalysisState, /学生集合或来源版本变化/);
-  assert.match(detailedDesign, /规则修改本身不(?:会|直接).*STALE.*LAB\/HWK.*同步.*同一事务.*自动重算课程总评/);
-  assert.match(processDetailedDesign, /规则修改本身不(?:会|直接).*STALE.*LAB\/HWK.*同步.*同一事务.*自动重算课程总评/);
+  assert.match(detailedDesign, /规则修改本身不(?:会|直接).*STALE.*LAB\/HWK.*来源同步.*课程总评.*总评来源版本/);
+  assert.match(processDetailedDesign, /规则修改本身不(?:会|直接).*STALE.*LAB\/HWK.*来源同步.*课程总评.*总评来源版本/);
   assert.doesNotMatch(detailedDesign, /成员、规则、成绩或统计契约变化会使快照/);
   assert.doesNotMatch(processDetailedDesign, /成员、规则、成绩或统计契约变化会使快照/);
   assert.match(gradeItemService, /updateGradeItem[\s\S]*gradeItemRepository\.update\(updated\)/);
   assert.doesNotMatch(sourceFingerprintImplementation, /gradeItemRepository|GradeItem/);
+  assert.match(sourceGradeItemsImplementation, /filter\(GradeItem::enabled\)[\s\S]*filter\(GradeItem::includedInFinal\)/);
+  assert.match(detailedDesign, /includedInFinal=false.*不刷新.*GradeRecord.*成绩项.*快照.*复用/);
+  assert.match(processDetailedDesign, /includedInFinal=false.*不刷新.*GradeRecord.*成绩项.*快照.*复用/);
+  assert.match(gradeTestReport, /includedInFinal=false.*成绩项.*快照.*复用/);
+  assert.doesNotMatch(gradeItemUseCase, /已发布成绩关联规则变更必须记录原因、处理人和时间/);
+  assert.doesNotMatch(gradeItemUseCase, /已发布成绩直接修改受限时，系统拒绝保存/);
+  assert.match(gradeItemUseCase, /GradeItem.*不接收.*reason.*不检查.*发布状态.*不写入.*GradeChangeLog/);
+  assert.match(overviewDesign, /GradeItem.*规则修改.*不接收.*原因.*不写入.*GradeChangeLog/);
+  assert.match(processOverview, /GradeItem.*规则修改.*不接收.*原因.*不写入.*GradeChangeLog/);
+  assert.doesNotMatch(updateGradeItemRequest, /reason/);
+  assert.doesNotMatch(updateGradeItemCommand, /reason/);
+  assert.doesNotMatch(updateGradeItemImplementation, /PublishStatus|GradeChangeLog|gradeChangeLogRepository/);
+  assert.doesNotMatch(recalculateImplementation, /rawScore|fullScore|weightedScore\s*=/);
+  assert.match(finalRecalculateApi, /路径 courseId；无请求体/);
+  assert.match(processRecalculateApi, /路径 courseId；无请求体/);
+  assert.match(finalRecalculateApi, /汇总现有 GradeRecord\.weightedScore/);
+  assert.match(processRecalculateApi, /汇总现有 GradeRecord\.weightedScore/);
+  assert.doesNotMatch(finalRecalculateApi, /按 rawScore、fullScore、weight 计算 weightedScore/);
+  assert.doesNotMatch(processRecalculateApi, /按 rawScore、fullScore、weight 计算 weightedScore/);
 
   const membershipCheck = studentGradeSequence.indexOf('isCourseMember');
   const accessException = studentGradeSequence.indexOf('StudentGradeAccessException');
