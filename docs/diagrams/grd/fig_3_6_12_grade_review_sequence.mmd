@@ -45,7 +45,7 @@ sequenceDiagram
         Service->>ReviewRepo: save(PENDING)
         Service->>Event: publish(GRADE_REVIEW_REQUESTED)
         Event->>LRN: 持久化教师通知
-        Note over Event,LRN: 持久化失败由 publisher 捕获并记日志，申请仍返回
+        Note over Service,LRN: publisher 挂起 Service 外层事务，LRN 独立事务失败时由 publisher 捕获并记日志，申请仍提交返回
         Service-->>Controller: GradeReviewSubmissionResult
         Controller-->>StudentView: PENDING 申请
       end
@@ -95,7 +95,7 @@ sequenceDiagram
         end
         Service->>Event: publish(GRADE_REVIEW_PROCESSED)
         Event->>LRN: 持久化学生通知
-        Note over Event,LRN: 持久化失败由 publisher 捕获并记日志，处理结果仍返回
+        Note over Service,LRN: publisher 挂起 Service 外层事务，LRN 独立事务失败时由 publisher 捕获并记日志，处理结果仍提交返回
         Service-->>Controller: GradeReviewProcessResult
         Controller-->>TeacherView: GradeReviewProcessResult
       end
