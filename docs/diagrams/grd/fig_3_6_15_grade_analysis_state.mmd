@@ -12,7 +12,7 @@ stateDiagram-v2
   CALCULATING --> CURRENT: 生成统计结果
   CALCULATING --> CURRENT_EMPTY: 仅有空态计数
   CALCULATING --> FAILED: 读取或计算失败
-  CURRENT --> STALE
-  CURRENT_EMPTY --> STALE
+  CURRENT --> STALE: 统计契约、学生集合或来源版本变化
+  CURRENT_EMPTY --> STALE: 统计契约、学生集合或来源版本变化
   STALE --> CALCULATING: 重算
   FAILED --> CALCULATING: 重试

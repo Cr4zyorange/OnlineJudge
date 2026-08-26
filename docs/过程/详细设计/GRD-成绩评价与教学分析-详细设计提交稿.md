@@ -430,7 +430,7 @@ sequenceDiagram
 | DB-GRD-06 | t_grade_review_request | 成绩异议申请表 | id, course_id, student_id, grade_item_id, target_type, reason, status, original_score, adjusted_score, response_comment, submitted_at, processed_by, processed_at, created_at, updated_at | 保存学生成绩异议与教师复核处理 |
 | DB-GRD-07 | t_grade_change_log | 成绩变更记录表 | id, course_id, student_id, grade_item_id, change_type, old_value, new_value, reason, operator_id, created_at | 保存已发布成绩修改和复核导致的变更 |
 | DB-GRD-08 | t_grade_analysis_snapshot | 统计分析快照表 | id, course_id, target_type, grade_item_id, source_data_time, source_fingerprint, average_score, max_score, min_score, pass_rate, completion_rate, total_student_count, completed_count, missing_count, unsubmitted_count, ungraded_count, distribution_json, calculated_at | 保存可直接返回的统计结果、带契约版本的来源指纹及来源时间点 |
-| DB-GRD-09 | t_grade_analysis_source_version | 统计来源版本表 | course_id, target_type, grade_item_key, source_version, source_data_time, updated_at | 保存成绩项或总评的轻量单调来源版本，供快照命中判断 |
+| DB-GRD-09 | t_grade_analysis_source_version | 统计来源版本表 | course_id, target_type, grade_item_key, source_version, source_data_time, updated_at | 保存成绩项成绩记录或课程总评的轻量单调来源版本，供快照命中判断；不跟踪 GradeItem 规则配置 |
 
 ### 6.3 主要表结构说明
 
@@ -582,7 +582,7 @@ idx_grade_review_student_status(course_id, student_id, status)
 4. 课程总评以课程和学生为唯一维度保存。
 5. 成绩发布、已发布成绩修改、异议复核处理必须保留记录。
 6. 学生异议申请必须关联本人已发布成绩；同一学生对同一课程成绩项或总评存在 PENDING 申请时，不允许重复提交。
-7. 统计分析快照必须记录 source_data_time 和 source_fingerprint。指纹显式携带统计契约版本，并覆盖课程、统计目标、当前有效学生集合及 Repository 维护的单调来源版本；契约、学生集合、成绩项成绩或课程总评任一变化都必须失效并生成新快照。
+7. 统计分析快照必须记录 source_data_time 和 source_fingerprint。指纹显式携带统计契约版本，并覆盖课程、统计目标、当前有效学生集合及 Repository 维护的单调来源版本；契约、学生集合、成绩项成绩或课程总评任一变化都必须失效并生成新快照。当前指纹不包含 GradeItem 规则配置，规则保存本身也不递增来源版本。
 8. 可复用快照必须保存完整人数计数与分布；历史快照缺少计数或使用旧契约指纹时只能读取后重算，不能进入快路径。
 
 ---
@@ -633,7 +633,7 @@ flowchart TD
 1. 汇总范围以课程成员学生名单为基础，避免遗漏未提交或缺失成绩的学生。
 2. 来源成绩进入 GRD 后形成独立成绩记录，记录来源模块、来源任务编号、来源更新时间和同步时间。
 3. 成绩记录区分 rawScore、weightedScore 和 finalScore。
-4. 规则变更、来源成绩变化或教师手动触发时，系统可重新计算相关成绩记录和课程总评。
+4. 来源成绩变化或教师手动触发时，系统可重新生成相关成绩记录和课程总评。当前规则修改不自动重算：LAB/HWK 的满分、权重或是否计入总评变化后，应执行来源同步；同步在同一事务内刷新 `weightedScore`、自动重算课程总评并推进相应分析来源版本。仅保存 GradeItem 不改变分析来源版本。
 5. 来源成绩同步和总评计算应记录批次，支持追溯和重试。
 
 ### 7.3 成绩发布流程
@@ -771,7 +771,7 @@ stateDiagram-v2
 
 图 3-6-15 GRD 教学分析派生状态图
 
-本图描述分析结果的派生生命周期，不新增数据库状态枚举。`CURRENT` 与 `CURRENT_EMPTY` 都要求完整快照；成员、规则、成绩或统计契约变化会使快照派生为 `STALE`，下一次查询重算。故障只形成运行期 `FAILED` 结果，不覆盖最近一次有效快照。
+本图描述分析结果的派生生命周期，不新增数据库状态枚举。`CURRENT` 与 `CURRENT_EMPTY` 都要求完整快照；统计契约、有效学生集合、成绩项成绩记录或课程总评来源版本变化会使快照派生为 `STALE`，下一次查询重算。规则修改本身不会直接使快照进入 `STALE`：LAB/HWK 规则变化后须执行来源同步；同步在同一事务内刷新成绩记录、自动重算课程总评，相应 Repository 写入推进来源版本后，分析查询才会生成新快照。故障只形成运行期 `FAILED` 结果，不覆盖最近一次有效快照。
 
 ---
 

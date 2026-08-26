@@ -70,7 +70,7 @@
 | FR-GR-03 | 教师成绩管理 | 教师总表、学生明细、单项成绩调整、总评调整、变更记录 | 后端和前端自动化已覆盖 |
 | FR-GR-04 | 成绩发布与状态控制 | 发布前检查、发布记录、发布后学生可见、相同范围重复发布返回同一 `publishId`、发布通知同步 best-effort 语义、发布后调整留痕 | 后端、前端和真实 API E2E 已覆盖；当前通知失败只记告警，发布记录及响应中的 `notificationStatus` 仍为 `SENT` |
 | FR-GR-05 | 学生成绩查询与结果展示 | 学生只查看本人已发布成绩、未发布不可见、来源和反馈展示 | 后端、前端和真实 API E2E 已覆盖 |
-| FR-GR-06 | 班级成绩统计与教学分析 | 课程总评和成绩项均分、最高分、最低分、及格率、完成率、分布和快照 | 后端和前端自动化已覆盖；大规模性能待专项确认 |
+| FR-GR-06 | 班级成绩统计与教学分析 | 课程总评和成绩项均分、最高分、最低分、及格率、完成率、分布和快照 | 后端和前端自动化已覆盖；当前快照指纹不含 GradeItem 规则，LAB/HWK 规则修改后需执行来源同步，由同步自动重算总评并推进来源版本；单独保存规则可能复用旧快照；大规模性能待专项确认 |
 | FR-GR-07 | 成绩异议与复核申请 | 学生提交异议、重复申请拦截、教师同意/驳回、复用调整留痕和通知 | 后端、前端和真实 API E2E 已覆盖；通知在响应前同步 best-effort 持久化，失败只记日志且不改变申请与响应 |
 | NFR-GR-01 | 可靠性 | 来源同步、重算、发布、通知失败和事务边界保持数据一致 | 自动化覆盖来源超时、来源删除、缺失、重复同步/发布和核心事务边界；来源提供方未映射异常在服务层整体回滚，API 当前返回 HTTP 500、`code=500` 和“系统错误，请联系管理员”；发布通知持久化异常由 publisher 捕获，仅记告警且不回滚发布，当前 `notificationStatus` 仍为 `SENT`，没有 `FAILED` 回写或补偿状态 |
 | NFR-GR-02 | 性能 | 成绩总表、学生个人成绩、教学分析分页和基础统计响应 | 自动化覆盖基础样本；生产规模压测待补充 |
@@ -143,7 +143,7 @@
 | TC-GR-03 | FR-GR-03 | UI-GRD-02、03、04、08；API-GRD-08 ~ 14；DB-GRD-02、03、07 | 已有成绩记录和课程总评；教师填写调整原因 | 查询总表、进入学生明细、调整单项成绩和总评、查询变更记录 | 分数更新，已发布成绩不回退未发布，变更记录保存旧值、新值、原因和操作人 | `teacherAdjustsGradeRecordWithReasonAndQueriesChangeLogsThroughApi`、`teacherAdjustsCourseFinalScoreWithReasonAndKeepsChangeLog`、前端明细调整用例通过 | 通过 |
 | TC-GR-04 | FR-GR-04 | UI-GRD-05；API-GRD-12 ~ 14；DB-GRD-02、03、04、07 | 成绩已计算且可发布；存在选中学生范围 | 教师发布成绩，重复执行同一范围发布，查询发布记录 | 发布后学生可见，记录发布批次；重复发布返回同一 `publishId`，不重复记录或通知；当前首次发布响应返回 `notificationStatus=SENT` | `teacherPublishesSelectedGradesAndEmitsGradePublishedEvent`、`repeatedPublishUsesRangeIdempotencyKeyAndDoesNotNotifyAgain`、`grade-lifecycle.spec.ts`、前端发布记录用例通过 | 通过 |
 | TC-GR-05 | FR-GR-05 | UI-GRD-06；API-GRD-15；DB-GRD-02、03 | 准备非课程成员、课程成员未发布成绩和本人已发布成绩 | 学生查询我的课程成绩 | 非成员返回 ERR-GRD-02/403；课程成员未发布返回 ERR-GRD-04/400 且不泄露分数字段；已发布只返回本人数据 | `nonMemberStudentCannotQueryPublishedCourseGradesThroughApi`、真实 E2E 未发布断言、`StudentGradeView.spec.ts` 通过 | 通过 |
-| TC-GR-06 | FR-GR-06 | UI-GRD-07；API-GRD-16、17；DB-GRD-08、02、03 | 成绩记录包含多分数段、缺失、未评分、未提交样本 | 教师查询课程总评分析和成绩项完成情况 | 返回均分、最高分、最低分、及格率、完成率、分布和来源时间点 | `GradeAnalysisServiceTest`、`teacherQueriesCourseGradeAnalysisThroughApi`、`teacherQueriesGradeItemCompletionThroughApi`、前端分析用例通过 | 通过 |
+| TC-GR-06 | FR-GR-06 | UI-GRD-07；API-GRD-16、17；DB-GRD-08、02、03、09 | 成绩记录包含多分数段、缺失、未评分、未提交样本；另准备仅修改规则但未同步的场景 | 教师查询课程总评分析和成绩项完成情况；修改 LAB/HWK 规则后分别在同步前后查询 | 成绩或学生集合来源版本变化时返回新快照；仅保存规则时允许复用旧快照，来源同步在同一事务内刷新成绩记录并自动重算总评后，才生成反映新规则的数据与快照 | `GradeAnalysisServiceTest`、`teacherQueriesCourseGradeAnalysisThroughApi`、`teacherQueriesGradeItemCompletionThroughApi`、前端分析用例通过；规则单独保存的快照限制由文档-实现契约锁定 | 通过 |
 | TC-GR-07 | FR-GR-07 | UI-GRD-09、10；API-GRD-18 ~ 21；DB-GRD-06、07 | 学生已有已发布成绩；教师具备课程权限 | 学生提交异议，教师筛选并处理，同意修改或驳回 | 申请状态流转，重复 PENDING 申请被拒绝，同意修改写入变更记录并通知学生 | `GradeReviewServiceTest`、`studentSubmitsGradeReviewAndTeacherProcessesItThroughApi`、前端复核处理用例通过 | 通过 |
 | TC-GR-08 | NFR-GR-01 | API-GRD-06、07、12；DB-GRD-02 ~ 05 | 模拟来源刷新、发布、重复发布和大班发布范围 | 同步、重算、发布、重复发布 | 数据事务边界稳定，发布幂等，发布范围摘要有长度边界 | `syncSourceGradesDeclaresTransactionalBoundaryForSyncAndRecalculation`、发布幂等和大班发布用例通过 | 通过 |
 | TC-GR-09 | NFR-GR-02 | UI-GRD-02、06、07；API-GRD-08、15、16；DB-GRD-02、03、08 | 准备分页和基础统计样本 | 查询教师总表、学生个人成绩、教学分析 | 接口支持分页和筛选，基础统计可返回 | 后端查询用例和前端分页/分析用例通过；生产规模压测待补充 | 有条件通过 |
@@ -226,6 +226,7 @@
 | GRD-266-LOG-015 | PR #270 七轮环境隔离与通知时序回归 | 契约 RED 3 passed / 2 failed，且外部 `SPRING_PROFILES_ACTIVE=compose` 验收按预期失败；清空继承环境、固定 H2 配置并修正同步 best-effort 通知语义后契约 5 passed / 0 failed、同一外部环境下真实 E2E 1 passed / 0 failed |
 | GRD-266-LOG-016 | PR #270 十二轮凭据隔离与复核通知可见性回归 | 契约 RED 3 passed / 2 failed；固定 disposable 教师/学生种子凭据并将通知可见性改为持久化成功条件后 5 passed / 0 failed；外部四项账号/密码均为错误值时真实 H2 lifecycle 仍 1 passed / 0 failed，端口、进程和临时目录无残留 |
 | GRD-266-LOG-017 | PR #270 十三轮同步异常契约回归 | 契约 RED 4 passed / 1 failed；移除 OP-GR-02 不会触发的规则错误分支，并同步详细设计接口、流程和 ERR-GRD-03 适用范围后 5 passed / 0 failed |
+| GRD-266-LOG-018 | PR #270 十四轮分析快照边界回归 | 契约 RED 4 passed / 1 failed；按当前实现明确 GradeItem 规则不进入快照指纹，LAB/HWK 规则变更须执行来源同步，且同步自动重算课程总评并推进来源版本；修正文档和状态图后 5 passed / 0 failed |
 
 ## 9 手工测试与联调确认
 
