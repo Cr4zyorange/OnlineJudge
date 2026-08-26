@@ -9,6 +9,14 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $results = [System.Collections.Generic.List[object]]::new()
+$summary = [pscustomobject]@{
+    environment = "real MySQL 9.6 + Spring Boot HTTP ($BaseUrl)"
+    total = 0
+    passed = 0
+    failed = 0
+    error = $null
+    checks = [System.Collections.Generic.List[object]]::new()
+}
 
 function Invoke-Api {
     param(
@@ -131,27 +139,25 @@ try {
     # 7) 公告与首页摘要
     $announcement = Invoke-Api 'POST' "/api/v1/courses/$publicCourseId/announcements" @{ title = 'E2E置顶公告'; content = '闭环验证'; isTop = $true } $teacherToken
     Add-Check '教师发布置顶公告' ($announcement.data.top -eq $true) "top=$($announcement.data.top)"
-    $summary = Invoke-Api 'GET' "/api/v1/courses/$publicCourseId/home-summary" $null $studentToken
-    Add-Check '课程首页摘要聚合' ($null -ne $summary.data.course -and $summary.data.announcements.Count -ge 1) "course=$($summary.data.course.id)"
-
-    $results | ForEach-Object { $_.detail = [regex]::Replace([string]$_.detail, 'token=[A-Za-z0-9_\-\.]+', 'token=[REDACTED]') }
-    $summary = [pscustomobject]@{
-        environment = "real MySQL 9.6 + Spring Boot HTTP ($BaseUrl)"
-        total = $results.Count
-        passed = @($results | Where-Object status -eq 'PASS').Count
-        failed = @($results | Where-Object status -eq 'FAIL').Count
-        checks = $results
-    }
+    $homeSummary = Invoke-Api 'GET' "/api/v1/courses/$publicCourseId/home-summary" $null $studentToken
+    Add-Check '课程首页摘要聚合' ($null -ne $homeSummary.data.course -and $homeSummary.data.announcements.Count -ge 1) "course=$($homeSummary.data.course.id)"
 } catch {
-    $summary = [pscustomobject]@{
-        environment = "real MySQL 9.6 + Spring Boot HTTP ($BaseUrl)"
-        error = $_.Exception.Message
-        checks = $results
-    }
+    $summary.error = $_.Exception.Message
 }
+
+$results | ForEach-Object { $_.detail = [regex]::Replace([string]$_.detail, 'token=[A-Za-z0-9_\-\.]+', 'token=[REDACTED]') }
+$summary.total = $results.Count
+$summary.passed = @($results | Where-Object status -eq 'PASS').Count
+$summary.failed = @($results | Where-Object status -eq 'FAIL').Count
+$summary.checks = $results
 
 New-Item -ItemType Directory -Path $OutDir -Force | Out-Null
 $outFile = Join-Path $OutDir 'crs-closure-http.json'
 $summary | ConvertTo-Json -Depth 10 | Set-Content -Encoding utf8 -LiteralPath $outFile
 Write-Host "PASS=$($summary.passed) FAIL=$($summary.failed) TOTAL=$($summary.total)"
 Write-Host "证据输出：$outFile"
+if ($summary.error -or $summary.failed -gt 0) {
+    Write-Host "CRS E2E 闭环失败：error='$($summary.error)' failed=$($summary.failed)，退出码 1"
+    exit 1
+}
+exit 0
