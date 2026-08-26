@@ -1,0 +1,13 @@
+sequenceDiagram
+  actor User as 学生/教师/管理员
+  participant System as OnlineJudgeForSE 系统边界
+  User->>System: 携带令牌访问受保护页面/接口
+  Note over System: 校验令牌签名、过期时间、会话状态与账号状态
+  alt 会话有效且账号正常
+    Note over System: 注入当前用户上下文并按接口权限点校验
+    System-->>User: 返回允许访问或拒绝访问
+  else 会话无效
+    System-->>User: 返回“登录已失效，请重新登录”
+  else 账号状态异常
+    System-->>User: 返回“账号状态异常，请联系管理员”
+  end

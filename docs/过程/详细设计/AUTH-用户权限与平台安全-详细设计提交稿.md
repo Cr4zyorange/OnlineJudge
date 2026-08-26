@@ -541,3 +541,31 @@ stateDiagram-v2
 
 AUTH 模块详细设计已覆盖页面设计、接口设计、服务组件、数据库表、核心流程、状态机、异常处理、安全权限、性能可维护性和需求追踪。本文档可作为用户权限与平台安全模块负责人提交给详细设计负责人的独立模块稿，后续可合并至《软件详细设计说明书》第 3.1、4、5、6、7、9 章对应位置。
 
+## 14 D2 业务场景闭环补充
+
+### 14.1 业务场景清单与分类
+
+按 Issue #261 盘点，AUTH 模块确认 11 个独立业务场景（本地编号 `SC-AUTH-01` ~ `SC-AUTH-11`），其余为 `include` 公共子流程或备选/异常路径，不新增正式 UC 编号；详细清单与映射见 `docs/过程/测试/TST-DOC-02-AUTH-业务场景清单与测试闭环.md`。
+
+| 场景 | 名称 | 服务编排（当前实现） |
+| --- | --- | --- |
+| SC-AUTH-01 | 学生自助注册 | AuthService + PasswordSecurityService + AuthRepository |
+| SC-AUTH-02 | 账号密码登录 | AuthService + PasswordSecurityService + SessionTokenService + AuthAuditService + AuthRepository |
+| SC-AUTH-03 | 退出登录 | AuthService + SessionTokenService + AuthAuditService + AuthRepository |
+| SC-AUTH-04 | 持续鉴权与当前用户上下文 | AuthRequiredInterceptor + TokenCurrentUserProvider + SessionTokenService + AccessControlService + AuthRepository |
+| SC-AUTH-05 | 个人资料查看与修改 | UserProfileController + AuthService + AuthRepository |
+| SC-AUTH-06 | 修改密码 | UserProfileController + AuthService + PasswordSecurityService + SessionTokenService + AuthAuditService + AuthRepository |
+| SC-AUTH-07 | 管理员用户与账号状态管理 | AuthAdminController + RoleService + AuthService + SessionTokenService + AuthAuditService + AuthRepository |
+| SC-AUTH-08 | 用户角色分配 | AuthAdminController + RoleService + AuthAuditService + AuthRepository |
+| SC-AUTH-09 | 角色与角色权限维护 | AuthAdminController + RoleService + AuthAuditService + AuthRepository |
+| SC-AUTH-10 | 安全异常拦截 | AuthRequiredInterceptor + TokenCurrentUserProvider + SessionTokenService + AccessControlService + AuthAuditService |
+| SC-AUTH-11 | 关键操作审计写入与查询 | AuthAuditService + RoleService + AuthRepository |
+
+### 14.2 详细层图组
+
+详细层对象/服务级顺序图与状态图/活动图已整合进《软件详细设计说明书》3.1 节“详细层业务场景图组”：SC-AUTH-01 ~ SC-AUTH-11 对应图 3-7 ~ 3-17，跨场景活动图对应图 3-18 ~ 3-20，SC-AUTH-05 个人资料、SC-AUTH-11 审计写入与查询的专属对象/服务活动图对应图 3-21 ~ 3-22，账号/会话状态机复用图 3-5、图 3-6。图内对象按当前实现绘制，设计编号 `SVC-AUTH-*` 与实现类映射见该节说明。
+
+### 14.3 三层图完整映射
+
+需求层（SRS 4.17）、概要层（概要设计说明书 5.1.2）、详细层（详细设计说明书 3.1）的完整图号映射见 `docs/过程/测试/TST-DOC-02-AUTH-业务场景清单与测试闭环.md` 第 3 章。
+
