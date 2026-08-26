@@ -5,13 +5,13 @@ sequenceDiagram
   Student->>System: OP-GR-05 提交本人已发布成绩异议
   alt 目标可复核且无重复 PENDING 申请
     System-->>Student: 返回 requestId、PENDING 和 submittedAt
-    Note over Student,System: publisher 挂起外层 GRD 事务，LRN 使用独立事务同步 best-effort 持久化；失败只回滚通知并记日志，不改变申请与响应
+    Note over Student,System: 教师通知在响应前同步 best-effort 持久化；失败只记日志，不改变申请与响应
     System-->>Teacher: 待处理复核申请可查询
     Teacher->>System: OP-GR-05 同意修改或驳回复核申请
     System-->>Teacher: 返回 requestId、APPROVED/REJECTED 和 processedAt
     Note over Teacher,System: APPROVE 写入的 GradeChangeLog 可经 API-GRD-14 单独查询，不在处理响应中
     System-->>Student: 复核结果可查询
-    Note over Student,System: 学生通知仍为独立事务的同步 best-effort；失败时复核结果可查询，但通知不可查询
+    Note over Student,System: 学生通知仍为同步 best-effort；失败时复核结果可查询，但通知不可查询
     opt 通知持久化成功
       System-->>Student: 复核结果通知可查询
     end

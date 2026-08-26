@@ -270,7 +270,7 @@ graph TD
 | 调用方 | 教师端 |
 | 主要入参 | publishScope, studentIds, gradeItemIds |
 | 主要出参 | publishId, publishedCount, publishedAt, notificationStatus |
-| 处理逻辑 | 校验课程权限、成绩规则、未评分/缺失状态和发布范围；按课程与规范化发布范围生成幂等键；若既有记录且目标行均已发布，直接返回既有 `publishId`、数量、时间和原通知状态；否则更新发布状态并写入 `notificationStatus=SENT` 的 GradePublishRecord，再同步 best-effort 发送 GRADE_PUBLISHED 事件；publisher 以 `NOT_SUPPORTED` 挂起外层 GRD 事务，`NotificationService` 使用独立事务持久化；失败只回滚通知事务并记告警，不回写发布记录或响应，也不将外层事务标记为 rollback-only |
+| 处理逻辑 | 校验课程权限、成绩规则、未评分/缺失状态和发布范围；按课程与规范化发布范围生成幂等键；若既有记录且目标行均已发布，直接返回既有 `publishId`、数量、时间和原通知状态；否则更新发布状态并写入 `notificationStatus=SENT` 的 GradePublishRecord，再同步 best-effort 发送 GRADE_PUBLISHED 事件；publisher 失败只记告警，不回写发布记录或响应 |
 | 异常情况 | 无课程权限、成绩规则缺失、仍存在未评分或缺失记录、发布范围为空或非法；相同范围重复发布和通知持久化失败不进入异常响应 |
 
 #### 4.2.7 查询我的课程成绩 API-GRD-15
@@ -796,7 +796,7 @@ stateDiagram-v2
 | ERR-GRD-04 | 成绩未发布，或来源成绩缺失、未提交、未评分 | 学生个人成绩查询、来源同步、总评计算、发布前检查 | 学生查询返回 400 和未发布提示且不返回分数；来源异常写入明确 gradeStatus 并在发布确认页提示 | FR-GR-02、FR-GR-04、FR-GR-05 |
 | ERR-GRD-05 | 预留的未发布成绩专用错误码（当前版本未启用） | 无 | 当前实现统一由 ERR-GRD-04 表达未发布业务状态，后续启用时需同步接口、前端和测试 | FR-GR-05 |
 | ERR-GRD-06 | 已发布成绩修改未填写原因 | 成绩调整、复核同意修改 | 拒绝保存，提示填写原因 | FR-GR-03、NFR-GR-03 |
-| ERR-GRD-07 | 预留的成绩发布通知失败错误码（当前版本未启用） | 无 | 当前 publisher 挂起外层 GRD 事务，由 LRN 独立事务持久化并捕获异常；通知失败不将外层事务标记为 rollback-only，发布不回滚，发布记录及响应中的 `notificationStatus` 仍为 `SENT`，当前没有 `FAILED` 回写或补偿状态 | FR-GR-04、NFR-GR-01 |
+| ERR-GRD-07 | 预留的成绩发布通知失败错误码（当前版本未启用） | 无 | 当前 publisher 捕获通知持久化异常并只记录告警；发布不回滚，发布记录及响应中的 `notificationStatus` 仍为 `SENT`，当前没有 `FAILED` 回写或补偿状态 | FR-GR-04、NFR-GR-01 |
 | ERR-GRD-08 | 学生重复提交处理中异议申请 | 异议申请接口 | 拒绝重复申请，返回现有 PENDING 申请状态 | FR-GR-07 |
 | ERR-GRD-09 | 教师处理无权限课程异议申请 | 复核处理接口 | 拒绝处理，不返回申请详情 | FR-GR-07、NFR-GR-04 |
 | ERR-GRD-10 | 统计分析结果与成绩数据时间点不一致 | 教学分析查询 | 重新计算或提示统计数据来源时间点 | FR-GR-06、NFR-GR-03 |
