@@ -274,14 +274,28 @@ test.describe('@grd GRD real source lifecycle', () => {
     }), 'process grade review');
     expect(processedReview).toMatchObject({ requestId: review.requestId, status: 'REJECTED' });
 
-    const notifications = await ok<{ records: Array<{ title: string; sourceModule: string; sourceId: number }> }>(
-      await request.get('/api/v1/notifications?type=GRADE&size=100', { headers: studentHeaders }),
-      'query student grade notifications'
-    );
-    expect(notifications.records).toEqual(expect.arrayContaining([
-      expect.objectContaining({ title: '成绩已发布', sourceModule: 'GRD', sourceId: publish.publishId }),
-      expect.objectContaining({ title: '成绩复核已处理', sourceModule: 'GRD', sourceId: review.requestId })
-    ]));
+    await expect.poll(async () => {
+      const notifications = await ok<{
+        records: Array<{ title: string; sourceModule: string; sourceId: number }>;
+      }>(
+        await request.get('/api/v1/notifications?type=GRADE&size=100', { headers: studentHeaders }),
+        'query student grade notifications'
+      );
+      return {
+        publicationVisible: notifications.records.some((notification) =>
+          notification.title === '成绩已发布'
+          && notification.sourceModule === 'GRD'
+          && notification.sourceId === publish.publishId),
+        reviewVisible: notifications.records.some((notification) =>
+          notification.title === '成绩复核已处理'
+          && notification.sourceModule === 'GRD'
+          && notification.sourceId === review.requestId)
+      };
+    }, {
+      message: 'wait for asynchronous grade publication and review notifications',
+      timeout: 10_000,
+      intervals: [100, 250, 500, 1_000]
+    }).toEqual({ publicationVisible: true, reviewVisible: true });
 
     const invalidAnalysis = await request.get(`/api/v1/courses/${courseId}/grade-analysis?targetType=INVALID`, {
       headers: teacherHeaders
