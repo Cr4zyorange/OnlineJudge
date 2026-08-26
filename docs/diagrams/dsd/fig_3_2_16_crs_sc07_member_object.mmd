@@ -1,0 +1,27 @@
+sequenceDiagram
+  participant Teacher as 教师
+  participant Ctrl as CourseController
+  participant Svc as CourseService
+  participant Repo as CourseRepository
+  participant DB as MySQL 数据库
+  Teacher->>Ctrl: GET /api/v1/courses/{courseId}/members?status=
+  Ctrl->>Svc: members(courseId, status, user)
+  Svc->>Svc: requireActiveMembership(courseId, user)
+  Svc->>Repo: listMembers(courseId, status)
+  Repo->>DB: SELECT crs_course_member
+  DB-->>Repo: List<CourseMember>
+  Svc-->>Ctrl: List<CourseMemberResponse>
+  Teacher->>Ctrl: PUT /api/v1/courses/{courseId}/members/{userId}
+  Ctrl->>Svc: updateMember(courseId, userId, request, user)
+  Svc->>Svc: 校验最后教师限制与状态流转
+  Svc->>Repo: updateMember(courseId, userId, role, status, user.id())
+  Repo->>DB: UPDATE crs_course_member
+  DB-->>Repo: CourseMember
+  Svc-->>Ctrl: CourseMemberResponse
+  Teacher->>Ctrl: DELETE /api/v1/courses/{courseId}/members/{userId}
+  Ctrl->>Svc: removeMember(courseId, userId, user)
+  Svc->>Svc: 校验 CANNOT_REMOVE_SELF 与 LAST_TEACHER_REQUIRED
+  Svc->>Repo: updateMember(courseId, userId, role, REMOVED, user.id())
+  Repo->>DB: UPDATE crs_course_member
+  DB-->>Repo: CourseMember(REMOVED)
+  Svc-->>Ctrl: 移除成功

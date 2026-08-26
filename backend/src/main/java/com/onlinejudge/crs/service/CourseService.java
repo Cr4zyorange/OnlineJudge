@@ -142,7 +142,11 @@ public class CourseService {
         if (status == CourseMemberStatus.REJECTED && member.status() != CourseMemberStatus.PENDING) {
             throw new BusinessException(HttpStatus.CONFLICT, "ONLY_PENDING_CAN_BE_REJECTED");
         }
-        return toMemberResponse(courseRepository.updateMember(courseId, userId, role, status, user.id()));
+        int updated = courseRepository.updateMember(courseId, userId, role, status, member.status(), user.id());
+        if (updated == 0) {
+            throw new BusinessException(HttpStatus.CONFLICT, "INVALID_MEMBER_STATUS_TRANSITION");
+        }
+        return toMemberResponse(courseRepository.findMember(courseId, userId).orElseThrow());
     }
 
     @Transactional
@@ -157,7 +161,11 @@ public class CourseService {
             throw new BusinessException(HttpStatus.CONFLICT, "LAST_TEACHER_REQUIRED");
         }
         validateMemberTransition(member.status(), CourseMemberStatus.REMOVED);
-        courseRepository.updateMember(courseId, userId, member.role(), CourseMemberStatus.REMOVED, user.id());
+        int updated = courseRepository.updateMember(
+                courseId, userId, member.role(), CourseMemberStatus.REMOVED, member.status(), user.id());
+        if (updated == 0) {
+            throw new BusinessException(HttpStatus.CONFLICT, "INVALID_MEMBER_STATUS_TRANSITION");
+        }
     }
 
     private Course getCourse(Long courseId) {
@@ -240,6 +248,7 @@ public class CourseService {
         if (targetStatus != CourseMemberStatus.ACTIVE || course.maxStudents() == null) {
             return;
         }
+        courseRepository.lockCourseForCapacity(course.id());
         if (courseRepository.activeStudentCount(course.id()) >= course.maxStudents()) {
             throw new BusinessException(HttpStatus.CONFLICT, "COURSE_FULL");
         }
