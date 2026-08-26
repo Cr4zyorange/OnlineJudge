@@ -88,6 +88,12 @@ test('GRD SSD branches and responses match the implemented API contracts', () =>
   const apiExceptionHandler = readRepositoryFile('backend/src/main/java/com/onlinejudge/common/exception/ApiExceptionHandler.java');
   const globalExceptionHandler = readRepositoryFile('backend/src/main/java/com/onlinejudge/common/exception/GlobalExceptionHandler.java');
   const notificationPublisher = readRepositoryFile('backend/src/main/java/com/onlinejudge/lrn/service/PersistentNotificationEventPublisher.java');
+  const gradeRecordService = readRepositoryFile('backend/src/main/java/com/onlinejudge/grd/service/GradeRecordService.java');
+  const gradeReviewProcessResult = readRepositoryFile('backend/src/main/java/com/onlinejudge/grd/service/GradeReviewProcessResult.java');
+  const gradePublishUseCase = srs.slice(
+    srs.indexOf('## 4.8 UC-GR-01'),
+    srs.indexOf('## 4.9 UC-LAB-02')
+  );
   const gradeItemUseCase = srs.slice(
     srs.indexOf('## 4.11 UC-GR-02'),
     srs.indexOf('## 4.12 UC-GR-03')
@@ -122,6 +128,25 @@ test('GRD SSD branches and responses match the implemented API contracts', () =>
   assert.doesNotMatch(notificationPublisher, /@Async/);
   assert.match(notificationPublisher, /notificationService\.createNotifications/);
   assert.match(notificationPublisher, /catch \(RuntimeException ex\)/);
+
+  assert.match(gradePublishUseCase, /重复发布.*同一.*publishId.*不重复.*通知/);
+  assert.doesNotMatch(gradePublishUseCase, /重复发布[^\n]{0,40}阻止发布/);
+  assert.match(gradePublishUseCase, /通知持久化失败.*只记录告警.*不回滚.*notificationStatus.*SENT/);
+  assert.match(gradeFlowSsd, /相同发布范围已成功[\s\S]*幂等返回既有 publishId[\s\S]*不重复.*通知/);
+  assert.match(gradeFlowSsd, /notificationStatus=SENT/);
+  assert.match(gradeFlowSsd, /best-effort.*失败.*不回滚.*SENT/);
+  assert.doesNotMatch(gradeFlowSsd, /重复发布.*提示/);
+  assert.match(detailedDesign, /\| ERR-GRD-07 \|[^\n]*预留[^\n]*未启用/);
+  assert.match(processDetailedDesign, /\| ERR-GRD-07 \|[^\n]*预留[^\n]*未启用/);
+  assert.match(gradeRecordService, /existingPublishRecord\.isPresent\(\).*allTargetRowsPublished[\s\S]*return new GradePublishResult/);
+  const storedSentStatus = gradeRecordService.indexOf('"SENT"');
+  const publicationNotification = gradeRecordService.indexOf('notificationEventPublisher.publish', storedSentStatus);
+  assert.ok(storedSentStatus >= 0 && publicationNotification > storedSentStatus);
+
+  assert.doesNotMatch(gradeReviewSsd, /返回处理状态和成绩变更留痕/);
+  assert.match(gradeReviewSsd, /requestId.*APPROVED\/REJECTED.*processedAt/);
+  assert.match(gradeReviewSsd, /GradeChangeLog.*API-GRD-14.*不在处理响应/);
+  assert.match(gradeReviewProcessResult, /record GradeReviewProcessResult\(\s*long requestId,\s*GradeReviewStatus status,\s*LocalDateTime processedAt\s*\)/);
 
   const syncOperation = gradeFlowSsd.indexOf('OP-GR-02');
   const sourceFailure = gradeFlowSsd.indexOf('来源同步失败');
