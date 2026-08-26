@@ -676,7 +676,7 @@ stateDiagram-v2
 
 ### 14.2 概要层图组
 
-概要层组件级顺序图与状态图/活动图已整合进《软件概要设计说明书》5.1.2 节：SC-AUTH-01 ~ SC-AUTH-11 对应图 5-2 ~ 5-12，共享状态/活动图对应图 5-13 ~ 5-17。组件名称对齐当前实现：`AuthController`、`UserProfileController`、`AuthAdminController`、`AuthService`、`RoleService`、`PasswordSecurityService`、`SessionTokenService`、`AuthAuditService`、`AccessControlService`、`AuthRequiredInterceptor`、`TokenCurrentUserProvider`、`AuthRepository`。
+概要层组件级顺序图与状态图/活动图已整合进《软件概要设计说明书》5.1.2 节：SC-AUTH-01 ~ SC-AUTH-11 对应图 5-2 ~ 5-12，账号/会话与跨场景状态/活动图对应图 5-13 ~ 5-17，SC-AUTH-05 个人资料、SC-AUTH-11 审计写入与查询的专属组件活动图对应图 5-18 ~ 5-19。组件名称对齐当前实现：`AuthController`、`UserProfileController`、`AuthAdminController`、`AuthService`、`RoleService`、`PasswordSecurityService`、`SessionTokenService`、`AuthAuditService`、`AccessControlService`、`AuthRequiredInterceptor`、`TokenCurrentUserProvider`、`AuthRepository`。
 
 ### 14.3 三层图完整映射
 
