@@ -343,6 +343,15 @@ test('GRD mutating lifecycle only runs through the disposable database wrapper',
   assert.match(spec, /realpathSync/);
   assert.match(spec, /process\.kill/);
   assert.match(spec, /test\.skip/);
+  const reviewNotificationAssertion = spec.slice(
+    spec.indexOf('const processedReview'),
+    spec.indexOf('const invalidAnalysis')
+  );
+  assert.match(reviewNotificationAssertion, /await expect\.poll\(async \(\) =>/);
+  assert.match(reviewNotificationAssertion, /timeout:\s*10_000/);
+  assert.match(reviewNotificationAssertion, /publicationVisible[\s\S]*publish\.publishId/);
+  assert.match(reviewNotificationAssertion, /reviewVisible[\s\S]*review\.requestId/);
+  assert.match(reviewNotificationAssertion, /sourceModule === 'GRD'/);
   assert.equal(packageJson.scripts['test:e2e:grd:disposable'], 'bash ../scripts/test/run-grd-e2e-disposable.sh');
   assert.match(e2eReadme, /npm run test:e2e:grd:disposable/);
 });
