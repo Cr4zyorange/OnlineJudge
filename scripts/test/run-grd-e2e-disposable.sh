@@ -19,6 +19,16 @@ fail() {
   exit 1
 }
 
+seeded_account_ready() {
+  local account="$1"
+  local password="$2"
+
+  curl --silent --fail --max-time 1 \
+    --header 'Content-Type: application/json' \
+    --data "{\"account\":\"$account\",\"password\":\"$password\"}" \
+    "$disposable_base_url/api/v1/auth/login" >/dev/null 2>&1
+}
+
 cleanup() {
   local status=$?
   trap - EXIT INT TERM
@@ -109,6 +119,22 @@ for _ in {1..120}; do
 done
 
 [[ "$backend_ready" -eq 1 ]] || fail 'isolated backend did not become healthy within 30 seconds'
+
+seeded_accounts_ready=0
+for _ in {1..120}; do
+  if seeded_account_ready teacher001 Teacher001@pass \
+    && seeded_account_ready student001 Student001@pass; then
+    seeded_accounts_ready=1
+    break
+  fi
+  if ! kill -0 "$backend_pid" 2>/dev/null; then
+    wait "$backend_pid" 2>/dev/null || true
+    fail 'isolated backend exited before seeded accounts became ready'
+  fi
+  sleep 0.25
+done
+
+[[ "$seeded_accounts_ready" -eq 1 ]] || fail 'seeded accounts did not become ready within 30 seconds'
 
 proof_file="$temp_dir/disposable-proof"
 proof_token="$(openssl rand -hex 32)"

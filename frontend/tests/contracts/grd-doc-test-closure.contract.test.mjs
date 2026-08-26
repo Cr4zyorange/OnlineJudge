@@ -199,6 +199,14 @@ test('GRD mutating lifecycle only runs through the disposable database wrapper',
   assert.match(runner, /E2E_GRD_DISPOSABLE_PROOF_FILE/);
   assert.match(runner, /E2E_GRD_DISPOSABLE_TOKEN/);
   assert.match(runner, /tests\/e2e\/grd\/grade-lifecycle\.spec\.ts/);
+  assert.match(runner, /seeded_account_ready\(\)/);
+  assert.match(runner, /\/api\/v1\/auth\/login/);
+  assert.match(runner, /seeded_account_ready teacher001 Teacher001@pass/);
+  assert.match(runner, /seeded_account_ready student001 Student001@pass/);
+  const healthReady = runner.indexOf('[[ "$backend_ready" -eq 1 ]]');
+  const seedReady = runner.indexOf('seeded_accounts_ready=0');
+  const proofCreation = runner.indexOf('proof_file="$temp_dir/disposable-proof"');
+  assert.ok(healthReady >= 0 && seedReady > healthReady && proofCreation > seedReady);
   assert.match(spec, /import \{ expect, test \} from ['"]@playwright\/test['"]/);
   assert.doesNotMatch(spec, /from ['"]\.\.\/fixtures['"]/);
   assert.doesNotMatch(spec, /process\.env\.E2E_GRD_DISPOSABLE_RUN/);
