@@ -50,7 +50,7 @@
 | 10 | `frontend/tests/unit/lrn` | LRN 前端页面和 API wrapper 单元测试 |
 | 11 | `frontend/tests/unit/CourseManagementView.spec.ts`、`frontend/tests/unit/lab/LabStudentView.spec.ts`、`frontend/tests/unit/hwk/HomeworkStudentView.spec.ts` | CRS/LAB/HWK 触发 LRN 进度和行为记录的前端联动测试 |
 | 12 | `database/migrations/20260530_01_create_lrn_learning_task.sql`、`20260531_01_create_lrn_learning_progress.sql`、`20260602_01_create_lrn_learning_record.sql`、`20260603_01_create_lrn_notification.sql`、`20260605_01_create_lrn_reminder_rule.sql` | LRN 数据表和迁移约束依据 |
-| 13 | `backend/src/test/java/com/onlinejudge/lrn/service/PersistentNotificationEventPublisherTransactionTest.java` | 真实 Spring/H2 验证提交后落库、来源回滚不落库、通知失败不污染来源事务及无外层事务即时落库 |
+| 13 | `backend/src/test/java/com/onlinejudge/lrn/service/PersistentNotificationEventPublisherTransactionTest.java` | Spring/H2（连接池上限 1）与可控执行器验证 after-commit 回调仅排队、不在回调线程申请新连接；并覆盖来源回滚不排队、普通通知失败/执行器拒绝不污染来源事务、无外层事务即时落库、空事件跳过，以及必达通知成功同事务提交/失败整体回滚 |
 
 ## 4 测试范围
 
