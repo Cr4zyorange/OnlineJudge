@@ -2,9 +2,8 @@ sequenceDiagram
   actor Student as 学生
   participant System as 在线教学平台
   Student->>System: 进入学习中心并选择筛选条件
-  System->>System: 按当前用户与有效课程成员关系聚合 CRS/LAB/HWK
   alt 有可见任务
-    System-->>Student: 返回类型、截止时间、状态、优先级和入口
+    System-->>Student: 展示本人有效课程的任务类型、截止时间、状态、优先级和入口
   else 无任务或来源不可用
     System-->>Student: 返回可理解空态或失败提示
   end
