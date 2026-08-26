@@ -105,6 +105,18 @@ test('GRD SSD branches and responses match the implemented API contracts', () =>
     srs.indexOf('## 4.13 UC-GR-04'),
     srs.indexOf('## 4.14 UC-GR-05')
   );
+  const syncSourceImplementation = gradeRecordService.slice(
+    gradeRecordService.indexOf('public GradeSyncResult syncSourceGrades'),
+    gradeRecordService.indexOf('public GradeRecalculationResult recalculateCourseGrades')
+  );
+  const finalSyncApi = detailedDesign.slice(
+    detailedDesign.indexOf('### 同步来源成绩 API-GRD-06'),
+    detailedDesign.indexOf('### 重新计算课程成绩 API-GRD-07')
+  );
+  const processSyncApi = processDetailedDesign.slice(
+    processDetailedDesign.indexOf('#### 4.2.2 同步来源成绩 API-GRD-06'),
+    processDetailedDesign.indexOf('#### 4.2.3 重新计算课程成绩 API-GRD-07')
+  );
 
   assert.doesNotMatch(gradeItemSsd, /来源任务存在|来源不存在/);
   assert.match(gradeItemSsd, /LAB\/HWK.*来源编号.*正整数/);
@@ -175,6 +187,11 @@ test('GRD SSD branches and responses match the implemented API contracts', () =>
   assert.ok(syncOperation >= 0 && sourceFailure > syncOperation && publishOperation > sourceFailure);
   assert.doesNotMatch(gradeFlowSsd, /失败原因和可重试提示/);
   assert.match(gradeFlowSsd, /HTTP 500.*code=500.*系统错误，请联系管理员/);
+  assert.doesNotMatch(gradeFlowSsd, /规则非法[\s\S]*ERR-GRD-03/);
+  assert.match(gradeFlowSsd, /无课程权限[\s\S]*ERR-GRD-01\/403/);
+  assert.doesNotMatch(syncSourceImplementation, /validateGradeRules|InvalidGradeRuleException/);
+  assert.doesNotMatch(finalSyncApi, /成绩规则缺失|规则非法/);
+  assert.doesNotMatch(processSyncApi, /成绩规则缺失|规则非法/);
   assert.match(gradeItemUseCase, /HTTP 500.*code.*500.*系统错误，请联系管理员/);
   assert.match(gradeTestReport, /HTTP 500.*code.*500.*系统错误，请联系管理员/);
   assert.doesNotMatch(apiExceptionHandler, /IllegalStateException/);
