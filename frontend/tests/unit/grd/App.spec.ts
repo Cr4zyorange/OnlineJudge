@@ -113,6 +113,17 @@ describe('App routed shell integration', () => {
     expect(mounted.wrapper.text()).toContain('无权限访问');
   });
 
+  it('navigates public routes to the account status page when the API auth failure event is dispatched', async () => {
+    const mounted = await mountAt('/login');
+    window.history.replaceState({}, '', '/account-disabled');
+
+    window.dispatchEvent(new Event('onlinejudge:navigation'));
+    await flushPromises();
+
+    expect(mounted.router.currentRoute.value.name).toBe('account-disabled');
+    expect(mounted.wrapper.text()).toContain('账号状态异常');
+  });
+
   async function mountAt(path: string) {
     const router = createAppRouter({
       history: createMemoryHistory(),

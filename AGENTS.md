@@ -132,6 +132,20 @@ REFACTOR：在测试保持通过的前提下清理结构、命名和重复代码
 - PR 描述必须包含 `close #issue_id` 或 `closes #issue_id`。
 - 没有关联 issue 的开发改动不应混入功能 PR。
 
+### Projects 审核状态流转
+
+GitHub Project 的 `Status` 是交付状态的唯一来源，固定按以下流程流转：
+
+```text
+Todo -> In progress -> 待审核 -> Done
+```
+
+- 负责人开始工作时手动将 issue 从 `Todo` 移至 `In progress`。
+- 完成自测后，创建目标为 `dev` 的**非草稿** PR，并在描述中写入 `closes #<issue_id>`；PR 与 issue 关联后，Projects 自动将其移至 `待审核`。
+- 项目负责人需要返工时，必须通过 GitHub PR Review 提交正式的 **Request changes**；Projects 自动将 issue 退回 `In progress`。普通评论不代表打回，也不会改变状态。
+- 项目负责人审核通过并合并 PR 后，Projects 自动将 issue 移至 `Done`。审核通过但尚未合并时，issue 保持 `待审核`。
+- 除自动化的合并结果外，任何人不得手动把未合并、未验收的 issue 标记为 `Done`。
+
 如果某个 issue 做不完、卡住，或发现范围明显大于预期，必须尽早在 issue/PR 中写明当前进展、阻塞点和需要协同的模块。
 
 ## 分支和同步规则

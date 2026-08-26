@@ -1,0 +1,127 @@
+WARNING: A restricted method in java.lang.System has been called
+WARNING: java.lang.System::load has been called by org.fusesource.jansi.internal.JansiLoader in an unnamed module (file:/C:/Code/SE/.codex-tools/apache-maven-3.9.9/lib/jansi-2.4.1.jar)
+WARNING: Use --enable-native-access=ALL-UNNAMED to avoid a warning for callers in this module
+WARNING: Restricted methods will be blocked in a future release unless native access is enabled
+
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by com.google.common.util.concurrent.AbstractFuture$UnsafeAtomicHelper (file:/C:/Code/SE/.codex-tools/apache-maven-3.9.9/lib/guava-33.2.1-jre.jar)
+WARNING: Please consider reporting this to the maintainers of class com.google.common.util.concurrent.AbstractFuture$UnsafeAtomicHelper
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+[INFO] Scanning for projects...
+[INFO]
+[INFO] ----------------< com.onlinejudge:onlinejudge-backend >-----------------
+[INFO] Building onlinejudge-backend 0.1.0-SNAPSHOT
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO]
+[INFO] --- resources:3.3.1:resources (default-resources) @ onlinejudge-backend ---
+[INFO] Copying 3 resources from src\main\resources to target\classes
+[INFO] Copying 12 resources from src\main\resources to target\classes
+[INFO]
+[INFO] --- compiler:3.13.0:compile (default-compile) @ onlinejudge-backend ---
+[INFO] Recompiling the module because of changed source code.
+[INFO] Compiling 388 source files with javac [debug parameters release 21] to target\classes
+[INFO]
+[INFO] --- resources:3.3.1:testResources (default-testResources) @ onlinejudge-backend ---
+[INFO] Copying 4 resources from src\test\resources to target\test-classes
+[INFO]
+[INFO] --- compiler:3.13.0:testCompile (default-testCompile) @ onlinejudge-backend ---
+[INFO] Recompiling the module because of changed dependency.
+[INFO] Compiling 56 source files with javac [debug parameters release 21] to target\test-classes
+[WARNING] /C:/Users/67231/Documents/Codex/2026-08-26/new-chat/work/pr273-onlinejudge/backend/src/test/java/com/onlinejudge/hwk/controller/HomeworkAttachmentControllerTest.java:[83,6] org.springframework.boot.test.mock.mockito �е� org.springframework.boot.test.mock.mockito.MockBean �ѹ�ʱ, �ұ��Ϊ��ɾ��
+[INFO]
+[INFO] --- surefire:3.5.3:test (default-test) @ onlinejudge-backend ---
+[INFO] Using auto detected provider org.apache.maven.surefire.junitplatform.JUnitPlatformProvider
+[INFO]
+[INFO] -------------------------------------------------------
+[INFO]  T E S T S
+[INFO] -------------------------------------------------------
+[INFO] Running com.onlinejudge.auth.AuthAdminControllerTest
+09:52:26.142 [main] INFO org.springframework.test.context.support.AnnotationConfigContextLoaderUtils -- Could not detect default configuration classes for test class [com.onlinejudge.auth.AuthAdminControllerTest]: AuthAdminControllerTest does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+09:52:26.571 [main] INFO org.springframework.boot.test.context.SpringBootTestContextBootstrapper -- Found @SpringBootConfiguration com.onlinejudge.OnlineJudgeApplication for test class com.onlinejudge.auth.AuthAdminControllerTest
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+
+ :: Spring Boot ::                (v3.4.5)
+
+2026-08-26T09:52:27.528+08:00  INFO 39420 --- [           main] c.o.auth.AuthAdminControllerTest         : Starting AuthAdminControllerTest using Java 25 with PID 39420 (started by 67231 in C:\Users\67231\Documents\Codex\2026-08-26\new-chat\work\pr273-onlinejudge\backend)
+2026-08-26T09:52:27.530+08:00  INFO 39420 --- [           main] c.o.auth.AuthAdminControllerTest         : No active profile set, falling back to 1 default profile: "default"
+2026-08-26T09:52:32.648+08:00  INFO 39420 --- [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
+2026-08-26T09:52:33.509+08:00  INFO 39420 --- [           main] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Added connection conn0: url=jdbc:h2:mem:auth_admin_controller user=SA
+2026-08-26T09:52:33.509+08:00  INFO 39420 --- [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
+2026-08-26T09:52:39.587+08:00  INFO 39420 --- [           main] o.s.b.t.m.w.SpringBootMockServletContext : Initializing Spring TestDispatcherServlet ''
+2026-08-26T09:52:39.590+08:00  INFO 39420 --- [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-08-26T09:52:39.592+08:00  INFO 39420 --- [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-08-26T09:52:39.702+08:00  INFO 39420 --- [           main] c.o.auth.AuthAdminControllerTest         : Started AuthAdminControllerTest in 12.838 seconds (process running for 15.089)
+Mockito is currently self-attaching to enable the inline-mock-maker. This will no longer work in future releases of the JDK. Please add Mockito as an agent to your build what is described in Mockito's documentation: https://javadoc.io/doc/org.mockito/mockito-core/latest/org/mockito/Mockito.html#0.3
+WARNING: A Java agent has been loaded dynamically (C:\Users\67231\.m2\repository\net\bytebuddy\byte-buddy-agent\1.15.11\byte-buddy-agent-1.15.11.jar)
+WARNING: If a serviceability tool is in use, please run with -XX:+EnableDynamicAgentLoading to hide this warning
+WARNING: If a serviceability tool is not in use, please run with -Djdk.instrument.traceUsage for more information
+WARNING: Dynamic loading of agents will be disallowed by default in a future release
+[INFO] Tests run: 9, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 21.63 s -- in com.onlinejudge.auth.AuthAdminControllerTest
+[INFO] Running com.onlinejudge.auth.AuthControllerTest
+2026-08-26T09:52:47.574+08:00  INFO 39420 --- [           main] t.c.s.AnnotationConfigContextLoaderUtils : Could not detect default configuration classes for test class [com.onlinejudge.auth.AuthControllerTest]: AuthControllerTest does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+2026-08-26T09:52:47.582+08:00  INFO 39420 --- [           main] .b.t.c.SpringBootTestContextBootstrapper : Found @SpringBootConfiguration com.onlinejudge.OnlineJudgeApplication for test class com.onlinejudge.auth.AuthControllerTest
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+
+ :: Spring Boot ::                (v3.4.5)
+
+2026-08-26T09:52:48.020+08:00  INFO 39420 --- [           main] c.onlinejudge.auth.AuthControllerTest    : Starting AuthControllerTest using Java 25 with PID 39420 (started by 67231 in C:\Users\67231\Documents\Codex\2026-08-26\new-chat\work\pr273-onlinejudge\backend)
+2026-08-26T09:52:48.022+08:00  INFO 39420 --- [           main] c.onlinejudge.auth.AuthControllerTest    : No active profile set, falling back to 1 default profile: "default"
+2026-08-26T09:52:49.552+08:00  INFO 39420 --- [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-2 - Starting...
+2026-08-26T09:52:49.556+08:00  INFO 39420 --- [           main] com.zaxxer.hikari.pool.HikariPool        : HikariPool-2 - Added connection conn10: url=jdbc:h2:mem:auth_controller user=SA
+2026-08-26T09:52:49.556+08:00  INFO 39420 --- [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-2 - Start completed.
+2026-08-26T09:52:50.892+08:00  INFO 39420 --- [           main] o.s.b.t.m.w.SpringBootMockServletContext : Initializing Spring TestDispatcherServlet ''
+2026-08-26T09:52:50.892+08:00  INFO 39420 --- [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-08-26T09:52:50.892+08:00  INFO 39420 --- [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-08-26T09:52:50.926+08:00  INFO 39420 --- [           main] c.onlinejudge.auth.AuthControllerTest    : Started AuthControllerTest in 3.344 seconds (process running for 26.312)
+[INFO] Tests run: 21, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 8.319 s -- in com.onlinejudge.auth.AuthControllerTest
+[INFO] Running com.onlinejudge.auth.AuthMigrationScriptTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.016 s -- in com.onlinejudge.auth.AuthMigrationScriptTest
+[INFO] Running com.onlinejudge.common.security.HeaderCurrentUserProviderTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.031 s -- in com.onlinejudge.common.security.HeaderCurrentUserProviderTest
+[INFO] Running com.onlinejudge.integration.AuthCrsIntegrationTest
+2026-08-26T09:52:55.964+08:00  INFO 39420 --- [           main] t.c.s.AnnotationConfigContextLoaderUtils : Could not detect default configuration classes for test class [com.onlinejudge.integration.AuthCrsIntegrationTest]: AuthCrsIntegrationTest does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+2026-08-26T09:52:56.044+08:00  INFO 39420 --- [           main] .b.t.c.SpringBootTestContextBootstrapper : Found @SpringBootConfiguration com.onlinejudge.OnlineJudgeApplication for test class com.onlinejudge.integration.AuthCrsIntegrationTest
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+
+ :: Spring Boot ::                (v3.4.5)
+
+2026-08-26T09:52:56.107+08:00  INFO 39420 --- [           main] c.o.integration.AuthCrsIntegrationTest   : Starting AuthCrsIntegrationTest using Java 25 with PID 39420 (started by 67231 in C:\Users\67231\Documents\Codex\2026-08-26\new-chat\work\pr273-onlinejudge\backend)
+2026-08-26T09:52:56.107+08:00  INFO 39420 --- [           main] c.o.integration.AuthCrsIntegrationTest   : No active profile set, falling back to 1 default profile: "default"
+2026-08-26T09:52:57.248+08:00  INFO 39420 --- [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-3 - Starting...
+2026-08-26T09:52:57.264+08:00  INFO 39420 --- [           main] com.zaxxer.hikari.pool.HikariPool        : HikariPool-3 - Added connection conn20: url=jdbc:h2:mem:auth_crs_integration user=SA
+2026-08-26T09:52:57.264+08:00  INFO 39420 --- [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-3 - Start completed.
+2026-08-26T09:52:57.959+08:00  INFO 39420 --- [           main] o.s.b.t.m.w.SpringBootMockServletContext : Initializing Spring TestDispatcherServlet ''
+2026-08-26T09:52:57.959+08:00  INFO 39420 --- [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-08-26T09:52:57.959+08:00  INFO 39420 --- [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-08-26T09:52:57.978+08:00  INFO 39420 --- [           main] c.o.integration.AuthCrsIntegrationTest   : Started AuthCrsIntegrationTest in 1.934 seconds (process running for 33.364)
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 3.509 s -- in com.onlinejudge.integration.AuthCrsIntegrationTest
+[INFO]
+[INFO] Results:
+[INFO]
+[INFO] Tests run: 36, Failures: 0, Errors: 0, Skipped: 0
+[INFO]
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD SUCCESS
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  01:06 min
+[INFO] Finished at: 2026-08-26T09:52:59+08:00
+[INFO] ------------------------------------------------------------------------

@@ -1,0 +1,105 @@
+sequenceDiagram
+  actor Student as 学生
+  actor Teacher as 教师
+  participant StudentView as StudentGrade<br/>View
+  participant TeacherView as TeacherGradeTable<br/>View
+  participant Controller as GradeReview<br/>Controller
+  participant Service as GradeReview<br/>Service
+  participant Permission as CoursePermission<br/>Client
+  participant ReviewRepo as GradeReviewRequest<br/>Repository
+  participant ItemRepo as GradeItem<br/>Repository
+  participant RecordRepo as GradeRecord<br/>Repository
+  participant SummaryRepo as CourseGradeSummary<br/>Repository
+  participant ChangeLogRepo as GradeChangeLog<br/>Repository
+  participant Event as NotificationEvent<br/>Publisher
+  participant LRN as LRN通知
+  Student->>StudentView: 填写异议理由
+  StudentView->>Controller: POST /courses/{courseId}/grade-review-requests
+  Controller->>Service: submitReviewRequest(courseId,studentId,command)
+  Service->>Permission: isCourseMember(courseId,studentId)
+  alt 非课程成员
+    Permission-->>Service: false
+    Service-->>Controller: GradeReviewPermissionException
+    Controller-->>StudentView: 无复核权限提示
+  else 课程成员
+    Permission-->>Service: true
+    Service->>Service: originalPublishedScore(...)
+    alt FINAL_SCORE
+      Service->>SummaryRepo: findByCourseId(courseId)
+      SummaryRepo-->>Service: 课程总评集合
+      Service->>Service: 筛选本人 PUBLISHED 总评
+    else GRADE_ITEM
+      Service->>RecordRepo: findByCourseId(courseId)
+      RecordRepo-->>Service: 课程成绩记录集合
+      Service->>Service: 筛选本人指定 PUBLISHED 成绩项
+    end
+    alt 复核目标未发布或不存在
+      Service-->>Controller: GradeReviewValidationException
+      Controller-->>StudentView: 只能复核本人已发布成绩
+    else 复核目标已发布
+      Service->>ReviewRepo: findPendingByTarget(...)
+      alt 已存在 PENDING 申请
+        Service-->>Controller: GradeReviewDuplicateException
+        Controller-->>StudentView: 重复申请提示
+      else 可提交
+        Service->>ReviewRepo: save(PENDING)
+        Service->>Event: 登记 GRADE_REVIEW_REQUESTED after-commit 回调
+        Note over Service,Event: 来源事务回滚时不生成通知
+        Event->>LRN: 来源事务提交后以独立事务持久化教师通知
+        Note over Event,LRN: 独立事务失败由 publisher 捕获并记日志，申请仍可查询
+        Service-->>Controller: GradeReviewSubmissionResult
+        Controller-->>StudentView: PENDING 申请
+      end
+    end
+  end
+  Teacher->>TeacherView: 处理待复核申请
+  TeacherView->>Controller: PUT /grade-review-requests/{requestId}/process
+  Controller->>Service: processReviewRequest(requestId,teacherId,command)
+  Service->>ReviewRepo: findById(requestId)
+  alt 申请不存在
+    ReviewRepo-->>Service: Optional.empty
+    Service-->>Controller: GradeItemNotFoundException
+    Controller-->>TeacherView: 申请不存在提示
+  else 申请存在
+    ReviewRepo-->>Service: request(courseId,status,target)
+    Service->>Permission: canManageCourseGrade(courseId,teacherId)
+    alt 无课程成绩管理权限
+      Permission-->>Service: false
+      Service-->>Controller: GradeReviewPermissionException
+      Controller-->>TeacherView: 无处理权限提示
+    else 有课程成绩管理权限
+      Permission-->>Service: true
+      alt 申请不是 PENDING
+        Service-->>Controller: GradeReviewValidationException
+        Controller-->>TeacherView: 申请已处理提示
+      else 申请为 PENDING
+        alt APPROVE
+          Service->>Service: applyApprovedAdjustment(...)
+          alt 总评复核
+            Service->>SummaryRepo: findByCourseId(courseId)
+            SummaryRepo-->>Service: 已发布总评
+            Service->>SummaryRepo: update(adjusted)
+            Service->>ChangeLogRepo: save(FINAL_ADJUST)
+          else 单项复核
+            Service->>RecordRepo: findByCourseId(courseId)
+            RecordRepo-->>Service: 已发布成绩记录
+            Service->>ItemRepo: findById(gradeItemId)
+            Service->>RecordRepo: update(adjusted)
+            Service->>ChangeLogRepo: save(RECORD_ADJUST)
+            Service->>RecordRepo: findByCourseId(courseId)
+            Service->>ItemRepo: findByCourseId(courseId)
+            Service->>SummaryRepo: update(重新计算的总评)
+          end
+          Service->>ReviewRepo: update(APPROVED)
+        else REJECT
+          Service->>ReviewRepo: update(REJECTED)
+        end
+        Service->>Event: 登记 GRADE_REVIEW_PROCESSED after-commit 回调
+        Note over Service,Event: 来源事务回滚时不生成通知
+        Event->>LRN: 来源事务提交后以独立事务持久化学生通知
+        Note over Event,LRN: 独立事务失败由 publisher 捕获并记日志，处理结果仍可查询
+        Service-->>Controller: GradeReviewProcessResult
+        Controller-->>TeacherView: GradeReviewProcessResult
+      end
+    end
+  end
