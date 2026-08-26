@@ -5,6 +5,7 @@ const DEMO_COURSE_ID = 9501;
 const DEMO_GRADE_SUMMARY_ID = 950421;
 
 test.describe.configure({ timeout: 60_000 });
+test.use({ navigationTimeout: 30_000 });
 
 type ApiEnvelope<T> = { code: string; message: string; data: T };
 type CurrentUser = { id: number };

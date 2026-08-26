@@ -4,6 +4,7 @@ import { expect, test } from '../fixtures';
 const DEMO_COURSE_ID = 9501;
 
 test.describe.configure({ timeout: 60_000 });
+test.use({ navigationTimeout: 30_000 });
 
 type ApiEnvelope<T> = { code: string; message: string; data: T };
 type CreatedEntity = { id: number };

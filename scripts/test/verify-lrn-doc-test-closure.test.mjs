@@ -68,6 +68,8 @@ test('LRN closure includes real cross-module integration, shared-runner E2E and 
   assert.match(e2eTest, /beforeGradeNotificationIds/);
   assert.match(e2eTest, /describe\.configure\(\{ timeout: 60_000 \}\)/);
   assert.match(notificationE2eTest, /describe\.configure\(\{ timeout: 60_000 \}\)/);
+  assert.match(e2eTest, /test\.use\(\{ navigationTimeout: 30_000 \}\)/);
+  assert.match(notificationE2eTest, /test\.use\(\{ navigationTimeout: 30_000 \}\)/);
   assert.match(e2eTest, /test\.info\(\)\.outputPath/);
   assert.match(notificationE2eTest, /test\.info\(\)\.outputPath/);
   assert.doesNotMatch(`${e2eTest}\n${notificationE2eTest}`, /output\/test\/issue-262\/evidence/);
