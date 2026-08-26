@@ -113,6 +113,127 @@ class GradeRecordServiceTest {
     }
 
     @Test
+    void sourceTimeoutAbortsSyncBeforeWritingPartialGradeState() {
+        InMemoryGradeItemRepository itemRepository = new InMemoryGradeItemRepository();
+        InMemoryGradeRecordRepository recordRepository = new InMemoryGradeRecordRepository();
+        InMemoryCourseGradeSummaryRepository summaryRepository = new InMemoryCourseGradeSummaryRepository();
+        InMemoryGradeCalculationBatchRepository batchRepository = new InMemoryGradeCalculationBatchRepository();
+        InMemoryGradeChangeLogRepository changeLogRepository = new InMemoryGradeChangeLogRepository();
+        RecordingNotificationEventPublisher eventPublisher = new RecordingNotificationEventPublisher();
+        GradeRecordService service = new GradeRecordService(
+                itemRepository,
+                recordRepository,
+                changeLogRepository,
+                new InMemoryGradePublishRecordRepository(),
+                summaryRepository,
+                batchRepository,
+                (courseId, sourceType, sourceId) -> {
+                    throw new IllegalStateException("source timeout");
+                },
+                permissionClient(601L),
+                eventPublisher
+        );
+        itemRepository.add(item(1L, 101L, "实验一", SourceType.LAB, 301L, "100.00", "1.00"));
+
+        assertThatThrownBy(() -> service.syncSourceGrades(101L, 501L))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("source timeout");
+
+        assertThat(recordRepository.findByCourseId(101L)).isEmpty();
+        assertThat(summaryRepository.findByCourseId(101L)).isEmpty();
+        assertThat(batchRepository.batches).isEmpty();
+        assertThat(changeLogRepository.logs).isEmpty();
+        assertThat(eventPublisher.events()).isEmpty();
+    }
+
+    @Test
+    void sourceFailureAfterEarlierSourceFetchDoesNotPersistPartialGradeState() {
+        InMemoryGradeItemRepository itemRepository = new InMemoryGradeItemRepository();
+        InMemoryGradeRecordRepository recordRepository = new InMemoryGradeRecordRepository();
+        InMemoryCourseGradeSummaryRepository summaryRepository = new InMemoryCourseGradeSummaryRepository();
+        InMemoryGradeCalculationBatchRepository batchRepository = new InMemoryGradeCalculationBatchRepository();
+        InMemoryGradeChangeLogRepository changeLogRepository = new InMemoryGradeChangeLogRepository();
+        RecordingNotificationEventPublisher eventPublisher = new RecordingNotificationEventPublisher();
+        GradeRecordService service = new GradeRecordService(
+                itemRepository,
+                recordRepository,
+                changeLogRepository,
+                new InMemoryGradePublishRecordRepository(),
+                summaryRepository,
+                batchRepository,
+                (courseId, sourceType, sourceId) -> {
+                    if (sourceType == SourceGradeType.LAB) {
+                        return List.of(source(courseId, sourceType, sourceId, 601L, "88.00", "100.00", "SCORED"));
+                    }
+                    throw new IllegalStateException("homework source unavailable");
+                },
+                permissionClient(601L),
+                eventPublisher
+        );
+        itemRepository.add(item(1L, 101L, "实验一", SourceType.LAB, 301L, "100.00", "0.50"));
+        itemRepository.add(item(2L, 101L, "作业一", SourceType.HWK, 401L, "100.00", "0.50"));
+
+        assertThatThrownBy(() -> service.syncSourceGrades(101L, 501L))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("homework source unavailable");
+
+        assertThat(recordRepository.findByCourseId(101L)).isEmpty();
+        assertThat(summaryRepository.findByCourseId(101L)).isEmpty();
+        assertThat(batchRepository.batches).isEmpty();
+        assertThat(changeLogRepository.logs).isEmpty();
+        assertThat(eventPublisher.events()).isEmpty();
+    }
+
+    @Test
+    void deletedSourceTaskBecomesMissingOnResyncAndKeepsPublishedChangeTrace() {
+        InMemoryGradeItemRepository itemRepository = new InMemoryGradeItemRepository();
+        InMemoryGradeRecordRepository recordRepository = new InMemoryGradeRecordRepository();
+        InMemoryCourseGradeSummaryRepository summaryRepository = new InMemoryCourseGradeSummaryRepository();
+        InMemoryGradeChangeLogRepository changeLogRepository = new InMemoryGradeChangeLogRepository();
+        RecordingNotificationEventPublisher eventPublisher = new RecordingNotificationEventPublisher();
+        AtomicReference<List<SourceGradeDTO>> sourceGrades = new AtomicReference<>(List.of(
+                source(101L, SourceGradeType.LAB, 301L, 601L, "80.00", "100.00", "SCORED")
+        ));
+        GradeRecordService service = new GradeRecordService(
+                itemRepository,
+                recordRepository,
+                changeLogRepository,
+                new InMemoryGradePublishRecordRepository(),
+                summaryRepository,
+                new InMemoryGradeCalculationBatchRepository(),
+                (courseId, sourceType, sourceId) -> sourceGrades.get(),
+                permissionClient(601L),
+                eventPublisher
+        );
+        itemRepository.add(item(1L, 101L, "实验一", SourceType.LAB, 301L, "100.00", "1.00"));
+        service.syncSourceGrades(101L, 501L);
+        service.publishCourseGrades(101L, 501L, new PublishCourseGradesCommand("COURSE", List.of(), List.of()));
+
+        sourceGrades.set(List.of());
+        GradeSyncResult result = service.syncSourceGrades(101L, 501L);
+
+        assertThat(result.syncedCount()).isZero();
+        assertThat(result.missingCount()).isEqualTo(1);
+        assertThat(recordRepository.findByStudentAndItem(101L, 601L, 1L).orElseThrow()).satisfies(record -> {
+            assertThat(record.rawScore()).isNull();
+            assertThat(record.gradeStatus()).isEqualTo(GradeStatus.MISSING);
+            assertThat(record.publishStatus()).isEqualTo(PublishStatus.PUBLISHED);
+        });
+        assertThat(summaryRepository.findByStudent(101L, 601L).orElseThrow()).satisfies(summary -> {
+            assertThat(summary.finalScore()).isNull();
+            assertThat(summary.finalStatus()).isEqualTo(FinalStatus.INCOMPLETE);
+            assertThat(summary.publishStatus()).isEqualTo(PublishStatus.PUBLISHED);
+        });
+        assertThat(changeLogRepository.logs).singleElement().satisfies(log -> {
+            assertThat(log.changeType()).isEqualTo("SOURCE_RESYNC");
+            assertThat(log.oldValue()).isEqualByComparingTo("80.00");
+            assertThat(log.newValue()).isNull();
+        });
+        assertThat(eventPublisher.events()).extracting(NotificationEvent::type)
+                .containsExactly("GRADE_PUBLISHED", "GRADE_CHANGED");
+    }
+
+    @Test
     void teacherAdjustsPublishedGradeRecordAndNotifiesStudentWithoutUnpublishingSummary() {
         InMemoryGradeItemRepository itemRepository = new InMemoryGradeItemRepository();
         InMemoryGradeRecordRepository recordRepository = new InMemoryGradeRecordRepository();
