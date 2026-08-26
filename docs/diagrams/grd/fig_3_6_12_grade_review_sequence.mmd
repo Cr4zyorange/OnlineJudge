@@ -43,9 +43,10 @@ sequenceDiagram
         Controller-->>StudentView: 重复申请提示
       else 可提交
         Service->>ReviewRepo: save(PENDING)
-        Service->>Event: publish(GRADE_REVIEW_REQUESTED)
-        Event->>LRN: 持久化教师通知
-        Note over Event,LRN: 持久化失败由 publisher 捕获并记日志，申请仍返回
+        Service->>Event: 登记 GRADE_REVIEW_REQUESTED after-commit 回调
+        Note over Service,Event: 来源事务回滚时不生成通知
+        Event->>LRN: 来源事务提交后以独立事务持久化教师通知
+        Note over Event,LRN: 独立事务失败由 publisher 捕获并记日志，申请仍可查询
         Service-->>Controller: GradeReviewSubmissionResult
         Controller-->>StudentView: PENDING 申请
       end
@@ -93,9 +94,10 @@ sequenceDiagram
         else REJECT
           Service->>ReviewRepo: update(REJECTED)
         end
-        Service->>Event: publish(GRADE_REVIEW_PROCESSED)
-        Event->>LRN: 持久化学生通知
-        Note over Event,LRN: 持久化失败由 publisher 捕获并记日志，处理结果仍返回
+        Service->>Event: 登记 GRADE_REVIEW_PROCESSED after-commit 回调
+        Note over Service,Event: 来源事务回滚时不生成通知
+        Event->>LRN: 来源事务提交后以独立事务持久化学生通知
+        Note over Event,LRN: 独立事务失败由 publisher 捕获并记日志，处理结果仍可查询
         Service-->>Controller: GradeReviewProcessResult
         Controller-->>TeacherView: GradeReviewProcessResult
       end

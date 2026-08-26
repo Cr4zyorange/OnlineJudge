@@ -14,7 +14,7 @@ sequenceDiagram
   Teacher->>System: OP-GR-03 发布成绩
   alt 首次发布成功
     System-->>Teacher: 返回 publishId、publishedCount、publishedAt 和 notificationStatus=SENT
-    Note over Teacher,System: 通知在响应前同步 best-effort 持久化；失败只记日志，不回滚发布，响应仍为 SENT
+    Note over Teacher,System: 登记 after-commit 通知；来源事务提交后由 LRN 独立事务 best-effort 持久化，回滚时不生成通知，失败只记日志
   else 相同发布范围已成功
     System-->>Teacher: 幂等返回既有 publishId 和原 notificationStatus，不重复写记录或通知
   else 发布校验失败
