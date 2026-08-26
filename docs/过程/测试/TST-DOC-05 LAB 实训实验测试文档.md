@@ -302,8 +302,9 @@ git diff --check
 | --- | --- | --- | --- | --- |
 | E2E-LAB-265-01 | UC-LAB-01 | 教师创建草稿，配置 Python、MIXED 评分、报告要求、公开/隐藏用例并发布 | 非课程管理者/字段无效被拒绝；发布后发送 `LAB_EXPERIMENT_PUBLISHED` | `LabExperimentControllerTest`，`issue-265-lab-lifecycle.spec.ts` |
 | E2E-LAB-265-02 | UC-LAB-02 | 学生只看到公开用例，提交源文件后收到评测结果，上传报告 | 非成员、已截止、格式错误和评测异常均受控返回；学生不看到隐藏用例 | `LabSubmissionControllerTest`，`LabEvaluationServiceTest`，共享 Playwright 用例 |
-| E2E-LAB-265-03 | UC-LAB-02 扩展 | 教师查看提交、下载指定源文件、评分报告和提交、截止并发布成绩；学生查看最终反馈 | 学生访问教师提交页和 API-LAB-19 均为 403；未发布成绩不暴露最终分 | `LabSubmissionControllerTest`，共享 Playwright 用例 |
-| E2E-LAB-265-04 | UC-LAB-02 扩展 | 教师查看提交数、评测完成数、均分和分布；GRD 获取已发布来源成绩 | 学生查询统计为 403；未发布实验不向 GRD 暴露来源成绩 | `LabExperimentControllerTest`，`releasedLabScoresExposeSourceGradesForGrdSync` |
+| E2E-LAB-265-03 | UC-LAB-02 扩展 | 教师查看提交、下载指定源文件、评分报告和提交、截止并发布成绩；学生查看最终反馈 | 学生访问教师提交页和 API-LAB-19 均为 403；受控 500 下载失败显示错误且解除路由后可重试；未发布成绩不暴露最终分 | `LabSubmissionControllerTest`，共享 Playwright 下载权限/失败重试用例 |
+| E2E-LAB-265-04 | UC-LAB-02 扩展 | 教师查看提交数、评测完成数、均分和分布；创建关联该实验的 GRD 成绩项并同步已发布来源成绩 | 学生查询统计为 403；未发布实验不向 GRD 暴露来源成绩 | `LabExperimentControllerTest`，`releasedLabScoresExposeSourceGradesForGrdSync`，共享 Playwright GRD 同步用例 |
+| E2E-LAB-265-05 | UC-LAB-01/02 扩展 | 发布或发布成绩后，学生查询到 `sourceModule=LAB`、目标实验 ID 和课程内动作链接的 LRN 通知 | 非课程成员不接收通知；来源模块、来源 ID 或动作链接不匹配即失败 | `LabExperimentControllerTest`，共享 Playwright LRN 通知用例 |
 | TC-LAB-42 | UC-LAB-02 评测矩阵 | 真 Docker 沙箱依次执行 AC、编译错误、运行错误、超时和内存限制样本 | Docker daemon 不可用返回 `SYSTEM_ERROR`；中途断连不在本机破坏性复现 | `DockerSandboxExecutorTest` |
 
 ### 13.2 端到端可追踪矩阵
@@ -332,19 +333,19 @@ git diff --check
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts/test/verify-issue-265.ps1
 ```
 
-该脚本校验三份 Compose 配置（`compose.yml`、`compose.eval.yml`、`compose.eval.local.example.yml`），并以三份文件的覆盖组合启动评测环境；其中本地评测覆盖提供 Docker CLI，评测覆盖提供 socket 与沙箱配置。随后脚本预拉取真实 Docker 评测镜像、运行后端行为/迁移/事务测试、真实 Docker 矩阵、沙箱容器清理、前端 LAB 单测、类型检查、构建和共享 Playwright 流程，并在结束时清理 Compose 容器、卷和孤儿容器。`-SkipCompose`、`-SkipE2E` 和 `-KeepEnvironment` 仅用于诊断，不应用于最终验收。
+该脚本校验三份 Compose 配置（`compose.yml`、`compose.eval.yml`、`compose.eval.local.example.yml`），并以三份文件加临时 override 的覆盖组合启动评测环境；临时 override 清除固定 `container_name`，每次执行生成唯一 Compose project 和随机 loopback 端口。`OJ_HTTP_PORT` 与 `E2E_BASE_URL` 在执行期间被强制为该端点，结束后恢复调用方环境；清理在 `up --wait` 前登记，因此部分启动失败也会以同一 project 执行 `down --volumes --remove-orphans`。随后脚本预拉取真实 Docker 评测镜像、运行后端行为/迁移/事务测试、真实 Docker 矩阵、沙箱容器清理、前端 LAB 单测、类型检查、构建和共享 Playwright 流程。默认最终验收遇到 `FAIL` 或 `BLOCKED` 均返回非零；仅显式 `-Diagnostic` 可允许 `BLOCKED` 返回零，且永不掩盖 `FAIL`。`-SkipCompose`、`-SkipE2E` 和 `-KeepEnvironment` 仅用于诊断，不应用于最终验收。
 
 | 编号 | 时间 | 执行内容 | 结果 | 说明 |
 | --- | --- | --- | --- | --- |
 | LAB-265-001 | 2026-08-25 | 目标后端测试：Controller、迁移、事务、评测服务与 Docker executor | PASS | 目标套件 60 tests，0 failures/errors，2 个 Docker-only skip；随后真机 smoke 6/6 通过 |
-| LAB-265-002 | 2026-08-25 | 真 Docker：AC、编译错误、运行错误、超时、64 MiB 内存限制、清理 | PASS | `OJ_DOCKER_SANDBOX_TEST=true` 下 `DockerSandboxExecutorTest` 6 tests 通过；每轮后 `oj-lab-` 容器为空 |
+| LAB-265-002 | 2026-08-26 | 真 Docker：AC、编译错误、运行错误、超时、64 MiB 内存限制、清理 | BLOCKED | 当前主机没有 Docker daemon，2026-08-25 的 PASS 仅为历史记录，未在本轮独立复现。责任人：LAB 模块负责人（Issue #265 owner）；目标日期：2026-09-05；重测：在 disposable FAT 主机运行默认验证器，要求 Docker 矩阵通过、无 `oj-lab-` 残留且唯一 Compose project/卷已清理。 |
 | LAB-265-003 | 2026-08-25 | 首次冷镜像 Docker smoke | FAIL（已缓解） | 未预拉取 `python:3.12-alpine` 时，镜像拉取占用固定编译阶段时限而得到伪 `TIME_LIMIT_EXCEEDED`；验证脚本已把 `docker pull` 固化为前置步骤，不修改生产契约 |
-| LAB-265-004 | 2026-08-25 | 共享 Playwright：教师发布到学生查看结果 | PASS | `tests/e2e/lab/issue-265-lab-lifecycle.spec.ts` 覆盖发布、提交、评测、报告、评分、反馈、隐藏用例、权限、截止、统计和受控下载 |
+| LAB-265-004 | 2026-08-26 | 共享 Playwright：主生命周期、下载权限/失败重试、LRN 通知和 GRD 来源成绩同步 | BLOCKED | 用例已拆分为命名串行场景，直接断言 API-LAB-19 的 403、受控 500 后重试、`sourceModule=LAB` 通知和 `LAB` 成绩项同步；当前主机无 disposable Compose 环境，不能将代码覆盖记为 E2E PASS。责任人：LAB 模块负责人（Issue #265 owner）；目标日期：2026-09-05；重测：默认验证器的本地隔离 E2E 全部通过。 |
 | LAB-265-005 | 2026-08-25 | Mermaid 源与 SVG、`git diff --check`、凭据/临时产物检查 | PASS | 3 份 Mermaid 源已渲染为非空 SVG，`git diff --check` 通过；本 issue 文件未发现凭据或临时产物 |
 | LAB-265-008 | 2026-08-25 | LAB 前端定向单测、类型检查与生产构建 | PASS | Vitest 5 files/58 tests 通过；`vue-tsc --noEmit` 与 `vite build` 通过 |
-| LAB-265-006 | 2026-08-25 | Docker daemon 在评测中途断连 | BLOCKED | 本机不以停止 daemon 的方式破坏正在执行的评测；现有可控模拟断连测试已覆盖 `SYSTEM_ERROR`，真实断连仅在可丢弃 FAT 主机复测 |
+| LAB-265-006 | 2026-08-26 | Docker daemon 在评测中途断连 | BLOCKED | 本机不以停止 daemon 的方式破坏正在执行的评测；现有可控模拟断连测试已覆盖 `SYSTEM_ERROR`。责任人：LAB 模块负责人（Issue #265 owner）；目标日期：2026-09-05；重测：在 disposable FAT 主机的实际评测运行中断开 daemon，断言请求受控返回 `SYSTEM_ERROR`、无悬挂 `oj-lab-` 容器且验证器清理同一 Compose project 的资源。 |
 | LAB-265-007 | 2026-08-25 | `npm run test:e2e:verify-failure` | FAIL（既有基线） | `frontend/scripts/verify-e2e-failure.mjs:42` 未观察到预期的故意断言失败；不属于 #265，未在本分支修改共享 runner |
-| LAB-265-009 | 2026-08-25 | 三文件 Compose 评测环境：Docker CLI、socket、8088、真实 E2E | PASS | 两文件组合暴露“容器内无 Docker CLI”的配置缺口；纳入 `compose.eval.local.example.yml` 后容器内 Docker 29.3.1 可用，Compose 服务健康，Playwright 1 passed |
+| LAB-265-009 | 2026-08-26 | 三文件 Compose 评测环境：Docker CLI、socket、随机 loopback 端口、真实 E2E | BLOCKED | 当前主机没有 Docker daemon。重测仅接受临时 override 取消固定容器名、唯一 project/卷、强制本地 `E2E_BASE_URL`、部分启动也执行 scoped cleanup，且 Playwright 全部通过的 disposable FAT 证据；责任人：LAB 模块负责人（Issue #265 owner）；目标日期：2026-09-05。 |
 
 ### 13.4 图与安全检查
 

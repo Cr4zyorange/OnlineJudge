@@ -3,6 +3,12 @@ import { test, expect } from '../fixtures';
 const COURSE_ID = 9501;
 const SOURCE_NAME = 'issue-265-source.py';
 const REPORT_NAME = 'issue-265-report.pdf';
+const lifecycleState: { labId: number; submissionId: number } = {
+  labId: 0,
+  submissionId: 0
+};
+
+test.describe.configure({ mode: 'serial' });
 
 test('teacher and student complete the LAB publish, submission, review, release, and feedback lifecycle', async ({ page, loginAs, logout }) => {
   await loginAs('teacher');
@@ -60,6 +66,8 @@ test('teacher and student complete the LAB publish, submission, review, release,
   const submissionPayload = await submissionResponse.json() as { data: { submissionId: number } };
   const submissionId = submissionPayload.data.submissionId;
   expect(submissionId).toBeGreaterThan(0);
+  lifecycleState.labId = labId;
+  lifecycleState.submissionId = submissionId;
   await expect(page.getByRole('status')).toContainText('提交成功');
 
   await page.locator('input[name="reportFile"]').setInputFiles({
@@ -127,4 +135,134 @@ test('teacher and student complete the LAB publish, submission, review, release,
   await expect(page.getByTestId('published-review')).toContainText('Submission reviewed in issue 265 E2E.');
   await page.goto(`/courses/${COURSE_ID}/labs/${labId}/submit`);
   await expect(page.getByTestId('lab-submit-blocked')).toContainText('实验提交阶段已结束');
+});
+
+test('student download permissions and teacher download failures remain observable', async ({ page, loginAs, logout }) => {
+  const { labId, submissionId } = lifecycleState;
+  expect(labId).toBeGreaterThan(0);
+  expect(submissionId).toBeGreaterThan(0);
+
+  await loginAs('student');
+  const deniedDownload = await page.evaluate(async ({ requestedLabId, requestedSubmissionId }) => {
+    const token = window.localStorage.getItem('onlinejudge.authToken');
+    const response = await fetch(
+      `/api/v1/labs/${requestedLabId}/submissions/${requestedSubmissionId}/source/download`,
+      { headers: token ? { Authorization: `Bearer ${token}` } : {} }
+    );
+    return { status: response.status, body: await response.json().catch(() => null) };
+  }, { requestedLabId: labId, requestedSubmissionId: submissionId });
+  expect(deniedDownload.status).toBe(403);
+  expect(deniedDownload.body?.code).toBe('ERR-AUTH-05');
+  await logout();
+
+  await loginAs('teacher');
+  await page.goto(`/courses/${COURSE_ID}/labs/${labId}/manage/submissions/${submissionId}`);
+  const sourceDownloadUrl = `**/api/v1/labs/${labId}/submissions/${submissionId}/source/download`;
+  await page.route(sourceDownloadUrl, async (route) => {
+    await route.fulfill({
+      status: 500,
+      contentType: 'application/json',
+      body: JSON.stringify({ code: 'LAB-500-01', message: '存储服务暂不可用', data: null })
+    });
+  });
+  await page.locator('[data-action="download-source-file"]').click();
+  await expect(page.getByTestId('source-file-download-error')).toBeVisible();
+  await page.unroute(sourceDownloadUrl);
+  const recoveredDownload = page.waitForEvent('download');
+  await page.locator('[data-action="download-source-file"]').click();
+  expect((await recoveredDownload).suggestedFilename()).toBe(SOURCE_NAME);
+  await logout();
+});
+
+test('student receives a LAB notification tied to the published lifecycle', async ({ page, loginAs, logout }) => {
+  const { labId } = lifecycleState;
+  expect(labId).toBeGreaterThan(0);
+
+  await loginAs('student');
+  const notificationPage = await page.evaluate(async () => {
+    const token = window.localStorage.getItem('onlinejudge.authToken');
+    const response = await fetch('/api/v1/notifications?page=1&size=100', {
+      headers: token ? { Authorization: `Bearer ${token}` } : {}
+    });
+    const body = await response.json();
+    return { status: response.status, data: body.data } as {
+      status: number;
+      data: { records: Array<{ sourceModule: string; sourceId: number | null; actionUrl: string | null; title: string }> };
+    };
+  });
+  expect(notificationPage.status).toBe(200);
+  const labNotification = notificationPage.data.records.find((notification) => (
+    notification.sourceModule === 'LAB' && notification.sourceId === labId
+  ));
+  expect(labNotification).toBeDefined();
+  expect(labNotification?.actionUrl).toContain(`/courses/${COURSE_ID}/labs/${labId}`);
+  expect(['实验已发布', '实验成绩已发布']).toContain(labNotification?.title);
+  await logout();
+});
+
+test('teacher syncs the released LAB source score into GRD', async ({ page, loginAs, logout }) => {
+  const { labId } = lifecycleState;
+  expect(labId).toBeGreaterThan(0);
+
+  await loginAs('teacher');
+  const gradeSync = await page.evaluate(async ({ courseId, requestedLabId }) => {
+    const token = window.localStorage.getItem('onlinejudge.authToken');
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
+    }
+    const gradeItemResponse = await fetch(`/api/v1/courses/${courseId}/grade-items`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        name: `Issue 265 LAB ${requestedLabId}`,
+        sourceType: 'LAB',
+        sourceId: requestedLabId,
+        fullScore: 100,
+        // Keep the source item eligible for sync without consuming the course weight budget.
+        weight: 0,
+        includedInFinal: true,
+        sortOrder: 9999
+      })
+    });
+    const gradeItemBody = await gradeItemResponse.json();
+    const syncResponse = await fetch(`/api/v1/courses/${courseId}/grades/sync`, { method: 'POST', headers });
+    const syncBody = await syncResponse.json();
+    const gradesResponse = await fetch(`/api/v1/courses/${courseId}/grades?page=1&size=100`, { headers });
+    const gradesBody = await gradesResponse.json();
+    return {
+      gradeItemStatus: gradeItemResponse.status,
+      gradeItem: gradeItemBody.data,
+      syncStatus: syncResponse.status,
+      sync: syncBody.data,
+      gradesStatus: gradesResponse.status,
+      grades: gradesBody.data
+    } as {
+      gradeItemStatus: number;
+      gradeItem: { sourceType: string; sourceId: number | null };
+      syncStatus: number;
+      sync: { syncedCount: number };
+      gradesStatus: number;
+      grades: { records: Array<{ studentId: number; records: Array<{ courseId: number; studentId: number; sourceType: string; sourceId: number | null; rawScore: string | null; gradeStatus: string }> }> };
+    };
+  }, { courseId: COURSE_ID, requestedLabId: labId });
+  expect(gradeSync.gradeItemStatus).toBe(201);
+  expect(gradeSync.gradeItem.sourceType).toBe('LAB');
+  expect(gradeSync.gradeItem.sourceId).toBe(labId);
+  expect(gradeSync.syncStatus).toBe(200);
+  expect(gradeSync.sync.syncedCount).toBeGreaterThan(0);
+  expect(gradeSync.gradesStatus).toBe(200);
+  const labGradeRow = gradeSync.grades.records.find((row) => (
+    row.records.some((record) => record.sourceType === 'LAB' && record.sourceId === labId)
+  ));
+  const labRecord = labGradeRow?.records.find((record) => (
+    record.sourceType === 'LAB' && record.sourceId === labId
+  ));
+  expect(labGradeRow).toBeDefined();
+  expect(labRecord).toBeDefined();
+  expect(labRecord?.courseId).toBe(COURSE_ID);
+  expect(labRecord?.studentId).toBe(labGradeRow?.studentId);
+  expect(Number(labRecord?.rawScore)).toBe(95);
+  expect(labRecord?.gradeStatus).toBe('SCORED');
+  await logout();
 });
