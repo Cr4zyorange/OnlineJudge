@@ -199,6 +199,8 @@ test('GRD mutating lifecycle only runs through the disposable database wrapper',
   assert.match(runner, /E2E_GRD_DISPOSABLE_PROOF_FILE/);
   assert.match(runner, /E2E_GRD_DISPOSABLE_TOKEN/);
   assert.match(runner, /tests\/e2e\/grd\/grade-lifecycle\.spec\.ts/);
+  assert.match(spec, /import \{ expect, test \} from ['"]@playwright\/test['"]/);
+  assert.doesNotMatch(spec, /from ['"]\.\.\/fixtures['"]/);
   assert.doesNotMatch(spec, /process\.env\.E2E_GRD_DISPOSABLE_RUN/);
   assert.match(spec, /timingSafeEqual/);
   assert.match(spec, /realpathSync/);

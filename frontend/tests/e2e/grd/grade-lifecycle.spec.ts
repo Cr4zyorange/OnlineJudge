@@ -1,8 +1,8 @@
 import type { APIRequestContext, APIResponse, TestInfo } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 import { timingSafeEqual } from 'node:crypto';
 import { readFileSync, realpathSync, statSync } from 'node:fs';
 import { basename, dirname, isAbsolute, relative } from 'node:path';
-import { expect, test } from '../fixtures';
 
 type ApiEnvelope<T> = {
   code: string;
