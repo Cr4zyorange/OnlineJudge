@@ -40,16 +40,22 @@ test.describe('@auth AUTH real-application scenarios', () => {
     await expect(page).toHaveURL(/\/login$/);
   });
 
-  test('disabled account cannot log in and receives account status feedback', async ({ page, request }) => {
+  test('disabled account cannot log in and receives account status feedback', async ({ page, request, loginAs }) => {
     const account = await registerUniqueStudent(request);
 
-    const adminToken = await loginToken(request, 'admin001', 'Admin001@pass');
+    await loginAs('admin');
+    const adminToken = await page.evaluate(
+      (tokenKey) => window.localStorage.getItem(tokenKey),
+      AUTH_TOKEN_KEY
+    );
+    expect(adminToken).toBeTruthy();
     const disableResponse = await request.put(`/api/v1/admin/users/${account.id}/status`, {
-      headers: bearer(adminToken),
+      headers: bearer(adminToken as string),
       data: { accountStatus: 'DISABLED' }
     });
     expect(disableResponse.ok()).toBe(true);
 
+    await page.evaluate((tokenKey) => window.localStorage.removeItem(tokenKey), AUTH_TOKEN_KEY);
     await page.goto('/login');
     await page.locator('input[name="account"]').fill(account.username);
     await page.locator('input[name="password"]').fill(account.password);
@@ -156,19 +162,6 @@ async function registerUniqueStudent(request: import('@playwright/test').APIRequ
     username,
     password
   };
-}
-
-async function loginToken(
-  request: import('@playwright/test').APIRequestContext,
-  account: string,
-  password: string
-): Promise<string> {
-  const response = await request.post('/api/v1/auth/login', {
-    data: { account, password }
-  });
-  expect(response.ok()).toBe(true);
-  const payload = await response.json();
-  return payload.data.token;
 }
 
 function bearer(token: string) {
