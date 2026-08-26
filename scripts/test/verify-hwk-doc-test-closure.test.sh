@@ -6,6 +6,30 @@ PATH="/mingw64/bin:/usr/bin:$PATH"
 export PATH
 
 repo_root=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
+if [ -n "${NODE_BIN:-}" ]; then
+  node_bin=$NODE_BIN
+elif command -v node >/dev/null 2>&1; then
+  node_bin=$(command -v node)
+elif [ -x '/mnt/d/Program Files/nodejs/node.exe' ]; then
+  node_bin='/mnt/d/Program Files/nodejs/node.exe'
+elif [ -x '/d/Program Files/nodejs/node.exe' ]; then
+  node_bin='/d/Program Files/nodejs/node.exe'
+else
+  echo 'missing node executable; set NODE_BIN to run Mermaid render verification' >&2
+  exit 1
+fi
+
+to_node_path() {
+  if printf '%s' "$node_bin" | grep -Eq '\.exe$' && command -v wslpath >/dev/null 2>&1; then
+    wslpath -w "$1"
+  else
+    printf '%s\n' "$1"
+  fi
+}
+
+render_tmp="$repo_root/output/hwk-doc-test-closure-mermaid"
+rm -rf "$render_tmp"
+mkdir -p "$render_tmp"
 
 require_file() {
   relative_path=$1
@@ -41,6 +65,10 @@ reject_file() {
   fi
 }
 
+normalize_svg() {
+  sed -e 's/[[:space:]][[:space:]]*/ /g' -e 's/> </></g' "$1"
+}
+
 srs='docs/最终提交/软件需求规格说明书.md'
 overview='docs/最终提交/软件概要设计说明书.md'
 detail='docs/最终提交/软件详细设计说明书.md'
@@ -62,6 +90,16 @@ do
   require_text "$source" 'alt '
   require_text "$source" 'else '
   require_file "$asset"
+  rendered="$render_tmp/$(basename "$asset")"
+  expected_normalized="$rendered.expected"
+  actual_normalized="$rendered.actual"
+  "$node_bin" "$(to_node_path "$repo_root/scripts/dev/render-mermaid.mjs")" "$(to_node_path "$repo_root/$source")" "$(to_node_path "$rendered")"
+  normalize_svg "$repo_root/$asset" > "$expected_normalized"
+  normalize_svg "$rendered" > "$actual_normalized"
+  if ! cmp -s "$expected_normalized" "$actual_normalized"; then
+    echo "rendered Mermaid output differs from committed asset: $asset" >&2
+    exit 1
+  fi
 done
 require_file "$closure"
 require_file "$e2e"
