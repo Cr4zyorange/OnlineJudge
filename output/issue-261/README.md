@@ -6,8 +6,10 @@
 
 | 项目 | 内容 |
 | --- | --- |
-| 基线 | `origin/dev` merge commit `758afd98ba2caad5a00fb6e12413c48f0156b2fb`（含共享 E2E PR #268） |
+| `dev` 基线 | `a11f025ce96f5bf26dff07c54bcb9728abcd2abf`（PR #274 合并提交，包含 #271 修复） |
+| 精确测试提交 | `250a320b2eb7a88d1e24f7a166bbb175a802b8f0`（后续证据提交只归档本次原始输出与回填报告） |
 | 分支 | `test/261-auth-doc-test-closure`（#261）；`fix/271-auth-status-navigation`（#271 修复，PR #274） |
+| 实际完成时间 | 2026-08-26 10:00（UTC+08:00） |
 | 操作系统 | Windows 11 家庭版（10.0.26200） |
 | 后端 | JDK 25；Maven 3.9.9；Spring Boot 3.4.5（H2 内存库） |
 | 前端 | Node v22.19.0；npm 10.9.3；Vue 3.5 / Vite 6.3 / Vitest 3.2.4；Playwright 1.62.1；Chrome（`E2E_BROWSER_CHANNEL=chrome`） |
@@ -22,7 +24,8 @@
 | `typecheck.log` | `vue-tsc --noEmit` | PASS |
 | `build.log` | `vite build` | PASS |
 | `e2e-contract.log` | 共享 E2E 契约（`node --test`） | PASS 3/3 |
-| `e2e-auth.log` | 完整 E2E 套件（共享 smoke 2 + AUTH 9，共 11 条） | 最终复测结果，见下方说明 |
+| `e2e-auth.log` | 完整 E2E 套件（共享 smoke 2 + AUTH 9，共 11 条） | PASS 11 / FAIL 0 / SKIP 0；25.9 s |
+| `mermaid-render.log` | 概要/详细设计内嵌 Mermaid 与新增需求层活动图 | PASS：33 + 69 个内嵌图块、2 个新增需求层图源 |
 
 ## 页面证据（`screenshots/`）
 
@@ -39,6 +42,6 @@
 
 ## 说明
 
-- 禁用/锁定两条 E2E（AUTH-E2E-05/06）原实现存在手工 `page.goto("/account-disabled")` 绕过，终审打回；已删除绕过并直接断言登录提交后的 URL 与状态页视图。该断言依赖 #271 修复（PR #274）合入 `dev` 后复测，最终 `e2e-auth.log` 在合入后于最新 `dev` 上重新生成。
+- 禁用/锁定两条 E2E（AUTH-E2E-05/06）原实现存在手工 `page.goto("/account-disabled")` 绕过，终审打回；现已删除绕过并直接断言登录提交后的 URL 与状态页视图。#271 修复（PR #274）已合入 `dev`，最终 `e2e-auth.log` 在精确测试提交 `250a320` 上重新生成并通过 11/11。
 - `frontend/scripts/verify-e2e-failure`（共享框架自检）在本机 Windows 上因绝对路径参数报 `No tests found`，已手工等效验证“故意断言失败 → `1 failed` + 非零退出码”通过（DEF-001）。
 - Compose :8088 入口因本机 Docker Hub 证书校验失败暂不可用（DEF-002），E2E 按共享 E2E 文档的本地真实服务方案执行。

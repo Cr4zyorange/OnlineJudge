@@ -246,17 +246,19 @@ AUTH 业务场景清单、`include` 公共子流程、备选/异常路径及需�
 
 | 项目 | 结果 |
 | --- | --- |
-| 基线 SHA | `758afd98ba2caad5a00fb6e12413c48f0156b2fb`（`origin/dev` merge commit `758afd9`，含共享 E2E PR #268） |
+| `dev` 基线 SHA | `a11f025ce96f5bf26dff07c54bcb9728abcd2abf`（PR #274 合并提交，包含 #271 修复） |
+| 精确测试提交 SHA | `250a320b2eb7a88d1e24f7a166bbb175a802b8f0` |
 | 环境 | Windows 11（10.0.26200）；JDK 25；Maven 3.9.9；Node v22.19.0；npm 10.9.3；Playwright 1.62.1；Chrome（`E2E_BROWSER_CHANNEL=chrome`） |
 | 应用入口 | 本地真实服务 Spring Boot :8080 + Vite :5173，`E2E_BASE_URL=http://127.0.0.1:5173` |
 | 后端 AUTH 目标测试 | PASS：36 / FAIL：0 / ERROR：0 / SKIP：0（5 个测试类） |
-| 前端 AUTH/API 单元测试 | PASS：27 / FAIL：0（5 个文件） |
+| 前端 AUTH/API/根导航单元测试 | PASS：34 / FAIL：0（6 个文件） |
 | 类型检查 / 构建 | `npm run typecheck` PASS；`npm run build` PASS |
 | 共享 E2E 契约 | `npm run test:e2e:contract` PASS（3/3） |
-| 完整 E2E 套件 | 共享 smoke 2 条 + AUTH 9 条，PASS：11 / FAIL：0 |
+| 完整 E2E 套件 | 共享 smoke 2 条 + AUTH 9 条，PASS：11 / FAIL：0 / SKIP：0；AUTH-E2E-05/06 直接断言真实跳转 |
+| Mermaid 图源 | 概要/详细设计 102 个内嵌图块全部渲染；新增需求层 `fig_4_36`、`fig_4_37` 生成 SVG 成功 |
 | `verify-e2e-failure` | BLOCKED（共享框架 Windows 平台缺陷 DEF-001，等效手工验证 PASS） |
 | `git diff --check` | PASS |
 
 ### 13.3 测试发现缺陷
 
-- DEF-003：登录页触发 `ERR-AUTH-03`（禁用/锁定）后 URL 被 pushState 到 `/account-disabled`，但视图不切换（导航监听器仅挂在已登录外壳）；已另建修复 Issue #271，本 Issue 关联记录。其余详见 `TST-DOC-02-AUTH-业务场景清单与测试闭环.md` 第 6.1 节。
+- DEF-003：登录页触发 `ERR-AUTH-03`（禁用/锁定）后 URL 被 pushState 到 `/account-disabled`，但视图不切换（导航监听器仅挂在已登录外壳）；#271 / PR #274 已合入 `dev`，并在精确测试提交 `250a320` 上通过 AUTH-E2E-05/06 真实跳转复测。其余详见 `TST-DOC-02-AUTH-业务场景清单与测试闭环.md` 第 6.1 节。

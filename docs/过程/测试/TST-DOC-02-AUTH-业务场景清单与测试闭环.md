@@ -155,16 +155,18 @@
 
 | 项目 | 内容 |
 | --- | --- |
-| 基线 SHA | 待最终复测回填（含 #271 修复合并后的最新 `dev`） |
+| `dev` 基线 SHA | `a11f025ce96f5bf26dff07c54bcb9728abcd2abf`（PR #274 合并提交，包含 #271 修复） |
+| 精确测试提交 SHA | `250a320b2eb7a88d1e24f7a166bbb175a802b8f0`（在上述 `dev` 上 rebase，包含 SC-AUTH-05/11 三层专属活动图；后续证据提交只回填本次执行日志与报告） |
 | 分支 | `test/261-auth-doc-test-closure` |
 | 执行环境 | Windows 11 家庭版（10.0.26200）；JDK 25；Maven 3.9.9；Node v22.19.0；npm 10.9.3；Playwright 1.62.1；浏览器 Chrome（`E2E_BROWSER_CHANNEL=chrome`） |
-| 应用入口 | 本地真实服务：Spring Boot :8080（H2 内存库 + 种子演示账号）+ Vite :5173（`/api` 代理），`E2E_BASE_URL=http://127.0.0.1:5173`；Compose :8088 入口因本机 Docker 证书问题 BLOCKED（见 DEF-002） |
+| 应用入口 | 本地真实服务：Spring Boot :8080（H2 本地文件库 + 种子演示账号）+ Vite :5173（`/api` 代理），`E2E_BASE_URL=http://127.0.0.1:5173`；Compose :8088 入口因本机 Docker 证书问题 BLOCKED（见 DEF-002） |
 | 后端 AUTH 目标测试 | 5 个测试类 / 36 条：`AuthControllerTest` 21、`AuthAdminControllerTest` 9、`AuthMigrationScriptTest` 1、`HeaderCurrentUserProviderTest` 3、`AuthCrsIntegrationTest` 2；PASS 36 / FAIL 0 / ERROR 0 / SKIP 0 |
-| 前端 AUTH/API 单元测试 | 5 个文件 / 27 条：`authApi` 8、`http` 11、`AuthView` 4、`AuthProfileView` 3、`AuthAdminView` 1；PASS 27 / FAIL 0 |
+| 前端 AUTH/API/根导航单元测试 | 6 个文件 / 34 条：`authApi` 8、`http` 11、`AuthView` 4、`AuthProfileView` 3、`AuthAdminView` 1、`App` 根导航 7；PASS 34 / FAIL 0 |
 | 前端类型检查 | `npm run typecheck`（vue-tsc --noEmit）：PASS |
 | 前端构建 | `npm run build`（vite build）：PASS |
 | 共享 E2E 契约 | `npm run test:e2e:contract`：PASS（3/3） |
-| 完整 E2E 套件 | 共享 smoke 2 条 + AUTH 9 条，共 11 条；禁用/锁定两条按真实跳转断言复测，结果待最终回填 |
+| 完整 E2E 套件 | 共享 smoke 2 条 + AUTH 9 条，共 11 条；PASS 11 / FAIL 0 / SKIP 0，耗时 25.9 s；AUTH-E2E-05/06 未使用手工 `page.goto`，直接断言登录提交后的 URL 与“账号状态异常”视图 |
+| Mermaid 图源 | 概要设计 33 个 + 详细设计 69 个内嵌图块，共 102 个全部渲染；新增需求层图源 `fig_4_36`、`fig_4_37` 均生成 SVG 成功 |
 | `verify-e2e-failure` | BLOCKED（共享框架 Windows 平台缺陷，见 DEF-001；等效手工验证 PASS） |
 | `git diff --check` | PASS |
 
@@ -174,7 +176,7 @@
 | --- | --- | --- | --- | --- | --- | --- |
 | DEF-001 | BLOCKED | Windows 下执行 `npm run test:e2e:verify-failure`：脚本以绝对路径（含反斜杠）传给 Playwright CLI，报 `No tests found` | 共享框架自检脚本无法在 Windows 直接执行；不影响 E2E 实际运行（已用手工等效验证确认“故意断言失败 → `1 failed` + 非零退出码”） | 共享 E2E 框架负责人（#267 范围） | 另行安排，不阻塞本 Issue 验收 | Windows 下脚本直接输出 `PASS` 且退出码 0 |
 | DEF-002 | BLOCKED | `docker compose -f deploy/docker/compose.yml up -d --build`：Docker Hub 拉取基础镜像时报 `x509: certificate signed by unknown authority`，配置镜像代理亦不可用 | Compose/MySQL :8088 入口在本机暂不可用；已按共享 E2E 文档的本地真实服务方案完成全部 E2E | 本地环境 / 部署负责人 | 另行安排 | Docker 可正常拉取并启动 Compose 后，在 `E2E_BASE_URL=http://127.0.0.1:8088` 复跑 11 条 E2E |
-| DEF-003 | 已修复（PR #274 / #271） | 禁用/锁定账号在登录页被拒后，`frontend/src/api/http.ts` 的 `handleAuthFailure` 将 URL pushState 为 `/account-disabled`，但 `onlinejudge:navigation` 监听器只挂在已登录外壳 `AppShell` 上，登录页视图不切换；已通过将监听器提升至根组件 `App.vue` 修复 | 已消除：登录页触发 `ERR-AUTH-03` 后 URL 与视图一致切换至账号状态页 | @wyx-1236（#271 负责人） | 已完成修复，待合入 `dev` 后最终复测 | E2E AUTH-E2E-05/06 以真实跳转断言通过 |
+| DEF-003 | PASS | 禁用/锁定账号在登录页被拒后，`frontend/src/api/http.ts` 的 `handleAuthFailure` 将 URL pushState 为 `/account-disabled`，但 `onlinejudge:navigation` 监听器只挂在已登录外壳 `AppShell` 上，登录页视图不切换；#271 / PR #274 已将监听器提升至根组件 `App.vue` | 已消除：登录页触发 `ERR-AUTH-03` 后 URL 与视图一致切换至账号状态页 | @wyx-1236（#271 负责人） | 2026-08-26 已合入 `dev` 并完成最终复测 | 精确测试提交 `250a320` 上 E2E AUTH-E2E-05/06 真实跳转断言通过 |
 
 ## 7 验收标准自检
 
@@ -188,3 +190,4 @@
 | 测试证据含环境、SHA、总数、通过、失败、错误、跳过及失败原因；只使用 PASS/FAIL/BLOCKED | PASS | 第 6 节 |
 | 图源可渲染、引用资产存在、`git diff --check` 通过 | PASS | `docs/diagrams/srs/`、`docs/最终提交/assets/` |
 | PR 仅含 AUTH 模块文档与测试改动，描述含 `closes #261`，目标 `dev` | PASS | PR #273 |
+| 关闭前填写实际完成时间并附原始输出与页面/API 证据 | PASS | 实际完成时间：2026-08-26 10:00（UTC+08:00）；`output/issue-261/` |
