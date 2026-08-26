@@ -39,7 +39,7 @@ npm run test:e2e:grd:disposable
 E2E_BROWSER_CHANNEL=chrome npm run test:e2e:grd:disposable
 ```
 
-包装脚本以空环境启动后端，仅保留命令查找路径，并显式固定空 active profile、H2 驱动、`sa`/空密码、`spring.sql.init.mode=always`、课程 schema 初始化和演示数据初始化。调用者即使导出了 Compose/MySQL 的 Spring 环境变量，也不会污染 disposable 后端。健康端点成功后，包装脚本还会继续轮询 `teacher001` 和 `student001` 的真实登录，确认认证种子 `ApplicationRunner` 已完成后才启动 Playwright，避免新库首个请求与种子初始化竞争。
+包装脚本以空环境启动后端，仅保留命令查找路径，并显式固定空 active profile、H2 驱动、`sa`/空密码、`spring.sql.init.mode=always`、课程 schema 初始化和演示数据初始化。调用者即使导出了 Compose/MySQL 的 Spring 环境变量，也不会污染 disposable 后端。健康端点成功后，包装脚本还会继续轮询 `teacher001` 和 `student001` 的真实登录，确认认证种子 `ApplicationRunner` 已完成后才启动 Playwright，避免新库首个请求与种子初始化竞争。启动 Playwright 时同样固定这两个种子账号及密码，不继承调用者导出的 `E2E_TEACHER_*`、`E2E_STUDENT_*` 覆盖值。
 
 直接通过 `npm run test:e2e`、手工设置运行标志或传入任意 `E2E_BASE_URL` 时，变异型 GRD 生命周期用例会跳过。包装脚本会在权限收紧的临时目录中生成一次性随机 token 和 proof 文件；用例同时校验 proof 归属、权限、token、loopback URL 与仍存活的隔离后端 PID，不能只靠一个可继承的环境标志放行。可用 `E2E_GRD_PORT` 覆盖 disposable 后端端口；端口已被服务占用时包装脚本会拒绝启动，不会复用现有应用。
 
@@ -60,7 +60,7 @@ npm run test:e2e:verify-failure
 - `waitForBusinessState(locator, expected)` 等待页面的可观察业务状态，不用固定 sleep。
 - `failureEvidenceName(suffix)` 产生不含账号或凭据的稳定失败证据名称。
 
-可覆盖的账号变量为 `E2E_STUDENT_ACCOUNT/PASSWORD`、`E2E_TEACHER_ACCOUNT/PASSWORD` 和 `E2E_ADMIN_ACCOUNT/PASSWORD`。不得将真实个人账号、Token、Cookie 或本机环境文件提交到仓库。
+普通共享 E2E 可覆盖的账号变量为 `E2E_STUDENT_ACCOUNT/PASSWORD`、`E2E_TEACHER_ACCOUNT/PASSWORD` 和 `E2E_ADMIN_ACCOUNT/PASSWORD`；disposable GRD 命令为匹配临时后端固定种子而忽略教师/学生覆盖值。不得将真实个人账号、Token、Cookie 或本机环境文件提交到仓库。
 
 ## 报告与敏感信息
 
