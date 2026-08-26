@@ -1202,6 +1202,162 @@ describe('CourseManagementView', () => {
     expect(wrapper.text()).toContain('CANNOT_REMOVE_SELF');
     expect(fetchMock.mock.calls.filter(([url]) => url === '/api/v1/courses/1/members')).toHaveLength(2);
   });
+
+  it('surfaces the backend COURSE_FULL message when a public join is rejected', async () => {
+    const joinableCourse = {
+      ...course,
+      id: 71,
+      enrollmentMode: 'PUBLIC',
+      member: false,
+      manageable: false,
+      memberCount: 60
+    };
+    const page = (list = [joinableCourse], total = list.length) => ({
+      code: '0',
+      message: 'success',
+      data: { list, total, page: 1, size: 20 }
+    });
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => page([joinableCourse], 1) })
+      .mockResolvedValueOnce({ ok: true, json: async () => page([joinableCourse], 1) })
+      .mockResolvedValueOnce({ ok: true, json: async () => page([], 0) })
+      .mockResolvedValueOnce({ ok: true, json: async () => page([], 0) })
+      .mockResolvedValueOnce({ ok: false, json: async () => ({ code: '409', message: 'COURSE_FULL', data: null }) });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const wrapper = mount(CourseManagementView);
+    await flushPromises();
+
+    const joinButton = wrapper.findAll('button.card-btn').find((button) => button.text().includes('直接加入'));
+    expect(joinButton).toBeTruthy();
+    await joinButton!.trigger('click');
+    await flushPromises();
+
+    const joinCall = fetchMock.mock.calls.find(([url, options]) => url === '/api/v1/courses/71/join' && options.method === 'POST');
+    expect(joinCall).toBeTruthy();
+    expect(wrapper.find('.state-card.error').text()).toContain('COURSE_FULL');
+  });
+
+  it('surfaces the backend INVALID_INVITE_CODE message when an invite join is rejected', async () => {
+    const inviteCourse = {
+      ...course,
+      id: 72,
+      enrollmentMode: 'INVITE',
+      inviteCode: undefined,
+      member: false,
+      manageable: false,
+      memberCount: 1
+    };
+    const page = (list = [inviteCourse], total = list.length) => ({
+      code: '0',
+      message: 'success',
+      data: { list, total, page: 1, size: 20 }
+    });
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => page([inviteCourse], 1) })
+      .mockResolvedValueOnce({ ok: true, json: async () => page([inviteCourse], 1) })
+      .mockResolvedValueOnce({ ok: true, json: async () => page([], 0) })
+      .mockResolvedValueOnce({ ok: true, json: async () => page([], 0) })
+      .mockResolvedValueOnce({ ok: false, json: async () => ({ code: '400', message: 'INVALID_INVITE_CODE', data: null }) });
+    vi.stubGlobal('fetch', fetchMock);
+    vi.spyOn(window, 'prompt').mockReturnValue('WRONG');
+
+    const wrapper = mount(CourseManagementView);
+    await flushPromises();
+
+    const joinButton = wrapper.findAll('button.card-btn').find((button) => button.text().includes('输入邀请码'));
+    expect(joinButton).toBeTruthy();
+    await joinButton!.trigger('click');
+    await flushPromises();
+
+    const joinCall = fetchMock.mock.calls.find(([url, options]) => url === '/api/v1/courses/72/join' && options.method === 'POST');
+    expect(joinCall).toBeTruthy();
+    expect(JSON.parse(joinCall![1].body)).toEqual({ inviteCode: 'WRONG' });
+    expect(wrapper.find('.state-card.error').text()).toContain('INVALID_INVITE_CODE');
+  });
+
+  it('shows upload failure from the backend without losing the resource form', async () => {
+    const page = (list = [course], total = list.length) => ({
+      code: '0',
+      message: 'success',
+      data: { list, total, page: 1, size: 20 }
+    });
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.includes('/home-summary')) {
+        return { ok: true, json: async () => homeSummary(course) };
+      }
+      if (url.includes('/resources')) {
+        if (init?.method === 'POST') {
+          return { ok: false, json: async () => ({ code: '400', message: '不支持的文件类型', data: null }) };
+        }
+        return { ok: true, json: async () => ({ code: '0', message: 'success', data: [] }) };
+      }
+      if (url.includes('/chapters') || url.includes('/announcements') || url.includes('/members')) {
+        return { ok: true, json: async () => ({ code: '0', message: 'success', data: [] }) };
+      }
+      return { ok: true, json: async () => page([course], 1) };
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const wrapper = mount(CourseManagementView);
+    await flushPromises();
+
+    await wrapper.get('.course-card').trigger('click');
+    await flushPromises();
+
+    const manageResourceButton = wrapper.findAll('.modal-actions-placeholder button').find((item) => item.text().includes('管理资源'));
+    expect(manageResourceButton).toBeTruthy();
+    await manageResourceButton!.trigger('click');
+    await flushPromises();
+
+    const nameInput = wrapper.find('input[maxlength="255"]');
+    await nameInput.setValue('第1章课件');
+    const fileInput = wrapper.find('input[type="file"]');
+    const file = new File(['pdf'], '课件.pdf', { type: 'application/pdf' });
+    Object.defineProperty(fileInput.element, 'files', { value: [file], configurable: true });
+    await fileInput.trigger('change');
+
+    const resourceForm = wrapper.findAll('form').find((form) => form.text().includes('资源名称'));
+    expect(resourceForm).toBeTruthy();
+    await resourceForm!.trigger('submit.prevent');
+    await flushPromises();
+
+    expect(wrapper.text()).toContain('不支持的文件类型');
+    expect(wrapper.find('input[maxlength="255"]').element as HTMLInputElement).toHaveProperty('value', '第1章课件');
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/v1/courses/1/resources',
+      expect.objectContaining({ method: 'POST' })
+    );
+  });
+
+  it('shows empty states for announcements and recent tasks in the course home summary', async () => {
+    const page = (list = [course], total = list.length) => ({
+      code: '0',
+      message: 'success',
+      data: { list, total, page: 1, size: 20 }
+    });
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('/home-summary')) {
+        return { ok: true, json: async () => homeSummary(course, [], []) };
+      }
+      if (url.includes('/chapters') || url.includes('/resources') || url.includes('/announcements') || url.includes('/members')) {
+        return { ok: true, json: async () => ({ code: '0', message: 'success', data: [] }) };
+      }
+      return { ok: true, json: async () => page([course], 1) };
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const wrapper = mount(CourseManagementView);
+    await flushPromises();
+    await wrapper.get('.course-card').trigger('click');
+    await flushPromises();
+
+    expect(wrapper.find('[data-testid="course-announcement-sidebar"]').text()).toContain('暂无课程公告');
+    expect(wrapper.find('[data-testid="course-recent-tasks"]').text()).toContain('暂无最近任务');
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/courses/1/home-summary', expect.anything());
+  });
 });
 
 function installLocalStorageMock() {

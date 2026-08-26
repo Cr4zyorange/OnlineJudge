@@ -98,6 +98,21 @@ flowchart TD
     P --> Q[通知学生处理结果]
 ```
 
+### 1.4 GRD 业务场景与三层图组索引
+
+GRD 以五个既有关键 UC 作为独立可验收场景；来源同步、权限校验、调整留痕和通知投递作为公共子流程复用，不另立 UC。下表同时标明主成功、备选和异常边界，避免把一张综合流程图误当成全部场景证据。
+
+| 场景类型 | 场景/用例 | 主成功路径 | 备选与异常路径 | 需求层 SSD | 概要层流程 | 详细层图 |
+| --- | --- | --- | --- | --- | --- | --- |
+| 独立场景 | UC-GR-01 汇总并发布成绩 | 真实 LAB/HWK 成绩同步、重算、发布并登记 after-commit 通知 | 同步阶段覆盖部分缺失、来源失败、无权限；规则非法只在独立规则校验或发布前检查中阻止操作；相同范围重复发布幂等返回既有结果；来源事务回滚不生成通知，通知独立事务失败只记告警 | 图 4-15 | 8.2、8.3 | 5.1、7.2、7.3、图 3-6-9 |
+| 独立场景 | UC-GR-02 配置成绩项与规则 | 保存来源类型、满分、权重；LAB/HWK 使用正整数来源编号，OTHER_COURSE_ITEM 可为空 | 来源类型非法、LAB/HWK 编号为空或非正数、权重非法、重复名称；当前修改接口不检查关联成绩发布状态或记录规则变更原因；现有同步契约将任务不存在或跨课程、未发布或暂无成绩统一按空结果和 `MISSING` 处理 | 图 4-56 | 8.1 | 7.1 |
+| 独立场景 | UC-GR-03 查询本人已发布成绩 | 当前学生查看本人明细、总评和发布时间 | 未发布、非成员、他人成绩不可见 | 图 4-57 | 8.4 | 图 3-6-11 |
+| 独立场景 | UC-GR-04 成绩异议与复核 | 学生提交，教师同意/驳回，结果通知学生 | 重复 PENDING、未发布/非本人、无权限、调整非法 | 图 4-58 | 8.6 | 图 3-6-12、图 3-6-10 |
+| 独立场景 | UC-GR-05 教学分析 | 教师查看课程/成绩项指标、分布和来源时间 | 空态、快照失效、维度非法、无权限、计算失败 | 图 4-59 | 8.5 | 图 3-6-13 ~ 图 3-6-15 |
+| 公共子流程 | AUTH/CRS 权限 | 使用当前登录身份与课程成员关系 | 会话失效、角色或课程权限不足 | 各 SSD 的前置条件 | 8.1、8.3 ~ 8.6 | GradePermission/CoursePermission 调用 |
+| 公共子流程 | LAB/HWK 来源同步 | 通过 SourceGradeDTO 读取已发布评分 | 超时/失败、任务删除或变化、缺失/未评分 | 图 4-15 | 8.2 | 5.1、7.2 |
+| 公共子流程 | 调整留痕与 LRN 通知 | 写变更日志；在来源事务内登记 after-commit 回调，提交后由 LRN 独立事务 best-effort 持久化 | 来源事务回滚时不生成通知；独立事务失败仅记录告警，不反向回滚已提交的成绩/发布/复核结果；复核响应不含通知结果，发布响应仍返回登记回调前写入的 `notificationStatus=SENT` | 图 4-15、图 4-58 | 8.3、8.6 | 7.3、7.5、图 3-6-12 |
+
 ---
 
 ## 2 2.5.6 成绩评价与教学分析模块功能需求设计
@@ -110,7 +125,7 @@ flowchart TD
 | 优先级 | P0（必须实现） |
 | 涉及角色 | 教师 |
 | 核心功能 | 教师在课程范围内定义成绩项，包括成绩项名称、成绩来源、满分值、权重和是否计入总评；系统按预设权重自动计算课程总评。 |
-| 设计要点 | ① 成绩项必须绑定 `course_id`，创建和修改前必须校验当前教师是否负责或被授权管理该课程。<br>② 成绩来源使用 `source_type + source_id` 表示，首版来源包括 LAB、HWK 和课程内其他可计分项目。<br>③ 成绩项保存满分值、权重、是否计入总评、显示顺序和启用状态。<br>④ 未发布成绩可修改计算规则；已发布成绩如需修改，应转入成绩调整或重新计算流程并保留记录。<br>⑤ 权重配置保存时应校验合法性，避免总评计算规则缺失或权重配置不合法。 |
+| 设计要点 | ① 成绩项必须绑定 `course_id`，创建和修改前必须校验当前教师是否负责或被授权管理该课程。<br>② 成绩来源使用 `source_type + source_id` 表示，首版来源包括 LAB、HWK 和课程内其他可计分项目。<br>③ 成绩项保存满分值、权重、是否计入总评、显示顺序和启用状态。<br>④ 当前 GradeItem 规则修改不接收原因、不检查关联成绩发布状态，也不写入 GradeChangeLog；手动调整已发布 GradeRecord/课程总评及来源同步实际改变已发布 GradeRecord 时才进入既有成绩变更留痕。<br>⑤ 权重配置保存时应校验合法性，避免总评计算规则缺失或权重配置不合法。 |
 
 ### 2.2 FR-GR-02 成绩汇总与总评生成（P0）
 
@@ -120,7 +135,7 @@ flowchart TD
 | 优先级 | P0（必须实现） |
 | 涉及角色 | 系统、教师 |
 | 核心功能 | 系统从实验模块、作业与自动评测模块读取已产生的评分结果，按课程、学生和成绩项汇总，生成学生课程成绩记录和课程总评。 |
-| 设计要点 | ① 汇总范围以课程成员学生名单为基础，避免遗漏未提交或缺失成绩的学生。<br>② 来源成绩进入 GRD 后形成独立成绩记录，记录来源模块、来源任务编号、来源更新时间和同步时间。<br>③ 成绩记录区分 `raw_score`、`weighted_score` 和 `final_score`。<br>④ 对未提交、未评分、缺失成绩设置明确 `grade_status`，并按课程成绩项规则决定是否参与总评。<br>⑤ 规则变更、来源成绩变化或教师手动触发时，系统可重新计算相关成绩记录和课程总评。 |
+| 设计要点 | ① 汇总范围以课程成员学生名单为基础，避免遗漏未提交或缺失成绩的学生。<br>② 来源成绩进入 GRD 后形成独立成绩记录，记录来源模块、来源任务编号、来源更新时间和同步时间。<br>③ 成绩记录区分 `raw_score`、`weighted_score` 和 `final_score`。<br>④ 对未提交、未评分、缺失成绩设置明确 `grade_status`，并按课程成绩项规则决定是否参与总评。<br>⑤ 当前规则保存不自动重算或推进教学分析来源版本；只有保存后仍启用且计入总评的 LAB/HWK 成绩项会由来源同步刷新 `weighted_score` 和成绩项来源版本。改为停用或不计入总评的项会被同步筛选排除，其 GradeRecord 和成绩项级快照可能保持旧值；同步仍会在同一事务内重算课程总评并推进总评来源版本。 |
 
 ### 2.3 FR-GR-03 教师成绩管理（P0）
 
@@ -140,7 +155,7 @@ flowchart TD
 | 优先级 | P0（必须实现） |
 | 涉及角色 | 教师、学生、系统 |
 | 核心功能 | 系统支持未发布和已发布成绩状态。教师确认成绩无误后发布课程成绩，发布后学生方可查看对应成绩结果。 |
-| 设计要点 | ① 成绩记录和课程总评均保存发布状态，默认未发布，发布后对对应学生可见。<br>② 发布前应检查成绩规则是否存在、是否仍有未评分记录，并向教师展示可发布范围和异常提示。<br>③ 发布操作生成发布记录，保存课程编号、发布范围、发布人、发布时间和通知状态。<br>④ 发布接口应具备幂等保护，避免教师重复点击造成重复发布记录或重复通知。<br>⑤ 成绩正式发布后，GRD 向 LRN 发送成绩发布事件。 |
+| 设计要点 | ① 成绩记录和课程总评均保存发布状态，默认未发布，发布后对对应学生可见。<br>② 发布前应检查成绩规则是否存在、是否仍有未评分记录，并向教师展示可发布范围和异常提示。<br>③ 首次发布生成发布记录，保存课程编号、发布范围、发布人、发布时间和通知状态。<br>④ 相同课程与发布范围的重复请求幂等返回既有 `publishId`，不重复生成发布记录或通知。<br>⑤ GRD 在来源事务内登记通知 after-commit 回调；来源事务回滚时不生成通知，提交后由 LRN 独立事务 best-effort 落库。通知失败只记录告警，不能反向回滚已提交的发布；发布记录及响应中的 `notificationStatus` 仍为 `SENT`，不代表通知实际落库，且尚无持久 outbox/自动重试。 |
 
 ### 2.5 FR-GR-05 学生成绩查询与结果展示（P0）
 
@@ -251,16 +266,16 @@ graph TD
 | 接口名称 | 方法与路径 | 调用方 | 主要入参 | 主要出参 | 需求追踪 |
 | --- | --- | --- | --- | --- | --- |
 | 查询成绩项列表 | `GET /api/v1/courses/{courseId}/grade-items` | 教师端 | `courseId` | `gradeItemList` | FR-GR-01 |
-| 创建成绩项 | `POST /api/v1/courses/{courseId}/grade-items` | 教师端 | `name, sourceType, sourceId, fullScore, weight, includedInFinal, sortOrder` | `gradeItemId, createdAt` | FR-GR-01 |
+| 创建成绩项 | `POST /api/v1/courses/{courseId}/grade-items` | 教师端 | `name, sourceType, sourceId, fullScore, weight, includedInFinal, sortOrder` | 完整持久化 `GradeItem`；不附带规则校验或重算结果 | FR-GR-01 |
 | 修改成绩项 | `PUT /api/v1/grade-items/{gradeItemId}` | 教师端 | `name, fullScore, weight, includedInFinal, sortOrder, enabled` | `gradeItemId, updatedAt` | FR-GR-01 |
 | 删除/停用成绩项 | `DELETE /api/v1/grade-items/{gradeItemId}` | 教师端 | `gradeItemId` | `gradeItemId, enabled` | FR-GR-01 |
-| 校验成绩规则 | `POST /api/v1/courses/{courseId}/grade-rules/validate` | 教师端 | `gradeItems` | `valid, errors` | FR-GR-01 |
+| 校验成绩规则 | `POST /api/v1/courses/{courseId}/grade-rules/validate` | 教师端 | 可选 `gradeItems`；为空时校验已保存成绩项 | `valid, totalIncludedWeight, errors` | FR-GR-01 |
 
 ### 5.2 成绩汇总与计算接口
 
 | 接口名称 | 方法与路径 | 调用方 | 主要入参 | 主要出参 | 需求追踪 |
 | --- | --- | --- | --- | --- | --- |
-| 同步来源成绩 | `POST /api/v1/courses/{courseId}/grades/sync` | 教师端/系统 | `gradeItemIds, sourceTypes` | `calculationBatchId, syncedCount, missingCount, ungradedCount` | FR-GR-02 |
+| 同步来源成绩 | `POST /api/v1/courses/{courseId}/grades/sync` | 教师端/系统 | 路径 `courseId`；无请求体 | `calculationBatchId, affectedItemCount, affectedStudentCount, syncedCount, missingCount, ungradedCount` | FR-GR-02 |
 | 重新计算课程成绩 | `POST /api/v1/courses/{courseId}/grades/recalculate` | 教师端/系统 | `gradeItemIds, studentIds` | `calculationBatchId, affectedCount` | FR-GR-01、FR-GR-02 |
 | 查询课程成绩总表 | `GET /api/v1/courses/{courseId}/grades` | 教师端 | `studentKeyword, gradeItemId, gradeStatus, publishStatus, page, size` | `records, total` | FR-GR-02、FR-GR-03 |
 | 查询学生成绩明细 | `GET /api/v1/courses/{courseId}/grades/students/{studentId}` | 教师端 | `courseId, studentId` | `studentGradeDetail` | FR-GR-03 |
@@ -386,7 +401,7 @@ GRD 从 LAB/HWK 读取或接收来源成绩时，只依赖以下字段，不依�
 | publishedCount | Integer | 发布成绩数量 |
 | publishedBy | Long | 发布人编号 |
 | publishedAt | LocalDateTime | 发布时间 |
-| notificationStatus | Enum | PENDING、SENT、FAILED |
+| notificationStatus | Enum | 模型预留 PENDING、SENT、FAILED；当前发布路径在调用 publisher 前写入 SENT，失败时不回写 FAILED |
 | remark | String | 备注 |
 
 ### 6.5 GradeCalculationBatch 成绩计算批次实体
@@ -577,7 +592,7 @@ CREATE INDEX idx_course_grade_publish ON t_course_grade_summary(course_id, publi
 | published_count | int | NOT NULL DEFAULT 0 | 发布成绩数量 |
 | published_by | bigint | NOT NULL | 发布人编号 |
 | published_at | datetime | NOT NULL | 发布时间 |
-| notification_status | varchar(30) | NOT NULL | PENDING、SENT、FAILED |
+| notification_status | varchar(30) | NOT NULL | 模型预留 PENDING、SENT、FAILED；当前发布路径只写 SENT，失败时不回写 FAILED |
 | remark | varchar(500) | NULL | 备注 |
 
 ### 7.5 t_grade_calculation_batch 成绩计算批次表
@@ -832,7 +847,7 @@ sequenceDiagram
 | 权重配置不合法 | 权重为空、负数或不满足课程规则 | 保存或发布前返回校验错误，不更新成绩记录。 | FR-GR-01 |
 | 教师无课程权限 | 当前教师不是课程负责人或授权教师 | 拒绝访问，记录操作失败日志。 | FR-GR-03、NFR-GR-04 |
 | 学生查看未发布成绩 | 学生访问未发布成绩记录 | 返回未发布提示，不返回具体分数、全班明细或统计结果。 | FR-GR-05、NFR-GR-04 |
-| 成绩发布通知发送失败 | LRN 事件发送失败或通知状态失败 | 成绩发布记录保存为已发布，通知状态标记为 `FAILED`，允许后续补偿发送。 | FR-GR-04、NFR-GR-01 |
+| 成绩发布通知持久化失败 | 来源事务提交后，`PersistentNotificationEventPublisher` 在独立 LRN 事务中持久化时抛出运行时异常 | publisher 捕获异常并记录告警；已提交的成绩和发布记录不会被反向回滚，接口仍成功，当前发布记录及响应中的 `notificationStatus` 仍为 `SENT`；来源事务回滚时不生成通知，当前版本没有 `FAILED` 回写、持久 outbox 或自动重试。 | FR-GR-04、NFR-GR-01 |
 | 已发布成绩被修改 | 教师调整已发布成绩项或总评 | 写入变更记录，更新成绩记录，向受影响学生发送 `GRADE_CHANGED` 事件。 | FR-GR-03、FR-GR-04 |
 | 统计结果未及时刷新 | 成绩来源变化后统计结果仍基于旧数据 | 教学分析查询时按最新成绩记录重新计算，或刷新统计快照并记录来源时间点。 | FR-GR-06、NFR-GR-03 |
 | 学生重复提交成绩异议 | 同一学生对同一课程成绩项或总评已有 PENDING 申请 | 拒绝重复申请，返回当前待处理申请编号和状态。 | FR-GR-07 |

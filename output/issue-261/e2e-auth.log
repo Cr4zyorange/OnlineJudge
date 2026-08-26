@@ -1,0 +1,36 @@
+
+> onlinejudge-frontend@0.1.0 test:e2e
+> playwright test
+
+
+Running 11 tests using 8 workers
+
+(node:31132) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:17156) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:30096) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:38660) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:20252) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:5772) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:23480) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:21816) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok  6 [chromium] › tests\e2e\auth\auth.spec.ts:33:3 › @auth AUTH real-application scenarios › wrong credentials show the safe login failure without entering any workspace (15.8s)
+  ok  5 [chromium] › tests\e2e\auth\auth.spec.ts:96:3 › @auth AUTH real-application scenarios › student accessing the admin page is rejected with the forbidden page (16.7s)
+  ok  1 [chromium] › tests\e2e\auth\auth.spec.ts:6:3 › @auth AUTH real-application scenarios › student logs in and lands on the learning task center (16.7s)
+  ok  7 [chromium] › tests\e2e\auth\auth.spec.ts:81:3 › @auth AUTH real-application scenarios › invalid session is rejected and the app redirects to the session expired page (16.7s)
+  ok  4 [chromium] › tests\e2e\auth\auth.spec.ts:24:3 › @auth AUTH real-application scenarios › admin logs in and lands on the auth and permission management page (16.8s)
+  ok  8 [chromium] › tests\e2e\auth\auth.spec.ts:15:3 › @auth AUTH real-application scenarios › teacher logs in and lands on the course center (16.1s)
+  ok  3 [chromium] › tests\e2e\auth\auth.spec.ts:43:3 › @auth AUTH real-application scenarios › disabled account cannot log in and receives account status feedback (18.9s)
+  ok 10 [chromium] › tests\e2e\shared\application.smoke.spec.ts:4:3 › @smoke shared real-application contract › serves the OnlineJudgeForSE application shell (2.5s)
+  ok 11 [chromium] › tests\e2e\shared\application.smoke.spec.ts:12:3 › @smoke shared real-application contract › proxies the backend health endpoint through the application entry (2.7s)
+  ok  9 [chromium] › tests\e2e\auth\auth.spec.ts:105:3 › @auth AUTH real-application scenarios › logout invalidates the old session so the token and protected pages are rejected (6.5s)
+  ok  2 [chromium] › tests\e2e\auth\auth.spec.ts:62:3 › @auth AUTH real-application scenarios › account locked by repeated failures cannot log in with the correct password (23.4s)
+
+  11 passed (25.9s)
