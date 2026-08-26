@@ -4,9 +4,15 @@ set -euo pipefail
 
 repo_root="$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"
 script="$repo_root/scripts/test/verify-issue-265.ps1"
+lab_e2e_spec="$repo_root/frontend/tests/e2e/lab/issue-265-lab-lifecycle.spec.ts"
 
 if [[ ! -f "$script" ]]; then
   printf 'expected issue #265 verifier at %s\n' "$script" >&2
+  exit 1
+fi
+
+if [[ ! -f "$lab_e2e_spec" ]]; then
+  printf 'expected issue #265 LAB E2E spec at %s\n' "$lab_e2e_spec" >&2
   exit 1
 fi
 
@@ -69,5 +75,23 @@ if grep -Eq 'exit[[:space:]]+0[[:space:]]*(#.*)?$' "$script"; then
   printf 'issue #265 verifier must not unconditionally report success\n' >&2
   exit 1
 fi
+
+required_lrn_fragments=(
+  "student receives a LAB notification tied to the published lifecycle"
+  'await expect.poll(async () =>'
+  'wait for asynchronous LAB publication notification'
+  'timeout: 10_000'
+  'intervals: [100, 250, 500, 1_000]'
+  "expect(labNotification?.sourceModule).toBe('LAB')"
+  'expect(labNotification?.sourceId).toBe(labId)'
+  'expect(labNotification?.actionUrl).toContain(`/courses/${COURSE_ID}/labs/${labId}`)'
+)
+
+for fragment in "${required_lrn_fragments[@]}"; do
+  if ! grep -Fq -- "$fragment" "$lab_e2e_spec"; then
+    printf 'issue #265 LRN E2E must use bounded polling and assert the LAB notification contract: %s\n' "$fragment" >&2
+    exit 1
+  fi
+done
 
 printf 'verify-issue-265.contract.test: PASS\n'

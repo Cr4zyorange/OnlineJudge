@@ -143,6 +143,9 @@ test('student download permissions and teacher download failures remain observab
   expect(submissionId).toBeGreaterThan(0);
 
   await loginAs('student');
+  // loginAs verifies credentials only; enter the authenticated shell before using its logout control.
+  await page.goto('/courses');
+  await expect(page.getByTestId('platform-navigation')).toBeVisible();
   const deniedDownload = await page.evaluate(async ({ requestedLabId, requestedSubmissionId }) => {
     const token = window.localStorage.getItem('onlinejudge.authToken');
     const response = await fetch(
@@ -179,22 +182,38 @@ test('student receives a LAB notification tied to the published lifecycle', asyn
   expect(labId).toBeGreaterThan(0);
 
   await loginAs('student');
-  const notificationPage = await page.evaluate(async () => {
-    const token = window.localStorage.getItem('onlinejudge.authToken');
-    const response = await fetch('/api/v1/notifications?page=1&size=100', {
-      headers: token ? { Authorization: `Bearer ${token}` } : {}
+  // API assertions do not render the shell; navigate before using its logout control.
+  await page.goto('/courses');
+  await expect(page.getByTestId('platform-navigation')).toBeVisible();
+  let labNotification: { sourceModule: string; sourceId: number | null; actionUrl: string | null; title: string } | undefined;
+
+  await expect.poll(async () => {
+    const notificationPage = await page.evaluate(async () => {
+      const token = window.localStorage.getItem('onlinejudge.authToken');
+      const response = await fetch('/api/v1/notifications?page=1&size=100', {
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      });
+      const body = await response.json();
+      return { status: response.status, data: body.data } as {
+        status: number;
+        data: { records: Array<{ sourceModule: string; sourceId: number | null; actionUrl: string | null; title: string }> };
+      };
     });
-    const body = await response.json();
-    return { status: response.status, data: body.data } as {
-      status: number;
-      data: { records: Array<{ sourceModule: string; sourceId: number | null; actionUrl: string | null; title: string }> };
-    };
-  });
-  expect(notificationPage.status).toBe(200);
-  const labNotification = notificationPage.data.records.find((notification) => (
-    notification.sourceModule === 'LAB' && notification.sourceId === labId
-  ));
-  expect(labNotification).toBeDefined();
+    if (notificationPage.status !== 200) {
+      return false;
+    }
+    labNotification = notificationPage.data.records.find((notification) => (
+      notification.sourceModule === 'LAB' && notification.sourceId === labId
+    ));
+    return labNotification !== undefined;
+  }, {
+    message: 'wait for asynchronous LAB publication notification',
+    timeout: 10_000,
+    intervals: [100, 250, 500, 1_000]
+  }).toBe(true);
+
+  expect(labNotification?.sourceModule).toBe('LAB');
+  expect(labNotification?.sourceId).toBe(labId);
   expect(labNotification?.actionUrl).toContain(`/courses/${COURSE_ID}/labs/${labId}`);
   expect(['实验已发布', '实验成绩已发布']).toContain(labNotification?.title);
   await logout();
@@ -205,6 +224,9 @@ test('teacher syncs the released LAB source score into GRD', async ({ page, logi
   expect(labId).toBeGreaterThan(0);
 
   await loginAs('teacher');
+  // API assertions do not render the shell; navigate before using its logout control.
+  await page.goto('/courses');
+  await expect(page.getByTestId('platform-navigation')).toBeVisible();
   const gradeSync = await page.evaluate(async ({ courseId, requestedLabId }) => {
     const token = window.localStorage.getItem('onlinejudge.authToken');
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
