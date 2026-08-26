@@ -10,9 +10,9 @@
 | --- | --- |
 | 需求审查锚点 | `origin/dev@8f8e4fc70341c701c25786f12efbffaeca2a3c5f` |
 | 第一轮执行 SHA | `origin/dev@758afd98ba2caad5a00fb6e12413c48f0156b2fb` |
-| 本轮被测头提交 | `d4905e1ce5c063a9c6c74c256f960b8b9c04a649` |
+| 本轮被测头提交 | `a51536d926eacdba660a90ac92503defd9058ab2` |
 | 验收分支 | `test/262-lrn-doc-test-closure` |
-| 执行时间 | 第一轮 2026-08-25 15:24–15:44；当前头复测 2026-08-26 10:01–10:23 +08:00 |
+| 执行时间 | 第一轮 2026-08-25 15:24–15:44；当前头复测 2026-08-26 10:01–10:41 +08:00 |
 | 操作系统 | Windows 11 家庭版 中文版，amd64 |
 | Java / Maven | Java 21.0.11 / Maven 3.9.16 |
 | Node / npm | Node 24.16.0 / npm 11.13.0 |
@@ -49,7 +49,7 @@
 | 后端单元/API/迁移/集成 | 16 个 LRN 目标测试类（含 `LrnCrossModuleEventIntegrationTest`、`GrdLrnIntegrationTest`） | 45 | 45 | 0 | 0 | 0 | PASS |
 | 前端单元 | 13 个 LRN 及 CRS/LAB/HWK 联动文件 | 115 | 115 | 0 | 0 | 0 | PASS |
 | 共享 E2E 契约 | `npm run test:e2e:contract` | 3 | 3 | 0 | 0 | 0 | PASS |
-| LRN Playwright E2E | 默认 4 workers：`npm run test:e2e -- tests/e2e/lrn` | 4 | 4 | 0 | 0 | 0 | PASS |
+| LRN Playwright E2E | 默认 4 workers：`npm run test:e2e -- tests/e2e/lrn`；GREEN 后连续两轮 | 8 | 8 | 0 | 0 | 0 | PASS |
 | TypeScript | `npm run typecheck` | 1 | 1 | 0 | 0 | 0 | PASS |
 | 前端构建 | `npm run build`（189 modules） | 1 | 1 | 0 | 0 | 0 | PASS |
 | 场景文档契约 | `node scripts/test/verify-lrn-doc-test-closure.test.mjs` | 4 | 4 | 0 | 0 | 0 | PASS |

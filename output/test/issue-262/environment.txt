@@ -1,7 +1,7 @@
 issue=#262
 audit_anchor=8f8e4fc70341c701c25786f12efbffaeca2a3c5f
 base_sha=758afd98ba2caad5a00fb6e12413c48f0156b2fb
-execution_sha=d4905e1ce5c063a9c6c74c256f960b8b9c04a649
+execution_sha=a51536d926eacdba660a90ac92503defd9058ab2
 branch=test/262-lrn-doc-test-closure
 os=Windows 11 Home Chinese amd64
 java=21.0.11
