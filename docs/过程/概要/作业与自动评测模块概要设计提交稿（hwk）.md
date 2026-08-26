@@ -1,4 +1,4 @@
-﻿# 作业与自动评测模块概要设计提交稿（HWK）
+# 作业与自动评测模块概要设计提交稿（HWK）
 
 > 项目名称：在线教学与实训平台  
 > 文档类型：概要设计模块提交稿  
@@ -276,7 +276,7 @@ graph TD
 
 | 事件名称                            | 触发时机            | 接收模块    | 主要字段                                                       | 说明                   |
 | ------------------------------- | --------------- | ------- | ---------------------------------------------------------- | -------------------- |
-| `HOMEWORK_PUBLISHED`            | 教师发布作业后         | LRN     | `homeworkId, courseId, title, deadline, receiverScope`     | 生成作业发布通知和任务中心条目。     |
+| `HOMEWORK_PUBLISHED`            | 教师发布作业时         | LRN     | `homeworkId, courseId, title, deadline, receiverScope`     | 必达通知；生成作业发布通知和任务中心条目，失败时发布事务整体回滚并保持 DRAFT。     |
 | `HOMEWORK_UPDATED`              | 教师修改已发布作业的重要信息后 | LRN     | `homeworkId, courseId, title, updatedFields`               | 提醒学生查看最新要求。          |
 | `HOMEWORK_DEADLINE_APPROACHING` | 作业截止前定时扫描       | LRN     | `homeworkId, courseId, deadline, unsubmittedStudentIds`    | 生成截止提醒。              |
 | `HOMEWORK_EVALUATION_FINISHED`  | 自动评测完成后         | LRN     | `homeworkId, submissionId, studentId, status`              | 通知学生查看评测结果。          |

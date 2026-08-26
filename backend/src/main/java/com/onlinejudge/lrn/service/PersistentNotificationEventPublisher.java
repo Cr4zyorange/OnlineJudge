@@ -5,69 +5,54 @@ import com.onlinejudge.common.event.NotificationEventPublisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.PlatformTransactionManager;
-import org.springframework.transaction.TransactionDefinition;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
-import org.springframework.transaction.support.TransactionTemplate;
 
 @Component
 public class PersistentNotificationEventPublisher implements NotificationEventPublisher {
     private static final Logger log = LoggerFactory.getLogger(PersistentNotificationEventPublisher.class);
 
     private final NotificationService notificationService;
-    private final TransactionTemplate notificationTransaction;
 
-    public PersistentNotificationEventPublisher(
-            NotificationService notificationService,
-            PlatformTransactionManager transactionManager
-    ) {
+    public PersistentNotificationEventPublisher(NotificationService notificationService) {
         this.notificationService = notificationService;
-        this.notificationTransaction = new TransactionTemplate(transactionManager);
-        this.notificationTransaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
     }
 
     @Override
     public void publish(NotificationEvent event) {
+        try {
+            persist(event);
+        } catch (RuntimeException ex) {
+            log.warn("Failed to persist notification event targetType={} targetId={}",
+                    event == null ? null : event.targetType(),
+                    event == null ? null : event.targetId(),
+                    ex);
+        }
+    }
+
+    @Override
+    public void publishRequired(NotificationEvent event) {
+        persist(event);
+    }
+
+    private void persist(NotificationEvent event) {
         if (event == null) {
             return;
         }
         if (event.recipientUserIds() == null || event.recipientUserIds().isEmpty()) {
             return;
         }
-        if (TransactionSynchronizationManager.isActualTransactionActive()
-                && TransactionSynchronizationManager.isSynchronizationActive()) {
-            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-                @Override
-                public void afterCommit() {
-                    persist(event);
-                }
-            });
-            return;
-        }
-        persist(event);
-    }
-
-    private void persist(NotificationEvent event) {
-        try {
-            notificationTransaction.executeWithoutResult(ignored ->
-                    notificationService.createNotifications(new NotificationCreateCommand(
-                            event.idempotencyKey(),
-                            event.type(),
-                            null,
-                            event.courseId() > 0 ? event.courseId() : null,
-                            normalizeSourceModule(event),
-                            event.targetId(),
-                            event.recipientUserIds(),
-                            event.title(),
-                            event.content(),
-                            1,
-                            event.linkUrl()
-                    )));
-        } catch (RuntimeException ex) {
-            log.warn("Failed to persist notification event targetType={} targetId={}",
-                    event.targetType(), event.targetId(), ex);
-        }
+        notificationService.createNotifications(new NotificationCreateCommand(
+                event.idempotencyKey(),
+                event.type(),
+                null,
+                event.courseId() > 0 ? event.courseId() : null,
+                normalizeSourceModule(event),
+                event.targetId(),
+                event.recipientUserIds(),
+                event.title(),
+                event.content(),
+                1,
+                event.linkUrl()
+        ));
     }
 
     private String normalizeSourceModule(NotificationEvent event) {
