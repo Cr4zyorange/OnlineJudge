@@ -18,15 +18,21 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.ArrayDeque;
+import java.util.Deque;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.Executor;
+import java.util.concurrent.RejectedExecutionException;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @JdbcTest(properties = {
-        "spring.datasource.url=jdbc:h2:mem:notification_publisher_tx;MODE=MySQL;DATABASE_TO_LOWER=TRUE;CASE_INSENSITIVE_IDENTIFIERS=TRUE;DB_CLOSE_DELAY=-1"
+        "spring.datasource.url=jdbc:h2:mem:notification_publisher_tx;MODE=MySQL;DATABASE_TO_LOWER=TRUE;CASE_INSENSITIVE_IDENTIFIERS=TRUE;DB_CLOSE_DELAY=-1",
+        "spring.datasource.hikari.maximum-pool-size=1",
+        "spring.datasource.hikari.connection-timeout=250"
 })
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Import({
@@ -52,6 +58,11 @@ class PersistentNotificationEventPublisherTransactionTest {
                 NotificationEventPublisher notificationPublisher
         ) {
             return new OuterBusinessProbe(jdbcTemplate, notificationPublisher);
+        }
+
+        @Bean(name = "notificationDeliveryExecutor")
+        QueuedNotificationExecutor notificationDeliveryExecutor() {
+            return new QueuedNotificationExecutor();
         }
     }
 
@@ -107,8 +118,45 @@ class PersistentNotificationEventPublisherTransactionTest {
             }
         }
 
+        @Transactional
+        public void saveBusinessStateAndPublishRequiredNotification(long id) {
+            jdbcTemplate.update("INSERT INTO notification_tx_probe (id) VALUES (?)", id);
+            notificationPublisher.publishRequired(event(id));
+        }
+
         int notificationCountAfterPublish() {
             return notificationCountAfterPublish;
+        }
+    }
+
+    static class QueuedNotificationExecutor implements Executor {
+        private final Deque<Runnable> tasks = new ArrayDeque<>();
+        private boolean rejectNext;
+
+        @Override
+        public void execute(Runnable command) {
+            if (rejectNext) {
+                rejectNext = false;
+                throw new RejectedExecutionException("simulated notification executor saturation");
+            }
+            tasks.addLast(command);
+        }
+
+        int pendingTaskCount() {
+            return tasks.size();
+        }
+
+        void runNext() {
+            tasks.removeFirst().run();
+        }
+
+        void rejectNext() {
+            rejectNext = true;
+        }
+
+        void clear() {
+            tasks.clear();
+            rejectNext = false;
         }
     }
 
@@ -124,20 +172,30 @@ class PersistentNotificationEventPublisherTransactionTest {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+    @Autowired
+    private QueuedNotificationExecutor notificationDeliveryExecutor;
+
     @BeforeEach
     void setUp() {
         jdbcTemplate.update("DELETE FROM lrn_notification_status_log");
         jdbcTemplate.update("DELETE FROM lrn_notification");
         jdbcTemplate.update("DELETE FROM notification_tx_probe");
+        notificationDeliveryExecutor.clear();
     }
 
     @Test
-    void notificationIsPersistedOnlyAfterOuterBusinessTransactionCommits() {
+    void afterCommitDefersNewTransactionUntilSourceConnectionIsReleased() {
         outerBusinessProbe.saveBusinessStateAndPublishNotification(1L, false);
 
         assertThat(outerBusinessProbe.notificationCountAfterPublish()).isZero();
         assertThat(probeCount(1L)).isEqualTo(1);
+        assertThat(notificationCount()).isZero();
+        assertThat(notificationDeliveryExecutor.pendingTaskCount()).isEqualTo(1);
+
+        notificationDeliveryExecutor.runNext();
+
         assertThat(notificationCount()).isEqualTo(1);
+        assertThat(notificationDeliveryExecutor.pendingTaskCount()).isZero();
     }
 
     @Test
@@ -148,6 +206,7 @@ class PersistentNotificationEventPublisherTransactionTest {
 
         assertThat(probeCount(2L)).isZero();
         assertThat(notificationCount()).isZero();
+        assertThat(notificationDeliveryExecutor.pendingTaskCount()).isZero();
     }
 
     @Test
@@ -158,6 +217,10 @@ class PersistentNotificationEventPublisherTransactionTest {
                 .doesNotThrowAnyException();
 
         assertThat(probeCount(3L)).isEqualTo(1);
+        assertThat(notificationDeliveryExecutor.pendingTaskCount()).isEqualTo(1);
+
+        assertThatCode(notificationDeliveryExecutor::runNext).doesNotThrowAnyException();
+
         assertThat(notificationCount()).isZero();
     }
 
@@ -166,6 +229,51 @@ class PersistentNotificationEventPublisherTransactionTest {
         notificationPublisher.publish(event(4L));
 
         assertThat(notificationCount()).isEqualTo(1);
+    }
+
+    @Test
+    void rejectedAfterCommitDispatchDoesNotAffectCommittedSourceTransaction() {
+        notificationDeliveryExecutor.rejectNext();
+
+        assertThatCode(() -> outerBusinessProbe.saveBusinessStateAndPublishNotification(7L, false))
+                .doesNotThrowAnyException();
+
+        assertThat(probeCount(7L)).isEqualTo(1);
+        assertThat(notificationCount()).isZero();
+        assertThat(notificationDeliveryExecutor.pendingTaskCount()).isZero();
+    }
+
+    @Test
+    void nullAndEmptyRecipientEventsDoNotScheduleOrPersistNotifications() {
+        notificationPublisher.publish(null);
+        notificationPublisher.publish(event(8L, List.of()));
+        notificationPublisher.publishRequired(null);
+        notificationPublisher.publishRequired(event(9L, List.of()));
+
+        assertThat(notificationCount()).isZero();
+        assertThat(notificationDeliveryExecutor.pendingTaskCount()).isZero();
+    }
+
+    @Test
+    void requiredNotificationFailureRollsBackSourceTransaction() {
+        notificationRepository.failNextSave();
+
+        assertThatThrownBy(() -> outerBusinessProbe.saveBusinessStateAndPublishRequiredNotification(5L))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("simulated notification persistence failure");
+
+        assertThat(probeCount(5L)).isZero();
+        assertThat(notificationCount()).isZero();
+        assertThat(notificationDeliveryExecutor.pendingTaskCount()).isZero();
+    }
+
+    @Test
+    void requiredNotificationCommitsAtomicallyWithSourceTransaction() {
+        outerBusinessProbe.saveBusinessStateAndPublishRequiredNotification(6L);
+
+        assertThat(probeCount(6L)).isEqualTo(1);
+        assertThat(notificationCount()).isEqualTo(1);
+        assertThat(notificationDeliveryExecutor.pendingTaskCount()).isZero();
     }
 
     private int probeCount(long id) {
@@ -184,11 +292,15 @@ class PersistentNotificationEventPublisherTransactionTest {
     }
 
     private static NotificationEvent event(long id) {
+        return event(id, List.of(601L));
+    }
+
+    private static NotificationEvent event(long id, List<Long> recipients) {
         return new NotificationEvent(
                 "LRN:TX:" + id,
                 "GRADE_PUBLISHED",
                 0L,
-                List.of(601L),
+                recipients,
                 "成绩已发布",
                 "测试通知事务边界",
                 "GRADE_PUBLISH_RECORD",
