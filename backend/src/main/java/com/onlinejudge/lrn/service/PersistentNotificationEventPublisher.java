@@ -18,30 +18,41 @@ public class PersistentNotificationEventPublisher implements NotificationEventPu
 
     @Override
     public void publish(NotificationEvent event) {
+        try {
+            persist(event);
+        } catch (RuntimeException ex) {
+            log.warn("Failed to persist notification event targetType={} targetId={}",
+                    event == null ? null : event.targetType(),
+                    event == null ? null : event.targetId(),
+                    ex);
+        }
+    }
+
+    @Override
+    public void publishRequired(NotificationEvent event) {
+        persist(event);
+    }
+
+    private void persist(NotificationEvent event) {
         if (event == null) {
             return;
         }
         if (event.recipientUserIds() == null || event.recipientUserIds().isEmpty()) {
             return;
         }
-        try {
-            notificationService.createNotifications(new NotificationCreateCommand(
-                    event.idempotencyKey(),
-                    event.type(),
-                    null,
-                    event.courseId() > 0 ? event.courseId() : null,
-                    normalizeSourceModule(event),
-                    event.targetId(),
-                    event.recipientUserIds(),
-                    event.title(),
-                    event.content(),
-                    1,
-                    event.linkUrl()
-            ));
-        } catch (RuntimeException ex) {
-            log.warn("Failed to persist notification event targetType={} targetId={}",
-                    event.targetType(), event.targetId(), ex);
-        }
+        notificationService.createNotifications(new NotificationCreateCommand(
+                event.idempotencyKey(),
+                event.type(),
+                null,
+                event.courseId() > 0 ? event.courseId() : null,
+                normalizeSourceModule(event),
+                event.targetId(),
+                event.recipientUserIds(),
+                event.title(),
+                event.content(),
+                1,
+                event.linkUrl()
+        ));
     }
 
     private String normalizeSourceModule(NotificationEvent event) {

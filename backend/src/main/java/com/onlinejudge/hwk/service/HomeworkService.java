@@ -204,7 +204,7 @@ public class HomeworkService {
         }
         Homework published = requireActiveWrite(repository.update(existing.publish(LocalDateTime.now())));
         try {
-            notificationEventPublisher.publish(new NotificationEvent(
+            notificationEventPublisher.publishRequired(new NotificationEvent(
                     "homework-published-" + published.id() + "-" + published.updatedAt(),
                     "HOMEWORK_PUBLISHED",
                     published.courseId(),
@@ -217,7 +217,13 @@ public class HomeworkService {
                     published.updatedAt()
             ));
         } catch (RuntimeException ex) {
-            log.warn("Failed to publish HOMEWORK_PUBLISHED event for homework {}: {}", published.id(), ex.toString());
+            log.error("Required HOMEWORK_PUBLISHED notification failed for homework {}; rolling back publish",
+                    published.id(), ex);
+            throw new HomeworkApiException(
+                    "HWK_5003",
+                    "homework notification delivery failed; publish rolled back",
+                    HttpStatus.SERVICE_UNAVAILABLE
+            );
         }
         return published;
     }
