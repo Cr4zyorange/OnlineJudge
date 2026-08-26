@@ -28,6 +28,7 @@
 | V1.7 | 2026-08-25 | GRD 模块负责人 | 按 PR #270 六轮评审明确来源提供方未映射异常的通用 500 响应，并补齐教学分析权限拒绝终止路径 |
 | V1.8 | 2026-08-25 | GRD 模块负责人 | 按 PR #270 七轮评审隔离外部 Spring/Compose 环境，并补充当时的复核通知时序证据（已由 V1.9 事务边界取代） |
 | V1.9 | 2026-08-26 | GRD 模块负责人 | 按 PR #270 打回意见将 LRN 事务缺陷拆为 #283 / PR #284 独立交付；#270 仅更新 GRD 文档、图和契约，合并顺序依赖 #284，并将 GRD SRS 图重编为 4-56 ~ 4-59 |
+| V1.10 | 2026-08-26 | GRD 模块负责人 | 在 #284 合入 `dev` 后，将真实 E2E 的发布/复核通知断言改为 10 秒有界轮询，并继续按本次动态 `publishId`、`requestId` 验证两条异步通知的最终可见性 |
 
 ### 1.2 审批记录
 
@@ -131,7 +132,7 @@
 | 后端 GRD 相关测试 | `mvn test -Dtest=GradeItemControllerTest,GradeRecordControllerTest,GradeItemMigrationTest,GradeAnalysisServiceTest,GradeItemServiceTest,GradeRecordServiceTest,GradeReviewServiceTest,GrdLrnIntegrationTest` | 8 个测试类通过，63 条通过，0 失败，0 错误，0 跳过 |
 | 前端 GRD 单元测试 | `node node_modules/vitest/vitest.mjs run tests/unit/grd/gradeItemsApi.spec.ts tests/unit/grd/gradeRecordsApi.spec.ts tests/unit/grd/GradeItemConfigView.spec.ts tests/unit/grd/TeacherGradeTableView.spec.ts tests/unit/grd/App.spec.ts src/views/grd/StudentGradeView.spec.ts --pool=threads` | 6 个测试文件通过，40 条测试通过 |
 | GRD 文档/E2E 契约 | `node --test tests/contracts/grd-doc-test-closure.contract.test.mjs` | 5 条通过，0 失败 |
-| 真实跨模块 E2E | `E2E_BROWSER_CHANNEL=chrome npm run test:e2e:grd:disposable` | 1 条 disposable 闭环场景通过，0 失败；临时后端和 H2 数据自动清理 |
+| 真实跨模块 E2E | `SPRING_PROFILES_ACTIVE=compose E2E_GRD_PORT=18090 E2E_BROWSER_CHANNEL=chrome E2E_FAILURE_ARTIFACTS=off npm run test:e2e:grd:disposable` | 1 条 disposable 闭环场景通过，0 失败；发布与复核通知在 10 秒内最终可见；退出后端口、后端进程和 H2 临时目录均已清理 |
 
 说明：前端测试运行时 Node 输出 `--localstorage-file` 未提供有效路径的警告，测试断言全部通过；该警告不影响 GRD 页面、路由和 API 用例结果。
 
@@ -145,7 +146,7 @@
 | TC-GR-04 | FR-GR-04 | UI-GRD-05；API-GRD-12 ~ 14；DB-GRD-02、03、04、07 | 成绩已计算且可发布；存在选中学生范围 | 教师发布成绩，重复执行同一范围发布，查询发布记录 | 发布后学生可见，记录发布批次；重复发布返回同一 `publishId`，不重复记录或通知；当前首次发布响应返回 `notificationStatus=SENT` | `teacherPublishesSelectedGradesAndEmitsGradePublishedEvent`、`repeatedPublishUsesRangeIdempotencyKeyAndDoesNotNotifyAgain`、`grade-lifecycle.spec.ts`、前端发布记录用例通过 | 通过 |
 | TC-GR-05 | FR-GR-05 | UI-GRD-06；API-GRD-15；DB-GRD-02、03 | 准备非课程成员、课程成员未发布成绩和本人已发布成绩 | 学生查询我的课程成绩 | 非成员返回 ERR-GRD-02/403；课程成员未发布返回 ERR-GRD-04/400 且不泄露分数字段；已发布只返回本人数据 | `nonMemberStudentCannotQueryPublishedCourseGradesThroughApi`、真实 E2E 未发布断言、`StudentGradeView.spec.ts` 通过 | 通过 |
 | TC-GR-06 | FR-GR-06 | UI-GRD-07；API-GRD-16、17；DB-GRD-08、02、03、09 | 成绩记录包含多分数段、缺失、未评分、未提交样本；另准备仅修改规则、仍计入总评以及改为不计入总评的场景 | 教师查询课程总评分析和成绩项完成情况；修改 LAB/HWK 规则后分别在同步前后查询 | 成绩或学生集合来源版本变化时返回新快照；仅保存规则时允许复用旧快照。仍启用且计入总评的项由同步刷新 GradeRecord；改为 `includedInFinal=false` 时同步不刷新该项，成绩项级快照可能继续复用，课程总评则重算并在下次分析查询生成新快照 | `GradeAnalysisServiceTest`、`teacherQueriesCourseGradeAnalysisThroughApi`、`teacherQueriesGradeItemCompletionThroughApi`、前端分析用例通过；同步筛选和快照限制由文档-实现契约锁定 | 通过 |
-| TC-GR-07 | FR-GR-07 | UI-GRD-09、10；API-GRD-18 ~ 21；DB-GRD-06、07 | 学生已有已发布成绩；教师具备课程权限 | 学生提交异议，教师筛选并处理，同意修改或驳回 | 申请状态流转，重复 PENDING 申请被拒绝，同意修改写入变更记录并通知学生 | `GradeReviewServiceTest`、`studentSubmitsGradeReviewAndTeacherProcessesItThroughApi`、前端复核处理用例通过 | 通过 |
+| TC-GR-07 | FR-GR-07 | UI-GRD-09、10；API-GRD-18 ~ 21；DB-GRD-06、07 | 学生已有已发布成绩；教师具备课程权限 | 学生提交异议，教师筛选并处理，同意修改或驳回；处理接口返回后有界轮询通知列表 | 申请状态流转，重复 PENDING 申请被拒绝，同意修改写入变更记录；10 秒内按本次动态 `publishId`、`requestId` 查询到发布与复核两条通知 | `GradeReviewServiceTest`、`studentSubmitsGradeReviewAndTeacherProcessesItThroughApi`、`grade-lifecycle.spec.ts`、前端复核处理用例通过 | 通过 |
 | TC-GR-08 | NFR-GR-01 | API-GRD-06、07、12；DB-GRD-02 ~ 05 | 模拟来源刷新、发布、重复发布和大班发布范围 | 同步、重算、发布、重复发布 | 数据事务边界稳定，发布幂等，发布范围摘要有长度边界 | `syncSourceGradesDeclaresTransactionalBoundaryForSyncAndRecalculation`、发布幂等和大班发布用例通过 | 通过 |
 | TC-GR-09 | NFR-GR-02 | UI-GRD-02、06、07；API-GRD-08、15、16；DB-GRD-02、03、08 | 准备分页和基础统计样本 | 查询教师总表、学生个人成绩、教学分析 | 接口支持分页和筛选，基础统计可返回 | 后端查询用例和前端分页/分析用例通过；生产规模压测待补充 | 有条件通过 |
 | TC-GR-10 | NFR-GR-03 | UI-GRD-08；API-GRD-06、12、13、14、21；DB-GRD-04 ~ 08 | 存在同步、发布、调整、复核、统计流程 | 查询批次、发布记录、变更记录、复核记录和快照 | 发布、分数调整、来源同步实际改变已发布成绩、复核和统计可追踪；当前 GradeItem 规则修改本身不写变更日志 | 迁移、服务和控制器日志/快照用例通过；规则修改审计缺口由契约测试确认 | 通过 |
@@ -167,7 +168,7 @@
 
 | 证据编号 | 场景/边界 | 自动化证据 | 结果 |
 | --- | --- | --- | --- |
-| E2E-GRD-001 | 主成功：真实 LAB/HWK 提交、评分、同步、总评、部分发布、学生查询、异议驳回、LRN 发布与复核通知 | `frontend/tests/e2e/grd/grade-lifecycle.spec.ts` | 通过 |
+| E2E-GRD-001 | 主成功：真实 LAB/HWK 提交、评分、同步、总评、部分发布、学生查询、异议驳回；处理响应后在 10 秒有限窗口内按动态 `publishId`、`requestId` 轮询 LRN 发布与复核通知，验证异步通知最终可见 | `frontend/tests/e2e/grd/grade-lifecycle.spec.ts` | 通过 |
 | E2E-GRD-002 | 备选：同课程第二名学生来源成绩缺失，分析显示 1/2 完成，完整课程发布被 `ERR-GRD-04` 拒绝，部分发布成功 | `grade-lifecycle.spec.ts` | 通过 |
 | E2E-GRD-003 | 状态/幂等：重复来源同步不重复产生结果；同一范围重复发布返回相同 `publishId` | `grade-lifecycle.spec.ts` | 通过 |
 | E2E-GRD-004 | 权限/异常：重复 PENDING 异议返回 `ERR-GRD-08`；学生访问教师接口 403；未登录访问 401；非法分析目标 400 | `grade-lifecycle.spec.ts` | 通过 |
@@ -231,8 +232,9 @@
 | GRD-266-LOG-019 | PR #270 十五轮同步筛选与规则审计边界回归 | 契约 RED 4 passed / 1 failed；明确停用/不计入总评项不会被同步刷新、成绩项快照可复用，并记录 GradeItem 修改不检查发布状态、不接收原因或写规则变更日志；同时对齐 API-GRD-07 仅汇总现有 weightedScore 的真实行为后 5 passed / 0 failed |
 | GRD-266-LOG-020 | PR #270 最新 `dev@570dd0c` 图号冲突回归 | 图组契约 RED 3 passed / 2 failed，确认 CRS 已占用图 4-38 ~ 4-55；合并最新 dev、保留 CRS 章节并将 GRD 四张 SSD 调整为图 4-56 ~ 4-59 后 GREEN 5 passed / 0 failed，六个相关 SVG 均通过 XML 解析 |
 | GRD-266-LOG-021 | PR #270 通知反向一致性契约 | 通知契约 RED 4 passed / 1 failed，确认复核 SSD 仍描述为来源事务内持久化；改为来源事务回滚不生成通知、提交后 LRN 独立事务落库，并锁定 #283 / PR #284 独立交付边界后 GREEN 5 passed / 0 failed |
-| GRD-266-LOG-022 | #283 / PR #284 LRN after-commit 生产修复 | `dev@570dd0c` 上的真实 Spring/H2 事务测试 RED 4 total / 2 passed / 2 failed，分别复现提交前通知可见和 `UnexpectedRollbackException`；PR #284 head `58d5a0e` GREEN 4 passed / 0 failed，相关回归 11 passed / 0 failed，全量后端 377 total / 372 passed / 0 failures / 0 errors / 5 skipped |
+| GRD-266-LOG-022 | #283 / PR #284 LRN after-commit 生产修复 | PR #284 最终以 `9bd8e6c` 合入 `dev@6255d80`；普通通知的提交回调只排入专用有界执行器，工作线程再以独立事务落库，必达通知仍加入来源事务。最终事务测试 8 passed / 0 failed，相关回归 78 passed / 0 failed，全量后端 383 total / 378 passed / 0 failures / 0 errors / 5 skipped |
 | GRD-266-LOG-023 | PR #270 返工版回归（2026-08-26） | macOS 26.6.2、Java 25.0.1、Maven 3.9.11、Spring Boot 3.4.5、Node 25.8.2、npm 11.11.1、Chrome 151；`origin/dev@570dd0c`。后端全量 377 total / 372 passed / 0 failures / 0 errors / 5 skipped，相关 GRD/LRN 23 passed / 0 failed；GRD Vitest 6 files / 41 passed；全部文档/E2E 契约 8 passed；disposable H2 真实 lifecycle 1 passed；类型检查、Vite 生产构建（189 modules）、四项 shell contract、SVG XML 与 `git diff --check` 通过 |
+| GRD-266-LOG-024 | PR #270 异步通知最终可见性回归（2026-08-26） | 基线 `origin/dev@6255d80`。契约 RED 4 passed / 1 failed，确认 E2E 仍单次查询异步通知；改为 10 秒有界轮询并保留动态 `publishId`、`requestId` 双断言后 GREEN 5 passed / 0 failed，TypeScript 类型检查通过；在外部 `SPRING_PROFILES_ACTIVE=compose` 污染下，端口 18090 的 disposable H2 真实 lifecycle 1 passed / 0 failed，退出后端口无监听、后端进程停止、临时目录删除 |
 
 ## 9 手工测试与联调确认
 
