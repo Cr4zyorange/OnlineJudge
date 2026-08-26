@@ -218,11 +218,15 @@ class CrsMysqlConcurrencyTest {
             return approvalOutcome(courseId, studentId, target, teacherId);
         });
 
-        assertThat(outcomes).as("审批结果只能为 APPROVED/REJECTED/状态冲突").allSatisfy(outcome ->
-                assertThat(outcome).isIn("APPROVED", "REJECTED", "TRANSITION_CONFLICT"));
+        // compare-and-set 语义：并发批准/拒绝中恰好 1 次把 PENDING 迁移到终态，
+        // 其余请求因 UPDATE 影响行数为 0 而返回状态冲突，不允许“后写覆盖”。
+        long succeeded = outcomes.stream()
+                .filter(outcome -> outcome.equals("APPROVED") || outcome.equals("REJECTED"))
+                .count();
+        long conflicts = outcomes.stream().filter("TRANSITION_CONFLICT"::equals).count();
+        assertThat(succeeded).as("并发审批只允许 1 次合法状态迁移（compare-and-set）").isEqualTo(1);
+        assertThat(conflicts).as("其余并发请求必须全部为状态冲突").isEqualTo(threads - 1);
         assertThat(outcomes).as("不应出现未知异常").doesNotContain("UNEXPECTED");
-        assertThat(outcomes).as("至少一个审批/拒绝调用真正完成了状态迁移")
-                .anySatisfy(outcome -> assertThat(outcome).isIn("APPROVED", "REJECTED"));
         assertThat(count("SELECT COUNT(*) FROM crs_course_member WHERE course_id = ? AND user_id = ?",
                 courseId, studentId)).isEqualTo(1);
         String finalStatus = queryString("""

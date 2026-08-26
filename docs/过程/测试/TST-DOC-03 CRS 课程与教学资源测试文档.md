@@ -67,7 +67,7 @@
 | CRS-LOG-003 | 2026-06-08 16:44 | `HeaderCoursePermissionClientTest` | Header 课程权限客户端的成员/教师/角色判断                    | 6 条通过  |
 | CRS-LOG-004 | 2026-06-08 16:44 | Maven 汇总                         | `Tests run: 31, Failures: 0, Errors: 0, Skipped: 0`          | 构建成功  |
 | CRS-LOG-010 | 2026-08-25 16:23 | `CrsClosureE2EApiTest`             | CRS 主流程闭环：建课、章节、资源、公告、三模式加入、审批权限、异常分支 | 1 条通过 |
-| CRS-LOG-011 | 2026-08-26 10:20 | `CrsMysqlConcurrencyTest`（`OJ_MYSQL_TEST=true`，MySQL 9.6） | 真实 MySQL 独立临时库：迁移与唯一约束、同用户并发加入、并发审批收敛单终态、从剩余 1 名额开始并发加入仅 1 人 ACTIVE（覆盖计数后插入竞争窗口） | 4 条通过 |
+| CRS-LOG-011 | 2026-08-26 11:25 | `CrsMysqlConcurrencyTest`（`OJ_MYSQL_TEST=true`，MySQL 9.6） | 真实 MySQL 独立临时库：迁移与唯一约束、同用户并发加入、并发审批恰好 1 次合法状态迁移（状态 compare-and-set）其余状态冲突、从剩余 1 名额开始并发加入仅 1 人 ACTIVE（覆盖计数后插入竞争窗口） | 4 条通过 |
 | CRS-LOG-012 | 2026-08-25 16:23 | Maven 全量（含真实 MySQL 环境变量） | `Tests run: 357, Failures: 0, Errors: 0, Skipped: 1`（Docker 沙箱专用跳过） | 构建成功  |
 
 #### 8.2.2 前端 CRS 执行日志
@@ -127,7 +127,7 @@
 | 前端覆盖     | 通过 | CRS 页面 18 条单测通过，全前端 170 条单测通过                |
 | 前端覆盖（补测） | 通过 | CRS 页面 24 条单测通过，全前端 555 条单测通过，生产构建通过；typecheck 依赖 `@playwright/test` 安装（本机离线 BLOCKED-02） |
 | 数据一致性   | 通过 | CRS 课程、成员、章节、资源、公告及 LRN 近期任务关联在测试中验证 |
-| 真实数据库   | 通过 | MySQL 9.6 独立临时库上经真实 `CourseService` 并发验证 4/4 通过；容量“计数后插入”竞争已由课程行锁 + 锁定读计数修复；H2 结果不替代该项 |
+| 真实数据库   | 通过 | MySQL 9.6 独立临时库上经真实 `CourseService` 并发验证 4/4 通过；容量“计数后插入”竞争由课程行锁 + 锁定读计数修复；审批状态竞争由 `WHERE join_status = ?` compare-and-set 修复，恰好 1 次合法迁移；H2 结果不替代该项 |
 | 端到端闭环   | 通过 | 共享 E2E 入口（#267 runner）接口闭环 19/19；4 张真实页面截图 |
 | 脚本退出码   | 通过 | `crs-e2e-http.test.ps1` 覆盖服务不可达与断言 FAIL 两条失败路径，均写证据并以非 0 退出 |
 | 非功能与安全 | 通过 | 已覆盖基础分页、权限、文件限制和异常映射；已执行人工安全/浏览器验收 |

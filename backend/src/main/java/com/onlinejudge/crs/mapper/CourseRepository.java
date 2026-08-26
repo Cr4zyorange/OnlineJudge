@@ -258,8 +258,11 @@ public class CourseRepository {
                 """, memberMapper, courseId, status.name());
     }
 
-    public CourseMember updateMember(Long courseId, Long userId, CourseMemberRole role, CourseMemberStatus status, Long approvedBy) {
-        jdbcTemplate.update("""
+    public int updateMember(Long courseId, Long userId, CourseMemberRole role, CourseMemberStatus status,
+                            CourseMemberStatus expectedStatus, Long approvedBy) {
+        // compare-and-set：仅当成员仍处于调用方读取到的状态时才迁移，返回更新行数；
+        // 并发批准/拒绝/移除同时基于旧状态判断时，只有一个事务能成功。
+        return jdbcTemplate.update("""
                 UPDATE crs_course_member
                    SET role = ?,
                        join_status = ?,
@@ -267,9 +270,9 @@ public class CourseRepository {
                        joined_at = CASE WHEN ? = 'ACTIVE' THEN CURRENT_TIMESTAMP ELSE joined_at END,
                        left_at = CASE WHEN ? = 'REMOVED' THEN CURRENT_TIMESTAMP ELSE NULL END,
                        updated_at = CURRENT_TIMESTAMP
-                 WHERE course_id = ? AND user_id = ? AND is_deleted = FALSE
-                """, role.name(), status.name(), status.name(), approvedBy, status.name(), status.name(), courseId, userId);
-        return findMember(courseId, userId).orElseThrow();
+                 WHERE course_id = ? AND user_id = ? AND join_status = ? AND is_deleted = FALSE
+                """, role.name(), status.name(), status.name(), approvedBy, status.name(), status.name(),
+                courseId, userId, expectedStatus.name());
     }
 
     public long memberCount(Long courseId) {
