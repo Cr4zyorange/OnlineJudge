@@ -5,8 +5,6 @@ import com.onlinejudge.common.event.NotificationEventPublisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Propagation;
-import org.springframework.transaction.annotation.Transactional;
 
 @Component
 public class PersistentNotificationEventPublisher implements NotificationEventPublisher {
@@ -19,7 +17,6 @@ public class PersistentNotificationEventPublisher implements NotificationEventPu
     }
 
     @Override
-    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public void publish(NotificationEvent event) {
         if (event == null) {
             return;
