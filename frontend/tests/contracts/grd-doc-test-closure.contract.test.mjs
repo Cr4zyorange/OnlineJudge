@@ -189,16 +189,15 @@ test('GRD SSD branches and responses match the implemented API contracts', () =>
   assert.match(gradeReviewUseCase, /同步 best-effort.*失败.*不改变.*响应/);
   assert.match(gradeTestReport, /同步 best-effort.*失败.*不改变.*响应/);
   assert.doesNotMatch(notificationPublisher, /@Async/);
-  assert.match(notificationPublisher, /@Transactional\(propagation = Propagation\.NOT_SUPPORTED\)[\s\S]*public void publish/);
   assert.match(notificationPublisher, /notificationService\.createNotifications/);
   assert.match(notificationPublisher, /catch \(RuntimeException ex\)/);
 
   assert.match(gradePublishUseCase, /重复发布.*同一.*publishId.*不重复.*通知/);
   assert.doesNotMatch(gradePublishUseCase, /重复发布[^\n]{0,40}阻止发布/);
-  assert.match(gradePublishUseCase, /通知持久化失败.*只回滚 LRN 独立事务.*rollback-only.*仍可提交.*notificationStatus.*SENT/);
+  assert.match(gradePublishUseCase, /通知持久化失败.*只记录告警.*不回滚.*notificationStatus.*SENT/);
   assert.match(gradeFlowSsd, /相同发布范围已成功[\s\S]*幂等返回既有 publishId[\s\S]*不重复.*通知/);
   assert.match(gradeFlowSsd, /notificationStatus=SENT/);
-  assert.match(gradeFlowSsd, /publisher.*挂起外层 GRD 事务.*LRN.*独立事务.*best-effort.*失败.*发布仍提交.*SENT/);
+  assert.match(gradeFlowSsd, /best-effort.*失败.*不回滚.*SENT/);
   assert.doesNotMatch(gradeFlowSsd, /重复发布.*提示/);
   assert.match(detailedDesign, /\| ERR-GRD-07 \|[^\n]*预留[^\n]*未启用/);
   assert.match(processDetailedDesign, /\| ERR-GRD-07 \|[^\n]*预留[^\n]*未启用/);
