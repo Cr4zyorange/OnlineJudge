@@ -3,9 +3,9 @@
 | 项目 | 内容 |
 | --- | --- |
 | GitHub Issue | #264 `[D2-HWK] 补齐 HWK 业务场景文档与测试闭环` |
-| 执行基线 | `origin/dev@a11f025ce96f5bf26dff07c54bcb9728abcd2abf`（已包含 #267 / PR #268 共享 E2E 入口及 #271 / PR #274 AUTH 导航修复） |
+| 执行基线 | `origin/dev@a30a096281a01d7169cc0c2d18360aa1a65cd6b0`（已包含 #281 / PR #285 的通知失败整体回滚契约） |
 | 本地分支 | `test/264-hwk-doc-test-closure` |
-| 实际完成日期 | 未完成；待 #281 契约确认与复测后填写 |
+| 实际完成日期 | 2026-08-26 |
 | 正式用例边界 | `UC-HWK-01 ~ UC-HWK-02`，不新增或重排 UC 编号 |
 | 需求范围 | `FR-HWK-01 ~ FR-HWK-06`、`NFR-HWK-01 ~ NFR-HWK-05` |
 | 执行环境 | Windows 11；Java 25；Maven 3.9.16；Node.js 24.15.0；npm 11.12.1；Spring Boot 3.4.5；Vue 3 / Vite 6.4.2；H2；Tectonic 0.17.0 |
@@ -45,7 +45,7 @@ HWK 保持两个已经确认的独立业务场景。页面动作、权限检查�
 | 共享 E2E #267 | PASS | 直接复用 PR #268 的 Playwright runner 与公共夹具；`homework-lifecycle.spec.ts` 2/2 通过，不新建 runner、配置或报告目录 |
 | GRD 来源成绩真实链路 | PASS | 创建仅绑定本次 `homeworkId` 且 `includedInFinal=true` 的 HWK 成绩项，调用 GRD `/grades/sync` 后按 `gradeItemId` 与当前学生查询成绩记录，精确断言 `sourceId=homeworkId` 和原始分 88；将 `includedInFinal` 变异为 false 时该断言按预期 RED |
 | LRN 发布/成绩通知成功链路 | PASS | 真实发布/成绩发布后从 LRN 通知 API 按 `sourceModule=HWK` 与 `sourceId=homeworkId` 断言落库 |
-| 通知投递失败设计/实现一致性 | FAIL | SRS 4.10 要求通知失败时拒绝操作并返回可追踪状态；`HomeworkControllerTest#publishKeepsHomeworkPublishedWhenNotificationDeliveryFails` 证明当前实现返回成功、保留 `PUBLISHED` 且未向调用方暴露通知失败状态；独立缺陷 #281 跟踪 |
+| 通知投递失败设计/实现一致性 | PASS | #281 / PR #285 已合并；`HomeworkControllerTest#publishRollsBackHomeworkWhenRequiredNotificationDeliveryFails` 证明必需通知投递失败时返回 `503/HWK_5003`，发布事务整体回滚，作业保持 `DRAFT` 且不留下通知记录 |
 
 ## 4 执行结果
 
@@ -57,29 +57,29 @@ HWK 保持两个已经确认的独立业务场景。页面动作、权限检查�
 | HWK 共享 E2E | 2 | 2 | 0 | 0 | 0 | PASS；真实 Spring Boot + Vite，系统 Chrome；本机未安装 Playwright ffmpeg，按共享 runner 开关以 `E2E_FAILURE_ARTIFACTS=off` 运行 |
 | HWK 后端定向 | 101 | 101 | 0 | 0 | 0 | PASS |
 | HWK 前端定向 | 182 | 182 | 0 | 0 | 0 | PASS；11/11 files |
-| 后端全量回归 | 368 | 367 | 0 | 0 | 1 | PASS；Docker-only 专项按环境假设跳过 |
-| 前端全量回归 | 552 | 552 | 0 | 0 | 0 | PASS；53/53 files |
+| 后端全量回归 | 375 | 370 | 0 | 0 | 5 | PASS；Docker/环境专项按测试假设跳过 |
+| 前端全量回归 | 556 | 556 | 0 | 0 | 0 | PASS；53/53 files |
 | 前端类型检查 | 1 | 1 | 0 | 0 | 0 | PASS |
 | 前端生产构建 | 1 | 1 | 0 | 0 | 0 | PASS；189 modules transformed |
 | 三层 TikZ 编译与静态图目视检查 | 6 | 6 | 0 | 0 | 0 | PASS；Tectonic 逐份生成 PDF，再渲染 PNG；中文、生命线、消息、组合片段和长参与者名称清晰 |
-| 通知投递失败设计/实现一致性 | 1 | 0 | 1 | 0 | 0 | FAIL；SRS 4.10 与当前运行时语义冲突，见 #281 |
+| 通知投递失败及 LRN 定向回归 | 9 | 9 | 0 | 0 | 0 | PASS；覆盖发布整体回滚、必需/尽力投递语义、通知持久化与查询 |
 
 首次 Maven 运行因受限沙箱不能连接 Maven Central，未进入测试断言；允许既有依赖解析后同一命令运行通过，不计为产品 FAIL。首次 E2E 因本机未安装 Playwright ffmpeg 而未进入业务步骤；按共享 runner 的敏感信息约定关闭失败录像后复测通过，不计为产品 FAIL。执行过程未记录 Token、Cookie、真实个人数据或本机凭据。
 
-## 5 FAIL、BLOCKED 与残余风险
+## 5 缺陷关闭与残余风险
 
-### 5.1 FAIL：通知投递失败设计/实现不一致
+### 5.1 #281：通知投递失败契约已关闭
 
-- 复现：运行 `HomeworkControllerTest#publishKeepsHomeworkPublishedWhenNotificationDeliveryFails`；模拟 `NotificationEventPublisher` 抛出异常后，API 仍返回 200，作业状态保持 `PUBLISHED`。
-- 影响：教师端收到发布成功，但 LRN 学习任务/通知可能未生成；当前响应没有可追踪的通知失败状态，无法证明 SRS 4.10 的异常路径闭环。
-- 缺陷 Issue：#281 `[HWK] 统一作业发布通知失败的设计与运行时语义`。
-- 责任人：@terrana37（HWK），LRN 与项目负责人共同确认公共契约。
-- 目标日期：2026-08-29。
-- 复测标准：SRS、详细设计、API/事件契约与运行时语义一致；通知成功/失败自动化同时验证作业状态、API 响应、LRN 落库或可靠补偿，并重新执行 HWK 发布 E2E。
+- 确认契约：`HOMEWORK_PUBLISHED` 是发布事务的必需通知；投递失败则发布整体失败并回滚。
+- 合并证据：#281 / PR #285 已合并到 `dev`，合并提交 `a30a096281a01d7169cc0c2d18360aa1a65cd6b0`。
+- 定向复测：`publishRollsBackHomeworkWhenRequiredNotificationDeliveryFails`、`PersistentNotificationEventPublisherTest`、`NotificationControllerTest` 共 9/9 PASS；失败响应为 `503/HWK_5003`，作业保持 `DRAFT`。
+- 闭环复测：真实 Spring Boot + Vite + 系统 Chrome 的 HWK Playwright 2/2 PASS，通知成功链路、四类提交、评测异常、批阅/重评与 GRD 精确成绩消费均通过。
+
+本 Issue 验收范围内无 FAIL 或 BLOCKED 项。
 
 ### 5.2 环境风险
 
-当前本地后端使用的真实沙箱不可用，CODE E2E 因此记录 `SYSTEM_ERROR` 并验证提交保留与重评可追踪；客观题自动评测主成功路径仍为 PASS。真实 Docker 沙箱中的 CODE AC/WA/资源限制保留为部署环境专项复核。本项是已披露环境风险，不改变 #281 的产品 FAIL 判定。
+当前本地后端使用的真实沙箱不可用，CODE E2E 因此记录 `SYSTEM_ERROR` 并验证提交保留与重评可追踪；客观题自动评测主成功路径仍为 PASS。真实 Docker 沙箱中的 CODE AC/WA/资源限制保留为部署环境专项复核。本项是已披露环境风险，不改变 #264 的闭环 PASS 判定。
 
 ## 6 PASS / FAIL / BLOCKED 规则
 
