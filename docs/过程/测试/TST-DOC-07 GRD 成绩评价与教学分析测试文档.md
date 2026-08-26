@@ -68,11 +68,11 @@
 | FR-GR-01 | 成绩项配置与计算规则 | 成绩项查询、创建、修改、停用、规则校验、权重和来源类型；LAB/HWK 正整数编号、OTHER_COURSE_ITEM 可空编号 | 后端和前端自动化已覆盖；现有来源契约无法区分不存在或跨课程与未发布或暂无成绩，空结果统一生成 `MISSING` |
 | FR-GR-02 | 成绩汇总与总评生成 | 同步 LAB/HWK 来源成绩、缺失/未评分状态、加权分和总评计算 | 后端、前端和真实来源 API E2E 已覆盖 |
 | FR-GR-03 | 教师成绩管理 | 教师总表、学生明细、单项成绩调整、总评调整、变更记录 | 后端和前端自动化已覆盖 |
-| FR-GR-04 | 成绩发布与状态控制 | 发布前检查、发布记录、发布后学生可见、重复发布幂等、发布后调整留痕 | 后端、前端和真实 API E2E 已覆盖 |
+| FR-GR-04 | 成绩发布与状态控制 | 发布前检查、发布记录、发布后学生可见、相同范围重复发布返回同一 `publishId`、发布通知同步 best-effort 语义、发布后调整留痕 | 后端、前端和真实 API E2E 已覆盖；当前通知失败只记告警，发布记录及响应中的 `notificationStatus` 仍为 `SENT` |
 | FR-GR-05 | 学生成绩查询与结果展示 | 学生只查看本人已发布成绩、未发布不可见、来源和反馈展示 | 后端、前端和真实 API E2E 已覆盖 |
 | FR-GR-06 | 班级成绩统计与教学分析 | 课程总评和成绩项均分、最高分、最低分、及格率、完成率、分布和快照 | 后端和前端自动化已覆盖；大规模性能待专项确认 |
 | FR-GR-07 | 成绩异议与复核申请 | 学生提交异议、重复申请拦截、教师同意/驳回、复用调整留痕和通知 | 后端、前端和真实 API E2E 已覆盖；通知在响应前同步 best-effort 持久化，失败只记日志且不改变申请与响应 |
-| NFR-GR-01 | 可靠性 | 来源同步、重算、发布、通知失败和事务边界保持数据一致 | 自动化覆盖来源超时、来源删除、缺失、重复同步/发布和核心事务边界；来源提供方未映射异常在服务层整体回滚，API 当前返回 HTTP 500、`code=500` 和“系统错误，请联系管理员”，无 GRD 专用错误码或重试提示 |
+| NFR-GR-01 | 可靠性 | 来源同步、重算、发布、通知失败和事务边界保持数据一致 | 自动化覆盖来源超时、来源删除、缺失、重复同步/发布和核心事务边界；来源提供方未映射异常在服务层整体回滚，API 当前返回 HTTP 500、`code=500` 和“系统错误，请联系管理员”；发布通知持久化异常由 publisher 捕获，仅记告警且不回滚发布，当前 `notificationStatus` 仍为 `SENT`，没有 `FAILED` 回写或补偿状态 |
 | NFR-GR-02 | 性能 | 成绩总表、学生个人成绩、教学分析分页和基础统计响应 | 自动化覆盖基础样本；生产规模压测待补充 |
 | NFR-GR-03 | 可追踪性 | 计算批次、发布记录、变更记录、复核记录、统计快照 | 自动化覆盖 |
 | NFR-GR-04 | 安全性 | 教师课程权限、学生本人过滤、未发布不可见、无权限复核拒绝 | 自动化覆盖 |
@@ -141,7 +141,7 @@
 | TC-GR-01 | FR-GR-01 | UI-GRD-01；API-GRD-01 ~ 05、07；DB-GRD-01、05 | 教师具备课程管理权限；准备 LAB/HWK 来源编号或 OTHER_COURSE_ITEM、满分、权重、排序数据 | 查询、创建、修改、停用成绩项，执行规则校验 | 合法规则保存成功；OTHER_COURSE_ITEM 可不关联任务；非法权重、重复名称、不支持的来源类型或 LAB/HWK 非正数编号被拒绝；任务不存在或跨课程与任务未发布或暂无成绩均按空来源结果生成 `MISSING` | `GradeItemControllerTest`、`GradeItemServiceTest`、`GradeItemConfigView.spec.ts`、`gradeItemsApi.spec.ts`、`GradeRecordServiceTest` 通过 | 通过 |
 | TC-GR-02 | FR-GR-02 | UI-GRD-02；API-GRD-06 ~ 09；DB-GRD-02、03、05 | 课程内有学生名单；LAB/HWK 来源成绩含已评分、缺失、未提交、未评分状态 | 教师同步来源成绩并查询成绩总表和学生明细 | 生成成绩记录、计算加权分和总评，缺失状态可见 | `teacherSyncsLabAndHomeworkSourceGradesThenCalculatesFinalScores`、`TeacherGradeTableView.spec.ts` 同步用例通过 | 通过 |
 | TC-GR-03 | FR-GR-03 | UI-GRD-02、03、04、08；API-GRD-08 ~ 14；DB-GRD-02、03、07 | 已有成绩记录和课程总评；教师填写调整原因 | 查询总表、进入学生明细、调整单项成绩和总评、查询变更记录 | 分数更新，已发布成绩不回退未发布，变更记录保存旧值、新值、原因和操作人 | `teacherAdjustsGradeRecordWithReasonAndQueriesChangeLogsThroughApi`、`teacherAdjustsCourseFinalScoreWithReasonAndKeepsChangeLog`、前端明细调整用例通过 | 通过 |
-| TC-GR-04 | FR-GR-04 | UI-GRD-05；API-GRD-12 ~ 14；DB-GRD-02、03、04、07 | 成绩已计算且可发布；存在选中学生范围 | 教师发布成绩，重复执行同一范围发布，查询发布记录 | 发布后学生可见，记录发布批次，重复发布幂等，不重复通知 | `teacherPublishesSelectedGradesAndEmitsGradePublishedEvent`、`repeatedPublishUsesRangeIdempotencyKeyAndDoesNotNotifyAgain`、前端发布记录用例通过 | 通过 |
+| TC-GR-04 | FR-GR-04 | UI-GRD-05；API-GRD-12 ~ 14；DB-GRD-02、03、04、07 | 成绩已计算且可发布；存在选中学生范围 | 教师发布成绩，重复执行同一范围发布，查询发布记录 | 发布后学生可见，记录发布批次；重复发布返回同一 `publishId`，不重复记录或通知；当前首次发布响应返回 `notificationStatus=SENT` | `teacherPublishesSelectedGradesAndEmitsGradePublishedEvent`、`repeatedPublishUsesRangeIdempotencyKeyAndDoesNotNotifyAgain`、`grade-lifecycle.spec.ts`、前端发布记录用例通过 | 通过 |
 | TC-GR-05 | FR-GR-05 | UI-GRD-06；API-GRD-15；DB-GRD-02、03 | 准备非课程成员、课程成员未发布成绩和本人已发布成绩 | 学生查询我的课程成绩 | 非成员返回 ERR-GRD-02/403；课程成员未发布返回 ERR-GRD-04/400 且不泄露分数字段；已发布只返回本人数据 | `nonMemberStudentCannotQueryPublishedCourseGradesThroughApi`、真实 E2E 未发布断言、`StudentGradeView.spec.ts` 通过 | 通过 |
 | TC-GR-06 | FR-GR-06 | UI-GRD-07；API-GRD-16、17；DB-GRD-08、02、03 | 成绩记录包含多分数段、缺失、未评分、未提交样本 | 教师查询课程总评分析和成绩项完成情况 | 返回均分、最高分、最低分、及格率、完成率、分布和来源时间点 | `GradeAnalysisServiceTest`、`teacherQueriesCourseGradeAnalysisThroughApi`、`teacherQueriesGradeItemCompletionThroughApi`、前端分析用例通过 | 通过 |
 | TC-GR-07 | FR-GR-07 | UI-GRD-09、10；API-GRD-18 ~ 21；DB-GRD-06、07 | 学生已有已发布成绩；教师具备课程权限 | 学生提交异议，教师筛选并处理，同意修改或驳回 | 申请状态流转，重复 PENDING 申请被拒绝，同意修改写入变更记录并通知学生 | `GradeReviewServiceTest`、`studentSubmitsGradeReviewAndTeacherProcessesItThroughApi`、前端复核处理用例通过 | 通过 |

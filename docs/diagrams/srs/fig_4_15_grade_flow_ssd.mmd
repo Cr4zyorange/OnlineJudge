@@ -10,8 +10,11 @@ sequenceDiagram
     System-->>Teacher: 返回 ERR-GRD-03/400 或 ERR-GRD-01/403
   end
   Teacher->>System: OP-GR-03 发布成绩
-  alt 发布成功
-    System-->>Teacher: 返回发布记录和通知状态
-  else 发布失败
-    System-->>Teacher: 返回未评分、规则缺失、重复发布或权限不足提示
+  alt 首次发布成功
+    System-->>Teacher: 返回 publishId、publishedCount、publishedAt 和 notificationStatus=SENT
+    Note over Teacher,System: 通知在响应前同步 best-effort 持久化；失败只记日志，不回滚发布，响应仍为 SENT
+  else 相同发布范围已成功
+    System-->>Teacher: 幂等返回既有 publishId 和原 notificationStatus，不重复写记录或通知
+  else 发布校验失败
+    System-->>Teacher: 返回未评分、规则缺失、发布范围非法或权限不足提示
   end

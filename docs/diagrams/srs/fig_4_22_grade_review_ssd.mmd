@@ -8,7 +8,8 @@ sequenceDiagram
     Note over Student,System: 教师通知在响应前同步 best-effort 持久化；失败只记日志，不改变申请与响应
     System-->>Teacher: 待处理复核申请可查询
     Teacher->>System: OP-GR-05 同意修改或驳回复核申请
-    System-->>Teacher: 返回处理状态和成绩变更留痕
+    System-->>Teacher: 返回 requestId、APPROVED/REJECTED 和 processedAt
+    Note over Teacher,System: APPROVE 写入的 GradeChangeLog 可经 API-GRD-14 单独查询，不在处理响应中
     System-->>Student: 复核结果和通知可见
   else 未发布/非本人/重复申请/无权限
     System-->>Student: 返回受控错误且不创建重复申请
