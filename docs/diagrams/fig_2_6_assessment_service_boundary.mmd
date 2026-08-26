@@ -1,0 +1,36 @@
+flowchart TB
+    Client[Browser / Vue SPA] --> Gateway[API Gateway]
+    Gateway --> Identity[Identity Service\nAUTH\nAuthentication principal]
+    Gateway --> Course[Course Service\nCRS\nCourses and membership]
+    Gateway --> Assessment[Assessment Service\nLAB + HWK]
+    Gateway --> LearningGrade[Learning and Grade Service\nLRN + GRD]
+
+    Assessment -->|canManageCourse\nisCourseMember\ncourse roster| Course
+    Assessment -->|LAB_EXPERIMENT_PUBLISHED\nLAB_SUBMISSION_SCORED\nEXPERIMENT_SCORE_PUBLISHED\nHOMEWORK_* events| LearningGrade
+    LearningGrade -->|SourceGradeDTO query\nfor published or archived sources| Assessment
+
+    subgraph AssessmentScope[Assessment Service ownership]
+        Lab[LAB lifecycle\nDB-LAB-01 to DB-LAB-09]
+        Hwk[HWK lifecycle\nDB-HWK-01 to DB-HWK-08]
+        Evaluator[Evaluation kernel\nEvaluationTask / Evaluator\nSandboxExecutor / EvaluationResult]
+        Storage[Assessment storage adapter\nsource files, reports, attachments]
+        Lab --> Evaluator
+        Hwk --> Evaluator
+        Lab --> Storage
+        Hwk --> Storage
+    end
+
+    Assessment --- AssessmentScope
+    Assessment --> AssessmentDb[(assessment schema\nLAB and HWK tables)]
+    Assessment --> Docker[Docker or Fake sandbox]
+
+    Identity --> IdentityDb[(identity schema\nDB-AUTH-*)]
+    Course --> CourseDb[(course schema\nDB-CRS-*)]
+    LearningGrade --> LearningGradeDb[(learning-grade schema\nDB-LRN-* and DB-GRD-*)]
+
+    classDef service fill:#e8f3ff,stroke:#1d5d9b,color:#172b4d
+    classDef assessment fill:#e8f7ed,stroke:#217a3c,color:#153d24
+    classDef data fill:#fff4d6,stroke:#9a6a00,color:#4b3200
+    class Gateway,Identity,Course,LearningGrade service
+    class Assessment,Lab,Hwk,Evaluator,Storage assessment
+    class AssessmentDb,IdentityDb,CourseDb,LearningGradeDb data
