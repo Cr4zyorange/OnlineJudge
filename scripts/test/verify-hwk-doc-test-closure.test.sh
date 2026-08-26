@@ -28,7 +28,7 @@ reject_text() {
   relative_path=$1
   rejected=$2
   if grep -Fq -- "$rejected" "$repo_root/$relative_path"; then
-    echo "obsolete combined HWK diagram is still referenced in $relative_path: $rejected" >&2
+    echo "rejected text is still present in $relative_path: $rejected" >&2
     exit 1
   fi
 }
@@ -86,8 +86,12 @@ require_text "$detail" 'assets/tikz/hwk/uc-hwk-01-object-sequence.png'
 require_text "$closure" '教师批阅/重评 | 扩展路径'
 require_text "$closure" '共享 E2E #267 | PASS'
 require_text "$closure" 'GRD 来源成绩真实链路 | PASS'
-require_text "$closure" '通知投递失败设计/实现一致性 | FAIL'
-reject_text "$closure" '本 Issue 验收范围内无 BLOCKED 项'
+require_text "$closure" '通知投递失败设计/实现一致性 | PASS'
+require_text "$closure" 'HomeworkControllerTest#publishRollsBackHomeworkWhenRequiredNotificationDeliveryFails'
+require_text "$closure" '#281 / PR #285 已合并'
+require_text "$closure" '本 Issue 验收范围内无 FAIL 或 BLOCKED 项'
+reject_text "$closure" '实际完成日期 | 未完成'
+reject_text "$closure" '通知投递失败设计/实现一致性 | FAIL'
 require_text "$e2e" '@hwk'
 require_text "$e2e" '教师创建发布作业后学生提交并获得已发布评语'
 require_text "$e2e" 'includedInFinal: true'

@@ -60,6 +60,8 @@ interface AttachmentRecord {
 }
 
 test.describe('@hwk HWK 真实业务闭环', () => {
+  test.describe.configure({ mode: 'serial' });
+
   test('教师创建发布作业后学生提交并获得已发布评语', async ({
     page,
     request,
