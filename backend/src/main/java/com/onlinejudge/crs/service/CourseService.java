@@ -240,6 +240,7 @@ public class CourseService {
         if (targetStatus != CourseMemberStatus.ACTIVE || course.maxStudents() == null) {
             return;
         }
+        courseRepository.lockCourseForCapacity(course.id());
         if (courseRepository.activeStudentCount(course.id()) >= course.maxStudents()) {
             throw new BusinessException(HttpStatus.CONFLICT, "COURSE_FULL");
         }
