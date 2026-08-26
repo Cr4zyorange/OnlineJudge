@@ -62,6 +62,13 @@ npm run test:e2e:verify-failure
 
 普通共享 E2E 可覆盖的账号变量为 `E2E_STUDENT_ACCOUNT/PASSWORD`、`E2E_TEACHER_ACCOUNT/PASSWORD` 和 `E2E_ADMIN_ACCOUNT/PASSWORD`；disposable GRD 命令为匹配临时后端固定种子而忽略教师/学生覆盖值。不得将真实个人账号、Token、Cookie 或本机环境文件提交到仓库。
 
+## 已有模块用例
+
+- `tests/e2e/shared/application.smoke.spec.ts`：应用壳与后端健康代理烟测。
+- `tests/e2e/crs/crs-closure.spec.ts`：CRS 主流程闭环（教师建课/章节/资源/公告；学生公开、邀请码、审批三模式加入；审批前后权限；非法邀请码、满员、重复加入与资源失败），复用共享夹具与运行器。
+
+接口级闭环（真实 MySQL + 真实 HTTP，无需 Playwright）由 `scripts/test/crs-e2e-http.ps1` 提供，输出人工证据到 `output/playwright/e2e-crs/`，与浏览器用例覆盖同一业务闭环。
+
 ## 报告与敏感信息
 
 - 人类可读 HTML 报告：`frontend/playwright-report/`。

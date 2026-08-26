@@ -1,0 +1,14 @@
+flowchart TD
+  A[学生输入邀请码并提交] --> B{校验课程状态}
+  B -->|已归档或关闭| C[返回 COURSE_CLOSED]
+  B -->|正常| D{校验邀请码}
+  D -->|不匹配| E[返回 INVALID_INVITE_CODE]
+  D -->|匹配| F{校验容量与重复加入}
+  F -->|已满| G[返回 COURSE_FULL]
+  F -->|已加入或待审| H[返回 ALREADY_JOINED/JOIN_PENDING]
+  F -->|可加入| I[创建 ACTIVE 成员并开放课程资源与任务]
+  C --> Z[结束]
+  E --> Z
+  G --> Z
+  H --> Z
+  I --> Z

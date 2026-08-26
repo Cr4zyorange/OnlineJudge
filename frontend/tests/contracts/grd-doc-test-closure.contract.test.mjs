@@ -6,10 +6,10 @@ import test from 'node:test';
 const repositoryRoot = resolve(import.meta.dirname, '../../..');
 
 const sourceAssets = [
-  'docs/diagrams/srs/fig_4_38_grade_item_config_ssd.mmd',
-  'docs/diagrams/srs/fig_4_39_student_grade_query_ssd.mmd',
-  'docs/diagrams/srs/fig_4_40_grade_review_ssd.mmd',
-  'docs/diagrams/srs/fig_4_41_grade_analysis_ssd.mmd',
+  'docs/diagrams/srs/fig_4_56_grade_item_config_ssd.mmd',
+  'docs/diagrams/srs/fig_4_57_student_grade_query_ssd.mmd',
+  'docs/diagrams/srs/fig_4_58_grade_review_ssd.mmd',
+  'docs/diagrams/srs/fig_4_59_grade_analysis_ssd.mmd',
   'docs/diagrams/grd/fig_3_6_11_student_grade_query_sequence.mmd',
   'docs/diagrams/grd/fig_3_6_12_grade_review_sequence.mmd',
   'docs/diagrams/grd/fig_3_6_13_grade_analysis_sequence.mmd',
@@ -43,8 +43,8 @@ test('GRD requirement and detailed design chapters reference the split scenario 
   const processDetail = readRepositoryFile('docs/过程/详细设计/GRD-成绩评价与教学分析-详细设计提交稿.md');
   const finalDetail = readRepositoryFile('docs/最终提交/软件详细设计说明书.md');
 
-  for (const figure of ['fig_4_38_grade_item_config_ssd.svg', 'fig_4_39_student_grade_query_ssd.svg',
-    'fig_4_40_grade_review_ssd.svg', 'fig_4_41_grade_analysis_ssd.svg']) {
+  for (const figure of ['fig_4_56_grade_item_config_ssd.svg', 'fig_4_57_student_grade_query_ssd.svg',
+    'fig_4_58_grade_review_ssd.svg', 'fig_4_59_grade_analysis_ssd.svg']) {
     assert.match(srs, new RegExp(figure.replaceAll('.', '\\.')));
   }
 
@@ -74,8 +74,8 @@ test('GRD uses the shared E2E runner for main, alternative, and exception paths'
 });
 
 test('GRD SSD branches and responses match the implemented API contracts', () => {
-  const gradeItemSsd = readRepositoryFile('docs/diagrams/srs/fig_4_38_grade_item_config_ssd.mmd');
-  const gradeReviewSsd = readRepositoryFile('docs/diagrams/srs/fig_4_40_grade_review_ssd.mmd');
+  const gradeItemSsd = readRepositoryFile('docs/diagrams/srs/fig_4_56_grade_item_config_ssd.mmd');
+  const gradeReviewSsd = readRepositoryFile('docs/diagrams/srs/fig_4_58_grade_review_ssd.mmd');
   const gradeFlowSsd = readRepositoryFile('docs/diagrams/srs/fig_4_15_grade_flow_ssd.mmd');
   const studentGradeSequence = readRepositoryFile('docs/diagrams/grd/fig_3_6_11_student_grade_query_sequence.mmd');
   const gradeReviewSequence = readRepositoryFile('docs/diagrams/grd/fig_3_6_12_grade_review_sequence.mmd');
