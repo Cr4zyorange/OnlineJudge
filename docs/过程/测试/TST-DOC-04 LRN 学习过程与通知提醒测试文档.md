@@ -48,7 +48,7 @@
 
 ### 2.3 #262 合并修复复测（2026-08-26）
 
-#269 已在本 PR 内按用户指定范围修复并复测。当前统计为后端 45/45 PASS、前端单元 115/115 PASS、共享 E2E 契约 3/3 PASS、文档契约 4/4 PASS、前端类型检查与构建 PASS、默认 4-worker LRN Playwright 联合命令 4/4 PASS。联合 E2E 从真实教师页面/API 业务入口发布 LAB/HWK、调整 GRD 成绩，并断言本次操作产生的新通知、目标通知未读→已读、重复打开幂等、删除、权限拒绝、断线刷新恢复和业务跳转。被测提交、命令、总数、失败/错误/跳过及原始输出统一记录在 `output/test/issue-262/`；NFR-LN-01/02 仍为 **BLOCKED**。
+#269 已在本 PR 内按用户指定范围修复并复测。最新 `dev@50a5dccd35ddc6b0c8936df20217575f18303a4f` 合并后的可检出被测提交为 `8b69a7241db6bdf585db532522abec041a3e4160`；当前统计为后端 101/101 PASS、前端单元 119/119 PASS、共享 E2E 契约 3/3 PASS、文档契约 4/4 PASS、前端类型检查与构建 PASS、默认 4-worker LRN Playwright 联合命令连续两轮 4/4 PASS（合计 8/8）。联合 E2E 从真实教师页面/API 业务入口发布 LAB/HWK、调整 GRD 成绩，并断言本次操作产生的新通知、目标通知未读→已读、重复打开幂等、删除、权限拒绝、断线刷新恢复和业务跳转。被测提交、命令、总数、失败/错误/跳过及去敏原始输出统一记录在 `output/test/issue-262/`；NFR-LN-01/02 仍为 **BLOCKED**。
 
 ## 3 测试依据
 
@@ -140,11 +140,11 @@
 
 | 测试类别 | 命令 | 执行结果 |
 | --- | --- | --- |
-| 后端 LRN 目标测试 | `mvn -q "-Dtest=LearningTaskControllerTest,LearningTaskMigrationTest,LearningTaskDefaultConfigurationTest,LearningProgressControllerTest,LearningProgressMigrationTest,LearningRecordControllerTest,LearningRecordMigrationTest,NotificationControllerTest,NotificationMigrationTest,ReminderRuleControllerTest,ReminderRuleFailureLoggingTest,ReminderRuleServiceTest,ReminderRuleMigrationTest,LrnCrossModuleEventIntegrationTest,GrdLrnIntegrationTest,IntDemoDataInitializerTest" test` | 16 个测试类、45/45 PASS，0 失败，0 错误，0 跳过 |
-| 前端 LRN 目标测试 | `npm run test:unit -- tests/unit/lrn/LearningTaskCenterView.spec.ts tests/unit/lrn/LearningProgressView.spec.ts tests/unit/lrn/LearningStatisticsView.spec.ts tests/unit/lrn/NotificationCenterView.spec.ts tests/unit/lrn/ReminderRuleSettingsView.spec.ts tests/unit/lrn/learningTasksApi.spec.ts tests/unit/lrn/learningProgressApi.spec.ts tests/unit/lrn/learningRecordsApi.spec.ts tests/unit/lrn/notificationsApi.spec.ts tests/unit/lrn/reminderRulesApi.spec.ts tests/unit/CourseManagementView.spec.ts tests/unit/lab/LabStudentView.spec.ts tests/unit/hwk/HomeworkStudentView.spec.ts` | 13 个测试文件、115/115 PASS，0 失败，0 错误，0 跳过 |
+| 后端 LRN 目标测试 | `mvn "-Dtest=HomeworkControllerTest,GrdLrnIntegrationTest,IntDemoDataInitializerTest,LrnCrossModuleEventIntegrationTest,LearningTaskDefaultConfigurationTest,LearningProgressControllerTest,LearningRecordControllerTest,LearningTaskControllerTest,NotificationControllerTest,ReminderRuleControllerTest,ReminderRuleFailureLoggingTest,LearningProgressMigrationTest,LearningRecordMigrationTest,LearningTaskMigrationTest,NotificationMigrationTest,ReminderRuleMigrationTest,PersistentNotificationEventPublisherTest,PersistentNotificationEventPublisherTransactionTest,ReminderRuleServiceTest" test` | 19 个测试类、101/101 PASS，0 失败，0 错误，0 跳过 |
+| 前端 LRN 目标测试 | `npm run test:unit -- tests/unit/lrn/LearningTaskCenterView.spec.ts tests/unit/lrn/LearningProgressView.spec.ts tests/unit/lrn/LearningStatisticsView.spec.ts tests/unit/lrn/NotificationCenterView.spec.ts tests/unit/lrn/ReminderRuleSettingsView.spec.ts tests/unit/lrn/learningTasksApi.spec.ts tests/unit/lrn/learningProgressApi.spec.ts tests/unit/lrn/learningRecordsApi.spec.ts tests/unit/lrn/notificationsApi.spec.ts tests/unit/lrn/reminderRulesApi.spec.ts tests/unit/CourseManagementView.spec.ts tests/unit/lab/LabStudentView.spec.ts tests/unit/hwk/HomeworkStudentView.spec.ts` | 13 个测试文件、119/119 PASS，0 失败，0 错误，0 跳过 |
 | 共享 E2E 契约 | `npm run test:e2e:contract` | 3/3 PASS，0 失败，0 错误，0 跳过 |
 | LRN 文档契约 | `node scripts/test/verify-lrn-doc-test-closure.test.mjs` | 4/4 PASS，0 失败，0 错误，0 跳过 |
-| LRN Playwright 联合 E2E | `npm run test:e2e -- tests/e2e/lrn` | 默认 4 workers，4/4 PASS，0 失败，0 错误，0 跳过 |
+| LRN Playwright 联合 E2E | `npm run test:e2e -- tests/e2e/lrn` | 默认 4 workers，连续两轮 8/8 PASS，0 失败，0 错误，0 跳过（17.9s、19.2s） |
 | 前端静态验证 | `npm run typecheck`、`npm run build` | PASS |
 
 #### 7.3.2 LRN 追踪矩阵
@@ -220,7 +220,7 @@
 | LRN-LOG-006 | 2026-06-10 15:54 | LRN 迁移与配置测试 | `lrn_learning_task`、`lrn_learning_progress`、`lrn_learning_record`、`lrn_notification`、`lrn_notification_status_log`、`lrn_reminder_rule`、`lrn_notification_setting`、扫描日志和默认迁移配置 | 7 条通过 |
 | LRN-LOG-007 | 2026-06-10 15:54 | `GrdLrnIntegrationTest`、`IntDemoDataInitializerTest` | GRD 成绩事件生成通知、INT 演示数据覆盖登录-课程-学习-LAB/HWK-GRD-通知闭环 | 3 条通过 |
 | LRN-LOG-008 | 2026-06-10 15:54 | Maven 汇总 | 目标命令共 15 个测试类 | 41 条通过，0 失败，0 错误，0 跳过 |
-| LRN-LOG-017 | 2026-08-26 | Maven 当前目标命令 | 增加 `LrnCrossModuleEventIntegrationTest`，复测 LRN Service/Controller/迁移及 LAB/HWK/GRD 集成 | 16 个测试类，45/45 PASS，0 失败，0 错误，0 跳过 |
+| LRN-LOG-017 | 2026-08-26 | Maven 当前目标命令 | 在最新 dev 合并提交复测 LRN Service/Controller/迁移、LAB/HWK/GRD 集成及最新通知事务契约 | 19 个测试类，101/101 PASS，0 失败，0 错误，0 跳过 |
 
 #### 8.3.2 前端 LRN 执行日志
 
@@ -233,8 +233,8 @@
 | LRN-LOG-013 | 2026-06-10 15:55 | `ReminderRuleSettingsView.spec.ts`、`reminderRulesApi.spec.ts` | 提醒规则展示、偏好保存、失败重试、API 调用 | 4 条通过 |
 | LRN-LOG-014 | 2026-06-10 15:55 | `CourseManagementView.spec.ts`、`LabStudentView.spec.ts`、`HomeworkStudentView.spec.ts` | CRS/LAB/HWK 页面触发 LRN 进度、行为记录和断点恢复 | 37 条通过 |
 | LRN-LOG-015 | 2026-06-10 15:55 | Vitest 汇总 | 目标命令共 13 个测试文件 | 67 条通过 |
-| LRN-LOG-018 | 2026-08-26 | Vitest 当前目标命令 | LRN 页面/API 与 CRS/LAB/HWK 联动复测 | 13 个测试文件，115/115 PASS，0 失败，0 错误，0 跳过 |
-| LRN-LOG-019 | 2026-08-26 | `npm run test:e2e -- tests/e2e/lrn` | 真实 LAB/HWK/GRD 通知、任务/统计/提醒页面、通知已读/删除/跳转、断线恢复 | 默认 4 workers，4/4 PASS，0 失败，0 错误，0 跳过 |
+| LRN-LOG-018 | 2026-08-26 | Vitest 当前目标命令 | LRN 页面/API 与 CRS/LAB/HWK 联动复测 | 13 个测试文件，119/119 PASS，0 失败，0 错误，0 跳过 |
+| LRN-LOG-019 | 2026-08-26 | `npm run test:e2e -- tests/e2e/lrn` | 真实 LAB/HWK/GRD 通知、任务/统计/提醒页面、通知已读/删除/跳转、断线恢复 | 默认 4 workers，连续两轮 8/8 PASS，0 失败，0 错误，0 跳过（17.9s、19.2s） |
 
 #### 8.3.3 本次文档校验日志
 
@@ -266,7 +266,7 @@
 
 | 验收维度 | 结论 | 依据 | 残余风险/后续动作 |
 | --- | --- | --- | --- |
-| 功能完整性 | PASS | `TC-LN-01 ~ TC-LN-06` 均有可执行用例，后端 45/45、前端 115/115、默认联合 E2E 4/4 PASS | 生产部署跨模块配置不在本地业务验收范围 |
+| 功能完整性 | PASS | `TC-LN-01 ~ TC-LN-06` 均有可执行用例，后端 101/101、前端 119/119、默认联合 E2E 连续两轮 8/8 PASS | 生产部署跨模块配置不在本地业务验收范围 |
 | 接口契约 | 通过 | `API-LRN-01 ~ API-LRN-11` 均有后端或前端测试覆盖 | 内部事件接口真实部署 token/IP 白名单策略需环境确认 |
 | 数据表和状态 | 通过 | `DB-LRN-01 ~ DB-LRN-07` 迁移和状态日志测试通过 | 生产库迁移顺序需在统一部署脚本中再次确认 |
 | 权限和隔离 | 通过 | 自动化覆盖 Bearer 登录态、课程成员、教师聚合和当前用户通知隔离 | 真实账号矩阵需手工复验 |
@@ -301,7 +301,7 @@ $env:E2E_BROWSER_CHANNEL='chrome'
 npm run test:e2e -- tests/e2e/lrn
 ```
 
-该命令不得附加 `--workers=1`，验收记录以 Playwright 默认 4-worker 联合执行 4/4 PASS 为准。
+该命令不得附加 `--workers=1`，验收记录以 Playwright 默认 4-worker 联合执行为准；本轮连续执行两次，均为 4/4 PASS。
 
 #### 11.3.4 LRN 页面和接口快速索引
 

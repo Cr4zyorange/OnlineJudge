@@ -9,10 +9,11 @@
 | 项目 | 记录 |
 | --- | --- |
 | 需求审查锚点 | `origin/dev@8f8e4fc70341c701c25786f12efbffaeca2a3c5f` |
-| 第一轮执行 SHA | `origin/dev@758afd98ba2caad5a00fb6e12413c48f0156b2fb` |
-| 本轮被测头提交 | `a51536d926eacdba660a90ac92503defd9058ab2` |
+| 最新开发基线 | `origin/dev@50a5dccd35ddc6b0c8936df20217575f18303a4f` |
+| 本轮被测头提交 | `8b69a7241db6bdf585db532522abec041a3e4160` |
+| 被测提交树 | `0fe28305cd4d730d55e89fd5941ceecfe44a75c0` |
 | 验收分支 | `test/262-lrn-doc-test-closure` |
-| 执行时间 | 第一轮 2026-08-25 15:24–15:44；当前头复测 2026-08-26 10:01–10:41 +08:00 |
+| 执行时间 | 当前头复测 2026-08-26 16:52–16:59 +08:00 |
 | 操作系统 | Windows 11 家庭版 中文版，amd64 |
 | Java / Maven | Java 21.0.11 / Maven 3.9.16 |
 | Node / npm | Node 24.16.0 / npm 11.13.0 |
@@ -29,7 +30,7 @@
 | LRN-SC-01 任务中心 | 真实页面展示聚合任务并按实验筛选 | 无任务/加载失败由 API 与前端单测覆盖 | 当前学生课程成员过滤 | PASS | E2E LRN 页面用例；`LearningTaskControllerTest`；`LearningTaskCenterView.spec.ts` |
 | LRN-SC-02 继续学习/进度 | 真实进度页展示课程和继续学习入口；保存/恢复由 API 测试覆盖 | 离线队列失败保留、恢复重放 | 非成员拒绝；同用户同课程隔离 | PASS | E2E LRN 页面用例；`LearningProgressControllerTest`；`learningRecordsApi.spec.ts` |
 | LRN-SC-03 个人统计 | 真实页面展示本人 7 天趋势和行为统计 | 无数据/失败/缓存回退由前端单测覆盖 | 401/403 不读取旧用户缓存 | PASS | E2E LRN 页面用例；`LearningRecordControllerTest`；`LearningStatisticsView.spec.ts` |
-| LRN-SC-04 通知管理/跳转 | LAB/HWK/GRD 真实业务变化均生成本人未读通知；有效通知先标记已读再跳转目标 | 短时断线显示失败并在重试后恢复；重复事件及重复打开均幂等 | 学生创建 LAB 被 403；通知归属隔离、已读/删除 API 状态留痕通过 | PASS | 默认 4-worker LRN E2E 4/4 PASS；点击 LAB 通知后 `isRead=true` 且该通知 ID 从未读集合移除；重复打开仅一次已读请求 |
+| LRN-SC-04 通知管理/跳转 | LAB/HWK/GRD 真实业务变化均生成本人未读通知；有效通知先标记已读再跳转目标 | 短时断线显示失败并在重试后恢复；重复事件及重复打开均幂等 | 学生创建 LAB 被 403；通知归属隔离、已读/删除 API 状态留痕通过 | PASS | 默认 4-worker LRN E2E 连续两轮 8/8 PASS；点击 LAB 通知后 `isRead=true` 且该通知 ID 从未读集合移除；重复打开仅一次已读请求 |
 | LRN-SC-05 提醒设置/触达 | 真实页面加载并保存提醒偏好 | 已提交/关闭非必要提醒跳过，写入失败记录扫描日志 | 必选规则不可非法关闭 | PASS | E2E LRN 页面用例；`ReminderRuleControllerTest`；`ReminderRuleFailureLoggingTest` |
 
 ## 公共子流程结果
@@ -46,8 +47,8 @@
 
 | 层级 | 命令/范围 | 总数 | 通过 | 失败 | 错误 | 跳过 | 结果 |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | --- |
-| 后端单元/API/迁移/集成 | 16 个 LRN 目标测试类（含 `LrnCrossModuleEventIntegrationTest`、`GrdLrnIntegrationTest`） | 45 | 45 | 0 | 0 | 0 | PASS |
-| 前端单元 | 13 个 LRN 及 CRS/LAB/HWK 联动文件 | 115 | 115 | 0 | 0 | 0 | PASS |
+| 后端单元/API/迁移/集成 | 19 个目标测试类（含最新 dev 的 HWK/LRN 通知契约） | 101 | 101 | 0 | 0 | 0 | PASS |
+| 前端单元 | 13 个 LRN 及 CRS/LAB/HWK 联动文件 | 119 | 119 | 0 | 0 | 0 | PASS |
 | 共享 E2E 契约 | `npm run test:e2e:contract` | 3 | 3 | 0 | 0 | 0 | PASS |
 | LRN Playwright E2E | 默认 4 workers：`npm run test:e2e -- tests/e2e/lrn`；GREEN 后连续两轮 | 8 | 8 | 0 | 0 | 0 | PASS |
 | TypeScript | `npm run typecheck` | 1 | 1 | 0 | 0 | 0 | PASS |
@@ -56,7 +57,7 @@
 | Mermaid 图源/静态资产 | 5 场景 × 3 层 | 15 | 15 | 0 | 0 | 0 | PASS |
 | NFR-LN-01/02 真实时延与响应时间 | 未执行逐项计时/压力采样 | 2 | 0 | 0 | 0 | 2 | BLOCKED |
 
-后端、前端和 E2E 摘要见 [backend-summary.txt](backend-summary.txt)、[frontend-summary.txt](frontend-summary.txt)、[e2e-summary.txt](e2e-summary.txt)；环境记录见 [environment.txt](environment.txt)。
+后端、前端和 E2E 摘要见 [backend-summary.txt](backend-summary.txt)、[frontend-summary.txt](frontend-summary.txt)、[e2e-summary.txt](e2e-summary.txt)；环境记录见 [environment.txt](environment.txt)，可核对的去敏原始输出见 [raw/README.md](raw/README.md)。
 
 ## 缺陷与合并复测
 

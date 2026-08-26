@@ -58,7 +58,15 @@ test('LRN closure includes real cross-module integration, shared-runner E2E and 
   const notificationE2eTest = await read('frontend/tests/e2e/lrn/notification-read-on-open.spec.ts');
   const baseline = await read('output/test/issue-262/README.md');
   const environment = await read('output/test/issue-262/environment.txt');
+  const rawIndex = await read('output/test/issue-262/raw/README.md');
+  const rawBackend = await read('output/test/issue-262/raw/backend-target.log');
+  const rawE2e = await Promise.all([
+    read('output/test/issue-262/raw/e2e-lrn.log'),
+    read('output/test/issue-262/raw/e2e-lrn-repeat.log')
+  ]);
   const tst = await read('docs/过程/测试/TST-DOC-04 LRN 学习过程与通知提醒测试文档.md');
+  const baseSha = environment.match(/^base_sha=([0-9a-f]{40})$/m)?.[1];
+  const executionSha = environment.match(/^execution_sha=([0-9a-f]{40})$/m)?.[1];
 
   assert.match(integrationTest, /LAB_EXPERIMENT_PUBLISHED/);
   assert.match(integrationTest, /HOMEWORK_PUBLISHED/);
@@ -74,13 +82,18 @@ test('LRN closure includes real cross-module integration, shared-runner E2E and 
   assert.match(notificationE2eTest, /test\.info\(\)\.outputPath/);
   assert.doesNotMatch(`${e2eTest}\n${notificationE2eTest}`, /output\/test\/issue-262\/evidence/);
   assert.match(baseline, /8f8e4fc70341c701c25786f12efbffaeca2a3c5f/);
-  assert.match(baseline, /758afd98ba2caad5a00fb6e12413c48f0156b2fb/);
+  assert.ok(baseSha, 'environment must record a full base SHA');
+  assert.ok(executionSha, 'environment must record a full execution SHA');
+  assert.notEqual(executionSha, baseSha, 'evidence must target the merged PR commit, not dev itself');
+  assert.match(baseline, new RegExp(baseSha));
+  assert.match(baseline, new RegExp(executionSha));
   assert.match(baseline, /PASS|FAIL|BLOCKED/);
-  assert.match(environment, /^execution_sha=[0-9a-f]{40}$/m);
-  assert.doesNotMatch(environment, /^execution_sha=758afd98ba2caad5a00fb6e12413c48f0156b2fb$/m);
-  assert.match(tst, /45\/45 PASS/);
-  assert.match(tst, /115\/115 PASS/);
-  assert.match(tst, /LRN Playwright.*4\/4 PASS/);
+  assert.match(rawIndex, new RegExp(executionSha));
+  assert.match(rawBackend, /Tests run: 101, Failures: 0, Errors: 0, Skipped: 0/);
+  assert.deepEqual(rawE2e.every((log) => /4 passed/.test(log)), true);
+  assert.match(tst, /101\/101 PASS/);
+  assert.match(tst, /119\/119 PASS/);
+  assert.match(tst, /LRN Playwright.*连续两轮 8\/8 PASS/);
 });
 
 test('requirements-layer LRN SSDs expose only actor-to-system interactions', async () => {

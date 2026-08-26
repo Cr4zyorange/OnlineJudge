@@ -1,0 +1,25 @@
+
+> onlinejudge-frontend@0.1.0 test:unit
+> vitest run tests/unit/lrn/LearningTaskCenterView.spec.ts tests/unit/lrn/LearningProgressView.spec.ts tests/unit/lrn/LearningStatisticsView.spec.ts tests/unit/lrn/NotificationCenterView.spec.ts tests/unit/lrn/ReminderRuleSettingsView.spec.ts tests/unit/lrn/learningTasksApi.spec.ts tests/unit/lrn/learningProgressApi.spec.ts tests/unit/lrn/learningRecordsApi.spec.ts tests/unit/lrn/notificationsApi.spec.ts tests/unit/lrn/reminderRulesApi.spec.ts tests/unit/CourseManagementView.spec.ts tests/unit/lab/LabStudentView.spec.ts tests/unit/hwk/HomeworkStudentView.spec.ts
+
+
+ RUN  v3.2.4 <WORKSPACE>/frontend
+
+ ✓ tests/unit/lrn/learningTasksApi.spec.ts (1 test) 6ms
+ ✓ tests/unit/lrn/reminderRulesApi.spec.ts (2 tests) 7ms
+ ✓ tests/unit/lrn/learningProgressApi.spec.ts (1 test) 5ms
+ ✓ tests/unit/lrn/notificationsApi.spec.ts (3 tests) 7ms
+ ✓ tests/unit/lrn/learningRecordsApi.spec.ts (6 tests) 22ms
+ ✓ tests/unit/lrn/ReminderRuleSettingsView.spec.ts (2 tests) 85ms
+ ✓ tests/unit/lrn/LearningStatisticsView.spec.ts (3 tests) 101ms
+ ✓ tests/unit/lrn/LearningProgressView.spec.ts (4 tests) 104ms
+ ✓ tests/unit/lrn/LearningTaskCenterView.spec.ts (5 tests) 184ms
+ ✓ tests/unit/lrn/NotificationCenterView.spec.ts (10 tests) 252ms
+ ✓ tests/unit/lab/LabStudentView.spec.ts (12 tests) 271ms
+ ✓ tests/unit/CourseManagementView.spec.ts (24 tests) 598ms
+ ✓ tests/unit/hwk/HomeworkStudentView.spec.ts (46 tests) 603ms
+
+ Test Files  13 passed (13)
+      Tests  119 passed (119)
+   Start at  16:53:54
+   Duration  3.64s (transform 3.59s, setup 0ms, collect 8.59s, tests 2.24s, environment 17.01s, prepare 4.45s)

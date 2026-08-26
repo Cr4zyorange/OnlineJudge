@@ -1,13 +1,13 @@
-Command scope: 16 targeted Maven test classes
-Reports: 16
-Tests: 45
-Passed: 45
+Command scope: 19 targeted Maven test classes
+Reports: 19
+Tests: 101
+Passed: 101
 Failures: 0
 Errors: 0
 Skipped: 0
 Result: PASS
 
 Cross-module details:
-- LrnCrossModuleEventIntegrationTest: 2/2 PASS (real LAB/HWK publish -> LRN)
-- GrdLrnIntegrationTest: 1/1 PASS (real GRD publish/change/review -> LRN)
-- Remaining LRN Controller/Service/Migration/INT tests: 42/42 PASS
+- HomeworkControllerTest: 46/46 PASS (required notification rollback contract)
+- PersistentNotificationEventPublisher tests: 10/10 PASS (after-commit and failure isolation)
+- LRN Controller/Service/Migration/INT and cross-module integration tests: 45/45 PASS
