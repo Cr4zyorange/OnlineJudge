@@ -5,7 +5,7 @@
 | GitHub Issue | #264 `[D2-HWK] 补齐 HWK 业务场景文档与测试闭环` |
 | 执行基线 | `origin/dev@758afd98ba2caad5a00fb6e12413c48f0156b2fb`（已包含 #267 / PR #268 共享 E2E 入口） |
 | 本地分支 | `test/264-hwk-doc-test-closure` |
-| 实际完成日期 | 2026-08-25 |
+| 实际完成日期 | 未完成；待 #281 契约确认与复测后填写 |
 | 正式用例边界 | `UC-HWK-01 ~ UC-HWK-02`，不新增或重排 UC 编号 |
 | 需求范围 | `FR-HWK-01 ~ FR-HWK-06`、`NFR-HWK-01 ~ NFR-HWK-05` |
 | 执行环境 | Windows 11；Java 25；Maven 3.9.16；Node.js 24.15.0；npm 11.12.1；Spring Boot 3.4.5；Vue 3 / Vite 6.4.2；H2；Tectonic 0.17.0 |
@@ -43,7 +43,9 @@ HWK 保持两个已经确认的独立业务场景。页面动作、权限检查�
 | 附件恢复、失败补偿和清理 | Attachment Service/Controller/Scheduling 测试及 FILE 页面测试 | PASS |
 | 统计与待处理名单 | Statistics/Repository/Attention 测试及统计页面测试 | PASS |
 | 共享 E2E #267 | PASS | 直接复用 PR #268 的 Playwright runner 与公共夹具；`homework-lifecycle.spec.ts` 2/2 通过，不新建 runner、配置或报告目录 |
-| GRD/LRN 真实链路 | PASS | 真实发布/成绩发布后从 LRN 通知 API 按 `sourceModule=HWK` 与 `sourceId` 断言落库；创建 HWK 成绩项并调用 GRD `/grades/sync`，断言学生成绩被消费 |
+| GRD 来源成绩真实链路 | PASS | 创建仅绑定本次 `homeworkId` 且 `includedInFinal=true` 的 HWK 成绩项，调用 GRD `/grades/sync` 后按 `gradeItemId` 与当前学生查询成绩记录，精确断言 `sourceId=homeworkId` 和原始分 88；将 `includedInFinal` 变异为 false 时该断言按预期 RED |
+| LRN 发布/成绩通知成功链路 | PASS | 真实发布/成绩发布后从 LRN 通知 API 按 `sourceModule=HWK` 与 `sourceId=homeworkId` 断言落库 |
+| 通知投递失败设计/实现一致性 | FAIL | SRS 4.10 要求通知失败时拒绝操作并返回可追踪状态；`HomeworkControllerTest#publishKeepsHomeworkPublishedWhenNotificationDeliveryFails` 证明当前实现返回成功、保留 `PUBLISHED` 且未向调用方暴露通知失败状态；独立缺陷 #281 跟踪 |
 
 ## 4 执行结果
 
@@ -60,12 +62,24 @@ HWK 保持两个已经确认的独立业务场景。页面动作、权限检查�
 | 前端类型检查 | 1 | 1 | 0 | 0 | 0 | PASS |
 | 前端生产构建 | 1 | 1 | 0 | 0 | 0 | PASS；189 modules transformed |
 | 三层 TikZ 编译与静态图目视检查 | 6 | 6 | 0 | 0 | 0 | PASS；Tectonic 逐份生成 PDF，再渲染 PNG；中文、生命线、消息、组合片段和长参与者名称清晰 |
+| 通知投递失败设计/实现一致性 | 1 | 0 | 1 | 0 | 0 | FAIL；SRS 4.10 与当前运行时语义冲突，见 #281 |
 
 首次 Maven 运行因受限沙箱不能连接 Maven Central，未进入测试断言；允许既有依赖解析后同一命令运行通过，不计为产品 FAIL。首次 E2E 因本机未安装 Playwright ffmpeg 而未进入业务步骤；按共享 runner 的敏感信息约定关闭失败录像后复测通过，不计为产品 FAIL。执行过程未记录 Token、Cookie、真实个人数据或本机凭据。
 
-## 5 BLOCKED 与残余风险
+## 5 FAIL、BLOCKED 与残余风险
 
-本 Issue 验收范围内无 BLOCKED 项。共享 E2E 和 GRD/LRN 真实边界均已执行并 PASS。当前本地后端使用的真实沙箱不可用，CODE E2E 因此记录 `SYSTEM_ERROR` 并验证提交保留与重评可追踪；客观题自动评测主成功路径仍为 PASS。真实 Docker 沙箱中的 CODE AC/WA/资源限制仍属部署环境专项复核，不影响 #264 的文档与测试闭环结论。
+### 5.1 FAIL：通知投递失败设计/实现不一致
+
+- 复现：运行 `HomeworkControllerTest#publishKeepsHomeworkPublishedWhenNotificationDeliveryFails`；模拟 `NotificationEventPublisher` 抛出异常后，API 仍返回 200，作业状态保持 `PUBLISHED`。
+- 影响：教师端收到发布成功，但 LRN 学习任务/通知可能未生成；当前响应没有可追踪的通知失败状态，无法证明 SRS 4.10 的异常路径闭环。
+- 缺陷 Issue：#281 `[HWK] 统一作业发布通知失败的设计与运行时语义`。
+- 责任人：@terrana37（HWK），LRN 与项目负责人共同确认公共契约。
+- 目标日期：2026-08-29。
+- 复测标准：SRS、详细设计、API/事件契约与运行时语义一致；通知成功/失败自动化同时验证作业状态、API 响应、LRN 落库或可靠补偿，并重新执行 HWK 发布 E2E。
+
+### 5.2 环境风险
+
+当前本地后端使用的真实沙箱不可用，CODE E2E 因此记录 `SYSTEM_ERROR` 并验证提交保留与重评可追踪；客观题自动评测主成功路径仍为 PASS。真实 Docker 沙箱中的 CODE AC/WA/资源限制保留为部署环境专项复核。本项是已披露环境风险，不改变 #281 的产品 FAIL 判定。
 
 ## 6 PASS / FAIL / BLOCKED 规则
 

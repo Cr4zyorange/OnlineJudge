@@ -8,14 +8,16 @@
   \hwkparticipant{System}{10}{OnlineJudgeForSE}{\DiagramDepth}
   \hwkactivation{System}{.55}{6.8}
 
-  \hwkmessage{Teacher}{System}{.8}{OP-HWK-01 保存作业(homeworkForm)}
+  \hwkmessage{Teacher}{System}{.8}{OP-HWK-01 提交作业表单(homeworkForm, action)}
   \draw[hwk fragment] (-.45,-1.55) rectangle (10.75,-6.5);
-  \node[hwk fragment label] at (-.35,-1.63) {alt 表单、课程权限和题型配置合法};
+  \node[hwk fragment label] at (-.35,-1.63) {alt};
+  \hwkguard{.15}{-1.63}{保存草稿且表单合法}
   \hwkreturn{System}{Teacher}{2.0}{作业草稿和编辑入口}
-  \hwkmessage{Teacher}{System}{2.75}{确认发布(homeworkId)}
-  \hwkself{System}{3.35}{生成课程任务和站内通知}
+  \hwkoperand{-.45}{10.75}{-2.4}{确认发布且权限、题型配置合法}
+  \hwkmessage{Teacher}{System}{2.95}{确认发布(homeworkId)}
+  \hwkself{System}{3.5}{生成课程任务和站内通知}
   \hwkreturn{System}{Teacher}{4.15}{已发布状态、任务和通知结果}
-  \node[hwk fragment label] at (-.35,-4.75) {else 字段/测试用例非法或课程无权限};
+  \hwkoperand{-.45}{10.75}{-4.65}{字段/测试用例非法或课程无权限}
   \hwkreturn{System}{Teacher}{5.55}{拒绝保存或发布并提示原因}
 \end{tikzpicture}
 \end{document}

@@ -24,10 +24,12 @@
   \hwkmessage{API}{Perm}{5.3}{校验成员、状态、截止与次数}
   \hwkmessage{API}{DB}{5.9}{保存版本并维护唯一有效提交}
   \draw[hwk fragment] (6.45,-6.35) rectangle (23.7,-8.8);
-  \node[hwk fragment label] at (6.55,-6.43) {alt OBJECTIVE/CODE / TEXT/FILE};
+  \node[hwk fragment label] at (6.55,-6.43) {alt};
+  \hwkguard{7.05}{-6.43}{OBJECTIVE/CODE}
   \hwkmessage{API}{Eval}{6.95}{自动评分或创建评测任务}
   \hwkreturn{Eval}{API}{7.55}{初始/最终评测状态}
-  \hwkmessage{API}{DB}{8.25}{标记待人工批阅}
+  \hwkoperand{6.45}{23.7}{-7.9}{TEXT/FILE}
+  \hwkmessage{API}{DB}{8.35}{标记待人工批阅}
   \hwkreturn{API}{FE}{9.15}{提交回执和可见状态}
   \hwkreturn{FE}{Student}{9.75}{结果、错误或恢复提示}
 \end{tikzpicture}

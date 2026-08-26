@@ -3,7 +3,7 @@
 \begin{document}
 \begin{tikzpicture}
   \tikzset{hwk participant/.append style={font=\scriptsize,text width=3.1cm}}
-  \def\DiagramDepth{11.2}
+  \def\DiagramDepth{12.0}
   \node[hwk title] at (14,1.15) {UC-HWK-02 教师创建并发布作业（对象顺序图）};
   \hwkparticipant{Teacher}{0}{教师}{\DiagramDepth}
   \hwkparticipant{View}{4}{Homework\ Editor View}{\DiagramDepth}
@@ -28,10 +28,13 @@
   \hwkmessage{Controller}{Service}{7.35}{publish(homeworkId, currentUser)}
   \hwkmessage{Service}{Permission}{7.95}{复核课程管理权限}
   \hwkmessage{Service}{Config}{8.55}{校验类型配置完整性}
-  \draw[hwk fragment] (11.45,-8.95) rectangle (28.75,-10.65);
-  \node[hwk fragment label] at (11.55,-9.03) {alt 合法且未删除 / 权限、配置或状态冲突};
+  \draw[hwk fragment] (11.45,-8.95) rectangle (28.75,-11.35);
+  \node[hwk fragment label] at (11.55,-9.03) {alt};
+  \hwkguard{12.05}{-9.03}{合法且未删除}
   \hwkmessage{Service}{Repository}{9.55}{原子更新 PUBLISHED/publishedAt}
   \hwkmessage{Service}{Event}{10.1}{publish(HOMEWORK\_PUBLISHED)}
-  \hwkreturn{Service}{Controller}{10.75}{结果或稳定 HWK 错误码}
+  \hwkreturn{Service}{Controller}{10.45}{发布结果}
+  \hwkoperand{11.45}{28.75}{-10.7}{权限、配置或状态冲突}
+  \hwkreturn{Service}{Controller}{11.15}{稳定 HWK 错误码}
 \end{tikzpicture}
 \end{document}

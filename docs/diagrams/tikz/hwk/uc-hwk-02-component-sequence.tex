@@ -16,12 +16,15 @@
   \hwkmessage{API}{Perm}{2.0}{校验课程管理权限}
   \hwkreturn{Perm}{API}{2.55}{允许或拒绝}
   \draw[hwk fragment] (7.45,-3.0) rectangle (20.75,-7.85);
-  \node[hwk fragment label] at (7.55,-3.08) {alt 保存草稿 / 发布且配置完整 / 失败};
+  \node[hwk fragment label] at (7.55,-3.08) {alt};
+  \hwkguard{8.05}{-3.08}{保存草稿}
   \hwkmessage{API}{DB}{3.65}{保存 DRAFT 及配置}
   \hwkreturn{API}{FE}{4.2}{返回草稿与更新时间}
+  \hwkoperand{7.45}{20.75}{-4.5}{请求发布且配置完整}
   \hwkmessage{API}{DB}{4.95}{原子更新 PUBLISHED/publishedAt}
   \hwkmessage{API}{Event}{5.55}{发布 HOMEWORK\_PUBLISHED}
   \hwkreturn{API}{FE}{6.25}{返回发布结果}
+  \hwkoperand{7.45}{20.75}{-6.55}{权限、配置或状态校验失败}
   \hwkreturn{API}{FE}{7.15}{受控错误并保留可修改内容}
   \hwkreturn{FE}{Teacher}{8.05}{展示最终状态}
 \end{tikzpicture}

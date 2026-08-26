@@ -18,7 +18,10 @@
   hwk label/.style={fill=white,inner sep=2pt,font=\scriptsize,align=center,text=HwkInk},
   hwk activation/.style={draw=HwkLine,fill=HwkAccent},
   hwk fragment/.style={draw=HwkLine,fill=HwkPanel,fill opacity=.28,text opacity=1},
-  hwk fragment label/.style={anchor=north west,font=\bfseries\scriptsize,text=HwkInk}
+  hwk fragment label/.style={anchor=north west,font=\bfseries\scriptsize,text=HwkInk},
+  hwk fragment divider/.style={draw=HwkLine,densely dashed},
+  hwk guard/.style={anchor=north west,fill=white,inner sep=1.5pt,
+    font=\bfseries\scriptsize,text=HwkInk}
 }
 
 \newcommand{\hwkparticipant}[4]{%
@@ -39,4 +42,11 @@
 \newcommand{\hwkself}[3]{%
   \draw[hwk message] ($(#1.south)+(0,-#2)$) -- ++(.55,0) -- ++(0,-.38) --
     node[midway,right,hwk label] {#3} ($(#1.south)+(0,-#2-.38)$);
+}
+\newcommand{\hwkguard}[3]{%
+  \node[hwk guard] at (#1,#2) {[#3]};
+}
+\newcommand{\hwkoperand}[4]{%
+  \draw[hwk fragment divider] (#1,#3) -- (#2,#3);
+  \node[hwk guard] at ($(#1,#3)+(.12,-.1)$) {[#4]};
 }

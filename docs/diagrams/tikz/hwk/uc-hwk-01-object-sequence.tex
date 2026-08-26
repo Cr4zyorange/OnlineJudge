@@ -29,12 +29,15 @@
   \hwkmessage{Submission}{Permission}{6.1}{校验成员和作业访问}
   \hwkmessage{Submission}{SubmitRepo}{6.65}{校验截止/次数并保存新版本}
   \hwkmessage{Submission}{AttachRepo}{7.2}{UPLOADED 原子绑定为 BOUND}
-  \draw[hwk fragment] (11.45,-7.65) rectangle (36.75,-10.15);
-  \node[hwk fragment label] at (11.55,-7.73) {alt OBJECTIVE/CODE / TEXT/FILE};
-  \hwkmessage{Submission}{Eval}{8.25}{创建独立评测记录}
-  \hwkmessage{Eval}{Evaluator}{8.8}{执行答案或 IO 评测}
-  \hwkreturn{Evaluator}{Eval}{9.35}{EvaluationResult}
-  \hwkmessage{Eval}{SubmitRepo}{9.9}{回写终态、分数或待批阅状态}
+  \draw[hwk fragment] (11.45,-7.65) rectangle (36.75,-10.45);
+  \node[hwk fragment label] at (11.55,-7.73) {alt};
+  \hwkguard{12.05}{-7.73}{OBJECTIVE/CODE}
+  \hwkmessage{Submission}{Eval}{8.3}{创建独立评测记录}
+  \hwkmessage{Eval}{Evaluator}{8.75}{执行答案或 IO 评测}
+  \hwkreturn{Evaluator}{Eval}{9.2}{EvaluationResult}
+  \hwkmessage{Eval}{SubmitRepo}{9.6}{回写评测终态与分数}
+  \hwkoperand{11.45}{36.75}{-9.85}{TEXT/FILE}
+  \hwkmessage{Submission}{SubmitRepo}{10.2}{标记待人工批阅}
   \hwkreturn{Submission}{View}{10.65}{提交回执与可见状态}
   \hwkreturn{View}{Student}{11.15}{安全反馈与历史入口}
 \end{tikzpicture}
