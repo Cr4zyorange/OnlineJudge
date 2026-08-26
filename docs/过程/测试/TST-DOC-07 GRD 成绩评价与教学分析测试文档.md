@@ -225,6 +225,7 @@
 | GRD-266-LOG-014 | PR #270 六轮异常响应与分析授权回归 | 先扩展契约断言并确认 4 passed / 1 failed；修正通用 HTTP 500 响应和教学分析权限终止路径后 5 passed / 0 failed |
 | GRD-266-LOG-015 | PR #270 七轮环境隔离与通知时序回归 | 契约 RED 3 passed / 2 failed，且外部 `SPRING_PROFILES_ACTIVE=compose` 验收按预期失败；清空继承环境、固定 H2 配置并修正同步 best-effort 通知语义后契约 5 passed / 0 failed、同一外部环境下真实 E2E 1 passed / 0 failed |
 | GRD-266-LOG-016 | PR #270 十二轮凭据隔离与复核通知可见性回归 | 契约 RED 3 passed / 2 failed；固定 disposable 教师/学生种子凭据并将通知可见性改为持久化成功条件后 5 passed / 0 failed；外部四项账号/密码均为错误值时真实 H2 lifecycle 仍 1 passed / 0 failed，端口、进程和临时目录无残留 |
+| GRD-266-LOG-017 | PR #270 十三轮同步异常契约回归 | 契约 RED 4 passed / 1 failed；移除 OP-GR-02 不会触发的规则错误分支，并同步详细设计接口、流程和 ERR-GRD-03 适用范围后 5 passed / 0 failed |
 
 ## 9 手工测试与联调确认
 

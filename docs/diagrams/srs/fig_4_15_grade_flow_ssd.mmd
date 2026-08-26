@@ -8,8 +8,8 @@ sequenceDiagram
     System-->>Teacher: 返回分页成绩总表
   else 来源同步失败：提供方抛出未映射异常
     System-->>Teacher: HTTP 500，code=500，系统错误，请联系管理员；事务回滚
-  else 规则非法或权限不足
-    System-->>Teacher: 返回 ERR-GRD-03/400 或 ERR-GRD-01/403
+  else 无课程权限
+    System-->>Teacher: 返回 ERR-GRD-01/403，且不读取或写入成绩数据
   end
   Teacher->>System: OP-GR-03 发布成绩
   alt 首次发布成功
