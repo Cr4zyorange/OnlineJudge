@@ -266,16 +266,16 @@ graph TD
 | 接口名称 | 方法与路径 | 调用方 | 主要入参 | 主要出参 | 需求追踪 |
 | --- | --- | --- | --- | --- | --- |
 | 查询成绩项列表 | `GET /api/v1/courses/{courseId}/grade-items` | 教师端 | `courseId` | `gradeItemList` | FR-GR-01 |
-| 创建成绩项 | `POST /api/v1/courses/{courseId}/grade-items` | 教师端 | `name, sourceType, sourceId, fullScore, weight, includedInFinal, sortOrder` | `gradeItemId, createdAt` | FR-GR-01 |
+| 创建成绩项 | `POST /api/v1/courses/{courseId}/grade-items` | 教师端 | `name, sourceType, sourceId, fullScore, weight, includedInFinal, sortOrder` | 完整持久化 `GradeItem`；不附带规则校验或重算结果 | FR-GR-01 |
 | 修改成绩项 | `PUT /api/v1/grade-items/{gradeItemId}` | 教师端 | `name, fullScore, weight, includedInFinal, sortOrder, enabled` | `gradeItemId, updatedAt` | FR-GR-01 |
 | 删除/停用成绩项 | `DELETE /api/v1/grade-items/{gradeItemId}` | 教师端 | `gradeItemId` | `gradeItemId, enabled` | FR-GR-01 |
-| 校验成绩规则 | `POST /api/v1/courses/{courseId}/grade-rules/validate` | 教师端 | `gradeItems` | `valid, errors` | FR-GR-01 |
+| 校验成绩规则 | `POST /api/v1/courses/{courseId}/grade-rules/validate` | 教师端 | 可选 `gradeItems`；为空时校验已保存成绩项 | `valid, totalIncludedWeight, errors` | FR-GR-01 |
 
 ### 5.2 成绩汇总与计算接口
 
 | 接口名称 | 方法与路径 | 调用方 | 主要入参 | 主要出参 | 需求追踪 |
 | --- | --- | --- | --- | --- | --- |
-| 同步来源成绩 | `POST /api/v1/courses/{courseId}/grades/sync` | 教师端/系统 | `gradeItemIds, sourceTypes` | `calculationBatchId, syncedCount, missingCount, ungradedCount` | FR-GR-02 |
+| 同步来源成绩 | `POST /api/v1/courses/{courseId}/grades/sync` | 教师端/系统 | 路径 `courseId`；无请求体 | `calculationBatchId, affectedItemCount, affectedStudentCount, syncedCount, missingCount, ungradedCount` | FR-GR-02 |
 | 重新计算课程成绩 | `POST /api/v1/courses/{courseId}/grades/recalculate` | 教师端/系统 | `gradeItemIds, studentIds` | `calculationBatchId, affectedCount` | FR-GR-01、FR-GR-02 |
 | 查询课程成绩总表 | `GET /api/v1/courses/{courseId}/grades` | 教师端 | `studentKeyword, gradeItemId, gradeStatus, publishStatus, page, size` | `records, total` | FR-GR-02、FR-GR-03 |
 | 查询学生成绩明细 | `GET /api/v1/courses/{courseId}/grades/students/{studentId}` | 教师端 | `courseId, studentId` | `studentGradeDetail` | FR-GR-03 |

@@ -203,8 +203,8 @@ graph TD
 | 方法与路径 | POST /api/v1/courses/{courseId}/grade-items |
 | 调用方 | 教师端 |
 | 主要入参 | name, sourceType, sourceId, fullScore, weight, includedInFinal, sortOrder |
-| 主要出参 | gradeItemId, createdAt |
-| 处理逻辑 | 从认证上下文取得教师身份；校验课程存在和教师课程权限；校验成绩项名称、来源类型、满分、权重和是否计入总评；保存成绩项定义；返回新成绩项编号 |
+| 主要出参 | 完整持久化 GradeItem（id、courseId、配置字段、状态、创建/更新时间等）；不附带规则校验或重算结果 |
+| 处理逻辑 | 从认证上下文取得教师身份；校验课程存在和教师课程权限；校验成绩项名称、来源类型、满分、权重和是否计入总评；保存并返回 GradeItem；规则校验由 API-GRD-05 独立调用 |
 | 异常情况 | 无课程权限、课程不存在、来源类型不支持、满分值不合法、权重配置不合法、成绩项名称缺失 |
 
 #### 4.2.2 同步来源成绩 API-GRD-06
@@ -213,10 +213,10 @@ graph TD
 | --- | --- |
 | 方法与路径 | POST /api/v1/courses/{courseId}/grades/sync |
 | 调用方 | 教师端、系统 |
-| 主要入参 | gradeItemIds, sourceTypes |
-| 主要出参 | calculationBatchId, syncedCount, missingCount, ungradedCount |
+| 主要入参 | 路径 courseId；无请求体 |
+| 主要出参 | calculationBatchId, affectedItemCount, affectedStudentCount, syncedCount, missingCount, ungradedCount；不包含成绩总表或发布前校验结果 |
 | 处理逻辑 | 校验课程权限；读取成绩项配置和课程学生名单；按 sourceType + sourceId 从 LAB/HWK 获取来源成绩 DTO；为每名课程学生生成或刷新 GradeRecord；对未提交、未评分、缺失成绩写入明确 gradeStatus；创建成绩计算批次并触发总评重算 |
-| 异常情况 | 无课程权限、成绩项不存在、来源模块无对应任务、来源成绩状态不完整、同步批次写入失败 |
+| 异常情况 | 无课程权限、成绩规则缺失或非法、来源提供方抛出异常、同步批次写入失败；空来源结果无法区分任务不存在/跨课程与未发布/暂无成绩，当前统一生成 MISSING |
 
 #### 4.2.3 重新计算课程成绩 API-GRD-07
 

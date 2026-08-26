@@ -95,7 +95,7 @@ sequenceDiagram
         Service->>Event: publish(GRADE_REVIEW_PROCESSED)
         Event->>LRN: 持久化学生通知
         Service-->>Controller: GradeReviewProcessResult
-        Controller-->>TeacherView: 处理结果与留痕
+        Controller-->>TeacherView: GradeReviewProcessResult
       end
     end
   end
