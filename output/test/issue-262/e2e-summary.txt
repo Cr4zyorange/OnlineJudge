@@ -1,12 +1,13 @@
 Entry: http://127.0.0.1:5173
-Browser: Google Chrome 151.0.7922.138
+Browser: Google Chrome 151.0.7922.174
 Specs: frontend/tests/e2e/lrn/lrn-business-closure.spec.ts + notification-read-on-open.spec.ts
+Workers: 4 (Playwright default; no --workers override)
 Tests: 4
 Passed: 4
 Failures: 0
 Errors: 0
 Skipped: 0
-Duration: 18.5s
+Duration: 53.8s
 Result: PASS
 
 PASS:
@@ -16,8 +17,9 @@ PASS:
 - marks a real LAB notification read before navigating and keeps repeated opens idempotent
 
 NOTE:
-- The first combined run had a setup-only timeout while loading `/` (3 passed / 1 failed).
-- The timed-out scenario passed alone, then the complete four-test suite passed cleanly.
+- RED review reproduction on the working tree: 2/4 PASS and 2/4 FAIL because the two real cross-module scenarios exceeded the former 30-second total timeout; trace showed fixture cleanup clearing auth after timeout.
+- GREEN after setting the explicit 60-second budget: the unchanged default 4-worker combined command passed 4/4.
+- Target-notification state and idempotency are asserted by notification ID, so notifications concurrently created by other workers do not race the assertion.
 - Defect #269 is fixed in the #262 branch per owner instruction.
 
 Sensitive browser artifacts remain ignored under frontend/test-results/ and are not committed.

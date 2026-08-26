@@ -1,6 +1,7 @@
 issue=#262
 audit_anchor=8f8e4fc70341c701c25786f12efbffaeca2a3c5f
-execution_sha=758afd98ba2caad5a00fb6e12413c48f0156b2fb
+base_sha=758afd98ba2caad5a00fb6e12413c48f0156b2fb
+execution_sha=d4905e1ce5c063a9c6c74c256f960b8b9c04a649
 branch=test/262-lrn-doc-test-closure
 os=Windows 11 Home Chinese amd64
 java=21.0.11
@@ -8,7 +9,7 @@ maven=3.9.16
 node=24.16.0
 npm=11.13.0
 playwright=1.62.1
-chrome=151.0.7922.138
+chrome=151.0.7922.174
 entry=http://127.0.0.1:5173 (Vite -> Spring Boot 8080)
 database=local H2 file database with public demo data
 docker=BLOCKED (daemon not running; supported local entry used)
