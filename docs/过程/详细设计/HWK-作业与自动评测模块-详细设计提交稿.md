@@ -340,15 +340,15 @@ graph TD
 
 #### 5.1.1 UC-HWK-02 教师创建并发布作业对象顺序图
 
-![](../../最终提交/assets/tikz/hwk/uc-hwk-02-object-sequence.png)
+![](../../最终提交/assets/fig_3_5_3a_hwk_publish_object.svg)
 
-TikZ 图源：`docs/diagrams/tikz/hwk/uc-hwk-02-object-sequence.tex`。
+Mermaid 图源：`docs/diagrams/dsd/fig_3_5_3a_hwk_publish_object.mmd`。
 
 #### 5.1.2 UC-HWK-01 学生提交作业并触发自动评测对象顺序图
 
-![](../../最终提交/assets/tikz/hwk/uc-hwk-01-object-sequence.png)
+![](../../最终提交/assets/fig_3_5_3b_hwk_submission_object.svg)
 
-TikZ 图源：`docs/diagrams/tikz/hwk/uc-hwk-01-object-sequence.tex`。
+Mermaid 图源：`docs/diagrams/dsd/fig_3_5_3b_hwk_submission_object.mmd`。
 
 ---
 

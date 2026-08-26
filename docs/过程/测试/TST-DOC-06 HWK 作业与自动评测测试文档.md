@@ -5,12 +5,12 @@
 | 文档名称 | HWK 作业与自动评测测试文档 |
 | 项目名称 | 在线教学与实训平台 |
 | 所属阶段 | 系统测试与验收测试 |
-| 报告版本 | V1.6 |
+| 报告版本 | V1.7 |
 | 编写日期 | 2026-08-26 |
 | 编写人 | HWK 模块负责人 |
 | 对应 issue | #264 HWK 业务场景文档与测试闭环；#157 TST-DOC-06；#225 HWK 统计与待处理名单；#224 HWK 草稿逻辑删除；#214 HWK FILE 附件上传与安全提交 |
 | 测试范围 | HWK 作业发布、草稿删除、提交/历史/评测/批阅、统计与待处理名单；FILE 单附件上传、24h 恢复/清理、原子绑定/补偿、所有权、受控下载、权限、安全与响应式页面 |
-| 测试结论 | #264 完整闭环 PASS：三层 TikZ 图、HWK 业务场景、LRN 通知与 GRD 精确成绩消费均已复测；#281 / PR #285 合并后，必需通知失败返回 `503/HWK_5003`，发布事务整体回滚且作业保持 `DRAFT` |
+| 测试结论 | #264 完整闭环 PASS：三层 Mermaid/SVG 图、HWK 业务场景、LRN 通知与 GRD 精确成绩消费均已复测；#281 / PR #285 合并后，必需通知失败返回 `503/HWK_5003`，发布事务整体回滚且作业保持 `DRAFT` |
 
 ## 1 文档控制
 
@@ -23,8 +23,9 @@
 | V1.2 | 2026-08-22 | HWK 模块负责人 | 按 #224 补充 API-HWK-22、HWK_4095、TC-HWK-19、UI-HWK-01 删除入口、父表原子软删/子历史保留/普通更新防复活；记录全量自动化、typecheck/build 和 1440×900/390×844 浏览器证据 |
 | V1.3 | 2026-08-22 | HWK 模块负责人 | 按 #214 补充 API-HWK-23/24、DB-HWK-08、TC-HWK-20 ~ 27、MAN-HWK-012，回填后端 340/定向 94、前端 545、MySQL 9.6 与 `output/playwright/issue-214/01~10` 证据 |
 | V1.4 | 2026-08-25 | HWK 模块负责人 | 按 #264 拆分 UC-HWK-01/02 需求层 SSD，补概要组件顺序图、详细对象顺序图和业务场景分类；记录文档契约 RED→GREEN、当前基线自动化统计、共享 HWK E2E 2/2 及 LRN/GRD 真实边界 PASS |
-| V1.5 | 2026-08-26 | HWK 模块负责人 | 按 PR #276 评审纠正 GRD 假阳性、TikZ 组合片段和通知失败结论；通知失败设计/实现冲突标记 FAIL 并关联 #281，待复测结果不预写为 PASS |
+| V1.5 | 2026-08-26 | HWK 模块负责人 | 按 PR #276 评审纠正 GRD 假阳性、UML 组合片段和通知失败结论；通知失败设计/实现冲突标记 FAIL 并关联 #281，待复测结果不预写为 PASS |
 | V1.6 | 2026-08-26 | HWK 模块负责人 | #281 / PR #285 合并后复测通知失败整体回滚契约；补充定向 9/9、共享 E2E 2/2、后端 375、前端 556 及闭环契约 GREEN 证据 |
+| V1.7 | 2026-08-26 | HWK 模块负责人 | 按项目统一图形工具回退六张新增图，改用仓库 Mermaid 渲染脚本生成白底 SVG，并更新三层文档引用与闭环契约 |
 
 ### 1.2 审批记录
 
@@ -229,9 +230,10 @@ HWK-LOG-001 ~ HWK-LOG-013 为 2026-06-09 的 V1.0 历史日志；HWK-LOG-014 起
 | HWK-LOG-022 | 2026-08-22 | Playwright Chromium | H2 + Vite + fake sandbox，1440/390、深链、键盘、403、姓名 503 | 9 张截图通过，见 `output/playwright/issue-225/README.md` |
 | HWK-LOG-025 | 2026-08-25 | Vitest `tests/unit/hwk` | #264 当前基线 HWK 页面、API、权限、异常和附件定向回归 | 11 files / 182 tests；全部通过 |
 | HWK-LOG-026 | 2026-08-25 | Vitest 全量、`vue-tsc --noEmit`、Vite build | #264 前端全量回归、类型检查和生产构建 | 53 files / 551 tests、类型检查、189 modules 构建全部通过 |
-| HWK-LOG-027 | 2026-08-25 | `verify-hwk-doc-test-closure.test.sh`、Tectonic 0.17.0 | 拆分 SSD、TikZ 三层图、场景分类与 E2E 存在性契约 | 图组 RED 因教师发布 SSD 缺失失败；规范调整后旧图号断言再次 RED；E2E RED 因 HWK 场景文件缺失失败；GREEN 通过；6/6 TikZ 可编译且 PNG 目视通过 |
+| HWK-LOG-027 | 2026-08-25 | `verify-hwk-doc-test-closure.test.sh` | 拆分 SSD、三层图、场景分类与 E2E 存在性契约 | 图组 RED 因教师发布 SSD 缺失失败；规范调整后旧图号断言再次 RED；E2E RED 因 HWK 场景文件缺失失败；GREEN 通过 |
 | HWK-LOG-028 | 2026-08-25 | Playwright `homework-lifecycle.spec.ts` | 教师页面创建/发布→学生 TEXT 提交→教师批阅/发布成绩→学生结果；OBJECTIVE/CODE/FILE、评测/附件异常、过期、越权、重评；LRN/GRD 真实 API 边界 | 2/2 PASS；Spring Boot + Vite + 系统 Chrome；LRN 按 HWK sourceId 查到发布/成绩通知，GRD 同步返回受影响成绩项/学生/同步数均大于 0 |
 | HWK-LOG-029 | 2026-08-26 | #281 定向、Playwright、Maven/Vitest 全量、typecheck/build | 合并 `origin/dev@a30a096` 后复测通知失败整体回滚与 #264 完整闭环；共享演示账号场景改为串行避免跨场景会话竞争 | 通知/LRN 9/9、HWK E2E 2/2、后端 375（5 skipped）、前端 53 files / 556、typecheck、189 modules build 均 PASS |
+| HWK-LOG-030 | 2026-08-26 | `render-mermaid.mjs`、`verify-hwk-doc-test-closure.test.sh` | 六张新增 UML 从专用图源回退为仓库统一 Mermaid `.mmd`，生成白底 SVG 并更新需求/概要/详细三层引用 | 6/6 SVG 渲染成功；组合片段包含明确 `alt/else` 分支；闭环契约与静态图目视检查 PASS |
 
 ## 9 手工测试与联调确认
 

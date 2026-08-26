@@ -29,8 +29,8 @@ HWK 保持两个已经确认的独立业务场景。页面动作、权限检查�
 
 | 独立场景 | 需求层 | 概要层 | 详细层 |
 | --- | --- | --- | --- |
-| UC-HWK-02 教师创建并发布作业 | SRS 图 4-14B；`tikz/hwk/uc-hwk-02-sequence.tex` | OOD 5.2 与 HWK 概要稿 9.1；`uc-hwk-02-component-sequence.tex` | DSD 与 HWK 详细设计稿 5.1.1；`uc-hwk-02-object-sequence.tex` |
-| UC-HWK-01 学生提交作业并触发自动评测 | SRS 图 4-14A；`tikz/hwk/uc-hwk-01-sequence.tex` | OOD 5.2 与 HWK 概要稿 9.2；`uc-hwk-01-component-sequence.tex` | DSD 与 HWK 详细设计稿 5.1.2；`uc-hwk-01-object-sequence.tex` |
+| UC-HWK-02 教师创建并发布作业 | SRS 图 4-14B；`fig_4_14b_hwk_publish_ssd.mmd` | OOD 5.2 与 HWK 概要稿 9.1；`fig_5_2_hwk_02_publish_component.mmd` | DSD 与 HWK 详细设计稿 5.1.1；`fig_3_5_3a_hwk_publish_object.mmd` |
+| UC-HWK-01 学生提交作业并触发自动评测 | SRS 图 4-14A；`fig_4_14a_hwk_submission_ssd.mmd` | OOD 5.2 与 HWK 概要稿 9.2；`fig_5_2_hwk_01_submission_component.mmd` | DSD 与 HWK 详细设计稿 5.1.2；`fig_3_5_3b_hwk_submission_object.mmd` |
 
 ## 3 可执行验证矩阵
 
@@ -61,7 +61,7 @@ HWK 保持两个已经确认的独立业务场景。页面动作、权限检查�
 | 前端全量回归 | 556 | 556 | 0 | 0 | 0 | PASS；53/53 files |
 | 前端类型检查 | 1 | 1 | 0 | 0 | 0 | PASS |
 | 前端生产构建 | 1 | 1 | 0 | 0 | 0 | PASS；189 modules transformed |
-| 三层 TikZ 编译与静态图目视检查 | 6 | 6 | 0 | 0 | 0 | PASS；Tectonic 逐份生成 PDF，再渲染 PNG；中文、生命线、消息、组合片段和长参与者名称清晰 |
+| 三层 Mermaid 渲染与静态图目视检查 | 6 | 6 | 0 | 0 | 0 | PASS；仓库 `render-mermaid.mjs` 逐份生成白底 SVG；中文、生命线、消息、组合片段和长参与者名称清晰，风格与相邻 UML 一致 |
 | 通知投递失败及 LRN 定向回归 | 9 | 9 | 0 | 0 | 0 | PASS；覆盖发布整体回滚、必需/尽力投递语义、通知持久化与查询 |
 
 首次 Maven 运行因受限沙箱不能连接 Maven Central，未进入测试断言；允许既有依赖解析后同一命令运行通过，不计为产品 FAIL。首次 E2E 因本机未安装 Playwright ffmpeg 而未进入业务步骤；按共享 runner 的敏感信息约定关闭失败录像后复测通过，不计为产品 FAIL。执行过程未记录 Token、Cookie、真实个人数据或本机凭据。

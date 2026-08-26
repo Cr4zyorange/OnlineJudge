@@ -619,15 +619,15 @@ CREATE INDEX idx_hwk_submission_attention ON t_hwk_submission(homework_id, is_fi
 
 ### 9.1 UC-HWK-02 教师创建并发布作业组件顺序图
 
-![](../../最终提交/assets/tikz/hwk/uc-hwk-02-component-sequence.png)
+![](../../最终提交/assets/fig_5_2_hwk_02_publish_component.svg)
 
-TikZ 图源：`docs/diagrams/tikz/hwk/uc-hwk-02-component-sequence.tex`。
+Mermaid 图源：`docs/diagrams/arch/fig_5_2_hwk_02_publish_component.mmd`。
 
 ### 9.2 UC-HWK-01 学生提交作业并触发自动评测组件顺序图
 
-![](../../最终提交/assets/tikz/hwk/uc-hwk-01-component-sequence.png)
+![](../../最终提交/assets/fig_5_2_hwk_01_submission_component.svg)
 
-TikZ 图源：`docs/diagrams/tikz/hwk/uc-hwk-01-component-sequence.tex`。
+Mermaid 图源：`docs/diagrams/arch/fig_5_2_hwk_01_submission_component.mmd`。
 
 ### 9.3 代码自动评测流程
 

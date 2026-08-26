@@ -1,0 +1,32 @@
+sequenceDiagram
+  actor Student as 学生
+  participant Frontend as Vue HWK 页面
+  participant API as HWK API
+  participant Permission as CRS 课程权限边界
+  participant Storage as 文件存储边界
+  participant DB as HWK 数据表
+  participant Evaluator as 共享评测边界
+  Student->>Frontend: 打开作业并填写提交内容
+  opt FILE 作业
+    Frontend->>API: 上传单附件
+    API->>Permission: 校验成员与作业归属
+    Permission-->>API: 允许上传
+    API->>Storage: 写入物理对象
+    Storage-->>API: 返回存储结果
+    API->>DB: 保存 UPLOADED 安全元数据
+    DB-->>API: 返回 fileId
+    API-->>Frontend: 返回 fileId 与安全摘要
+  end
+  Frontend->>API: 提交 TEXT/OBJECTIVE/CODE/fileId
+  API->>Permission: 校验成员、状态、截止与次数
+  Permission-->>API: 允许提交
+  API->>DB: 保存版本并维护唯一有效提交
+  alt OBJECTIVE/CODE
+    API->>Evaluator: 自动评分或创建评测任务
+    Evaluator-->>API: 返回初始或最终评测状态
+  else TEXT/FILE
+    API->>DB: 标记待人工批阅
+    DB-->>API: 返回待批阅状态
+  end
+  API-->>Frontend: 返回提交回执和可见状态
+  Frontend-->>Student: 展示结果、错误或恢复提示
