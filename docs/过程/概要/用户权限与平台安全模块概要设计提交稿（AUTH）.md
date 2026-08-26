@@ -653,3 +653,31 @@ stateDiagram-v2
 ## 13 模块提交结论
 
 用户权限与平台安全模块概要设计已覆盖功能需求、非功能需求、页面设计、接口设计、核心数据结构、数据库表结构、运行流程、异常处理、安全策略和需求追踪关系。本文档可作为 AUTH 模块提交稿交由概要设计负责人整合进《软件概要设计说明书》。
+
+## 14 D2 业务场景闭环补充
+
+### 14.1 业务场景清单与分类
+
+按 Issue #261 盘点，AUTH 模块确认 11 个独立业务场景（本地编号 `SC-AUTH-01` ~ `SC-AUTH-11`），其余为 `include` 公共子流程或备选/异常路径，不新增正式 UC 编号；详细清单与映射见 `docs/过程/测试/TST-DOC-02-AUTH-业务场景清单与测试闭环.md`。
+
+| 场景 | 名称 | include 公共子流程 | 备选/异常路径 |
+| --- | --- | --- | --- |
+| SC-AUTH-01 | 学生自助注册 | C1 账号与密码校验 | E1 账号已存在；E6 输入校验失败 |
+| SC-AUTH-02 | 账号密码登录 | C1；C2 会话签发与校验；C3 角色菜单加载；C4 审计写入 | E1 错误凭据；E2 禁用/冻结；E3 失败锁定 |
+| SC-AUTH-03 | 退出登录 | C2；C4 | E4 令牌失效 |
+| SC-AUTH-04 | 持续鉴权与当前用户上下文 | C2；C5 统一认证与权限拦截 | E4；E5 越权访问；E2 |
+| SC-AUTH-05 | 个人资料查看与修改 | C1（格式校验） | E6 |
+| SC-AUTH-06 | 修改密码 | C1；C2；C4 | E6；原密码错误；新旧密码相同 |
+| SC-AUTH-07 | 管理员用户与账号状态管理 | C2；C4；C5 | E5；目标用户不存在 |
+| SC-AUTH-08 | 用户角色分配 | C4；C5 | E5；用户/角色不可用 |
+| SC-AUTH-09 | 角色与角色权限维护 | C4；C5 | E5；角色/权限不可用 |
+| SC-AUTH-10 | 安全异常拦截 | C2；C4；C5 | E2、E3、E4、E5 |
+| SC-AUTH-11 | 关键操作审计写入与查询 | C4；C5 | E7 审计写入失败 |
+
+### 14.2 概要层图组
+
+概要层组件级顺序图与状态图/活动图已整合进《软件概要设计说明书》5.1.2 节：SC-AUTH-01 ~ SC-AUTH-11 对应图 5-2 ~ 5-12，账号/会话与跨场景状态/活动图对应图 5-13 ~ 5-17，SC-AUTH-05 个人资料、SC-AUTH-11 审计写入与查询的专属组件活动图对应图 5-18 ~ 5-19。组件名称对齐当前实现：`AuthController`、`UserProfileController`、`AuthAdminController`、`AuthService`、`RoleService`、`PasswordSecurityService`、`SessionTokenService`、`AuthAuditService`、`AccessControlService`、`AuthRequiredInterceptor`、`TokenCurrentUserProvider`、`AuthRepository`。
+
+### 14.3 三层图完整映射
+
+需求层（SRS 4.17）、概要层（概要设计说明书 5.1.2）、详细层（详细设计说明书 3.1 详细层业务场景图组）的完整图号映射见 `docs/过程/测试/TST-DOC-02-AUTH-业务场景清单与测试闭环.md` 第 3 章。
