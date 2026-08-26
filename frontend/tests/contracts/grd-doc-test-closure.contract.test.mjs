@@ -80,6 +80,7 @@ test('GRD SSD branches and responses match the implemented API contracts', () =>
   const studentGradeSequence = readRepositoryFile('docs/diagrams/grd/fig_3_6_11_student_grade_query_sequence.mmd');
   const gradeReviewSequence = readRepositoryFile('docs/diagrams/grd/fig_3_6_12_grade_review_sequence.mmd');
   const gradeAnalysisSequence = readRepositoryFile('docs/diagrams/grd/fig_3_6_13_grade_analysis_sequence.mmd');
+  const gradeAnalysisState = readRepositoryFile('docs/diagrams/grd/fig_3_6_15_grade_analysis_state.mmd');
   const srs = readRepositoryFile('docs/最终提交/软件需求规格说明书.md');
   const detailedDesign = readRepositoryFile('docs/最终提交/软件详细设计说明书.md');
   const processDetailedDesign = readRepositoryFile('docs/过程/详细设计/GRD-成绩评价与教学分析-详细设计提交稿.md');
@@ -92,6 +93,8 @@ test('GRD SSD branches and responses match the implemented API contracts', () =>
   const gradeSyncResult = readRepositoryFile('backend/src/main/java/com/onlinejudge/grd/service/GradeSyncResult.java');
   const gradeItemController = readRepositoryFile('backend/src/main/java/com/onlinejudge/grd/controller/GradeItemController.java');
   const gradeItemConfigView = readRepositoryFile('frontend/src/views/grd/GradeItemConfigView.vue');
+  const gradeItemService = readRepositoryFile('backend/src/main/java/com/onlinejudge/grd/service/GradeItemService.java');
+  const gradeAnalysisService = readRepositoryFile('backend/src/main/java/com/onlinejudge/grd/service/GradeAnalysisService.java');
   const gradeReviewProcessResult = readRepositoryFile('backend/src/main/java/com/onlinejudge/grd/service/GradeReviewProcessResult.java');
   const gradePublishUseCase = srs.slice(
     srs.indexOf('## 4.8 UC-GR-01'),
@@ -116,6 +119,10 @@ test('GRD SSD branches and responses match the implemented API contracts', () =>
   const processSyncApi = processDetailedDesign.slice(
     processDetailedDesign.indexOf('#### 4.2.2 同步来源成绩 API-GRD-06'),
     processDetailedDesign.indexOf('#### 4.2.3 重新计算课程成绩 API-GRD-07')
+  );
+  const sourceFingerprintImplementation = gradeAnalysisService.slice(
+    gradeAnalysisService.indexOf('private String sourceFingerprint'),
+    gradeAnalysisService.indexOf('private String timeValue')
   );
 
   assert.doesNotMatch(gradeItemSsd, /来源任务存在|来源不存在/);
@@ -228,6 +235,14 @@ test('GRD SSD branches and responses match the implemented API contracts', () =>
   assert.ok(analysisPermissionCheck >= 0 && analysisPermissionException > analysisPermissionCheck);
   assert.ok(analysisItemLookup > analysisPermissionException && analysisStudentLookup > analysisPermissionException);
   assert.match(gradeAnalysisSequence, /GradeItemPermissionException.*ERR-GRD-01.*403/);
+  assert.doesNotMatch(gradeAnalysisState, /规则/);
+  assert.match(gradeAnalysisState, /学生集合或来源版本变化/);
+  assert.match(detailedDesign, /规则修改本身不(?:会|直接).*STALE.*LAB\/HWK.*同步.*同一事务.*自动重算课程总评/);
+  assert.match(processDetailedDesign, /规则修改本身不(?:会|直接).*STALE.*LAB\/HWK.*同步.*同一事务.*自动重算课程总评/);
+  assert.doesNotMatch(detailedDesign, /成员、规则、成绩或统计契约变化会使快照/);
+  assert.doesNotMatch(processDetailedDesign, /成员、规则、成绩或统计契约变化会使快照/);
+  assert.match(gradeItemService, /updateGradeItem[\s\S]*gradeItemRepository\.update\(updated\)/);
+  assert.doesNotMatch(sourceFingerprintImplementation, /gradeItemRepository|GradeItem/);
 
   const membershipCheck = studentGradeSequence.indexOf('isCourseMember');
   const accessException = studentGradeSequence.indexOf('StudentGradeAccessException');
