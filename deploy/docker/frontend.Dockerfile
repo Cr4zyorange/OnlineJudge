@@ -19,7 +19,8 @@ LABEL org.opencontainers.image.revision="$GIT_SHA" \
 COPY --chown=nginx:nginx deploy/nginx/default.conf /etc/nginx/conf.d/default.conf
 COPY --from=build --chown=nginx:nginx /workspace/dist /usr/share/nginx/html
 
-RUN chown -R nginx:nginx /var/cache/nginx /var/run /usr/share/nginx/html
+RUN sed -i 's|^pid .*;|pid /tmp/nginx.pid;|' /etc/nginx/nginx.conf \
+    && chown -R nginx:nginx /var/cache/nginx /usr/share/nginx/html
 
 EXPOSE 80
 
