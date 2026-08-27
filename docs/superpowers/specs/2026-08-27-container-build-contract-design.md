@@ -8,11 +8,11 @@
 
 ## 2. 方案比较
 
-### 方案 A：参数化镜像契约与统一脚本入口（采用）
+### 方案 A：固定镜像名、统一 `GIT_SHA` 与脚本入口（采用）
 
-Compose、构建脚本和烟测脚本统一消费 `BACKEND_IMAGE_REPOSITORY`、`FRONTEND_IMAGE_REPOSITORY` 与 `IMAGE_TAG`。`IMAGE_TAG` 必须是完整 40 位 Git SHA，构建时额外生成 12 位短 SHA 标签；OCI `org.opencontainers.image.revision` 保存完整 SHA。默认仓库名只用于本地，不在本任务推送远端镜像。
+按已合并的 `docs/开发/D3-CICD-共享契约.md`，Compose、构建脚本和烟测脚本只消费 `GIT_SHA`。`GIT_SHA` 必须是当前 checkout 的完整 40 位 Git SHA；镜像名固定为 `onlinejudge/backend:${GIT_SHA}` 与 `onlinejudge/frontend:${GIT_SHA}`，OCI `org.opencontainers.image.revision` 保存同一完整 SHA。
 
-优点是契约明确、无需生成或改写受版本控制的 Compose 文件，CI 和 Kubernetes 可直接注入同名参数。缺点是本地启动必须显式提供版本值，但这正好满足“缺失版本号必须失败”的验收要求。
+优点是 Compose、Actions 与 Kubernetes 只有一个版本事实且不存在同义变量。缺点是本地启动必须显式提供版本值，但这正好满足“缺失版本号必须失败”的验收要求。
 
 ### 方案 B：构建时生成带固定标签的 Compose 文件
 
@@ -28,12 +28,10 @@ Digest 能提供最强的不可变引用，但本地构建尚未推送仓库时�
 
 | 参数 | 规则 | 默认值 |
 | --- | --- | --- |
-| `BACKEND_IMAGE_REPOSITORY` | 非空镜像仓库名，不含标签 | `onlinejudge/backend` |
-| `FRONTEND_IMAGE_REPOSITORY` | 非空镜像仓库名，不含标签 | `onlinejudge/frontend` |
-| `IMAGE_TAG` | 必填，当前源码完整 40 位十六进制 Git SHA | 无 |
+| `GIT_SHA` | 必填，当前源码完整 40 位十六进制 Git SHA | 无 |
 | `OJ_HTTP_PORT` | 本地前端暴露端口 | `8088` |
 
-构建脚本对缺失或格式错误的 `IMAGE_TAG` 返回非零；同时验证当前 checkout 的 `HEAD` 与传入 SHA 一致，避免错误 revision 被写入镜像。每个自建镜像生成 `<repository>:<full-sha>` 和 `<repository>:<12-char-short-sha>` 两个本地标签，验证和 Compose 主流程只依赖完整 SHA 标签，不依赖 `latest`。
+构建脚本对缺失、`latest`、非 40 位或非当前 checkout 的 `GIT_SHA` 返回非零，避免错误 revision 被写入镜像。每个自建镜像只按共享契约生成固定仓库名的完整 SHA 标签；验证和 Compose 主流程不依赖 `latest`，也不发明短 SHA 或可覆盖仓库名。
 
 Dockerfile 通过构建参数接收完整 SHA，并写入以下 OCI 标签：
 
@@ -47,7 +45,7 @@ Dockerfile 通过构建参数接收完整 SHA，并写入以下 OCI 标签：
 
 后端继续使用 Java 21 多阶段构建和 Maven 缓存挂载，依赖解析只复制 `pom.xml`，业务源码变化不会无条件破坏依赖缓存。运行阶段创建专用非 root 用户，应用 JAR、上传目录和健康探针工具均对该用户可用。
 
-前端继续使用 Node 22、`npm ci` 和 Nginx 多阶段构建，依赖层只复制 package 清单与 lockfile，并使用 BuildKit npm 缓存。运行阶段使用非 root Nginx 用户和非特权端口 `8080`；Nginx pid、缓存和临时目录显式放在该用户可写位置。Compose 相应把宿主端口映射到容器 `8080`。
+前端继续使用 Node 22、`npm ci` 和 Nginx 多阶段构建，依赖层只复制 package 清单与 lockfile，并使用 BuildKit npm 缓存。运行阶段使用非 root Nginx 用户，保持共享契约规定的容器端口 `80`；Nginx pid、缓存和临时目录显式设为该用户可写，不改变 `/api/ -> backend:8080` 路由。
 
 `.dockerignore` 排除 Git 元数据、IDE 文件、依赖目录、构建产物、测试输出、临时目录、环境文件、密钥/证书常见扩展名和不参与镜像构建的提交物。Dockerfile 仍只复制自身构建所需目录，降低误带本地文件和缓存失效的风险。
 
@@ -55,17 +53,19 @@ MySQL 固定引用官方 `mysql:8.4`，不创建数据库 Dockerfile。Compose �
 
 ## 5. Compose 与运行流程
 
-`deploy/docker/compose.yml` 为前后端同时声明精确 `image` 引用与已有 `build` 配置。直接解析 Compose 时缺失 `IMAGE_TAG` 即失败；构建脚本负责构建，烟测脚本使用 `--no-build` 启动已构建的完整 SHA 镜像，防止烟测期间隐式产生其他内容。
+`deploy/docker/compose.yml` 为前后端同时声明固定仓库名的 `${GIT_SHA}` 精确 `image` 引用与已有 `build` 配置。直接解析 Compose 时缺失 `GIT_SHA`、`MYSQL_PASSWORD` 或 `MYSQL_ROOT_PASSWORD` 即失败；构建脚本负责构建，烟测脚本使用 `--no-build` 启动已构建的完整 SHA 镜像，防止烟测期间隐式产生其他内容。`.env.example` 只保留 Secret 键名，不提供演示口令；Compose profile 的 datasource password 也不再回退到仓库口令。
+
+后端保留 `/api/v1/system/health` 作为不访问数据库的 liveness，并新增匿名可访问的 `/api/v1/system/readiness`。Readiness 必须通过配置的数据源执行 `SELECT 1`；成功返回 HTTP 200 与 `data.status="UP"`，数据库不可连接或查询失败时返回 HTTP 503，响应不得含 `status:"UP"`、连接串、用户名或口令。Compose backend healthcheck 切换到 readiness，前端代理烟测也调用 readiness，从而证明 `frontend -> backend -> mysql` 完整可用。
 
 烟测使用独立 Compose project name，并在退出时只清理该 project 的容器、网络和卷。启动采用 Compose 健康检查和有界等待，不使用固定 sleep。通过条件包括：
 
 1. MySQL、后端、前端三个服务均为 healthy；
 2. MySQL 实际镜像为 `mysql:8.4`；
 3. 前后端实际镜像引用完整 SHA 标签；
-4. 两个镜像的 OCI revision 等于输入 SHA；
+4. 两个镜像的 OCI revision 等于输入 `GIT_SHA`；
 5. 两个应用容器的运行用户不是 root；
 6. 前端静态入口和后端健康接口可访问；
-7. 通过现有登录/核心读取验证触发一次真实数据库访问，证明后端连接 MySQL。
+7. 后端 readiness 与经前端代理的 readiness 均成功，证明后端连接 MySQL及三服务链路可用；现有登录/核心只读验收继续作为业务闭环证据。
 
 构建、启动或健康检查任一失败时，脚本保留非零退出码，输出 Compose 状态与相关日志，然后执行精确清理。
 
@@ -74,17 +74,18 @@ MySQL 固定引用官方 `mysql:8.4`，不创建数据库 Dockerfile。Compose �
 测试按 Red-Green-Refactor 执行：
 
 1. 扩展 Java Compose/Dockerfile 静态契约测试，先证明当前配置缺少必填 SHA、OCI revision、非 root 用户和精确镜像引用；确认按预期失败。
-2. 新增 Shell 脚本测试，用可控的假 Docker 命令证明缺失版本、构建失败和健康失败均返回非零；确认按预期失败。
-3. 写最小 Dockerfile、Compose 和脚本实现使定向测试通过。
-4. 重构共享参数校验，复跑全部定向测试。
-5. 在 Docker Desktop Linux Engine 上执行真实前后端构建和三容器烟测；记录 Docker/Compose 版本、完整 Git SHA、镜像数量、healthy 服务数量、命令退出码和原始日志。
-6. 最后运行后端相关测试、Shell 测试、前端类型检查/构建、Compose 配置解析和 `git diff --check`。
+2. 扩展 `SystemHealthControllerTest` 与 Compose profile 测试，先证明匿名 readiness、数据库失败 503 和无密码 fallback 尚未满足；确认按预期失败。
+3. 在 `scripts/docker/**` 新增 Shell 脚本测试，用可控的假 Docker 命令证明缺失/错误 `GIT_SHA`、构建失败和健康失败均返回非零；确认按预期失败。
+4. 写最小 readiness、Dockerfile、Compose 和脚本实现使定向测试通过。
+5. 重构共享参数校验，复跑全部定向测试。
+6. 在 Docker Desktop Linux Engine 上执行真实前后端构建和三容器烟测；记录 Docker/Compose 版本、完整 Git SHA、镜像数量、healthy 服务数量、命令退出码和原始日志。
+7. 最后运行后端相关测试、Shell 测试、前端类型检查/构建、Compose 配置解析和 `git diff --check`。
 
-Windows 宿主统一通过 WSL/Linux Shell 执行 Bash 验收脚本，避免 Git for Windows 的路径与进程语义差异。脚本本身以 Linux、GitHub-hosted Runner 和后续 Kind 环境为目标。
+脚本以 Linux、GitHub-hosted Runner 和后续 Kind 环境为目标；Windows Git worktree 可通过 Git Bash 执行，原生 WSL checkout 可直接使用 Linux Shell。
 
 ## 7. 门禁、协作与交付
 
-当前 #272、#275、#276 尚未全部合入，因此先完成本设计、RED 验收与路径冲突核对，不在过期基线上形成最终实现结论。门禁解除后执行：
+2026-08-27 复核确认 #272、#275、#276 均已合入，当前分支已重放到 `origin/dev@54e47e90e0c8f7c8031dcd0f760d6756ce8f8dfe`。实施继续执行：
 
 1. 获取最新远端并把本分支重放到最新 `origin/dev`；
 2. 复查 #287 的数据库初始化入口以及 #288/#290 使用的镜像参数名；
