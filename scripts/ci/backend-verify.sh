@@ -43,17 +43,27 @@ printf 'backend-verify: java=%s maven=%s\n' "$java_major" "$maven_version" | tee
 
 [[ -f "$backend_dir/pom.xml" ]] || fail "missing $backend_dir/pom.xml"
 
+preserve_reports() {
+  local phase="$1"
+  local dest="$backend_dir/target/surefire-reports/$phase"
+  mkdir -p "$dest"
+  rm -f "$dest"/*.xml
+  (cd "$backend_dir" && cp target/surefire-reports/*.xml "$dest"/)
+}
+
 # 编译门禁：主代码必须可编译。
 (cd "$backend_dir" && log_run mvn -B -ntp -q -DskipTests compile)
 
 # 单元测试门禁：排除跨模块集成/E2E API 测试类。
-(cd "$backend_dir" && log_run mvn -B -ntp test \
-  -Dsurefire.excludes='**/integration/**,**/CrsClosureE2EApiTest.java' \
-  -Dsurefire.reportsDirectory=target/surefire-reports/unit)
+(cd "$backend_dir" && rm -f target/surefire-reports/*.xml \
+  && log_run mvn -B -ntp test \
+  -Dsurefire.excludes='**/integration/**,**/CrsClosureE2EApiTest.java')
+preserve_reports unit
 
 # 集成测试门禁：跨模块契约与 E2E API 场景（H2 内存库，无需外部服务）。
-(cd "$backend_dir" && log_run mvn -B -ntp test \
-  -Dsurefire.includes='**/integration/**,**/CrsClosureE2EApiTest.java' \
-  -Dsurefire.reportsDirectory=target/surefire-reports/integration)
+(cd "$backend_dir" && rm -f target/surefire-reports/*.xml \
+  && log_run mvn -B -ntp test \
+  -Dsurefire.includes='**/integration/**,**/CrsClosureE2EApiTest.java')
+preserve_reports integration
 
 printf 'backend-verify: PASS (compile + unit + integration)\n' | tee -a "$log"

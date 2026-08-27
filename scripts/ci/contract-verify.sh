@@ -30,8 +30,10 @@ java_major="$(java -version 2>&1 | sed -n '1s/.*version "\([0-9][0-9]*\).*/\1/p'
 log_run bash "$checkout/scripts/test/verify-shell-contract.sh" "$checkout"
 
 # 后端公共契约：common/integration 共享对象结构不可回归。
-(cd "$checkout/backend" && log_run mvn -B -ntp test \
-  -Dtest=CommonInfrastructureContractTest \
-  -Dsurefire.reportsDirectory=target/surefire-reports/contract)
+(cd "$checkout/backend" && rm -f target/surefire-reports/*.xml \
+  && log_run mvn -B -ntp test -Dtest=CommonInfrastructureContractTest)
+mkdir -p "$checkout/backend/target/surefire-reports/contract"
+rm -f "$checkout/backend/target/surefire-reports/contract"/*.xml
+(cd "$checkout/backend" && cp target/surefire-reports/*.xml target/surefire-reports/contract/)
 
 printf 'contract-verify: PASS (shell contract + common infrastructure contract)\n' | tee -a "$log"

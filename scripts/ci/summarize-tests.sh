@@ -17,21 +17,25 @@ append() {
 count_reports() {
   local label="$1"
   local dir="$2"
-  local total=0 failures=0 errors=0 skipped=0 files=0
+  local total failures errors skipped files
 
   [[ -d "$dir" ]] || {
     append "$label: no reports found"
     return 0
   }
 
-  while IFS=' ' read -r t e s f; do
-    total=$((total + t))
-    errors=$((errors + e))
-    skipped=$((skipped + s))
-    failures=$((failures + f))
-    files=$((files + 1))
-  done < <(grep -hoE '<testsuite[^>]*>' "$dir"/*.xml 2>/dev/null \
-    | sed -nE 's/.*tests="([0-9]+)".*errors="([0-9]+)".*skipped="([0-9]+)".*failures="([0-9]+)".*/\1 \2 \3 \4/p')
+  sum_attr() {
+    grep -hE '<testsuite ' "$dir"/*.xml 2>/dev/null \
+      | grep -oE "$1=\"[0-9]+\"" \
+      | grep -oE '[0-9]+' \
+      | awk '{ s += $1 } END { print s + 0 }'
+  }
+
+  total="$(sum_attr tests)"
+  failures="$(sum_attr failures)"
+  errors="$(sum_attr errors)"
+  skipped="$(sum_attr skipped)"
+  files="$(grep -lE '<testsuite[ >]' "$dir"/*.xml 2>/dev/null | wc -l | tr -d ' ')"
 
   append "$label: files=$files tests=$total failures=$failures errors=$errors skipped=$skipped"
 }

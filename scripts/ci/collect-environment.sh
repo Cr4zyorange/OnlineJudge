@@ -40,7 +40,8 @@ if [[ -z "$ref" ]] && git -C "$checkout" rev-parse --git-dir >/dev/null 2>&1; th
   ref="$(git -C "$checkout" rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
 fi
 if [[ -z "$repository" ]] && git -C "$checkout" rev-parse --git-dir >/dev/null 2>&1; then
-  repository="$(git -C "$checkout" remote get-url origin 2>/dev/null | sed -nE 's#.*[:/]([^/]+/[^/]+)(\.git)?$#\1#p' || true)"
+  repository="$(git -C "$checkout" remote get-url origin 2>/dev/null \
+    | sed -nE 's#.*[:/]([^/]+/[^/]+).*#\1#p' | sed 's/\.git$//' || true)"
 fi
 if [[ -z "$runner_os" ]]; then
   runner_os="$(uname -s 2>/dev/null || true)"
