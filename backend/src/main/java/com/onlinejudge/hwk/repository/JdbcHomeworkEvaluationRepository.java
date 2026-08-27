@@ -128,6 +128,20 @@ public class JdbcHomeworkEvaluationRepository implements HomeworkEvaluationRepos
     }
 
     @Override
+    public boolean claimPending(long evaluationId, long submissionId, LocalDateTime startedAt) {
+        return jdbcTemplate.update("""
+                        UPDATE t_hwk_evaluation
+                        SET status = 'RUNNING', started_at = ?, updated_at = ?
+                        WHERE id = ? AND submission_id = ? AND status = 'PENDING'
+                        """,
+                Timestamp.valueOf(startedAt),
+                Timestamp.valueOf(startedAt),
+                evaluationId,
+                submissionId
+        ) == 1;
+    }
+
+    @Override
     public Optional<HomeworkEvaluation> findLatestBySubmissionId(long submissionId) {
         return jdbcTemplate.query("""
                         SELECT %s

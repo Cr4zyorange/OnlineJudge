@@ -243,6 +243,11 @@ class HomeworkSubmissionServiceTest {
         }
 
         @Override
+        public boolean claimPending(long evaluationId, long submissionId, java.time.LocalDateTime startedAt) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
         public Optional<HomeworkEvaluation> findById(long id) {
             return Optional.empty();
         }
