@@ -13,6 +13,7 @@ import org.springframework.stereotype.Repository;
 import java.sql.PreparedStatement;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -139,6 +140,34 @@ public class JdbcHomeworkEvaluationRepository implements HomeworkEvaluationRepos
                 evaluationId,
                 submissionId
         ) == 1;
+    }
+
+    @Override
+    public List<HomeworkEvaluation> findPendingCodeEvaluations(int limit) {
+        return jdbcTemplate.query("""
+                        SELECT %s
+                        FROM t_hwk_evaluation
+                        WHERE evaluation_type = 'CODE_JUDGE' AND status = 'PENDING'
+                        ORDER BY id
+                        LIMIT ?
+                        """.formatted(SELECT_COLUMNS),
+                ROW_MAPPER,
+                Math.max(1, limit)
+        );
+    }
+
+    @Override
+    public int requeueRunningCodeEvaluationsBefore(LocalDateTime startedBefore, LocalDateTime requeuedAt) {
+        return jdbcTemplate.update("""
+                        UPDATE t_hwk_evaluation
+                        SET status = 'PENDING', updated_at = ?
+                        WHERE evaluation_type = 'CODE_JUDGE'
+                          AND status = 'RUNNING'
+                          AND started_at < ?
+                        """,
+                Timestamp.valueOf(requeuedAt),
+                Timestamp.valueOf(startedBefore)
+        );
     }
 
     @Override

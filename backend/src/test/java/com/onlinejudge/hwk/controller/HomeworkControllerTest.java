@@ -9,6 +9,7 @@ import com.onlinejudge.common.event.NotificationEvent;
 import com.onlinejudge.common.event.NotificationEventPublisher;
 import com.onlinejudge.hwk.domain.Homework;
 import com.onlinejudge.hwk.domain.HomeworkRepository;
+import com.onlinejudge.hwk.service.HomeworkEvaluationRecovery;
 import com.onlinejudge.integration.grade.SourceGradeClient;
 import com.onlinejudge.integration.grade.SourceGradeType;
 import org.junit.jupiter.api.BeforeEach;
@@ -43,7 +44,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest(properties = {
-        "spring.datasource.url=jdbc:h2:mem:homework_controller;MODE=MySQL;DATABASE_TO_LOWER=TRUE;CASE_INSENSITIVE_IDENTIFIERS=TRUE;DB_CLOSE_DELAY=-1"
+        "spring.datasource.url=jdbc:h2:mem:homework_controller;MODE=MySQL;DATABASE_TO_LOWER=TRUE;CASE_INSENSITIVE_IDENTIFIERS=TRUE;DB_CLOSE_DELAY=-1",
+        "onlinejudge.hwk.evaluation.recovery-enabled=true"
 })
 @AutoConfigureMockMvc
 @Sql(
@@ -114,6 +116,9 @@ class HomeworkControllerTest {
 
     @Autowired
     private SourceGradeClient sourceGradeClient;
+
+    @Autowired
+    private HomeworkEvaluationRecovery evaluationRecovery;
 
     @BeforeEach
     void clearNotificationEvents() {
@@ -1257,6 +1262,46 @@ class HomeworkControllerTest {
     }
 
     @Test
+    void recoveryEvaluatesPersistedCodeSubmissionWhenInitialAfterCommitDispatchWasMissed() throws Exception {
+        long homeworkId = createHomeworkAndReturnId(codePayload("[\"python\"]"));
+        mockMvc.perform(put("/api/v1/homeworks/{homeworkId}/publish", homeworkId)
+                        .headers(teacherHeaders("101", "101", "101:601")))
+                .andExpect(status().isOk());
+        long submissionId = insertSubmission(
+                homeworkId, 601, "CODE", "SUBMITTED", "PENDING", "NEED_REVIEW", null,
+                null, 1, true, false, "2026-08-27 08:00:00"
+        );
+        insertCodeEvaluation(submissionId, homeworkId, 601, "PENDING", "2026-08-27 08:00:00");
+
+        evaluationRecovery.recoverPendingEvaluations();
+
+        awaitEvaluationStatus(submissionId, "ACCEPTED");
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT evaluation_status FROM t_hwk_submission WHERE id = ?", String.class, submissionId
+        )).isEqualTo("ACCEPTED");
+    }
+
+    @Test
+    void recoveryRequeuesRunningCodeSubmissionLeftByPreviousProcess() throws Exception {
+        long homeworkId = createHomeworkAndReturnId(codePayload("[\"python\"]"));
+        mockMvc.perform(put("/api/v1/homeworks/{homeworkId}/publish", homeworkId)
+                        .headers(teacherHeaders("101", "101", "101:601")))
+                .andExpect(status().isOk());
+        long submissionId = insertSubmission(
+                homeworkId, 601, "CODE", "SUBMITTED", "RUNNING", "NEED_REVIEW", null,
+                null, 1, true, false, "2026-01-01 08:00:00"
+        );
+        insertCodeEvaluation(submissionId, homeworkId, 601, "RUNNING", "2026-01-01 08:00:00");
+
+        evaluationRecovery.recoverAfterRestart();
+
+        awaitEvaluationStatus(submissionId, "ACCEPTED");
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT evaluation_status FROM t_hwk_submission WHERE id = ?", String.class, submissionId
+        )).isEqualTo("ACCEPTED");
+    }
+
+    @Test
     void studentEvaluationResultHidesHiddenCaseExpectedOutput() throws Exception {
         long homeworkId = createHomeworkAndReturnId(codePayloadWithHiddenCase("[\"python\"]"));
         mockMvc.perform(put("/api/v1/homeworks/{homeworkId}/publish", homeworkId)
@@ -1737,6 +1782,22 @@ class HomeworkControllerTest {
                 VALUES (?, ?, ?, 'AUTO', 'ACCEPTED', 100, 1, 1, 20, 1024, '历史评测结果',
                         CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                 """, submissionId, homeworkId, studentId);
+    }
+
+    private void insertCodeEvaluation(
+            long submissionId,
+            long homeworkId,
+            long studentId,
+            String status,
+            String startedAt
+    ) {
+        jdbcTemplate.update("""
+                INSERT INTO t_hwk_evaluation
+                (submission_id, homework_id, student_id, evaluation_type, status, score, passed_cases, total_cases,
+                 time_used_ms, memory_used_kb, feedback, started_at, finished_at, created_at, updated_at)
+                VALUES (?, ?, ?, 'CODE_JUDGE', ?, 0, 0, 1, NULL, NULL, 'waiting for evaluation',
+                        ?, NULL, ?, ?)
+                """, submissionId, homeworkId, studentId, status, startedAt, startedAt, startedAt);
     }
 
     private void insertReviewLog(long submissionId, long homeworkId, long studentId) {

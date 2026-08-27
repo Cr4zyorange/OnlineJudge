@@ -248,6 +248,19 @@ class HomeworkSubmissionServiceTest {
         }
 
         @Override
+        public List<HomeworkEvaluation> findPendingCodeEvaluations(int limit) {
+            return List.of();
+        }
+
+        @Override
+        public int requeueRunningCodeEvaluationsBefore(
+                java.time.LocalDateTime startedBefore,
+                java.time.LocalDateTime requeuedAt
+        ) {
+            return 0;
+        }
+
+        @Override
         public Optional<HomeworkEvaluation> findById(long id) {
             return Optional.empty();
         }
