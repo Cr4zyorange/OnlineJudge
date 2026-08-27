@@ -6,8 +6,8 @@
  *   node scripts/dev/render-mermaid.mjs <mmdPath> <svgPath> [<mmdPath> <svgPath> ...]
  *
  * 依赖（本机开发工具，不进入产物）：
- *   - Chrome/Edge headless（默认读取 CHROME_PATH，或常见安装路径）
- *   - mermaid.min.js（默认读取 MERMAID_JS，或 VS Code Markdown Preview Enhanced 扩展捆绑版本）
+ *   - Chrome/Edge/Chromium headless（Playwright、环境变量或常见安装路径）
+ *   - mermaid.min.js（frontend 锁定依赖，或通过 MERMAID_JS 指定）
  *
  * 生成结果与仓库既有 assets/*.svg 约定保持一致：
  *   - svg id 统一为 my-svg
@@ -15,29 +15,75 @@
  *   - 背景为白色
  */
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { dirname, join, resolve } from 'node:path';
+import { createRequire } from 'node:module';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
-const DEFAULT_MERMAID_JS = [
-  'C:/Users/BHM/.vscode/extensions/shd101wyy.markdown-preview-enhanced-0.8.30/crossnote/dependencies/mermaid/mermaid.min.js',
-  'C:/Users/BHM/.vscode/extensions/.cf4e8ff9-818d-4280-b2f1-0fb6f7e6543a/crossnote/dependencies/mermaid/mermaid.min.js',
-].find((candidate) => {
-  try {
-    readFileSync(candidate);
-    return true;
-  } catch {
-    return false;
+const scriptDir = dirname(fileURLToPath(import.meta.url));
+const repoRoot = resolve(scriptDir, '../..');
+const requireFromFrontend = createRequire(join(repoRoot, 'frontend/package.json'));
+
+function firstExisting(candidates) {
+  return candidates.find((candidate) => candidate && existsSync(candidate));
+}
+
+function executableFromCommand(command) {
+  const result =
+    process.platform === 'win32'
+      ? spawnSync('where', [command], { encoding: 'utf8' })
+      : spawnSync('sh', ['-c', `command -v ${command}`], { encoding: 'utf8' });
+  if (result.status !== 0) {
+    return undefined;
   }
-});
+  return result.stdout.split(/\r?\n/).find((line) => line.trim());
+}
 
-const DEFAULT_CHROME = [
-  process.env.CHROME_PATH,
-  'C:/Program Files/Google/Chrome/Application/chrome.exe',
-  'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',
-  'C:/Program Files/Microsoft/Edge/Application/msedge.exe',
-].find((candidate) => candidate && readFileSync(candidate, { encoding: null }) !== undefined);
+function resolveMermaidJs() {
+  if (process.env.MERMAID_JS) {
+    return firstExisting([process.env.MERMAID_JS]);
+  }
+  try {
+    return requireFromFrontend.resolve('mermaid/dist/mermaid.min.js');
+  } catch {
+    return undefined;
+  }
+}
+
+function resolvePlaywrightChromium() {
+  if (process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH) {
+    return firstExisting([process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH]);
+  }
+  try {
+    const { chromium } = requireFromFrontend('playwright');
+    return firstExisting([chromium.executablePath()]);
+  } catch {
+    return undefined;
+  }
+}
+
+function resolveBrowser() {
+  return firstExisting([
+    process.env.CHROME_PATH,
+    resolvePlaywrightChromium(),
+    'C:/Program Files/Google/Chrome/Application/chrome.exe',
+    'C:/Program Files (x86)/Google/Chrome/Application/chrome.exe',
+    'C:/Program Files/Microsoft/Edge/Application/msedge.exe',
+    'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',
+    '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+    '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge',
+    '/usr/bin/google-chrome',
+    '/usr/bin/google-chrome-stable',
+    '/usr/bin/chromium',
+    '/usr/bin/chromium-browser',
+    executableFromCommand('google-chrome'),
+    executableFromCommand('google-chrome-stable'),
+    executableFromCommand('chromium'),
+    executableFromCommand('chromium-browser'),
+    executableFromCommand('msedge'),
+  ]);
+}
 
 const args = process.argv.slice(2);
 if (args.length === 0 || args.length % 2 !== 0) {
@@ -45,14 +91,14 @@ if (args.length === 0 || args.length % 2 !== 0) {
   process.exit(1);
 }
 
-const mermaidJs = process.env.MERMAID_JS || DEFAULT_MERMAID_JS;
-const chromePath = DEFAULT_CHROME;
+const mermaidJs = resolveMermaidJs();
+const chromePath = resolveBrowser();
 if (!mermaidJs) {
-  console.error('未找到 mermaid.min.js，请通过 MERMAID_JS 环境变量指定');
+  console.error('未找到 mermaid.min.js，请先在 frontend 安装 mermaid，或通过 MERMAID_JS 环境变量指定');
   process.exit(1);
 }
 if (!chromePath) {
-  console.error('未找到 Chrome/Edge，请通过 CHROME_PATH 环境变量指定');
+  console.error('未找到 Chrome/Edge/Chromium，请安装 Playwright 浏览器，或通过 CHROME_PATH/PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH 指定');
   process.exit(1);
 }
 

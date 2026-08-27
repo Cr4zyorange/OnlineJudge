@@ -26,6 +26,7 @@
     "@types/node": "^25.9.1",
     "@vue/test-utils": "^2.4.6",
     "jsdom": "^26.1.0",
+    "mermaid": "^11.17.2",
     "typescript": "^5.8.3",
     "vitest": "^3.1.2",
     "vue-tsc": "^2.2.10"

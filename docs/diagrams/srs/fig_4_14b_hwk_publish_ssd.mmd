@@ -1,0 +1,16 @@
+sequenceDiagram
+  actor Teacher as 教师
+  participant System as OnlineJudgeForSE 系统边界
+  Teacher->>System: OP-HWK-01 提交作业表单(homeworkForm, action)
+  alt 保存草稿且表单合法
+    System-->>Teacher: 返回作业草稿和编辑入口
+  else 确认发布且权限、题型配置合法
+    Teacher->>System: 确认发布(homeworkId)
+    alt 必需通知投递成功
+      System-->>Teacher: 返回已发布状态、任务和通知结果
+    else 必需通知投递失败
+      System-->>Teacher: 返回 503/HWK_5003，作业仍为 DRAFT
+    end
+  else 字段/测试用例非法或课程无权限
+    System-->>Teacher: 拒绝保存或发布并提示原因
+  end

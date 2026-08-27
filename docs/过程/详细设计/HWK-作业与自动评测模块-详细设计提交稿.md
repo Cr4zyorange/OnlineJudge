@@ -336,39 +336,19 @@ graph TD
 | SVC-HWK-13 | HomeworkAttachmentService | 编排 API-HWK-23/24，校验类型/大小/内容签名、24 小时状态、所有权、原子绑定和每次下载重鉴权；仅通过 FileStorageService 操作物理字节 | 当前用户、homeworkId、fileId/submissionId、multipart 文件 | 安全附件 DTO、下载资源、删除/绑定结果 |
 | SVC-HWK-14 | HomeworkAttachmentRepository | 按 fileId+作业+上传者+状态+有效期条件查询/原子绑定，保存 DB-HWK-08 生命周期 | 附件实体、绑定条件 | 附件记录、原子更新行数 |
 
-### 5.1 服务调用关系
+### 5.1 独立场景对象/服务调用关系
 
-```mermaid
-sequenceDiagram
-    participant Student as 学生端
-    participant Controller as HomeworkController
-    participant Permission as HomeworkPermissionService
-    participant Submission as HomeworkSubmissionService
-    participant Eval as HomeworkEvaluationService
-    participant Worker as EvaluationWorkerClient
-    participant DB as MySQL
-    participant LRN as LRN通知模块
+#### 5.1.1 UC-HWK-02 教师创建并发布作业对象顺序图
 
-    Student->>Controller: POST /homeworks/{id}/submissions
-    Controller->>Permission: 校验学生课程成员关系和作业可提交性
-    Permission-->>Controller: 通过
-    Controller->>Submission: 保存提交内容
-    Submission->>DB: 写入 t_hwk_submission
-    alt 客观题
-        Submission->>Eval: 自动评分
-        Eval->>DB: 写入 t_hwk_evaluation 并更新分数
-    else 代码题
-        Submission->>Eval: 创建评测记录
-        Eval->>DB: 写入 PENDING 评测记录
-        Eval->>Worker: 提交异步评测任务
-    else 文件/文本题
-        Submission->>DB: 标记为待教师批阅
-    end
-    Controller-->>Student: 返回提交成功和初始评测状态
-    Worker-->>Eval: 回写评测结果
-    Eval->>DB: 更新评测记录和自动得分
-    Eval->>LRN: 发送评测完成事件
-```
+![](../../最终提交/assets/fig_3_5_3a_hwk_publish_object.svg)
+
+Mermaid 图源：`docs/diagrams/dsd/fig_3_5_3a_hwk_publish_object.mmd`。
+
+#### 5.1.2 UC-HWK-01 学生提交作业并触发自动评测对象顺序图
+
+![](../../最终提交/assets/fig_3_5_3b_hwk_submission_object.svg)
+
+Mermaid 图源：`docs/diagrams/dsd/fig_3_5_3b_hwk_submission_object.mmd`。
 
 ---
 
