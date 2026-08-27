@@ -27,8 +27,18 @@ set -Eeuo pipefail
 printf '%s\n' "$*" >> "$CONTAINER_TEST_DOCKER_LOG"
 
 if [[ " $* " == *" volume inspect "* ]]; then
-  [[ "${CONTAINER_TEST_MISSING_VOLUME:-0}" != "1" ]]
-  exit
+  [[ "${CONTAINER_TEST_MISSING_VOLUME:-0}" != "1" ]] || exit 1
+  if [[ " $* " == *" --format "* ]]; then
+    printf '%s\n' "${CONTAINER_TEST_VOLUME_LABEL:-app-data}"
+  fi
+  exit 0
+fi
+
+if [[ " $* " == *" ps --filter "* ]]; then
+  if [[ "${CONTAINER_TEST_VOLUME_IN_USE:-0}" == "1" ]]; then
+    printf 'running-container-id\n'
+  fi
+  exit 0
 fi
 
 if [[ "${1:-}" == "run" ]]; then
@@ -73,6 +83,10 @@ run_failure mismatch-sha 'GIT_SHA must match the current HEAD' GIT_SHA="$wrong_s
 run_failure invalid-volume 'APP_DATA_VOLUME contains unsupported characters' GIT_SHA="$head_sha" APP_DATA_VOLUME='../unsafe'
 run_failure missing-volume 'Docker volume does not exist: onlinejudge_app-data' \
   GIT_SHA="$head_sha" APP_DATA_VOLUME=onlinejudge_app-data CONTAINER_TEST_MISSING_VOLUME=1
+run_failure wrong-volume-label 'Docker volume is not labeled as Compose app-data: onlinejudge_mysql-data' \
+  GIT_SHA="$head_sha" APP_DATA_VOLUME=onlinejudge_mysql-data CONTAINER_TEST_VOLUME_LABEL=mysql-data
+run_failure volume-in-use 'Docker volume is mounted by a running container: onlinejudge_app-data' \
+  GIT_SHA="$head_sha" APP_DATA_VOLUME=onlinejudge_app-data CONTAINER_TEST_VOLUME_IN_USE=1
 run_failure migration-failure 'simulated ownership migration failure' \
   GIT_SHA="$head_sha" APP_DATA_VOLUME=onlinejudge_app-data CONTAINER_TEST_FAIL_MIGRATION=1
 
@@ -84,6 +98,7 @@ env "${common_env[@]}" GIT_SHA="$head_sha" APP_DATA_VOLUME=onlinejudge_app-data 
   }
 
 grep -Fq 'volume inspect onlinejudge_app-data' "$docker_log" || fail 'volume existence was not checked'
+grep -Fq 'ps --filter volume=onlinejudge_app-data' "$docker_log" || fail 'running volume users were not checked'
 grep -Fq -- "--user 0:0 --entrypoint sh --volume onlinejudge_app-data:/data onlinejudge/backend:$head_sha -c chown -R 10001:10001 /data" "$docker_log" || \
   fail 'root ownership migration command was not issued'
 grep -Fq -- "--user 10001:10001 --entrypoint sh --volume onlinejudge_app-data:/data onlinejudge/backend:$head_sha -c test -r /data && test -w /data" "$docker_log" || \
