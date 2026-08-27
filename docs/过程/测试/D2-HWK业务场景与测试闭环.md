@@ -5,7 +5,7 @@
 | GitHub Issue | #264 `[D2-HWK] 补齐 HWK 业务场景文档与测试闭环` |
 | 执行基线 | `origin/dev@a30a096281a01d7169cc0c2d18360aa1a65cd6b0`（已包含 #281 / PR #285 的通知失败整体回滚契约） |
 | 本地分支 | `test/264-hwk-doc-test-closure` |
-| 最近复审日期 | 2026-08-27 |
+| 实际完成日期 | 2026-08-27（文档/测试交付完成；PR #276 合并时 #264 关闭，FR-HWK-04 产品 FAIL 由修复 Issue #296 跟踪） |
 | 正式用例边界 | `UC-HWK-01 ~ UC-HWK-02`，不新增或重排 UC 编号 |
 | 需求范围 | `FR-HWK-01 ~ FR-HWK-06`、`NFR-HWK-01 ~ NFR-HWK-05` |
 | 执行环境 | Windows 11；Java 25；Maven 3.9.16；Node.js 24.15.0；npm 11.12.1；Spring Boot 3.4.5；Vue 3 / Vite 6.4.2；H2；Tectonic 0.17.0 |
@@ -43,7 +43,7 @@ HWK 保持两个已经确认的独立业务场景。页面动作、权限检查�
 | CODE 提交后独立后台评测 | `homework-lifecycle.spec.ts` 在不调用 API-HWK-11 的情况下等待后读取提交详情 | FAIL：POST 仅创建 PENDING 记录；等待 1 秒后仍为 PENDING，首次 API-HWK-11 读取才同步执行 evaluator |
 | 附件恢复、失败补偿和清理 | Attachment Service/Controller/Scheduling 测试及 FILE 页面测试 | PASS |
 | 统计与待处理名单 | Statistics/Repository/Attention 测试及统计页面测试 | PASS |
-| 共享 E2E #267 | `homework-lifecycle.spec.ts` 复用 PR #268 的 Playwright runner 与公共夹具 | FAIL：2 个测试均执行完毕，但第二个测试明确复现 CODE 后台评测缺失；runner 通过不等于 FR-HWK-04 通过 |
+| 共享 E2E #267 | `homework-lifecycle.spec.ts` 复用 PR #268 的 Playwright runner 与公共夹具 | PASS（runner 2/2，两条断言均通过）；产品验收结论以本表"CODE 提交后独立后台评测"行为准，runner 通过不等于 FR-HWK-04 通过 |
 | GRD 来源成绩真实链路 | PASS | 创建仅绑定本次 `homeworkId` 且 `includedInFinal=true` 的 HWK 成绩项，调用 GRD `/grades/sync` 后按 `gradeItemId` 与当前学生查询成绩记录，精确断言 `sourceId=homeworkId` 和原始分 88；将 `includedInFinal` 变异为 false 时该断言按预期 RED |
 | LRN 发布/成绩通知成功链路 | PASS | 真实发布/成绩发布后从 LRN 通知 API 按 `sourceModule=HWK` 与 `sourceId=homeworkId` 断言落库 |
 | 通知投递失败设计/实现一致性 | PASS | #281 / PR #285 已合并；`HomeworkControllerTest#publishRollsBackHomeworkWhenRequiredNotificationDeliveryFails` 证明必需通知投递失败时返回 `503/HWK_5003`，发布事务整体回滚，作业保持 `DRAFT` 且不留下通知记录 |
@@ -55,7 +55,8 @@ HWK 保持两个已经确认的独立业务场景。页面动作、权限检查�
 | 图组闭环契约 RED | 1 | 0 | 1 | 0 | 0 | 预期失败：缺少拆分后的教师发布 SSD 源文件；规范调整后旧图号断言再次按预期失败 |
 | 共享 E2E 契约 RED | 1 | 0 | 1 | 0 | 0 | 预期失败：`frontend/tests/e2e/hwk/homework-lifecycle.spec.ts` 不存在 |
 | 文档闭环契约 GREEN | 1 | 1 | 0 | 0 | 0 | PASS |
-| HWK 共享 E2E 业务验收 | 2 | 1 | 1 | 0 | 0 | FAIL；Playwright runner 2/2 执行通过，其中一个测试以可执行断言复现 CODE 提交后无后台 Worker、提交持续 PENDING 的产品缺口 |
+| HWK 共享 E2E（Playwright runner） | 2 | 2 | 0 | 0 | 0 | PASS；两条测试断言均通过，第二条以预期 `PENDING` 断言复现 CODE 后台评测缺失 |
+| HWK 共享 E2E（FR-HWK-04 产品判定） | 1 | 0 | 1 | 0 | 0 | FAIL；CODE 提交后无后台 Worker、提交持续 PENDING，判定依据见 §5.2 与修复 Issue #296 |
 | HWK 后端定向 | 101 | 101 | 0 | 0 | 0 | PASS |
 | HWK 前端定向 | 182 | 182 | 0 | 0 | 0 | PASS；11/11 files |
 | 后端全量回归 | 375 | 370 | 0 | 0 | 5 | PASS；Docker/环境专项按测试假设跳过 |
@@ -82,7 +83,7 @@ HWK 保持两个已经确认的独立业务场景。页面动作、权限检查�
 - 代码证据：`createInitialEvaluation` 只保存 `CODE_JUDGE/PENDING`；`evaluationDetail` 调用 `latestOrCreateEvaluation`，在 API-HWK-11 读请求中同步执行 evaluator。
 - 判定：FR-HWK-04 的客观题自动评分为 PASS，CODE “提交后创建任务并由后台 Worker 异步执行”为 FAIL；TC-HWK-10、TC-HWK-11 不通过，由修复 Issue #296 实现任务调度并补不读取 API-HWK-11 的终态测试。
 - 责任与计划：修复 Issue #296，负责人 @terrana37，计划开始 2026-08-29，目标完成 2026-09-05；复测标准：不调用 API-HWK-11 的独立终态测试通过，TC-HWK-10/11 更新为 PASS。
-- Issue #264 结论：存在产品 FAIL，不满足完整闭环或关闭条件；#264 关闭前须完成 #296 或由项目负责人明确接受延期。
+- Issue #264 结论：存在产品 FAIL（FR-HWK-04 CODE 后台评测）。按 #264 自身边界"生产缺陷另建修复 Issue、本 Issue 只关联缺陷和复测结果"，#264 的交付物为本文档与测试证据，本 PR 合并即完成 #264 的文档/测试验收范围并保留 `Closes #264`；FR-HWK-04 产品 FAIL 的生命周期由修复 Issue #296 独立跟踪至终态。
 
 ### 5.3 环境风险
 
