@@ -80,6 +80,9 @@ class HomeworkControllerTest {
         @Primary
         Evaluator deterministicHomeworkEvaluator() {
             return task -> {
+                if (task.sourceCode() != null && task.sourceCode().contains("#FAKE_SYSTEM_ERROR")) {
+                    throw new IllegalStateException("sandbox unavailable");
+                }
                 boolean wrong = task.sourceCode() != null && task.sourceCode().contains("#FAKE_WRONG");
                 String expectedOutput = task.options().getOrDefault("expectedOutput", "");
                 return new EvaluationResult(
@@ -1058,6 +1061,8 @@ class HomeworkControllerTest {
 
         long submissionId = submitCodeAnswer(homeworkId, "print(input())", "python", studentHeaders("101"));
 
+        awaitEvaluationStatus(submissionId, "ACCEPTED");
+
         mockMvc.perform(get("/api/v1/submissions/{submissionId}/evaluation", submissionId)
                         .headers(studentHeaders("101")))
                 .andExpect(status().isOk())
@@ -1127,6 +1132,8 @@ class HomeworkControllerTest {
                 .andExpect(status().isOk());
         long submissionId = submitCodeAnswer(homeworkId, "print(input())", "python", studentHeaders("101"));
 
+        awaitEvaluationStatus(submissionId, "ACCEPTED");
+
         mockMvc.perform(get("/api/v1/submissions/{submissionId}/evaluation", submissionId)
                         .headers(studentHeaders("101")))
                 .andExpect(status().isOk())
@@ -1166,6 +1173,8 @@ class HomeworkControllerTest {
                 .andExpect(status().isOk());
         long submissionId = submitCodeAnswer(homeworkId, "#FAKE_WRONG\nprint(input())", "python", studentHeaders("101"));
 
+        awaitEvaluationStatus(submissionId, "WRONG_ANSWER");
+
         String evaluationBody = mockMvc.perform(get("/api/v1/submissions/{submissionId}/evaluation", submissionId)
                         .headers(teacherHeaders("101", "101")))
                 .andExpect(status().isOk())
@@ -1198,6 +1207,8 @@ class HomeworkControllerTest {
 
         long submissionId = submitCodeAnswer(homeworkId, "#FAKE_WRONG\nprint(input())", "python", studentHeaders("101"));
 
+        awaitEvaluationStatus(submissionId, "WRONG_ANSWER");
+
         mockMvc.perform(get("/api/v1/submissions/{submissionId}/evaluation", submissionId)
                         .headers(teacherHeaders("101", "101")))
                 .andExpect(status().isOk())
@@ -1216,12 +1227,44 @@ class HomeworkControllerTest {
     }
 
     @Test
+    void codeHomeworkWorkerFailurePreservesSubmissionAndRecordsSystemError() throws Exception {
+        long homeworkId = createHomeworkAndReturnId(codePayload("[\"python\"]"));
+        mockMvc.perform(put("/api/v1/homeworks/{homeworkId}/publish", homeworkId)
+                        .headers(teacherHeaders("101", "101", "101:601")))
+                .andExpect(status().isOk());
+
+        long submissionId = submitCodeAnswer(
+                homeworkId,
+                "#FAKE_SYSTEM_ERROR\nprint(input())",
+                "python",
+                studentHeaders("101")
+        );
+
+        awaitEvaluationStatus(submissionId, "SYSTEM_ERROR");
+
+        mockMvc.perform(get("/api/v1/submissions/{submissionId}", submissionId)
+                        .headers(teacherHeaders("101", "101")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.submissionId").value(submissionId))
+                .andExpect(jsonPath("$.data.evaluationStatus").value("SYSTEM_ERROR"))
+                .andExpect(jsonPath("$.data.autoScore").value(0));
+
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM t_hwk_submission WHERE id = ?",
+                Integer.class,
+                submissionId
+        )).isEqualTo(1);
+    }
+
+    @Test
     void studentEvaluationResultHidesHiddenCaseExpectedOutput() throws Exception {
         long homeworkId = createHomeworkAndReturnId(codePayloadWithHiddenCase("[\"python\"]"));
         mockMvc.perform(put("/api/v1/homeworks/{homeworkId}/publish", homeworkId)
                         .headers(teacherHeaders("101", "101", "101:601")))
                 .andExpect(status().isOk());
         long submissionId = submitCodeAnswer(homeworkId, "#FAKE_WRONG\nprint(input())", "python", studentHeaders("101"));
+
+        awaitEvaluationStatus(submissionId, "WRONG_ANSWER");
 
         String studentBody = mockMvc.perform(get("/api/v1/submissions/{submissionId}/evaluation", submissionId)
                         .headers(studentHeaders("101")))
@@ -1855,6 +1898,23 @@ class HomeworkControllerTest {
                         )
                 ))
         );
+    }
+
+    private void awaitEvaluationStatus(long submissionId, String expectedStatus) throws InterruptedException {
+        long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(3);
+        String actualStatus = null;
+        while (System.nanoTime() < deadline) {
+            actualStatus = jdbcTemplate.queryForObject(
+                    "SELECT status FROM t_hwk_evaluation WHERE submission_id = ? ORDER BY id DESC LIMIT 1",
+                    String.class,
+                    submissionId
+            );
+            if (expectedStatus.equals(actualStatus)) {
+                return;
+            }
+            Thread.sleep(25);
+        }
+        assertThat(actualStatus).isEqualTo(expectedStatus);
     }
 
     private String futureDeadline() {

@@ -4,6 +4,7 @@ import com.onlinejudge.hwk.domain.CreateHomeworkSubmissionCommand;
 import com.onlinejudge.hwk.domain.Homework;
 import com.onlinejudge.hwk.domain.HomeworkEvaluation;
 import com.onlinejudge.hwk.domain.HomeworkEvaluationRepository;
+import com.onlinejudge.hwk.domain.HomeworkEvaluationType;
 import com.onlinejudge.hwk.domain.HomeworkQuestion;
 import com.onlinejudge.hwk.domain.HomeworkRepository;
 import com.onlinejudge.hwk.domain.HomeworkReviewLog;
@@ -12,9 +13,13 @@ import com.onlinejudge.hwk.domain.HomeworkStatus;
 import com.onlinejudge.hwk.domain.HomeworkSubmission;
 import com.onlinejudge.hwk.domain.HomeworkSubmissionRepository;
 import com.onlinejudge.hwk.domain.HomeworkSubmissionSearchCriteria;
+import com.onlinejudge.hwk.domain.HomeworkReviewStatus;
+import com.onlinejudge.hwk.domain.HomeworkSubmitStatus;
 import com.onlinejudge.hwk.domain.HomeworkTestCase;
 import com.onlinejudge.hwk.domain.HomeworkType;
 import com.onlinejudge.common.web.PageResponse;
+import com.onlinejudge.common.evaluation.EvaluationStatus;
+import com.onlinejudge.common.evaluation.Evaluator;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.DuplicateKeyException;
 
@@ -23,8 +28,54 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 
 class HomeworkSubmissionServiceTest {
+    @Test
+    void evaluationDetailReturnsPendingResultWithoutInvokingEvaluator() {
+        HomeworkRepository homeworkRepository = mock(HomeworkRepository.class);
+        HomeworkSubmissionRepository submissionRepository = mock(HomeworkSubmissionRepository.class);
+        HomeworkEvaluationRepository evaluationRepository = mock(HomeworkEvaluationRepository.class);
+        LocalDateTime now = LocalDateTime.now();
+        Homework homework = new Homework(
+                11L, 101L, null, "Async code homework", "description", HomeworkType.CODE,
+                HomeworkStatus.PUBLISHED, 100, now.plusDays(1), true, false, true,
+                null, 501L, now, false, now, now, List.of(), List.of(), null
+        );
+        HomeworkSubmission submission = new HomeworkSubmission(
+                31L, 11L, 601L, HomeworkType.CODE, "print(input())", null, null, "python",
+                HomeworkSubmitStatus.SUBMITTED, EvaluationStatus.PENDING, HomeworkReviewStatus.NEED_REVIEW,
+                null, null, null, null, 1, true, now, null, null, now, now, false
+        );
+        HomeworkEvaluation evaluation = new HomeworkEvaluation(
+                41L, 31L, 11L, 601L, HomeworkEvaluationType.CODE_JUDGE, EvaluationStatus.PENDING,
+                0, 0, 1, null, null, null, "waiting for evaluation", null, null, null,
+                false, null, now, null, now, now
+        );
+        Evaluator evaluator = mock(Evaluator.class);
+
+        when(submissionRepository.findById(31L)).thenReturn(Optional.of(submission));
+        when(homeworkRepository.findById(11L)).thenReturn(Optional.of(homework));
+        when(evaluationRepository.findLatestBySubmissionId(31L)).thenReturn(Optional.of(evaluation));
+
+        HomeworkSubmissionService service = new HomeworkSubmissionService(
+                homeworkRepository,
+                submissionRepository,
+                evaluationRepository,
+                mock(HomeworkReviewLogRepository.class),
+                (courseId, userId) -> true,
+                evaluator
+        );
+
+        HomeworkSubmissionService.EvaluationDetail detail = service.evaluationDetail(31L, 601L);
+
+        assertThat(detail.evaluation()).isSameAs(evaluation);
+        verifyNoInteractions(evaluator);
+    }
+
     @Test
     void submitReturnsControlledConflictWhenSubmissionVersionIsAlreadyUsed() {
         HomeworkSubmissionService service = new HomeworkSubmissionService(
