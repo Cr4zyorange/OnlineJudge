@@ -3,12 +3,11 @@ name: onlinejudge
 services:
   mysql:
     image: mysql:8.4
-    container_name: onlinejudge-mysql
     environment:
       MYSQL_DATABASE: ${MYSQL_DATABASE:-onlinejudge}
       MYSQL_USER: ${MYSQL_USER:-onlinejudge}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-onlinejudge}
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?MYSQL_PASSWORD is required}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD is required}
     command:
       - --character-set-server=utf8mb4
       - --collation-server=utf8mb4_unicode_ci
@@ -23,10 +22,12 @@ services:
       start_period: 20s
 
   backend:
+    image: onlinejudge/backend:${GIT_SHA:?GIT_SHA must be the current full 40-character commit SHA}
     build:
       context: ../..
       dockerfile: deploy/docker/backend.Dockerfile
-    container_name: onlinejudge-backend
+      args:
+        GIT_SHA: ${GIT_SHA:?GIT_SHA must be the current full 40-character commit SHA}
     depends_on:
       mysql:
         condition: service_healthy
@@ -35,24 +36,26 @@ services:
       MYSQL_PORT: 3306
       MYSQL_DATABASE: ${MYSQL_DATABASE:-onlinejudge}
       MYSQL_USER: ${MYSQL_USER:-onlinejudge}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-onlinejudge}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?MYSQL_PASSWORD is required}
       ONLINEJUDGE_DEMO_DATA_ENABLED: ${ONLINEJUDGE_DEMO_DATA_ENABLED:-true}
       ONLINEJUDGE_EVALUATION_SANDBOX_MODE: ${ONLINEJUDGE_EVALUATION_SANDBOX_MODE:-fake}
       ONLINEJUDGE_NOTIFICATIONS_INTERNAL_TOKEN: ${ONLINEJUDGE_NOTIFICATIONS_INTERNAL_TOKEN:-}
     volumes:
       - app-data:/opt/onlinejudge/data
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/api/v1/system/health | grep -q '\"status\":\"UP\"'"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/api/v1/system/readiness | grep -q '\"status\":\"UP\"'"]
       interval: 10s
       timeout: 5s
       retries: 12
       start_period: 30s
 
   frontend:
+    image: onlinejudge/frontend:${GIT_SHA:?GIT_SHA must be the current full 40-character commit SHA}
     build:
       context: ../..
       dockerfile: deploy/docker/frontend.Dockerfile
-    container_name: onlinejudge-frontend
+      args:
+        GIT_SHA: ${GIT_SHA:?GIT_SHA must be the current full 40-character commit SHA}
     depends_on:
       backend:
         condition: service_healthy
