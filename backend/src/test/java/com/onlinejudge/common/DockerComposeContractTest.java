@@ -21,8 +21,20 @@ class DockerComposeContractTest {
         assertThat(compose).contains("frontend:");
         assertThat(compose).contains("mysql-data:/var/lib/mysql");
         assertThat(compose).contains("../../database/mysql/compose-schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro");
-        assertThat(compose).contains("${OJ_HTTP_PORT:-8088}:80");
+        assertThat(compose).contains("${OJ_HTTP_PORT:-8088}:8080");
         assertThat(compose).contains("/api/v1/system/health");
+    }
+
+    @Test
+    void composeRequiresFullGitShaForBothApplicationImages() throws IOException {
+        Path composeFile = Path.of("..", "deploy", "docker", "compose.yml");
+        String compose = Files.readString(composeFile);
+
+        assertThat(compose).contains("image: ${BACKEND_IMAGE_REPOSITORY:-onlinejudge/backend}:${IMAGE_TAG:?IMAGE_TAG must be a full 40-character Git SHA}");
+        assertThat(compose).contains("image: ${FRONTEND_IMAGE_REPOSITORY:-onlinejudge/frontend}:${IMAGE_TAG:?IMAGE_TAG must be a full 40-character Git SHA}");
+        assertThat(compose).contains("IMAGE_REVISION: ${IMAGE_TAG:?IMAGE_TAG must be a full 40-character Git SHA}");
+        assertThat(compose).contains("image: mysql:8.4");
+        assertThat(compose).doesNotContain("image: latest");
     }
 
     @Test
@@ -72,6 +84,11 @@ class DockerComposeContractTest {
         assertThat(ignores).contains("backend/target");
         assertThat(ignores).contains("frontend/node_modules");
         assertThat(ignores).contains("frontend/dist");
+        assertThat(ignores).contains("output");
+        assertThat(ignores).contains("tmp");
+        assertThat(ignores).contains("**/.env");
+        assertThat(ignores).contains("**/*.pem");
+        assertThat(ignores).contains("**/*.key");
     }
 
     @Test
@@ -89,6 +106,24 @@ class DockerComposeContractTest {
 
         assertThat(backendDockerfile).contains("--mount=type=cache,target=/root/.m2");
         assertThat(backendDockerfile).contains("-Dmaven.test.skip=true package");
+    }
+
+    @Test
+    void applicationImagesCarryOciRevisionAndRunAsNonRootUsers() throws IOException {
+        String backendDockerfile = Files.readString(Path.of("..", "deploy", "docker", "backend.Dockerfile"));
+        String frontendDockerfile = Files.readString(Path.of("..", "deploy", "docker", "frontend.Dockerfile"));
+
+        assertThat(backendDockerfile).contains("ARG IMAGE_REVISION");
+        assertThat(frontendDockerfile).contains("ARG IMAGE_REVISION");
+        assertThat(backendDockerfile).contains("org.opencontainers.image.revision=\"$IMAGE_REVISION\"");
+        assertThat(frontendDockerfile).contains("org.opencontainers.image.revision=\"$IMAGE_REVISION\"");
+        assertThat(backendDockerfile).contains("org.opencontainers.image.version=\"$IMAGE_REVISION\"");
+        assertThat(frontendDockerfile).contains("org.opencontainers.image.version=\"$IMAGE_REVISION\"");
+        assertThat(backendDockerfile).contains("org.opencontainers.image.source=\"$IMAGE_SOURCE\"");
+        assertThat(frontendDockerfile).contains("org.opencontainers.image.source=\"$IMAGE_SOURCE\"");
+        assertThat(backendDockerfile).contains("USER 10001:10001");
+        assertThat(frontendDockerfile).contains("--mount=type=cache,target=/root/.npm");
+        assertThat(frontendDockerfile).contains("USER nginx");
     }
 
     @Test
