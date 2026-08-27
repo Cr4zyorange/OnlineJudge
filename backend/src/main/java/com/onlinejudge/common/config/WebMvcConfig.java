@@ -35,6 +35,7 @@ public class WebMvcConfig implements WebMvcConfigurer {
                         "/api/v1/auth/login",
                         "/api/v1/auth/register",
                         "/api/v1/system/health",
+                        "/api/v1/system/readiness",
                         "/api/v1/notifications/events"
                 );
     }
