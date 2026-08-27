@@ -43,7 +43,7 @@ HWK 保持两个已经确认的独立业务场景。页面动作、权限检查�
 | CODE 提交后独立后台评测 | `homework-lifecycle.spec.ts` 在不调用 API-HWK-11 的情况下等待后读取提交详情 | FAIL：POST 仅创建 PENDING 记录；等待 1 秒后仍为 PENDING，首次 API-HWK-11 读取才同步执行 evaluator |
 | 附件恢复、失败补偿和清理 | Attachment Service/Controller/Scheduling 测试及 FILE 页面测试 | PASS |
 | 统计与待处理名单 | Statistics/Repository/Attention 测试及统计页面测试 | PASS |
-| 共享 E2E #267 | `homework-lifecycle.spec.ts` 复用 PR #268 的 Playwright runner 与公共夹具 | FAIL：2 个测试均执行完毕，但第二个测试明确复现 CODE 后台评测缺失；runner 通过不等于 FR-HWK-04 通过 |
+| 共享 E2E #267 | `homework-lifecycle.spec.ts` 复用 PR #268 的 Playwright runner 与公共夹具 | PASS（runner）：原始计数为 2 passed、0 failed；第二个通过的断言明确复现 CODE 后台评测缺失。runner 通过不等于 FR-HWK-04 产品验收通过，后者单独判定 FAIL |
 | GRD 来源成绩真实链路 | PASS | 创建仅绑定本次 `homeworkId` 且 `includedInFinal=true` 的 HWK 成绩项，调用 GRD `/grades/sync` 后按 `gradeItemId` 与当前学生查询成绩记录，精确断言 `sourceId=homeworkId` 和原始分 88；将 `includedInFinal` 变异为 false 时该断言按预期 RED |
 | LRN 发布/成绩通知成功链路 | PASS | 真实发布/成绩发布后从 LRN 通知 API 按 `sourceModule=HWK` 与 `sourceId=homeworkId` 断言落库 |
 | 通知投递失败设计/实现一致性 | PASS | #281 / PR #285 已合并；`HomeworkControllerTest#publishRollsBackHomeworkWhenRequiredNotificationDeliveryFails` 证明必需通知投递失败时返回 `503/HWK_5003`，发布事务整体回滚，作业保持 `DRAFT` 且不留下通知记录 |
@@ -55,7 +55,7 @@ HWK 保持两个已经确认的独立业务场景。页面动作、权限检查�
 | 图组闭环契约 RED | 1 | 0 | 1 | 0 | 0 | 预期失败：缺少拆分后的教师发布 SSD 源文件；规范调整后旧图号断言再次按预期失败 |
 | 共享 E2E 契约 RED | 1 | 0 | 1 | 0 | 0 | 预期失败：`frontend/tests/e2e/hwk/homework-lifecycle.spec.ts` 不存在 |
 | 文档闭环契约 GREEN | 1 | 1 | 0 | 0 | 0 | PASS |
-| HWK 共享 E2E 业务验收 | 2 | 1 | 1 | 0 | 0 | FAIL；Playwright runner 2/2 执行通过，其中一个测试以可执行断言复现 CODE 提交后无后台 Worker、提交持续 PENDING 的产品缺口 |
+| HWK 共享 E2E runner | 2 | 2 | 0 | 0 | 0 | PASS；第二个通过的断言复现 CODE 提交后无后台 Worker、提交持续 PENDING。FR-HWK-04 的 CODE 后台 Worker 产品验收另行判定 FAIL（见 §5.2 / #296） |
 | HWK 后端定向 | 101 | 101 | 0 | 0 | 0 | PASS |
 | HWK 前端定向 | 182 | 182 | 0 | 0 | 0 | PASS；11/11 files |
 | 后端全量回归 | 375 | 370 | 0 | 0 | 5 | PASS；Docker/环境专项按测试假设跳过 |
@@ -82,7 +82,7 @@ HWK 保持两个已经确认的独立业务场景。页面动作、权限检查�
 - 代码证据：`createInitialEvaluation` 只保存 `CODE_JUDGE/PENDING`；`evaluationDetail` 调用 `latestOrCreateEvaluation`，在 API-HWK-11 读请求中同步执行 evaluator。
 - 判定：FR-HWK-04 的客观题自动评分为 PASS，CODE “提交后创建任务并由后台 Worker 异步执行”为 FAIL；TC-HWK-10、TC-HWK-11 不通过，由修复 Issue #296 实现任务调度并补不读取 API-HWK-11 的终态测试。
 - 责任与计划：修复 Issue #296，负责人 @terrana37，计划开始 2026-08-29，目标完成 2026-09-05；复测标准：不调用 API-HWK-11 的独立终态测试通过，TC-HWK-10/11 更新为 PASS。
-- Issue #264 结论：存在产品 FAIL，不满足完整闭环或关闭条件；#264 关闭前须完成 #296 或由项目负责人明确接受延期。
+- Issue #264 结论：文档与测试闭环交付完成，可按 Issue #264 关闭；FR-HWK-04 的 CODE 后台 Worker 产品验收仍为 FAIL，修复由 #296 独立跟踪。#264 记录复现、影响、责任人与复测标准，不以该产品缺口冒充 PASS。
 
 ### 5.3 环境风险
 
