@@ -33,7 +33,7 @@ java_major="$(java -version 2>&1 | sed -n '1s/.*version "\([0-9][0-9]*\).*/\1/p'
   fail "expected Java $expected_java_major, got $java_major (override with OJ_CI_JAVA_MAJOR)"
 }
 
-maven_version="$(mvn -version | sed -n '1s/.*Apache Maven \([0-9][0-9]*\.[0-9][0-9]*\).*/\1/p')"
+maven_version="$(mvn -version | sed -n '1s/.*Apache Maven \([0-9][0-9.]*\).*/\1/p')"
 [[ -n "$maven_version" ]] || fail "cannot detect maven version"
 version_ge "$maven_version" "$expected_maven_min_version" || {
   fail "expected Maven >= $expected_maven_min_version, got $maven_version"
@@ -44,16 +44,16 @@ printf 'backend-verify: java=%s maven=%s\n' "$java_major" "$maven_version" | tee
 [[ -f "$backend_dir/pom.xml" ]] || fail "missing $backend_dir/pom.xml"
 
 # 编译门禁：主代码必须可编译。
-log_run mvn -B -ntp -q -DskipTests compile
+(cd "$backend_dir" && log_run mvn -B -ntp -q -DskipTests compile)
 
 # 单元测试门禁：排除跨模块集成/E2E API 测试类。
-log_run mvn -B -ntp test \
+(cd "$backend_dir" && log_run mvn -B -ntp test \
   -Dsurefire.excludes='**/integration/**,**/CrsClosureE2EApiTest.java' \
-  -Dsurefire.reportsDirectory=target/surefire-reports/unit
+  -Dsurefire.reportsDirectory=target/surefire-reports/unit)
 
 # 集成测试门禁：跨模块契约与 E2E API 场景（H2 内存库，无需外部服务）。
-log_run mvn -B -ntp test \
+(cd "$backend_dir" && log_run mvn -B -ntp test \
   -Dsurefire.includes='**/integration/**,**/CrsClosureE2EApiTest.java' \
-  -Dsurefire.reportsDirectory=target/surefire-reports/integration
+  -Dsurefire.reportsDirectory=target/surefire-reports/integration)
 
 printf 'backend-verify: PASS (compile + unit + integration)\n' | tee -a "$log"
