@@ -6,6 +6,7 @@ sequenceDiagram
   participant Storage as 文件存储边界
   participant DB as HWK 数据表
   participant Worker as HWK 评测 Worker
+  participant Recovery as HWK 评测恢复器
   participant Evaluator as 共享评测边界
   Student->>Frontend: 打开作业并填写提交内容
   opt FILE 作业
@@ -34,6 +35,11 @@ sequenceDiagram
   end
   API-->>Frontend: 返回提交回执和可见状态
   API-->>Worker: 事务提交后投递评测任务事件
+  opt 事件丢失、线程池拒绝或进程重启
+    Recovery->>DB: 定时扫描 PENDING；启动重置遗留 RUNNING
+    DB-->>Recovery: 返回可恢复任务
+    Recovery-->>Worker: 重新投递待评测任务
+  end
   Worker->>DB: 原子认领 PENDING 任务并标记 RUNNING
   Worker->>Evaluator: 执行 IO 评测
   Evaluator-->>Worker: 返回 EvaluationResult

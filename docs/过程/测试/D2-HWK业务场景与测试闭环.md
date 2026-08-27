@@ -18,11 +18,11 @@ HWK 保持两个已经确认的独立业务场景。页面动作、权限检查�
 | 场景/流程 | 分类 | 归属 | 触发与可验证结果 |
 | --- | --- | --- | --- |
 | 教师创建并发布作业 | 独立场景 | UC-HWK-02 | 教师保存草稿并确认发布；合法配置变为 PUBLISHED，非法配置保留可修改草稿并返回稳定错误 |
-| 学生提交作业并触发自动评测 | 独立场景 | UC-HWK-01 | 学生提交 TEXT/OBJECTIVE/CODE/FILE；OBJECTIVE 同步形成评测终态，CODE 形成 PENDING 任务并由后台 Worker 推进到终态，学生只能看到允许公开的反馈 |
+| 学生提交作业并触发自动评测 | 独立场景 | UC-HWK-01 | 学生提交 TEXT/OBJECTIVE/CODE/FILE；OBJECTIVE 同步形成评测终态，CODE 形成持久 PENDING 任务并由后台 Worker 推进到终态；首次派发遗漏或进程重启后由恢复器重新投递，学生只能看到允许公开的反馈 |
 | 草稿编辑/删除 | 备选路径 | UC-HWK-02 | 保存草稿、更新草稿或仅逻辑删除 DRAFT；历史和子记录不被级联清理 |
 | 题目与测试用例配置 | 公共子流程 | UC-HWK-02 | OBJECTIVE/CODE 发布前完成配置完整性校验 |
 | 附件上传/恢复/绑定/下载/清理 | 公共子流程 | UC-HWK-01 | 单附件从 UPLOADED 原子进入 BOUND/DELETED，下载每次重鉴权，失败执行物理对象补偿或延迟清理 |
-| 自动评测 | 公共子流程 | UC-HWK-01 | OBJECTIVE 生成独立终态评测记录；CODE 生成持久 PENDING 任务，事务提交后由 Worker 原子认领并调用共享 Evaluator，API-HWK-11 保持纯读取 |
+| 自动评测 | 公共子流程 | UC-HWK-01 | OBJECTIVE 生成独立终态评测记录；CODE 生成持久 PENDING 任务，事务提交后由 Worker 原子认领并调用共享 Evaluator；恢复器定时重投 PENDING、在启动时重置旧进程遗留 RUNNING，API-HWK-11 保持纯读取 |
 | 教师批阅/重评 | 扩展路径 | UC-HWK-01 | 教师对待批阅提交评分，或新建 REJUDGE 记录；评分、评语和操作日志可追踪 |
 | 统计与待处理名单 | 查询子流程 | UC-HWK-01 | 课程管理者查询固定五档、未提交、待评测和待批阅分页结果 |
 
@@ -41,7 +41,7 @@ HWK 保持两个已经确认的独立业务场景。页面动作、权限检查�
 | TEXT/OBJECTIVE/CODE/FILE 提交与历史 | `HomeworkControllerTest`、`HomeworkSubmissionServiceTest`、`HomeworkAttachmentControllerTest`、学生提交/历史前端测试 | PASS |
 | 截止、迟交、禁止重交、越权与隐藏答案 | HWK Controller/Bearer/Service 测试及学生结果页测试 | PASS |
 | 客观题评测、人工批阅与手动重评 | `HomeworkControllerTest`、结果/批阅页面测试 | PASS |
-| CODE 提交后独立后台评测 | `codeHomeworkSubmissionEvaluatesIoCasesAndTeacherCanReevaluate`、`evaluationDetailReturnsPendingResultWithoutInvokingEvaluator` 与 `homework-lifecycle.spec.ts` 只轮询 API-HWK-10 | PASS：POST 返回 PENDING 后，Worker 独立推进到 ACCEPTED/失败终态；API-HWK-11 不再触发 evaluator |
+| CODE 提交后独立后台评测 | `codeHomeworkSubmissionEvaluatesIoCasesAndTeacherCanReevaluate`、`evaluationDetailReturnsPendingResultWithoutInvokingEvaluator`、`HomeworkEvaluationRecoveryTest` 与 `homework-lifecycle.spec.ts` 只轮询 API-HWK-10 | PASS：POST 返回 PENDING 后，Worker 独立推进到 ACCEPTED/失败终态；首次派发遗漏或进程重启后的恢复也进入终态；API-HWK-11 不再触发 evaluator |
 | 附件恢复、失败补偿和清理 | Attachment Service/Controller/Scheduling 测试及 FILE 页面测试 | PASS |
 | 统计与待处理名单 | Statistics/Repository/Attention 测试及统计页面测试 | PASS |
 | 共享 E2E #267 | `homework-lifecycle.spec.ts` 复用 PR #268 的 Playwright runner 与公共夹具 | PASS 契约：第二个场景不调用 API-HWK-11，只轮询提交详情并要求 AC 与编译错误样本均进入终态且保留提交 |
@@ -57,9 +57,9 @@ HWK 保持两个已经确认的独立业务场景。页面动作、权限检查�
 | 共享 E2E 契约 RED | 1 | 0 | 1 | 0 | 0 | 预期失败：`frontend/tests/e2e/hwk/homework-lifecycle.spec.ts` 不存在 |
 | 文档闭环契约 GREEN | 1 | 1 | 0 | 0 | 0 | PASS |
 | HWK 共享 E2E 业务验收 | 2 | 待复测 | 0 | 0 | 0 | #296 已将第二个场景改为仅轮询 API-HWK-10 并断言 ACCEPTED/COMPILE_ERROR 终态；待共享 Compose runner 复跑回填 |
-| HWK 后端定向 | 101 | 101 | 0 | 0 | 0 | PASS |
+| HWK 后端定向 | 105 | 105 | 0 | 0 | 0 | PASS；包含首次派发遗漏与旧进程 RUNNING 恢复 |
 | HWK 前端定向 | 182 | 182 | 0 | 0 | 0 | PASS；11/11 files |
-| 后端全量回归 | 390 | 383 | 0 | 0 | 7 | PASS；Docker/MySQL 环境专项按测试假设跳过 |
+| 后端全量回归 | 394 | 387 | 0 | 0 | 7 | PASS；Docker/MySQL 环境专项按测试假设跳过 |
 | 前端全量回归 | 556 | 556 | 0 | 0 | 0 | PASS；53/53 files |
 | 前端类型检查 | 1 | 1 | 0 | 0 | 0 | PASS |
 | 前端生产构建 | 1 | 1 | 0 | 0 | 0 | PASS；189 modules transformed |
@@ -79,10 +79,10 @@ HWK 保持两个已经确认的独立业务场景。页面动作、权限检查�
 
 ### 5.2 FR-HWK-04：CODE 后台自动评测已由 #296 闭环
 
-- 实现：API-HWK-07 在提交事务内保存 `CODE_JUDGE/PENDING`，事务提交后投递 `HomeworkEvaluationTaskCreated`；`HomeworkEvaluationWorker` 使用 HWK 专用线程池消费，并以条件更新原子认领任务。
+- 实现：API-HWK-07 在提交事务内保存 `CODE_JUDGE/PENDING`，事务提交后投递 `HomeworkEvaluationTaskCreated`；`HomeworkEvaluationWorker` 使用 HWK 专用线程池消费，并以条件更新原子认领任务。`HomeworkEvaluationRecovery` 定时扫描持久 PENDING，并在应用启动时将旧进程遗留 RUNNING 重置为 PENDING 后重新投递；线程池拒绝不会删除任务，下一轮扫描会重试。
 - 共享边界：Worker 复用 `Evaluator` / `EvaluationTask`，不新增公共 API、DTO、错误码或数据库表；API-HWK-11 仅查询最新评测记录，不再执行 evaluator。
 - 异常语义：Worker 或评测器出现未预期异常时，独立事务将评测和提交更新为 `SYSTEM_ERROR`，提交主记录及历史不删除。
-- 自动化证据：提交后不调用 API-HWK-11 即进入终态的 Controller 测试、PENDING 结果纯读取单元测试、Worker 异常保留提交测试均通过；共享 E2E 改为只轮询 API-HWK-10。
+- 自动化证据：提交后不调用 API-HWK-11 即进入终态的 Controller 测试、PENDING 结果纯读取单元测试、Worker 异常保留提交测试，以及 `recoveryEvaluatesPersistedCodeSubmissionWhenInitialAfterCommitDispatchWasMissed` 与 `recoveryRequeuesRunningCodeSubmissionLeftByPreviousProcess` 均通过；共享 E2E 改为只轮询 API-HWK-10。
 - 判定：FR-HWK-04 的 CODE 后台评测与 TC-HWK-10、TC-HWK-11 更新为 PASS；真实 Docker 多语言、资源限制和并发压测仍按部署专项执行，不属于 #296。
 - Issue 生命周期：#264 已由 PR #276 按文档与测试闭环交付完成；FR-HWK-04 产品缺陷由 #296 独立跟踪，本分支完成修复并在 #296 合并后关闭该产品缺陷。
 

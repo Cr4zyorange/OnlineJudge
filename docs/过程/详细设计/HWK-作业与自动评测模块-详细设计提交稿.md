@@ -51,7 +51,7 @@ HWK 模块不负责：
 1. 客观题支持单选题、多选题、判断题自动评分。
 2. 代码题支持基于预设测试用例的输入输出比对。
 3. 文件提交题与文本题以教师人工批阅为主。
-4. 代码评测采用异步任务方式，不在提交接口中同步等待运行结果。
+4. 代码评测采用异步任务方式，不在提交接口中同步等待运行结果；事务后事件只作首次派发，持久 PENDING 由定时恢复扫描重投，应用启动时将旧进程遗留 RUNNING 重置为 PENDING。
 5. 不实现复杂分布式在线判题平台能力，如大规模并发评测、复杂 Special Judge、交互式题目、排行榜和竞赛模式。
 
 ---
@@ -331,7 +331,7 @@ graph TD
 | SVC-HWK-08 | HomeworkStatisticsService | 独立负责单次作业统计：读取 CRS 当前活跃学生范围，编排未提交分页，并调用 Repository SQL 聚合数量、分数摘要和固定五档；不得把逻辑留在 HomeworkService 或加载全部最终提交到内存 | homeworkId、page、size、当前课程管理者 | 兼容增量作业统计 DTO |
 | SVC-HWK-09 | HomeworkPermissionService | 封装课程成员校验、教师课程管理权限校验和提交访问权限校验 | 当前用户、courseId、homeworkId、submissionId | 权限校验结果 |
 | SVC-HWK-10 | HomeworkEventPublisher | 向 LRN 和 GRD 发送作业事件和成绩来源事件 | 业务事件 DTO | 事件发送结果 |
-| SVC-HWK-11 | EvaluationWorkerClient | 与 LAB 共享评测 Worker 抽象，提交代码评测任务并接收回调 | 评测任务、语言、限制参数、测试用例 | 评测任务状态、评测结果 |
+| SVC-HWK-11 | EvaluationWorkerClient / HomeworkEvaluationRecovery | 与 LAB 共享评测 Worker 抽象，提交代码评测任务并接收回调；事务后事件仅作首次派发，恢复器定时重投持久 PENDING、启动时重置旧进程遗留 RUNNING | 评测任务、语言、限制参数、测试用例、持久评测状态 | 评测任务状态、评测结果 |
 | SVC-HWK-12 | HomeworkRepository/Mapper | 完成业务表访问；提供父表原子 `softDeleteDraft`，普通更新不得写删除标记且排除已删除记录；用条件聚合 SQL 和组合索引支持固定五档、有效范围和 attention 分页 | 实体对象、查询条件、CRS 活跃学生范围 | 数据库记录、聚合行、分页记录 |
 | SVC-HWK-13 | HomeworkAttachmentService | 编排 API-HWK-23/24，校验类型/大小/内容签名、24 小时状态、所有权、原子绑定和每次下载重鉴权；仅通过 FileStorageService 操作物理字节 | 当前用户、homeworkId、fileId/submissionId、multipart 文件 | 安全附件 DTO、下载资源、删除/绑定结果 |
 | SVC-HWK-14 | HomeworkAttachmentRepository | 按 fileId+作业+上传者+状态+有效期条件查询/原子绑定，保存 DB-HWK-08 生命周期 | 附件实体、绑定条件 | 附件记录、原子更新行数 |

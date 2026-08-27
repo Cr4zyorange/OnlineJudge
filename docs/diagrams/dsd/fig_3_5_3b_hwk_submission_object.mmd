@@ -9,6 +9,7 @@ sequenceDiagram
   participant SubmissionRepo as SubmissionRepository
   participant EvaluationRepo as JdbcHomeworkEvaluationRepository
   participant Worker as HomeworkEvaluationWorker
+  participant Recovery as HomeworkEvaluationRecovery
   participant Evaluator as 共享 Evaluator
   opt FILE 作业上传
     Student->>View: 选择一个文件并上传
@@ -38,6 +39,11 @@ sequenceDiagram
   end
   Submission-->>View: 返回提交回执与可见状态
   Submission-->>Worker: AFTER_COMMIT 投递 HomeworkEvaluationTaskCreated
+  opt 首次派发遗漏、线程池拒绝或进程重启
+    Recovery->>EvaluationRepo: 定时读取 PENDING；启动重置遗留 RUNNING
+    EvaluationRepo-->>Recovery: 返回可恢复 CODE_JUDGE 任务
+    Recovery-->>Worker: 重新投递 HomeworkEvaluationTaskCreated
+  end
   Worker->>EvaluationRepo: 条件更新 PENDING 为 RUNNING
   EvaluationRepo-->>Worker: 返回认领结果
   Worker->>Evaluator: 使用共享 EvaluationTask 执行 IO 评测
