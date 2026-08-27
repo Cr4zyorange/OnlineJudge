@@ -1,0 +1,33 @@
+sequenceDiagram
+  actor Teacher as 教师
+  participant C as LabExperimentController
+  participant S as LabExperimentService
+  participant P as CoursePermissionClient
+  participant R as LabExperimentRepository
+  participant N as NotificationEventPublisher
+  participant L as LRN NotificationService
+
+  Teacher->>C: POST API-LAB-01 创建草稿
+  C->>S: createLab(courseId, teacherId, request)
+  S->>P: canManageCourse(courseId, teacherId)
+  P-->>S: true
+  S->>R: save(DRAFT, testcaseList)
+  R-->>S: LabExperiment
+  S-->>C: 草稿响应
+  C-->>Teacher: 201/200 DRAFT
+
+  Teacher->>C: POST API-LAB-06 发布
+  C->>S: publishLab(labId, teacherId)
+  S->>R: findById(labId)
+  R-->>S: DRAFT 实验
+  S->>P: canManageCourse(courseId, teacherId)
+  P-->>S: true
+  S->>R: updateLifecycle(PUBLISHED)
+  R-->>S: 已发布实验
+  S->>P: listCourseStudentIds(courseId)
+  P-->>S: 接收学生编号
+  S->>N: publish(LAB_EXPERIMENT_PUBLISHED)
+  N->>L: processEvent(event)
+  L-->>N: 通知落库结果
+  S-->>C: 已发布实验
+  C-->>Teacher: PUBLISHED
