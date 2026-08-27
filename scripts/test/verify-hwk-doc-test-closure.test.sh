@@ -138,6 +138,7 @@ require_text "$publish_object" '保存 DRAFT 聚合（含题目、测试用例�
 require_text "$submission_object" '当前 CODE 结果读取路径（FR-HWK-04 缺口）'
 
 require_text "$closure" '教师批阅/重评 | 扩展路径'
+require_text "$closure" '| 实际完成日期 | 2026-08-27 |'
 require_text "$closure" '共享 E2E #267 | `homework-lifecycle.spec.ts`'
 require_text "$closure" 'runner 通过不等于 FR-HWK-04 产品验收通过'
 require_text "$closure" 'GRD 来源成绩真实链路 | PASS'
