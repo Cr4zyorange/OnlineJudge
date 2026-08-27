@@ -19,6 +19,7 @@ class ComposeProfilePropertiesTest {
 
         assertThat(properties.getProperty("spring.datasource.url")).startsWith("jdbc:mysql://");
         assertThat(properties.getProperty("spring.datasource.driver-class-name")).isEqualTo("com.mysql.cj.jdbc.Driver");
+        assertThat(properties.getProperty("spring.datasource.password")).isEqualTo("${MYSQL_PASSWORD}");
         assertThat(properties.getProperty("spring.sql.init.mode")).isEqualTo("never");
         assertThat(properties).doesNotContainKey("spring.sql.init.schema-locations");
         assertThat(properties.getProperty("spring.datasource.hikari.initialization-fail-timeout")).isEqualTo("60000");

@@ -21,8 +21,8 @@ class DockerComposeContractTest {
         assertThat(compose).contains("frontend:");
         assertThat(compose).contains("mysql-data:/var/lib/mysql");
         assertThat(compose).contains("../../database/mysql/compose-schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro");
-        assertThat(compose).contains("${OJ_HTTP_PORT:-8088}:8080");
-        assertThat(compose).contains("/api/v1/system/health");
+        assertThat(compose).contains("${OJ_HTTP_PORT:-8088}:80");
+        assertThat(compose).contains("/api/v1/system/readiness");
     }
 
     @Test
@@ -30,9 +30,11 @@ class DockerComposeContractTest {
         Path composeFile = Path.of("..", "deploy", "docker", "compose.yml");
         String compose = Files.readString(composeFile);
 
-        assertThat(compose).contains("image: ${BACKEND_IMAGE_REPOSITORY:-onlinejudge/backend}:${IMAGE_TAG:?IMAGE_TAG must be a full 40-character Git SHA}");
-        assertThat(compose).contains("image: ${FRONTEND_IMAGE_REPOSITORY:-onlinejudge/frontend}:${IMAGE_TAG:?IMAGE_TAG must be a full 40-character Git SHA}");
-        assertThat(compose).contains("IMAGE_REVISION: ${IMAGE_TAG:?IMAGE_TAG must be a full 40-character Git SHA}");
+        assertThat(compose).contains("image: onlinejudge/backend:${GIT_SHA:?GIT_SHA must be the current full 40-character commit SHA}");
+        assertThat(compose).contains("image: onlinejudge/frontend:${GIT_SHA:?GIT_SHA must be the current full 40-character commit SHA}");
+        assertThat(compose).contains("GIT_SHA: ${GIT_SHA:?GIT_SHA must be the current full 40-character commit SHA}");
+        assertThat(compose).contains("MYSQL_PASSWORD: ${MYSQL_PASSWORD:?MYSQL_PASSWORD is required}");
+        assertThat(compose).contains("MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD is required}");
         assertThat(compose).contains("image: mysql:8.4");
         assertThat(compose).doesNotContain("image: latest");
     }
@@ -113,12 +115,12 @@ class DockerComposeContractTest {
         String backendDockerfile = Files.readString(Path.of("..", "deploy", "docker", "backend.Dockerfile"));
         String frontendDockerfile = Files.readString(Path.of("..", "deploy", "docker", "frontend.Dockerfile"));
 
-        assertThat(backendDockerfile).contains("ARG IMAGE_REVISION");
-        assertThat(frontendDockerfile).contains("ARG IMAGE_REVISION");
-        assertThat(backendDockerfile).contains("org.opencontainers.image.revision=\"$IMAGE_REVISION\"");
-        assertThat(frontendDockerfile).contains("org.opencontainers.image.revision=\"$IMAGE_REVISION\"");
-        assertThat(backendDockerfile).contains("org.opencontainers.image.version=\"$IMAGE_REVISION\"");
-        assertThat(frontendDockerfile).contains("org.opencontainers.image.version=\"$IMAGE_REVISION\"");
+        assertThat(backendDockerfile).contains("ARG GIT_SHA");
+        assertThat(frontendDockerfile).contains("ARG GIT_SHA");
+        assertThat(backendDockerfile).contains("org.opencontainers.image.revision=\"$GIT_SHA\"");
+        assertThat(frontendDockerfile).contains("org.opencontainers.image.revision=\"$GIT_SHA\"");
+        assertThat(backendDockerfile).contains("org.opencontainers.image.version=\"$GIT_SHA\"");
+        assertThat(frontendDockerfile).contains("org.opencontainers.image.version=\"$GIT_SHA\"");
         assertThat(backendDockerfile).contains("org.opencontainers.image.source=\"$IMAGE_SOURCE\"");
         assertThat(frontendDockerfile).contains("org.opencontainers.image.source=\"$IMAGE_SOURCE\"");
         assertThat(backendDockerfile).contains("USER 10001:10001");

@@ -27,4 +27,13 @@ class SystemHealthControllerTest {
                 .andExpect(jsonPath("$.message").value("success"))
                 .andExpect(jsonPath("$.data.status").value("UP"));
     }
+
+    @Test
+    void readinessEndpointIsPublicAndReturnsUpWhenDatabaseIsAvailable() throws Exception {
+        mockMvc.perform(get("/api/v1/system/readiness"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"))
+                .andExpect(jsonPath("$.message").value("success"))
+                .andExpect(jsonPath("$.data.status").value("UP"));
+    }
 }
