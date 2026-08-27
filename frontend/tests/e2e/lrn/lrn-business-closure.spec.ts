@@ -1,8 +1,10 @@
 import type { APIResponse, Page } from '@playwright/test';
 import { expect, test } from '../fixtures';
+import { verifyLrnDisposableProof } from './disposable-proof';
 
 const DEMO_COURSE_ID = 9501;
 const DEMO_GRADE_SUMMARY_ID = 950421;
+const hasDisposableProof = verifyLrnDisposableProof();
 
 test.describe.configure({ timeout: 60_000 });
 test.use({ navigationTimeout: 30_000 });
@@ -20,6 +22,8 @@ type NotificationRecord = {
 type NotificationPage = { records: NotificationRecord[]; unreadCount: number; total: number };
 
 test.describe('@lrn UC-LRN-01 business closure', () => {
+  test.skip(!hasDisposableProof, 'Mutating LRN closure must run through npm run test:e2e:lrn:disposable');
+
   test('real LAB/HWK/GRD changes create isolated notifications with auditable lifecycle', async ({
     page,
     loginAs,

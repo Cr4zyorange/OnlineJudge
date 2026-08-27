@@ -15,29 +15,72 @@
  *   - 背景为白色
  */
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { homedir, tmpdir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
-const DEFAULT_MERMAID_JS = [
-  'C:/Users/BHM/.vscode/extensions/shd101wyy.markdown-preview-enhanced-0.8.30/crossnote/dependencies/mermaid/mermaid.min.js',
-  'C:/Users/BHM/.vscode/extensions/.cf4e8ff9-818d-4280-b2f1-0fb6f7e6543a/crossnote/dependencies/mermaid/mermaid.min.js',
-].find((candidate) => {
-  try {
-    readFileSync(candidate);
-    return true;
-  } catch {
-    return false;
+const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
+
+function firstExisting(candidates) {
+  return candidates.find((candidate) => candidate && existsSync(candidate));
+}
+
+function vscodeMermaidCandidates() {
+  const extensionRoot = join(homedir(), '.vscode', 'extensions');
+  if (!existsSync(extensionRoot)) {
+    return [];
   }
-});
+  return readdirSync(extensionRoot, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory() && entry.name.startsWith('shd101wyy.markdown-preview-enhanced-'))
+    .map((entry) => join(
+      extensionRoot,
+      entry.name,
+      'crossnote',
+      'dependencies',
+      'mermaid',
+      'mermaid.min.js'
+    ));
+}
 
-const DEFAULT_CHROME = [
+function executableFromPath(names) {
+  const lookup = process.platform === 'win32' ? 'where' : 'which';
+  for (const name of names) {
+    const result = spawnSync(lookup, [name], { encoding: 'utf8' });
+    const candidate = result.status === 0 ? result.stdout.split(/\r?\n/).find(Boolean)?.trim() : undefined;
+    if (candidate && existsSync(candidate)) {
+      return candidate;
+    }
+  }
+  return undefined;
+}
+
+const DEFAULT_MERMAID_JS = firstExisting([
+  process.env.MERMAID_JS,
+  join(repoRoot, 'frontend', 'node_modules', 'mermaid', 'dist', 'mermaid.min.js'),
+  join(repoRoot, 'node_modules', 'mermaid', 'dist', 'mermaid.min.js'),
+  ...vscodeMermaidCandidates()
+]);
+
+const DEFAULT_CHROME = firstExisting([
   process.env.CHROME_PATH,
   'C:/Program Files/Google/Chrome/Application/chrome.exe',
   'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',
   'C:/Program Files/Microsoft/Edge/Application/msedge.exe',
-].find((candidate) => candidate && readFileSync(candidate, { encoding: null }) !== undefined);
+  '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+  '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge',
+  '/usr/bin/google-chrome',
+  '/usr/bin/google-chrome-stable',
+  '/usr/bin/chromium',
+  '/usr/bin/chromium-browser'
+]) || executableFromPath([
+  'google-chrome',
+  'google-chrome-stable',
+  'chromium',
+  'chromium-browser',
+  'chrome',
+  'msedge'
+]);
 
 const args = process.argv.slice(2);
 if (args.length === 0 || args.length % 2 !== 0) {
@@ -45,7 +88,7 @@ if (args.length === 0 || args.length % 2 !== 0) {
   process.exit(1);
 }
 
-const mermaidJs = process.env.MERMAID_JS || DEFAULT_MERMAID_JS;
+const mermaidJs = DEFAULT_MERMAID_JS;
 const chromePath = DEFAULT_CHROME;
 if (!mermaidJs) {
   console.error('未找到 mermaid.min.js，请通过 MERMAID_JS 环境变量指定');
@@ -97,40 +140,43 @@ function extractSvg(dump) {
     .replace(/<svg id="my-svg"/, '<svg id="my-svg"');
 }
 
-for (let index = 0; index < args.length; index += 2) {
-  const mmdPath = args[index];
-  const svgPath = args[index + 1];
-  const htmlPath = join(workDir, `fig-${index / 2}.html`);
-  writeFileSync(htmlPath, buildHtml(mmdPath), 'utf8');
+try {
+  for (let index = 0; index < args.length; index += 2) {
+    const mmdPath = args[index];
+    const svgPath = args[index + 1];
+    const htmlPath = join(workDir, `fig-${index / 2}.html`);
+    writeFileSync(htmlPath, buildHtml(mmdPath), 'utf8');
 
-  const result = spawnSync(
-    chromePath,
-    [
-      '--headless=new',
-      '--disable-gpu',
-      '--no-sandbox',
-      '--dump-dom',
-      '--virtual-time-budget=8000',
-      pathToFileURL(htmlPath).href,
-    ],
-    { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }
-  );
-  if (result.status !== 0) {
-    console.error(`渲染失败：${mmdPath}（Chrome 退出码 ${result.status}）`);
-    console.error((result.stderr || '').slice(0, 500));
-    process.exitCode = 1;
-    continue;
+    const result = spawnSync(
+      chromePath,
+      [
+        '--headless=new',
+        '--disable-gpu',
+        '--disable-dev-shm-usage',
+        '--no-sandbox',
+        '--dump-dom',
+        '--virtual-time-budget=8000',
+        pathToFileURL(htmlPath).href,
+      ],
+      { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }
+    );
+    if (result.error || result.status !== 0) {
+      console.error(`渲染失败：${mmdPath}（Chrome 退出码 ${result.status ?? 'spawn-error'}）`);
+      console.error((result.error?.message || result.stderr || '').slice(0, 500));
+      process.exitCode = 1;
+      continue;
+    }
+    const svg = extractSvg(result.stdout);
+    if (!svg || /<pre style="color:red">/.test(result.stdout)) {
+      console.error(`渲染失败：${mmdPath}（未生成 SVG 或 mermaid 抛错）`);
+      process.exitCode = 1;
+      continue;
+    }
+    mkdirSync(dirname(svgPath), { recursive: true });
+    writeFileSync(svgPath, svg, 'utf8');
+    console.log(`OK  ${mmdPath} -> ${svgPath}`);
   }
-  const svg = extractSvg(result.stdout);
-  if (!svg || /<pre style="color:red">/.test(result.stdout)) {
-    console.error(`渲染失败：${mmdPath}（未生成 SVG 或 mermaid 抛错）`);
-    process.exitCode = 1;
-    continue;
-  }
-  mkdirSync(svgPath.split(/[\\/]/).slice(0, -1).join('/'), { recursive: true });
-  writeFileSync(svgPath, svg, 'utf8');
-  console.log(`OK  ${mmdPath} -> ${svgPath}`);
+} finally {
+  rmSync(workDir, { recursive: true, force: true });
 }
-
-rmSync(workDir, { recursive: true, force: true });
 process.exit(process.exitCode ?? 0);

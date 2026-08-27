@@ -1,8 +1,13 @@
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { spawnSync } from 'node:child_process';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
 import test from 'node:test';
+import { fileURLToPath } from 'node:url';
 
 const root = new URL('../../', import.meta.url);
+const rootPath = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const manifestUrl = new URL('docs/diagrams/lrn/manifest.json', root);
 const expectedScenes = [
   'LRN-SC-01',
@@ -17,20 +22,39 @@ async function read(relativePath) {
   return readFile(new URL(relativePath, root), 'utf8');
 }
 
-test('LRN closure manifest maps every confirmed scenario to three renderable diagram layers', async () => {
+test('LRN closure manifest maps every confirmed scenario to three diagram layers that really render', async () => {
   const manifest = JSON.parse(await readFile(manifestUrl, 'utf8'));
+  const renderDir = await mkdtemp(join(tmpdir(), 'onlinejudge-lrn-mermaid-'));
+  const renderArgs = [];
 
-  assert.equal(manifest.formalUseCase, 'UC-LRN-01');
-  assert.deepEqual(manifest.scenarios.map((scene) => scene.id), expectedScenes);
-  for (const scene of manifest.scenarios) {
-    assert.deepEqual(expectedLayers.every((layer) => Boolean(scene[layer])), true);
-    for (const layer of expectedLayers) {
-      const diagram = scene[layer];
-      const source = await read(diagram.source);
-      const asset = await read(diagram.asset);
-      assert.match(source, /(?:sequenceDiagram|flowchart|stateDiagram-v2)/);
-      assert.match(asset, /<svg[\s>]/);
+  try {
+    assert.equal(manifest.formalUseCase, 'UC-LRN-01');
+    assert.deepEqual(manifest.scenarios.map((scene) => scene.id), expectedScenes);
+    for (const scene of manifest.scenarios) {
+      assert.deepEqual(expectedLayers.every((layer) => Boolean(scene[layer])), true);
+      for (const layer of expectedLayers) {
+        const diagram = scene[layer];
+        const source = await read(diagram.source);
+        const asset = await read(diagram.asset);
+        assert.match(source, /(?:sequenceDiagram|flowchart|stateDiagram-v2)/);
+        assert.match(asset, /<svg[\s>]/);
+        renderArgs.push(diagram.source, join(renderDir, `${scene.id}-${layer}.svg`));
+      }
     }
+
+    const result = spawnSync(
+      process.execPath,
+      [join(rootPath, 'scripts/dev/render-mermaid.mjs'), ...renderArgs],
+      { cwd: rootPath, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }
+    );
+    assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+    for (const scene of manifest.scenarios) {
+      for (const layer of expectedLayers) {
+        assert.match(await readFile(join(renderDir, `${scene.id}-${layer}.svg`), 'utf8'), /<svg[\s>]/);
+      }
+    }
+  } finally {
+    await rm(renderDir, { recursive: true, force: true });
   }
 });
 
@@ -52,21 +76,14 @@ test('LRN module documents expose the scenario catalogue, public subflows and di
   assert.doesNotMatch(combined, /UC-LRN-0[2-9]/);
 });
 
-test('LRN closure includes real cross-module integration, shared-runner E2E and current baseline evidence', async () => {
+test('LRN closure includes real cross-module integration and a disposable browser runner', async () => {
   const integrationTest = await read('backend/src/test/java/com/onlinejudge/integration/LrnCrossModuleEventIntegrationTest.java');
   const e2eTest = await read('frontend/tests/e2e/lrn/lrn-business-closure.spec.ts');
   const notificationE2eTest = await read('frontend/tests/e2e/lrn/notification-read-on-open.spec.ts');
+  const packageJson = JSON.parse(await read('frontend/package.json'));
+  const runner = await read('scripts/test/run-lrn-e2e-disposable.mjs');
   const baseline = await read('output/test/issue-262/README.md');
-  const environment = await read('output/test/issue-262/environment.txt');
-  const rawIndex = await read('output/test/issue-262/raw/README.md');
-  const rawBackend = await read('output/test/issue-262/raw/backend-target.log');
-  const rawE2e = await Promise.all([
-    read('output/test/issue-262/raw/e2e-lrn.log'),
-    read('output/test/issue-262/raw/e2e-lrn-repeat.log')
-  ]);
   const tst = await read('docs/过程/测试/TST-DOC-04 LRN 学习过程与通知提醒测试文档.md');
-  const baseSha = environment.match(/^base_sha=([0-9a-f]{40})$/m)?.[1];
-  const executionSha = environment.match(/^execution_sha=([0-9a-f]{40})$/m)?.[1];
 
   assert.match(integrationTest, /LAB_EXPERIMENT_PUBLISHED/);
   assert.match(integrationTest, /HOMEWORK_PUBLISHED/);
@@ -74,6 +91,13 @@ test('LRN closure includes real cross-module integration, shared-runner E2E and 
   assert.match(e2eTest, /from '\.\.\/fixtures'/);
   assert.match(e2eTest, /@lrn/);
   assert.match(e2eTest, /beforeGradeNotificationIds/);
+  assert.match(e2eTest, /verifyLrnDisposableProof/);
+  assert.match(notificationE2eTest, /verifyLrnDisposableProof/);
+  assert.equal(packageJson.scripts['test:e2e:lrn:disposable'], 'node ../scripts/test/run-lrn-e2e-disposable.mjs');
+  assert.match(runner, /onlinejudge-lrn-e2e-/);
+  assert.match(runner, /SPRING_DATASOURCE_URL/);
+  assert.match(runner, /VITE_API_PROXY_TARGET/);
+  assert.match(runner, /E2E_LRN_DISPOSABLE_PROOF_FILE/);
   assert.match(e2eTest, /describe\.configure\(\{ timeout: 60_000 \}\)/);
   assert.match(notificationE2eTest, /describe\.configure\(\{ timeout: 60_000 \}\)/);
   assert.match(e2eTest, /test\.use\(\{ navigationTimeout: 30_000 \}\)/);
@@ -82,18 +106,12 @@ test('LRN closure includes real cross-module integration, shared-runner E2E and 
   assert.match(notificationE2eTest, /test\.info\(\)\.outputPath/);
   assert.doesNotMatch(`${e2eTest}\n${notificationE2eTest}`, /output\/test\/issue-262\/evidence/);
   assert.match(baseline, /8f8e4fc70341c701c25786f12efbffaeca2a3c5f/);
-  assert.ok(baseSha, 'environment must record a full base SHA');
-  assert.ok(executionSha, 'environment must record a full execution SHA');
-  assert.notEqual(executionSha, baseSha, 'evidence must target the merged PR commit, not dev itself');
-  assert.match(baseline, new RegExp(baseSha));
-  assert.match(baseline, new RegExp(executionSha));
-  assert.match(baseline, /PASS|FAIL|BLOCKED/);
-  assert.match(rawIndex, new RegExp(executionSha));
-  assert.match(rawBackend, /Tests run: 101, Failures: 0, Errors: 0, Skipped: 0/);
-  assert.deepEqual(rawE2e.every((log) => /4 passed/.test(log)), true);
+  assert.match(baseline, /#295/);
+  assert.doesNotMatch(baseline, /\*\*BLOCKED\*\*[\s\S]*NFR-LN-01\/02/);
   assert.match(tst, /101\/101 PASS/);
   assert.match(tst, /119\/119 PASS/);
-  assert.match(tst, /LRN Playwright.*连续两轮 8\/8 PASS/);
+  assert.match(tst, /#295/);
+  assert.match(tst, /test:e2e:lrn:disposable/);
 });
 
 test('requirements-layer LRN SSDs expose only actor-to-system interactions', async () => {

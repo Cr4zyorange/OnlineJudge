@@ -1,7 +1,9 @@
 import type { APIResponse, Page } from '@playwright/test';
 import { expect, test } from '../fixtures';
+import { verifyLrnDisposableProof } from './disposable-proof';
 
 const DEMO_COURSE_ID = 9501;
+const hasDisposableProof = verifyLrnDisposableProof();
 
 test.describe.configure({ timeout: 60_000 });
 test.use({ navigationTimeout: 30_000 });
@@ -20,6 +22,8 @@ type NotificationPage = {
 };
 
 test.describe('@lrn #269 notification read-on-open', () => {
+  test.skip(!hasDisposableProof, 'Mutating LRN closure must run through npm run test:e2e:lrn:disposable');
+
   test('marks a real LAB notification read before navigating and keeps repeated opens idempotent', async ({
     page,
     loginAs,
