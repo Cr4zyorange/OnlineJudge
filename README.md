@@ -93,6 +93,70 @@ Docker Compose 的空数据卷会按顺序执行 `database/mysql/compose-schema.
 ```
 
 DEV/CI 环境可追加 `--seed`，Kind 中使用同一脚本的 `kubectl` adapter。迁移按 `database/migrations/manifest.txt` 的固定顺序执行并校验 SHA-256；失败会返回非零状态并打印具体文件名。禁止通过删除持久化卷规避迁移失败。完整契约与 MySQL 8.4 验证命令见 [D3-DATABASE 数据库启动与迁移契约](docs/开发/D3-DATABASE-数据库启动与迁移契约.md)。
+## Docker Compose 最短启动
+
+这一节是当前 `dev` 已有 Compose 部署的最短复演路径。它运行 `mysql`、`backend`、`frontend` 三个服务；只有前端经 `OJ_HTTP_PORT` 暴露到宿主机，后端和 MySQL 只在 Compose 网络内通信。
+
+| 前置项 | 用途 | 检查命令 |
+| --- | --- | --- |
+| Git | 获取精确源码版本 | `git --version` |
+| Docker Engine / Docker Desktop | 构建和运行三容器 | `docker version` |
+| Docker Compose v2 | 编排容器和健康等待 | `docker compose version` |
+| Bash、curl 7.76+、Python 3、grep、sed | 执行验收脚本 | `bash --version`、`curl --version`、`python3 --version` |
+
+在 macOS、Linux 或 Windows 的 Git Bash/WSL 中执行以下命令。PowerShell 使用者可以用 `Copy-Item deploy/docker/.env.example deploy/docker/.env` 代替 `cp`；Compose 和验收脚本仍应在具备 Bash 的环境运行。
+
+```bash
+git rev-parse HEAD
+cp deploy/docker/.env.example deploy/docker/.env
+docker compose -f deploy/docker/compose.yml up --detach --build --wait
+curl --fail-with-body http://127.0.0.1:8088/api/v1/system/health
+bash scripts/deploy/verify-compose.sh
+```
+
+`deploy/docker/.env.example` 仅是本地教学演示模板；复制出的 `.env` 不得提交。当前 `origin/dev` 已通过 `database/mysql/compose-schema.sql` 和 `database/seeds/dev-ci.sql` 提供空 MySQL 数据卷的初始化与 DEV/CI 种子数据；#287 与 #289 已合入，但本节命令仍需在 #288、#290、#292 完成后按 [D3 CI/CD 共享契约](docs/开发/D3-CICD-共享契约.md) 复核，不能把未复演的路径或结果写成已验证。
+
+验收脚本会输出逐项 `PASS:` 或以非零退出码和 `FAIL:` 终止。它验证健康、登录、课程、学习任务、实验、作业、成绩和通知 API；原始输出是复演证据，登录 token 不应写入日志或提交到仓库。
+
+保留数据的停止命令是：
+
+```bash
+docker compose -f deploy/docker/compose.yml down --remove-orphans
+```
+
+只有确认不再需要 MySQL 数据和上传文件时，才执行会删除 `mysql-data` 与 `app-data` 卷的清理：
+
+```bash
+docker compose -f deploy/docker/compose.yml down --volumes --remove-orphans
+```
+
+### 统一脚本入口
+
+脚本本身才是参数、依赖和断言的唯一正本；这里仅提供入口索引，避免在多个文档复制会漂移的实现命令。
+
+| 场景 | 正本 | 当前状态 |
+| --- | --- | --- |
+| 本地 H2 开发 | `scripts/dev/start-dev.sh` | 已有 |
+| Compose 业务 API 验收 | `scripts/deploy/verify-compose.sh` | 已有 |
+| Compose 验收脚本自身契约 | `scripts/test/verify-compose.test.sh` | 已有 |
+| CRS HTTP 端到端验收 | `scripts/test/crs-e2e-http.ps1` | 已有，需先启动可访问的应用 |
+ | D3 容器镜像构建与标签校验 | #289 的 `deploy/docker/**`、`scripts/docker/**` | 已合入 `origin/dev`（PR #302） |
+ | D3 临时 Kind 部署与精确清理 | #288 的 `deploy/k8s/**`、`scripts/kind/**`（PR #303） | 尚未合入 `dev` |
+ | D3 GitHub Actions 质量门禁 | #290 的 `.github/workflows/ci.yml` 与 `scripts/ci/**`（PR #298） | 尚未合入 `dev` |
+ | D3 GitHub Actions 交付编排 | #292 的 `.github/workflows/d3-delivery.yml` 与 `scripts/delivery/**` | 尚无 PR，尚未合入 `dev` |
+
+### D3 CI/CD 与临时 Kind 状态
+
+目标 D3 交付在 GitHub-hosted Runner 内创建并清理临时 Kind 集群，不使用额外服务器、长期集群或外部 `kubeconfig`。该目标的服务名、镜像、变量、Secret 和健康语义以 [D3 CI/CD 共享契约](docs/开发/D3-CICD-共享契约.md) 为唯一正本：
+
+- 服务只包括 `mysql`、`backend`、`frontend`；入口经 frontend 的 `/api/` 代理到 backend。
+- 两个自建镜像必须使用同一次构建的完整 `GIT_SHA`：`onlinejudge/backend:${GIT_SHA}` 与 `onlinejudge/frontend:${GIT_SHA}`，并具有同值的 `org.opencontainers.image.revision`。禁止以 `latest` 作为唯一构建、部署或验收版本。
+- GitHub Secrets 和 Kubernetes Secret 只使用 `MYSQL_PASSWORD`、`MYSQL_ROOT_PASSWORD`、`ONLINEJUDGE_NOTIFICATIONS_INTERNAL_TOKEN` 三个键名，文档、日志和镜像都不得写入其值。
+- 完成交付时，backend liveness 为 `/api/v1/system/health`，数据库感知 readiness 为 `/api/v1/system/readiness`；Kind 验收还必须经 frontend 代理检查 readiness。
+
+ #289 已随 PR #302 合入当前 `origin/dev`；#288 的 PR #303、#290 的 PR #298 尚未合入，#292 仍未创建 PR。上述 Kind、readiness 和 Actions 交付入口只有在对应 producer 合入后才可视为当前 checkout 的可执行能力，不能提前标记为 PASS。待 #288、#290 和 #292 合入后，未参与实现的人应在干净 checkout 依次执行各实现提供的入口，并记录环境、完整 SHA、实际命令、服务/测试数量、退出码和未经改写的输出。建议证据目录格式为 `output/issue-291/replay-<UTC>/`：`environment.txt`、`commands.txt`、`raw/`；只有命令退出码为 `0` 且原始断言成功时才记录 `PASS`。该目录是复演产生物，不应预先生成或提交伪造结果。
+
+故障排查先查看 [部署文档的常见问题](docs/最终提交/部署文档.md#9-常见问题) 和相关容器日志；D3 合入后，GitHub Actions 的失败日志、测试报告和 Kind 诊断以 #290/#292 工作流归档为准。当前 Compose 路径不声明为长期生产部署或云端高可用方案。
 
 ### 7. CI 质量门禁
 
