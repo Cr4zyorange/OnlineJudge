@@ -8,6 +8,7 @@ source "$repo_root/scripts/docker/container-contract.sh"
 require_full_git_sha
 require_command git
 require_matching_head "$repo_root"
+require_clean_source_tree "$repo_root"
 require_command docker
 
 printf 'Building %s\n' "$(backend_image_ref)"

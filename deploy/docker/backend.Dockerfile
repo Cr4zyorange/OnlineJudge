@@ -19,15 +19,12 @@ LABEL org.opencontainers.image.revision="$GIT_SHA" \
       org.opencontainers.image.version="$GIT_SHA" \
       org.opencontainers.image.source="$IMAGE_SOURCE"
 
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends wget \
+RUN command -v wget >/dev/null \
     && groupadd --system --gid 10001 onlinejudge \
     && useradd --system --uid 10001 --gid 10001 --home-dir /opt/onlinejudge --shell /usr/sbin/nologin onlinejudge \
-    && rm -rf /var/lib/apt/lists/*
+    && install -d -o 10001 -g 10001 /opt/onlinejudge/data /opt/onlinejudge/data/uploads
 
 COPY --from=build --chown=10001:10001 /workspace/backend/target/onlinejudge-backend-0.1.0-SNAPSHOT.jar app.jar
-
-RUN install -d -o 10001 -g 10001 /opt/onlinejudge/data /opt/onlinejudge/data/uploads
 
 EXPOSE 8080
 

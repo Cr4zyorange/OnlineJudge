@@ -41,7 +41,9 @@ CURL_BIN="${CURL_BIN:-curl}"
 require_command "$CURL_BIN"
 
 compose_file="$repo_root/deploy/docker/compose.yml"
-project_name="onlinejudge-smoke-${GIT_SHA:0:12}"
+run_id="${CONTAINER_SMOKE_RUN_ID:-$$}"
+[[ "$run_id" =~ ^[a-z0-9][a-z0-9_-]*$ ]] || fail "CONTAINER_SMOKE_RUN_ID contains unsupported characters"
+project_name="onlinejudge-smoke-${GIT_SHA:0:12}-${run_id}"
 base_url="${BASE:-http://127.0.0.1:${OJ_HTTP_PORT:-8088}}"
 verify_script="${VERIFY_COMPOSE_SCRIPT:-$repo_root/scripts/deploy/verify-compose.sh}"
 
@@ -84,9 +86,11 @@ frontend_revision="$(docker image inspect --format '{{ index .Config.Labels "org
 
 backend_user="$(docker inspect --format '{{.Config.User}}' "$backend_container")"
 frontend_user="$(docker inspect --format '{{.Config.User}}' "$frontend_container")"
-[[ -n "$backend_user" && "$backend_user" != "root" && "$backend_user" != "0" && "$backend_user" != 0:* ]] || \
+backend_primary_user="${backend_user%%:*}"
+frontend_primary_user="${frontend_user%%:*}"
+[[ -n "$backend_primary_user" && "$backend_primary_user" != "root" && "$backend_primary_user" != "0" ]] || \
   fail "backend container must not run as root"
-[[ -n "$frontend_user" && "$frontend_user" != "root" && "$frontend_user" != "0" && "$frontend_user" != 0:* ]] || \
+[[ -n "$frontend_primary_user" && "$frontend_primary_user" != "root" && "$frontend_primary_user" != "0" ]] || \
   fail "frontend container must not run as root"
 
 backend_readiness="$("${compose_command[@]}" exec -T backend \

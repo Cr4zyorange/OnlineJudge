@@ -23,6 +23,16 @@ require_matching_head() {
   [[ "$GIT_SHA" == "$head_sha" ]] || fail "GIT_SHA must match the current HEAD"
 }
 
+require_clean_source_tree() {
+  local repo_root="$1"
+  local source_status
+
+  source_status="$(git -C "$repo_root" status --porcelain --untracked-files=all)" || \
+    fail "unable to inspect the source tree"
+  [[ -z "$source_status" ]] || \
+    fail "source tree must be clean before building versioned images"
+}
+
 require_secret() {
   local variable_name="$1"
   [[ -n "${!variable_name:-}" ]] || fail "$variable_name is required"
