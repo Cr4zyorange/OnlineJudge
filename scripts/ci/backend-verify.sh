@@ -23,6 +23,30 @@ log_run() {
   "$@" 2>&1 | tee -a "$log"
 }
 
+run_mvn_retry() {
+  # 仅对依赖传输类瞬时失败（Maven Central 429 / 网络中断）做有界重试；
+  # 测试断言或编译错误不属于传输失败，直接失败，不重试、不弱化门禁。
+  local attempt=1
+  local status=1
+  local output_file
+  output_file="$(mktemp "${TMPDIR:-/tmp}/oj-mvn-out.XXXXXX")"
+  while [[ $attempt -le 3 ]]; do
+    if "$@" 2>&1 | tee -a "$log" | tee "$output_file"; then
+      status=0
+      break
+    fi
+    if ! grep -Eq "Could not transfer artifact|status code: 429|status code: 5[0-9][0-9]|Connection (refused|reset|timed out)|Read timed out|UnknownHost|handshake failure" "$output_file"; then
+      break
+    fi
+    printf '%s: transient Maven transfer failure (attempt %s/3); retrying in %ss\n' \
+      "${0##*/}" "$attempt" "$((attempt * 15))" | tee -a "$log"
+    sleep "$((attempt * 15))"
+    attempt=$((attempt + 1))
+  done
+  rm -f "$output_file"
+  return "$status"
+}
+
 version_ge() {
   # 不依赖 GNU sort -V（macOS BSD sort 不支持），用 awk 按 x.y.z 数值比较。
   awk -v a="$1" -v b="$2" 'BEGIN {
@@ -61,17 +85,20 @@ preserve_reports() {
 }
 
 # 编译门禁：主代码必须可编译。
-(cd "$backend_dir" && log_run mvn -B -ntp -q -DskipTests compile)
+printf '\n$ mvn -B -ntp -q -DskipTests compile\n' | tee -a "$log"
+(cd "$backend_dir" && run_mvn_retry mvn -B -ntp -q -DskipTests compile)
 
 # 单元测试门禁：排除跨模块集成/E2E API 测试类。
+printf '\n$ mvn -B -ntp test（单元，排除 integration/** 与 CrsClosureE2EApiTest）\n' | tee -a "$log"
 (cd "$backend_dir" && rm -f target/surefire-reports/*.xml \
-  && log_run mvn -B -ntp test \
+  && run_mvn_retry mvn -B -ntp test \
   -Dsurefire.excludes='**/integration/**,**/CrsClosureE2EApiTest.java')
 preserve_reports unit
 
 # 集成测试门禁：跨模块契约与 E2E API 场景（H2 内存库，无需外部服务）。
+printf '\n$ mvn -B -ntp test（集成，仅 integration/** 与 CrsClosureE2EApiTest）\n' | tee -a "$log"
 (cd "$backend_dir" && rm -f target/surefire-reports/*.xml \
-  && log_run mvn -B -ntp test \
+  && run_mvn_retry mvn -B -ntp test \
   -Dsurefire.includes='**/integration/**,**/CrsClosureE2EApiTest.java')
 preserve_reports integration
 
