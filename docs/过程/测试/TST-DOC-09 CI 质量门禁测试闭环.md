@@ -33,9 +33,10 @@ RED 基线（实现前）：`verify-workflow-gates.test.sh` 因 `check-workflows
 
 ## 3. GREEN：全套质量门禁通过
 
-权威证据（真实 GitHub Actions）：run `33056398897`（event=pull_request，ubuntu-24.04，
-Java 21.0.12、Node 22.23.2、npm 10.9.2、Maven 3.9.x），PR head `9cbde1cdb585185c27293379d57265f95601f483`，
-全部 5 个 job 结论 `success`，`delivery` 执行通过。run 内各 job 的 `test-summary.txt` 原始输出：
+权威证据（真实 GitHub Actions）：run `33058441807`（event=pull_request，ubuntu-24.04，
+Java 21.0.12、Node 22.23.2、npm 10.9.2、Maven 3.9.x），PR head `c5fac2aeb344191900b0bc64e65cab35590927fb`，
+全部 5 个 job 结论 `success`，`delivery` 执行通过；PR check rollup 全部 `SUCCESS`。
+run 内各 job 的 `test-summary.txt` 原始输出：
 
 ```text
 backend unit: files=54 tests=373 failures=0 errors=0 skipped=7
@@ -83,6 +84,7 @@ run conclusion: failure
 | --- | --- | --- | --- |
 | `33054458192` | `2ac6ec0` | frontend（8 个 `LabStudentAttachments` 用例） | 测试夹具 `publishAt` 无时区，UTC runner 下按本地解析导致“未发布”；改为显式 `+08:00` |
 | `33055289509` | `b275a41` | backend（`LearningRecordControllerTest` 限流用例） | 异步写线程池先于循环落库，第 10 次请求被误判 429；测试内可控 executor 挂起写入使语义确定 |
+| `33057373593` | `587e537` | backend（基础设施） | Maven Central 429 + Actions 缓存服务 400，冷缓存依赖解析失败；门禁脚本增加仅针对依赖传输失败的 3 次有界重试 |
 
 ## 5. REFACTOR：本地/CI 共用脚本
 
@@ -106,8 +108,10 @@ bash scripts/ci/verify-workflow-gates.test.sh
 - 2026-08-27 全新 clone @ `2ac6ec0`，`bash scripts/ci/verify-workflow-gates.test.sh`
   完整 PASS（静态校验、9 个变异全被拒绝、受控编译失败阻断 `delivery`、GREEN 到达并
   通过 `delivery`、环境清单精确记录 PR head/base SHA）。
-- 2026-08-27 真实 Actions run `33056398897` @ PR head `9cbde1c` 全 job success
-  （含 `delivery`）；受控失败 run `33056734060` 验证失败阻断（见第 4 节）。
+- 2026-08-27 最终 head `c5fac2a` 本地验收完整 PASS；真实 Actions run
+  `33058441807` @ `c5fac2a` 全 job success（含 `delivery`），PR check 全绿。
+- 2026-08-27 真实受控失败 run `33056734060` @ `53a5127`：backend/contracts FAIL、
+  `delivery` skipped（见第 4 节）。
 
 验证范围说明：脚本在 Git Bash/WSL bash 下均可执行（不依赖脚本可执行位）；本机 Java
 25/Node 24 与 CI 固定版本（21/22）不一致时，脚本自动按本机工具链覆盖预期版本，CI 的
