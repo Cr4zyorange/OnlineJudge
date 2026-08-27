@@ -121,21 +121,25 @@ describe('LearningTaskCenterView', () => {
     expect(learningTasksApi.listLearningTasks).toHaveBeenCalledTimes(2);
     expect(wrapper.text()).toContain('Java作业1');
   });
-  it('requests the next and previous pages from pagination controls', async () => {
+  it('appends the next task page from the continuous loading control', async () => {
     vi.mocked(learningTasksApi.listLearningTasks)
       .mockResolvedValueOnce({ ...taskPage, total: 45, page: 1, size: 20 })
       .mockResolvedValueOnce({
-        records: [taskPage.records[1]],
+        records: [{
+          ...taskPage.records[1],
+          taskId: 777,
+          title: '追加加载的作业',
+          actionUrl: '/courses/101/homeworks/777'
+        }],
         total: 45,
         page: 2,
         size: 20
-      })
-      .mockResolvedValueOnce({ ...taskPage, total: 45, page: 1, size: 20 });
+      });
 
     const wrapper = mount(LearningTaskCenterView);
     await flushPromises();
 
-    await wrapper.get('[data-testid="next-page"]').trigger('click');
+    await wrapper.get('[data-testid="load-more-tasks"]').trigger('click');
     await flushPromises();
 
     expect(learningTasksApi.listLearningTasks).toHaveBeenLastCalledWith(expect.objectContaining({
@@ -143,12 +147,40 @@ describe('LearningTaskCenterView', () => {
       size: 20
     }));
 
-    await wrapper.get('[data-testid="prev-page"]').trigger('click');
+    expect(wrapper.findAll('.task-card')).toHaveLength(3);
+  });
+
+  it('keeps appending task pages through one continuous 200-task browsing path', async () => {
+    vi.mocked(learningTasksApi.listLearningTasks).mockImplementation(async (query) => {
+      const page = query?.page ?? 1;
+      return {
+        records: Array.from({ length: 20 }, (_, index) => ({
+          taskId: ((page - 1) * 20) + index + 1,
+        taskType: 'HOMEWORK' as const,
+        title: `连续任务 ${((page - 1) * 20) + index + 1}`,
+        courseId: 101,
+        courseName: 'Java程序设计',
+        deadline: '2030-12-31 23:59:59',
+        progress: 0,
+        status: 'NOT_STARTED' as const,
+        actionUrl: `/courses/101/homeworks/${((page - 1) * 20) + index + 1}`
+      })),
+        total: 200,
+        page,
+        size: 20
+      };
+    });
+
+    const wrapper = mount(LearningTaskCenterView);
     await flushPromises();
 
-    expect(learningTasksApi.listLearningTasks).toHaveBeenLastCalledWith(expect.objectContaining({
-      page: 1,
-      size: 20
-    }));
+    for (let page = 2; page <= 10; page += 1) {
+      await wrapper.get('[data-testid="load-more-tasks"]').trigger('click');
+      await flushPromises();
+    }
+
+    expect(wrapper.findAll('.task-card')).toHaveLength(200);
+    expect(wrapper.get('[data-testid="loaded-task-count"]').text()).toContain('200 / 200');
+    expect(learningTasksApi.listLearningTasks).toHaveBeenCalledTimes(10);
   });
 });

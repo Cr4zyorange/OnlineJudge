@@ -39,7 +39,7 @@
           <div>
             <h2>我的学习任务</h2>
           </div>
-          <button type="button" class="task-center__refresh" :disabled="loading" @click="loadTasks">
+          <button type="button" class="task-center__refresh" :disabled="loading" @click="refreshTasks">
             刷新
           </button>
         </header>
@@ -88,7 +88,7 @@
           :message="errorMessage"
         >
           <template #actions>
-            <button type="button" data-testid="retry-tasks" @click="loadTasks">重试</button>
+            <button type="button" data-testid="retry-tasks" @click="refreshTasks">重试</button>
           </template>
         </PageState>
         <PageState
@@ -132,30 +132,31 @@
             </a>
             <span v-else class="task-card__unavailable">入口已失效</span>
           </article>
+          <div
+            v-if="canLoadMore"
+            ref="loadMoreSentinel"
+            class="task-center__load-sentinel"
+            data-testid="task-load-more-sentinel"
+            aria-hidden="true"
+          />
         </div>
 
         <nav
           v-if="taskPage && taskPage.total > 0"
           class="task-center__pagination"
-          aria-label="任务列表分页"
+          aria-label="任务列表连续加载"
         >
+          <span data-testid="loaded-task-count">已加载 {{ tasks.length }} / {{ taskPage.total }} 条</span>
           <button
+            v-if="canLoadMore"
             type="button"
-            data-testid="prev-page"
-            :disabled="loading || !canGoPrevious"
-            @click="goPreviousPage"
+            data-testid="load-more-tasks"
+            :disabled="loading || loadingMore"
+            @click="loadMoreTasks"
           >
-            上一页
+            {{ loadingMore ? '加载中…' : '加载更多' }}
           </button>
-          <span>第 {{ taskPage.page }} / {{ totalPages }} 页</span>
-          <button
-            type="button"
-            data-testid="next-page"
-            :disabled="loading || !canGoNext"
-            @click="goNextPage"
-          >
-            下一页
-          </button>
+          <span v-else>已加载全部任务</span>
         </nav>
       </section>
     </section>
@@ -163,7 +164,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 import { listLearningTasks } from '../../api/lrn/learningTasks';
 import PageState from '../../components/foundation/PageState.vue';
 import type {
@@ -177,16 +178,19 @@ import type {
 import { sanitizeInternalActionUrl } from './internalActionUrl';
 
 const loading = ref(false);
+const loadingMore = ref(false);
 const errorMessage = ref('');
 const taskPage = ref<LearningTaskPage | null>(null);
+const tasks = ref<LearningTask[]>([]);
 const selectedTaskType = ref<'' | LearningTaskType>('');
 const selectedStatus = ref<'' | LearningTaskStatus>('');
 const sortBy = ref<LearningTaskSortBy>('deadline');
 const order = ref<SortOrder>('asc');
 const page = ref(1);
 const size = ref(20);
+const loadMoreSentinel = ref<HTMLElement | null>(null);
+let loadMoreObserver: IntersectionObserver | null = null;
 
-const tasks = computed(() => taskPage.value?.records ?? []);
 const overdueCount = computed(() => tasks.value.filter((task) => task.status === 'OVERDUE').length);
 const inProgressCount = computed(() => tasks.value.filter((task) => task.status === 'IN_PROGRESS').length);
 const totalPages = computed(() => {
@@ -195,49 +199,100 @@ const totalPages = computed(() => {
   }
   return Math.max(1, Math.ceil(taskPage.value.total / taskPage.value.size));
 });
-const canGoPrevious = computed(() => page.value > 1);
-const canGoNext = computed(() => page.value < totalPages.value);
+const canLoadMore = computed(() => (
+  tasks.value.length < (taskPage.value?.total ?? 0)
+  && page.value < totalPages.value
+));
 
-onMounted(loadTasks);
+onMounted(async () => {
+  await loadTasks();
+  observeLoadMoreSentinel();
+});
+
+onBeforeUnmount(() => {
+  loadMoreObserver?.disconnect();
+  loadMoreObserver = null;
+});
 
 async function reloadFromFirstPage() {
   page.value = 1;
   await loadTasks();
 }
 
-async function loadTasks() {
-  loading.value = true;
+async function refreshTasks() {
+  await loadTasks();
+}
+
+async function loadTasks(append = false) {
+  if (loading.value || loadingMore.value) {
+    return;
+  }
+  const requestedPage = append ? page.value + 1 : 1;
+  if (append) {
+    loadingMore.value = true;
+  } else {
+    loading.value = true;
+  }
   errorMessage.value = '';
   try {
-    taskPage.value = await listLearningTasks({
+    const result = await listLearningTasks({
       taskType: selectedTaskType.value ? [selectedTaskType.value] : undefined,
       status: selectedStatus.value || undefined,
       sortBy: sortBy.value,
       order: order.value,
-      page: page.value,
+      page: requestedPage,
       size: size.value
     });
+    taskPage.value = result;
+    page.value = result.page;
+    if (append) {
+      const existingTaskKeys = new Set(tasks.value.map(taskKey));
+      tasks.value = [
+        ...tasks.value,
+        ...result.records.filter((task) => !existingTaskKeys.has(taskKey(task)))
+      ];
+    } else {
+      tasks.value = result.records;
+    }
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '任务列表加载失败';
   } finally {
-    loading.value = false;
+    if (append) {
+      loadingMore.value = false;
+    } else {
+      loading.value = false;
+    }
+    await nextTick();
+    observeLoadMoreSentinel();
   }
 }
 
-async function goPreviousPage() {
-  if (!canGoPrevious.value) {
+async function loadMoreTasks() {
+  if (!canLoadMore.value) {
     return;
   }
-  page.value -= 1;
-  await loadTasks();
+  await loadTasks(true);
 }
 
-async function goNextPage() {
-  if (!canGoNext.value) {
+function observeLoadMoreSentinel() {
+  if (typeof IntersectionObserver === 'undefined') {
     return;
   }
-  page.value += 1;
-  await loadTasks();
+  loadMoreObserver?.disconnect();
+  const sentinel = loadMoreSentinel.value;
+  if (!sentinel || !canLoadMore.value) {
+    return;
+  }
+  loadMoreObserver = new IntersectionObserver((entries) => {
+    if (entries.some((entry) => entry.isIntersecting)) {
+      void loadMoreTasks();
+    }
+  }, { rootMargin: '240px 0px' });
+  loadMoreObserver.observe(sentinel);
+}
+
+function taskKey(task: LearningTask) {
+  return `${task.taskType}-${task.taskId}`;
 }
 
 function taskTypeLabel(type: LearningTask['taskType']) {
