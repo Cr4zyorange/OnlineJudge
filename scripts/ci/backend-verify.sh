@@ -24,7 +24,16 @@ log_run() {
 }
 
 version_ge() {
-  [[ "$(printf '%s\n%s\n' "$1" "$2" | sort -V | head -1)" == "$2" ]]
+  # 不依赖 GNU sort -V（macOS BSD sort 不支持），用 awk 按 x.y.z 数值比较。
+  awk -v a="$1" -v b="$2" 'BEGIN {
+    split(a, A, ".")
+    split(b, B, ".")
+    if (A[1] > B[1]) exit 0
+    if (A[1] < B[1]) exit 1
+    if (A[2] > B[2]) exit 0
+    if (A[2] < B[2]) exit 1
+    exit !(A[3] >= B[3])
+  }'
 }
 
 java_major="$(java -version 2>&1 | sed -n '1s/.*version "\([0-9][0-9]*\).*/\1/p' | sed 's/^1\.//')"

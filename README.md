@@ -99,7 +99,7 @@ DEV/CI 环境可追加 `--seed`，Kind 中使用同一脚本的 `kubectl` adapte
 仓库使用 GitHub-hosted Actions 对 PR 与 `dev` push 执行质量门禁：workflow 静态校验、后端编译/单元/集成测试、前端 typecheck/单元测试/构建、公共契约验证，全部通过后 `delivery` 检查点才会执行；任一前置失败都会阻断后续镜像/部署阶段并保留测试报告、日志、环境与精确 SHA 证据。
 
 ```bash
-./scripts/ci/verify-workflow-gates.test.sh
+bash scripts/ci/verify-workflow-gates.test.sh
 ```
 
 详细说明（作业链、版本固定、Action 固定、Secrets 声明与本地运行方式）见 [docs/开发/CI-质量门禁开发流程.md](docs/开发/CI-质量门禁开发流程.md)。

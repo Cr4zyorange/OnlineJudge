@@ -31,7 +31,7 @@ expect_checker_reject() {
   local keyword="$2"
   local out
 
-  if out="$("$checker" "$repo_root" "$mutations_dir/$mutation.yml" 2>&1)"; then
+  if out="$(bash "$checker" "$repo_root" "$mutations_dir/$mutation.yml" 2>&1)"; then
     fail "mutation '$mutation' was not rejected"
   elif grep -Fq "$keyword" <<<"$out"; then
     pass "mutation '$mutation' rejected ($keyword)"
@@ -56,15 +56,16 @@ fi
 printf 'verify-workflow-gates: RED/GREEN acceptance for Issue #290\n'
 
 # 1. Static workflow checks pass on the real checkout.
-if "$checker" "$repo_root" >/dev/null 2>&1; then
+#    统一用 bash 显式调用，不依赖脚本可执行位（Windows/macOS 检出可能为 100644）。
+if bash "$checker" "$repo_root" >/dev/null 2>&1; then
   pass "static workflow checks pass on the real checkout"
 else
   fail "static workflow checks failed on the real checkout"
-  "$checker" "$repo_root" >&2 || true
+  bash "$checker" "$repo_root" >&2 || true
 fi
 
 # 2. Dry-run chain: every job including delivery would run.
-if out="$("$chain" --checkout "$repo_root" --dry-run 2>&1)"; then
+if out="$(bash "$chain" --checkout "$repo_root" --dry-run 2>&1)"; then
   if grep -Fq "DRY-RUN delivery" <<<"$out"; then
     pass "dry-run all-pass chain reaches delivery"
   else
@@ -78,7 +79,7 @@ fi
 
 # 3. Controlled failure in dry-run: delivery must be skipped and exit must be non-zero.
 set +e
-out="$("$chain" --checkout "$repo_root" --dry-run --fail-job backend-gate 2>&1)"
+out="$(bash "$chain" --checkout "$repo_root" --dry-run --fail-job backend-gate 2>&1)"
 status=$?
 set -e
 if [[ $status -ne 0 ]]; then
@@ -106,37 +107,48 @@ cp "$target_checkout/$workflow_rel" "$mutations_dir/missing-concurrency.yml"
 cp "$target_checkout/$workflow_rel" "$mutations_dir/cancel-in-progress.yml"
 cp "$target_checkout/$workflow_rel" "$mutations_dir/inline-commands.yml"
 
+# 变异工具说明：`sed -i.bak` 同时兼容 GNU（Linux/Git Bash）与 BSD（macOS）sed，
+# 修改后删除备份文件；裸 `sed -i` 在 BSD 上会报 unknown option。
+mutate() {
+  local file="$1"
+  shift
+  sed -i.bak "$@" "$file"
+  rm -f "$file.bak"
+}
+
 # 4a. continue-on-error must never be used on a gate step.
-sed -i 's#^        run: bash scripts/ci/backend-verify.sh "$GITHUB_WORKSPACE"#        run: bash scripts/ci/backend-verify.sh "$GITHUB_WORKSPACE"\n        continue-on-error: true#' \
-  "$mutations_dir/continue-on-error.yml"
+mutate "$mutations_dir/continue-on-error.yml" \
+  's#^        run: bash scripts/ci/backend-verify.sh "$GITHUB_WORKSPACE"#        run: bash scripts/ci/backend-verify.sh "$GITHUB_WORKSPACE"\n        continue-on-error: true#'
 
 # 4b. Workflow token permissions must stay read-only.
-sed -i 's#^  contents: read#  contents: write#' "$mutations_dir/permissions.yml"
+mutate "$mutations_dir/permissions.yml" 's#^  contents: read#  contents: write#'
 
 # 4c. Third-party actions must be pinned to the controlled SHA.
-sed -i 's|actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2|actions/checkout@v4|' \
-  "$mutations_dir/unpinned-action.yml"
+mutate "$mutations_dir/unpinned-action.yml" \
+  's|actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2|actions/checkout@v4|'
 
 # 4d. Delivery steps must never use if: always().
-sed -i 's#^        run: bash scripts/ci/collect-environment.sh "$GITHUB_WORKSPACE" ci-artifacts/delivery/environment.json#        if: always()\n        run: bash scripts/ci/collect-environment.sh "$GITHUB_WORKSPACE" ci-artifacts/delivery/environment.json#' \
-  "$mutations_dir/delivery-always.yml"
+mutate "$mutations_dir/delivery-always.yml" \
+  's#^        run: bash scripts/ci/collect-environment.sh "$GITHUB_WORKSPACE" ci-artifacts/delivery/environment.json#        if: always()\n        run: bash scripts/ci/collect-environment.sh "$GITHUB_WORKSPACE" ci-artifacts/delivery/environment.json#'
 
 # 4e. Every job needs an explicit timeout.
-sed -i '/^    timeout-minutes: 30$/d' "$mutations_dir/missing-timeout.yml"
+mutate "$mutations_dir/missing-timeout.yml" '/^    timeout-minutes: 30$/d'
 
 # 4f. Delivery must explicitly need every quality gate.
-sed -i '/^    needs: \[validate-workflows, backend-gate, frontend-gate, contracts-gate\]$/d' \
-  "$mutations_dir/missing-needs.yml"
+mutate "$mutations_dir/missing-needs.yml" \
+  '/^    needs: \[validate-workflows, backend-gate, frontend-gate, contracts-gate\]$/d'
 
 # 4g. Concurrency guard against stale status must exist.
-sed -i 's/^concurrency:$/# concurrency disabled by mutation/' "$mutations_dir/missing-concurrency.yml"
+mutate "$mutations_dir/missing-concurrency.yml" \
+  's/^concurrency:$/# concurrency disabled by mutation/'
 
 # 4h. New commits must cancel stale runs on the same ref.
-sed -i 's#^  cancel-in-progress: true#  cancel-in-progress: false#' "$mutations_dir/cancel-in-progress.yml"
+mutate "$mutations_dir/cancel-in-progress.yml" \
+  's#^  cancel-in-progress: true#  cancel-in-progress: false#'
 
 # 4i. Gate jobs must call the repository canonical scripts.
-sed -i 's#^        run: bash scripts/ci/backend-verify.sh "$GITHUB_WORKSPACE"#        run: mvn -B test#' \
-  "$mutations_dir/inline-commands.yml"
+mutate "$mutations_dir/inline-commands.yml" \
+  's#^        run: bash scripts/ci/backend-verify.sh "$GITHUB_WORKSPACE"#        run: mvn -B test#'
 
 expect_checker_reject continue-on-error "continue-on-error"
 expect_checker_reject permissions "permissions"
@@ -161,7 +173,7 @@ class CiControlledFailure {
 JAVA
 
 set +e
-out="$("$chain" --checkout "$target_checkout" --include backend-gate,delivery 2>&1)"
+out="$(bash "$chain" --checkout "$target_checkout" --include backend-gate,delivery 2>&1)"
 status=$?
 set -e
 if [[ $status -ne 0 ]]; then
@@ -177,7 +189,7 @@ fi
 
 # 6. GREEN: removing the defect restores the same chain.
 rm -f "$broken_file"
-if out="$("$chain" --checkout "$target_checkout" --include backend-gate,delivery 2>&1)"; then
+if out="$(bash "$chain" --checkout "$target_checkout" --include backend-gate,delivery 2>&1)"; then
   if grep -Fq "RUN delivery" <<<"$out" && grep -Fq "PASS delivery" <<<"$out"; then
     pass "green chain reaches and passes delivery"
   else
