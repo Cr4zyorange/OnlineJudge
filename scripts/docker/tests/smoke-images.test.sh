@@ -87,10 +87,12 @@ if [[ "${1:-}" == "inspect" ]]; then
     exit 0
   fi
   if [[ "$args" == *".Config.User"* ]]; then
-    if [[ "$container_id" == "backend-container" && "${CONTAINER_TEST_ROOT_USER:-0}" == "1" ]]; then
-      printf 'root\n'
+    if [[ "$container_id" == "backend-container" && -n "${CONTAINER_TEST_BACKEND_USER:-}" ]]; then
+      printf '%s\n' "$CONTAINER_TEST_BACKEND_USER"
     elif [[ "$container_id" == "backend-container" ]]; then
       printf '10001:10001\n'
+    elif [[ "$container_id" == "frontend-container" && -n "${CONTAINER_TEST_FRONTEND_USER:-}" ]]; then
+      printf '%s\n' "$CONTAINER_TEST_FRONTEND_USER"
     elif [[ "$container_id" == "frontend-container" ]]; then
       printf 'nginx\n'
     fi
@@ -157,6 +159,7 @@ common_env=(
   "CONTAINER_TEST_VERIFY_LOG=$verify_log"
   "VERIFY_COMPOSE_SCRIPT=$fake_verify"
   "CURL_BIN=$fake_bin/curl"
+  "CONTAINER_SMOKE_RUN_ID=contract"
 )
 
 run_expected_failure() {
@@ -197,7 +200,9 @@ grep -Fq ' down --volumes --remove-orphans' "$docker_log" || fail "startup failu
 
 run_expected_failure unhealthy 'expected 3 running services, got 2' CONTAINER_TEST_UNHEALTHY=1
 run_expected_failure revision 'backend OCI revision did not match GIT_SHA' CONTAINER_TEST_BAD_REVISION=1
-run_expected_failure root-user 'backend container must not run as root' CONTAINER_TEST_ROOT_USER=1
+run_expected_failure root-user 'backend container must not run as root' CONTAINER_TEST_BACKEND_USER=root:root
+run_expected_failure numeric-root-user 'backend container must not run as root' CONTAINER_TEST_BACKEND_USER=0:10001
+run_expected_failure frontend-root-user 'frontend container must not run as root' CONTAINER_TEST_FRONTEND_USER=root:root
 run_expected_failure mysql-image 'MySQL container must use mysql:8.4' CONTAINER_TEST_WRONG_MYSQL_IMAGE=1
 run_expected_failure backend-readiness 'backend readiness did not report UP' CONTAINER_TEST_FAIL_BACKEND_READINESS=1
 run_expected_failure frontend-readiness 'frontend-proxied readiness did not report UP' CONTAINER_TEST_FAIL_FRONTEND_READINESS=1
@@ -210,7 +215,7 @@ env "${common_env[@]}" bash "$source_script" >"$fixture_root/success.out" 2>"$fi
   fail "valid three-service smoke failed"
 }
 
-project_suffix="${head_sha:0:12}"
+project_suffix="${head_sha:0:12}-contract"
 grep -Fq -- "--project-name onlinejudge-smoke-$project_suffix" "$docker_log" || \
   fail "smoke did not use a SHA-scoped project name"
 grep -Fq 'up -d --no-build --wait --wait-timeout 240' "$docker_log" || \

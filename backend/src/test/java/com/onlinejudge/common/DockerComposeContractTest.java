@@ -37,6 +37,7 @@ class DockerComposeContractTest {
         assertThat(compose).contains("MYSQL_PASSWORD: ${MYSQL_PASSWORD:?MYSQL_PASSWORD is required}");
         assertThat(compose).contains("MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD is required}");
         assertThat(compose).contains("image: mysql:8.4");
+        assertThat(compose).doesNotContain("ONLINEJUDGE_NOTIFICATIONS_INTERNAL_TOKEN:");
         assertThat(compose).doesNotContain("image: latest");
     }
 
@@ -89,17 +90,19 @@ class DockerComposeContractTest {
         assertThat(ignores).contains("frontend/dist");
         assertThat(ignores).contains("output");
         assertThat(ignores).contains("tmp");
-        assertThat(ignores).contains("**/.env");
+        assertThat(ignores).contains("**/.env*");
         assertThat(ignores).contains("**/*.pem");
         assertThat(ignores).contains("**/*.key");
     }
 
     @Test
-    void backendRuntimeImageInstallsHealthcheckProbeTool() throws IOException {
+    void backendRuntimeImageUsesProbeFromPinnedBaseWithoutMutablePackageInstall() throws IOException {
         Path dockerfile = Path.of("..", "deploy", "docker", "backend.Dockerfile");
         String backendDockerfile = Files.readString(dockerfile);
 
-        assertThat(backendDockerfile).contains("apt-get install -y --no-install-recommends wget");
+        assertThat(backendDockerfile).contains("command -v wget");
+        assertThat(backendDockerfile).doesNotContain("apt-get update");
+        assertThat(backendDockerfile).doesNotContain("apt-get install");
     }
 
     @Test

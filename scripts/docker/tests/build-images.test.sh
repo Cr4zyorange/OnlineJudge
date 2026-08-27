@@ -20,6 +20,26 @@ fail() {
 
 mkdir -p "$fake_bin"
 
+real_git="$(command -v git)"
+export CONTAINER_TEST_REAL_GIT="$real_git"
+
+cat > "$fake_bin/git" <<'EOF'
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+if [[ " $* " == *" status --porcelain --untracked-files=all "* ]]; then
+  if [[ "${CONTAINER_TEST_DIRTY_TRACKED:-0}" == "1" ]]; then
+    printf ' M backend/src/main/java/Example.java\n'
+  elif [[ "${CONTAINER_TEST_DIRTY_UNTRACKED:-0}" == "1" ]]; then
+    printf '?? frontend/src/untracked.ts\n'
+  fi
+  exit 0
+fi
+
+exec "$CONTAINER_TEST_REAL_GIT" "$@"
+EOF
+chmod +x "$fake_bin/git"
+
 cat > "$fake_bin/docker" <<'EOF'
 #!/usr/bin/env bash
 set -Eeuo pipefail
@@ -42,8 +62,9 @@ run_invalid_case() {
   local case_name="$1"
   local git_sha="$2"
   local expected_message="$3"
+  shift 3
 
-  if GIT_SHA="$git_sha" PATH="$fake_bin:$PATH" \
+  if env "$@" GIT_SHA="$git_sha" PATH="$fake_bin:$PATH" \
     CONTAINER_TEST_DOCKER_LOG="$docker_log" \
     bash "$source_script" >"$fixture_root/$case_name.out" 2>"$fixture_root/$case_name.err"; then
     fail "$case_name unexpectedly succeeded"
@@ -63,6 +84,11 @@ grep -Fq 'GIT_SHA is required' "$fixture_root/missing.err" || \
 run_invalid_case latest latest 'GIT_SHA must be a full 40-character Git SHA'
 run_invalid_case invalid not-a-git-sha 'GIT_SHA must be a full 40-character Git SHA'
 run_invalid_case mismatch "$wrong_sha" 'GIT_SHA must match the current HEAD'
+
+run_invalid_case dirty-tracked "$head_sha" 'source tree must be clean' \
+  CONTAINER_TEST_DIRTY_TRACKED=1
+run_invalid_case dirty-untracked "$head_sha" 'source tree must be clean' \
+  CONTAINER_TEST_DIRTY_UNTRACKED=1
 
 : > "$docker_log"
 if GIT_SHA="$head_sha" PATH="$fake_bin:$PATH" \
