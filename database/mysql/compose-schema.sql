@@ -2,6 +2,18 @@
 -- Generated from database/migrations in Compose startup order; run once by the MySQL container on an empty mysql-data volume.
 SET NAMES utf8mb4;
 
+CREATE TABLE schema_migrations (
+    installed_rank BIGINT NOT NULL AUTO_INCREMENT,
+    version VARCHAR(255) NOT NULL,
+    checksum_sha256 CHAR(64) NOT NULL,
+    installed_type VARCHAR(16) NOT NULL,
+    execution_ms BIGINT NOT NULL DEFAULT 0,
+    installed_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    success TINYINT(1) NOT NULL DEFAULT 1,
+    PRIMARY KEY (installed_rank),
+    UNIQUE KEY uk_schema_migrations_version (version)
+);
+
 
 -- Source: database/migrations/DB-AUTH-01-auth-user-session.sql
 CREATE TABLE IF NOT EXISTS t_auth_user (
@@ -1056,3 +1068,37 @@ CREATE TABLE IF NOT EXISTS t_hwk_submission_attachment (
     CONSTRAINT fk_hwk_attachment_submission
         FOREIGN KEY (submission_id) REFERENCES t_hwk_submission(id) ON DELETE CASCADE
 );
+
+
+-- The clean snapshot already contains every migration below. Checksums are
+-- validated by database/mysql/migrate.sh before a retained database is reused.
+INSERT INTO schema_migrations
+    (version, checksum_sha256, installed_type, execution_ms, success)
+VALUES
+    ('DB-AUTH-01-auth-user-session.sql', '3412ed06f6fabdba1a64f8f2d324a67a3853638837c5ee1628df92c4024bd2da', 'COMPOSE_BASELINE', 0, 1),
+    ('DB-CRS-01-course-and-member.sql', '414ab8cd30b0bd906511188fb69b93034d0b3abd7bf10c83ae553c003b1aca86', 'COMPOSE_BASELINE', 0, 1),
+    ('DB-CRS-02-course-chapter.sql', 'b2b1b885cb2d6eee3abd280a68d856a3b01df23e6d984b211fffe2f6f2b4912c', 'COMPOSE_BASELINE', 0, 1),
+    ('DB-CRS-03-course-resource.sql', 'cdebde056bcb89c2f91df9964f4ca9a340ff852749deaf7251bfeb0ec8a08882', 'COMPOSE_BASELINE', 0, 1),
+    ('DB-CRS-05-course-announcement.sql', '9a08334bda5429cba78d14d7bbf0ba324ebee88f3704a5286d540f7397476b76', 'COMPOSE_BASELINE', 0, 1),
+    ('20260525_01_create_grd_grade_item.sql', 'f4dc89b1c3964f5fc00eb2d0aa353e8206bd3d11f7c51dcd59d63c06a2283c90', 'COMPOSE_BASELINE', 0, 1),
+    ('20260525_02_create_lab_experiment.sql', '3d0360bb58c924f89f8373a77e88d8a68a28497b91ff1bbff1f5d0263e0e7798', 'COMPOSE_BASELINE', 0, 1),
+    ('20260526_01_create_lab_submission.sql', '52ed23b016bbd79d2d494ca549bf2a4f63d77b65bca8286deae4b33edcd6eac4', 'COMPOSE_BASELINE', 0, 1),
+    ('20260530_01_create_hwk_homework.sql', '5f9ce51e7ff6a90052e45ab139f162fff636469bfd1b245c67a79faa44056071', 'COMPOSE_BASELINE', 0, 1),
+    ('20260530_01_create_lrn_learning_task.sql', '215aa6357d2103816e68de66cab638262cf084ae84b0e2a8f6e923a1d654688a', 'COMPOSE_BASELINE', 0, 1),
+    ('20260531_01_create_lrn_learning_progress.sql', 'c4976e8c700053f9997afb6defa874649f9738e80ec0b4def60b0e39a503ed3f', 'COMPOSE_BASELINE', 0, 1),
+    ('20260601_01_create_hwk_submission.sql', '206d8b67279cd6e03542ba920a87027d2d99abcc84cdc41a12665be61e80ba4a', 'COMPOSE_BASELINE', 0, 1),
+    ('20260601_01_create_lab_evaluation_result.sql', 'fbc023ac521f3273cd048f429f198241da571238a7479a3ca58c59d7590eef67', 'COMPOSE_BASELINE', 0, 1),
+    ('20260601_02_create_lab_evaluation.sql', '39719c47ca7472296224f4b80398b453fea020650d47712b694d880dbcf56f93', 'COMPOSE_BASELINE', 0, 1),
+    ('20260602_01_create_hwk_evaluation.sql', '83711cfd10157ef7cba43719159716d59d1b9ae4d5f107926772b2172494e5da', 'COMPOSE_BASELINE', 0, 1),
+    ('20260602_01_create_lrn_learning_record.sql', 'e881062a73e474d06262c9ab12cc1849270661f4db2835afe1698dc941867daf', 'COMPOSE_BASELINE', 0, 1),
+    ('20260602_02_create_hwk_review_log.sql', '630b58d659af830604accf146af8ea40ef91774bb9c259c600c589de9f577e6d', 'COMPOSE_BASELINE', 0, 1),
+    ('20260603_01_create_lrn_notification.sql', '84fb161460ee43caca81c2bdd801285a340f5931055a3ac5f42fe4702972ddd3', 'COMPOSE_BASELINE', 0, 1),
+    ('20260604_01_create_lab_report.sql', '3163f90eb4aec03be19e6ac832fce4fea8fcacc3380c7a8c87aba5cb588e8dc7', 'COMPOSE_BASELINE', 0, 1),
+    ('20260605_01_create_lrn_reminder_rule.sql', '348409012b0fe77dd7b82dd38cb0089d82a135d82d0d4ad8fd5ca17fd6eeb27e', 'COMPOSE_BASELINE', 0, 1),
+    ('20260605_02_create_lab_score.sql', '351b6e43c425c5957e7db82339208efd7f7c2c199be000c60eb28a160320eacc', 'COMPOSE_BASELINE', 0, 1),
+    ('20260606_01_add_lab_published_at.sql', '15595f5895106e6384a1ff5ff6a3c1ec10bc514d970a945291ad3ec8ee44e526', 'COMPOSE_BASELINE', 0, 1),
+    ('20260822_01_add_hwk_statistics_attention_indexes.sql', 'de4aabc612b50e04aef211811cbc7a66de6de9f41d2455157be4012f274b22ee', 'COMPOSE_BASELINE', 0, 1),
+    ('20260822_02_create_lab_submission_source_file.sql', 'dfa9b67d00e4fb5cbd66766018614d54c86833a82b126f048303165d3b9bdd24', 'COMPOSE_BASELINE', 0, 1),
+    ('20260822_03_create_hwk_submission_attachment.sql', '8f0fc9fe747eefff0a4be8a4465ce295c94f0dc4609a1f238ca7e74959932379', 'COMPOSE_BASELINE', 0, 1),
+    ('20260825_01_add_grd_analysis_source_fingerprint.sql', '04fdad0cacb1cffa2b8284a309d05a0b8f2501fa5bacfb6e5da45f33c740a3d2', 'COMPOSE_BASELINE', 0, 1),
+    ('20260825_02_add_grd_analysis_source_version.sql', 'deb4161f9321d486d8cd70726f041e4fa7075645e803fca9851e3476f08dfd17', 'COMPOSE_BASELINE', 0, 1);
