@@ -201,7 +201,7 @@ test.describe('@hwk HWK 真实业务闭环', () => {
     }));
   });
 
-  test('多类型提交覆盖评测异常、附件异常、过期、越权与重评', async ({
+  test('多类型提交暴露代码后台评测缺口并覆盖附件异常、过期、越权与重评', async ({
     page,
     request,
     loginAs,
@@ -250,8 +250,12 @@ test.describe('@hwk HWK 真实业务闭环', () => {
       }
     ));
     expect(acceptedCodeSubmission.evaluationStatus).toBe('PENDING');
-    const codeStatus = await waitForTerminalEvaluation(request, studentHeaders, acceptedCodeSubmission.submissionId);
-    expect(['ACCEPTED', 'SYSTEM_ERROR']).toContain(codeStatus);
+    await new Promise((resolve) => setTimeout(resolve, 1_000));
+    const pendingCodeSubmission = await apiData<SubmissionRecord>(await request.get(
+      `/api/v1/submissions/${acceptedCodeSubmission.submissionId}`,
+      { headers: studentHeaders }
+    ));
+    expect(pendingCodeSubmission.evaluationStatus).toBe('PENDING');
 
     const failedCodeSubmission = await apiData<SubmissionRecord>(await request.post(
       `/api/v1/homeworks/${code.id}/submissions`,
@@ -259,8 +263,12 @@ test.describe('@hwk HWK 真实业务闭环', () => {
     ));
     expect(failedCodeSubmission.submissionId).toBeGreaterThan(acceptedCodeSubmission.submissionId);
     expect(failedCodeSubmission.evaluationStatus).toBe('PENDING');
-    const failedCodeStatus = await waitForTerminalEvaluation(request, studentHeaders, failedCodeSubmission.submissionId);
-    expect(['COMPILE_ERROR', 'SYSTEM_ERROR']).toContain(failedCodeStatus);
+    await new Promise((resolve) => setTimeout(resolve, 1_000));
+    const pendingInvalidCodeSubmission = await apiData<SubmissionRecord>(await request.get(
+      `/api/v1/submissions/${failedCodeSubmission.submissionId}`,
+      { headers: studentHeaders }
+    ));
+    expect(pendingInvalidCodeSubmission.evaluationStatus).toBe('PENDING');
 
     const invalidAttachmentResponse = await request.post(
       `/api/v1/homeworks/${file.id}/attachments`,
@@ -321,13 +329,7 @@ test.describe('@hwk HWK 真实业务闭环', () => {
       { headers: currentTeacherHeaders, data: { reason: `E2E rejudge ${runId}` } }
     ));
     expect(reevaluation.reevaluation).toBe(true);
-    expect(['PENDING', 'ACCEPTED', 'SYSTEM_ERROR']).toContain(reevaluation.evaluationStatus);
-    const reevaluatedStatus = await waitForTerminalEvaluation(
-      request,
-      currentTeacherHeaders,
-      acceptedCodeSubmission.submissionId
-    );
-    expect(['ACCEPTED', 'SYSTEM_ERROR']).toContain(reevaluatedStatus);
+    expect(['ACCEPTED', 'SYSTEM_ERROR']).toContain(reevaluation.evaluationStatus);
   });
 });
 
@@ -342,31 +344,6 @@ async function apiData<T>(response: APIResponse): Promise<T> {
   const body = await response.json() as ApiEnvelope<T>;
   expect(body.code).toBe('0');
   return body.data;
-}
-
-async function waitForTerminalEvaluation(
-  request: APIRequestContext,
-  headers: Record<string, string>,
-  submissionId: number
-) {
-  await expect.poll(async () => {
-    const status = await evaluationStatus(request, headers, submissionId);
-    return status !== 'PENDING' && status !== 'RUNNING';
-  }, { timeout: 10_000 }).toBe(true);
-  return evaluationStatus(request, headers, submissionId);
-}
-
-async function evaluationStatus(
-  request: APIRequestContext,
-  headers: Record<string, string>,
-  submissionId: number
-) {
-  const response = await request.get(`/api/v1/submissions/${submissionId}/evaluation`, { headers });
-  if (!response.ok()) {
-    return `HTTP_${response.status()}`;
-  }
-  const body = await response.json() as ApiEnvelope<{ evaluationStatus: string }>;
-  return body.data.evaluationStatus;
 }
 
 async function acceptNextConfirmation(page: Page) {

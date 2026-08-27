@@ -29,6 +29,25 @@ function isInsideMetadata(element) {
   return false;
 }
 
+const semanticAttributeNames = [
+  'data-et',
+  'data-id',
+  'data-type',
+  'data-from',
+  'data-to',
+  'marker-start',
+  'marker-end',
+  'name',
+];
+
+function semanticAttributes(element) {
+  return Object.fromEntries(
+    semanticAttributeNames
+      .filter((name) => element.hasAttribute(name))
+      .map((name) => [name, element.getAttribute(name)])
+  );
+}
+
 function semanticEntries(path) {
   const source = readFileSync(path, 'utf8');
   const dom = new JSDOM(source, { contentType: 'image/svg+xml' });
@@ -45,6 +64,7 @@ function semanticEntries(path) {
     .map((element) => ({
       tag: element.localName,
       classes: [...element.classList].sort(),
+      attributes: semanticAttributes(element),
       text:
         element.localName === 'text' || element.localName === 'foreignObject'
           ? normalizeText(element.textContent || '')
