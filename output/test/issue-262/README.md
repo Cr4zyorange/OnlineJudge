@@ -9,11 +9,11 @@
 | 项目 | 记录 |
 | --- | --- |
 | 需求审查锚点 | `origin/dev@8f8e4fc70341c701c25786f12efbffaeca2a3c5f` |
-| 最新开发基线 | `origin/dev@50a5dccd35ddc6b0c8936df20217575f18303a4f` |
-| 本轮被测头提交 | `c913dcc9c57a8e9bc327711419775d6218fa55c4` |
-| 被测提交树 | `014e1e880c6c4d3600da18d7233c1956a616267a` |
+| 最新开发基线 | `origin/dev@844029628a616f233597da5842b9905e4941a81f` |
+| 本轮被测头提交 | `6141f4c13374b14c943f0ff75b7e4c4b18a88ce4` |
+| 被测提交树 | `cbcb230d7cebe1fb85c643ff613478aa3ef661a1` |
 | 验收分支 | `test/262-lrn-doc-test-closure` |
-| 执行时间 | tested SHA 完整复测及证据重放 2026-08-27 09:51–10:15 +08:00 |
+| 执行时间 | tested SHA 完整复测及证据生成 2026-08-27 11:58–12:04 +08:00 |
 | 操作系统 | Windows 11 家庭版 中文版，amd64 |
 | Java / Maven | Java 21.0.11 / Maven 3.9.16 |
 | Node / npm | Node 24.16.0 / npm 11.13.0 |
@@ -51,14 +51,14 @@
 | 后端单元/API/迁移/集成 | 19 个目标测试类（含最新 dev 的 HWK/LRN 通知契约） | 101 | 101 | 0 | 0 | 0 | PASS |
 | 前端单元 | 13 个 LRN 及 CRS/LAB/HWK 联动文件 | 119 | 119 | 0 | 0 | 0 | PASS |
 | 共享 E2E 契约 | `npm run test:e2e:contract` | 3 | 3 | 0 | 0 | 0 | PASS |
-| LRN Playwright E2E | 独立临时 H2/随机端口、默认 4 workers：`npm run test:e2e:lrn:disposable`；连续两轮 | 8 | 8 | 0 | 0 | 0 | PASS |
+| LRN Playwright E2E | 独立临时 H2/随机端口、默认 4 workers：`npm run test:e2e:lrn:disposable`；连续两轮（Playwright 8.5s、11.4s） | 8 | 8 | 0 | 0 | 0 | PASS |
 | TypeScript | `npm run typecheck` | 1 | 1 | 0 | 0 | 0 | PASS |
 | 前端构建 | `npm run build`（189 modules） | 1 | 1 | 0 | 0 | 0 | PASS |
 | 场景文档契约 | `node scripts/test/verify-lrn-doc-test-closure.test.mjs` | 4 | 4 | 0 | 0 | 0 | PASS |
 | Mermaid 图源/静态资产 | 5 场景 × 3 层，全部图源真实渲染到临时目录 | 15 | 15 | 0 | 0 | 0 | PASS |
 | NFR-LN-01/02 真实时延与响应时间 | 已有链路/分页基础证据；专项计时、压力和阈值判定转 #295 | 2 | 0 | 0 | 0 | 2 | 部分验证（#295 收口） |
 
-后端、前端和 E2E 摘要见 [backend-summary.txt](backend-summary.txt)、[frontend-summary.txt](frontend-summary.txt)、[e2e-summary.txt](e2e-summary.txt)；环境记录见 [environment.txt](environment.txt)，可核对的去敏原始输出见 [raw/README.md](raw/README.md)。`git diff --check origin/dev...c913dcc9c57a8e9bc327711419775d6218fa55c4` 的原始输出和退出码见 [raw/diff-check.log](raw/diff-check.log)，结果为 exit code 0。
+后端、前端和 E2E 摘要见 [backend-summary.txt](backend-summary.txt)、[frontend-summary.txt](frontend-summary.txt)、[e2e-summary.txt](e2e-summary.txt)；环境记录见 [environment.txt](environment.txt)，可核对的去敏原始输出见 [raw/README.md](raw/README.md)。`git diff --check 844029628a616f233597da5842b9905e4941a81f..6141f4c13374b14c943f0ff75b7e4c4b18a88ce4` 的命令和退出码见 [raw/diff-check.log](raw/diff-check.log)，结果为 exit code 0。evidence 提交的独立门禁还会核对 `execution_sha` 等于其直接父提交，且该提交只包含本目录内证据文件。
 
 ## 缺陷与合并复测
 

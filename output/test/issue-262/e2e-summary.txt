@@ -1,4 +1,4 @@
-Entry: http://127.0.0.1:5173
+Entry: random loopback Vite port -> random loopback Spring Boot port per run
 Browser: Google Chrome 151.0.7922.174
 Specs: frontend/tests/e2e/lrn/lrn-business-closure.spec.ts + notification-read-on-open.spec.ts
 Workers: 4 (Playwright default; no --workers override)
@@ -8,7 +8,8 @@ Passed: 8
 Failures: 0
 Errors: 0
 Skipped: 0
-Durations: 18.2s, 22.3s
+Playwright durations: 8.5s, 11.4s
+Disposable command wall times: 19.5s, 22.7s
 Result: PASS
 
 PASS:
@@ -18,8 +19,10 @@ PASS:
 - marks a real LAB notification read before navigating and keeps repeated opens idempotent
 
 NOTE:
-- On execution_sha c913dcc9c57a8e9bc327711419775d6218fa55c4, the unchanged default 4-worker combined command passed 4/4 twice consecutively after service warm-up (18.2s, 22.3s).
+- On execution_sha 6141f4c13374b14c943f0ff75b7e4c4b18a88ce4, `npm run test:e2e:lrn:disposable` passed 4/4 twice consecutively.
+- Every run used a unique temporary H2 file database, upload directory and random ports, then removed its exact process tree and temporary directory; no shared demo database was mutated.
 - Target-notification state and idempotency are asserted by notification ID, so notifications concurrently created by other workers do not race the assertion.
 - Defect #269 is fixed in the #262 branch per owner instruction.
+- NFR-LN-01/02 specialized timing and performance acceptance is owned by #295 and does not block #262.
 
 Sensitive browser artifacts remain ignored under frontend/test-results/ and are not committed.

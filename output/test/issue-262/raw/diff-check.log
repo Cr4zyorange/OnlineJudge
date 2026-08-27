@@ -1,4 +1,2 @@
-command=git diff --check origin/dev...c913dcc9c57a8e9bc327711419775d6218fa55c4
-output_begin
-output_end
+command=git diff --check 844029628a616f233597da5842b9905e4941a81f..6141f4c13374b14c943f0ff75b7e4c4b18a88ce4
 exit_code=0

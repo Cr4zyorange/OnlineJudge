@@ -1,7 +1,7 @@
-✔ LRN closure manifest maps every confirmed scenario to three renderable diagram layers (23.7102ms)
-✔ LRN module documents expose the scenario catalogue, public subflows and diagram ids (2.0171ms)
-✔ LRN closure includes real cross-module integration, shared-runner E2E and current baseline evidence (3.5102ms)
-✔ requirements-layer LRN SSDs expose only actor-to-system interactions (3.0214ms)
+✔ LRN closure manifest maps every confirmed scenario to three diagram layers that really render (38224.7218ms)
+✔ LRN module documents expose the scenario catalogue, public subflows and diagram ids (2.8813ms)
+✔ LRN closure includes real cross-module integration and a disposable browser runner (4.1284ms)
+✔ requirements-layer LRN SSDs expose only actor-to-system interactions (6.0612ms)
 ℹ tests 4
 ℹ suites 0
 ℹ pass 4
@@ -9,4 +9,4 @@
 ℹ cancelled 0
 ℹ skipped 0
 ℹ todo 0
-ℹ duration_ms 35.7847
+ℹ duration_ms 38242.0527
