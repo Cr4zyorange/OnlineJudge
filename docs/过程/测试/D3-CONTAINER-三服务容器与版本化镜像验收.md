@@ -43,7 +43,7 @@ mkdir -p output/issue-289
 - 数据库查询失败时 readiness 返回 HTTP 503，不返回 `status="UP"`，不泄漏 JDBC URL、用户名或口令。
 - 构建、Compose 启动、healthy 数量、镜像名、OCI revision、运行用户、两条 readiness 或业务验收任一不符时，烟测返回非零并输出限定项目诊断。
 - MySQL 只引用 `mysql:8.4`，初始化仍只挂载 `database/mysql/compose-schema.sql`，本任务不复制 schema。
-- 历史 root 所有权的 `app-data` 卷只通过显式迁移入口原地调整为 UID/GID 10001；脚本先检查卷存在，迁移后再以非 root 身份验证可读写，不删除数据卷。
+- 历史 root 所有权的 `app-data` 卷只通过显式迁移入口原地调整为 UID/GID 10001；脚本先检查卷存在、Compose `app-data` 标签正确且未被运行容器挂载，迁移后再以非 root 身份验证可读写，不删除数据卷。
 
 ## 5. 证据状态
 
