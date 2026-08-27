@@ -117,17 +117,27 @@ function Test-DockerContainerCleanup {
     if ($leftovers.Count -gt 0) {
         throw ("sandbox containers remain: {0}" -f ($leftovers -join ', '))
     }
+
+    $relayLeftovers = @(& docker ps -a --format '{{.Names}}' --filter 'name=oj265-docker-relay-' 2>$null)
+    if ($LASTEXITCODE -ne 0) {
+        throw 'could not inspect Docker API relay containers'
+    }
+    if ($relayLeftovers.Count -gt 0) {
+        throw ("Docker API relay containers remain: {0}" -f ($relayLeftovers -join ', '))
+    }
 }
 
-function Invoke-RealDockerSmoke {
+function Invoke-DockerSandboxTests {
+    param([string]$TestSelector)
+
     $previousValue = [Environment]::GetEnvironmentVariable('OJ_DOCKER_SANDBOX_TEST', 'Process')
     try {
         [Environment]::SetEnvironmentVariable('OJ_DOCKER_SANDBOX_TEST', 'true', 'Process')
         Push-Location $backendRoot
         try {
-            & mvn test '-Dtest=DockerSandboxExecutorTest'
+            & mvn test ("-Dtest={0}" -f $TestSelector)
             if ($LASTEXITCODE -ne 0) {
-                throw "real Docker sandbox smoke exited with code $LASTEXITCODE"
+                throw "Docker sandbox test $TestSelector exited with code $LASTEXITCODE"
             }
         } finally {
             Pop-Location
@@ -135,6 +145,14 @@ function Invoke-RealDockerSmoke {
     } finally {
         [Environment]::SetEnvironmentVariable('OJ_DOCKER_SANDBOX_TEST', $previousValue, 'Process')
     }
+}
+
+function Invoke-RealDockerSmoke {
+    Invoke-DockerSandboxTests -TestSelector 'DockerSandboxExecutorTest#dockerExecutorRunsPythonInContainerWhenExplicitlyEnabled+dockerExecutorClassifiesRealAcceptanceFailureLimitsAndCleanupWhenExplicitlyEnabled'
+}
+
+function Invoke-DockerApiRelayInterruption {
+    Invoke-DockerSandboxTests -TestSelector 'DockerSandboxExecutorTest#dockerApiRelayDisconnectDuringRealRunIsReportedAsSystemErrorAndLeavesNoSandboxContainers'
 }
 
 function Write-Summary {
@@ -161,14 +179,16 @@ try {
     }
 
     Invoke-Check -Name 'Docker evaluator image preflight' -Action {
-        $image = if ([string]::IsNullOrWhiteSpace($env:ONLINEJUDGE_EVALUATION_DOCKER_PYTHON_IMAGE)) {
+        $pythonImage = if ([string]::IsNullOrWhiteSpace($env:ONLINEJUDGE_EVALUATION_DOCKER_PYTHON_IMAGE)) {
             'python:3.12-alpine'
         } else {
             $env:ONLINEJUDGE_EVALUATION_DOCKER_PYTHON_IMAGE
         }
-        & docker pull $image
-        if ($LASTEXITCODE -ne 0) {
-            throw "could not prepare evaluator image $image"
+        foreach ($image in @($pythonImage, 'alpine/socat:1.8.0.3')) {
+            & docker pull $image
+            if ($LASTEXITCODE -ne 0) {
+                throw "could not prepare evaluator image $image"
+            }
         }
     }
 
@@ -188,7 +208,8 @@ try {
     Invoke-Check -Name 'real Docker sandbox smoke' -Action { Invoke-RealDockerSmoke }
 
     Invoke-Check -Name 'Docker sandbox cleanup' -Action { Test-DockerContainerCleanup }
-    Add-CheckResult -Status BLOCKED -Name 'Docker daemon disconnect during evaluation' -Detail 'requires an unsafe mid-run daemon interruption; verify on a disposable FAT host'
+    Invoke-Check -Name 'isolated Docker API relay interruption' -Action { Invoke-DockerApiRelayInterruption }
+    Invoke-Check -Name 'Docker cleanup after API relay interruption' -Action { Test-DockerContainerCleanup }
 
     if ($SkipCompose) {
         Add-CheckResult -Status BLOCKED -Name 'Compose application environment' -Detail 'skipped by -SkipCompose'

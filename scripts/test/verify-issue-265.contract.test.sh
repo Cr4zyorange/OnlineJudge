@@ -23,6 +23,9 @@ required_fragments=(
   "'-f', \$composeFiles[2]"
   'DockerSandboxExecutorTest'
   'docker pull'
+  'alpine/socat:1.8.0.3'
+  'dockerApiRelayDisconnectDuringRealRunIsReportedAsSystemErrorAndLeavesNoSandboxContainers'
+  'isolated Docker API relay interruption'
   'LabExperimentControllerTest'
   'LabSubmissionControllerTest'
   'npm run test:unit'
@@ -68,6 +71,11 @@ fi
 
 if grep -Fq '$composeStarted' "$script"; then
   printf 'issue #265 verifier must not gate cleanup on fully completed compose startup\n' >&2
+  exit 1
+fi
+
+if grep -Fq "Add-CheckResult -Status BLOCKED -Name 'Docker daemon disconnect during evaluation'" "$script"; then
+  printf 'issue #265 verifier must exercise the isolated Docker API relay interruption instead of blocking acceptance\n' >&2
   exit 1
 fi
 
