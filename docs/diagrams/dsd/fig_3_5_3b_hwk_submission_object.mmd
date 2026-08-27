@@ -8,6 +8,7 @@ sequenceDiagram
   participant AttachmentRepo as AttachmentRepository
   participant SubmissionRepo as SubmissionRepository
   participant EvaluationRepo as JdbcHomeworkEvaluationRepository
+  participant Worker as HomeworkEvaluationWorker
   participant Evaluator as 共享 Evaluator
   opt FILE 作业上传
     Student->>View: 选择一个文件并上传
@@ -36,14 +37,20 @@ sequenceDiagram
     SubmissionRepo-->>Submission: 返回待批阅状态
   end
   Submission-->>View: 返回提交回执与可见状态
-  opt 当前 CODE 结果读取路径（FR-HWK-04 缺口）
-    View->>Submission: GET API-HWK-11 查询评测结果
-    Submission->>EvaluationRepo: 查询最新 PENDING 记录
-    EvaluationRepo-->>Submission: 返回 PENDING
-    Submission->>Evaluator: 在读请求中同步执行 IO 评测
-    Evaluator-->>Submission: 返回 EvaluationResult
-    Submission->>EvaluationRepo: 回写评测终态
-    Submission->>SubmissionRepo: 回写评测终态与分数
-    Submission-->>View: 返回评测结果
+  Submission-->>Worker: AFTER_COMMIT 投递 HomeworkEvaluationTaskCreated
+  Worker->>EvaluationRepo: 条件更新 PENDING 为 RUNNING
+  EvaluationRepo-->>Worker: 返回认领结果
+  Worker->>Evaluator: 使用共享 EvaluationTask 执行 IO 评测
+  Evaluator-->>Worker: 返回 EvaluationResult
+  alt 评测正常完成
+    Worker->>EvaluationRepo: 回写评测终态与日志
+    Worker->>SubmissionRepo: 回写评测终态与分数
+  else Worker 或评测器异常
+    Worker->>EvaluationRepo: 回写 SYSTEM_ERROR
+    Worker->>SubmissionRepo: 保留提交并标记 SYSTEM_ERROR
   end
+  View->>Submission: GET API-HWK-10/11 查询结果
+  Submission->>EvaluationRepo: 只读最新评测记录
+  EvaluationRepo-->>Submission: 返回 PENDING/RUNNING/终态
+  Submission-->>View: 返回可见结果
   View-->>Student: 展示安全反馈与历史入口
