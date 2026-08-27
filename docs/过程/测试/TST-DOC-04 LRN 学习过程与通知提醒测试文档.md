@@ -5,12 +5,12 @@
 | 文档名称 | LRN 学习过程与通知提醒测试文档 |
 | 项目名称 | 在线教学与实训平台 |
 | 所属阶段 | 系统测试与验收测试 |
-| 报告版本 | V1.2 |
+| 报告版本 | V1.3 |
 | 编写日期 | 2026-06-10 |
 | 编写人 | LRN 模块负责人 |
 | 对应 issue | #155；#262 D2-LRN 业务场景文档与测试闭环 |
 | 测试范围 | 学习任务中心、学习进度、学习行为仪表盘、通知分类推送、通知已读/删除、提醒规则与通知偏好 |
-| 测试结论 | #262 业务场景、权限、异常和真实 LAB/HWK/GRD 本地联合 E2E 为 PASS；NFR-LN-01/02 因无逐项计时证据保持 BLOCKED |
+| 测试结论 | #262 范围内的 FR-LN-01~06、NFR-LN-03~05、权限、异常和真实 LAB/HWK/GRD 隔离式本地联合 E2E 为 PASS；NFR-LN-01/02 已拆分至 #295，不阻塞 #262 |
 
 ## 1 文档控制
 
@@ -21,6 +21,7 @@
 | V1.0 | 2026-06-10 | LRN 模块负责人 | 按 #155 和 TST-DOC-01 统一规范整理 LRN 测试范围、用例、自动化覆盖、执行日志、手工验收点和残余风险 |
 | V1.1 | 2026-08-25 | @luoZiHui-maker | 按 #262 增加场景/子流程闭环、真实 LAB/HWK/GRD 事件测试、共享 E2E 依赖和当前 SHA 证据规则 |
 | V1.2 | 2026-08-26 | @luoZiHui-maker | 合入 #269 修复复测，补充默认 4-worker 联合 E2E、被测头提交、当前统计和最终 PASS/BLOCKED 结论 |
+| V1.3 | 2026-08-27 | @luoZiHui-maker | 按 #262 最新范围将 NFR-LN-01/02 移交 #295，补充一次性数据库/端口 E2E、真实 Mermaid 渲染和 tested/evidence 双提交门禁 |
 
 ### 1.2 审批记录
 
@@ -32,15 +33,15 @@
 
 ## 2 测试概述
 
-本文件用于记录 LRN 学习过程与通知提醒模块在当前版本下的测试依据、测试环境、测试数据、测试用例、执行结果、手工验收清单、缺陷风险和验收结论。覆盖范围对齐 `FR-LN-01 ~ FR-LN-06`、`NFR-LN-01 ~ NFR-LN-05`、`UI-LRN-01 ~ UI-LRN-05`、`API-LRN-01 ~ API-LRN-11`、`DB-LRN-01 ~ DB-LRN-07`、`TC-LN-01 ~ TC-LN-06` 与 `TC-LN-N01 ~ TC-LN-N05`。
+本文件用于记录 LRN 学习过程与通知提醒模块在当前版本下的测试依据、测试环境、测试数据、测试用例、执行结果、手工验收清单、缺陷风险和验收结论。#262 的验收范围为 `FR-LN-01 ~ FR-LN-06`、`NFR-LN-03 ~ NFR-LN-05`、`UI-LRN-01 ~ UI-LRN-05`、`API-LRN-01 ~ API-LRN-11`、`DB-LRN-01 ~ DB-LRN-07` 及相应用例；`NFR-LN-01/02` 的实现、专项计时和最终判定已由 [#295](https://github.com/Cr4zyorange/OnlineJudge/issues/295) 独立负责，本文件只保留已有的“部分验证”基线供其复测。
 
-当前已执行 LRN 后端 Spring Boot、前端 Vue/Vitest、共享 E2E 契约及本地真实浏览器 Playwright 联合测试。自动化覆盖了任务聚合与分页、学习进度保存和断点续传、教师课程进度聚合、学习行为统计和上报限流、通知分类生成和当前用户隔离、已读/删除/有效跳转状态、提醒规则保存、截止提醒扫描、失败记录，以及 LAB/HWK/GRD 真实业务动作触发通知。WebSocket 或轮询触达时延、列表逐项响应时间和生产部署链路没有计时原始证据，相关性能项保持 BLOCKED。
+当前已执行 LRN 后端 Spring Boot、前端 Vue/Vitest、共享 E2E 契约及本地真实浏览器 Playwright 联合测试。自动化覆盖了任务聚合与分页、学习进度保存和断点续传、教师课程进度聚合、学习行为统计和上报限流、通知分类生成和当前用户隔离、已读/删除/有效跳转状态、提醒规则保存、截止提醒扫描、失败记录，以及 LAB/HWK/GRD 真实业务动作触发通知。联合 E2E 每轮创建独立临时 H2 文件库、随机前后端端口和进程，并在结束后清理，避免修改共享演示数据。WebSocket 或轮询触达时延、列表逐项响应时间和生产部署链路没有计时原始证据，继续作为 #295 的专项验收范围，不影响 #262 的 PASS 结论。
 
 ### 2.1 #262 场景与证据口径
 
 `LRN-SC-01 ~ LRN-SC-05` 对应任务中心、继续学习/进度、个人统计、通知管理/跳转、提醒配置/触达；`LRN-SUB-01 ~ LRN-SUB-05` 对应成员过滤、进度/行为/离线恢复、跨模块事件幂等、提醒扫描与失败日志、通知状态与安全跳转。它们全部归属正式 `UC-LRN-01`。教师课程学习统计为**候选独立场景**，本轮不新增 UC 编号。
 
-真实跨模块后端链由 `LrnCrossModuleEventIntegrationTest` 覆盖 LAB/HWK 发布入口，由 `GrdLrnIntegrationTest` 覆盖 GRD 发布/变更/复核入口；浏览器层必须复用 #267 的唯一 Playwright fixtures。每次结论只用 PASS / FAIL / BLOCKED，并在 `output/test/issue-262/README.md` 写明环境、执行 SHA、总数、通过、失败、错误、跳过和失败原因。无逐项计时原始证据时，NFR-LN-01/02 性能项保持 BLOCKED，不得沿用历史“通过”。
+真实跨模块后端链由 `LrnCrossModuleEventIntegrationTest` 覆盖 LAB/HWK 发布入口，由 `GrdLrnIntegrationTest` 覆盖 GRD 发布/变更/复核入口；浏览器层复用 #267 的 Playwright fixtures，但写操作必须通过 `npm run test:e2e:lrn:disposable` 启动一次性本地环境。每次结论只用 PASS / FAIL / BLOCKED，并在 `output/test/issue-262/README.md` 写明环境、执行 SHA、总数、通过、失败、错误、跳过和失败原因。NFR-LN-01/02 仍不得沿用历史“通过”，其“部分验证”状态和剩余专项由 #295 收口。
 
 ### 2.2 #262 第一轮结果（2026-08-25）
 
@@ -48,11 +49,15 @@
 
 ### 2.3 #262 合并修复复测（2026-08-26）
 
-#269 已在本 PR 内按用户指定范围修复并复测。最新 `dev@50a5dccd35ddc6b0c8936df20217575f18303a4f` 合并后的可检出被测提交为 `8b69a7241db6bdf585db532522abec041a3e4160`；当前统计为后端 101/101 PASS、前端单元 119/119 PASS、共享 E2E 契约 3/3 PASS、文档契约 4/4 PASS、前端类型检查与构建 PASS、默认 4-worker LRN Playwright 联合命令连续两轮 4/4 PASS（合计 8/8）。联合 E2E 从真实教师页面/API 业务入口发布 LAB/HWK、调整 GRD 成绩，并断言本次操作产生的新通知、目标通知未读→已读、重复打开幂等、删除、权限拒绝、断线刷新恢复和业务跳转。被测提交、命令、总数、失败/错误/跳过及去敏原始输出统一记录在 `output/test/issue-262/`；NFR-LN-01/02 仍为 **BLOCKED**。
+#269 已在本 PR 内按用户指定范围修复并复测。最新一轮证据以 `output/test/issue-262/environment.txt` 的 `base_sha`、`execution_sha` 和 `execution_tree` 为唯一机器可检出锚点；统计为后端 101/101 PASS、前端单元 119/119 PASS、共享 E2E 契约 3/3 PASS、文档契约 4/4 PASS、前端类型检查与构建 PASS、隔离式 4-worker LRN Playwright 联合命令连续两轮 4/4 PASS（合计 8/8）。联合 E2E 从真实教师页面/API 业务入口发布 LAB/HWK、调整 GRD 成绩，并断言本次操作产生的新通知、目标通知未读→已读、重复打开幂等、删除、权限拒绝、断线刷新恢复和业务跳转。NFR-LN-01/02 的已有证据保持“部分验证”，剩余验收由 #295 负责。
 
 ### 2.4 #262 复审证据一致性修正（2026-08-27）
 
-本轮先提交全部可执行契约、待验文档与换行修正，形成新的 tested SHA；随后必须在该 SHA 上执行完整验证。证据提交只能修改 `output/test/issue-262/` 下的环境、摘要和去敏原始日志，并以 `environment.txt` 的 `execution_sha` 指向其直接父提交。`git diff --check origin/dev...<tested-sha>` 的原始输出与退出码必须纳入 evidence，不能仅在 TST 中声明 PASS。NFR-LN-01/02 仍为 **BLOCKED**，因此 PR 保持 Draft，Issue 保持 `In progress`。
+本轮先提交全部可执行契约和文档，形成 tested SHA，并只在该 SHA 上执行完整验证；紧随其后的 evidence 提交只能修改 `output/test/issue-262/`，且 `environment.txt` 的 `execution_sha` 必须等于 evidence 提交的直接父提交。独立证据门禁通过 `git rev-parse HEAD^` 和提交差异验证这一关系，并核对 `git diff --check origin/dev...<tested-sha>` 的原始输出与退出码。按照 #262 最新范围，NFR-LN-01/02 已拆分至 #295；全部复审意见解决后 PR #272 可转为 Ready，#262 随非草稿 PR 进入 `待审核`。
+
+### 2.5 #262 最新复审收口（2026-08-27）
+
+本轮已同步 `origin/dev@844029628a616f233597da5842b9905e4941a81f`。文档门禁会把 `docs/diagrams/lrn/manifest.json` 中全部 15 个 Mermaid 图源实际渲染到临时目录，不再以正则或既有 SVG 代替渲染验证；渲染脚本同时兼容 Windows、macOS 和 Linux 浏览器查找。LRN 浏览器验收由一次性运行器分配随机前后端端口和独立临时 H2 文件库，进程与数据在每轮结束后清理。行为测试与 evidence 提交校验已拆分，最终 SHA 和执行结果只在 `output/test/issue-262/` 的证据提交中记录。
 
 ## 3 测试依据
 
@@ -83,10 +88,10 @@
 | FR-LN-02 | 学习进度记录与展示 | 课程级、章节级进度；继续学习；断点续传；教师查看所教课程聚合进度 | 后端、前端和真实页面继续学习入口已覆盖；复杂编辑器内部状态仍需专项验收 |
 | FR-LN-03 | 学习行为跟踪 | 学习时长、访问次数、任务完成统计；近 7 天趋势；离线队列回放；上报限流 | 后端和前端自动化已覆盖 |
 | FR-LN-04 | 通知分类推送与展示 | 任务、成绩、公告、系统通知分类；内部事件鉴权；幂等生成；列表筛选分页 | 后端、前端和本地真实 LAB/HWK/GRD 联合 E2E 已覆盖 |
-| FR-LN-05 | 通知触达与状态管理 | 未读、已读、删除、批量已读、通知跳转、状态日志和用户隔离 | 后端、前端和真实浏览器跳转已覆盖；真实推送时延保持 BLOCKED |
+| FR-LN-05 | 通知触达与状态管理 | 未读、已读、删除、批量已读、通知跳转、状态日志和用户隔离 | 后端、前端和真实浏览器跳转已覆盖；真实推送时延由 #295 专项验收 |
 | FR-LN-06 | 定时提醒与规则配置 | 提醒规则、通知偏好、任务截止提醒、重复提醒防护、失败记录 | 后端和前端自动化已覆盖 |
-| NFR-LN-01 | 实时性 | 任务状态、学习进度、通知未读数快速刷新，通知推送延迟不超过设计阈值 | 接口链路自动化覆盖；真实推送时延待手工计时 |
-| NFR-LN-02 | 性能 | 任务列表、通知列表分页，批量操作和进度保存响应时间 | 自动化覆盖分页、size 上限和基础规模；压力测试待补充 |
+| NFR-LN-01 | 实时性 | 任务状态、学习进度、通知未读数快速刷新，通知推送延迟不超过设计阈值 | 部分验证；真实推送时延由 #295 计时收口，不属于 #262 阻塞项 |
+| NFR-LN-02 | 性能 | 任务列表、通知列表分页，批量操作和进度保存响应时间 | 部分验证；压力与响应时间由 #295 收口，不属于 #262 阻塞项 |
 | NFR-LN-03 | 可靠性 | 断点续传、离线队列回放、通知幂等、失败扫描日志 | 自动化覆盖核心分支 |
 | NFR-LN-04 | 易用性 | 固定入口、主要路径不超过 2 步、空态/失败态/重试提示 | 前端单元和真实浏览器覆盖关键入口、空态/失败态与重试 |
 | NFR-LN-05 | 可追踪性 | 学习记录、通知读取和删除、提醒扫描失败均可追溯用户与时间 | 自动化覆盖状态日志和扫描日志 |
@@ -148,7 +153,7 @@
 | 前端 LRN 目标测试 | `npm run test:unit -- tests/unit/lrn/LearningTaskCenterView.spec.ts tests/unit/lrn/LearningProgressView.spec.ts tests/unit/lrn/LearningStatisticsView.spec.ts tests/unit/lrn/NotificationCenterView.spec.ts tests/unit/lrn/ReminderRuleSettingsView.spec.ts tests/unit/lrn/learningTasksApi.spec.ts tests/unit/lrn/learningProgressApi.spec.ts tests/unit/lrn/learningRecordsApi.spec.ts tests/unit/lrn/notificationsApi.spec.ts tests/unit/lrn/reminderRulesApi.spec.ts tests/unit/CourseManagementView.spec.ts tests/unit/lab/LabStudentView.spec.ts tests/unit/hwk/HomeworkStudentView.spec.ts` | 13 个测试文件、119/119 PASS，0 失败，0 错误，0 跳过 |
 | 共享 E2E 契约 | `npm run test:e2e:contract` | 3/3 PASS，0 失败，0 错误，0 跳过 |
 | LRN 文档契约 | `node scripts/test/verify-lrn-doc-test-closure.test.mjs` | 4/4 PASS，0 失败，0 错误，0 跳过 |
-| LRN Playwright 联合 E2E | `npm run test:e2e -- tests/e2e/lrn` | 默认 4 workers，连续两轮 8/8 PASS，0 失败，0 错误，0 跳过（17.9s、19.2s） |
+| LRN Playwright 联合 E2E | `npm run test:e2e:lrn:disposable` | 独立临时 H2、随机端口、默认 4 workers，连续两轮 8/8 PASS，0 失败，0 错误，0 跳过；每轮完成后清理进程与数据 |
 | 前端静态验证 | `npm run typecheck`、`npm run build` | PASS |
 
 #### 7.3.2 LRN 追踪矩阵
@@ -161,8 +166,8 @@
 | TC-LN-04 | FR-LN-04 | UI-LRN-04 | API-LRN-06、API-LRN-09 | DB-LRN-04 | 通知分类、内部事件、幂等、筛选分页、当前用户隔离 | 已覆盖 |
 | TC-LN-05 | FR-LN-05 | UI-LRN-04 | API-LRN-07、API-LRN-08 | DB-LRN-05 | 已读、批量已读、删除、跳转、状态日志、越权保护 | 已覆盖 |
 | TC-LN-06 | FR-LN-06 | UI-LRN-05 | API-LRN-10、API-LRN-11 | DB-LRN-06、DB-LRN-07 | 提醒规则、通知偏好、截止提醒、失败记录 | 已覆盖 |
-| TC-LN-N01 | NFR-LN-01 | 全部 LRN 页面 | 全部 LRN 接口 | DB-LRN-01 ~ DB-LRN-07 | 登录态、课程权限、事件接口鉴权、用户数据隔离 | 已覆盖，真实推送时延待手工 |
-| TC-LN-N02 | NFR-LN-02 | UI-LRN-04 | API-LRN-09 | DB-LRN-04、DB-LRN-05 | 通知幂等、不重复生成、失败可记录 | 已覆盖 |
+| TC-LN-N01 | NFR-LN-01 | 全部 LRN 页面 | 全部 LRN 接口 | DB-LRN-01 ~ DB-LRN-07 | 登录态、课程权限、事件接口鉴权、用户数据隔离 | 部分验证；专项计时由 #295 收口 |
+| TC-LN-N02 | NFR-LN-02 | UI-LRN-04 | API-LRN-09 | DB-LRN-04、DB-LRN-05 | 通知幂等、不重复生成、失败可记录 | 部分验证；专项压力与响应时间由 #295 收口 |
 | TC-LN-N03 | NFR-LN-03 | UI-LRN-01 ~ UI-LRN-05 | API-LRN-01 ~ API-LRN-11 | 全部 LRN 表 | 空态、失败态、重试、主流程入口可用 | 已覆盖，默认联合 E2E PASS |
 | TC-LN-N04 | NFR-LN-04 | UI-LRN-01、UI-LRN-04 | API-LRN-01、API-LRN-06 | DB-LRN-01、DB-LRN-04 | 分页上限、基础规模、列表响应 | 已覆盖，压力待补充 |
 | TC-LN-N05 | NFR-LN-05 | 全部 LRN 页面 | 全部 LRN 接口 | 全部 LRN 表 | Mock/测试接口、日志和状态可追踪 | 已覆盖 |
@@ -238,7 +243,7 @@
 | LRN-LOG-014 | 2026-06-10 15:55 | `CourseManagementView.spec.ts`、`LabStudentView.spec.ts`、`HomeworkStudentView.spec.ts` | CRS/LAB/HWK 页面触发 LRN 进度、行为记录和断点恢复 | 37 条通过 |
 | LRN-LOG-015 | 2026-06-10 15:55 | Vitest 汇总 | 目标命令共 13 个测试文件 | 67 条通过 |
 | LRN-LOG-018 | 2026-08-26 | Vitest 当前目标命令 | LRN 页面/API 与 CRS/LAB/HWK 联动复测 | 13 个测试文件，119/119 PASS，0 失败，0 错误，0 跳过 |
-| LRN-LOG-019 | 2026-08-26 | `npm run test:e2e -- tests/e2e/lrn` | 真实 LAB/HWK/GRD 通知、任务/统计/提醒页面、通知已读/删除/跳转、断线恢复 | 默认 4 workers，连续两轮 8/8 PASS，0 失败，0 错误，0 跳过（17.9s、19.2s） |
+| LRN-LOG-019 | 2026-08-27 | `npm run test:e2e:lrn:disposable` | 在一次性 H2、随机端口中验证真实 LAB/HWK/GRD 通知、任务/统计/提醒页面、通知已读/删除/跳转、断线恢复 | 默认 4 workers，连续两轮 8/8 PASS，0 失败，0 错误，0 跳过；运行后已清理 |
 
 #### 8.3.3 本次文档校验日志
 
@@ -246,6 +251,7 @@
 | --- | --- | --- | --- | --- |
 | LRN-LOG-016 | 2026-06-10 15:56 | `git diff --check` | 检查文档变更空白和补丁格式 | 通过 |
 | LRN-LOG-020 | 2026-08-26 | 文档契约、共享 E2E 契约、类型检查、构建、`git diff --check` | 校验图组、黑盒需求 SSD、共享入口、静态类型、生产构建和补丁格式 | PASS |
+| LRN-LOG-021 | 2026-08-27 | `node scripts/test/verify-lrn-doc-test-closure.test.mjs`、`node scripts/test/verify-issue-262-evidence.test.mjs` | 实际渲染 15 个 Mermaid 图源；分别校验行为文档与 evidence 父提交/SHA/路径边界 | PASS |
 
 ## 9 手动测试
 
@@ -259,10 +265,10 @@
 | LRN-MAN-004 | TC-LN-03 | 仪表盘数据随真实学习动作变化 | 学生进入 CRS/LAB/HWK 并完成访问或提交 | 打开学习仪表盘，观察总时长、访问次数、趋势和最近记录 | 统计与真实操作一致，失败时展示重试或缓存提示 | 待手工验收 | 学习时长依赖真实停留时间，需人工计时核对 |
 | LRN-MAN-005 | TC-LN-04、TC-LN-05 | 通知中心分类、已读、删除、跳转 | 账号存在任务、成绩、公告、系统通知 | 切换类型/未读筛选，批量已读，删除单条，点击业务跳转 | 未读数变化正确；删除后列表隐藏；跳转到对应业务页；其他用户通知不受影响 | PASS | 默认 4-worker Playwright 断言目标通知未读→已读、重复打开幂等、删除和真实 LAB 跳转 |
 | LRN-MAN-006 | TC-LN-04 | 跨模块真实事件生成通知 | CRS/LAB/HWK/GRD 模块在同一环境可用 | 发布公告、发布实验/作业、发布成绩或复核成绩 | LRN 收到事件并生成分类通知，重复操作不生成重复通知 | PASS | 本地 DEV 的 LAB/HWK 发布和 GRD 调整均生成本次新通知；生产部署配置仍属环境风险 |
-| LRN-MAN-007 | TC-LN-06 | 提醒规则设置和截止提醒 | 学生有临近截止且未提交的 LAB/HWK | 修改提醒偏好，等待或触发提醒扫描 | 符合规则的未提交任务产生提醒；关闭非必要提醒后不再收到非必要提醒 | PASS | 页面保存和后端扫描规则已覆盖；真实调度触达时延仍为 BLOCKED |
+| LRN-MAN-007 | TC-LN-06 | 提醒规则设置和截止提醒 | 学生有临近截止且未提交的 LAB/HWK | 修改提醒偏好，等待或触发提醒扫描 | 符合规则的未提交任务产生提醒；关闭非必要提醒后不再收到非必要提醒 | PASS | 页面保存和后端扫描规则已覆盖；真实调度触达时延由 #295 专项计时 |
 | LRN-MAN-008 | TC-LN-N01 | 权限边界手工核对 | 准备学生 A、学生 B、教师、非成员账号 | 分别访问学习任务、进度、仪表盘、通知和提醒页面 | A/B 互不泄露数据；非成员被拒绝；学生不能查看教师聚合 | 待手工验收 | 自动化已覆盖主要分支，真实账号配置仍需核对 |
 | LRN-MAN-009 | TC-LN-N01、TC-LN-N04 | 会话过期和网络异常 | 删除 token 或关闭后端服务 | 打开 LRN 页面并执行刷新/保存/已读/删除操作 | 显示登录失效或网络失败提示，不展示其他用户缓存 | PASS | Playwright 覆盖通知列表断线与刷新恢复；会话失效和缓存隔离由单元/API 测试覆盖 |
-| LRN-MAN-010 | TC-LN-N02、TC-LN-N03 | 通知触达时延和可靠性 | 测试环境支持通知轮询或推送 | 触发任务/成绩/公告通知并计时 | 通知列表和未读数在设计阈值内刷新，断线恢复后不丢通知 | BLOCKED | 联合 E2E 证明业务结果但没有逐项计时，不能据此判定 NFR-LN-01/02 PASS |
+| LRN-MAN-010 | TC-LN-N02、TC-LN-N03 | 通知触达时延和可靠性 | 测试环境支持通知轮询或推送 | 触发任务/成绩/公告通知并计时 | 通知列表和未读数在设计阈值内刷新，断线恢复后不丢通知 | 部分验证（转 #295） | #262 的隔离式联合 E2E 已证明可靠性结果；逐项计时与阈值判定由 #295 负责 |
 
 ## 10 验收结论
 
@@ -270,12 +276,12 @@
 
 | 验收维度 | 结论 | 依据 | 残余风险/后续动作 |
 | --- | --- | --- | --- |
-| 功能完整性 | PASS | `TC-LN-01 ~ TC-LN-06` 均有可执行用例，后端 101/101、前端 119/119、默认联合 E2E 连续两轮 8/8 PASS | 生产部署跨模块配置不在本地业务验收范围 |
+| 功能完整性 | PASS | `TC-LN-01 ~ TC-LN-06` 均有可执行用例，后端 101/101、前端 119/119、隔离式联合 E2E 连续两轮 8/8 PASS | 生产部署跨模块配置不在本地业务验收范围 |
 | 接口契约 | 通过 | `API-LRN-01 ~ API-LRN-11` 均有后端或前端测试覆盖 | 内部事件接口真实部署 token/IP 白名单策略需环境确认 |
 | 数据表和状态 | 通过 | `DB-LRN-01 ~ DB-LRN-07` 迁移和状态日志测试通过 | 生产库迁移顺序需在统一部署脚本中再次确认 |
 | 权限和隔离 | 通过 | 自动化覆盖 Bearer 登录态、课程成员、教师聚合和当前用户通知隔离 | 真实账号矩阵需手工复验 |
 | 异常和边界 | 通过 | 自动化覆盖未登录、非成员、非法参数、限流、内部 token 错误、提醒失败日志 | 高并发异常和真实网络波动需压力/联调补充 |
-| 非功能 | BLOCKED | NFR-LN-03/04/05 的幂等、离线恢复、状态日志、失败重试和入口可用已有证据 | NFR-LN-01/02 缺少逐项计时与压力测试，不能写 PASS |
+| #262 非功能范围 | PASS | NFR-LN-03/04/05 的幂等、离线恢复、状态日志、失败重试和入口可用已有自动化及隔离式 E2E 证据 | NFR-LN-01/02 当前为部分验证，已拆分至 #295，不阻塞 #262 |
 | 测试文档交付 | 通过 | 本文件按 TST-DOC-01 和各模块负责人任务整理 6.3、7.3、8.3、9.3、10.3 内容 | 交由 @MontesquieuE 统一整合时需补充最终 FAT/UAT 实测结果 |
 
 ## 11 附录
@@ -296,16 +302,15 @@ cd frontend
 npm run test:unit -- tests/unit/lrn/LearningTaskCenterView.spec.ts tests/unit/lrn/LearningProgressView.spec.ts tests/unit/lrn/LearningStatisticsView.spec.ts tests/unit/lrn/NotificationCenterView.spec.ts tests/unit/lrn/ReminderRuleSettingsView.spec.ts tests/unit/lrn/learningTasksApi.spec.ts tests/unit/lrn/learningProgressApi.spec.ts tests/unit/lrn/learningRecordsApi.spec.ts tests/unit/lrn/notificationsApi.spec.ts tests/unit/lrn/reminderRulesApi.spec.ts tests/unit/CourseManagementView.spec.ts tests/unit/lab/LabStudentView.spec.ts tests/unit/hwk/HomeworkStudentView.spec.ts
 ```
 
-#### 11.3.3 共享 E2E 命令
+#### 11.3.3 隔离式 LRN E2E 命令
 
 ```powershell
 cd frontend
-$env:E2E_BASE_URL='http://127.0.0.1:5173'
 $env:E2E_BROWSER_CHANNEL='chrome'
-npm run test:e2e -- tests/e2e/lrn
+npm run test:e2e:lrn:disposable
 ```
 
-该命令不得附加 `--workers=1`，验收记录以 Playwright 默认 4-worker 联合执行为准；本轮连续执行两次，均为 4/4 PASS。
+运行器为每轮分配随机本地端口、独立临时 H2 文件库和不可伪造的进程证明；Playwright 写场景只在证明有效时执行。该命令不得附加 `--workers=1`，验收记录以默认 4-worker 联合执行为准；本轮连续执行两次，均为 4/4 PASS，随后清理精确进程树和临时目录。
 
 #### 11.3.4 LRN 页面和接口快速索引
 
@@ -319,4 +324,4 @@ npm run test:e2e -- tests/e2e/lrn
 
 #### 11.3.5 交付说明
 
-本 issue 交付 LRN 场景文档、三层图源/静态资产、后端/前端/共享 E2E 测试及用户指定并入 #262 的 #269 最小生产修复。测试负责人整合时可直接抽取本文件的 `6.3`、`7.3`、`8.3`、`9.3`、`10.3` 和 `11.3` 小节合入总测试报告；生产部署配置和 NFR-LN-01/02 专项计时仍需独立证据。
+本 issue 交付 LRN 场景文档、三层图源/静态资产、后端/前端/共享 E2E 测试、隔离式浏览器运行器及用户指定并入 #262 的 #269 最小生产修复。测试负责人整合时可直接抽取本文件的 `6.3`、`7.3`、`8.3`、`9.3`、`10.3` 和 `11.3` 小节合入总测试报告；生产部署配置仍属部署验收风险，NFR-LN-01/02 的实现、逐项计时和最终结论由 #295 独立交付。
