@@ -67,7 +67,11 @@ fi
 
 if [[ "${1:-}" == "inspect" ]]; then
   container_id="${*: -1}"
-  if [[ "$args" == *" .Config.Image "* ]]; then
+  if [[ "$args" == *".State.Health.Status"* ]]; then
+    printf 'healthy\n'
+    exit 0
+  fi
+  if [[ "$args" == *".Config.Image"* ]]; then
     case "$container_id" in
       mysql-container)
         if [[ "${CONTAINER_TEST_WRONG_MYSQL_IMAGE:-0}" == "1" ]]; then
@@ -82,7 +86,7 @@ if [[ "${1:-}" == "inspect" ]]; then
     esac
     exit 0
   fi
-  if [[ "$args" == *" .Config.User "* ]]; then
+  if [[ "$args" == *".Config.User"* ]]; then
     if [[ "$container_id" == "backend-container" && "${CONTAINER_TEST_ROOT_USER:-0}" == "1" ]]; then
       printf 'root\n'
     elif [[ "$container_id" == "backend-container" ]]; then
@@ -165,8 +169,10 @@ run_expected_failure() {
     >"$fixture_root/$case_name.out" 2>"$fixture_root/$case_name.err"; then
     fail "$case_name unexpectedly succeeded"
   fi
-  grep -Fq "$expected_message" "$fixture_root/$case_name.err" || \
+  grep -Fq "$expected_message" "$fixture_root/$case_name.err" || {
+    cat "$fixture_root/$case_name.err" >&2
     fail "$case_name did not report: $expected_message"
+  }
 }
 
 if env -u GIT_SHA MYSQL_PASSWORD=contract-password MYSQL_ROOT_PASSWORD=contract-root-password \

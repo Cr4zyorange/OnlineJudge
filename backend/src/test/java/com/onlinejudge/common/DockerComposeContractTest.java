@@ -23,6 +23,7 @@ class DockerComposeContractTest {
         assertThat(compose).contains("../../database/mysql/compose-schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro");
         assertThat(compose).contains("${OJ_HTTP_PORT:-8088}:80");
         assertThat(compose).contains("/api/v1/system/readiness");
+        assertThat(compose).doesNotContain("container_name:");
     }
 
     @Test
@@ -115,6 +116,10 @@ class DockerComposeContractTest {
         String backendDockerfile = Files.readString(Path.of("..", "deploy", "docker", "backend.Dockerfile"));
         String frontendDockerfile = Files.readString(Path.of("..", "deploy", "docker", "frontend.Dockerfile"));
 
+        assertThat(backendDockerfile).contains("FROM maven:3.9.9-eclipse-temurin-21@sha256:3a4ab3276a087bf276f79cae96b1af04f53731bec53fb2e651aca79e4b10211e AS build");
+        assertThat(backendDockerfile).contains("FROM eclipse-temurin:21-jre@sha256:7a65df4b22d2de92d4e04056e884f3b9122d70b21e2847fd66084278bd0ce037");
+        assertThat(frontendDockerfile).contains("FROM node:22-alpine@sha256:c610fcdfb1d5b4740dd70c284ed3cb16bb857e0f7166196e36a5501df7a3aa32 AS build");
+        assertThat(frontendDockerfile).contains("FROM nginx:1.27-alpine@sha256:65645c7bb6a0661892a8b03b89d0743208a18dd2f3f17a54ef4b76fb8e2f2a10");
         assertThat(backendDockerfile).contains("ARG GIT_SHA");
         assertThat(frontendDockerfile).contains("ARG GIT_SHA");
         assertThat(backendDockerfile).contains("org.opencontainers.image.revision=\"$GIT_SHA\"");
