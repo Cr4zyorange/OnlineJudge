@@ -19,6 +19,7 @@
 | 版本 | 日期 | 修订人 | 修订说明 |
 | --- | --- | --- | --- |
 | V1.0 | 2026-06-11 | LAB 模块负责人 | 按 #152 统一结构整理 LAB 测试范围、测试数据、用例追踪、自动化覆盖、执行日志模板、手工验收点和残余风险 |
+| V1.1 | 2026-08-27 | LAB 模块负责人 | Issue #265 按当前 dev 基线复跑默认 Docker/Compose 验证器；补充每项结果的 base/head SHA、环境、计数、原始输出和可控 Docker API 中断验收 |
 
 ### 1.2 审批记录
 
@@ -296,7 +297,7 @@ git diff --check
 
 ### 13.1 验收范围与用例归属
 
-本节以 `origin/dev` 的 `758afd98ba2caad5a00fb6e12413c48f0156b2fb` 为实现与文档校准基线。正式场景仅保留 `UC-LAB-01 教师创建并发布实验` 和 `UC-LAB-02 学生提交实验并查看评测结果`：实验报告、评测异常、教师评分/反馈、统计、成绩发布、LRN 通知、GRD 来源成绩与 `API-LAB-19` 受控下载均为 UC-LAB-02 的扩展流程，不修改 API、数据库、DTO、状态枚举或共享 Playwright runner。
+`origin/dev@758afd98ba2caad5a00fb6e12413c48f0156b2fb` 仅保留为 Issue #265 开始时的最低开发基线，不能作为本节当前验收的实现或测试证据。本轮实际执行的身份为 `base_sha=50a5dccd35ddc6b0c8936df20217575f18303a4f`、`tested_head_sha=285d049002cd8e15640ae5a10d7c065758b62091`；后者包含 LRN after-commit 异步通知的有界 `expect.poll` 修复，以及可复现的 Docker API relay 中断验收。正式场景仅保留 `UC-LAB-01 教师创建并发布实验` 和 `UC-LAB-02 学生提交实验并查看评测结果`：实验报告、评测异常、教师评分/反馈、统计、成绩发布、LRN 通知、GRD 来源成绩与 `API-LAB-19` 受控下载均为 UC-LAB-02 的扩展流程，不修改 API、数据库、DTO、状态枚举或共享 Playwright runner。
 
 | 场景编号 | 用例 | 主成功路径 | 备选/异常路径 | 自动化证据 |
 | --- | --- | --- | --- | --- |
@@ -305,7 +306,7 @@ git diff --check
 | E2E-LAB-265-03 | UC-LAB-02 扩展 | 教师查看提交、下载指定源文件、评分报告和提交、截止并发布成绩；学生查看最终反馈 | 学生访问教师提交页和 API-LAB-19 均为 403；受控 500 下载失败显示错误且解除路由后可重试；未发布成绩不暴露最终分 | `LabSubmissionControllerTest`，共享 Playwright 下载权限/失败重试用例 |
 | E2E-LAB-265-04 | UC-LAB-02 扩展 | 教师查看提交数、评测完成数、均分和分布；创建关联该实验的 GRD 成绩项并同步已发布来源成绩 | 学生查询统计为 403；未发布实验不向 GRD 暴露来源成绩 | `LabExperimentControllerTest`，`releasedLabScoresExposeSourceGradesForGrdSync`，共享 Playwright GRD 同步用例 |
 | E2E-LAB-265-05 | UC-LAB-01/02 扩展 | 发布或发布成绩后，学生查询到 `sourceModule=LAB`、目标实验 ID 和课程内动作链接的 LRN 通知 | 非课程成员不接收通知；来源模块、来源 ID 或动作链接不匹配即失败 | `LabExperimentControllerTest`，共享 Playwright LRN 通知用例 |
-| TC-LAB-42 | UC-LAB-02 评测矩阵 | 真 Docker 沙箱依次执行 AC、编译错误、运行错误、超时和内存限制样本 | Docker daemon 不可用返回 `SYSTEM_ERROR`；中途断连不在本机破坏性复现 | `DockerSandboxExecutorTest` |
+| TC-LAB-42 | UC-LAB-02 评测矩阵 | 真 Docker 沙箱依次执行 AC、编译错误、运行错误、超时和内存限制样本 | Docker daemon 不可用或 Docker API relay 在编译后、运行前中断时均返回 `SYSTEM_ERROR`，且无 `oj-lab-` 或 relay 残留 | `DockerSandboxExecutorTest` |
 
 ### 13.2 端到端可追踪矩阵
 
@@ -335,17 +336,43 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/test/verify-issue-26
 
 该脚本校验三份 Compose 配置（`compose.yml`、`compose.eval.yml`、`compose.eval.local.example.yml`），并以三份文件加临时 override 的覆盖组合启动评测环境；临时 override 清除固定 `container_name`，每次执行生成唯一 Compose project 和随机 loopback 端口。`OJ_HTTP_PORT` 与 `E2E_BASE_URL` 在执行期间被强制为该端点，结束后恢复调用方环境；清理在 `up --wait` 前登记，因此部分启动失败也会以同一 project 执行 `down --volumes --remove-orphans`。随后脚本预拉取真实 Docker 评测镜像、运行后端行为/迁移/事务测试、真实 Docker 矩阵、沙箱容器清理、前端 LAB 单测、类型检查、构建和共享 Playwright 流程。默认最终验收遇到 `FAIL` 或 `BLOCKED` 均返回非零；仅显式 `-Diagnostic` 可允许 `BLOCKED` 返回零，且永不掩盖 `FAIL`。`-SkipCompose`、`-SkipE2E` 和 `-KeepEnvironment` 仅用于诊断，不应用于最终验收。
 
-| 编号 | 时间 | 执行内容 | 结果 | 说明 |
-| --- | --- | --- | --- | --- |
-| LAB-265-001 | 2026-08-25 | 目标后端测试：Controller、迁移、事务、评测服务与 Docker executor | PASS | 目标套件 60 tests，0 failures/errors，2 个 Docker-only skip；随后真机 smoke 6/6 通过 |
-| LAB-265-002 | 2026-08-26 | 真 Docker：AC、编译错误、运行错误、超时、64 MiB 内存限制、清理 | BLOCKED | 当前主机没有 Docker daemon，2026-08-25 的 PASS 仅为历史记录，未在本轮独立复现。责任人：LAB 模块负责人（Issue #265 owner）；目标日期：2026-09-05；重测：在 disposable FAT 主机运行默认验证器，要求 Docker 矩阵通过、无 `oj-lab-` 残留且唯一 Compose project/卷已清理。 |
-| LAB-265-003 | 2026-08-25 | 首次冷镜像 Docker smoke | FAIL（已缓解） | 未预拉取 `python:3.12-alpine` 时，镜像拉取占用固定编译阶段时限而得到伪 `TIME_LIMIT_EXCEEDED`；验证脚本已把 `docker pull` 固化为前置步骤，不修改生产契约 |
-| LAB-265-004 | 2026-08-26 | 共享 Playwright：主生命周期、下载权限/失败重试、LRN 通知和 GRD 来源成绩同步 | BLOCKED | 用例已拆分为命名串行场景，直接断言 API-LAB-19 的 403、受控 500 后重试、`sourceModule=LAB` 通知和 `LAB` 成绩项同步；当前主机无 disposable Compose 环境，不能将代码覆盖记为 E2E PASS。责任人：LAB 模块负责人（Issue #265 owner）；目标日期：2026-09-05；重测：默认验证器的本地隔离 E2E 全部通过。 |
-| LAB-265-005 | 2026-08-25 | Mermaid 源与 SVG、`git diff --check`、凭据/临时产物检查 | PASS | 3 份 Mermaid 源已渲染为非空 SVG，`git diff --check` 通过；本 issue 文件未发现凭据或临时产物 |
-| LAB-265-008 | 2026-08-25 | LAB 前端定向单测、类型检查与生产构建 | PASS | Vitest 5 files/58 tests 通过；`vue-tsc --noEmit` 与 `vite build` 通过 |
-| LAB-265-006 | 2026-08-26 | Docker daemon 在评测中途断连 | BLOCKED | 本机不以停止 daemon 的方式破坏正在执行的评测；现有可控模拟断连测试已覆盖 `SYSTEM_ERROR`。责任人：LAB 模块负责人（Issue #265 owner）；目标日期：2026-09-05；重测：在 disposable FAT 主机的实际评测运行中断开 daemon，断言请求受控返回 `SYSTEM_ERROR`、无悬挂 `oj-lab-` 容器且验证器清理同一 Compose project 的资源。 |
-| LAB-265-007 | 2026-08-25 | `npm run test:e2e:verify-failure` | FAIL（既有基线） | `frontend/scripts/verify-e2e-failure.mjs:42` 未观察到预期的故意断言失败；不属于 #265，未在本分支修改共享 runner |
-| LAB-265-009 | 2026-08-26 | 三文件 Compose 评测环境：Docker CLI、socket、随机 loopback 端口、真实 E2E | BLOCKED | 当前主机没有 Docker daemon。重测仅接受临时 override 取消固定容器名、唯一 project/卷、强制本地 `E2E_BASE_URL`、部分启动也执行 scoped cleanup，且 Playwright 全部通过的 disposable FAT 证据；责任人：LAB 模块负责人（Issue #265 owner）；目标日期：2026-09-05。 |
+结果不得跨提交复用：每一条 `PASS`、`FAIL` 或 `BLOCKED` 都必须同时记录 `base_sha`、`tested_head_sha` 和原始输出路径。以下表格是本 PR 当前实现的唯一验收结论；此前基于 `758afd` 或未记录完整 base/head 的 smoke 观察不再作为本轮通过证据。
+
+### 13.3.1 当前 disposable Docker/Compose 验收
+
+| 字段 | 实际值 |
+| --- | --- |
+| 执行时间 | 2026-08-27 10:41-10:45（UTC+08:00） |
+| 命令 | `pwsh -NoProfile -File scripts/test/verify-issue-265.ps1`（默认最终验收模式，未使用 `-Diagnostic`） |
+| base_sha | `50a5dccd35ddc6b0c8936df20217575f18303a4f` |
+| tested_head_sha | `285d049002cd8e15640ae5a10d7c065758b62091` |
+| 环境 | Windows 11；PowerShell 7.6.4；Java 24.0.2；Node.js 24.15.0；npm 11.12.1；Docker Engine 29.3.1（linux/amd64）；Docker Compose 5.1.0 |
+| disposable 环境 | `oj265-038ed5a78e1f`，`http://127.0.0.1:3068`；运行结束后 project 容器、网络和卷均已清理 |
+| 验证器检查计数 | 16 项：16 PASS、0 FAIL、0 BLOCKED |
+| 默认退出码 | `0`；未使用 `-Diagnostic`、`-SkipCompose`、`-SkipE2E` 或 `-KeepEnvironment` |
+| 原始输出 | `output/issue-265/2026-08-27-default-verifier-285d049.log` |
+| 原始输出 SHA-256 | `753BFAD7C4D29752D7978BC24F879598B3311A98840BAE1888DB92643A8EF3F0` |
+
+| 编号 | 验收项 | 结果 | base_sha | tested_head_sha | 总数 / 通过 / 失败 / 错误 / 跳过 | 说明 |
+| --- | --- | --- | --- | --- | --- | --- |
+| LAB-265-011-01 | Git 基线 | PASS | `50a5dccd35ddc6b0c8936df20217575f18303a4f` | `285d049002cd8e15640ae5a10d7c065758b62091` | 1 / 1 / 0 / 0 / 0 | 默认验证器记录当前 head。 |
+| LAB-265-011-02 | disposable Compose project | PASS | `50a5dccd35ddc6b0c8936df20217575f18303a4f` | `285d049002cd8e15640ae5a10d7c065758b62091` | 1 / 1 / 0 / 0 / 0 | 创建唯一 project `oj265-038ed5a78e1f` 与随机 loopback 端口。 |
+| LAB-265-011-03 | Docker daemon | PASS | `50a5dccd35ddc6b0c8936df20217575f18303a4f` | `285d049002cd8e15640ae5a10d7c065758b62091` | 1 / 1 / 0 / 0 / 0 | Docker Engine 29.3.1（linux/amd64）可用。 |
+| LAB-265-011-04 | Docker 评测与 relay 镜像预拉取 | PASS | `50a5dccd35ddc6b0c8936df20217575f18303a4f` | `285d049002cd8e15640ae5a10d7c065758b62091` | 2 / 2 / 0 / 0 / 0 | `python:3.12-alpine` 与 `alpine/socat:1.8.0.3` 均已预拉取。 |
+| LAB-265-011-05 | 三文件 Compose 评测配置 | PASS | `50a5dccd35ddc6b0c8936df20217575f18303a4f` | `285d049002cd8e15640ae5a10d7c065758b62091` | 1 / 1 / 0 / 0 / 0 | `compose.yml`、`compose.eval.yml`、`compose.eval.local.example.yml` 与临时 override 可解析。 |
+| LAB-265-011-06 | LAB 后端行为、迁移、事务与评测服务 | PASS | `50a5dccd35ddc6b0c8936df20217575f18303a4f` | `285d049002cd8e15640ae5a10d7c065758b62091` | 61 / 58 / 0 / 0 / 3 | 三个跳过项为未在该聚合套件启用的真实 Docker 分支；原始 Surefire 汇总为 `Tests run: 61, Failures: 0, Errors: 0, Skipped: 3`。 |
+| LAB-265-011-07 | 真 Docker 沙箱 smoke | PASS | `50a5dccd35ddc6b0c8936df20217575f18303a4f` | `285d049002cd8e15640ae5a10d7c065758b62091` | 2 / 2 / 0 / 0 / 0 | 在真 Docker 中覆盖 AC、编译错误、运行错误、超时和内存限制。 |
+| LAB-265-011-08 | Docker 沙箱容器清理 | PASS | `50a5dccd35ddc6b0c8936df20217575f18303a4f` | `285d049002cd8e15640ae5a10d7c065758b62091` | 1 / 1 / 0 / 0 / 0 | 运行后无 `oj-lab-` 或 Docker API relay 残留容器。 |
+| LAB-265-011-09 | 隔离 Docker API relay 中断 | PASS | `50a5dccd35ddc6b0c8936df20217575f18303a4f` | `285d049002cd8e15640ae5a10d7c065758b62091` | 1 / 1 / 0 / 0 / 0 | relay 先代理真实 Docker 编译调用，再在运行调用前删除；真实 Docker CLI 连接失败被归类为 `SYSTEM_ERROR`。 |
+| LAB-265-011-10 | relay 中断后的 Docker 清理 | PASS | `50a5dccd35ddc6b0c8936df20217575f18303a4f` | `285d049002cd8e15640ae5a10d7c065758b62091` | 1 / 1 / 0 / 0 / 0 | 断连路径后无 `oj-lab-` 或 relay 残留容器。 |
+| LAB-265-011-11 | Compose 应用健康检查 | PASS | `50a5dccd35ddc6b0c8936df20217575f18303a4f` | `285d049002cd8e15640ae5a10d7c065758b62091` | 3 / 3 / 0 / 0 / 0 | MySQL、backend、frontend 均在同一 disposable project 中达到 healthy。 |
+| LAB-265-011-12 | 前端 LAB 定向单测 | PASS | `50a5dccd35ddc6b0c8936df20217575f18303a4f` | `285d049002cd8e15640ae5a10d7c065758b62091` | 58 / 58 / 0 / 0 / 0 | 5 个 LAB 单测文件均通过。 |
+| LAB-265-011-13 | 前端类型检查 | PASS | `50a5dccd35ddc6b0c8936df20217575f18303a4f` | `285d049002cd8e15640ae5a10d7c065758b62091` | 1 / 1 / 0 / 0 / 0 | `vue-tsc --noEmit` 通过。 |
+| LAB-265-011-14 | 前端生产构建 | PASS | `50a5dccd35ddc6b0c8936df20217575f18303a4f` | `285d049002cd8e15640ae5a10d7c065758b62091` | 1 / 1 / 0 / 0 / 0 | `vite build` 通过。 |
+| LAB-265-011-15 | Compose-backed LAB Playwright 生命周期 | PASS | `50a5dccd35ddc6b0c8936df20217575f18303a4f` | `285d049002cd8e15640ae5a10d7c065758b62091` | 4 / 4 / 0 / 0 / 0 | 覆盖发布/提交/评分/反馈、下载 403 与失败重试、LRN 异步通知轮询和 GRD 来源成绩同步。 |
+| LAB-265-011-16 | Compose 容器、网络和卷清理 | PASS | `50a5dccd35ddc6b0c8936df20217575f18303a4f` | `285d049002cd8e15640ae5a10d7c065758b62091` | 1 / 1 / 0 / 0 / 0 | `down --volumes --remove-orphans` 已对 `oj265-038ed5a78e1f` 完成 scoped cleanup。 |
+
+中断验收不停止宿主 Docker daemon：测试临时创建只绑定随机 loopback 端口的 `alpine/socat` relay，将其连接到 Docker socket。编译命令经 relay 在真实 Docker 中完成；测试随后删除 relay，再启动运行命令，Docker CLI 产生真实连接失败。`DockerSandboxExecutor` 将该错误写为 `SYSTEM_ERROR`，同时断言沙箱和 relay 容器均无残留。该故障注入覆盖了评测过程中的 Docker API 可达性丢失，且可由默认验证器在 disposable 环境中重复执行。
 
 ### 13.4 图与安全检查
 

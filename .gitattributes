@@ -1,1 +1,4 @@
 *.sh text eol=lf
+
+# Preserve raw Docker/Compose console captures as test evidence.
+output/issue-265/*.log -whitespace
