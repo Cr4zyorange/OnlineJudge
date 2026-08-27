@@ -16,6 +16,7 @@
 | GREEN：静态与 readiness 契约 | 同一 Maven 定向命令 | 15 tests，0 failures，0 errors，0 skipped。 |
 | GREEN：构建入口 | Git Bash 执行 `scripts/docker/tests/build-images.test.sh` | PASS；覆盖缺失/非法/不匹配 SHA、Docker 构建失败、固定双镜像及禁止别名。 |
 | GREEN：烟测入口 | Git Bash 执行 `scripts/docker/tests/smoke-images.test.sh` | PASS；覆盖启动/健康/镜像/revision/root/readiness/业务验证失败和限定清理。 |
+| GREEN：旧卷升级入口 | Git Bash 执行 `scripts/docker/tests/migrate-app-data.test.sh` | PASS；覆盖版本、卷名、卷不存在、迁移失败、UID 10001 读写复核和失败码传播。 |
 | 既有业务验收脚本回归 | WSL 执行 `scripts/test/verify-compose.test.sh` | PASS。Git for Windows 对含换行和反斜杠凭据的进程参数语义不同，因此按脚本目标 Linux 环境复核。 |
 
 ## 3. 真实环境验收步骤
@@ -37,10 +38,12 @@ mkdir -p output/issue-289
 ## 4. 失败与安全断言
 
 - `GIT_SHA` 缺失、非 40 位或不等于当前 `HEAD` 时，在 Docker 构建/启动前返回非零。
+- 工作树包含已跟踪或未跟踪改动时，构建入口返回非零，禁止给未提交内容标注当前 `HEAD` revision。
 - `MYSQL_PASSWORD`、`MYSQL_ROOT_PASSWORD` 缺失时 Compose 和烟测入口返回非零；`.env.example` 不提供口令。
 - 数据库查询失败时 readiness 返回 HTTP 503，不返回 `status="UP"`，不泄漏 JDBC URL、用户名或口令。
 - 构建、Compose 启动、healthy 数量、镜像名、OCI revision、运行用户、两条 readiness 或业务验收任一不符时，烟测返回非零并输出限定项目诊断。
 - MySQL 只引用 `mysql:8.4`，初始化仍只挂载 `database/mysql/compose-schema.sql`，本任务不复制 schema。
+- 历史 root 所有权的 `app-data` 卷只通过显式迁移入口原地调整为 UID/GID 10001；脚本先检查卷存在，迁移后再以非 root 身份验证可读写，不删除数据卷。
 
 ## 5. 证据状态
 
