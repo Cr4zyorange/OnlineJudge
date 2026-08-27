@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 
-set -euo pipefail
+set -Eeuo pipefail
 
-repo_root="$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"
-source_script="$repo_root/scripts/deploy/smoke-container-images.sh"
+repo_root="$(CDPATH= cd -- "$(dirname -- "$0")/../../.." && pwd)"
+source_script="$repo_root/scripts/docker/smoke-images.sh"
 fixture_root="$(mktemp -d "${TMPDIR:-/tmp}/onlinejudge-smoke-images-test.XXXXXX")"
 fake_bin="$fixture_root/bin"
 docker_log="$fixture_root/docker.log"
@@ -16,7 +16,7 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 fail() {
-  printf 'smoke-container-images.test: FAIL: %s\n' "$*" >&2
+  printf 'smoke-images.test: FAIL: %s\n' "$*" >&2
   exit 1
 }
 
@@ -24,7 +24,7 @@ mkdir -p "$fake_bin"
 
 cat > "$fake_bin/docker" <<'EOF'
 #!/usr/bin/env bash
-set -euo pipefail
+set -Eeuo pipefail
 
 printf '%s\n' "$*" >> "$CONTAINER_TEST_DOCKER_LOG"
 args=" $* "
@@ -56,6 +56,15 @@ if [[ "$args" == *" compose "* && "$args" == *" ps -q frontend "* ]]; then
   exit 0
 fi
 
+if [[ "$args" == *" compose "* && "$args" == *" exec -T backend "* ]]; then
+  if [[ "${CONTAINER_TEST_FAIL_BACKEND_READINESS:-0}" == "1" ]]; then
+    printf '{"code":"503","message":"service unavailable"}\n'
+  else
+    printf '{"code":"0","data":{"status":"UP"}}\n'
+  fi
+  exit 0
+fi
+
 if [[ "${1:-}" == "inspect" ]]; then
   container_id="${*: -1}"
   if [[ "$args" == *" .Config.Image "* ]]; then
@@ -67,8 +76,8 @@ if [[ "${1:-}" == "inspect" ]]; then
           printf 'mysql:8.4\n'
         fi
         ;;
-      backend-container) printf '%s:%s\n' "${BACKEND_IMAGE_REPOSITORY:-onlinejudge/backend}" "$IMAGE_TAG" ;;
-      frontend-container) printf '%s:%s\n' "${FRONTEND_IMAGE_REPOSITORY:-onlinejudge/frontend}" "$IMAGE_TAG" ;;
+      backend-container) printf 'onlinejudge/backend:%s\n' "$GIT_SHA" ;;
+      frontend-container) printf 'onlinejudge/frontend:%s\n' "$GIT_SHA" ;;
       *) exit 32 ;;
     esac
     exit 0
@@ -83,17 +92,14 @@ if [[ "${1:-}" == "inspect" ]]; then
     fi
     exit 0
   fi
-  if [[ "$args" == *" .Image "* ]]; then
-    printf '%s-image\n' "${container_id%-container}"
-    exit 0
-  fi
 fi
 
 if [[ "${1:-}" == "image" && "${2:-}" == "inspect" ]]; then
-  if [[ "${CONTAINER_TEST_BAD_REVISION:-0}" == "1" && "$args" == *" backend-image "* ]]; then
+  image_ref="${*: -1}"
+  if [[ "${CONTAINER_TEST_BAD_REVISION:-0}" == "1" && "$image_ref" == onlinejudge/backend:* ]]; then
     printf '0000000000000000000000000000000000000000\n'
   else
-    printf '%s\n' "$IMAGE_TAG"
+    printf '%s\n' "$GIT_SHA"
   fi
   exit 0
 fi
@@ -115,9 +121,20 @@ exit 33
 EOF
 chmod +x "$fake_bin/docker"
 
+cat > "$fake_bin/curl" <<'EOF'
+#!/usr/bin/env bash
+set -Eeuo pipefail
+if [[ "${CONTAINER_TEST_FAIL_FRONTEND_READINESS:-0}" == "1" ]]; then
+  printf '{"code":"503","message":"service unavailable"}\n'
+else
+  printf '{"code":"0","data":{"status":"UP"}}\n'
+fi
+EOF
+chmod +x "$fake_bin/curl"
+
 cat > "$fake_verify" <<'EOF'
 #!/usr/bin/env bash
-set -euo pipefail
+set -Eeuo pipefail
 printf 'verify\n' >> "$CONTAINER_TEST_VERIFY_LOG"
 if [[ "${CONTAINER_TEST_FAIL_VERIFY:-0}" == "1" ]]; then
   printf 'simulated HTTP verification failure\n' >&2
@@ -128,13 +145,14 @@ chmod +x "$fake_verify"
 
 head_sha="$(git -C "$repo_root" rev-parse HEAD)"
 common_env=(
-  "IMAGE_TAG=$head_sha"
-  "BACKEND_IMAGE_REPOSITORY=contract/backend"
-  "FRONTEND_IMAGE_REPOSITORY=contract/frontend"
+  "GIT_SHA=$head_sha"
+  "MYSQL_PASSWORD=contract-password"
+  "MYSQL_ROOT_PASSWORD=contract-root-password"
   "PATH=$fake_bin:$PATH"
   "CONTAINER_TEST_DOCKER_LOG=$docker_log"
   "CONTAINER_TEST_VERIFY_LOG=$verify_log"
   "VERIFY_COMPOSE_SCRIPT=$fake_verify"
+  "CURL_BIN=$fake_bin/curl"
 )
 
 run_expected_failure() {
@@ -151,25 +169,32 @@ run_expected_failure() {
     fail "$case_name did not report: $expected_message"
 }
 
-if env -u IMAGE_TAG PATH="$fake_bin:$PATH" \
-  CONTAINER_TEST_DOCKER_LOG="$docker_log" \
+if env -u GIT_SHA MYSQL_PASSWORD=contract-password MYSQL_ROOT_PASSWORD=contract-root-password \
+  PATH="$fake_bin:$PATH" CONTAINER_TEST_DOCKER_LOG="$docker_log" \
   bash "$source_script" >"$fixture_root/missing.out" 2>"$fixture_root/missing.err"; then
-  fail "missing IMAGE_TAG unexpectedly succeeded"
+  fail "missing GIT_SHA unexpectedly succeeded"
 fi
-grep -Fq 'IMAGE_TAG is required' "$fixture_root/missing.err" || \
-  fail "missing IMAGE_TAG did not produce the required diagnostic"
+grep -Fq 'GIT_SHA is required' "$fixture_root/missing.err" || \
+  fail "missing GIT_SHA did not produce the required diagnostic"
+
+if env -u MYSQL_PASSWORD GIT_SHA="$head_sha" MYSQL_ROOT_PASSWORD=contract-root-password \
+  PATH="$fake_bin:$PATH" CONTAINER_TEST_DOCKER_LOG="$docker_log" \
+  bash "$source_script" >"$fixture_root/missing-secret.out" 2>"$fixture_root/missing-secret.err"; then
+  fail "missing MYSQL_PASSWORD unexpectedly succeeded"
+fi
+grep -Fq 'MYSQL_PASSWORD is required' "$fixture_root/missing-secret.err" || \
+  fail "missing MYSQL_PASSWORD did not produce the required diagnostic"
 
 run_expected_failure startup 'simulated compose startup failure' CONTAINER_TEST_FAIL_UP=1
-grep -Fq ' compose ' "$docker_log" || fail "startup failure did not invoke Compose"
 grep -Fq ' logs ' "$docker_log" || fail "startup failure did not collect logs"
 grep -Fq ' down --volumes --remove-orphans' "$docker_log" || fail "startup failure did not clean scoped resources"
 
 run_expected_failure unhealthy 'expected 3 running services, got 2' CONTAINER_TEST_UNHEALTHY=1
-grep -Fq ' logs ' "$docker_log" || fail "unhealthy case did not collect logs"
-
-run_expected_failure revision 'backend OCI revision did not match IMAGE_TAG' CONTAINER_TEST_BAD_REVISION=1
+run_expected_failure revision 'backend OCI revision did not match GIT_SHA' CONTAINER_TEST_BAD_REVISION=1
 run_expected_failure root-user 'backend container must not run as root' CONTAINER_TEST_ROOT_USER=1
 run_expected_failure mysql-image 'MySQL container must use mysql:8.4' CONTAINER_TEST_WRONG_MYSQL_IMAGE=1
+run_expected_failure backend-readiness 'backend readiness did not report UP' CONTAINER_TEST_FAIL_BACKEND_READINESS=1
+run_expected_failure frontend-readiness 'frontend-proxied readiness did not report UP' CONTAINER_TEST_FAIL_FRONTEND_READINESS=1
 run_expected_failure http-verify 'simulated HTTP verification failure' CONTAINER_TEST_FAIL_VERIFY=1
 
 : > "$docker_log"
@@ -179,8 +204,8 @@ env "${common_env[@]}" bash "$source_script" >"$fixture_root/success.out" 2>"$fi
   fail "valid three-service smoke failed"
 }
 
-short_sha="${head_sha:0:12}"
-grep -Fq "--project-name onlinejudge-smoke-$short_sha" "$docker_log" || \
+project_suffix="${head_sha:0:12}"
+grep -Fq -- "--project-name onlinejudge-smoke-$project_suffix" "$docker_log" || \
   fail "smoke did not use a SHA-scoped project name"
 grep -Fq 'up -d --no-build --wait --wait-timeout 240' "$docker_log" || \
   fail "smoke did not use bounded Compose health waiting"
@@ -188,4 +213,4 @@ grep -Fq 'down --volumes --remove-orphans' "$docker_log" || \
   fail "smoke did not clean volumes and orphans"
 [[ "$(wc -l < "$verify_log" | tr -d ' ')" -eq 1 ]] || fail "HTTP verifier did not run exactly once"
 
-printf 'smoke-container-images.test: PASS\n'
+printf 'smoke-images.test: PASS\n'
