@@ -7,6 +7,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -14,7 +16,10 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayDeque;
+import java.util.Deque;
 import java.util.Map;
+import java.util.concurrent.Executor;
 
 import static org.hamcrest.Matchers.hasSize;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -25,6 +30,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest(properties = {
         "spring.datasource.url=jdbc:h2:mem:lrn_learning_record_controller;MODE=MySQL;DATABASE_TO_LOWER=TRUE;CASE_INSENSITIVE_IDENTIFIERS=TRUE;DB_CLOSE_DELAY=-1",
         "onlinejudge.auth.allow-header-auth=false",
+        "spring.main.allow-bean-definition-overriding=true",
         "spring.sql.init.schema-locations=classpath:schema.sql,file:../database/migrations/20260531_01_create_lrn_learning_progress.sql,file:../database/migrations/20260602_01_create_lrn_learning_record.sql"
 })
 @AutoConfigureMockMvc
@@ -37,6 +43,9 @@ class LearningRecordControllerTest {
 
     @Autowired
     private ObjectMapper objectMapper;
+
+    @Autowired
+    private ControllableLearningRecordExecutor learningRecordExecutor;
 
     private SessionUser student;
     private SessionUser otherStudent;
@@ -177,7 +186,25 @@ class LearningRecordControllerTest {
 
     @Test
     void sameResourceReportsAreRateLimitedBeforeAsynchronousWritesComplete() throws Exception {
-        for (int index = 0; index < 10; index += 1) {
+        // 保持异步写入挂起，确定性地证明：即使写入尚未落库，内存中的在途请求也会计入限流。
+        // 生产 executor 是真实线程池，写入可能在下一次请求前完成，导致第 10 次请求被误判 429（时序敏感）。
+        learningRecordExecutor.holdTasks(true);
+        try {
+            for (int index = 0; index < 10; index += 1) {
+                mockMvc.perform(post("/api/v1/learning/records")
+                                .header(HttpHeaders.AUTHORIZATION, "Bearer " + student.token())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(Map.of(
+                                        "courseId", 101,
+                                        "sourceModule", "LAB",
+                                        "sourceId", 301,
+                                        "actionType", "STUDY",
+                                        "durationSeconds", 5
+                                ))))
+                        .andExpect(status().isOk())
+                        .andExpect(jsonPath("$.data.id").value(0));
+            }
+
             mockMvc.perform(post("/api/v1/learning/records")
                             .header(HttpHeaders.AUTHORIZATION, "Bearer " + student.token())
                             .contentType(MediaType.APPLICATION_JSON)
@@ -188,22 +215,11 @@ class LearningRecordControllerTest {
                                     "actionType", "STUDY",
                                     "durationSeconds", 5
                             ))))
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.data.id").value(0));
+                    .andExpect(status().isTooManyRequests())
+                    .andExpect(jsonPath("$.code").value("LRN-429-03"));
+        } finally {
+            learningRecordExecutor.holdTasks(false);
         }
-
-        mockMvc.perform(post("/api/v1/learning/records")
-                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + student.token())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(Map.of(
-                                "courseId", 101,
-                                "sourceModule", "LAB",
-                                "sourceId", 301,
-                                "actionType", "STUDY",
-                                "durationSeconds", 5
-                        ))))
-                .andExpect(status().isTooManyRequests())
-                .andExpect(jsonPath("$.code").value("LRN-429-03"));
     }
 
     @Test
@@ -316,5 +332,37 @@ class LearningRecordControllerTest {
     }
 
     private record SessionUser(long id, String token) {
+    }
+
+    @TestConfiguration
+    static class ControllableExecutorConfig {
+        @Bean(name = "learningRecordExecutor")
+        ControllableLearningRecordExecutor learningRecordExecutor() {
+            return new ControllableLearningRecordExecutor();
+        }
+    }
+
+    static class ControllableLearningRecordExecutor implements Executor {
+        private final Deque<Runnable> held = new ArrayDeque<>();
+        private boolean holding;
+
+        @Override
+        public void execute(Runnable command) {
+            if (holding) {
+                held.addLast(command);
+                return;
+            }
+            command.run();
+        }
+
+        void holdTasks(boolean holding) {
+            this.holding = holding;
+            if (!holding) {
+                Runnable task;
+                while ((task = held.pollFirst()) != null) {
+                    task.run();
+                }
+            }
+        }
     }
 }
