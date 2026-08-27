@@ -6,8 +6,8 @@
  *   node scripts/dev/render-mermaid.mjs <mmdPath> <svgPath> [<mmdPath> <svgPath> ...]
  *
  * 依赖（本机开发工具，不进入产物）：
- *   - Chrome/Edge headless（默认读取 CHROME_PATH，或常见安装路径）
- *   - mermaid.min.js（默认读取 MERMAID_JS，或 VS Code Markdown Preview Enhanced 扩展捆绑版本）
+ *   - Chrome/Edge/Chromium headless（Playwright、环境变量或常见安装路径）
+ *   - mermaid.min.js（frontend 锁定依赖，或通过 MERMAID_JS 指定）
  *
  * 生成结果与仓库既有 assets/*.svg 约定保持一致：
  *   - svg id 统一为 my-svg

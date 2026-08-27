@@ -22,14 +22,15 @@ fi
 to_node_path() {
   if printf '%s' "$node_bin" | grep -Eq '\.exe$' && command -v wslpath >/dev/null 2>&1; then
     wslpath -w "$1"
+  elif printf '%s' "$node_bin" | grep -Eq '\.exe$' && command -v cygpath >/dev/null 2>&1; then
+    cygpath -w "$1"
   else
     printf '%s\n' "$1"
   fi
 }
 
-render_tmp="$repo_root/output/hwk-doc-test-closure-mermaid"
-rm -rf "$render_tmp"
-mkdir -p "$render_tmp"
+render_tmp=$(mktemp -d "${TMPDIR:-/tmp}/oj-hwk-doc-test-closure.XXXXXX")
+trap 'rm -rf "$render_tmp"' EXIT HUP INT TERM
 
 require_file() {
   relative_path=$1
@@ -65,10 +66,6 @@ reject_file() {
   fi
 }
 
-normalize_svg() {
-  sed -e 's/[[:space:]][[:space:]]*/ /g' -e 's/> </></g' "$1"
-}
-
 srs='docs/最终提交/软件需求规格说明书.md'
 overview='docs/最终提交/软件概要设计说明书.md'
 detail='docs/最终提交/软件详细设计说明书.md'
@@ -91,15 +88,8 @@ do
   require_text "$source" 'else '
   require_file "$asset"
   rendered="$render_tmp/$(basename "$asset")"
-  expected_normalized="$rendered.expected"
-  actual_normalized="$rendered.actual"
   "$node_bin" "$(to_node_path "$repo_root/scripts/dev/render-mermaid.mjs")" "$(to_node_path "$repo_root/$source")" "$(to_node_path "$rendered")"
-  normalize_svg "$repo_root/$asset" > "$expected_normalized"
-  normalize_svg "$rendered" > "$actual_normalized"
-  if ! cmp -s "$expected_normalized" "$actual_normalized"; then
-    echo "rendered Mermaid output differs from committed asset: $asset" >&2
-    exit 1
-  fi
+  "$node_bin" "$(to_node_path "$repo_root/scripts/dev/verify-mermaid-svg.mjs")" "$(to_node_path "$repo_root/$asset")" "$(to_node_path "$rendered")"
 done
 require_file "$closure"
 require_file "$e2e"
