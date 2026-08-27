@@ -19,9 +19,15 @@
 | -------- | ------------------------------------------------------------ |
 | 模块名称 | 学习过程与通知提醒（LRN）                                    |
 | 模块缩写 | LRN                                                          |
-| 功能定位 | 学习任务聚合、学习进度记录、学习行为跟踪、通知推送与状态管理、定时提醒 |
+| 功能定位 | 学习任务聚合、学习进度记录、学习行为跟踪、通知落库/查询刷新与状态管理、定时提醒 |
 | 核心数据 | 学习任务快照、学习进度、学习记录、通知、通知状态日志、提醒规则、通知偏好 |
-| 技术栈   | Spring Boot、MyBatis-Plus、Vue3+TypeScript、WebSocket、Redis |
+| 技术栈   | Spring Boot、JDBC、Vue3+TypeScript；本版本通知采用数据库落库和页面加载/手动刷新/可配置轮询，WebSocket/SSE 与 Redis 为可选扩展 |
+
+### 1.1 场景级详细设计闭环（#262）
+
+`LRN-SC-01 ~ LRN-SC-05` 是正式 `UC-LRN-01` 内的任务中心、继续学习/进度、个人统计、通知管理/跳转、提醒配置/触达五个可核查场景；`LRN-SUB-01 ~ LRN-SUB-05` 是成员过滤与聚合、进度/行为/离线重放、事件转通知/幂等/失败、提醒扫描/偏好/失败日志、通知状态/安全跳转五个公共子流程。教师课程学习统计暂为**候选独立场景**，未经确认不新增正式 UC。
+
+各场景的需求层、概要层、详细层图源与静态资产由 `docs/diagrams/lrn/manifest.json` 一一映射。通知详细状态为 `EVENT_RECEIVED → UNREAD → READ → DELETED`，重复事件进入 `DUPLICATE`，非法事件进入 `REJECTED`，写入异常进入 `FAILED_RECORDED`；只有通知所属用户能执行已读和删除。
 
 ## 2 模块职责与依赖关系
 
@@ -196,7 +202,7 @@
 | ---------- | --------------------- | ------------------------------------------------------------ | -------------------------- | --------------------- |
 | SVC-LRN-01 | LearningTaskService   | 聚合 CRS/LAB/HWK 任务数据，管理任务快照缓存，处理进度保存与查询 | userId, query, progressDTO | 分页任务列表、进度DTO |
 | SVC-LRN-02 | LearningRecordService | 记录学习行为（访问、时长），计算近7天统计数据，提供仪表盘数据 | LearningRecordDTO          | 统计DTO、成功/失败    |
-| SVC-LRN-03 | NotificationService   | 创建通知记录、查询通知列表、标记已读/删除、WebSocket推送、未读计数缓存 | NotificationCreateDTO      | 通知列表、未读数      |
+| SVC-LRN-03 | NotificationService   | 创建通知记录、查询通知列表与未读数、标记已读/删除、记录状态日志；本版本不强依赖 WebSocket/Redis | NotificationCreateDTO      | 通知列表、未读数      |
 | SVC-LRN-04 | ReminderRuleService   | 管理用户提醒规则和通知偏好，定时扫描即将截止任务并触发提醒   | userId, ruleDTO            | 规则列表、成功/失败   |
 | SVC-LRN-05 | EventConsumerService  | 监听来自 LAB/HWK/GRD 的事件（MQ或直接调用），调用 NotificationService 创建通知 | ModuleEvent                | 通知ID列表            |
 
@@ -287,53 +293,43 @@ sequenceDiagram
     participant P as 前端页面
     participant C as LRN Controller
     participant S as LearningTaskService
-    participant Cache as Redis
-    participant CRS as CRS模块
-    participant LAB as LAB模块
-    participant HWK as HWK模块
+    participant Permission as 课程权限校验
+    participant DB as MySQL数据库
 
     U->>P: 进入学习任务中心
     P->>C: GET /api/v1/learning/tasks
     C->>S: getTaskList(userId, query)
-    S->>Cache: 尝试获取缓存任务列表
-    alt 缓存命中
-        Cache-->>S: 返回缓存数据
-    else 缓存未命中
-        S->>CRS: 调用课程资源任务摘要
-        S->>LAB: 调用实验任务摘要
-        S->>HWK: 调用作业任务摘要
-        CRS-->>S: 资源任务列表
-        LAB-->>S: 实验任务列表
-        HWK-->>S: 作业任务列表
-        S->>Cache: 合并后写入缓存（TTL=5min）
-    end
+    S->>Permission: 获取当前用户有效课程
+    Permission-->>S: 课程编号集合
+    S->>DB: 按用户、课程、类型、状态分页查询任务快照
+    DB-->>S: 资源/实验/作业任务列表
     S-->>C: 返回分页任务列表
     C-->>P: JSON响应
     P-->>U: 渲染任务卡片
 ```
 
-### 7.2 通知触发与推送时序图
+### 7.2 通知触发、落库与查询刷新时序图
 
 ```mermaid
 sequenceDiagram
     participant LAB as LAB模块
-    participant Event as 事件总线
-    participant EC as EventConsumerService
+    participant EP as NotificationEventPublisher
     participant NS as NotificationService
+    participant CRS as 课程成员校验
     participant DB as MySQL数据库
-    participant WS as WebSocketServer
     participant FE as 前端页面
     participant U as 用户
 
-    LAB->>Event: 发布 EXPERIMENT_PUBLISHED 事件
-    Event->>EC: 监听触发
-    EC->>NS: processEvent(event)
-    NS->>DB: 批量插入通知记录
-    NS->>NS: 更新Redis未读数（incr）
-    NS->>WS: 向接收人推送消息（JSON）
-    WS-->>FE: WebSocket消息
-    FE->>FE: 更新未读角标、弹出提示
-    FE-->>U: 显示实时通知
+    LAB->>EP: 发布 LAB_EXPERIMENT_PUBLISHED 事件
+    EP->>NS: createNotifications(event)
+    NS->>CRS: 过滤有效课程成员
+    CRS-->>NS: 有效接收人
+    NS->>DB: 以幂等键+用户唯一约束写通知与 CREATE 日志
+    U->>FE: 登录/进入通知中心/手动刷新
+    FE->>NS: GET /api/v1/notifications
+    NS->>DB: 查询本人通知与未读数
+    DB-->>FE: 通知列表与未读数
+    FE-->>U: 展示最新站内通知
 ```
 
 ### 7.3 状态机
@@ -378,7 +374,7 @@ stateDiagram-v2
 | 任务快照数据过期且无法拉取   | 返回缓存旧数据，记录错误日志，提示“部分任务可能未更新”      | 30001  | 200（带警告） |
 | 普通通知调度或持久化失败 | after-commit 回调的执行器拒绝或工作线程独立事务失败时记录告警，不反向回滚来源业务；有界内存队列当前未实现持久重试/outbox | 30002  | 来源业务响应不反向改写 |
 | 必达通知持久化失败 | `publishRequired` 异常向上抛出并回滚来源事务；作业发布映射为 `503/HWK_5003` | HWK_5003 | 503 |
-| WebSocket连接断开            | 前端启用轮询（每30秒），后端仍保持推送队列                  | -      | -             |
+| 通知列表网络短时中断         | 前端保留已落库状态的恢复入口，显示失败提示；网络恢复后重试查询 | -      | -             |
 | 学习进度保存时唯一键冲突     | 使用 `ON DUPLICATE KEY UPDATE` 更新                         | 0      | 200           |
 | 用户尝试修改他人通知         | 接口层校验 `notification.user_id == currentUserId`，否则403 | 403    | 403           |
 | 学习行为上报频率过高         | 限制同一用户同一资源每分钟最多10次，超出返回429             | 30003  | 429           |
@@ -398,8 +394,8 @@ stateDiagram-v2
 
 | 性能点       | 设计策略                                                     |
 | ------------ | ------------------------------------------------------------ |
-| 任务列表加载 | Redis缓存任务快照，TTL=5分钟；列表分页，每页20条             |
-| 未读计数     | Redis存储 `lrn:unread:{userId}`，通知创建时incr，标记已读时decr |
+| 任务列表加载 | 按用户和课程成员关系查询任务快照；列表分页，每页默认20条     |
+| 未读计数     | 从通知数据库状态按当前用户统计；列表和角标使用同一数据来源   |
 | 学习行为上报 | 异步写入数据库（`@Async`），不阻塞用户操作                   |
 | 数据库索引   | 已按查询场景建立复合索引（见DDL）                            |
 | 批量操作     | 标记已读支持批量 `update ... where id in (…)`                |
@@ -423,7 +419,7 @@ stateDiagram-v2
 - **任务列表**：不同角色、不同课程、不同状态下的任务展示正确性；缓存过期后数据刷新。
 - **学习进度**：断点续传功能（关闭页面再打开恢复位置）；进度百分比计算准确。
 - **学习行为**：时长统计准确性；仪表盘折线图数据正确。
-- **通知**：事件触发后通知生成；WebSocket实时推送；批量已读/删除的幂等性。
+- **通知**：事件触发后通知落库；页面加载/手动刷新/可配置轮询可见；重复事件、批量已读/删除的幂等性。
 - **提醒规则**：定时任务触发提醒；用户关闭非必要通知后不再收到提醒。
 - **性能**：任务列表首屏加载 ≤1.5秒；通知列表加载 ≤1秒；标记已读批量操作 ≤500ms。
 

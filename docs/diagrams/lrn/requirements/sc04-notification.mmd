@@ -1,0 +1,11 @@
+sequenceDiagram
+  actor User as 当前用户
+  participant System as 在线教学平台
+  User->>System: 打开通知中心并筛选
+  System-->>User: 返回本人通知与未读数
+  User->>System: 标记已读/删除/打开通知
+  alt 通知属于本人且目标有效
+    System-->>User: 展示更新后的通知状态并打开受控业务页面
+  else 通知不属于本人或目标失效
+    System-->>User: 展示失败提示并停留在安全页面
+  end

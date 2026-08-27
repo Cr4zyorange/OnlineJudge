@@ -134,8 +134,10 @@
                 v-if="safeActionUrl(notification.actionUrl)"
                 class="notification-card__link"
                 :href="safeActionUrl(notification.actionUrl) ?? undefined"
+                :aria-disabled="openingNotificationId === notification.notificationId ? 'true' : undefined"
+                @click.prevent="openNotification(notification)"
               >
-                查看详情
+                {{ openingNotificationId === notification.notificationId ? '正在打开' : '查看详情' }}
               </a>
               <div v-else class="notification-card__recovery">
                 <span class="notification-card__unavailable">入口已失效</span>
@@ -180,6 +182,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
+import { useRouter } from 'vue-router';
 import { deleteNotification, listNotifications, markNotificationsRead } from '../../api/lrn/notifications';
 import { readAuthStorage } from '../../api/auth/storage';
 import { currentUser } from '../../app/runtimeContext';
@@ -188,6 +191,7 @@ import { notificationUnreadCount, syncNotificationUnreadCount } from '../../lrn/
 import type { NotificationItem, NotificationPage, NotificationType } from '../../types/lrn';
 import { sanitizeInternalActionUrl } from './internalActionUrl';
 
+const router = useRouter();
 const loading = ref(false);
 const errorMessage = ref('');
 const notificationPage = ref<NotificationPage | null>(null);
@@ -201,6 +205,8 @@ const selectedIds = ref<number[]>([]);
 const feedbackMessage = ref('');
 const unreadCount = notificationUnreadCount;
 const notificationSessionKey = computed(currentNotificationSessionKey);
+const openingNotificationId = ref<number | null>(null);
+let notificationLoadGeneration = 0;
 
 const notifications = computed(() => notificationPage.value?.records ?? []);
 const totalPages = computed(() => {
@@ -241,6 +247,7 @@ async function reloadFromFirstPage() {
 
 async function loadNotifications() {
   const sessionKey = currentNotificationSessionKey();
+  const requestGeneration = ++notificationLoadGeneration;
   loading.value = true;
   errorMessage.value = '';
   try {
@@ -252,7 +259,7 @@ async function loadNotifications() {
       page: page.value,
       size: size.value
     });
-    if (sessionKey !== currentNotificationSessionKey()) {
+    if (requestGeneration !== notificationLoadGeneration || sessionKey !== currentNotificationSessionKey()) {
       return;
     }
     notificationPage.value = result;
@@ -260,9 +267,13 @@ async function loadNotifications() {
     const visibleIds = new Set(notifications.value.map((notification) => notification.notificationId));
     selectedIds.value = selectedIds.value.filter((notificationId) => visibleIds.has(notificationId));
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : '通知加载失败';
+    if (requestGeneration === notificationLoadGeneration && sessionKey === currentNotificationSessionKey()) {
+      errorMessage.value = error instanceof Error ? error.message : '通知加载失败';
+    }
   } finally {
-    loading.value = false;
+    if (requestGeneration === notificationLoadGeneration) {
+      loading.value = false;
+    }
   }
 }
 
@@ -314,6 +325,42 @@ async function markAllRead() {
     feedbackMessage.value = `已标记 ${result.updatedCount} 条通知`;
     selectedIds.value = [];
   });
+}
+
+async function openNotification(notification: NotificationItem) {
+  const actionUrl = safeActionUrl(notification.actionUrl);
+  if (!actionUrl || openingNotificationId.value !== null) {
+    return;
+  }
+
+  openingNotificationId.value = notification.notificationId;
+  errorMessage.value = '';
+  feedbackMessage.value = '';
+  try {
+    if (!notification.isRead) {
+      const result = await markNotificationsRead({
+        notificationIds: [notification.notificationId],
+        readAll: false
+      });
+      const nextUnreadCount = Math.max(
+        0,
+        (notificationPage.value?.unreadCount ?? unreadCount.value) - result.updatedCount
+      );
+      notificationPage.value = notificationPage.value && {
+        ...notificationPage.value,
+        unreadCount: nextUnreadCount,
+        records: notificationPage.value.records.map((item) => (
+          item.notificationId === notification.notificationId ? { ...item, isRead: true } : item
+        ))
+      };
+      syncNotificationUnreadCount(nextUnreadCount);
+    }
+    await router.push(actionUrl);
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : '通知打开失败';
+  } finally {
+    openingNotificationId.value = null;
+  }
 }
 
 async function deleteNotificationById(notificationId: number) {

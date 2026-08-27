@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
-import { readFileSync, readdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { execFileSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
@@ -11,16 +11,16 @@ function readFrontendFile(path) {
   return readFileSync(new URL(path, frontendRoot), 'utf8');
 }
 
-function findPlaywrightConfigs(directory = fileURLToPath(frontendRoot), relativeDirectory = '') {
-  return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
-    const relativePath = relativeDirectory ? `${relativeDirectory}/${entry.name}` : entry.name;
-    if (entry.isDirectory()) {
-      return entry.name === 'node_modules'
-        ? []
-        : findPlaywrightConfigs(join(directory, entry.name), relativePath);
-    }
-    return /(^|\/)playwright\.config\.[cm]?[jt]s$/.test(relativePath) ? [relativePath] : [];
-  });
+function findPlaywrightConfigs() {
+  const repositoryFiles = execFileSync('git', ['ls-files', '-z', '--', 'frontend'], {
+    cwd: fileURLToPath(repositoryRoot),
+    encoding: 'utf8'
+  }).split('\0');
+
+  return repositoryFiles
+    .filter((path) => path.startsWith('frontend/'))
+    .map((path) => path.slice('frontend/'.length))
+    .filter((path) => /(^|\/)playwright\.config\.[cm]?[jt]s$/.test(path));
 }
 
 test('shared E2E package commands use the single Playwright runner', () => {

@@ -1,0 +1,2 @@
+command=git diff --check 50b3b397941aa6879b010a03951d1d19c5a57250..d66b7debaddde20fee2d097c7b8a6096ddd35d6d
+exit_code=0

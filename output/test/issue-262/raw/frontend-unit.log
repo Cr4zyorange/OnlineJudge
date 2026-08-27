@@ -1,0 +1,84 @@
+
+> onlinejudge-frontend@0.1.0 test:unit
+> vitest run
+
+
+ RUN  v3.2.4 <WORKSPACE>/frontend
+
+ ✓ tests/unit/lab/LabStudentView.spec.ts (12 tests) 268ms
+ ✓ tests/unit/grd/TeacherGradeTableView.spec.ts (15 tests) 401ms
+ ✓ tests/unit/hwk/HomeworkSubmissionHistoryView.spec.ts (15 tests) 381ms
+ ✓ tests/unit/lab/LabSubmissionReviewView.spec.ts (21 tests) 483ms
+ ✓ tests/unit/hwk/HomeworkSubmissionWorkspaceView.spec.ts (22 tests) 555ms
+ ✓ tests/unit/hwk/HomeworkSubmissionReviewView.spec.ts (24 tests) 559ms
+ ✓ tests/unit/CourseManagementView.spec.ts (24 tests) 576ms
+ ✓ tests/unit/hwk/HomeworkStudentView.spec.ts (46 tests) 718ms
+ ✓ tests/unit/lab/LabStudentFlowView.spec.ts (44 tests) 824ms
+ ✓ tests/unit/hwk/HomeworkEditorView.spec.ts (15 tests) 201ms
+ ✓ tests/unit/hwk/homeworksApi.spec.ts (10 tests) 16ms
+ ✓ tests/unit/lab/LabSubmissionResultView.spec.ts (14 tests) 170ms
+ ✓ tests/unit/hwk/HomeworkStatisticsView.spec.ts (12 tests) 267ms
+ ✓ tests/unit/hwk/HomeworkSubmissionResultView.spec.ts (14 tests) 239ms
+ ✓ tests/unit/lab/LabSubmissionHistoryView.spec.ts (17 tests) 348ms
+ ✓ tests/unit/lab/LabSubmissionWorkspaceView.spec.ts (12 tests) 341ms
+ ✓ tests/unit/auth/authApi.spec.ts (8 tests) 10ms
+ ✓ tests/unit/hwk/HomeworkTeacherView.spec.ts (14 tests) 672ms
+ ✓ tests/unit/app/router.spec.ts (37 tests) 612ms
+(node:5779) Warning: `--localstorage-file` was provided without a valid path
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ tests/unit/lrn/NotificationCenterView.spec.ts (11 tests) 250ms
+ ✓ tests/unit/lab/LabStudentAttachments.spec.ts (9 tests) 88ms
+ ✓ tests/unit/lab/LabStudentListView.spec.ts (12 tests) 217ms
+ ✓ tests/unit/grd/GradeItemConfigView.spec.ts (7 tests) 182ms
+ ✓ tests/unit/auth/AuthAdminView.spec.ts (1 test) 145ms
+ ✓ tests/unit/lrn/learningRecordsApi.spec.ts (6 tests) 16ms
+ ✓ tests/unit/components/FoundationComponents.spec.ts (9 tests) 188ms
+(node:5794) Warning: `--localstorage-file` was provided without a valid path
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ tests/unit/api/http.spec.ts (11 tests) 18ms
+ ✓ tests/unit/lab/LabStatisticsView.spec.ts (10 tests) 193ms
+(node:5798) Warning: `--localstorage-file` was provided without a valid path
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ tests/unit/grd/gradeRecordsApi.spec.ts (6 tests) 10ms
+ ✓ tests/unit/components/PlatformNavigationBar.spec.ts (8 tests) 92ms
+(node:5804) Warning: `--localstorage-file` was provided without a valid path
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ tests/unit/lab/LabEditorView.spec.ts (5 tests) 168ms
+ ✓ tests/unit/hwk/HomeworkManageView.spec.ts (5 tests) 99ms
+ ✓ src/views/grd/StudentGradeView.spec.ts (4 tests) 92ms
+ ✓ tests/unit/lab/LabTeacherView.spec.ts (4 tests) 251ms
+ ✓ tests/unit/hwk/HomeworkStudentListView.spec.ts (5 tests) 198ms
+ ✓ tests/unit/grd/App.spec.ts (7 tests) 260ms
+ ✓ tests/unit/lrn/LearningProgressView.spec.ts (4 tests) 103ms
+ ✓ tests/unit/lab/labDisplay.spec.ts (24 tests) 5ms
+ ✓ tests/unit/auth/AuthProfileView.spec.ts (3 tests) 81ms
+ ✓ tests/unit/lrn/LearningTaskCenterView.spec.ts (6 tests) 621ms
+   ✓ LearningTaskCenterView > keeps appending task pages through one continuous 200-task browsing path  452ms
+(node:5822) Warning: `--localstorage-file` was provided without a valid path
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ tests/unit/lrn/notificationUnreadState.spec.ts (3 tests) 50ms
+ ✓ tests/unit/lab/LabManageView.spec.ts (3 tests) 82ms
+ ✓ tests/unit/auth/AuthView.spec.ts (4 tests) 85ms
+ ✓ tests/unit/api/labs.spec.ts (4 tests) 9ms
+ ✓ tests/unit/lrn/LearningStatisticsView.spec.ts (3 tests) 73ms
+ ✓ tests/unit/lrn/notificationsApi.spec.ts (3 tests) 8ms
+ ✓ tests/unit/lrn/reminderRulesApi.spec.ts (2 tests) 4ms
+(node:5839) Warning: `--localstorage-file` was provided without a valid path
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ tests/unit/lrn/learningProgressApi.spec.ts (1 test) 5ms
+(node:5838) Warning: `--localstorage-file` was provided without a valid path
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ tests/unit/grd/gradeItemsApi.spec.ts (2 tests) 9ms
+ ✓ tests/unit/components/PlatformNav.spec.ts (3 tests) 40ms
+ ✓ tests/unit/app/courseMain.spec.ts (1 test) 17ms
+ ✓ tests/unit/components/CourseContextNavigation.spec.ts (1 test) 16ms
+ ✓ tests/unit/lrn/ReminderRuleSettingsView.spec.ts (2 tests) 50ms
+(node:5842) Warning: `--localstorage-file` was provided without a valid path
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ tests/unit/lrn/learningTasksApi.spec.ts (1 test) 7ms
+
+ Test Files  54 passed (54)
+      Tests  566 passed (566)
+   Start at  14:55:54
+   Duration  6.25s (transform 4.33s, setup 0ms, collect 11.31s, tests 11.38s, environment 16.80s, prepare 3.20s)
+

@@ -1,0 +1,16 @@
+issue=#262
+audit_anchor=8f8e4fc70341c701c25786f12efbffaeca2a3c5f
+base_sha=50b3b397941aa6879b010a03951d1d19c5a57250
+execution_sha=d66b7debaddde20fee2d097c7b8a6096ddd35d6d
+execution_tree=bc84f2d7938f2aae1339532a6db5e161e28708b4
+branch=test/262-lrn-doc-test-closure
+os=macOS 26.6.2 arm64
+java=25
+maven=3.9.11
+node=25.8.2
+npm=11.11.1
+playwright=1.62.1
+chrome=151.0.7922.174
+entry=random loopback Vite port -> random loopback Spring Boot port per run
+database=unique temporary H2 file database and upload directory per run; removed after each run
+docker=not required for the disposable local acceptance path

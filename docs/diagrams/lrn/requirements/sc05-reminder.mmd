@@ -1,0 +1,12 @@
+sequenceDiagram
+  actor Student as 学生
+  participant System as 在线教学平台
+  Student->>System: 查看并保存提醒规则/偏好
+  System-->>Student: 返回有效规则状态
+  alt 到达提醒时间且学生符合规则
+    System-->>Student: 展示对应 LAB/HWK 截止提醒和业务入口
+  else 学生已提交或已关闭非必要提醒
+    System-->>Student: 保持当前通知列表且不重复触达
+  else 提醒暂时不可用
+    System-->>Student: 展示可理解失败提示或稍后刷新结果
+  end
