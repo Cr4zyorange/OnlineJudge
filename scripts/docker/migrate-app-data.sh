@@ -17,6 +17,18 @@ app_data_volume="${APP_DATA_VOLUME:-onlinejudge_app-data}"
 docker volume inspect "$app_data_volume" >/dev/null 2>&1 || \
   fail "Docker volume does not exist: $app_data_volume"
 
+volume_role="$(docker volume inspect \
+  --format '{{ index .Labels "com.docker.compose.volume" }}' \
+  "$app_data_volume")"
+[[ "$volume_role" == "app-data" ]] || \
+  fail "Docker volume is not labeled as Compose app-data: $app_data_volume"
+
+running_users="$(docker ps \
+  --filter "volume=$app_data_volume" \
+  --format '{{.ID}}')"
+[[ -z "$running_users" ]] || \
+  fail "Docker volume is mounted by a running container: $app_data_volume"
+
 docker run --rm \
   --user 0:0 \
   --entrypoint sh \
