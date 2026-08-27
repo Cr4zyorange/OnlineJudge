@@ -18,9 +18,11 @@ test('deliberate assertion failure returns a non-zero exit', () => {
 });
 `, { mode: 0o600 });
 
-  const result = spawnSync(
+const result = spawnSync(
     process.execPath,
-    [playwrightCli, 'test', temporarySpec, '--workers=1'],
+    // Playwright 在 Windows 上无法把含反斜杠的绝对路径识别为测试文件，
+    // 统一转成正斜杠，保证本地（Windows）与 CI（Linux）行为一致。
+    [playwrightCli, 'test', temporarySpec.replaceAll('\\', '/'), '--workers=1'],
     {
       cwd: process.cwd(),
       encoding: 'utf8',
