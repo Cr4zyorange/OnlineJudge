@@ -1,0 +1,19 @@
+# Frontend Service: the only HTTP entry of the deployment, ClusterIP on
+# container port 80 (D3 contract #293 section 2). In Kind it is reached
+# through temporary port-forwarding (scripts/kind/k8s-verify.sh), not NodePort.
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend
+  namespace: onlinejudge-ci
+  labels:
+    app: frontend
+    app.kubernetes.io/part-of: onlinejudge
+spec:
+  type: ClusterIP
+  selector:
+    app: frontend
+  ports:
+    - port: 80
+      name: http
+      targetPort: http
