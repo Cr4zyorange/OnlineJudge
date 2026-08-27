@@ -31,7 +31,7 @@
 | Compose/Kubernetes 服务 DNS 名 | `mysql`、`backend`、`frontend` | `deploy/docker/compose.yml` 已采用三项服务名。 |
 | 后端地址 | `http://backend:8080` | `deploy/nginx/default.conf` 的 `proxy_pass http://backend:8080;`。 |
 | 反向代理前缀 | `/api/` | Nginx 将整个 `/api/` 前缀转发到后端；健康接口因此经前端访问为 `/api/v1/system/health`。 |
-| 后端探针路径 | liveness 为 `/api/v1/system/health`；数据库 readiness 为 `/api/v1/system/readiness` | 基线只有前者；后者是本契约新增的 D3 实现项，语义见第 5 节。 |
+| 后端探针路径 | liveness 为 `/api/v1/system/health`；数据库 readiness 为 `/api/v1/system/readiness`；两者都允许无 `Authorization` 请求 | 基线只有前者被鉴权白名单排除；后者是本契约新增的 D3 实现项，语义见第 5 节。 |
 | 公共 HTTP 端口输入 | `OJ_HTTP_PORT` | Compose 默认值为 `8088`；这是唯一可改变本地前端宿主端口的输入，不用于数据库或后端端口。 |
 | 数据库连接 | `MYSQL_HOST=mysql`、`MYSQL_PORT=3306` | `application-compose.properties` 与 Compose 后端环境变量逐项一致。 |
 
@@ -88,6 +88,7 @@ ConfigMap 只保存 4.1 的非敏感键；Secret 只保存本节键名及由平�
 | `backend/src/main/resources/application-compose.properties` 含 `spring.datasource.password=${MYSQL_PASSWORD:onlinejudge}` fallback。 | 改为无 fallback 的 `${MYSQL_PASSWORD}`；缺失键必须使 Compose profile 启动失败，不能回退到仓库中的口令。 | #289 同步该配置、其自动化测试和部署文档；#288/#290/#292 只注入 Secret。 |
 | `ONLINEJUDGE_NOTIFICATIONS_INTERNAL_TOKEN` 在 Compose 与 Spring 配置中可为空。 | 键名不变，作为 Secret；未启用内部通知可缺省，启用时必须注入且不得记录值。 | #289、#288、#290、#292。 |
 | `SystemHealthController.health()` 不访问 datasource，Compose、前端代理验收和后续 Kind 设计若只调用 `/api/v1/system/health`，数据库不可用仍可能通过。 | 保留 `/api/v1/system/health` 作为 liveness；新增数据库感知的 `/api/v1/system/readiness`。后者必须执行 `SELECT 1`，不可连接时返回 HTTP `503` 且不返回 `UP`。 | #289 实现与测试并切换 Compose；#288 设置 probes；#292 执行端到端 readiness 断言。 |
+| `WebMvcConfig` 的 `AuthRequiredInterceptor` 仅排除 `/api/v1/system/health`，新增 readiness 路由会先返回 `401`。 | 同样排除 `/api/v1/system/readiness`；探针请求不得携带业务用户凭据。 | #289 修改 `WebMvcConfig` 并以无 `Authorization` 的 `200/UP` 和 `503` 测试证明；#288/#292 按无凭据探针调用。 |
 | `mysql:8.4`、`3306`，后端 `8080`，前端 `80`、`${OJ_HTTP_PORT:-8088}` 及 Nginx `/api/ -> backend:8080` 已存在。 | 保持原值；不得以新同义名替换。 | #289、#288、#290、#292。 |
 
 ## 5. 健康、就绪与可脚本化断言
@@ -98,7 +99,7 @@ ConfigMap 只保存 4.1 的非敏感键；Secret 只保存本节键名及由平�
 | --- | --- | --- | --- |
 | `mysql` | `mysqladmin ping -h 127.0.0.1 -uroot -p$MYSQL_ROOT_PASSWORD --silent` | 退出码 `0`；命令必须使用 Secret 注入的 root 口令。 | `deploy/docker/compose.yml` 已以该命令为 healthcheck。 |
 | `backend` liveness | `GET http://127.0.0.1:8080/api/v1/system/health` | HTTP `200`，JSON 包含 `"status":"UP"`；基线响应的完整断言为 `code == "0"`、`message == "success"`、`data.status == "UP"`。此探针不访问 datasource，数据库不可用不应触发 liveness 重启。 | 基线 `SystemHealthController` 与 `SystemHealthControllerTest` 已满足该语义。 |
-| `backend` readiness | `GET http://127.0.0.1:8080/api/v1/system/readiness` | 成功时必须通过配置的数据源执行 `SELECT 1`，返回 HTTP `200` 与 `data.status == "UP"`；数据库不可连、账号口令无效或查询失败时返回 HTTP `503` 且响应不得含 `"status":"UP"`，也不得泄露连接串或口令。 | 基线没有此接口，#289 负责实现和 RED/GREEN 测试：受控 datasource 失败先断言 `503`，可用 datasource 再断言 `200/UP`。 |
+| `backend` readiness | 无 `Authorization` 的 `GET http://127.0.0.1:8080/api/v1/system/readiness` | 成功时必须通过配置的数据源执行 `SELECT 1`，返回 HTTP `200` 与 `data.status == "UP"`；数据库不可连、账号口令无效或查询失败时返回 HTTP `503` 且响应不得含 `"status":"UP"`，也不得泄露连接串或口令。 | 基线没有此接口且 `WebMvcConfig` 未放行该路径；#289 负责实现和 RED/GREEN 测试：无凭据的受控 datasource 失败先断言 `503`，可用 datasource 再断言 `200/UP`，不得返回 `401`。 |
 | `frontend` 静态服务 | `GET http://127.0.0.1/` | HTTP `200`，响应包含 `<!doctype html>`。 | `deploy/docker/compose.yml` 的 frontend healthcheck。 |
 | `frontend -> backend` 代理连通性 | `GET http://frontend/api/v1/system/readiness`（或将 frontend 临时端口转发后访问同一路径） | HTTP `200`，JSON 包含 `"status":"UP"`；证明 Nginx `/api/` 代理、backend 与 MySQL 均可用，而不是只证明静态页或后端进程存在。 | Nginx 已代理至 `backend:8080`；#289 补 Compose 验收，#288/#292 必须补这条跨服务断言。 |
 
@@ -109,7 +110,7 @@ Kubernetes 的 MySQL probes 使用 `mysqladmin ping`；backend 的 `startupProbe
 | Issue | 唯一负责的文件/目录 | 读取的契约输入 | 对下游的稳定输出 | 明确不负责 |
 | --- | --- | --- | --- | --- |
 | #293 `D3-CONTRACT` | `docs/开发/D3-CICD-共享契约.md` | 基线的 Compose、Dockerfile、Nginx、后端配置与本表事实 | 本共享契约 | 不修改任何 Dockerfile、Compose、workflow、Kubernetes 清单或业务代码。 |
-| #289 `D3-CONTAINER` | `deploy/docker/**`、`.dockerignore`、`scripts/docker/**`（如需新增）；`backend/src/main/java/com/onlinejudge/common/controller/SystemHealthController.java`、`backend/src/main/resources/application-compose.properties`、`backend/src/test/java/com/onlinejudge/common/SystemHealthControllerTest.java`；`docs/最终提交/部署文档.md`、`docs/最终提交/软件实现说明书.md`、`docs/最终提交/测试文档.md` | 服务名、`GIT_SHA`、镜像名、变量、Secret 边界和第 5 节断言 | 可构建的两个带 tag/OCI label 的镜像；无 password fallback 的 Compose profile；liveness/readiness 实现和 RED/GREEN 测试；同步后的权威部署/实现/测试文档；Compose 与容器烟测入口 | 不创建 GitHub Actions 或 Kubernetes 资源，也不改变业务接口语义。 |
+| #289 `D3-CONTAINER` | `deploy/docker/**`、`.dockerignore`、`scripts/docker/**`（如需新增）；`backend/src/main/java/com/onlinejudge/common/controller/SystemHealthController.java`、`backend/src/main/java/com/onlinejudge/common/config/WebMvcConfig.java`、`backend/src/main/resources/application-compose.properties`、`backend/src/test/java/com/onlinejudge/common/SystemHealthControllerTest.java`；`docs/最终提交/部署文档.md`、`docs/最终提交/软件实现说明书.md`、`docs/最终提交/测试文档.md` | 服务名、`GIT_SHA`、镜像名、变量、Secret 边界和第 5 节断言 | 可构建的两个带 tag/OCI label 的镜像；无 password fallback 的 Compose profile；匿名可访问的 liveness/readiness 实现和 RED/GREEN 测试；同步后的权威部署/实现/测试文档；Compose 与容器烟测入口 | 不创建 GitHub Actions 或 Kubernetes 资源，也不改变业务接口语义。 |
 | #290 `D3-CI` | `.github/workflows/ci.yml`、`scripts/ci/**`（如需新增） | 仓库测试正本、`GIT_SHA`、Secret 键名和 #289 的构建入口 | PR/dev push 质量门禁、测试报告和可审计环境/SHA 清单 | 不创建 `deploy/k8s/**`，不实现端到端 Kind 部署工作流。 |
 | #288 `D3-K8S` | `deploy/k8s/**`、`scripts/kind/**`（如需新增） | 三服务名、镜像精确引用、ConfigMap/Secret 边界、健康断言和 #287 schema 正本 | 可重复部署/精确清理的 Kind 基线，以及 Ready/连通性诊断入口 | 不修改 Dockerfile、Compose、质量门禁 workflow 或 schema 正本。 |
 | #292 `D3-DELIVERY` | `.github/workflows/d3-delivery.yml`、`scripts/delivery/**`（如需新增） | #290 质量门禁结果、#289 镜像构建输出、#288 Kind 部署/清理入口、`GIT_SHA` 和第 5 节断言 | 串联质量门禁、版本化镜像、Kind 验收、诊断归档和清理的端到端流水线 | 不复制 #289 的构建实现、不创建第二套 Kubernetes 清单、不弱化 #290 门禁。 |
@@ -121,7 +122,7 @@ Kubernetes 的 MySQL probes 使用 `mysqladmin ping`；backend 的 `startupProbe
 - [ ] 所有引用仅使用 `mysql`、`backend`、`frontend` 三个服务名，端口与方向符合第 2 节。
 - [ ] 两个自建 image 的 tag 和 `org.opencontainers.image.revision` 都等于同一个完整 `GIT_SHA`，且没有 `latest` 作为唯一 tag。
 - [ ] 非敏感键来自同名 environment/ConfigMap，三项敏感键只来自 Secret 或 GitHub Secrets，证据中没有值；Compose、`.env.example` 和 `application-compose.properties` 没有密码 fallback，三份权威文档同步说明必填 Secret 输入。
-- [ ] MySQL、backend liveness、backend readiness、frontend 静态服务和 frontend-to-backend readiness 均按第 5 节断言；数据库不可用时 readiness 必须失败，且失败时保留原始输出并返回非零。
+- [ ] MySQL、backend liveness、backend readiness、frontend 静态服务和 frontend-to-backend readiness 均按第 5 节断言；无 `Authorization` 的 readiness 在数据库可用时必须成功、数据库不可用时必须失败，且失败时保留原始输出并返回非零。
 - [ ] 变更只触及责任表中本 Issue 的路径；若需要改变本契约，先更新本文件并在相关 Issue/PR 中说明消费者影响。
 
 ## 8. 本文件核对记录
