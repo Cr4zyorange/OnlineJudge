@@ -83,6 +83,9 @@ frontend/playwright-report/
 tmp/
 temp/
 
+# CI quality gate evidence
+ci-artifacts/
+
 # Application runtime data
 uploads/
 storage/
