@@ -1,0 +1,4 @@
+command=git diff --check origin/dev...c913dcc9c57a8e9bc327711419775d6218fa55c4
+output_begin
+output_end
+exit_code=0

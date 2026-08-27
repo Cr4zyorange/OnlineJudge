@@ -2,9 +2,9 @@
 > onlinejudge-frontend@0.1.0 test:e2e:contract
 > node --test tests/contracts/shared-e2e-entry.contract.test.mjs
 
-✔ shared E2E package commands use the single Playwright runner (1.1938ms)
-✔ repository has one Playwright config and one ignored artifact convention (435.0839ms)
-✔ shared fixture, real-application smoke and local runbook are present (2.5374ms)
+✔ shared E2E package commands use the single Playwright runner (0.7058ms)
+✔ repository has one Playwright config and one ignored artifact convention (127.1449ms)
+✔ shared fixture, real-application smoke and local runbook are present (2.7386ms)
 ℹ tests 3
 ℹ suites 0
 ℹ pass 3
@@ -12,4 +12,4 @@
 ℹ cancelled 0
 ℹ skipped 0
 ℹ todo 0
-ℹ duration_ms 506.6562
+ℹ duration_ms 196.5378

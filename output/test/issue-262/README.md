@@ -10,10 +10,10 @@
 | --- | --- |
 | 需求审查锚点 | `origin/dev@8f8e4fc70341c701c25786f12efbffaeca2a3c5f` |
 | 最新开发基线 | `origin/dev@50a5dccd35ddc6b0c8936df20217575f18303a4f` |
-| 本轮被测头提交 | `8b69a7241db6bdf585db532522abec041a3e4160` |
-| 被测提交树 | `0fe28305cd4d730d55e89fd5941ceecfe44a75c0` |
+| 本轮被测头提交 | `c913dcc9c57a8e9bc327711419775d6218fa55c4` |
+| 被测提交树 | `014e1e880c6c4d3600da18d7233c1956a616267a` |
 | 验收分支 | `test/262-lrn-doc-test-closure` |
-| 执行时间 | 当前头复测 2026-08-26 16:52–16:59 +08:00 |
+| 执行时间 | tested SHA 完整复测及证据重放 2026-08-27 09:51–10:15 +08:00 |
 | 操作系统 | Windows 11 家庭版 中文版，amd64 |
 | Java / Maven | Java 21.0.11 / Maven 3.9.16 |
 | Node / npm | Node 24.16.0 / npm 11.13.0 |
@@ -57,7 +57,7 @@
 | Mermaid 图源/静态资产 | 5 场景 × 3 层 | 15 | 15 | 0 | 0 | 0 | PASS |
 | NFR-LN-01/02 真实时延与响应时间 | 未执行逐项计时/压力采样 | 2 | 0 | 0 | 0 | 2 | BLOCKED |
 
-后端、前端和 E2E 摘要见 [backend-summary.txt](backend-summary.txt)、[frontend-summary.txt](frontend-summary.txt)、[e2e-summary.txt](e2e-summary.txt)；环境记录见 [environment.txt](environment.txt)，可核对的去敏原始输出见 [raw/README.md](raw/README.md)。
+后端、前端和 E2E 摘要见 [backend-summary.txt](backend-summary.txt)、[frontend-summary.txt](frontend-summary.txt)、[e2e-summary.txt](e2e-summary.txt)；环境记录见 [environment.txt](environment.txt)，可核对的去敏原始输出见 [raw/README.md](raw/README.md)。`git diff --check origin/dev...c913dcc9c57a8e9bc327711419775d6218fa55c4` 的原始输出和退出码见 [raw/diff-check.log](raw/diff-check.log)，结果为 exit code 0。
 
 ## 缺陷与合并复测
 

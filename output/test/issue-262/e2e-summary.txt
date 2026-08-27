@@ -8,7 +8,7 @@ Passed: 8
 Failures: 0
 Errors: 0
 Skipped: 0
-Durations: 17.9s, 19.2s
+Durations: 18.2s, 22.3s
 Result: PASS
 
 PASS:
@@ -18,7 +18,7 @@ PASS:
 - marks a real LAB notification read before navigating and keeps repeated opens idempotent
 
 NOTE:
-- On execution_sha 8b69a7241db6bdf585db532522abec041a3e4160, the unchanged default 4-worker combined command passed 4/4 twice consecutively (17.9s, 19.2s).
+- On execution_sha c913dcc9c57a8e9bc327711419775d6218fa55c4, the unchanged default 4-worker combined command passed 4/4 twice consecutively after service warm-up (18.2s, 22.3s).
 - Target-notification state and idempotency are asserted by notification ID, so notifications concurrently created by other workers do not race the assertion.
 - Defect #269 is fixed in the #262 branch per owner instruction.
 

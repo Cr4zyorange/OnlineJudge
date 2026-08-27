@@ -4,10 +4,10 @@ Passed: 119
 Failures: 0
 Errors: 0
 Skipped: 0
-Duration: 3.64s
+Duration: 2.93s
 Result: PASS
 
 Typecheck: PASS
-Build: PASS (189 modules transformed, 2.56s)
+Build: PASS (189 modules transformed, 2.39s)
 Shared E2E contract: 3/3 PASS
 LRN document contract: 4/4 PASS
