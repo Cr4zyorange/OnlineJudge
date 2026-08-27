@@ -1,7 +1,10 @@
 import { flushPromises, mount } from '@vue/test-utils';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import NotificationCenterView from '../../../src/views/lrn/NotificationCenterView.vue';
 import * as notificationsApi from '../../../src/api/lrn/notifications';
+import { writeAuthStorage, removeAuthStorage } from '../../../src/api/auth/storage';
+import { currentUser, resetRuntimeContext } from '../../../src/app/runtimeContext';
+import { resetNotificationUnreadState } from '../../../src/lrn/notificationUnreadState';
 import type { NotificationPage } from '../../../src/types/lrn';
 
 vi.mock('../../../src/api/lrn/notifications');
@@ -55,13 +58,21 @@ const notificationPage: NotificationPage = {
 describe('NotificationCenterView', () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    resetNotificationUnreadState();
+    resetRuntimeContext();
+    removeAuthStorage('onlinejudge.authToken');
+    removeAuthStorage('onlinejudge.userId');
     window.history.replaceState({}, '', '/notifications');
+  });
+
+  afterEach(() => {
+    mountedViews.splice(0).forEach((wrapper) => wrapper.unmount());
   });
 
   it('renders categorized notifications with unread highlight and action links', async () => {
     vi.mocked(notificationsApi.listNotifications).mockResolvedValueOnce(notificationPage);
 
-    const wrapper = mount(NotificationCenterView);
+    const wrapper = mountNotificationCenter();
     await flushPromises();
 
     expect(notificationsApi.listNotifications).toHaveBeenCalledWith(expect.objectContaining({
@@ -100,7 +111,7 @@ describe('NotificationCenterView', () => {
       unreadCount: 1
     });
 
-    const wrapper = mount(NotificationCenterView);
+    const wrapper = mountNotificationCenter();
     await flushPromises();
 
     expect(wrapper.text()).toContain('入口已失效');
@@ -113,7 +124,7 @@ describe('NotificationCenterView', () => {
     vi.mocked(notificationsApi.markNotificationsRead).mockResolvedValueOnce({ updatedCount: 1 });
     routerPush.mockResolvedValueOnce(undefined);
 
-    const wrapper = mount(NotificationCenterView);
+    const wrapper = mountNotificationCenter();
     await flushPromises();
 
     await wrapper.get('a[href="/courses/101/homeworks/501"]').trigger('click');
@@ -132,7 +143,7 @@ describe('NotificationCenterView', () => {
     vi.mocked(notificationsApi.listNotifications).mockResolvedValueOnce(notificationPage);
     vi.mocked(notificationsApi.markNotificationsRead).mockRejectedValueOnce(new Error('标记已读失败'));
 
-    const wrapper = mount(NotificationCenterView);
+    const wrapper = mountNotificationCenter();
     await flushPromises();
 
     await wrapper.get('a[href="/courses/101/homeworks/501"]').trigger('click');
@@ -150,7 +161,7 @@ describe('NotificationCenterView', () => {
     }));
     routerPush.mockResolvedValueOnce(undefined);
 
-    const wrapper = mount(NotificationCenterView);
+    const wrapper = mountNotificationCenter();
     await flushPromises();
 
     const link = wrapper.get('a[href="/courses/101/homeworks/501"]');
@@ -179,7 +190,7 @@ describe('NotificationCenterView', () => {
       unreadCount: 1
     });
 
-    const wrapper = mount(NotificationCenterView);
+    const wrapper = mountNotificationCenter();
     await flushPromises();
 
     expect(wrapper.text()).toContain('入口已失效');
@@ -198,7 +209,7 @@ describe('NotificationCenterView', () => {
         unreadCount: 0
       });
 
-    const wrapper = mount(NotificationCenterView);
+    const wrapper = mountNotificationCenter();
     await flushPromises();
 
     await wrapper.get('[name="type"]').setValue('GRADE');
@@ -216,7 +227,7 @@ describe('NotificationCenterView', () => {
       .mockRejectedValueOnce(new Error('通知加载失败'))
       .mockResolvedValueOnce(notificationPage);
 
-    const wrapper = mount(NotificationCenterView);
+    const wrapper = mountNotificationCenter();
     await flushPromises();
 
     expect(wrapper.text()).toContain('通知加载失败');
@@ -250,7 +261,7 @@ describe('NotificationCenterView', () => {
     vi.mocked(notificationsApi.markNotificationsRead).mockResolvedValueOnce({ updatedCount: 1 });
     vi.mocked(notificationsApi.deleteNotification).mockResolvedValueOnce({ updatedCount: 1 });
 
-    const wrapper = mount(NotificationCenterView);
+    const wrapper = mountNotificationCenter();
     await flushPromises();
 
     await wrapper.get('[data-testid="notification-select-10"]').setValue(true);
@@ -285,7 +296,7 @@ describe('NotificationCenterView', () => {
       .mockResolvedValueOnce(afterReadAllPage);
     vi.mocked(notificationsApi.markNotificationsRead).mockResolvedValueOnce({ updatedCount: 1 });
 
-    const wrapper = mount(NotificationCenterView);
+    const wrapper = mountNotificationCenter();
     await flushPromises();
 
     await wrapper.get('[data-testid="mark-all-read"]').trigger('click');
@@ -298,4 +309,59 @@ describe('NotificationCenterView', () => {
     expect(wrapper.text()).toContain('未读 0');
     expect(wrapper.get('[data-testid="mark-all-read"]').attributes('disabled')).toBeDefined();
   });
+
+  it('clears stale notification cards before rendering a response for a different session', async () => {
+    let resolveFirst: ((value: NotificationPage) => void) | undefined;
+    writeAuthStorage('onlinejudge.authToken', 'student-session-a');
+    writeAuthStorage('onlinejudge.userId', '101');
+    currentUser.value = user(101, 'student-a');
+    vi.mocked(notificationsApi.listNotifications)
+      .mockImplementationOnce(() => new Promise((resolve) => {
+        resolveFirst = resolve;
+      }))
+      .mockResolvedValueOnce({
+        ...notificationPage,
+        records: [{ ...notificationPage.records[1], title: '学生 B 的通知' }],
+        total: 1,
+        unreadCount: 0
+      });
+
+    const wrapper = mountNotificationCenter();
+    await vi.waitFor(() => {
+      expect(notificationsApi.listNotifications).toHaveBeenCalledTimes(1);
+    });
+
+    writeAuthStorage('onlinejudge.authToken', 'student-session-b');
+    writeAuthStorage('onlinejudge.userId', '202');
+    currentUser.value = user(202, 'student-b');
+    await vi.waitFor(() => {
+      expect(notificationsApi.listNotifications).toHaveBeenCalledTimes(2);
+    });
+
+    resolveFirst?.(notificationPage);
+    await flushPromises();
+
+    expect(wrapper.text()).not.toContain('新作业发布：Java 编程题');
+    expect(wrapper.text()).toContain('学生 B 的通知');
+    expect(notificationsApi.listNotifications).toHaveBeenCalledTimes(2);
+  });
 });
+
+const mountedViews: Array<ReturnType<typeof mount>> = [];
+
+function mountNotificationCenter() {
+  const wrapper = mount(NotificationCenterView);
+  mountedViews.push(wrapper);
+  return wrapper;
+}
+
+function user(id: number, username: string) {
+  return {
+    id,
+    username,
+    userType: 'STUDENT',
+    displayName: username,
+    roles: ['STUDENT'],
+    permissions: []
+  };
+}

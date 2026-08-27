@@ -141,7 +141,8 @@ test.describe('@lrn UC-LRN-01 business closure', () => {
     await loginAs('student');
     let interrupted = false;
     await page.route('**/api/v1/notifications**', async (route) => {
-      if (!interrupted) {
+      const requestUrl = new URL(route.request().url());
+      if (!interrupted && requestUrl.searchParams.get('size') === '20') {
         interrupted = true;
         await route.abort('internetdisconnected');
         return;

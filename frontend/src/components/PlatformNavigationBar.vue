@@ -50,10 +50,15 @@
           href="/notifications"
           data-testid="platform-nav-notifications"
           title="消息通知中心"
-          aria-label="消息通知中心"
+          :aria-label="unreadCount > 0 ? `消息通知中心，${unreadCount} 条未读` : '消息通知中心'"
           :class="{ active: activeSection === 'notifications' }"
         >
           <i class="bi bi-bell"></i>
+          <span
+            v-if="unreadCount > 0"
+            class="navbar-notification-badge"
+            data-testid="platform-nav-unread-badge"
+          >{{ unreadCount > 99 ? '99+' : unreadCount }}</span>
         </a>
         <a class="avatar" href="/profile" data-testid="platform-nav-profile" aria-label="个人中心">
           {{ avatarText }}
@@ -118,6 +123,7 @@ import {
   type BackgroundOption
 } from '../backgroundOptions';
 import { readLocalStorage, writeLocalStorage } from '../utils/browserStorage';
+import { useNotificationUnread } from '../lrn/notificationUnreadState';
 
 const props = defineProps<{
   currentPath: string;
@@ -129,6 +135,7 @@ const backgroundMenuStyle = ref<Record<string, string>>({});
 const selectedBackgroundId = ref(backgroundOptions[0].id);
 const selectedBackground = computed(() => findBackgroundOption(selectedBackgroundId.value));
 const logoutPending = ref(false);
+const { unreadCount } = useNotificationUnread();
 const hasActiveSession = ref(Boolean(readLocalStorage('onlinejudge.authToken')));
 
 const avatarText = computed(() => {
@@ -255,6 +262,27 @@ function previewStyle(option: BackgroundOption) {
 
 .navbar-user a.active {
   color: var(--oj-brand);
+}
+
+.navbar-user a[data-testid='platform-nav-notifications'] {
+  position: relative;
+}
+
+.navbar-notification-badge {
+  position: absolute;
+  top: -7px;
+  right: -9px;
+  display: grid;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 3px;
+  place-items: center;
+  border-radius: 999px;
+  background: #c83f4d;
+  color: #fff;
+  font-size: 0.64rem;
+  font-weight: 800;
+  line-height: 1;
 }
 
 .logout-button {

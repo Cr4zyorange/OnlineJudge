@@ -1,0 +1,38 @@
+sequenceDiagram
+  actor Teacher as 教师
+  participant View as HomeworkEditorView
+  participant Controller as HomeworkController
+  participant Service as HomeworkService
+  participant Permission as CoursePermissionClient
+  participant Repository as JdbcHomeworkRepository
+  participant Publisher as NotificationEventPublisher
+  Teacher->>View: 填写配置并保存草稿
+  View->>Controller: POST/PUT /api/v1/homeworks
+  Controller->>Service: create/update(command, currentUser)
+  Service->>Permission: canManageCourse(userId, courseId)
+  Permission-->>Service: 返回允许或拒绝
+  Service->>Repository: 保存 DRAFT 聚合（含题目、测试用例和评测配置）
+  Repository-->>Service: 返回持久化后的 Homework
+  Service-->>Controller: 返回 Homework
+  Controller-->>View: 返回 HomeworkResponse
+  Teacher->>View: 确认发布
+  View->>Controller: PUT /api/v1/homeworks/{id}/publish
+  Controller->>Service: publish(homeworkId, currentUser)
+  Service->>Permission: 复核课程管理权限
+  Service->>Repository: 读取聚合作业与类型配置
+  Repository-->>Service: 返回 Homework、题目和测试用例
+  Service->>Service: 校验类型配置完整性
+  alt 合法且未删除
+    Service->>Repository: 在事务中更新 PUBLISHED/publishedAt
+    Service->>Publisher: publishRequired(HOMEWORK_PUBLISHED)
+    alt 必需通知持久化成功
+      Publisher-->>Service: 返回成功
+      Service-->>Controller: 返回发布结果
+    else 必需通知持久化失败
+      Publisher--xService: 抛出投递异常
+      Service->>Repository: 回滚并保持 DRAFT
+      Service-->>Controller: 返回 HWK_5003
+    end
+  else 权限、配置或状态冲突
+    Service-->>Controller: 返回稳定 HWK 错误码
+  end

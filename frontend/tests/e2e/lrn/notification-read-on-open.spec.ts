@@ -53,16 +53,30 @@ test.describe('@lrn #269 notification read-on-open', () => {
     expect(beforeUnreadNotificationIds.has(notice.notificationId)).toBe(true);
 
     let readMutationCount = 0;
-    page.on('request', (request) => {
-      if (request.method() === 'PUT' && request.url().includes('/api/v1/notifications/read')) {
-        readMutationCount += 1;
+    let releaseFirstRead: (() => void) | undefined;
+    const firstReadReleased = new Promise<void>((resolve) => {
+      releaseFirstRead = resolve;
+    });
+    await page.route('**/api/v1/notifications/read', async (route) => {
+      readMutationCount += 1;
+      if (readMutationCount !== 1) {
+        await route.continue();
+        return;
       }
+      const response = await route.fetch();
+      await firstReadReleased;
+      await route.fulfill({ response });
     });
 
     await page.goto('/notifications');
     const card = page.getByTestId(`notification-card-${notice.notificationId}`);
     await expect(card).toContainText(`Issue 269 LAB ${suffix}`);
-    await card.getByRole('link', { name: '查看详情' }).click();
+    const detailLink = card.getByRole('link', { name: '查看详情' });
+    await detailLink.dispatchEvent('click');
+    await expect.poll(() => readMutationCount).toBe(1);
+    await card.locator('.notification-card__link').dispatchEvent('click');
+    await expect.poll(() => readMutationCount).toBe(1);
+    releaseFirstRead?.();
 
     await expect(page).toHaveURL(new RegExp(`/courses/${DEMO_COURSE_ID}/labs/${lab.id}$`));
     await expect(page.getByTestId('lab-detail-page')).toContainText(`Issue 269 LAB ${suffix}`);
@@ -78,16 +92,12 @@ test.describe('@lrn #269 notification read-on-open', () => {
     await page.goto('/notifications');
     const readCard = page.getByTestId(`notification-card-${notice.notificationId}`);
     await expect(readCard).not.toContainText('未读');
-    await page.screenshot({
-      path: test.info().outputPath('notification-read-state-after-fix.png'),
-      fullPage: true
-    });
     await readCard.getByRole('link', { name: '查看详情' }).click();
     await expect(page).toHaveURL(new RegExp(`/courses/${DEMO_COURSE_ID}/labs/${lab.id}$`));
     expect(readMutationCount).toBe(1);
 
     await page.screenshot({
-      path: test.info().outputPath('notification-read-on-open-after-fix.png'),
+      path: test.info().outputPath('notification-read-on-open.png'),
       fullPage: true
     });
   });
@@ -97,7 +107,7 @@ async function notificationPage(page: Page, headers: Record<string, string>) {
   return apiData<NotificationPage>(await page.request.get('/api/v1/notifications?size=100', { headers }));
 }
 
-async function apiData<T>(response: APIResponse): Promise<T> {
+async function apiData<T>(response: APIResponse) {
   expect(response.ok(), `${response.url()} returned ${response.status()}`).toBe(true);
   const envelope = await response.json() as ApiEnvelope<T>;
   expect(envelope.code).toBe('0');

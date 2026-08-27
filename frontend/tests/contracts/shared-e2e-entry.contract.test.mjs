@@ -1,13 +1,26 @@
 import assert from 'node:assert/strict';
-import { readFileSync, readdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { execFileSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
+import { fileURLToPath } from 'node:url';
 
 const frontendRoot = new URL('../..', import.meta.url);
 const repositoryRoot = new URL('../../..', import.meta.url);
 
 function readFrontendFile(path) {
   return readFileSync(new URL(path, frontendRoot), 'utf8');
+}
+
+function findPlaywrightConfigs() {
+  const repositoryFiles = execFileSync('git', ['ls-files', '-z', '--', 'frontend'], {
+    cwd: fileURLToPath(repositoryRoot),
+    encoding: 'utf8'
+  }).split('\0');
+
+  return repositoryFiles
+    .filter((path) => path.startsWith('frontend/'))
+    .map((path) => path.slice('frontend/'.length))
+    .filter((path) => /(^|\/)playwright\.config\.[cm]?[jt]s$/.test(path));
 }
 
 test('shared E2E package commands use the single Playwright runner', () => {
@@ -20,8 +33,7 @@ test('shared E2E package commands use the single Playwright runner', () => {
 });
 
 test('repository has one Playwright config and one ignored artifact convention', () => {
-  const configFiles = readdirSync(frontendRoot, { recursive: true })
-    .filter((path) => /(^|\/)playwright\.config\.[cm]?[jt]s$/.test(path));
+  const configFiles = findPlaywrightConfigs();
   const config = readFrontendFile('playwright.config.ts');
   const gitignore = readFileSync(new URL('.gitignore', repositoryRoot), 'utf8');
 

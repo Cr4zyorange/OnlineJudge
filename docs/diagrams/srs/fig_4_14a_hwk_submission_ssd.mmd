@@ -1,0 +1,21 @@
+sequenceDiagram
+  actor Student as 学生
+  actor Teacher as 教师
+  participant System as OnlineJudgeForSE 系统边界
+  Student->>System: OP-HWK-02 提交作业(homeworkId, submission)
+  alt 作业开放、成员和提交格式合法
+    alt OBJECTIVE
+      System-->>Student: 返回提交回执、评测终态和自动分
+    else CODE
+      System-->>Student: 返回提交已受理、评测记录 PENDING
+    else TEXT/FILE
+      System-->>Student: 返回提交回执和待批阅状态
+    end
+    opt 教师批阅或重评
+      Teacher->>System: OP-HWK-04 提交评分、评语或重评理由
+      System-->>Teacher: 返回批阅/重评结果与审计日志
+      System-->>Student: OP-HWK-05 返回可见反馈与结果
+    end
+  else 逾期、非成员、格式非法或附件不可绑定
+    System-->>Student: 返回稳定错误码和受控提示
+  end

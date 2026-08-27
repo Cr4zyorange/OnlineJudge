@@ -617,64 +617,17 @@ CREATE INDEX idx_hwk_submission_attention ON t_hwk_submission(homework_id, is_fi
 
 ## 9 运行设计补充：核心业务流程
 
-### 9.1 教师发布作业流程
+### 9.1 UC-HWK-02 教师创建并发布作业组件顺序图
 
-```mermaid
-sequenceDiagram
-    actor Teacher as 教师
-    participant Web as 前端页面
-    participant HWK as HWK模块
-    participant AUTH as AUTH模块
-    participant CRS as CRS模块
-    participant LRN as 通知模块
-    participant DB as MySQL
+![](../../最终提交/assets/fig_5_2_hwk_02_publish_component.svg)
 
-    Teacher->>Web: 填写作业信息并点击发布
-    Web->>HWK: POST /homeworks 或 PUT /homeworks/{id}/publish
-    HWK->>AUTH: 校验教师身份与课程权限
-    AUTH-->>HWK: 返回权限校验结果
-    HWK->>CRS: 校验课程/章节是否存在
-    CRS-->>HWK: 返回课程信息
-    HWK->>DB: 保存作业并更新为已发布
-    HWK->>LRN: 发送 HOMEWORK_PUBLISHED 事件
-    HWK-->>Web: 返回发布成功
-    Web-->>Teacher: 展示发布结果
-```
+Mermaid 图源：`docs/diagrams/arch/fig_5_2_hwk_02_publish_component.mmd`。
 
-### 9.2 学生提交作业流程
+### 9.2 UC-HWK-01 学生提交作业并触发自动评测组件顺序图
 
-```mermaid
-sequenceDiagram
-    actor Student as 学生
-    participant Web as 前端页面
-    participant HWK as HWK模块
-    participant AUTH as AUTH模块
-    participant FS as 文件存储
-    participant DB as MySQL
-    participant Judge as 评测服务
+![](../../最终提交/assets/fig_5_2_hwk_01_submission_component.svg)
 
-    Student->>Web: 选择一个 FILE 附件
-    Web->>HWK: API-HWK-23 multipart 单 file
-    HWK->>AUTH: 校验学生身份、课程成员和作业状态
-    AUTH-->>HWK: 返回校验结果
-    HWK->>HWK: 校验 10 MiB 与扩展/MIME/内容签名白名单
-    HWK->>FS: 以服务端存储键写入文件
-    HWK->>DB: 写入 UPLOADED 元数据与 24h expiresAt
-    HWK-->>Web: 返回 UUID 与安全元数据
-    Student->>Web: 确认提交
-    Web->>HWK: API-HWK-07（FILE fileIds 恰好 1）
-    HWK->>AUTH: 再次校验课程成员关系
-    HWK->>DB: 同事务创建提交并将附件 UPLOADED 转为 BOUND
-    alt 客观题作业
-        HWK->>DB: 根据标准答案计算并保存自动得分
-    else 代码作业
-        HWK->>Judge: 创建异步评测任务
-    else 文件/主观作业
-        HWK->>DB: 标记为等待教师批阅
-    end
-    HWK-->>Web: 返回提交成功和提交状态
-    Web-->>Student: 展示提交编号与状态
-```
+Mermaid 图源：`docs/diagrams/arch/fig_5_2_hwk_01_submission_component.mmd`。
 
 ### 9.3 代码自动评测流程
 

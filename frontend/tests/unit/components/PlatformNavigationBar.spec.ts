@@ -1,8 +1,13 @@
 import { mount } from '@vue/test-utils';
+import { ref } from 'vue';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import PlatformNavigationBar from '../../../src/components/PlatformNavigationBar.vue';
 import { BACKGROUND_STORAGE_KEY } from '../../../src/backgroundOptions';
 import { logout } from '../../../src/api/auth/auth';
+
+vi.mock('../../../src/lrn/notificationUnreadState', () => ({
+  useNotificationUnread: () => ({ unreadCount: ref(3) })
+}));
 
 vi.mock('../../../src/api/auth/auth', () => ({
   logout: vi.fn()
@@ -19,6 +24,16 @@ describe('PlatformNavigationBar', () => {
     document.body.classList.remove('oj-video-background');
     document.querySelectorAll('.background-picker__menu').forEach((menu) => menu.remove());
     window.history.pushState({}, '', '/courses');
+  });
+
+  it('renders the unread notification badge from the shared state', () => {
+    const wrapper = mount(PlatformNavigationBar, {
+      props: {
+        currentPath: '/courses'
+      }
+    });
+
+    expect(wrapper.get('[data-testid="platform-nav-unread-badge"]').text()).toBe('3');
   });
 
   it('lets users pick a background image from the fixed image set', async () => {

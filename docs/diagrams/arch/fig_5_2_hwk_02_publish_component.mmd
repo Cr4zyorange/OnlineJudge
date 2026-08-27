@@ -1,0 +1,30 @@
+sequenceDiagram
+  actor Teacher as 教师
+  participant Frontend as Vue HWK 教师端
+  participant API as HWK API
+  participant Permission as CRS 课程权限边界
+  participant DB as HWK 数据表
+  participant Notification as LRN 通知事件边界
+  Teacher->>Frontend: 填写作业、题目和测试用例
+  Frontend->>API: 保存草稿或请求发布
+  API->>Permission: 校验课程管理权限
+  Permission-->>API: 返回允许或拒绝
+  alt 保存草稿
+    API->>DB: 保存 DRAFT 及配置
+    DB-->>API: 返回草稿与更新时间
+    API-->>Frontend: 返回草稿结果
+  else 请求发布且配置完整
+    API->>DB: 在发布事务中更新 PUBLISHED/publishedAt
+    API->>Notification: 必需投递 HOMEWORK_PUBLISHED
+    alt 通知投递成功
+      Notification-->>API: 返回持久化成功
+      API-->>Frontend: 返回发布成功
+    else 通知投递失败
+      Notification--xAPI: 返回投递异常
+      API->>DB: 回滚事务并保持 DRAFT
+      API-->>Frontend: 返回 503/HWK_5003
+    end
+  else 权限、配置或状态校验失败
+    API-->>Frontend: 返回受控错误并保留可修改内容
+  end
+  Frontend-->>Teacher: 展示最终状态
