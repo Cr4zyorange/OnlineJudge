@@ -1,0 +1,14 @@
+sequenceDiagram
+  actor Teacher as 教师
+  participant System as OnlineJudgeForSE 系统边界
+  Teacher->>System: OP-GR-01 保存成绩项与计算规则
+  Note over Teacher,System: LAB/HWK 来源编号须为正整数<br/>OTHER_COURSE_ITEM 来源编号可为空
+  alt 字段与规则合法
+    System-->>Teacher: 返回已保存成绩项
+  else 字段/规则/权限非法
+    System-->>Teacher: 返回受控错误且不修改既有规则
+  end
+  opt 教师单独校验当前规则
+    Teacher->>System: POST /courses/{courseId}/grade-rules/validate
+    System-->>Teacher: 返回 valid、totalIncludedWeight 和 errors
+  end
