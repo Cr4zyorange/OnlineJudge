@@ -33,27 +33,32 @@ RED 基线（实现前）：`verify-workflow-gates.test.sh` 因 `check-workflows
 
 ## 3. GREEN：全套质量门禁通过
 
-修复注入缺陷后重跑同一链路：
+验收基线：`68b4ee70ed6d2fae3f29a288d80a8bb3afa4ed47`（2026-08-27 在隔离 checkout 重跑）。
+本 HEAD 已合并 `Cr4zyorange:dev`（含 LRN NFR 闭环 #297 等新增测试），以下为原始结果：
 
 ```text
 PASS validate-workflows（check-workflows: PASS 50 checks）
-PASS backend-gate（compile + 单元 371 tests + 集成 15 tests）
-PASS frontend-gate（typecheck + 单元 556 tests + build + runner contracts 3 tests）
-PASS contracts-gate（shell contract 19 scripts + CommonInfrastructureContractTest）
-RUN delivery
+PASS backend-gate（compile + 单元 373 tests（skipped 7）+ 集成 15 tests）
+PASS frontend-gate（typecheck + 单元 563 tests + build + runner contracts 3 tests）
+PASS contracts-gate（shell contract 21 tracked scripts + CommonInfrastructureContractTest 1 test）
+RUN delivery（bash scripts/ci/delivery-checkpoint.sh）
 PASS delivery
 gate-chain: PASS
 ```
 
-测试汇总（`test-summary.txt`）：
+测试汇总（隔离 checkout 中 `summarize-tests.sh` 原始输出）：
 
 ```text
-backend unit: files=54 tests=371 failures=0 errors=0 skipped=5
+backend unit: files=54 tests=373 failures=0 errors=0 skipped=7
 backend integration: files=6 tests=15 failures=0 errors=0 skipped=0
 backend contract: files=1 tests=1 failures=0 errors=0 skipped=0
-frontend unit: files=1 tests=556 failures=0 errors=0 skipped=0
+frontend unit: files=1 tests=563 failures=0 errors=0 skipped=0
 frontend runner contracts: tests 3 / pass 3 / fail 0 / skipped 0
 ```
+
+> 计数说明：合并 dev 前（`a2fbec4`）记录为单元 371 tests/skipped 5、前端 556 tests、
+> shell contract 19 scripts；合并后新增测试与脚本使计数变为上述值。计数差异来自基线
+> 变化而非行为回归，本文件只保留当前 PR head 的实测值。
 
 ## 4. REFACTOR：本地/CI 共用脚本
 
@@ -68,6 +73,10 @@ frontend runner contracts: tests 3 / pass 3 / fail 0 / skipped 0
 ```bash
 bash scripts/ci/verify-workflow-gates.test.sh
 ```
+
+最后全量执行：2026-08-27 @ `68b4ee70ed6d2fae3f29a288d80a8bb3afa4ed47`，结果为
+`verify-workflow-gates: PASS`（静态校验 50 项、9 个变异全被拒绝、受控编译失败阻断
+`delivery`、GREEN 链路到达并通过 `delivery`）。
 
 验证范围说明：脚本在 Git Bash/WSL bash 下均可执行；本机 Java 25/Node 24 与 CI 固定版本（21/22）不一致时，脚本自动按本机工具链覆盖预期版本，CI 的版本固定由 workflow `env:` 与门禁脚本默认值严格保证。
 
