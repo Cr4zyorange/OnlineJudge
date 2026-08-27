@@ -11,7 +11,7 @@
           </div>
           <div>
             <dt>未读通知</dt>
-            <dd>未读 {{ notificationPage?.unreadCount ?? 0 }}</dd>
+            <dd data-testid="notification-center-unread-count">未读 {{ unreadCount }}</dd>
           </div>
         </dl>
         <a class="notification-center__settings" data-testid="reminder-settings-entry" href="/learning/reminders">
@@ -179,9 +179,12 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { deleteNotification, listNotifications, markNotificationsRead } from '../../api/lrn/notifications';
+import { readAuthStorage } from '../../api/auth/storage';
+import { currentUser } from '../../app/runtimeContext';
 import PageState from '../../components/foundation/PageState.vue';
+import { notificationUnreadCount, syncNotificationUnreadCount } from '../../lrn/notificationUnreadState';
 import type { NotificationItem, NotificationPage, NotificationType } from '../../types/lrn';
 import { sanitizeInternalActionUrl } from './internalActionUrl';
 
@@ -196,6 +199,8 @@ const page = ref(1);
 const size = ref(20);
 const selectedIds = ref<number[]>([]);
 const feedbackMessage = ref('');
+const unreadCount = notificationUnreadCount;
+const notificationSessionKey = computed(currentNotificationSessionKey);
 
 const notifications = computed(() => notificationPage.value?.records ?? []);
 const totalPages = computed(() => {
@@ -209,16 +214,37 @@ const canGoNext = computed(() => page.value < totalPages.value);
 
 onMounted(loadNotifications);
 
+watch(notificationSessionKey, (nextSessionKey, previousSessionKey) => {
+  if (nextSessionKey === previousSessionKey) {
+    return;
+  }
+  notificationPage.value = null;
+  selectedIds.value = [];
+  feedbackMessage.value = '';
+  page.value = 1;
+  if (nextSessionKey) {
+    void loadNotifications();
+  }
+});
+
+watch(unreadCount, (nextUnreadCount) => {
+  if (loading.value || !notificationPage.value || nextUnreadCount === notificationPage.value.unreadCount) {
+    return;
+  }
+  void loadNotifications();
+});
+
 async function reloadFromFirstPage() {
   page.value = 1;
   await loadNotifications();
 }
 
 async function loadNotifications() {
+  const sessionKey = currentNotificationSessionKey();
   loading.value = true;
   errorMessage.value = '';
   try {
-    notificationPage.value = await listNotifications({
+    const result = await listNotifications({
       type: selectedType.value || undefined,
       isRead: selectedReadState.value === '' ? undefined : selectedReadState.value === 'true',
       startTime: startTime.value || undefined,
@@ -226,6 +252,11 @@ async function loadNotifications() {
       page: page.value,
       size: size.value
     });
+    if (sessionKey !== currentNotificationSessionKey()) {
+      return;
+    }
+    notificationPage.value = result;
+    syncNotificationUnreadCount(result.unreadCount);
     const visibleIds = new Set(notifications.value.map((notification) => notification.notificationId));
     selectedIds.value = selectedIds.value.filter((notificationId) => visibleIds.has(notificationId));
   } catch (error) {
@@ -233,6 +264,15 @@ async function loadNotifications() {
   } finally {
     loading.value = false;
   }
+}
+
+function currentNotificationSessionKey() {
+  const token = readAuthStorage('onlinejudge.authToken');
+  const userId = currentUser.value?.id ?? readAuthStorage('onlinejudge.userId');
+  if (!token || userId === null || userId === undefined || String(userId).trim() === '') {
+    return null;
+  }
+  return `${userId}:${token}`;
 }
 
 async function goPreviousPage() {

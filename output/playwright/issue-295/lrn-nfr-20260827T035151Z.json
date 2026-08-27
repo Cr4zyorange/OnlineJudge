@@ -1,0 +1,51 @@
+{
+  "status": "PASS",
+  "baseSha": "844029628a616f233597da5842b9905e4941a81f",
+  "testedHeadSha": "8c27c580b28d72fb615e9ee3524f9667a4fe0860",
+  "environment": "http://127.0.0.1:35062",
+  "generatedAt": "2026-08-27T03:52:05.935Z",
+  "marker": "lrn295-1787802712886-0",
+  "courseId": 9502,
+  "browserTaskTotal": 205,
+  "homeworkCount": 200,
+  "labId": 950212,
+  "labNotificationId": 950707,
+  "gradePublicationId": 950432,
+  "gradeNotificationId": 950708,
+  "crossModuleUnreadCount": 4,
+  "notificationHomeworkId": 950512,
+  "testSummary": {
+    "total": 1,
+    "passed": 1,
+    "failed": 0,
+    "skipped": 0
+  },
+  "thresholds": {
+    "taskFirstPaintMs": 1500,
+    "notificationFirstPaintMs": 1000,
+    "batchReadMs": 500,
+    "progressSaveMs": 1000,
+    "notificationRefreshMs": 1000,
+    "scrollFrameMs": 1000
+  },
+  "measurements": {
+    "taskFirstPaintMs": 251.92958400000134,
+    "notificationFirstPaintMs": 250.86662499999875,
+    "batchReadMs": 43.41016599999966,
+    "progressSaveMs": 7.100000001490116,
+    "notificationPersistMs": 10.637624999999389,
+    "browserRefreshMs": 871.6055420000012,
+    "scrollSamplesMs": [
+      55.45145799999955,
+      42.34491699999853,
+      50.717790999999124,
+      40.705541999999696,
+      42.41070800000125,
+      49.33354099999997,
+      50.72208299999875,
+      51.24904199999946,
+      49.856541000001016,
+      56.87541700000111
+    ]
+  }
+}
