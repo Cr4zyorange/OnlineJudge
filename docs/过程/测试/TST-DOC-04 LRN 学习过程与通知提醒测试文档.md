@@ -50,6 +50,10 @@
 
 #269 已在本 PR 内按用户指定范围修复并复测。最新 `dev@50a5dccd35ddc6b0c8936df20217575f18303a4f` 合并后的可检出被测提交为 `8b69a7241db6bdf585db532522abec041a3e4160`；当前统计为后端 101/101 PASS、前端单元 119/119 PASS、共享 E2E 契约 3/3 PASS、文档契约 4/4 PASS、前端类型检查与构建 PASS、默认 4-worker LRN Playwright 联合命令连续两轮 4/4 PASS（合计 8/8）。联合 E2E 从真实教师页面/API 业务入口发布 LAB/HWK、调整 GRD 成绩，并断言本次操作产生的新通知、目标通知未读→已读、重复打开幂等、删除、权限拒绝、断线刷新恢复和业务跳转。被测提交、命令、总数、失败/错误/跳过及去敏原始输出统一记录在 `output/test/issue-262/`；NFR-LN-01/02 仍为 **BLOCKED**。
 
+### 2.4 #262 复审证据一致性修正（2026-08-27）
+
+本轮先提交全部可执行契约、待验文档与换行修正，形成新的 tested SHA；随后必须在该 SHA 上执行完整验证。证据提交只能修改 `output/test/issue-262/` 下的环境、摘要和去敏原始日志，并以 `environment.txt` 的 `execution_sha` 指向其直接父提交。`git diff --check origin/dev...<tested-sha>` 的原始输出与退出码必须纳入 evidence，不能仅在 TST 中声明 PASS。NFR-LN-01/02 仍为 **BLOCKED**，因此 PR 保持 Draft，Issue 保持 `In progress`。
+
 ## 3 测试依据
 
 | 序号 | 文档/代码依据 | 用途 |
