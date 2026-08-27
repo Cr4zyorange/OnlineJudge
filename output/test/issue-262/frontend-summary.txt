@@ -1,13 +1,13 @@
-Targeted Vitest files: 13
-Tests: 119
-Passed: 119
+Targeted Vitest files: 54
+Tests: 566
+Passed: 566
 Failures: 0
 Errors: 0
 Skipped: 0
-Duration: 4.49s
+Duration: 6.25s
 Result: PASS
 
 Typecheck: PASS
-Build: PASS (189 modules transformed, 3.79s)
+Build: PASS (190 modules transformed, 1.31s)
 Shared E2E contract: 3/3 PASS
 LRN document contract: 4/4 PASS

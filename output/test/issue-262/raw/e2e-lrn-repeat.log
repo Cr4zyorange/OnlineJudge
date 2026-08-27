@@ -2,25 +2,31 @@
 > onlinejudge-frontend@0.1.0 test:e2e:lrn:disposable
 > node ../scripts/test/run-lrn-e2e-disposable.mjs
 
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::staticFieldBase has been called by com.google.inject.internal.aop.HiddenClassDefiner (file:/opt/homebrew/Cellar/maven/3.9.11/libexec/lib/guice-5.1.0-classes.jar)
+WARNING: Please consider reporting this to the maintainers of class com.google.inject.internal.aop.HiddenClassDefiner
+WARNING: sun.misc.Unsafe::staticFieldBase will be removed in a future release
 
 > onlinejudge-frontend@0.1.0 test:e2e
 > playwright test tests/e2e/lrn --workers=4
 
 
-Running 4 tests using 4 workers
+Running 5 tests using 4 workers
 
-(node:27316) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+  -  1 [chromium] › tests/e2e/lrn/issue-295-lrn-nfr.spec.ts:38:3 › @lrn NFR-LN-01 and NFR-LN-02 › measures a fresh 200-task path and automatically refreshes real LAB/HWK/GRD notifications
+(node:6590) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
 (Use `node --trace-warnings ...` to show where the warning was created)
-(node:22036) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(node:6589) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
 (Use `node --trace-warnings ...` to show where the warning was created)
-(node:8660) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(node:6592) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
 (Use `node --trace-warnings ...` to show where the warning was created)
-(node:28244) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(node:6591) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
 (Use `node --trace-warnings ...` to show where the warning was created)
-  ok 2 [chromium] › tests\e2e\lrn\lrn-business-closure.spec.ts:113:3 › @lrn UC-LRN-01 business closure › student opens every LRN page and saves reminder preferences on seeded real data (5.6s)
-  ok 4 [chromium] › tests\e2e\lrn\lrn-business-closure.spec.ts:140:3 › @lrn UC-LRN-01 business closure › notification list reports a short disconnection and refreshes after recovery (7.6s)
-  ok 3 [chromium] › tests\e2e\lrn\notification-read-on-open.spec.ts:27:3 › @lrn #269 notification read-on-open › marks a real LAB notification read before navigating and keeps repeated opens idempotent (9.7s)
-  ok 1 [chromium] › tests\e2e\lrn\lrn-business-closure.spec.ts:27:3 › @lrn UC-LRN-01 business closure › real LAB/HWK/GRD changes create isolated notifications with auditable lifecycle (10.4s)
+  ✓  4 [chromium] › tests/e2e/lrn/lrn-business-closure.spec.ts:140:3 › @lrn UC-LRN-01 business closure › notification list reports a short disconnection and refreshes after recovery (4.1s)
+  ✓  5 [chromium] › tests/e2e/lrn/lrn-business-closure.spec.ts:113:3 › @lrn UC-LRN-01 business closure › student opens every LRN page and saves reminder preferences on seeded real data (4.7s)
+  ✓  3 [chromium] › tests/e2e/lrn/lrn-business-closure.spec.ts:27:3 › @lrn UC-LRN-01 business closure › real LAB/HWK/GRD changes create isolated notifications with auditable lifecycle (6.4s)
+  ✓  2 [chromium] › tests/e2e/lrn/notification-read-on-open.spec.ts:27:3 › @lrn #269 notification read-on-open › marks a real LAB notification read before navigating and keeps repeated opens idempotent (6.7s)
 
-  4 passed (11.4s)
+  1 skipped
+  4 passed (7.3s)
 run-lrn-e2e-disposable: PASS; isolated services and database removed

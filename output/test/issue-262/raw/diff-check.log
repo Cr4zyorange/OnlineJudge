@@ -1,2 +1,2 @@
-command=git diff --check 844029628a616f233597da5842b9905e4941a81f..6141f4c13374b14c943f0ff75b7e4c4b18a88ce4
+command=git diff --check 50b3b397941aa6879b010a03951d1d19c5a57250..d66b7debaddde20fee2d097c7b8a6096ddd35d6d
 exit_code=0
