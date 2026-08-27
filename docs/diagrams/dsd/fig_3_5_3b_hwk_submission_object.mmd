@@ -7,7 +7,7 @@ sequenceDiagram
   participant Storage as FileStorageService
   participant AttachmentRepo as AttachmentRepository
   participant SubmissionRepo as SubmissionRepository
-  participant Evaluation as EvaluationService/Repository
+  participant EvaluationRepo as JdbcHomeworkEvaluationRepository
   participant Evaluator as 共享 Evaluator
   opt FILE 作业上传
     Student->>View: 选择一个文件并上传
@@ -26,14 +26,24 @@ sequenceDiagram
   Permission-->>Submission: 返回允许
   Submission->>SubmissionRepo: 校验截止/次数并保存新版本
   Submission->>AttachmentRepo: UPLOADED 原子绑定为 BOUND
-  alt OBJECTIVE/CODE
-    Submission->>Evaluation: 创建独立评测记录
-    Evaluation->>Evaluator: 执行答案或 IO 评测
-    Evaluator-->>Evaluation: 返回 EvaluationResult
-    Evaluation->>SubmissionRepo: 回写评测终态与分数
+  alt OBJECTIVE
+    Submission->>EvaluationRepo: 保存 OBJECTIVE_AUTO 终态与得分
+    Submission->>SubmissionRepo: 回写评测终态与分数
+  else CODE
+    Submission->>EvaluationRepo: 保存 CODE_JUDGE/PENDING 评测记录
   else TEXT/FILE
     Submission->>SubmissionRepo: 标记待人工批阅
     SubmissionRepo-->>Submission: 返回待批阅状态
   end
   Submission-->>View: 返回提交回执与可见状态
+  opt 当前 CODE 结果读取路径（FR-HWK-04 缺口）
+    View->>Submission: GET API-HWK-11 查询评测结果
+    Submission->>EvaluationRepo: 查询最新 PENDING 记录
+    EvaluationRepo-->>Submission: 返回 PENDING
+    Submission->>Evaluator: 在读请求中同步执行 IO 评测
+    Evaluator-->>Submission: 返回 EvaluationResult
+    Submission->>EvaluationRepo: 回写评测终态
+    Submission->>SubmissionRepo: 回写评测终态与分数
+    Submission-->>View: 返回评测结果
+  end
   View-->>Student: 展示安全反馈与历史入口

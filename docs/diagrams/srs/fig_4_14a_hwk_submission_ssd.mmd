@@ -4,12 +4,12 @@ sequenceDiagram
   participant System as OnlineJudgeForSE 系统边界
   Student->>System: OP-HWK-02 提交作业(homeworkId, submission)
   alt 作业开放、成员和提交格式合法
-    System-->>Student: 返回提交回执、版本和当前状态
-    alt OBJECTIVE/CODE
-      System->>System: OP-HWK-03 触发自动评测
-      System-->>Student: 返回可见评测状态、自动分和反馈摘要
-    else TEXT/FILE 或评测异常
-      System-->>Student: 返回待批阅或失败状态（提交保留）
+    alt OBJECTIVE
+      System-->>Student: 返回提交回执、评测终态和自动分
+    else CODE
+      System-->>Student: 返回提交已受理、评测记录 PENDING
+    else TEXT/FILE
+      System-->>Student: 返回提交回执和待批阅状态
     end
     opt 教师批阅或重评
       Teacher->>System: OP-HWK-04 提交评分、评语或重评理由
