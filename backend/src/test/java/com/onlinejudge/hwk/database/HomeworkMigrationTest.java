@@ -42,7 +42,7 @@ class HomeworkMigrationTest {
             "src/main/resources/h2-hwk-statistics-attention-indexes.sql"
     );
     private static final Path COMPOSE_MIGRATION_RUNNER_PATH = Path.of(
-            "../database/mysql/apply-compose-migration.sh"
+            "../database/mysql/migrate.sh"
     );
     private static final Path DEPLOYMENT_DOCUMENT_PATH = Path.of(
             "../docs/最终提交/部署文档.md"
@@ -218,13 +218,16 @@ class HomeworkMigrationTest {
         String deploymentDocument = Files.readString(DEPLOYMENT_DOCUMENT_PATH);
 
         assertThat(runner)
-                .contains("database/migrations")
+                .contains("manifest.txt")
+                .contains("schema_migrations")
                 .contains("docker compose")
                 .contains("exec -T mysql");
         assertThat(COMPOSE_MIGRATION_RUNNER_PATH).isExecutable();
         assertThat(deploymentDocument)
-                .contains("apply-compose-migration.sh")
-                .contains("20260822_01_add_hwk_statistics_attention_indexes.sql");
+                .contains("database/mysql/migrate.sh")
+                .contains("database/migrations/manifest.txt")
+                .contains("schema_migrations")
+                .contains("SHA-256");
     }
 
     @Test
