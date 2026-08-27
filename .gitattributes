@@ -1,4 +1,5 @@
 *.sh text eol=lf
 
-# Preserve raw Docker/Compose console captures as test evidence.
-output/issue-265/*.log -whitespace
+# Preserve Docker/Compose console captures as test evidence with a repository-stable
+# line ending so their documented SHA-256 values are directly reproducible.
+output/issue-265/*.log text eol=lf -whitespace

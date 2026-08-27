@@ -351,7 +351,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/test/verify-issue-26
 | 验证器检查计数 | 16 项：16 PASS、0 FAIL、0 BLOCKED |
 | 默认退出码 | `0`；未使用 `-Diagnostic`、`-SkipCompose`、`-SkipE2E` 或 `-KeepEnvironment` |
 | 原始输出 | `output/issue-265/2026-08-27-default-verifier-285d049.log` |
-| 原始输出 SHA-256 | `753BFAD7C4D29752D7978BC24F879598B3311A98840BAE1888DB92643A8EF3F0` |
+| 原始输出 SHA-256 | `87bc76f59f3af716e835bb83521fa438aac6ea55a6a58a09f2629cb7df5d5f9d`（日志在仓库中固定为 UTF-8 LF；Windows 采集时的 CRLF 已规范化，因此可直接对提交文件执行 `shasum -a 256` 复算。） |
 
 | 编号 | 验收项 | 结果 | base_sha | tested_head_sha | 总数 / 通过 / 失败 / 错误 / 跳过 | 说明 |
 | --- | --- | --- | --- | --- | --- | --- |
