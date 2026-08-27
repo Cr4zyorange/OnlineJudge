@@ -175,7 +175,9 @@ run_check "delivery steps never use if: always()" bash -c \
   '! grep -Fq "if: always()" <<< "$1"' _ "$delivery_section"
 
 # 10. 第三方 Action 必须固定到受控 SHA 与版本注释。
+uses_seen=0
 while IFS= read -r uses_line; do
+  uses_seen=$((uses_seen + 1))
   action="$(printf '%s' "$uses_line" | sed -nE 's/^[[:space:]]*uses: actions\/([a-z-]+)@([0-9a-f]{40}) # (v[0-9]+\.[0-9]+\.[0-9]+)$/\1/p')"
   sha="$(printf '%s' "$uses_line" | sed -nE 's/^[[:space:]]*uses: actions\/[a-z-]+@([0-9a-f]{40}).*/\1/p')"
   tag="$(printf '%s' "$uses_line" | sed -nE 's/^[[:space:]]*uses: actions\/[a-z-]+@[0-9a-f]{40} # (v[0-9]+\.[0-9]+\.[0-9]+)$/\1/p')"
@@ -186,7 +188,8 @@ while IFS= read -r uses_line; do
   if [[ "${action_sha[$action]:-}" != "$sha" || "${action_tag[$action]:-}" != "$tag" ]]; then
     fail_check "action $action not pinned to the controlled version (expected ${action_tag[$action]:-unknown} = ${action_sha[$action]:-unknown})"
   fi
-done < <(grep -E '^[[:space:]]*- uses: ' "$workflow_file" || true)
+done < <(grep -E '^[[:space:]]*uses: ' "$workflow_file" || true)
+run_check "third-party action pinning was exercised" test "$uses_seen" -gt 0
 
 # 11. 每个门禁作业的上传步骤必须在失败时仍保留证据。
 for job in validate-workflows backend-gate frontend-gate contracts-gate; do
