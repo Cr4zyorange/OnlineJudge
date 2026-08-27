@@ -130,6 +130,7 @@ class DockerComposeContractTest {
         assertThat(frontendDockerfile).contains("org.opencontainers.image.source=\"$IMAGE_SOURCE\"");
         assertThat(backendDockerfile).contains("USER 10001:10001");
         assertThat(frontendDockerfile).contains("--mount=type=cache,target=/root/.npm");
+        assertThat(frontendDockerfile).contains("pid /tmp/nginx.pid;");
         assertThat(frontendDockerfile).contains("USER nginx");
     }
 
