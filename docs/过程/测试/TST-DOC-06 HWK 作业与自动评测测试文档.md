@@ -259,7 +259,7 @@ HWK-LOG-001 ~ HWK-LOG-013 为 2026-06-09 的 V1.0 历史日志；HWK-LOG-014 起
 | 风险编号 | 风险说明 | 影响范围 | 建议处理 |
 | --- | --- | --- | --- |
 | R-HWK-001 | #264 已执行共享 Playwright 两条场景；MAN-HWK-001 ~ MAN-HWK-006 的全页面、多视口人工走查仍需在发布候选环境复核 | UI-HWK-01 ~ UI-HWK-09 | 发布候选环境按 MAN-HWK-001 ~ MAN-HWK-006 补充视觉与会话异常走查；不得覆盖 FR-HWK-04 当前 FAIL |
-| R-HWK-002 | CODE 提交后没有独立后台 Worker，PENDING 评测由 API-HWK-11 读取同步触发 | FR-HWK-04、NFR-HWK-01、NFR-HWK-02、NFR-HWK-05 | 独立生产实现 issue 增加任务调度/Worker，并以不读取 API-HWK-11 的终态测试验收；随后再执行真实 Docker 多语言、错误、超时和并发专项 |
+| R-HWK-002 | CODE 提交后没有独立后台 Worker，PENDING 评测由 API-HWK-11 读取同步触发 | FR-HWK-04、NFR-HWK-01、NFR-HWK-02、NFR-HWK-05 | 修复 Issue #296（负责人 @terrana37，目标完成 2026-09-05）增加任务调度/Worker，并以不读取 API-HWK-11 的终态测试验收；随后再执行真实 Docker 多语言、错误、超时和并发专项 |
 | R-HWK-003 | #264 已通过真实本地服务验证 LRN 通知与 GRD 成绩同步边界；生产环境联调尚未记录完整结果 | FR-HWK-06、NFR-HWK-03 | 在统一测试环境复跑作业发布、成绩发布、通知中心和成绩同步闭环 |
 | R-HWK-004 | Maven 和 Vitest 在普通沙箱下存在写入/子进程权限限制 | 本地验证流程 | 本地开发机可直接运行；受限环境下需使用已批准的提权命令 |
 | R-HWK-005 | 本机 Docker daemon socket 不存在，#225 存量迁移尚未在真实 MySQL 8.4 容器执行首次、重跑与 EXPLAIN | DB-HWK-04、TC-HWK-N02、部署升级 | 当前由 H2 执行测试、MySQL 脚本静态契约和 shell 语法覆盖；部署时按 `apply-compose-migration.sh` 入口实跑并保存输出 |

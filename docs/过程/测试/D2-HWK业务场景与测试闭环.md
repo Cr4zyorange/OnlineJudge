@@ -80,8 +80,9 @@ HWK 保持两个已经确认的独立业务场景。页面动作、权限检查�
 
 - 复现：CODE 提交 POST 返回 `PENDING`；不调用 `GET /api/v1/submissions/{id}/evaluation`，等待 1 秒后通过只读提交详情查询仍为 `PENDING`。
 - 代码证据：`createInitialEvaluation` 只保存 `CODE_JUDGE/PENDING`；`evaluationDetail` 调用 `latestOrCreateEvaluation`，在 API-HWK-11 读请求中同步执行 evaluator。
-- 判定：FR-HWK-04 的客观题自动评分为 PASS，CODE “提交后创建任务并由后台 Worker 异步执行”为 FAIL；TC-HWK-10、TC-HWK-11 不通过，需由独立生产实现 issue 修复任务调度并补不读取 API-HWK-11 的终态测试。
-- Issue #264 结论：存在产品 FAIL，不满足完整闭环或关闭条件。
+- 判定：FR-HWK-04 的客观题自动评分为 PASS，CODE “提交后创建任务并由后台 Worker 异步执行”为 FAIL；TC-HWK-10、TC-HWK-11 不通过，由修复 Issue #296 实现任务调度并补不读取 API-HWK-11 的终态测试。
+- 责任与计划：修复 Issue #296，负责人 @terrana37，计划开始 2026-08-29，目标完成 2026-09-05；复测标准：不调用 API-HWK-11 的独立终态测试通过，TC-HWK-10/11 更新为 PASS。
+- Issue #264 结论：存在产品 FAIL，不满足完整闭环或关闭条件；#264 关闭前须完成 #296 或由项目负责人明确接受延期。
 
 ### 5.3 环境风险
 
