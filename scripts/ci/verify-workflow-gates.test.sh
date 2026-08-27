@@ -201,6 +201,26 @@ else
   printf '%s\n' "$out" >&2
 fi
 
+# 7. Environment manifest must record the exact PR head/base SHA.
+#    pull_request 事件的 GITHUB_SHA 是 merge 提交，不是被测 head。
+fake_event="$fixture_root/pull_request_event.json"
+cat > "$fake_event" <<'JSON'
+{"pull_request":{"head":{"sha":"0123456789abcdef0123456789abcdef01234567","ref":"feature/290-github-actions-gate"},"base":{"sha":"9999999999999999999999999999999999999999"}}}
+JSON
+env_output="$fixture_root/env-out/environment.json"
+mkdir -p "$fixture_root/env-out"
+if GITHUB_EVENT_NAME=pull_request GITHUB_EVENT_PATH="$fake_event" GITHUB_SHA=not-the-head \
+    bash "$repo_root/scripts/ci/collect-environment.sh" "$repo_root" "$env_output" >/dev/null 2>&1; then
+  if grep -Fq '0123456789abcdef0123456789abcdef01234567' "$env_output" \
+      && grep -Fq '9999999999999999999999999999999999999999' "$env_output"; then
+    pass "environment manifest records exact PR head and base SHA"
+  else
+    fail "environment manifest did not record the exact PR SHAs"
+  fi
+else
+  fail "collect-environment failed under a PR event fixture"
+fi
+
 if [[ $fail_count -gt 0 ]]; then
   printf 'verify-workflow-gates: FAIL (%s failure(s))\n' "$fail_count" >&2
   exit 1

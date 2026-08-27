@@ -30,8 +30,22 @@ run_id="${GITHUB_RUN_ID:-}"
 run_attempt="${GITHUB_RUN_ATTEMPT:-}"
 workflow="${GITHUB_WORKFLOW:-}"
 base_ref="${GITHUB_BASE_REF:-}"
+base_sha=""
 runner_os="${RUNNER_OS:-}"
 runner_arch="${RUNNER_ARCH:-}"
+
+# pull_request 事件的 GITHUB_SHA 指向 merge 提交，必须用事件里的 head/base SHA 记录精确被测版本。
+if [[ "$event_name" == "pull_request" && -n "${GITHUB_EVENT_PATH:-}" && -f "$GITHUB_EVENT_PATH" ]]; then
+  if command -v jq >/dev/null 2>&1; then
+    head_sha="$(jq -r '.pull_request.head.sha // empty' "$GITHUB_EVENT_PATH" 2>/dev/null || true)"
+    ref="$(jq -r '.pull_request.head.ref // empty' "$GITHUB_EVENT_PATH" 2>/dev/null || true)"
+    base_sha="$(jq -r '.pull_request.base.sha // empty' "$GITHUB_EVENT_PATH" 2>/dev/null || true)"
+  else
+    head_sha="$(sed -nE 's/.*"head"[[:space:]]*:[[:space:]]*\{[^}]*"sha"[[:space:]]*:[[:space:]]*"([0-9a-f]{40})".*/\1/p' "$GITHUB_EVENT_PATH" | head -1)"
+    ref="$(sed -nE 's/.*"head"[[:space:]]*:[[:space:]]*\{[^}]*"ref"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/p' "$GITHUB_EVENT_PATH" | head -1)"
+    base_sha="$(sed -nE 's/.*"base"[[:space:]]*:[[:space:]]*\{[^}]*"sha"[[:space:]]*:[[:space:]]*"([0-9a-f]{40})".*/\1/p' "$GITHUB_EVENT_PATH" | head -1)"
+  fi
+fi
 
 if [[ -z "$head_sha" ]] && git -C "$checkout" rev-parse --git-dir >/dev/null 2>&1; then
   head_sha="$(git -C "$checkout" rev-parse HEAD 2>/dev/null || true)"
@@ -65,6 +79,7 @@ timestamp_utc="$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || true)"
   printf '  "run_attempt": "%s",\n' "$(printf '%s' "$run_attempt" | json_escape)"
   printf '  "ref": "%s",\n' "$(printf '%s' "$ref" | json_escape)"
   printf '  "base_ref": "%s",\n' "$(printf '%s' "$base_ref" | json_escape)"
+  printf '  "base_sha": "%s",\n' "$(printf '%s' "$base_sha" | json_escape)"
   printf '  "head_sha": "%s",\n' "$(printf '%s' "$head_sha" | json_escape)"
   printf '  "runner_os": "%s",\n' "$(printf '%s' "$runner_os" | json_escape)"
   printf '  "runner_arch": "%s",\n' "$(printf '%s' "$runner_arch" | json_escape)"
