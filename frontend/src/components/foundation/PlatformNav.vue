@@ -11,9 +11,18 @@
         <RouterLink v-if="isAdmin" to="/admin/auth" data-testid="platform-nav-admin">权限管理</RouterLink>
       </div>
       <div class="platform-nav__account">
-        <RouterLink to="/notifications" data-testid="platform-nav-notifications" aria-label="消息通知">
+        <RouterLink
+          to="/notifications"
+          data-testid="platform-nav-notifications"
+          :aria-label="unreadCount > 0 ? `消息通知，${unreadCount} 条未读` : '消息通知'"
+        >
           <span class="platform-nav__desktop-label">通知</span>
           <span class="platform-nav__mobile-label" aria-hidden="true">通知</span>
+          <span
+            v-if="unreadCount > 0"
+            class="platform-nav__notification-badge"
+            data-testid="platform-nav-unread-badge"
+          >{{ unreadCount > 99 ? '99+' : unreadCount }}</span>
         </RouterLink>
         <RouterLink class="platform-nav__avatar" to="/profile" data-testid="platform-nav-profile" aria-label="个人中心">
           {{ avatarText }}
@@ -37,9 +46,11 @@ import { computed, ref } from 'vue';
 import { RouterLink, useRouter } from 'vue-router';
 import { logout } from '../../api/auth/auth';
 import { currentCourse, currentUser } from '../../app/runtimeContext';
+import { useNotificationUnread } from '../../lrn/notificationUnreadState';
 
 const router = useRouter();
 const logoutPending = ref(false);
+const { unreadCount } = useNotificationUnread();
 const isAdmin = computed(() => (
   currentUser.value?.userType === 'ADMIN'
   || currentUser.value?.roles.includes('ADMIN') === true
@@ -121,6 +132,21 @@ async function handleLogout() {
   display: none;
 }
 
+.platform-nav__notification-badge {
+  display: inline-grid;
+  min-width: 18px;
+  height: 18px;
+  margin-left: 4px;
+  padding: 0 4px;
+  place-items: center;
+  border-radius: 999px;
+  background: #c83f4d;
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
 .platform-nav a,
 .platform-nav button {
   border: 0;
@@ -183,6 +209,21 @@ async function handleLogout() {
     height: 34px;
     place-items: center;
     padding: 0;
+  }
+
+  .platform-nav__notification-badge {
+    position: absolute;
+    top: -3px;
+    right: -5px;
+    min-width: 15px;
+    height: 15px;
+    margin: 0;
+    padding: 0 3px;
+    font-size: 0.62rem;
+  }
+
+  .platform-nav__account > a:first-child {
+    position: relative;
   }
 
   .platform-nav__links {
