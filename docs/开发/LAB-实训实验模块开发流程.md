@@ -32,22 +32,22 @@ LAB 与 HWK 必须提前统一评测状态枚举和评测结果 DTO，复用 `Ev
 
 ## 4. 状态机先行
 
-LAB 开发前必须先定好实验状态和提交/评测状态。推荐实验状态：
+LAB 开发前必须先定好实验状态和提交/评测状态。持久化实验状态为：
 
 ```text
-DRAFT → NOT_OPEN → PUBLISHED → CLOSED → SCORE_PUBLISHED → ARCHIVED
+DRAFT → PUBLISHED → CLOSED → SCORE_PUBLISHED → ARCHIVED
 ```
 
 状态用途：
 
 - `DRAFT`：草稿，可编辑，不对学生可见
-- `NOT_OPEN`：已配置但未到开放时间
+- `NOT_OPEN` / `OPEN`：由发布时间和截止时间推导的页面展示标签，不写入数据库
 - `PUBLISHED`：学生可查看和提交
 - `CLOSED`：截止后不可提交，可评测和评分
 - `SCORE_PUBLISHED`：成绩已发布，可供学生查看并同步 GRD
 - `ARCHIVED`：归档后不可修改
 
-评测状态至少包含 `PENDING`、`RUNNING`、`ACCEPTED`、`WRONG_ANSWER`、`COMPILE_ERROR`、`RUNTIME_ERROR`、`TIME_LIMIT_EXCEEDED`、`SYSTEM_ERROR`。首版自动评测可以简化为 IO 比对，不引入重型分布式判题架构。
+评测状态至少包含 `PENDING`、`RUNNING`、`ACCEPTED`、`WRONG_ANSWER`、`COMPILE_ERROR`、`RUNTIME_ERROR`、`TIME_LIMIT_EXCEEDED`、`SYSTEM_ERROR`。当前 Docker 沙箱负责编译、运行、IO 比对、网络隔离、CPU/内存/pid/tmpfs 限制和评测后容器清理；它不是分布式判题架构，也不得在业务服务中复制一套 HWK 不兼容的评测逻辑。
 
 ## 5. 数据库与实体
 
@@ -151,7 +151,7 @@ LAB 前端必须包含：
 | 实验发布 | 教师可创建、编辑、发布实验 |
 | 学生提交 | 学生可在开放期提交并得到反馈 |
 | 提交历史 | 多次提交记录和有效版本正确 |
-| 自动评测 | IO 比对能生成评测记录和状态 |
+| 自动评测 | Docker 沙箱能完成 IO 比对，且 AC、编译错误、运行错误、超时、内存限制和容器清理均可重复验证 |
 | 教师评分 | 教师可评分，修改分数有日志 |
 | 学生反馈 | 学生只能看自己的评测和评分结果 |
 | 统计页面 | 已提交、未提交、平均分等指标正确 |
@@ -162,13 +162,15 @@ LAB 前端必须包含：
 | 生命周期与异常 | 无文件、旧元数据缺失、已删除、物理文件缺失和存储异常返回冻结错误语义 |
 | 前端下载状态 | 独立源文件入口覆盖 pending 去重、失败重试、401/403 和 blob 下载 |
 | 迁移与补偿 | H2/MySQL/compose schema 一致，提交版本与资产一对一；物理存储已成功且事务回滚时，补偿删除成功后不留孤儿文件，partial copy/delete 失败仍为运维残余 |
+| UC-LAB-01 浏览器链路 | 教师创建草稿、配置公开/隐藏测试用例并发布；发布事件由 LRN 消费，失败分支保留字段并返回受控提示 |
+| UC-LAB-02 浏览器链路 | 学生提交、Docker 评测、报告上传、教师受控下载/评分/反馈、成绩发布、学生查看结果；覆盖学生越权、截止、隐藏用例与统计 |
 
 ## 10. 联调顺序
 
 1. AUTH → LAB：当前用户和角色判断
 2. CRS → LAB：课程成员和教师权限校验
 3. LAB ↔ HWK：评测状态和 `EvaluationResult` 一致；#214 的 HWK FILE 上传/所有权链路与 LAB 源文件资产保持独立，若抽取公共文件契约必须显式同步双方
-4. LAB → LRN：发布、评测完成、评分完成通知
-5. LAB → GRD：实验成绩来源同步或查询
+4. LAB → LRN：`LAB_EXPERIMENT_PUBLISHED`、`LAB_SUBMISSION_SCORED`、`EXPERIMENT_SCORE_PUBLISHED` 由 `NotificationEventPublisher` 发布，LRN 负责通知落库
+5. LAB → GRD：`LabSourceGradeService` 仅在 `SCORE_PUBLISHED`/`ARCHIVED` 时提供 `SourceGradeDTO`，GRD 不读取 LAB 内部表
 
-完成标准是教师发布实验、学生提交、系统评测、教师评分、学生查看反馈、成绩进入 GRD 的路径可演示。
+完成标准是教师发布实验、学生提交、系统评测、教师评分、学生查看反馈、成绩进入 GRD 的路径可演示。Issue #265 的可重复入口为 `scripts/test/verify-issue-265.ps1`；其在真实 Docker 评测前预拉取评测镜像，避免首次镜像拉取被误归类为编译超时。

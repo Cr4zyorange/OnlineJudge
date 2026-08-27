@@ -1,15 +1,33 @@
 sequenceDiagram
   actor Student as 学生
+  actor Teacher as 教师
   participant System as OnlineJudgeForSE 系统边界
   Student->>System: 打开实验详情
-  System-->>Student: 返回实验说明、截止时间和提交要求
-  Student->>System: OP-LAB-04 提交实验代码、附件或报告
+  System-->>Student: 返回实验说明、截止时间、公开用例和提交要求
+  Student->>System: OP-LAB-04 提交代码或源文件
   alt 提交受理
-    System-->>Student: 返回提交成功和评测中状态
+    System-->>Student: 返回提交编号和 PENDING/RUNNING 状态
+    System->>System: Docker 沙箱编译、运行、IO 比对和资源限制
+    alt 编译/运行/超时/沙箱异常
+      System-->>Student: 返回 COMPILE_ERROR/RUNTIME_ERROR/TIME_LIMIT_EXCEEDED/SYSTEM_ERROR 摘要
+    else 评测完成
+      System-->>Student: 返回公开用例反馈、得分和评测状态
+    end
+    Student->>System: OP-LAB-04a 上传 PDF/DOCX/ZIP 实验报告
+    System-->>Student: 返回报告版本和受理结果
+    Teacher->>System: 查看提交、报告和评测结果
+    Teacher->>System: OP-LAB-06 受控下载指定提交源文件（API-LAB-19）
+    alt 课程管理权限和提交归属均通过
+      System-->>Teacher: 返回文件流和安全响应头
+    else 无权限、归属错配或资产异常
+      System-->>Teacher: 返回受控 401/403/404/409/500 错误
+    end
+    Teacher->>System: OP-LAB-06 评分、评语并发布成绩
+    System->>System: 写入评分/变更记录，发布 LRN 事件并向 GRD 暴露来源成绩
     Student->>System: 查询实验评测结果
-    System-->>Student: OP-LAB-05 返回评测状态、得分和失败摘要
+    System-->>Student: OP-LAB-05 返回已发布最终分、教师评语和公开反馈
     Student->>System: 查看实验反馈
     System-->>Student: OP-LAB-06 返回可见反馈、教师评语或最终得分
   else 提交失败
-    System-->>Student: 返回逾期、格式错误、无权限或评测异常提示
+    System-->>Student: 返回逾期、格式错误、无权限或受理异常提示
   end
