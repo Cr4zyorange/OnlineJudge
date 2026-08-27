@@ -5,6 +5,8 @@ sequenceDiagram
   participant Permission as CRS 课程权限边界
   participant Storage as 文件存储边界
   participant DB as HWK 数据表
+  participant Worker as HWK 评测 Worker
+  participant Recovery as HWK 评测恢复器
   participant Evaluator as 共享评测边界
   Student->>Frontend: 打开作业并填写提交内容
   opt FILE 作业
@@ -32,12 +34,22 @@ sequenceDiagram
     DB-->>API: 返回待批阅状态
   end
   API-->>Frontend: 返回提交回执和可见状态
-  opt 当前 CODE 结果读取路径（FR-HWK-04 缺口）
-    Frontend->>API: GET API-HWK-11 查询评测结果
-    API->>DB: 读取 PENDING 评测记录
-    API->>Evaluator: 在读请求中同步执行 IO 评测
-    Evaluator-->>API: 返回 EvaluationResult
-    API->>DB: 回写评测终态与得分
-    API-->>Frontend: 返回评测结果
+  API-->>Worker: 事务提交后投递评测任务事件
+  opt 事件丢失、线程池拒绝或进程重启
+    Recovery->>DB: 定时扫描 PENDING；启动重置遗留 RUNNING
+    DB-->>Recovery: 返回可恢复任务
+    Recovery-->>Worker: 重新投递待评测任务
   end
+  Worker->>DB: 原子认领 PENDING 任务并标记 RUNNING
+  Worker->>Evaluator: 执行 IO 评测
+  Evaluator-->>Worker: 返回 EvaluationResult
+  alt 评测正常完成
+    Worker->>DB: 回写评测终态与得分
+  else Worker 或评测器异常
+    Worker->>DB: 记录 SYSTEM_ERROR 并保留提交
+  end
+  Frontend->>API: GET API-HWK-10/11 查询提交或评测结果
+  API->>DB: 只读最新状态
+  DB-->>API: 返回 PENDING/RUNNING/终态
+  API-->>Frontend: 返回可见结果
   Frontend-->>Student: 展示结果、错误或恢复提示

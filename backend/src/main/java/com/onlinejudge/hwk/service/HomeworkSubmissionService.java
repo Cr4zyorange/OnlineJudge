@@ -28,6 +28,7 @@ import com.onlinejudge.hwk.domain.HomeworkTestCase;
 import com.onlinejudge.hwk.domain.HomeworkType;
 import com.onlinejudge.integration.course.CoursePermissionClient;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -60,6 +61,7 @@ public class HomeworkSubmissionService {
     private final CoursePermissionClient coursePermissionClient;
     private final Evaluator evaluator;
     private final HomeworkAttachmentService attachmentService;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Autowired
     public HomeworkSubmissionService(
@@ -69,7 +71,8 @@ public class HomeworkSubmissionService {
             HomeworkReviewLogRepository reviewLogRepository,
             CoursePermissionClient coursePermissionClient,
             Evaluator evaluator,
-            HomeworkAttachmentService attachmentService
+            HomeworkAttachmentService attachmentService,
+            ApplicationEventPublisher eventPublisher
     ) {
         this.homeworkRepository = homeworkRepository;
         this.submissionRepository = submissionRepository;
@@ -78,6 +81,7 @@ public class HomeworkSubmissionService {
         this.coursePermissionClient = coursePermissionClient;
         this.evaluator = evaluator;
         this.attachmentService = attachmentService;
+        this.eventPublisher = eventPublisher;
     }
 
     public HomeworkSubmissionService(
@@ -89,7 +93,7 @@ public class HomeworkSubmissionService {
             Evaluator evaluator
     ) {
         this(homeworkRepository, submissionRepository, evaluationRepository, reviewLogRepository,
-                coursePermissionClient, evaluator, null);
+                coursePermissionClient, evaluator, null, event -> { });
     }
 
     @Transactional
@@ -202,14 +206,55 @@ public class HomeworkSubmissionService {
         return new SubmissionDetail(homework, submission, true);
     }
 
-    @Transactional
+    @Transactional(readOnly = true)
     public EvaluationDetail evaluationDetail(long submissionId, long userId) {
         SubmissionDetail detail = detail(submissionId, userId);
         if (!detail.managerView()) {
             requireEvaluationVisible(detail.homework());
         }
-        HomeworkEvaluation evaluation = latestOrCreateEvaluation(detail.homework(), detail.submission(), userId);
+        HomeworkEvaluation evaluation = evaluationRepository.findLatestBySubmissionId(submissionId)
+                .orElseThrow(() -> new HomeworkApiException(
+                        "HWK_4009", "evaluation result not available", HttpStatus.NOT_FOUND));
         return new EvaluationDetail(detail.homework(), detail.submission(), evaluation, detail.managerView());
+    }
+
+    @Transactional
+    public void evaluatePendingCodeSubmission(long evaluationId, long submissionId) {
+        LocalDateTime startedAt = LocalDateTime.now();
+        if (!evaluationRepository.claimPending(evaluationId, submissionId, startedAt)) {
+            return;
+        }
+        HomeworkEvaluation evaluation = evaluationRepository.findById(evaluationId)
+                .orElseThrow(() -> new IllegalStateException("claimed homework evaluation not found"));
+        HomeworkSubmission submission = submissionRepository.findById(submissionId)
+                .orElseThrow(() -> new IllegalStateException("homework submission not found"));
+        Homework homework = homeworkRepository.findById(submission.homeworkId())
+                .filter(item -> !item.deleted())
+                .orElseThrow(() -> new IllegalStateException("homework not found"));
+        if (homework.type() != HomeworkType.CODE) {
+            throw new IllegalStateException("evaluation task does not belong to code homework");
+        }
+        evaluateCodeSubmission(homework, submission, submission.studentId(), false, evaluation);
+    }
+
+    @Transactional
+    public void markCodeEvaluationSystemError(long evaluationId, long submissionId) {
+        HomeworkEvaluation evaluation = evaluationRepository.findById(evaluationId).orElse(null);
+        HomeworkSubmission submission = submissionRepository.findById(submissionId).orElse(null);
+        if (evaluation == null || submission == null || isTerminalEvaluationStatus(evaluation.status())) {
+            return;
+        }
+        LocalDateTime now = LocalDateTime.now();
+        evaluationRepository.update(new HomeworkEvaluation(
+                evaluation.id(), evaluation.submissionId(), evaluation.homeworkId(), evaluation.studentId(),
+                evaluation.evaluationType(), EvaluationStatus.SYSTEM_ERROR, 0, 0, evaluation.totalCases(),
+                evaluation.timeUsedMs(), evaluation.memoryUsedKb(), "evaluation worker failed",
+                "evaluation worker failed", evaluation.logUrl(), evaluation.compileLog(), evaluation.runLog(),
+                evaluation.reevaluation(), evaluation.triggeredBy(), evaluation.startedAt(), now,
+                evaluation.createdAt(), now
+        ));
+        submissionRepository.update(submission.withEvaluationResult(
+                EvaluationStatus.SYSTEM_ERROR, HomeworkReviewStatus.NEED_REVIEW, 0, null, now));
     }
 
     @Transactional
@@ -357,7 +402,7 @@ public class HomeworkSubmissionService {
             return;
         }
         if (homework.type() == HomeworkType.CODE) {
-            evaluationRepository.save(new HomeworkEvaluation(
+            HomeworkEvaluation evaluation = evaluationRepository.save(new HomeworkEvaluation(
                     0L,
                     submission.id(),
                     homework.id(),
@@ -381,30 +426,8 @@ public class HomeworkSubmissionService {
                     now,
                     now
             ));
+            eventPublisher.publishEvent(new HomeworkEvaluationTaskCreated(evaluation.id(), submission.id()));
         }
-    }
-
-    private HomeworkEvaluation latestOrCreateEvaluation(Homework homework, HomeworkSubmission submission, long userId) {
-        Optional<HomeworkEvaluation> latest = evaluationRepository.findLatestBySubmissionId(submission.id());
-        if (homework.type() == HomeworkType.CODE
-                && latest.map(HomeworkEvaluation::status).filter(this::isTerminalEvaluationStatus).isEmpty()) {
-            return evaluateCodeSubmission(homework, submission, userId, false, latest.orElse(null));
-        }
-        if (latest.isPresent()) {
-            return latest.get();
-        }
-        if (homework.type() == HomeworkType.OBJECTIVE) {
-            return saveObjectiveEvaluation(
-                    homework,
-                    submission,
-                    calculateObjectiveScore(homework, submission.answerJson()),
-                    HomeworkEvaluationType.OBJECTIVE_AUTO,
-                    false,
-                    null,
-                    LocalDateTime.now()
-            );
-        }
-        throw new HomeworkApiException("HWK_4009", "evaluation result not available", HttpStatus.NOT_FOUND);
     }
 
     private HomeworkEvaluation reevaluateObjective(Homework homework, HomeworkSubmission submission, long managerId) {

@@ -5,12 +5,12 @@
 | 文档名称 | HWK 作业与自动评测测试文档 |
 | 项目名称 | 在线教学与实训平台 |
 | 所属阶段 | 系统测试与验收测试 |
-| 报告版本 | V1.8 |
+| 报告版本 | V2.0 |
 | 编写日期 | 2026-08-27 |
 | 编写人 | HWK 模块负责人 |
-| 对应 issue | #264 HWK 业务场景文档与测试闭环；#296 CODE 提交后台评测 Worker 修复；#157 TST-DOC-06；#225 HWK 统计与待处理名单；#224 HWK 草稿逻辑删除；#214 HWK FILE 附件上传与安全提交 |
+| 对应 issue | #296 CODE 提交后台评测 Worker；#264 HWK 业务场景文档与测试闭环；#157 TST-DOC-06；#225 HWK 统计与待处理名单；#224 HWK 草稿逻辑删除；#214 HWK FILE 附件上传与安全提交 |
 | 测试范围 | HWK 作业发布、草稿删除、提交/历史/评测/批阅、统计与待处理名单；FILE 单附件上传、24h 恢复/清理、原子绑定/补偿、所有权、受控下载、权限、安全与响应式页面 |
-| 测试结论 | #264 的文档与测试闭环交付已完成，可按 Issue #264 关闭；三层 Mermaid/SVG、LRN 通知、GRD 精确成绩消费及客观题评测已复测。CODE 提交只创建 `PENDING`，首次 API-HWK-11 读取才同步执行 evaluator，不满足 FR-HWK-04 后台 Worker 契约；该产品验收仍为 FAIL，由 #296 独立修复 |
+| 测试结论 | #296 已补齐 CODE 后台 Worker 与持久恢复：提交创建 PENDING 任务，事务提交后独立消费并进入终态；定时扫描重投首次派发遗漏任务，启动时重置旧进程遗留 RUNNING；API-HWK-11 保持纯读取，异常落 SYSTEM_ERROR 且提交保留。FR-HWK-04、NFR-HWK-01 与 TC-HWK-10/11 本地自动化判定 PASS；真实 Docker 专项仍按部署环境复核 |
 
 ## 1 文档控制
 
@@ -27,6 +27,8 @@
 | V1.6 | 2026-08-26 | HWK 模块负责人 | #281 / PR #285 合并后复测通知失败整体回滚契约；补充定向 9/9、共享 E2E runner 2/2、后端 375、前端 556 及闭环契约 GREEN 证据；CODE 产品结论后由 V1.8 纠正 |
 | V1.7 | 2026-08-26 | HWK 模块负责人 | 按项目统一图形工具回退六张新增图，改用仓库 Mermaid 渲染脚本生成白底 SVG，并更新三层文档引用与闭环契约 |
 | V1.8 | 2026-08-27 | HWK 模块负责人 | 按 PR #276 复审纠正 CODE 评测假阳性：E2E 不再以 API-HWK-11 读取触发评测，FR-HWK-04 与 TC-HWK-10/11 如实标记 FAIL；同步三层图源、SVG 边语义校验和反向变异测试，并明确 #264 文档/测试闭环可关闭、#296 独立负责产品修复 |
+| V1.9 | 2026-08-27 | HWK 模块负责人 | 按 #296 实现提交后后台评测 Worker、PENDING 原子认领、API-HWK-11 纯读取与 SYSTEM_ERROR 兜底；E2E 仅轮询 API-HWK-10 验收终态，TC-HWK-10/11 更新为 PASS |
+| V2.0 | 2026-08-27 | HWK 模块负责人 | 按 PR #299 返工补齐持久恢复：定时重投 PENDING、启动时重置旧进程遗留 RUNNING，并以首次派发遗漏/重启自动化验证；不改变公共 API、DTO、错误码或状态枚举 |
 
 ### 1.2 审批记录
 
@@ -68,10 +70,10 @@
 | FR-HWK-01 | 作业创建与发布 | 教师/助教创建草稿、编辑、原子逻辑删除 DRAFT、保存题目/测试用例、发布、关闭、发布通知；删除只改父表，普通更新不得复活 | PASS；#281 复测证明必需通知失败返回 `503/HWK_5003` 并整体回滚，作业保持 `DRAFT` |
 | FR-HWK-02 | 学生作业查看与提交 | 学生查看已发布作业，标准答案和隐藏用例不可见，提交文本/客观题/代码，截止和重复提交规则 | 后端和前端自动化已覆盖 |
 | FR-HWK-03 | 提交历史管理 | 学生个人历史、教师全班分页列表、筛选、提交详情、最新有效提交标识，以及 attention 未传时的兼容行为 | 既有列表与 #225 attention 兼容回归均已覆盖 |
-| FR-HWK-04 | 自动评测 | 客观题自动评分、代码题 IO 评测、失败状态保留、评测结果查询、重评 | 部分 FAIL：客观题与手动重评路径通过；CODE 提交后只保存 PENDING，API-HWK-11 读取才同步执行 evaluator，后台 Worker 未实现 |
+| FR-HWK-04 | 自动评测 | 客观题自动评分、代码题 IO 评测、失败状态保留、评测结果查询、重评 | PASS：客观题同步评分；CODE 提交后由后台 Worker 从 PENDING 推进到终态，定时扫描重投遗漏任务、启动恢复旧 RUNNING，API-HWK-11 仅读，异常保留提交 |
 | FR-HWK-05 | 教师批阅与重评 | 人工分数、评语、重评日志，以及待评测/待批阅 attention 的题型、评测终态和批阅状态组合 | 既有批阅与 #225 attention 新语义已由自动化和浏览器覆盖 |
 | FR-HWK-06 | 作业反馈与结果展示 | 成绩可见性；当前活跃学生单次作业统计；五档归一化；未提交、待评测、待批阅服务端分页；向 GRD 提供成绩来源 | #225 单次作业统计与名单契约通过；GRD 生产全链路仍待统一环境确认 |
-| NFR-HWK-01 | 可靠性 | 提交、评测、批阅、通知失败和分数记录不丢失；草稿删除原子化且普通更新不能复活 | PASS；通知失败不留下已发布作业或部分通知，受控错误与事务状态可追踪 |
+| NFR-HWK-01 | 可靠性 | 提交、评测、批阅、通知失败和分数记录不丢失；草稿删除原子化且普通更新不能复活 | PASS；通知失败不留下已发布作业或部分通知；CODE PENDING 在首次派发遗漏时由定时扫描重投，旧进程 RUNNING 在启动时重新入队，受控错误与事务状态可追踪 |
 | NFR-HWK-02 | 性能 | 三类名单分页、统计 SQL 聚合、组合索引、聚合总数不受当前页影响 | #225 SQL、迁移、极大页码与大于单页样本通过；生产规模压力和 MySQL EXPLAIN 待部署复核 |
 | NFR-HWK-03 | 可追踪性 | 提交、评测、批阅、重评、成绩发布均有记录或日志；删除父作业后全部子数据和历史保留 | 六类子记录主键与关键内容保持测试通过 |
 | NFR-HWK-04 | 安全性 | 当前用户来源、课程成员校验、统计/attention/草稿删除的学生与无权限教师 403、姓名失败不泄露裸 ID | 删除 403、状态 409、重复删除 404 契约通过 |
@@ -155,8 +157,8 @@
 | TC-HWK-07 | FR-HWK-03 | UI-HWK-06；API-HWK-08；DB-HWK-04 | 作业允许重复提交，学生提交多次 | 查询我的提交历史 | 历史完整，仅最新提交 `is_final=1` | `studentSubmissionHistoryKeepsPreviousVersionsAndMarksOnlyLatestFinal`、前端历史用例通过 | 通过 |
 | TC-HWK-08 | FR-HWK-03、05 | UI-HWK-06、08；API-HWK-09、10；DB-HWK-04 | 教师/助教有权限；含历史、删除、REJECTED、非当前学生、各题型和状态 | 不传 attention 回归旧列表；分别传两类 attention 并组合旧筛选、翻页和恢复 URL | 未传时行为不变；attention 只返回当前活跃学生的最终有效 SUBMITTED/LATE，状态语义正确，按 `submitted_at DESC,id DESC` 稳定分页 | Controller/Repository 及前端队列、路由用例通过；真实深链刷新、返回和前进/后退通过 | 通过 |
 | TC-HWK-09 | FR-HWK-04 | API-HWK-07、11；DB-HWK-05 | 客观题作业配置标准答案和分值 | 学生提交客观题答案，查询评测结果 | 自动计算分数，生成评测记录 | `objectiveHomeworkSubmissionCreatesEvaluationRecordAndResultView` 通过 | 通过 |
-| TC-HWK-10 | FR-HWK-04 | UI-HWK-05、07；API-HWK-07、11；DB-HWK-03、05 | 代码题配置 IO 用例和语言白名单 | 学生提交代码；不调用 API-HWK-11，等待后读取提交详情 | 独立 Worker 将 PENDING 推进到终态并返回通过用例数和分数 | E2E 等待 1 秒后提交仍为 PENDING；首次 API-HWK-11 读取才同步执行 evaluator | 失败 |
-| TC-HWK-11 | FR-HWK-04；NFR-HWK-01 | API-HWK-07、11；DB-HWK-04、05 | 代码提交包含编译错误 | 学生提交代码；不调用 API-HWK-11，等待后读取提交详情 | Worker 记录 COMPILE_ERROR/SYSTEM_ERROR，提交记录不丢失 | E2E 等待后仍为 PENDING；失败终态依赖 API-HWK-11 读触发或教师手动重评 | 失败 |
+| TC-HWK-10 | FR-HWK-04 | UI-HWK-05、07；API-HWK-07、10、11；DB-HWK-03、05 | 代码题配置 IO 用例和语言白名单；提交已持久化但首次 after-commit 派发未发生 | 学生提交代码；不调用 API-HWK-11，仅轮询提交详情；恢复器扫描持久 PENDING | 独立 Worker 将 PENDING 推进到终态并返回通过用例数和分数 | `codeHomeworkSubmissionEvaluatesIoCasesAndTeacherCanReevaluate` 不读取 API-HWK-11 即等待到 ACCEPTED；`recoveryEvaluatesPersistedCodeSubmissionWhenInitialAfterCommitDispatchWasMissed` 证明恢复器可推进遗漏任务；E2E 仅轮询 API-HWK-10 并断言 100 分 | 通过 |
+| TC-HWK-11 | FR-HWK-04；NFR-HWK-01 | API-HWK-07、10、11；DB-HWK-04、05 | 代码提交包含编译错误、评测器异常或旧进程遗留 RUNNING | 学生提交代码；不调用 API-HWK-11，仅轮询提交详情；启动恢复后重新投递旧 RUNNING | Worker 记录 COMPILE_ERROR/SYSTEM_ERROR，提交记录不丢失；旧进程任务不永久滞留 RUNNING | E2E 编译错误进入 COMPILE_ERROR；`codeHomeworkWorkerFailurePreservesSubmissionAndRecordsSystemError` 证明异常落 SYSTEM_ERROR 且提交保留；`recoveryRequeuesRunningCodeSubmissionLeftByPreviousProcess` 证明启动恢复后进入终态 | 通过 |
 | TC-HWK-12 | FR-HWK-04、05 | UI-HWK-08；API-HWK-12；DB-HWK-05、06 | 已有提交和评测记录；教师提供重评理由 | 教师触发重评 | 新增评测记录，保留旧记录，写入重评日志 | `codeHomeworkSubmissionEvaluatesIoCasesAndTeacherCanReevaluate`、`objectiveReevaluationUpdatesSubmissionSummary` 通过 | 通过 |
 | TC-HWK-13 | FR-HWK-05 | UI-HWK-08；API-HWK-13；DB-HWK-04、06 | 教师/助教有课程管理权限；存在待批阅提交 | 填写人工分数和评语 | 更新 manualScore、finalScore、comment，写入日志 | `courseManagerReviewsSubmissionAndReadsReviewAuditLogs`、前端教师批阅用例通过 | 通过 |
 | TC-HWK-14 | FR-HWK-05 | API-HWK-13；错误码 `HWK_4008` | 作业总分 100，教师填写超出总分的分数 | 提交批阅 | 返回分数范围错误，不更新成绩 | `teacherReviewRejectsScoreOutsideHomeworkTotalScore` 通过 | 通过 |
@@ -173,7 +175,7 @@
 | TC-HWK-25 | FR-HWK-03、05；NFR-HWK-03、04 | API-HWK-08/09/10；DB-HWK-08 | 多版本 FILE 提交与不可用资产 | 查询学生历史/教师详情 | 每个版本只返回精确绑定的安全附件摘要，不串版或泄露存储引用 | 自动化与 MAN-HWK-012 历史/批阅页通过 | 通过 |
 | TC-HWK-26 | FR-HWK-03、05；NFR-HWK-04 | API-HWK-24 | 提交者、课程管理者、匿名、他人提交 | 下载并核对鉴权、响应头和 SHA-256 | 每次重鉴权；仅提交者/课程管理者成功；精确版本且不泄露内部引用 | 学生/教师 SHA-256 均 `d1847d02cb36254509d0ec2df0eaf20805ce3f6aed4e25a809aea88f8d8568fa`；匿名 401，他人 403 | 通过 |
 | TC-HWK-27 | FR-HWK-02、03；NFR-HWK-05 | UI-HWK-05/06/08；API-HWK-23/24 | 上传/恢复失败、迟到响应、路由切换、sessionStorage | 选择→上传→失败保留/重试/移除→提交；刷新恢复 GET 失败后重载 | 无假 fileId/路由污染；sessionStorage 不含 File/本地路径；恢复失败保留 session/UUID | 前端 53 files / 545 tests；`fileId=d3b0f3f1-e989-4a6f-8665-ba35daa29329` 恢复 GET 500/HWK_5002 后保留，解除 mock 后 GET 200、DELETE 200 | 通过 |
-| TC-HWK-N01 | NFR-HWK-01 | API-HWK-03、07、11、13 | 模拟通知投递失败、评测失败、重复提交冲突 | 执行发布、提交、查询和批阅 | 主数据保持一致，错误以受控响应返回 | `publishRollsBackHomeworkWhenRequiredNotificationDeliveryFails` 断言 `503/HWK_5003`、`DRAFT` 与无通知残留；重复提交冲突用例通过 | 通过 |
+| TC-HWK-N01 | NFR-HWK-01 | API-HWK-03、07、11、13；DB-HWK-05 | 模拟通知投递失败、评测失败、重复提交冲突、首次派发遗漏和进程重启 | 执行发布、提交、查询和批阅；扫描 PENDING 并启动恢复 RUNNING | 主数据保持一致，错误以受控响应返回，持久评测任务不会因短暂派发异常或进程重启永久滞留 | `publishRollsBackHomeworkWhenRequiredNotificationDeliveryFails` 断言 `503/HWK_5003`、`DRAFT` 与无通知残留；两个 `HomeworkEvaluationRecovery` 自动化用例覆盖遗漏派发与重启恢复 | 通过 |
 | TC-HWK-N02 | NFR-HWK-02 | API-HWK-05、09、15；组合索引与增量迁移 | 数据量大于单页，包含活跃/退出学生和多版本提交 | 查询三类名单和统计，检查 Repository 查询及迁移元数据 | 1 基页码、size 1～100、稳定排序和聚合总数正确；统计为 SQL 聚合，不加载全部最终提交；组合索引存在且列顺序正确 | SQL 聚合、极大页码、fresh/H2/存量 MySQL 脚本契约 10 条通过；真实 MySQL EXPLAIN 待部署复核 | 有条件通过 |
 | TC-HWK-N03 | NFR-HWK-03 | API-HWK-10、20、21；DB-HWK-04、05、06 | 存在多次提交、评测、重评、批阅 | 查询详情、评测日志、批阅日志 | 提交和日志可追溯 | 迁移测试和控制器日志用例通过 | 通过 |
 | TC-HWK-N04 | NFR-HWK-04 | 全部 HWK 接口；重点 API-HWK-09、15 | 学生、无权限教师、姓名服务失败、缓存数据 | 越权查询统计/名单并触发姓名降级 | 返回 `HWK_4031`/403 且不泄露统计、名单或学生标识；页面不展示裸 `studentId` | 专属 403 自动化通过；390px 学生深链落到 403；姓名服务 503 时只显示安全占位 | 通过 |
@@ -236,6 +238,8 @@ HWK-LOG-001 ~ HWK-LOG-013 为 2026-06-09 的 V1.0 历史日志；HWK-LOG-014 起
 | HWK-LOG-029 | 2026-08-26 | #281 定向、Playwright、Maven/Vitest 全量、typecheck/build | 合并 `origin/dev@a30a096` 后复测通知失败整体回滚；共享演示账号场景改为串行避免跨场景会话竞争 | 通知/LRN 9/9、HWK E2E runner 2/2、后端 375（5 skipped）、前端 53 files / 556、typecheck、189 modules build 均通过；CODE 完整闭环结论已由 HWK-LOG-031 推翻 |
 | HWK-LOG-030 | 2026-08-26 | `render-mermaid.mjs`、`verify-hwk-doc-test-closure.test.sh` | 六张新增 UML 从专用图源回退为仓库统一 Mermaid `.mmd`，生成白底 SVG 并更新需求/概要/详细三层引用 | 6/6 SVG 渲染成功；组合片段包含明确 `alt/else` 分支；闭环契约与静态图目视检查 PASS |
 | HWK-LOG-031 | 2026-08-27 | `homework-lifecycle.spec.ts`、`verify-mermaid-svg.test.mjs` | 不读取 API-HWK-11 观察 CODE 提交状态；交换 SVG 消息边 from/to 验证语义比较器 | CODE 提交等待后仍为 PENDING，FR-HWK-04 判定 FAIL；反向消息边被比较器拒绝 |
+| HWK-LOG-032 | 2026-08-27 | `HomeworkControllerTest`、`HomeworkSubmissionServiceTest`、后端全量、`homework-lifecycle.spec.ts` | 提交后不读 API-HWK-11 等待后台终态；验证 PENDING 纯读与评测器异常落库 | 后端相邻 49/49、全量 390（383 passed、7 skipped）PASS；E2E 契约改为仅轮询 API-HWK-10，typecheck/build/Playwright 列表通过，共享 Compose runner 待复测 |
+| HWK-LOG-033 | 2026-08-27 | `HomeworkEvaluationRecoveryTest`、`HomeworkControllerTest`、`mvn -q test` | 持久 PENDING 在首次派发遗漏后被扫描重投；旧进程遗留 RUNNING 在启动时重置并重新执行；无 HWK 表的其他模块测试上下文默认关闭恢复器 | 后端相邻 105/105、全量 394（387 passed、7 skipped），0 failures、0 errors，PASS |
 
 ## 9 手工测试与联调确认
 
@@ -258,8 +262,8 @@ HWK-LOG-001 ~ HWK-LOG-013 为 2026-06-09 的 V1.0 历史日志；HWK-LOG-014 起
 
 | 风险编号 | 风险说明 | 影响范围 | 建议处理 |
 | --- | --- | --- | --- |
-| R-HWK-001 | #264 已执行共享 Playwright 两条场景；MAN-HWK-001 ~ MAN-HWK-006 的全页面、多视口人工走查仍需在发布候选环境复核 | UI-HWK-01 ~ UI-HWK-09 | 发布候选环境按 MAN-HWK-001 ~ MAN-HWK-006 补充视觉与会话异常走查；不得覆盖 FR-HWK-04 当前 FAIL |
-| R-HWK-002 | CODE 提交后没有独立后台 Worker，PENDING 评测由 API-HWK-11 读取同步触发 | FR-HWK-04、NFR-HWK-01、NFR-HWK-02、NFR-HWK-05 | 修复 Issue #296（负责人 @terrana37，目标完成 2026-09-05）增加任务调度/Worker，并以不读取 API-HWK-11 的终态测试验收；随后再执行真实 Docker 多语言、错误、超时和并发专项 |
+| R-HWK-001 | #264 已执行共享 Playwright 两条场景；MAN-HWK-001 ~ MAN-HWK-006 的全页面、多视口人工走查仍需在发布候选环境复核 | UI-HWK-01 ~ UI-HWK-09 | 发布候选环境按 MAN-HWK-001 ~ MAN-HWK-006 补充视觉与会话异常走查；不得覆盖 #296 的后台终态自动化证据 |
+| R-HWK-002 | #296 已消除读请求触发评测和任务派发遗漏/重启永久滞留缺陷；剩余风险为真实 Docker 多语言、资源限制与高并发专项未在本机执行 | FR-HWK-04、NFR-HWK-01、NFR-HWK-02、NFR-HWK-05 | 后台 Worker、原子认领、PENDING 定时恢复、旧 RUNNING 启动恢复、纯读取与 SYSTEM_ERROR 兜底已自动化通过；部署环境继续执行真实 Docker 专项，不回退为 API-HWK-11 同步评测 |
 | R-HWK-003 | #264 已通过真实本地服务验证 LRN 通知与 GRD 成绩同步边界；生产环境联调尚未记录完整结果 | FR-HWK-06、NFR-HWK-03 | 在统一测试环境复跑作业发布、成绩发布、通知中心和成绩同步闭环 |
 | R-HWK-004 | Maven 和 Vitest 在普通沙箱下存在写入/子进程权限限制 | 本地验证流程 | 本地开发机可直接运行；受限环境下需使用已批准的提权命令 |
 | R-HWK-005 | 本机 Docker daemon socket 不存在，#225 存量迁移尚未在真实 MySQL 8.4 容器执行首次、重跑与 EXPLAIN | DB-HWK-04、TC-HWK-N02、部署升级 | 当前由 H2 执行测试、MySQL 脚本静态契约和 shell 语法覆盖；部署时按 `apply-compose-migration.sh` 入口实跑并保存输出 |
@@ -270,13 +274,13 @@ HWK-LOG-001 ~ HWK-LOG-013 为 2026-06-09 的 V1.0 历史日志；HWK-LOG-014 起
 
 | 验收项 | 结论 | 说明 |
 | --- | --- | --- |
-| 功能覆盖 | 未通过 | 固定五档/attention、草稿逻辑删除等既有证据保留；CODE 提交后没有后台 Worker，FR-HWK-04 与 TC-HWK-10/11 失败 |
-| 接口覆盖 | 部分通过 | API-HWK-01~22 已有接口可调用；API-HWK-07 只创建 PENDING，API-HWK-11 读请求同步执行 evaluator，与设计契约冲突 |
+| 功能覆盖 | 通过 | 固定五档/attention、草稿逻辑删除等既有证据保留；#296 补齐 CODE 后台 Worker 与持久恢复，FR-HWK-04、NFR-HWK-01 与 TC-HWK-10/11 通过 |
+| 接口覆盖 | 通过 | API-HWK-07 创建 PENDING 任务并在提交后异步消费；PENDING 定时恢复与旧 RUNNING 启动恢复均为内部实现；API-HWK-10/11 只读状态，不新增或修改公共请求/响应契约 |
 | 页面覆盖 | 通过 | UI-HWK-01 删除交互单测及 1440×900/390×844 浏览器证据通过，390px 无横向溢出且控制台干净 |
 | 数据一致性 | 有条件通过 | 父表原子软删、普通更新防复活、六类子记录保留自动化通过；真实 MySQL 并发当前读仍按部署环境复核 |
 | 权限与安全 | 通过 | 草稿删除无权限 403、非 DRAFT 409、重复删除 404；既有统计权限和隐私证据保持通过 |
-| 非功能 | 未通过 | 分页、稳定排序、SQL 聚合、索引和可重复性已有证据保留；后台任务缺失违反 NFR-HWK-01/02/05，生产压测、真实 MySQL EXPLAIN 和真实沙箱专项仍待补 |
-| 最终结论 | #264 文档/测试闭环完成 | 文档闭环、共享入口契约、typecheck/build、LRN/GRD 和客观题路径通过；HWK E2E runner 原始计数为 2 passed / 0 failed，第二条通过的断言复现 CODE 持续 PENDING。FR-HWK-04 的产品验收仍为 FAIL，由 Issue #296 独立修复；#264 可按文档与测试闭环交付关闭，不以产品缺口冒充 PASS |
+| 非功能 | 有条件通过 | 分页、稳定排序、SQL 聚合、索引和后台任务可重复认领/恢复已有证据；生产压测、真实 MySQL EXPLAIN 和真实 Docker 专项仍待部署环境执行 |
+| 最终结论 | #296 PASS | 后台 Worker、PENDING 定时恢复、旧 RUNNING 启动恢复、API-HWK-11 纯读取、异常终态和不读取 API-HWK-11 的验收契约已补齐；#264 已由 PR #276 完成文档与测试交付，#296 合并后独立关闭 FR-HWK-04 产品缺陷 |
 
 ## 12 附录
 
@@ -321,4 +325,5 @@ sh -n database/mysql/apply-compose-migration.sh
 | #224 浏览器 | MAN-HWK-011 通过；真实 DELETE 200/deleted=true；1440×900/390×844 四张截图见 `output/playwright/issue-224/README.md` |
 | #264 自动化 | HWK 后端 101/101、HWK 前端 182/182、通知/LRN 定向 9/9；全量后端 375 tests（5 个环境专项 skipped）、全量前端 556/556；共享入口契约 3/3；typecheck、189 modules build、文档闭环契约通过 |
 | #264 共享 E2E | Playwright runner 原始计数：2 passed / 0 failed；复用 #267/#268 的公共夹具，串行使用共享演示账号。第二个通过的断言在不读取 API-HWK-11 时复现 CODE 持续 PENDING，因此 FR-HWK-04 的后台 Worker 产品验收仍为 FAIL，由 #296 独立修复 |
+| #296 自动化 | 后端相邻 105/105、全量 394（387 passed、7 skipped）；首次派发遗漏与旧进程 RUNNING 恢复均进入终态；前端 typecheck、189 modules build、Playwright 2 条用例加载、文档/SVG 语义契约通过；Compose runner 因 Docker daemon 不可用待复测 |
 | 手工/联调状态 | #224/#225 已验收；#264 真实本地 LRN/GRD 边界通过；真实 MySQL 容器、真实 Docker 沙箱和生产环境联调仍按风险项复核 |

@@ -201,7 +201,7 @@ test.describe('@hwk HWK 真实业务闭环', () => {
     }));
   });
 
-  test('多类型提交暴露代码后台评测缺口并覆盖附件异常、过期、越权与重评', async ({
+  test('多类型提交验证代码后台评测并覆盖附件异常、过期、越权与重评', async ({
     page,
     request,
     loginAs,
@@ -250,12 +250,13 @@ test.describe('@hwk HWK 真实业务闭环', () => {
       }
     ));
     expect(acceptedCodeSubmission.evaluationStatus).toBe('PENDING');
-    await new Promise((resolve) => setTimeout(resolve, 1_000));
-    const pendingCodeSubmission = await apiData<SubmissionRecord>(await request.get(
-      `/api/v1/submissions/${acceptedCodeSubmission.submissionId}`,
-      { headers: studentHeaders }
-    ));
-    expect(pendingCodeSubmission.evaluationStatus).toBe('PENDING');
+    const acceptedCodeResult = await waitForSubmissionTerminal(
+      request,
+      studentHeaders,
+      acceptedCodeSubmission.submissionId
+    );
+    expect(acceptedCodeResult.evaluationStatus).toBe('ACCEPTED');
+    expect(acceptedCodeResult.autoScore).toBe(100);
 
     const failedCodeSubmission = await apiData<SubmissionRecord>(await request.post(
       `/api/v1/homeworks/${code.id}/submissions`,
@@ -263,12 +264,13 @@ test.describe('@hwk HWK 真实业务闭环', () => {
     ));
     expect(failedCodeSubmission.submissionId).toBeGreaterThan(acceptedCodeSubmission.submissionId);
     expect(failedCodeSubmission.evaluationStatus).toBe('PENDING');
-    await new Promise((resolve) => setTimeout(resolve, 1_000));
-    const pendingInvalidCodeSubmission = await apiData<SubmissionRecord>(await request.get(
-      `/api/v1/submissions/${failedCodeSubmission.submissionId}`,
-      { headers: studentHeaders }
-    ));
-    expect(pendingInvalidCodeSubmission.evaluationStatus).toBe('PENDING');
+    const failedCodeResult = await waitForSubmissionTerminal(
+      request,
+      studentHeaders,
+      failedCodeSubmission.submissionId
+    );
+    expect(failedCodeResult.evaluationStatus).toBe('COMPILE_ERROR');
+    expect(failedCodeResult.autoScore).toBe(0);
 
     const invalidAttachmentResponse = await request.post(
       `/api/v1/homeworks/${file.id}/attachments`,
@@ -344,6 +346,24 @@ async function apiData<T>(response: APIResponse): Promise<T> {
   const body = await response.json() as ApiEnvelope<T>;
   expect(body.code).toBe('0');
   return body.data;
+}
+
+async function waitForSubmissionTerminal(
+  request: APIRequestContext,
+  headers: Record<string, string>,
+  submissionId: number
+) {
+  await expect.poll(async () => {
+    const latest = await apiData<SubmissionRecord>(await request.get(
+      `/api/v1/submissions/${submissionId}`,
+      { headers }
+    ));
+    return latest.evaluationStatus;
+  }, { timeout: 10_000 }).not.toMatch(/^(PENDING|RUNNING)$/);
+  return apiData<SubmissionRecord>(await request.get(
+    `/api/v1/submissions/${submissionId}`,
+    { headers }
+  ));
 }
 
 async function acceptNextConfirmation(page: Page) {

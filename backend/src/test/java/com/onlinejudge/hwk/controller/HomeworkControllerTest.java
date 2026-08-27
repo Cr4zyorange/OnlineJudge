@@ -9,6 +9,7 @@ import com.onlinejudge.common.event.NotificationEvent;
 import com.onlinejudge.common.event.NotificationEventPublisher;
 import com.onlinejudge.hwk.domain.Homework;
 import com.onlinejudge.hwk.domain.HomeworkRepository;
+import com.onlinejudge.hwk.service.HomeworkEvaluationRecovery;
 import com.onlinejudge.integration.grade.SourceGradeClient;
 import com.onlinejudge.integration.grade.SourceGradeType;
 import org.junit.jupiter.api.BeforeEach;
@@ -43,7 +44,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest(properties = {
-        "spring.datasource.url=jdbc:h2:mem:homework_controller;MODE=MySQL;DATABASE_TO_LOWER=TRUE;CASE_INSENSITIVE_IDENTIFIERS=TRUE;DB_CLOSE_DELAY=-1"
+        "spring.datasource.url=jdbc:h2:mem:homework_controller;MODE=MySQL;DATABASE_TO_LOWER=TRUE;CASE_INSENSITIVE_IDENTIFIERS=TRUE;DB_CLOSE_DELAY=-1",
+        "onlinejudge.hwk.evaluation.recovery-enabled=true"
 })
 @AutoConfigureMockMvc
 @Sql(
@@ -80,6 +82,9 @@ class HomeworkControllerTest {
         @Primary
         Evaluator deterministicHomeworkEvaluator() {
             return task -> {
+                if (task.sourceCode() != null && task.sourceCode().contains("#FAKE_SYSTEM_ERROR")) {
+                    throw new IllegalStateException("sandbox unavailable");
+                }
                 boolean wrong = task.sourceCode() != null && task.sourceCode().contains("#FAKE_WRONG");
                 String expectedOutput = task.options().getOrDefault("expectedOutput", "");
                 return new EvaluationResult(
@@ -111,6 +116,9 @@ class HomeworkControllerTest {
 
     @Autowired
     private SourceGradeClient sourceGradeClient;
+
+    @Autowired
+    private HomeworkEvaluationRecovery evaluationRecovery;
 
     @BeforeEach
     void clearNotificationEvents() {
@@ -1058,6 +1066,8 @@ class HomeworkControllerTest {
 
         long submissionId = submitCodeAnswer(homeworkId, "print(input())", "python", studentHeaders("101"));
 
+        awaitEvaluationStatus(submissionId, "ACCEPTED");
+
         mockMvc.perform(get("/api/v1/submissions/{submissionId}/evaluation", submissionId)
                         .headers(studentHeaders("101")))
                 .andExpect(status().isOk())
@@ -1127,6 +1137,8 @@ class HomeworkControllerTest {
                 .andExpect(status().isOk());
         long submissionId = submitCodeAnswer(homeworkId, "print(input())", "python", studentHeaders("101"));
 
+        awaitEvaluationStatus(submissionId, "ACCEPTED");
+
         mockMvc.perform(get("/api/v1/submissions/{submissionId}/evaluation", submissionId)
                         .headers(studentHeaders("101")))
                 .andExpect(status().isOk())
@@ -1166,6 +1178,8 @@ class HomeworkControllerTest {
                 .andExpect(status().isOk());
         long submissionId = submitCodeAnswer(homeworkId, "#FAKE_WRONG\nprint(input())", "python", studentHeaders("101"));
 
+        awaitEvaluationStatus(submissionId, "WRONG_ANSWER");
+
         String evaluationBody = mockMvc.perform(get("/api/v1/submissions/{submissionId}/evaluation", submissionId)
                         .headers(teacherHeaders("101", "101")))
                 .andExpect(status().isOk())
@@ -1198,6 +1212,8 @@ class HomeworkControllerTest {
 
         long submissionId = submitCodeAnswer(homeworkId, "#FAKE_WRONG\nprint(input())", "python", studentHeaders("101"));
 
+        awaitEvaluationStatus(submissionId, "WRONG_ANSWER");
+
         mockMvc.perform(get("/api/v1/submissions/{submissionId}/evaluation", submissionId)
                         .headers(teacherHeaders("101", "101")))
                 .andExpect(status().isOk())
@@ -1216,12 +1232,84 @@ class HomeworkControllerTest {
     }
 
     @Test
+    void codeHomeworkWorkerFailurePreservesSubmissionAndRecordsSystemError() throws Exception {
+        long homeworkId = createHomeworkAndReturnId(codePayload("[\"python\"]"));
+        mockMvc.perform(put("/api/v1/homeworks/{homeworkId}/publish", homeworkId)
+                        .headers(teacherHeaders("101", "101", "101:601")))
+                .andExpect(status().isOk());
+
+        long submissionId = submitCodeAnswer(
+                homeworkId,
+                "#FAKE_SYSTEM_ERROR\nprint(input())",
+                "python",
+                studentHeaders("101")
+        );
+
+        awaitEvaluationStatus(submissionId, "SYSTEM_ERROR");
+
+        mockMvc.perform(get("/api/v1/submissions/{submissionId}", submissionId)
+                        .headers(teacherHeaders("101", "101")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.submissionId").value(submissionId))
+                .andExpect(jsonPath("$.data.evaluationStatus").value("SYSTEM_ERROR"))
+                .andExpect(jsonPath("$.data.autoScore").value(0));
+
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM t_hwk_submission WHERE id = ?",
+                Integer.class,
+                submissionId
+        )).isEqualTo(1);
+    }
+
+    @Test
+    void recoveryEvaluatesPersistedCodeSubmissionWhenInitialAfterCommitDispatchWasMissed() throws Exception {
+        long homeworkId = createHomeworkAndReturnId(codePayload("[\"python\"]"));
+        mockMvc.perform(put("/api/v1/homeworks/{homeworkId}/publish", homeworkId)
+                        .headers(teacherHeaders("101", "101", "101:601")))
+                .andExpect(status().isOk());
+        long submissionId = insertSubmission(
+                homeworkId, 601, "CODE", "SUBMITTED", "PENDING", "NEED_REVIEW", null,
+                null, 1, true, false, "2026-08-27 08:00:00"
+        );
+        insertCodeEvaluation(submissionId, homeworkId, 601, "PENDING", "2026-08-27 08:00:00");
+
+        evaluationRecovery.recoverPendingEvaluations();
+
+        awaitEvaluationStatus(submissionId, "ACCEPTED");
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT evaluation_status FROM t_hwk_submission WHERE id = ?", String.class, submissionId
+        )).isEqualTo("ACCEPTED");
+    }
+
+    @Test
+    void recoveryRequeuesRunningCodeSubmissionLeftByPreviousProcess() throws Exception {
+        long homeworkId = createHomeworkAndReturnId(codePayload("[\"python\"]"));
+        mockMvc.perform(put("/api/v1/homeworks/{homeworkId}/publish", homeworkId)
+                        .headers(teacherHeaders("101", "101", "101:601")))
+                .andExpect(status().isOk());
+        long submissionId = insertSubmission(
+                homeworkId, 601, "CODE", "SUBMITTED", "RUNNING", "NEED_REVIEW", null,
+                null, 1, true, false, "2026-01-01 08:00:00"
+        );
+        insertCodeEvaluation(submissionId, homeworkId, 601, "RUNNING", "2026-01-01 08:00:00");
+
+        evaluationRecovery.recoverAfterRestart();
+
+        awaitEvaluationStatus(submissionId, "ACCEPTED");
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT evaluation_status FROM t_hwk_submission WHERE id = ?", String.class, submissionId
+        )).isEqualTo("ACCEPTED");
+    }
+
+    @Test
     void studentEvaluationResultHidesHiddenCaseExpectedOutput() throws Exception {
         long homeworkId = createHomeworkAndReturnId(codePayloadWithHiddenCase("[\"python\"]"));
         mockMvc.perform(put("/api/v1/homeworks/{homeworkId}/publish", homeworkId)
                         .headers(teacherHeaders("101", "101", "101:601")))
                 .andExpect(status().isOk());
         long submissionId = submitCodeAnswer(homeworkId, "#FAKE_WRONG\nprint(input())", "python", studentHeaders("101"));
+
+        awaitEvaluationStatus(submissionId, "WRONG_ANSWER");
 
         String studentBody = mockMvc.perform(get("/api/v1/submissions/{submissionId}/evaluation", submissionId)
                         .headers(studentHeaders("101")))
@@ -1696,6 +1784,22 @@ class HomeworkControllerTest {
                 """, submissionId, homeworkId, studentId);
     }
 
+    private void insertCodeEvaluation(
+            long submissionId,
+            long homeworkId,
+            long studentId,
+            String status,
+            String startedAt
+    ) {
+        jdbcTemplate.update("""
+                INSERT INTO t_hwk_evaluation
+                (submission_id, homework_id, student_id, evaluation_type, status, score, passed_cases, total_cases,
+                 time_used_ms, memory_used_kb, feedback, started_at, finished_at, created_at, updated_at)
+                VALUES (?, ?, ?, 'CODE_JUDGE', ?, 0, 0, 1, NULL, NULL, 'waiting for evaluation',
+                        ?, NULL, ?, ?)
+                """, submissionId, homeworkId, studentId, status, startedAt, startedAt, startedAt);
+    }
+
     private void insertReviewLog(long submissionId, long homeworkId, long studentId) {
         jdbcTemplate.update("""
                 INSERT INTO t_hwk_review_log
@@ -1855,6 +1959,23 @@ class HomeworkControllerTest {
                         )
                 ))
         );
+    }
+
+    private void awaitEvaluationStatus(long submissionId, String expectedStatus) throws InterruptedException {
+        long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(3);
+        String actualStatus = null;
+        while (System.nanoTime() < deadline) {
+            actualStatus = jdbcTemplate.queryForObject(
+                    "SELECT status FROM t_hwk_evaluation WHERE submission_id = ? ORDER BY id DESC LIMIT 1",
+                    String.class,
+                    submissionId
+            );
+            if (expectedStatus.equals(actualStatus)) {
+                return;
+            }
+            Thread.sleep(25);
+        }
+        assertThat(actualStatus).isEqualTo(expectedStatus);
     }
 
     private String futureDeadline() {

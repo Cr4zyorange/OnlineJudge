@@ -18,11 +18,11 @@ HWK 保持两个已经确认的独立业务场景。页面动作、权限检查�
 | 场景/流程 | 分类 | 归属 | 触发与可验证结果 |
 | --- | --- | --- | --- |
 | 教师创建并发布作业 | 独立场景 | UC-HWK-02 | 教师保存草稿并确认发布；合法配置变为 PUBLISHED，非法配置保留可修改草稿并返回稳定错误 |
-| 学生提交作业并触发自动评测 | 独立场景 | UC-HWK-01 | 学生提交 TEXT/OBJECTIVE/CODE/FILE；OBJECTIVE 同步形成评测终态，CODE 当前只形成 PENDING 记录且没有独立 Worker，学生只能看到允许公开的反馈 |
+| 学生提交作业并触发自动评测 | 独立场景 | UC-HWK-01 | 学生提交 TEXT/OBJECTIVE/CODE/FILE；OBJECTIVE 同步形成评测终态，CODE 形成持久 PENDING 任务并由后台 Worker 推进到终态；首次派发遗漏或进程重启后由恢复器重新投递，学生只能看到允许公开的反馈 |
 | 草稿编辑/删除 | 备选路径 | UC-HWK-02 | 保存草稿、更新草稿或仅逻辑删除 DRAFT；历史和子记录不被级联清理 |
 | 题目与测试用例配置 | 公共子流程 | UC-HWK-02 | OBJECTIVE/CODE 发布前完成配置完整性校验 |
 | 附件上传/恢复/绑定/下载/清理 | 公共子流程 | UC-HWK-01 | 单附件从 UPLOADED 原子进入 BOUND/DELETED，下载每次重鉴权，失败执行物理对象补偿或延迟清理 |
-| 自动评测 | 公共子流程 | UC-HWK-01 | OBJECTIVE 生成独立终态评测记录；CODE 只生成 PENDING 记录，当前由 API-HWK-11 读取请求同步触发 evaluator，与后台 Worker 契约不一致 |
+| 自动评测 | 公共子流程 | UC-HWK-01 | OBJECTIVE 生成独立终态评测记录；CODE 生成持久 PENDING 任务，事务提交后由 Worker 原子认领并调用共享 Evaluator；恢复器定时重投 PENDING、在启动时重置旧进程遗留 RUNNING，API-HWK-11 保持纯读取 |
 | 教师批阅/重评 | 扩展路径 | UC-HWK-01 | 教师对待批阅提交评分，或新建 REJUDGE 记录；评分、评语和操作日志可追踪 |
 | 统计与待处理名单 | 查询子流程 | UC-HWK-01 | 课程管理者查询固定五档、未提交、待评测和待批阅分页结果 |
 
@@ -41,10 +41,10 @@ HWK 保持两个已经确认的独立业务场景。页面动作、权限检查�
 | TEXT/OBJECTIVE/CODE/FILE 提交与历史 | `HomeworkControllerTest`、`HomeworkSubmissionServiceTest`、`HomeworkAttachmentControllerTest`、学生提交/历史前端测试 | PASS |
 | 截止、迟交、禁止重交、越权与隐藏答案 | HWK Controller/Bearer/Service 测试及学生结果页测试 | PASS |
 | 客观题评测、人工批阅与手动重评 | `HomeworkControllerTest`、结果/批阅页面测试 | PASS |
-| CODE 提交后独立后台评测 | `homework-lifecycle.spec.ts` 在不调用 API-HWK-11 的情况下等待后读取提交详情 | FAIL：POST 仅创建 PENDING 记录；等待 1 秒后仍为 PENDING，首次 API-HWK-11 读取才同步执行 evaluator |
+| CODE 提交后独立后台评测 | `codeHomeworkSubmissionEvaluatesIoCasesAndTeacherCanReevaluate`、`evaluationDetailReturnsPendingResultWithoutInvokingEvaluator`、`HomeworkEvaluationRecoveryTest` 与 `homework-lifecycle.spec.ts` 只轮询 API-HWK-10 | PASS：POST 返回 PENDING 后，Worker 独立推进到 ACCEPTED/失败终态；首次派发遗漏或进程重启后的恢复也进入终态；API-HWK-11 不再触发 evaluator |
 | 附件恢复、失败补偿和清理 | Attachment Service/Controller/Scheduling 测试及 FILE 页面测试 | PASS |
 | 统计与待处理名单 | Statistics/Repository/Attention 测试及统计页面测试 | PASS |
-| 共享 E2E #267 | `homework-lifecycle.spec.ts` 复用 PR #268 的 Playwright runner 与公共夹具 | PASS（runner）：原始计数为 2 passed、0 failed；第二个通过的断言明确复现 CODE 后台评测缺失。runner 通过不等于 FR-HWK-04 产品验收通过，后者单独判定 FAIL |
+| 共享 E2E #267 | `homework-lifecycle.spec.ts` 复用 PR #268 的 Playwright runner 与公共夹具 | PASS 契约：第二个场景不调用 API-HWK-11，只轮询提交详情并要求 AC 与编译错误样本均进入终态且保留提交 |
 | GRD 来源成绩真实链路 | PASS | 创建仅绑定本次 `homeworkId` 且 `includedInFinal=true` 的 HWK 成绩项，调用 GRD `/grades/sync` 后按 `gradeItemId` 与当前学生查询成绩记录，精确断言 `sourceId=homeworkId` 和原始分 88；将 `includedInFinal` 变异为 false 时该断言按预期 RED |
 | LRN 发布/成绩通知成功链路 | PASS | 真实发布/成绩发布后从 LRN 通知 API 按 `sourceModule=HWK` 与 `sourceId=homeworkId` 断言落库 |
 | 通知投递失败设计/实现一致性 | PASS | #281 / PR #285 已合并；`HomeworkControllerTest#publishRollsBackHomeworkWhenRequiredNotificationDeliveryFails` 证明必需通知投递失败时返回 `503/HWK_5003`，发布事务整体回滚，作业保持 `DRAFT` 且不留下通知记录 |
@@ -56,10 +56,10 @@ HWK 保持两个已经确认的独立业务场景。页面动作、权限检查�
 | 图组闭环契约 RED | 1 | 0 | 1 | 0 | 0 | 预期失败：缺少拆分后的教师发布 SSD 源文件；规范调整后旧图号断言再次按预期失败 |
 | 共享 E2E 契约 RED | 1 | 0 | 1 | 0 | 0 | 预期失败：`frontend/tests/e2e/hwk/homework-lifecycle.spec.ts` 不存在 |
 | 文档闭环契约 GREEN | 1 | 1 | 0 | 0 | 0 | PASS |
-| HWK 共享 E2E runner | 2 | 2 | 0 | 0 | 0 | PASS；第二个通过的断言复现 CODE 提交后无后台 Worker、提交持续 PENDING。FR-HWK-04 的 CODE 后台 Worker 产品验收另行判定 FAIL（见 §5.2 / #296） |
-| HWK 后端定向 | 101 | 101 | 0 | 0 | 0 | PASS |
+| HWK 共享 E2E 业务验收 | 2 | 待复测 | 0 | 0 | 0 | #296 已将第二个场景改为仅轮询 API-HWK-10 并断言 ACCEPTED/COMPILE_ERROR 终态；待共享 Compose runner 复跑回填 |
+| HWK 后端定向 | 105 | 105 | 0 | 0 | 0 | PASS；包含首次派发遗漏与旧进程 RUNNING 恢复 |
 | HWK 前端定向 | 182 | 182 | 0 | 0 | 0 | PASS；11/11 files |
-| 后端全量回归 | 375 | 370 | 0 | 0 | 5 | PASS；Docker/环境专项按测试假设跳过 |
+| 后端全量回归 | 394 | 387 | 0 | 0 | 7 | PASS；Docker/MySQL 环境专项按测试假设跳过 |
 | 前端全量回归 | 556 | 556 | 0 | 0 | 0 | PASS；53/53 files |
 | 前端类型检查 | 1 | 1 | 0 | 0 | 0 | PASS |
 | 前端生产构建 | 1 | 1 | 0 | 0 | 0 | PASS；189 modules transformed |
@@ -75,19 +75,20 @@ HWK 保持两个已经确认的独立业务场景。页面动作、权限检查�
 - 确认契约：`HOMEWORK_PUBLISHED` 是发布事务的必需通知；投递失败则发布整体失败并回滚。
 - 合并证据：#281 / PR #285 已合并到 `dev`，合并提交 `a30a096281a01d7169cc0c2d18360aa1a65cd6b0`。
 - 定向复测：`publishRollsBackHomeworkWhenRequiredNotificationDeliveryFails`、`PersistentNotificationEventPublisherTest`、`NotificationControllerTest` 共 9/9 PASS；失败响应为 `503/HWK_5003`，作业保持 `DRAFT`。
-- 闭环复测：通知成功链路、四类提交、批阅/手动重评与 GRD 精确成绩消费均执行；CODE 提交后的独立后台评测未通过，因此不能以 Playwright runner 2/2 通过替代产品验收。
+- 闭环复测：通知成功链路、四类提交、批阅/手动重评与 GRD 精确成绩消费的既有证据保留；CODE 提交后的独立后台评测已由 #296 后端自动化通过，共享 E2E runner 待 Compose 环境复跑。
 
-### 5.2 FR-HWK-04：CODE 后台自动评测未闭环
+### 5.2 FR-HWK-04：CODE 后台自动评测已由 #296 闭环
 
-- 复现：CODE 提交 POST 返回 `PENDING`；不调用 `GET /api/v1/submissions/{id}/evaluation`，等待 1 秒后通过只读提交详情查询仍为 `PENDING`。
-- 代码证据：`createInitialEvaluation` 只保存 `CODE_JUDGE/PENDING`；`evaluationDetail` 调用 `latestOrCreateEvaluation`，在 API-HWK-11 读请求中同步执行 evaluator。
-- 判定：FR-HWK-04 的客观题自动评分为 PASS，CODE “提交后创建任务并由后台 Worker 异步执行”为 FAIL；TC-HWK-10、TC-HWK-11 不通过，由修复 Issue #296 实现任务调度并补不读取 API-HWK-11 的终态测试。
-- 责任与计划：修复 Issue #296，负责人 @terrana37，计划开始 2026-08-29，目标完成 2026-09-05；复测标准：不调用 API-HWK-11 的独立终态测试通过，TC-HWK-10/11 更新为 PASS。
-- Issue #264 结论：文档与测试闭环交付完成，可按 Issue #264 关闭；FR-HWK-04 的 CODE 后台 Worker 产品验收仍为 FAIL，修复由 #296 独立跟踪。#264 记录复现、影响、责任人与复测标准，不以该产品缺口冒充 PASS。
+- 实现：API-HWK-07 在提交事务内保存 `CODE_JUDGE/PENDING`，事务提交后投递 `HomeworkEvaluationTaskCreated`；`HomeworkEvaluationWorker` 使用 HWK 专用线程池消费，并以条件更新原子认领任务。`HomeworkEvaluationRecovery` 定时扫描持久 PENDING，并在应用启动时将旧进程遗留 RUNNING 重置为 PENDING 后重新投递；线程池拒绝不会删除任务，下一轮扫描会重试。
+- 共享边界：Worker 复用 `Evaluator` / `EvaluationTask`，不新增公共 API、DTO、错误码或数据库表；API-HWK-11 仅查询最新评测记录，不再执行 evaluator。
+- 异常语义：Worker 或评测器出现未预期异常时，独立事务将评测和提交更新为 `SYSTEM_ERROR`，提交主记录及历史不删除。
+- 自动化证据：提交后不调用 API-HWK-11 即进入终态的 Controller 测试、PENDING 结果纯读取单元测试、Worker 异常保留提交测试，以及 `recoveryEvaluatesPersistedCodeSubmissionWhenInitialAfterCommitDispatchWasMissed` 与 `recoveryRequeuesRunningCodeSubmissionLeftByPreviousProcess` 均通过；共享 E2E 改为只轮询 API-HWK-10。
+- 判定：FR-HWK-04 的 CODE 后台评测与 TC-HWK-10、TC-HWK-11 更新为 PASS；真实 Docker 多语言、资源限制和并发压测仍按部署专项执行，不属于 #296。
+- Issue 生命周期：#264 已由 PR #276 按文档与测试闭环交付完成；FR-HWK-04 产品缺陷由 #296 独立跟踪，本分支完成修复并在 #296 合并后关闭该产品缺陷。
 
 ### 5.3 环境风险
 
-当前本地后端使用的真实沙箱不可用；教师手动重评可进入同步 evaluator 并记录 `SYSTEM_ERROR`，提交保留与重评可追踪。真实 Docker 沙箱中的 CODE AC/WA/资源限制仍需部署环境专项复核；该环境风险独立于已确认的后台 Worker 缺失，不改变 FR-HWK-04 的 FAIL 判定。
+当前本地后端使用的真实沙箱不可用；自动 Worker 与教师手动重评均能记录 `SYSTEM_ERROR`，提交保留且评测历史可追踪。真实 Docker 沙箱中的 CODE AC/WA/资源限制仍需部署环境专项复核；该环境风险不改变 #296 对任务调度、纯读取和异常持久化的 PASS 判定。
 
 ## 6 PASS / FAIL / BLOCKED 规则
 
