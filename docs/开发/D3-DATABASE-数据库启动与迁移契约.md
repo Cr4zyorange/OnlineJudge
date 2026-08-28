@@ -6,6 +6,7 @@
 
 - `compose-schema.sql` 是空数据库的最新 MySQL 8.4 快照，并内置与迁移文件 SHA-256 对应的 `schema_migrations` 基线。
 - `manifest.txt` 是唯一迁移顺序；文件系统顺序和文件名自然排序都不是迁移顺序。
+- `.gitattributes` 将 `database/**/*.sql` 的 checkout 行尾固定为 LF；即使本机启用 `core.autocrlf=true`，迁移文件的原始字节 SHA-256 仍必须与基线一致，runner 不做静默行尾规范化。
 - `migrate.sh` 负责已有数据库升级、版本记录、checksum 漂移拒绝和失败迁移定位。
 - `database/seeds/dev-ci.sql` 只提供两个禁用登录的数据库健康身份和一门可辨识课程；它不提供真实凭据，不替代 `AuthSeedDataInitializer` 或 `IntDemoDataInitializer` 的可登录账号与完整演示闭环数据。
 - `database/seeds/clean-dev-ci.sql` 只清理 `db_ci_*_287` 和 `D3-DATABASE-287` 所属记录。
