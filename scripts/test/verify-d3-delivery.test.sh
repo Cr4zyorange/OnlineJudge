@@ -54,6 +54,12 @@ require_text "$workflow" 'bash scripts/kind/k8s-cleanup.sh'
 require_text "$workflow" 'actions/upload-artifact@'
 require_text "$workflow" 'forced_failure'
 
+# GitHub resolves action `with:` inputs before a runner context exists, so a
+# runner.temp expression there rejects the workflow before it can dispatch.
+if grep -Fq '${{ runner.temp }}' "$workflow"; then
+  fail 'artifact paths must use checkout-relative directories, not runner.temp expressions'
+fi
+
 require_text "$delivery_script" 'scripts/kind/k8s-verify.sh'
 require_text "$delivery_script" 'scripts/kind/k8s-deploy.sh'
 require_text "$delivery_script" 'scripts/kind/k8s-diagnose.sh'
