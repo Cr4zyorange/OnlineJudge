@@ -1,0 +1,243 @@
+name: d3-delivery
+
+# #292 consumes the completion of #290 rather than recreating its three
+# quality-gate jobs.  Only a successful push to dev may reach image build and
+# Kind deployment.  workflow_dispatch exists solely to record the requested
+# controlled RED runs; it never pretends to be a real #290 result.
+on:
+  workflow_run:
+    workflows: ["ci-quality-gate"]
+    types: [completed]
+    branches: [dev]
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Exact ref to exercise (use dev for controlled evidence)
+        required: true
+        default: dev
+        type: string
+      quality_gate_conclusion:
+        description: Simulated #290 conclusion for a controlled RED run
+        required: true
+        default: success
+        type: choice
+        options: [success, failure]
+      forced_failure:
+        description: Optional controlled deployment failure after Kind is Ready
+        required: true
+        default: none
+        type: choice
+        options: [none, health]
+
+concurrency:
+  group: d3-delivery-${{ github.event.workflow_run.head_sha || inputs.ref || github.run_id }}
+  cancel-in-progress: false
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  quality-gate:
+    name: Consume #290 quality-gate result
+    # A PR quality-gate completion must not gain delivery secrets through a
+    # workflow_run trigger.  #292 only delivers pushes to dev.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'dev')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      git_sha: ${{ steps.source.outputs.git_sha }}
+      source_run_id: ${{ steps.source.outputs.source_run_id }}
+      source_run_url: ${{ steps.source.outputs.source_run_url }}
+      source_conclusion: ${{ steps.source.outputs.source_conclusion }}
+    steps:
+      - name: Checkout exact quality-gate revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || inputs.ref }}
+          fetch-depth: 0
+      - name: Resolve source quality-gate metadata
+        id: source
+        env:
+          QUALITY_GATE_CONCLUSION: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.conclusion || inputs.quality_gate_conclusion }}
+          QUALITY_GATE_RUN_ID: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.id || github.run_id }}
+          FORCED_FAILURE: ${{ inputs.forced_failure || 'none' }}
+        run: |
+          set -Eeuo pipefail
+          git_sha="$(git rev-parse HEAD)"
+          [[ "$git_sha" =~ ^[0-9a-f]{40}$ ]]
+          if [[ "$FORCED_FAILURE" == "quality-gate" ]]; then
+            QUALITY_GATE_CONCLUSION=failure
+          fi
+          printf 'git_sha=%s\n' "$git_sha" >> "$GITHUB_OUTPUT"
+          printf 'source_run_id=%s\n' "$QUALITY_GATE_RUN_ID" >> "$GITHUB_OUTPUT"
+          printf 'source_run_url=https://github.com/%s/actions/runs/%s\n' "$GITHUB_REPOSITORY" "$QUALITY_GATE_RUN_ID" >> "$GITHUB_OUTPUT"
+          printf 'source_conclusion=%s\n' "$QUALITY_GATE_CONCLUSION" >> "$GITHUB_OUTPUT"
+          [[ "$QUALITY_GATE_CONCLUSION" == success ]] \
+            || { printf 'quality gate concluded %s; image build and Kind delivery are blocked\n' "$QUALITY_GATE_CONCLUSION" >&2; exit 1; }
+      - name: Download #290 JUnit and quality-gate evidence
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_RUN_ID: ${{ steps.source.outputs.source_run_id }}
+          EVIDENCE_DIR: ${{ runner.temp }}/d3-quality-gate-evidence
+        run: |
+          set -u
+          mkdir -p "$EVIDENCE_DIR"
+          if [[ "${{ github.event_name }}" == workflow_run ]]; then
+            if ! gh run download "$SOURCE_RUN_ID" --repo "$GITHUB_REPOSITORY" --dir "$EVIDENCE_DIR"; then
+              printf 'quality-gate artifact download failed; the original run remains the authoritative evidence source\n' \
+                > "$EVIDENCE_DIR/download-warning.txt"
+            fi
+          else
+            printf 'manual controlled run: no external #290 artifact download was attempted\n' \
+              > "$EVIDENCE_DIR/download-warning.txt"
+          fi
+          printf '{"run_id":"%s","url":"https://github.com/%s/actions/runs/%s","conclusion":"%s"}\n' \
+            "$SOURCE_RUN_ID" "$GITHUB_REPOSITORY" "$SOURCE_RUN_ID" "${{ steps.source.outputs.source_conclusion }}" \
+            > "$EVIDENCE_DIR/quality-gate-run.json"
+      - name: Upload consumed quality-gate evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: d3-quality-gate-${{ github.run_id }}
+          path: ${{ runner.temp }}/d3-quality-gate-evidence/**
+          if-no-files-found: warn
+          retention-days: 14
+
+  build-images:
+    name: Build exact-SHA images once
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    needs: [quality-gate]
+    env:
+      GIT_SHA: ${{ needs.quality-gate.outputs.git_sha }}
+      QUALITY_GATE_RUN_ID: ${{ needs.quality-gate.outputs.source_run_id }}
+      QUALITY_GATE_RUN_URL: ${{ needs.quality-gate.outputs.source_run_url }}
+      QUALITY_GATE_CONCLUSION: ${{ needs.quality-gate.outputs.source_conclusion }}
+      EVIDENCE_DIR: ${{ runner.temp }}/d3-build-evidence
+    steps:
+      - name: Checkout exact quality-gate revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ needs.quality-gate.outputs.git_sha }}
+          fetch-depth: 0
+      - name: Build versioned application images
+        run: bash scripts/docker/build-images.sh
+      - name: Record image tag, local digest and OCI revision
+        if: always()
+        run: |
+          set -u
+          mkdir -p "$EVIDENCE_DIR"
+          bash scripts/delivery/collect-evidence.sh "$EVIDENCE_DIR"
+      - name: Export exact images for the Kind job
+        run: |
+          set -Eeuo pipefail
+          mkdir -p "$EVIDENCE_DIR"
+          docker save "onlinejudge/backend:${GIT_SHA}" "onlinejudge/frontend:${GIT_SHA}" \
+            --output "$EVIDENCE_DIR/application-images.tar"
+      - name: Upload image and traceability evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: d3-images-${{ github.run_id }}
+          path: ${{ runner.temp }}/d3-build-evidence/**
+          if-no-files-found: warn
+          retention-days: 14
+
+  deploy-kind:
+    name: Load images, verify Kind delivery, preserve diagnostics
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    needs: [build-images]
+    env:
+      GIT_SHA: ${{ needs.quality-gate.outputs.git_sha }}
+      QUALITY_GATE_RUN_ID: ${{ needs.quality-gate.outputs.source_run_id }}
+      QUALITY_GATE_RUN_URL: ${{ needs.quality-gate.outputs.source_run_url }}
+      QUALITY_GATE_CONCLUSION: ${{ needs.quality-gate.outputs.source_conclusion }}
+      MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
+      MYSQL_ROOT_PASSWORD: ${{ secrets.MYSQL_ROOT_PASSWORD }}
+      ONLINEJUDGE_NOTIFICATIONS_INTERNAL_TOKEN: ${{ secrets.ONLINEJUDGE_NOTIFICATIONS_INTERNAL_TOKEN }}
+      D3_EVIDENCE_DIR: ${{ runner.temp }}/d3-kind-evidence
+      D3_DELIVERY_FORCED_FAILURE: ${{ inputs.forced_failure || 'none' }}
+    steps:
+      - name: Checkout exact quality-gate revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ needs.quality-gate.outputs.git_sha }}
+          fetch-depth: 0
+      - name: Download exact images built by this run
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: d3-images-${{ github.run_id }}
+          path: ${{ runner.temp }}/d3-build-evidence
+      - name: Load exact image archive
+        run: docker load --input "${{ runner.temp }}/d3-build-evidence/application-images.tar"
+      - name: Install pinned Kind CLI when the runner does not provide it
+        run: bash scripts/delivery/ensure-kind.sh
+      - name: Run end-to-end Kind delivery
+        run: bash scripts/delivery/run-kind-delivery.sh "$D3_EVIDENCE_DIR"
+      - name: Collect Kubernetes diagnostics after any delivery result
+        if: always()
+        run: |
+          set -u
+          if command -v kind >/dev/null 2>&1 && kind get clusters 2>/dev/null | grep -qx onlinejudge-ci; then
+            KIND_DIAGNOSTICS_DIR="$D3_EVIDENCE_DIR/kubernetes-diagnostics" \
+              bash scripts/kind/k8s-diagnose.sh || true
+          else
+            mkdir -p "$D3_EVIDENCE_DIR"
+            printf 'Kind cluster onlinejudge-ci was not available for diagnostics\n' \
+              > "$D3_EVIDENCE_DIR/diagnostics-unavailable.txt"
+          fi
+      - name: Collect image, manifest and health evidence
+        if: always()
+        run: bash scripts/delivery/collect-evidence.sh "$D3_EVIDENCE_DIR"
+      - name: Cleanup temporary Kind cluster
+        if: always()
+        run: |
+          set -u
+          if command -v kind >/dev/null 2>&1 && kind get clusters 2>/dev/null | grep -qx onlinejudge-ci; then
+            bash scripts/kind/k8s-cleanup.sh --cluster
+          else
+            printf 'Kind cluster onlinejudge-ci already absent; no cleanup required\n'
+          fi
+      - name: Upload Kind delivery evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: d3-kind-delivery-${{ github.run_id }}
+          path: ${{ runner.temp }}/d3-kind-evidence/**
+          if-no-files-found: warn
+          retention-days: 14
+
+  archive-evidence:
+    name: Archive delivery outcome even when blocked or failed
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: [quality-gate, build-images, deploy-kind]
+    steps:
+      - name: Write cross-job delivery outcome
+        env:
+          GIT_SHA: ${{ needs.quality-gate.outputs.git_sha }}
+          QUALITY_GATE_RESULT: ${{ needs.quality-gate.result }}
+          BUILD_RESULT: ${{ needs.build-images.result }}
+          DEPLOY_RESULT: ${{ needs.deploy-kind.result }}
+          SOURCE_RUN_URL: ${{ needs.quality-gate.outputs.source_run_url }}
+        run: |
+          set -Eeuo pipefail
+          evidence_dir="${RUNNER_TEMP}/d3-archive-evidence"
+          mkdir -p "$evidence_dir"
+          printf 'git_sha=%s\nquality_gate=%s\nbuild_images=%s\ndeploy_kind=%s\nsource_run=%s\n' \
+            "$GIT_SHA" "$QUALITY_GATE_RESULT" "$BUILD_RESULT" "$DEPLOY_RESULT" "$SOURCE_RUN_URL" \
+            > "$evidence_dir/delivery-outcome.txt"
+      - name: Upload final delivery outcome
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: d3-delivery-outcome-${{ github.run_id }}
+          path: ${{ runner.temp }}/d3-archive-evidence/**
+          if-no-files-found: warn
+          retention-days: 14
