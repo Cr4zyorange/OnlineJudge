@@ -45,30 +45,38 @@ docker pull docker.m.daocloud.io/kindest/node:v1.36.1
 docker tag docker.m.daocloud.io/kindest/node:v1.36.1 kindest/node:v1.36.1
 ```
 
-## 验证证据(2026-08-27,Windows 本地 Docker Desktop)
+## 验证证据(证据 head `94a110132190850dceb90bdadd8d800c717c422c`;分支最新提交仅为本 README 文档,不改变任何被测产物)
 
-| 项目 | 环境与版本 | 输入 | 命令 | 结果 |
-| --- | --- | --- | --- | --- |
-| RED:基线缺失部署入口 | 基线 worktree `origin/dev@54e47e9` | - | `bash scripts/test/verify-k8s-manifests.test.sh ../oj-baseline` | FAIL:`deploy/k8s directory not found` |
-| RED:基线缺失脚本入口 | 同上 | - | `bash scripts/test/verify-kind-scripts.test.sh ../oj-baseline` | FAIL:`scripts/kind directory not found` |
-| GREEN:manifest 契约 | `feature/288-kind-kubernetes` | - | `bash scripts/test/verify-k8s-manifests.test.sh` | PASS(14 项断言组) |
-| GREEN:脚本行为(伪造 docker/kind/kubectl) | 同上 | `GIT_SHA=0123…4567` | `bash scripts/test/verify-kind-scripts.test.sh` | PASS(17 项断言组) |
-| GREEN:shell 契约 | 同上 | - | `bash scripts/test/verify-shell-contract.sh ../oj-288` | PASS(22 个跟踪脚本,LF + bash -n) |
+证据 head 基于 `origin/dev@2a3d355`(rebase,#287/#289 已合入)。下列全部离线测试、镜像构建与活体验证均在 `94a1101` 精确执行;其后提交只修改本文件。
 
-活体集群验证(2026-08-28 评审后复跑,Windows Git Bash + Docker Desktop 引擎,kind v0.33/kubectl v1.36.1,节点 `kindest/node:v1.36.1`,集群 Ready 15s;全流程逐步退出码均为 0):
+环境:Windows 11 + Docker Desktop(client/server 29.7.2),kind v0.33.0,kubectl v1.36.1,节点 `kindest/node:v1.36.1`;后端/前端镜像由 #289 官方入口 `scripts/docker/build-images.sh` 从本 head 构建(非 root 用户 10001、OCI revision 标签、真实 `/api/v1/system/readiness`)。
 
-| 项目 | 命令 | 结果(原始输出摘录) |
+| 项目 | 输入 | 命令 | 结果 |
+| --- | --- | --- | --- |
+| RED:基线缺失部署入口 | 基线 worktree(旧基线 origin/dev) | `bash scripts/test/verify-k8s-manifests.test.sh <基线>` | FAIL:`deploy/k8s directory not found` |
+| RED:基线缺失脚本入口 | 同上 | `bash scripts/test/verify-kind-scripts.test.sh <基线>` | FAIL:`scripts/kind directory not found` |
+| 执行位检查 | - | `git ls-files -s -- scripts/kind` | 7 个脚本全部 `100755`(契约测试已加模式断言防回归) |
+| GREEN:manifest 契约 | - | `bash scripts/test/verify-k8s-manifests.test.sh` | PASS(14 项断言组) |
+| GREEN:脚本行为(伪造 docker/kind/kubectl,原子日志) | `GIT_SHA=0123…4567` | `bash scripts/test/verify-kind-scripts.test.sh` | PASS(19 项断言组;另连跑 5 次均 rc=0 验证无日志竞态) |
+| GREEN:shell 契约 | - | `bash scripts/test/verify-shell-contract.sh <本 worktree>` | PASS(33 个跟踪脚本,LF + bash -n) |
+
+活体集群验证(2026-08-28,官方镜像,全流程逐步退出码均为 0):
+
+| 步骤 | 命令 | 结果(原始输出摘录) |
 | --- | --- | --- |
-| 一条命令部署 | `GIT_SHA=4833391e… MYSQL_PASSWORD=… MYSQL_ROOT_PASSWORD=… KIND_SKIP_LOAD=1 scripts/kind/k8s-deploy.sh` | exit 0;mysql-0、backend、frontend 全部 `1/1 Running`;滚动等待均带 `--timeout` |
-| 契约断言 | `scripts/kind/k8s-verify.sh` | 三项 Ready 副本=1;`mysql pods all run mysql:8.4`;`backend/frontend pods all run …:4833391e…`(逐 Pod 匹配);`mysqld is alive`;backend readiness 200/UP;前端静态页;`frontend -> backend` 代理 readiness 200/UP |
-| 滚动更新 | `kubectl rollout restart deployment/backend` + `rollout status --timeout=420s` | exit 0;新 Pod 先 Running、旧 Pod 后 Terminating(maxUnavailable=0/maxSurge=1) |
-| 滚动后立即断言 | `scripts/kind/k8s-verify.sh` | exit 0(复跑通过;评审中先后修复两处误报:镜像断言改为逐 Pod 匹配以容忍终止中的旧 Pod,HTTP 断言加 `--retry-all-errors` 以容忍端点切换瞬间的连接重置,等待仍有界) |
-| 重复部署 | 再次执行 `k8s-deploy.sh` | exit 0(apply 幂等,三服务 Ready) |
-| 精确清理(命名空间) | `scripts/kind/k8s-cleanup.sh` | exit 0;`namespace "onlinejudge-ci" deleted`;复查 NotFound;kind 集群保留 |
-| 精确清理(集群) | `scripts/kind/k8s-cleanup.sh --cluster` | exit 0;`Deleted nodes: ["onlinejudge-ci-control-plane"]`;`No kind clusters found` |
+| 干净集群创建 | `env -u HTTP_PROXY -u HTTPS_PROXY … kind create cluster --config deploy/k8s/kind-cluster.yaml --wait 180s` | rc=0;`Ready after 16s` |
+| 官方镜像准备 | `GIT_SHA=94a1101… bash scripts/docker/build-images.sh` + 节点内 `ctr` 拉取 `mysql:8.4`(DaoCloud 镜像站)并重打规范标签 | rc=0;节点 crictl 三镜像齐备 |
+| 一条命令部署 | `GIT_SHA=94a1101… MYSQL_PASSWORD=… MYSQL_ROOT_PASSWORD=… KIND_SKIP_LOAD=1 scripts/kind/k8s-deploy.sh` | rc=0;mysql-0、backend、frontend 全部 `1/1 Running`(backend 以 uid 10001 运行,emptyDir 经 `fsGroup: 10001` 可写) |
+| 契约断言 | `scripts/kind/k8s-verify.sh` | rc=0;三项 Ready 副本=1;`mysql pods all run mysql:8.4`;`backend/frontend pods all run …:94a1101…`(逐 Pod 匹配);`mysqld is alive`;backend readiness(数据库感知)200/UP;前端静态页;`frontend -> backend` 代理 readiness 200/UP |
+| 滚动更新 | `kubectl rollout restart deployment/backend` + `rollout status --timeout=420s` | rc=0;新 Pod 先 Running、旧 Pod 后 Terminating(maxUnavailable=0/maxSurge=1) |
+| 滚动后立即断言 | `scripts/kind/k8s-verify.sh` | rc=0(镜像断言逐 Pod 匹配容忍终止中的旧 Pod;HTTP 断言 `--retry-all-errors` 容忍端点切换瞬间的重置,等待仍有界) |
+| 重复部署 | 再次执行 `k8s-deploy.sh` | rc=0(apply 幂等,三服务 Ready) |
+| 精确清理(命名空间) | `scripts/kind/k8s-cleanup.sh` | rc=0;`namespace "onlinejudge-ci" deleted`;复查 NotFound;kind 集群保留 |
+| 精确清理(集群) | `scripts/kind/k8s-cleanup.sh --cluster` | rc=0;`Deleted nodes: ["onlinejudge-ci-control-plane"]`;`No kind clusters found` |
 
 说明与残余事项:
 
-- 后端验证镜像构建自本地分支 `tmp/288-readiness-stub@4833391eaf2b4066b2ed69b5918b9cccde1962c7`(origin/dev + 最小 readiness 桩,契约 §5 语义:`SELECT 1` → 200/UP,503 不含 UP,拦截器放行)。该桩仅用于本地验证,不推送;#289 合入后需在最新 `dev` 上 rebase 并用正式镜像重跑本表作为最终验收证据(父任务 #286 门禁)。
-- 本机 Windows 侧原生 `kind` 曾在 "Preparing nodes" 处挂起:其派生的 `docker info -f` 子进程与 Docker Desktop CLI 插件纠缠,并随宿主代理 `127.0.0.1:7897` 注入节点 systemd。对 Docker Desktop 与 WSL 做一次干净全量重启(并确认 `settings-store.json` 中 `EnableIntegrationWithDefaultWslDistro` 为 true)后,Windows 原生路径恢复正常,最终复跑即在该路径完成;kind 创建集群时建议 `env -u HTTP_PROXY -u HTTPS_PROXY …` 清除代理变量,避免节点内代理不可达。本环境另有两个已记录并绕过的差异:`docker save` 导出的 `mysql:8.4` 缺 attestation blob(改为节点内 `ctr` 直接从 DaoCloud 镜像站拉取后重打规范标签);`k8s-verify.sh` 在 Git Bash 下需 `MSYS_NO_PATHCONV=1` 防止容器内路径 `/bin/sh` 被误转换。GitHub-hosted Runner(Linux)不受这些 Windows 特有问题影响。
-- 镜像装载在本机使用了 `KIND_SKIP_LOAD=1`(镜像已在节点),脚本默认路径 `kind load docker-image` 在 Linux Runner 上可直接使用。
+- 本机 Windows 侧原生 `kind` 曾在 "Preparing nodes" 处挂起(其派生的 `docker info -f` 子进程与 Docker Desktop CLI 插件纠缠,并随宿主代理 `127.0.0.1:7897` 注入节点 systemd)。对 Docker Desktop 与 WSL 做一次干净全量重启(并确认 `settings-store.json` 中 `EnableIntegrationWithDefaultWslDistro` 为 true)后,Windows 原生路径恢复正常,上表即在该路径完成;kind 创建集群时建议 `env -u HTTP_PROXY -u HTTPS_PROXY …` 清除代理变量,避免节点内代理不可达。GitHub-hosted Runner(Linux)不受这些 Windows 特有问题影响。
+- 本环境两个已记录并绕过的差异:`docker save` 导出的 `mysql:8.4` 缺 attestation blob(改为节点内 `ctr` 直接从镜像站拉取后重打规范标签);`k8s-verify.sh` 在 Git Bash 下需 `MSYS_NO_PATHCONV=1` 防止容器内路径 `/bin/sh` 被误转换。
+- 镜像装载在本机使用了 `KIND_SKIP_LOAD=1`(镜像已在节点),脚本默认路径 `kind load docker-image` 在 Linux Runner 上可直接使用;#292 串联流水线时应在 Runner 上走默认路径。
+- GitHub Actions:#290 质量门禁 workflow 尚未合入 `dev`;待其可用后,本 PR 分支的推送将触发真实 Actions 运行,届时以其对同一 head 的结果为准补充链接。
