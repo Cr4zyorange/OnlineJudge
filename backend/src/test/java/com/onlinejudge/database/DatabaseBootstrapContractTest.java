@@ -3,10 +3,12 @@ package com.onlinejudge.database;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -98,6 +100,31 @@ class DatabaseBootstrapContractTest {
             assertThat(baselineChecksums.get(migration))
                     .as("checksum for %s", migration)
                     .isEqualTo(sha256(DATABASE_ROOT.resolve("migrations").resolve(migration)));
+        }
+    }
+
+    @Test
+    void migrationChecksumsStayLfWhenGitAutocrlfIsEnabled() throws Exception {
+        List<String> migrationPaths = manifestEntries().stream()
+                .map(migration -> "database/migrations/" + migration)
+                .toList();
+        List<String> command = new ArrayList<>(List.of(
+                "git", "-c", "core.autocrlf=true", "check-attr", "eol", "--"
+        ));
+        command.addAll(migrationPaths);
+
+        Process process = new ProcessBuilder(command)
+                .directory(REPOSITORY_ROOT.toFile())
+                .redirectErrorStream(true)
+                .start();
+        String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+        int exitCode = process.waitFor();
+
+        assertThat(exitCode).as("git check-attr output: %s", output).isZero();
+        for (String migrationPath : migrationPaths) {
+            assertThat(output)
+                    .as("Git must force LF for checksum source %s even with core.autocrlf=true", migrationPath)
+                    .contains(migrationPath + ": eol: lf");
         }
     }
 
