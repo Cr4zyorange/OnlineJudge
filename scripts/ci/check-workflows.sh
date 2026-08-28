@@ -7,15 +7,24 @@ checkout="${1:-$repo_root}"
 workflow_file="${2:-$checkout/.github/workflows/ci.yml}"
 required_jobs=(validate-workflows backend-gate frontend-gate contracts-gate delivery)
 
-declare -A action_sha action_tag
-action_sha[checkout]=11bd71901bbe5b1630ceea73d27597364c9af683
-action_tag[checkout]=v4.2.2
-action_sha[setup-java]=8df1039502a15bceb9433410b1a100fbe190c53b
-action_tag[setup-java]=v4.5.0
-action_sha[setup-node]=49933ea5288caeca8642d1e84afbd3f7d6820020
-action_tag[setup-node]=v4.4.0
-action_sha[upload-artifact]=ea165f8d65b6e75b540449e92b4886f43607fa02
-action_tag[upload-artifact]=v4.6.2
+# bash 3.2（macOS 默认）不支持关联数组，改用 case 函数维护 Action 固定版本表。
+action_sha_of() {
+  case "$1" in
+    checkout) printf '%s' 11bd71901bbe5b1630ceea73d27597364c9af683 ;;
+    setup-java) printf '%s' 8df1039502a15bceb9433410b1a100fbe190c53b ;;
+    setup-node) printf '%s' 49933ea5288caeca8642d1e84afbd3f7d6820020 ;;
+    upload-artifact) printf '%s' ea165f8d65b6e75b540449e92b4886f43607fa02 ;;
+  esac
+}
+
+action_tag_of() {
+  case "$1" in
+    checkout) printf '%s' v4.2.2 ;;
+    setup-java) printf '%s' v4.5.0 ;;
+    setup-node) printf '%s' v4.4.0 ;;
+    upload-artifact) printf '%s' v4.6.2 ;;
+  esac
+}
 
 checks=0
 failures=0
@@ -131,15 +140,18 @@ done
 checks=$((checks + 1))
 
 # 6. 门禁作业必须调用仓库正本脚本，且脚本必须存在。
-declare -A job_script
-job_script[validate-workflows]=scripts/ci/check-workflows.sh
-job_script[backend-gate]=scripts/ci/backend-verify.sh
-job_script[frontend-gate]=scripts/ci/frontend-verify.sh
-job_script[contracts-gate]=scripts/ci/contract-verify.sh
-job_script[delivery]=scripts/ci/delivery-checkpoint.sh
+job_script_of() {
+  case "$1" in
+    validate-workflows) printf '%s' scripts/ci/check-workflows.sh ;;
+    backend-gate) printf '%s' scripts/ci/backend-verify.sh ;;
+    frontend-gate) printf '%s' scripts/ci/frontend-verify.sh ;;
+    contracts-gate) printf '%s' scripts/ci/contract-verify.sh ;;
+    delivery) printf '%s' scripts/ci/delivery-checkpoint.sh ;;
+  esac
+}
 
 for job in "${required_jobs[@]}"; do
-  script="${job_script[$job]}"
+  script="$(job_script_of "$job")"
   section="$(job_section "$workflow_file" "$job")"
   run_check "$job calls canonical script $script" bash -c \
     'grep -Fq "$1" <<< "$2"' _ "$script" "$section"
@@ -185,8 +197,10 @@ while IFS= read -r uses_line; do
     fail_check "third-party action must be pinned to controlled SHA with version comment: $uses_line"
     continue
   fi
-  if [[ "${action_sha[$action]:-}" != "$sha" || "${action_tag[$action]:-}" != "$tag" ]]; then
-    fail_check "action $action not pinned to the controlled version (expected ${action_tag[$action]:-unknown} = ${action_sha[$action]:-unknown})"
+  expected_sha="$(action_sha_of "$action")"
+  expected_tag="$(action_tag_of "$action")"
+  if [[ -z "$expected_sha" || "$expected_sha" != "$sha" || "$expected_tag" != "$tag" ]]; then
+    fail_check "action $action not pinned to the controlled version (expected ${expected_tag:-unknown} = ${expected_sha:-unknown})"
   fi
 done < <(grep -E '^[[:space:]]*uses: ' "$workflow_file" || true)
 run_check "third-party action pinning was exercised" test "$uses_seen" -gt 0

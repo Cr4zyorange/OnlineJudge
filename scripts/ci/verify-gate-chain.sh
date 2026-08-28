@@ -95,10 +95,26 @@ order="$(job_names "$workflow" | paste -sd ' ' -)"
   exit 2
 }
 
-declare -A deps
-for job in $order; do
-  deps["$job"]="$(needs_of "$workflow" "$job" | tr ',' ' ')"
-done
+# bash 3.2（macOS 默认）不支持关联数组；deps/status 均通过函数按需读取。
+deps_of() {
+  needs_of "$workflow" "$1" | tr ',' ' '
+}
+
+status_name() {
+  printf 'oj_status_%s' "$(printf '%s' "$1" | tr '-' '_')"
+}
+
+status_get() {
+  local name
+  name="$(status_name "$1")"
+  printf '%s' "${!name:-}"
+}
+
+status_set() {
+  local name
+  name="$(status_name "$1")"
+  eval "$name=\$2"
+}
 
 # --include 依赖闭包：只运行指定作业及其前置链。
 include_set=""
@@ -109,14 +125,13 @@ if [[ -n "$include_jobs" ]]; then
     for job in $(printf '%s' "$pending" | tr ',' ' '); do
       if [[ " $include_set " != *" $job "* ]]; then
         include_set="$include_set $job"
-        next_pending="$next_pending ${deps[$job]:-}"
+        next_pending="$next_pending $(deps_of "$job")"
       fi
     done
     pending="$(printf '%s' "$next_pending" | tr ' ' '\n' | sort -u | grep -v '^$' | paste -sd ',' - || true)"
   done
 fi
 
-declare -A status
 overall_failures=0
 skipped=0
 
@@ -126,14 +141,14 @@ run_job() {
   local failed_deps=""
   local dep
 
-  for dep in ${deps[$job]:-}; do
-    if [[ "${status[$dep]:-}" == failed || "${status[$dep]:-}" == skipped ]]; then
+  for dep in $(deps_of "$job"); do
+    if [[ "$(status_get "$dep")" == failed || "$(status_get "$dep")" == skipped ]]; then
       failed_deps="$failed_deps $dep"
     fi
   done
 
   if [[ -n "$failed_deps" ]]; then
-    status["$job"]=skipped
+    status_set "$job" skipped
     skipped=$((skipped + 1))
     printf 'SKIPPED %s (dependency%s failed:%s)\n' "$job" \
       "$([[ "$(wc -w <<< "$failed_deps")" -gt 1 ]] && printf 's' || printf '')" "$failed_deps"
@@ -141,7 +156,7 @@ run_job() {
   fi
 
   if [[ "$job" == "$fail_job" ]]; then
-    status["$job"]=failed
+    status_set "$job" failed
     overall_failures=$((overall_failures + 1))
     printf 'FAIL %s (simulated failure injection)\n' "$job"
     return 0
@@ -149,7 +164,7 @@ run_job() {
 
   script="$(script_for "$job")"
   if [[ -z "$script" || ! -f "$checkout/$script" ]]; then
-    status["$job"]=failed
+    status_set "$job" failed
     overall_failures=$((overall_failures + 1))
     printf 'FAIL %s (missing canonical script %s)\n' "$job" "${script:-unknown}"
     return 0
@@ -157,16 +172,16 @@ run_job() {
 
   if [[ $dry_run -eq 1 ]]; then
     printf 'DRY-RUN %s (bash %s)\n' "$job" "$script"
-    status["$job"]=done
+    status_set "$job" done
     return 0
   fi
 
   printf 'RUN %s (bash %s)\n' "$job" "$script"
   if bash "$checkout/$script" "$checkout"; then
-    status["$job"]=done
+    status_set "$job" done
     printf 'PASS %s\n' "$job"
   else
-    status["$job"]=failed
+    status_set "$job" failed
     overall_failures=$((overall_failures + 1))
     printf 'FAIL %s\n' "$job"
   fi
@@ -180,7 +195,7 @@ for job in $order; do
 done
 
 if [[ -z "$include_set" ]]; then
-  [[ " $order " == *" delivery "* ]] && [[ "${status[delivery]:-}" != skipped ]]
+  [[ " $order " == *" delivery "* ]] && [[ "$(status_get delivery)" != skipped ]]
 fi
 
 if [[ $overall_failures -gt 0 || $skipped -gt 0 ]]; then
