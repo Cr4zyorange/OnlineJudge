@@ -9,14 +9,15 @@
 
 ## 0. 证据范围与仓库说明（重要）
 
-本 PR 为 **`Cr4zyorange/OnlineJudge#298`**（base=`dev@2a3d355`，head=`2d75679`，
-即第 3 节 fork 绿灯 run `33152784008` 的精确被测 head；非草稿、mergeable）。
+本 PR 为 **`Cr4zyorange/OnlineJudge#298`**（base=`dev@2a3d355`；当前 head 以 PR
+页面为准；非草稿、mergeable）。第 3 节记录的是清理 CI 范围前的历史 fork 绿灯，不把
+它声明为当前 PR head 的目标仓库 check。
 以下事实于 2026-08-28 通过 GitHub REST API 核查：
 
-- 目标仓库 `Cr4zyorange/OnlineJudge` 的 `actions/runs` 总数为 **0**（自仓库存在以来
-  从未产生任何 workflow run）；`commits/2d75679.../check-runs` 与 `/status` 均为空，
-  即 **PR #298 当前没有任何 check**。目标仓库 Actions 未执行（未启用或 PR 运行被禁用，
-  需仓库/组织管理员在 Settings→Actions 确认），因此目标 PR 侧无法产生 check 证据。
+- 最后一次取证时，目标仓库 `Cr4zyorange/OnlineJudge` 的 `actions/runs` 总数为 **0**，
+  PR #298 没有任何 check。现已启用私有 fork PR 的只读、无 secrets workflow 权限；清理
+  范围后的当前 head push 必须在目标仓库产生新的 PR check 与 artifact，才是本 Issue 的
+  最终验收证据。
 - 本文第 3、4 节引用的**真实 GitHub Actions 运行全部发生在镜像仓库
   `MontesquieuE/OnlineJudgeForSE`（PR #1）**，运行环境清单记录
   `repository=MontesquieuE/OnlineJudgeForSE`、`base_sha=50a5dccd`（镜像 dev）。
@@ -26,8 +27,8 @@
   `base_sha=50a5dccd` 不是目标基线；目标基线以第 0 节首行为准。
   本分支已 rebase 到目标 `dev@2a3d355`（`git merge-base HEAD target/dev` =
   `2a3d355`），与最新 dev 无冲突。
-- 一旦目标仓库管理员启用 Actions，重新 push 本分支即可在 PR #298 上产生真实 check；
-  届时按第 3 节同样方式核对 run 的环境清单（repository/base_sha/head_sha）即可。
+- 当前最终验证 push 后，按第 3 节同样方式核对目标运行的环境清单
+  （repository/base_sha/head_sha）与 PR check 状态。
 
 ## 1. 验证目标
 
@@ -55,7 +56,7 @@ RED 基线（实现前）：`verify-workflow-gates.test.sh` 因 `check-workflows
 
 真实 GitHub Actions 上的受控失败见第 4 节（fork 验证）。
 
-## 3. GREEN：真实 GitHub Actions 通过（fork/镜像验证，head 与目标 PR 一致）
+## 3. GREEN：真实 GitHub Actions 通过（fork/镜像历史验证）
 
 权威 fork 绿灯：run
 [`33152784008`](https://github.com/MontesquieuE/OnlineJudgeForSE/actions/runs/33152784008)
@@ -70,8 +71,9 @@ Node v22.23.2、npm 10.9.8），环境清单记录：
 }
 ```
 
-`head_sha` 与本 PR（目标 `Cr4zyorange/OnlineJudge#298`）的 head **完全一致**
-（`pull_request.head.sha`）；`base_sha` 为镜像 dev，不是目标基线（见第 0 节）。
+`head_sha` 与当时 PR（目标 `Cr4zyorange/OnlineJudge#298`）的 head 一致；`base_sha`
+为镜像 dev，不是目标基线（见第 0 节）。范围清理后的当前 PR head 必须以目标仓库
+Actions 重新验证，不能用该历史 fork run 代替。
 全部 5 个 job 结论 `success`，`delivery` 执行并通过；镜像 PR #1 在 head `2d75679`
 的 check rollup 5 项全部 `SUCCESS`。run 内各 job 的 `test-summary.txt` 原始输出：
 
@@ -92,10 +94,9 @@ frontend runner contracts: # tests 3 / # pass 3 / # fail 0 / # skipped 0
 > 取自 `GITHUB_SHA`（pull_request 事件为 merge ref 提交），环境清单以
 > `environment.json` 为准。
 
-> 修订说明：本文件随 head 前进持续更新证据引用。第 3 节引用的 run
-> `33152784008` 由 head `2d75679`（本修订的上一提交）触发；本修订只更新
-> 证据引用（纯文档），不改变被测代码，因此 run 的测试计数与门禁结论
-> 对本 head 仍然有效。
+> 修订说明：第 3 节 run `33152784008` 由历史 head `2d75679` 触发。随后为保持
+> #290 的 CI-only 范围，已撤回其中无关的 HWK 生产代码修复；该 run 保留为脚本历史
+> 验证，最终合入以前必须在目标仓库对当前 head 重新运行。
 
 计数说明（随基线变化，非回归）：
 
@@ -103,10 +104,10 @@ frontend runner contracts: # tests 3 / # pass 3 / # fail 0 / # skipped 0
 | --- | --- | --- | --- | --- |
 | 合并 dev 前（`a2fbec4`） | 371（skipped 5） | 15 | 556 | — |
 | rebase 到目标 `678570a` 后 | 383（skipped 7） | 17 | 566 | `33139279562` @ `b131170` |
-| rebase 到目标 `2a3d355` 后（当前） | 391（skipped 7） | 17 | 566 | `33152784008` @ `2d75679` |
+| rebase 到目标 `2a3d355` 后（历史 fork 验证） | 391（skipped 7） | 17 | 566 | `33152784008` @ `2d75679` |
 
 `383 → 391` 的 +8 后端单元用例来自目标 dev 从 `678570a` 前进到 `2a3d355` 时并入的
-数据库引导提交（PR #301）。以当前 fork run `33152784008` 的计数为准。
+数据库引导提交（PR #301）。当前最终 head 的计数以目标仓库重新运行产生的 artifact 为准。
 
 ## 4. 真实 Actions 受控失败证据（fork 验证）
 
@@ -123,7 +124,7 @@ Delivery checkpoint: skipped
 run conclusion: failure
 ```
 
-证据保留方式：受控失败提交取证后已从分支还原（当前 head `2d75679` 不含注入提交），
+证据保留方式：受控失败提交取证后已从分支还原（当前分支不含注入提交），
 运行记录与 artifact 按 SHA 保留在镜像仓库 Actions 中，PR 历史保持干净。
 
 门禁还拦截并修复了四次真实缺陷（同样导致 delivery skipped，均为镜像仓库 fork 运行）：
@@ -134,7 +135,6 @@ run conclusion: failure
 | `33055289509` | `b275a41` | backend（`LearningRecordControllerTest` 限流用例） | 异步写线程池先于循环落库，第 10 次请求被误判 429；测试内可控 executor 挂起写入使语义确定 |
 | `33057373593` | `587e537` | backend（基础设施） | Maven Central 429 + Actions 缓存服务 400，冷缓存依赖解析失败；门禁脚本增加仅针对依赖传输失败的 3 次有界重试 |
 | `33138722525` | `a1f5577` | backend（`GrdLrnIntegrationTest`） | 变更/复核通知由异步 executor 投递，断言时首条仍为发布通知；测试内增加 5s 有界轮询后再断言 |
-| `33151021489` | `cc4dbbe` | frontend（`HomeworkStudentView` 草稿保留用例） | 先前用例挂起的 500ms 防抖保存在新用例恢复草稿后触发，空内容分支误删刚恢复的草稿；草稿保存改为 token 校验，恢复草稿前取消挂起调度，旧调度不再执行 |
 
 ## 5. REFACTOR：本地/CI 共用脚本
 
@@ -165,10 +165,10 @@ bash scripts/ci/verify-workflow-gates.test.sh
   工具链，故该路径以真实 GitHub Actions 证据为准（fork 绿灯 run `33152784008` 与
   受控失败 run `33138034066`）。在具备完整工具链的全新 clone 上，该命令按第 5 节
   相同的脚本与变异集合端到端执行。
-- 真实 GitHub Actions：fork 绿灯 run `33152784008` @ head `2d75679` 全 job success
+- 真实 GitHub Actions：fork 历史绿灯 run `33152784008` @ head `2d75679` 全 job success
   （含 `delivery`，见第 3 节）；受控失败 run `33138034066` 验证失败阻断（见第 4 节）。
-- 目标仓库 PR #298 的 check 状态见第 0 节：当前无 check，待管理员启用 Actions 后
-  重新 push 产生。
+- 目标仓库 PR #298：当前 CI-only head push 后，必须在目标仓库产生 check 与 artifact；
+  fork 历史 run 不作为该最终验收的替代品。
 
 验证范围说明：脚本在 Git Bash/WSL bash 下均可执行（不依赖脚本可执行位）；本机 Java
 25/Node 24 与 CI 固定版本（21/22）不一致时，脚本自动按本机工具链覆盖预期版本，CI 的
