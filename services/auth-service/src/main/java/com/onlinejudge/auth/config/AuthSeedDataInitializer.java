@@ -4,11 +4,17 @@ import com.onlinejudge.auth.controller.RegisterRequest;
 import com.onlinejudge.auth.repository.AuthRepository;
 import com.onlinejudge.auth.service.AuthService;
 import org.springframework.boot.ApplicationRunner;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
 
 @Configuration
+@ConditionalOnProperty(
+        prefix = "onlinejudge.auth",
+        name = "seed-data-enabled",
+        havingValue = "true"
+)
 public class AuthSeedDataInitializer {
     @Bean
     @Order(0)
