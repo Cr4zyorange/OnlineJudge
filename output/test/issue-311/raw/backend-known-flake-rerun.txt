@@ -1,0 +1,65 @@
+[INFO] Scanning for projects...
+[INFO]
+[INFO] ----------------< com.onlinejudge:onlinejudge-backend >-----------------
+[INFO] Building onlinejudge-backend 0.1.0-SNAPSHOT
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO]
+[INFO] --- resources:3.3.1:resources (default-resources) @ onlinejudge-backend ---
+[INFO] Copying 3 resources from src\main\resources to target\classes
+[INFO] Copying 12 resources from src\main\resources to target\classes
+[INFO]
+[INFO] --- compiler:3.13.0:compile (default-compile) @ onlinejudge-backend ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO]
+[INFO] --- resources:3.3.1:testResources (default-testResources) @ onlinejudge-backend ---
+[INFO] Copying 4 resources from src\test\resources to target\test-classes
+[INFO]
+[INFO] --- compiler:3.13.0:testCompile (default-testCompile) @ onlinejudge-backend ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO]
+[INFO] --- surefire:3.5.3:test (default-test) @ onlinejudge-backend ---
+[INFO] Using auto detected provider org.apache.maven.surefire.junitplatform.JUnitPlatformProvider
+[INFO]
+[INFO] -------------------------------------------------------
+[INFO]  T E S T S
+[INFO] -------------------------------------------------------
+[INFO] Running com.onlinejudge.integration.GrdLrnIntegrationTest
+17:00:25.716 [main] INFO org.springframework.test.context.support.AnnotationConfigContextLoaderUtils -- Could not detect default configuration classes for test class [com.onlinejudge.integration.GrdLrnIntegrationTest]: GrdLrnIntegrationTest does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+17:00:26.266 [main] INFO org.springframework.boot.test.context.SpringBootTestContextBootstrapper -- Found @SpringBootConfiguration com.onlinejudge.OnlineJudgeApplication for test class com.onlinejudge.integration.GrdLrnIntegrationTest
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+
+ :: Spring Boot ::                (v3.4.5)
+
+2026-08-28T17:00:27.666+08:00  INFO 14828 --- [           main] c.o.integration.GrdLrnIntegrationTest    : Starting GrdLrnIntegrationTest using Java 21.0.9 with PID 14828 (started by 67231 in C:\Users\67231\.config\superpowers\worktrees\OnlineJudge\feature\311-auth-service\backend)
+2026-08-28T17:00:27.671+08:00  INFO 14828 --- [           main] c.o.integration.GrdLrnIntegrationTest    : No active profile set, falling back to 1 default profile: "default"
+2026-08-28T17:00:31.599+08:00  INFO 14828 --- [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
+2026-08-28T17:00:32.334+08:00  INFO 14828 --- [           main] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Added connection conn0: url=jdbc:h2:mem:grd_lrn_integration user=SA
+2026-08-28T17:00:32.338+08:00  INFO 14828 --- [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
+2026-08-28T17:00:36.716+08:00  INFO 14828 --- [           main] o.s.b.t.m.w.SpringBootMockServletContext : Initializing Spring TestDispatcherServlet ''
+2026-08-28T17:00:36.716+08:00  INFO 14828 --- [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-08-28T17:00:36.716+08:00  INFO 14828 --- [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-08-28T17:00:36.825+08:00  INFO 14828 --- [           main] c.o.integration.GrdLrnIntegrationTest    : Started GrdLrnIntegrationTest in 10.108 seconds (process running for 13.041)
+Mockito is currently self-attaching to enable the inline-mock-maker. This will no longer work in future releases of the JDK. Please add Mockito as an agent to your build what is described in Mockito's documentation: https://javadoc.io/doc/org.mockito/mockito-core/latest/org/mockito/Mockito.html#0.3
+WARNING: A Java agent has been loaded dynamically (C:\Users\67231\.m2\repository\net\bytebuddy\byte-buddy-agent\1.15.11\byte-buddy-agent-1.15.11.jar)
+WARNING: If a serviceability tool is in use, please run with -XX:+EnableDynamicAgentLoading to hide this warning
+WARNING: If a serviceability tool is not in use, please run with -Djdk.instrument.traceUsage for more information
+WARNING: Dynamic loading of agents will be disallowed by default in a future release
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 6322 s -- in com.onlinejudge.integration.GrdLrnIntegrationTest
+[INFO]
+[INFO] Results:
+[INFO]
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0
+[INFO]
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD SUCCESS
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  01:45 h
+[INFO] Finished at: 2026-08-28T18:45:49+08:00
+[INFO] ------------------------------------------------------------------------

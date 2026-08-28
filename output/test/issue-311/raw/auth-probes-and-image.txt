@@ -1,0 +1,4 @@
+health={"code":"0","message":"success","data":{"status":"UP"}}
+readiness={"code":"0","message":"success","data":{"status":"UP"}}
+version={"code":"0","message":"success","data":{"version":"0.1.0-SNAPSHOT","service":"auth-service","revision":"7bba68e0580ac4fd648ebfe9fbba48f186e4003d"}}
+image=sha256:7076e3019370eaaf0012170d421071e7524004de927d7f2ebc18f02ac679a145 7bba68e0580ac4fd648ebfe9fbba48f186e4003d 7bba68e0580ac4fd648ebfe9fbba48f186e4003d 10001:10001

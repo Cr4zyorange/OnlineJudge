@@ -1,0 +1,111 @@
+#0 building with "desktop-linux" instance using docker driver
+
+#1 [internal] load build definition from auth-service.Dockerfile
+#1 transferring dockerfile: 1.45kB 0.0s done
+#1 DONE 0.0s
+
+#2 resolve image config for docker-image://docker.io/docker/dockerfile:1.7
+#2 DONE 0.3s
+
+#3 docker-image://docker.io/docker/dockerfile:1.7@sha256:a57df69d0ea827fb7266491f2813635de6f17269be881f696fbfdf2d83dda33e
+#3 resolve docker.io/docker/dockerfile:1.7@sha256:a57df69d0ea827fb7266491f2813635de6f17269be881f696fbfdf2d83dda33e 0.1s done
+#3 CACHED
+
+#4 [internal] load metadata for docker.io/library/eclipse-temurin:21-jre@sha256:7a65df4b22d2de92d4e04056e884f3b9122d70b21e2847fd66084278bd0ce037
+#4 ...
+
+#5 [internal] load metadata for docker.io/library/maven:3.9.9-eclipse-temurin-21@sha256:3a4ab3276a087bf276f79cae96b1af04f53731bec53fb2e651aca79e4b10211e
+#5 DONE 0.1s
+
+#4 [internal] load metadata for docker.io/library/eclipse-temurin:21-jre@sha256:7a65df4b22d2de92d4e04056e884f3b9122d70b21e2847fd66084278bd0ce037
+#4 DONE 0.1s
+
+#6 [internal] load .dockerignore
+#6 transferring context: 283B 0.0s done
+#6 DONE 0.0s
+
+#7 [build 1/6] FROM docker.io/library/maven:3.9.9-eclipse-temurin-21@sha256:3a4ab3276a087bf276f79cae96b1af04f53731bec53fb2e651aca79e4b10211e
+#7 resolve docker.io/library/maven:3.9.9-eclipse-temurin-21@sha256:3a4ab3276a087bf276f79cae96b1af04f53731bec53fb2e651aca79e4b10211e 0.0s done
+#7 DONE 0.1s
+
+#8 [stage-1 1/4] FROM docker.io/library/eclipse-temurin:21-jre@sha256:7a65df4b22d2de92d4e04056e884f3b9122d70b21e2847fd66084278bd0ce037
+#8 resolve docker.io/library/eclipse-temurin:21-jre@sha256:7a65df4b22d2de92d4e04056e884f3b9122d70b21e2847fd66084278bd0ce037 0.0s done
+#8 DONE 0.1s
+
+#9 [stage-1 2/4] WORKDIR /opt/onlinejudge-auth
+#9 CACHED
+
+#10 [internal] load build context
+#10 transferring context: 136.11kB 0.2s done
+#10 DONE 0.3s
+
+#11 [build 2/6] WORKDIR /workspace
+#11 CACHED
+
+#12 [build 3/6] COPY services/auth-service/pom.xml services/auth-service/pom.xml
+#12 CACHED
+
+#13 [build 4/6] RUN --mount=type=cache,target=/root/.m2     mvn -f services/auth-service/pom.xml -q -Dmaven.test.skip=true dependency:go-offline
+#13 CACHED
+
+#14 [build 5/6] COPY services/auth-service services/auth-service
+#14 DONE 0.2s
+
+#15 [stage-1 3/4] RUN command -v wget >/dev/null     && groupadd --system --gid 10001 onlinejudge     && useradd --system --uid 10001 --gid 10001 --home-dir /opt/onlinejudge-auth --shell /usr/sbin/nologin onlinejudge
+#15 0.398 useradd warning: onlinejudge's uid 10001 is greater than SYS_UID_MAX 999
+#15 DONE 0.5s
+
+#16 [build 6/6] RUN --mount=type=cache,target=/root/.m2     mvn -f services/auth-service/pom.xml -Dmaven.test.skip=true package
+#16 2.401 [INFO] Scanning for projects...
+#16 2.818 [INFO]
+#16 2.818 [INFO] --------------< com.onlinejudge:onlinejudge-auth-service >--------------
+#16 2.818 [INFO] Building onlinejudge-auth-service 0.1.0-SNAPSHOT
+#16 2.819 [INFO]   from pom.xml
+#16 2.819 [INFO] --------------------------------[ jar ]---------------------------------
+#16 3.522 [INFO]
+#16 3.522 [INFO] --- resources:3.3.1:resources (default-resources) @ onlinejudge-auth-service ---
+#16 3.747 [INFO] Copying 2 resources from src/main/resources to target/classes
+#16 3.836 [INFO] Copying 2 resources from src/main/resources to target/classes
+#16 3.844 [INFO]
+#16 3.844 [INFO] --- compiler:3.13.0:compile (default-compile) @ onlinejudge-auth-service ---
+#16 4.045 [INFO] Recompiling the module because of added or removed source files.
+#16 4.059 [INFO] Compiling 46 source files with javac [debug parameters release 21] to target/classes
+#16 6.233 [INFO]
+#16 6.233 [INFO] --- resources:3.3.1:testResources (default-testResources) @ onlinejudge-auth-service ---
+#16 6.246 [INFO] Not copying test resources
+#16 6.247 [INFO]
+#16 6.247 [INFO] --- compiler:3.13.0:testCompile (default-testCompile) @ onlinejudge-auth-service ---
+#16 6.259 [INFO] Not compiling test sources
+#16 6.259 [INFO]
+#16 6.260 [INFO] --- surefire:3.5.3:test (default-test) @ onlinejudge-auth-service ---
+#16 6.438 [INFO] Tests are skipped.
+#16 6.438 [INFO]
+#16 6.438 [INFO] --- jar:3.4.2:jar (default-jar) @ onlinejudge-auth-service ---
+#16 6.838 [INFO] Building jar: /workspace/services/auth-service/target/onlinejudge-auth-service-0.1.0-SNAPSHOT.jar
+#16 6.972 [INFO]
+#16 6.972 [INFO] --- spring-boot:3.4.5:repackage (repackage) @ onlinejudge-auth-service ---
+#16 7.538 [INFO] Replacing main artifact /workspace/services/auth-service/target/onlinejudge-auth-service-0.1.0-SNAPSHOT.jar with repackaged archive, adding nested dependencies in BOOT-INF/.
+#16 7.538 [INFO] The original artifact has been renamed to /workspace/services/auth-service/target/onlinejudge-auth-service-0.1.0-SNAPSHOT.jar.original
+#16 7.539 [INFO] ------------------------------------------------------------------------
+#16 7.539 [INFO] BUILD SUCCESS
+#16 7.539 [INFO] ------------------------------------------------------------------------
+#16 7.542 [INFO] Total time:  5.169 s
+#16 7.546 [INFO] Finished at: 2026-08-28T08:51:32Z
+#16 7.546 [INFO] ------------------------------------------------------------------------
+#16 DONE 7.8s
+
+#17 [stage-1 4/4] COPY --from=build --chown=10001:10001 /workspace/services/auth-service/target/onlinejudge-auth-service-0.1.0-SNAPSHOT.jar app.jar
+#17 DONE 0.3s
+
+#18 exporting to image
+#18 exporting layers
+#18 exporting layers 1.6s done
+#18 exporting manifest sha256:09b989cc7af22e8da82d9635f6758e7bbbe701ff54b184b72a32ae7f208384b7 0.0s done
+#18 exporting config sha256:a13311507a9dc5c3c43e32dbf508a6ee2569d1f4ca6cb7b271e72bbc5ecc61e2 0.0s done
+#18 exporting attestation manifest sha256:ee68b1129fe6f819c85bb7340ed25a42351941ed2f58a6cef9234a929cffce81 0.0s done
+#18 exporting manifest list sha256:7076e3019370eaaf0012170d421071e7524004de927d7f2ebc18f02ac679a145 0.0s done
+#18 naming to docker.io/onlinejudge/auth-service:7bba68e0580ac4fd648ebfe9fbba48f186e4003d
+#18 naming to docker.io/onlinejudge/auth-service:7bba68e0580ac4fd648ebfe9fbba48f186e4003d done
+#18 unpacking to docker.io/onlinejudge/auth-service:7bba68e0580ac4fd648ebfe9fbba48f186e4003d
+#18 unpacking to docker.io/onlinejudge/auth-service:7bba68e0580ac4fd648ebfe9fbba48f186e4003d 0.4s done
+#18 DONE 2.1s
