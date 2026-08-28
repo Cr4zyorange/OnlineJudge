@@ -34,9 +34,9 @@ RED 基线（实现前）：`verify-workflow-gates.test.sh` 因 `check-workflows
 ## 3. GREEN：全套质量门禁通过
 
 权威证据（真实 GitHub Actions）：run
-[`33137715535`](https://github.com/MontesquieuE/OnlineJudgeForSE/actions/runs/33137715535)
+[`33139279562`](https://github.com/MontesquieuE/OnlineJudgeForSE/actions/runs/33139279562)
 （event=pull_request，ubuntu-24.04，Java 21.0.12、Node 22.23.2、npm 10.9.2、Maven 3.9.x），
-PR head `c83092b5fb05f1332e2014724206e2e4acc7717c`（rebase 至含 #299/#302 的
+PR head `b1311709ae74a8d7d913d4cc12bcaeafe6bebd5b`（rebase 至含 #299/#302 的
 `678570a` 基线后），全部 5 个 job 结论 `success`，`delivery` 执行通过；PR check
 rollup 全部 `SUCCESS`。run 内各 job 的 `test-summary.txt` 原始输出：
 
@@ -47,7 +47,7 @@ frontend unit: files=1 tests=566 failures=0 errors=0 skipped=0
 frontend runner contracts: # tests 3 / # pass 3 / # fail 0 / # skipped 0
 ```
 
-`environment.json`（同一 artifact）记录 `head_sha: c83092b5fb05f1332e2014724206e2e4acc7717c`
+`environment.json`（同一 artifact）记录 `head_sha: b1311709ae74a8d7d913d4cc12bcaeafe6bebd5b`
 （pull_request 事件取 `pull_request.head.sha`，而非 merge 提交 SHA）。
 
 补充（隔离 checkout 重跑，2026-08-27 @ `68b4ee70ed6d2fae3f29a288d80a8bb3afa4ed47`）：
@@ -65,7 +65,7 @@ gate-chain: PASS
 > 计数说明：合并 dev 前（`a2fbec4`）记录为单元 371 tests/skipped 5、前端 556 tests、
 > shell contract 19 scripts；合并 dev 并 rebase 到 `678570a` 后新增测试使计数变化
 > （单元 383/7、集成 17、前端 566）。计数差异来自基线变化而非行为回归；以真实
-> Actions run `33137715535` 的计数为准。
+> Actions run `33139279562` 的计数为准。
 
 ## 4. 真实 Actions 受控失败证据
 
@@ -92,6 +92,7 @@ run conclusion: failure
 | `33054458192` | `2ac6ec0` | frontend（8 个 `LabStudentAttachments` 用例） | 测试夹具 `publishAt` 无时区，UTC runner 下按本地解析导致“未发布”；改为显式 `+08:00` |
 | `33055289509` | `b275a41` | backend（`LearningRecordControllerTest` 限流用例） | 异步写线程池先于循环落库，第 10 次请求被误判 429；测试内可控 executor 挂起写入使语义确定 |
 | `33057373593` | `587e537` | backend（基础设施） | Maven Central 429 + Actions 缓存服务 400，冷缓存依赖解析失败；门禁脚本增加仅针对依赖传输失败的 3 次有界重试 |
+| `33138722525` | `a1f5577` | backend（`GrdLrnIntegrationTest`） | 变更/复核通知由异步 executor 投递，断言时首条仍为发布通知；测试内增加 5s 有界轮询后再断言 |
 
 ## 5. REFACTOR：本地/CI 共用脚本
 
@@ -116,7 +117,7 @@ bash scripts/ci/verify-workflow-gates.test.sh
 - 全新 clone 中 `bash scripts/ci/verify-workflow-gates.test.sh`
   完整 PASS（静态校验、9 个变异全被拒绝、受控编译失败阻断 `delivery`、GREEN 到达并
   通过 `delivery`、环境清单精确记录 PR head/base SHA）。
-- 真实 Actions run `33137715535` @ head `c83092b` 全 job success（含 `delivery`），
+- 真实 Actions run `33139279562` @ head `b131170` 全 job success（含 `delivery`），
   PR check 全绿；受控失败 run `33138034066` 验证失败阻断（见第 4 节）。
 
 验证范围说明：脚本在 Git Bash/WSL bash 下均可执行（不依赖脚本可执行位）；本机 Java
