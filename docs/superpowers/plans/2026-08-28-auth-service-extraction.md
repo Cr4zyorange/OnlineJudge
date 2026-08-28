@@ -655,7 +655,7 @@ Expected: exit `0`, standalone tests pass, package exists, and forbidden package
 
 Document exact public endpoints, `Authorization: Bearer` format, `/me` subject fields, error mapping (`ERR-AUTH-04`, `ERR-AUTH-05`), Header rejection, AUTH-unavailable fail-closed rule, database variables, seed-data switch, probe paths, build commands, and the known dependency on #310/#317. State that other services must not query `t_auth_*`.
 
-Create `output/test/issue-311/README.md` with slots filled by commands from Task 8: baseline SHA `2a3d355`, tested SHA, environment, commands, counts, exit codes, image digest/revision, and raw log filenames. Do not claim Docker PASS before it runs.
+Create `output/test/issue-311/README.md` with slots filled by commands from Task 8: baseline SHA `2a3d355`, tested SHA, environment, commands, counts, exit codes, image digest/revision, and raw record filenames. Do not claim Docker PASS before it runs.
 
 - [ ] **Step 4: Check docs and commit**
 
@@ -669,21 +669,21 @@ git commit -m "docs(auth): document independent service delivery"
 
 **Files:**
 - Modify: `output/test/issue-311/README.md`
-- Create: `output/test/issue-311/raw/auth-service-test.log`
-- Create: `output/test/issue-311/raw/auth-service-package.log`
-- Create: `output/test/issue-311/raw/auth-boundary.log`
-- Create: `output/test/issue-311/raw/auth-image.log`
-- Create: `output/test/issue-311/raw/auth-compose-smoke.log`
-- Create: `output/test/issue-311/raw/backend-auth-regression.log`
-- Create: `output/test/issue-311/raw/backend-full-regression.log`
+- Create: `output/test/issue-311/raw/auth-service-test.txt`
+- Create: `output/test/issue-311/raw/auth-service-package.txt`
+- Create: `output/test/issue-311/raw/auth-boundary.txt`
+- Create: `output/test/issue-311/raw/auth-image.txt`
+- Create: `output/test/issue-311/raw/auth-compose-smoke.txt`
+- Create: `output/test/issue-311/raw/backend-auth-regression.txt`
+- Create: `output/test/issue-311/raw/backend-full-regression.txt`
 
 - [ ] **Step 1: Run service and boundary verification with raw logs**
 
 ```powershell
-& $maven -f services/auth-service/pom.xml test *> output/test/issue-311/raw/auth-service-test.log
-& $maven -f services/auth-service/pom.xml package -DskipTests *> output/test/issue-311/raw/auth-service-package.log
+& $maven -f services/auth-service/pom.xml test *> output/test/issue-311/raw/auth-service-test.txt
+& $maven -f services/auth-service/pom.xml package -DskipTests *> output/test/issue-311/raw/auth-service-package.txt
 $env:MAVEN_CMD = $maven
-& scripts/test/verify-auth-service-boundary.ps1 *> output/test/issue-311/raw/auth-boundary.log
+& scripts/test/verify-auth-service-boundary.ps1 *> output/test/issue-311/raw/auth-boundary.txt
 ```
 
 Expected: all exit codes `0`; record exact test totals from Surefire reports.
@@ -691,8 +691,8 @@ Expected: all exit codes `0`; record exact test totals from Surefire reports.
 - [ ] **Step 2: Run monolith AUTH compatibility and full regression**
 
 ```powershell
-& $maven -f backend/pom.xml '-Dtest=AuthControllerTest,AuthAdminControllerTest,AuthMigrationScriptTest,AuthServiceExtractionContractTest' test *> output/test/issue-311/raw/backend-auth-regression.log
-& $maven -f backend/pom.xml test *> output/test/issue-311/raw/backend-full-regression.log
+& $maven -f backend/pom.xml '-Dtest=AuthControllerTest,AuthAdminControllerTest,AuthMigrationScriptTest,AuthServiceExtractionContractTest' test *> output/test/issue-311/raw/backend-auth-regression.txt
+& $maven -f backend/pom.xml test *> output/test/issue-311/raw/backend-full-regression.txt
 ```
 
 Expected: AUTH compatibility passes. Compare the full run with baseline `408 / 1 failure / 7 skipped`; any new failure is a #311 regression and must be fixed. The known `GrdLrnIntegrationTest` ordering failure remains separately identified if reproduced.
@@ -702,8 +702,8 @@ Expected: AUTH compatibility passes. Compare the full run with baseline `408 / 1
 ```powershell
 $testedSha = git rev-parse HEAD
 $env:GIT_SHA = $testedSha
-docker build --build-arg "GIT_SHA=$testedSha" -f deploy/docker/auth-service.Dockerfile -t "onlinejudge/auth-service:$testedSha" . *> output/test/issue-311/raw/auth-image.log
-docker compose -f deploy/docker/compose.auth.yml up -d *> output/test/issue-311/raw/auth-compose-smoke.log
+docker build --build-arg "GIT_SHA=$testedSha" -f deploy/docker/auth-service.Dockerfile -t "onlinejudge/auth-service:$testedSha" . *> output/test/issue-311/raw/auth-image.txt
+docker compose -f deploy/docker/compose.auth.yml up -d *> output/test/issue-311/raw/auth-compose-smoke.txt
 Invoke-RestMethod http://127.0.0.1:8081/api/v1/system/health
 Invoke-RestMethod http://127.0.0.1:8081/api/v1/system/readiness
 Invoke-RestMethod http://127.0.0.1:8081/api/v1/system/version
