@@ -1,0 +1,18 @@
+# Backend Service: ClusterIP only, container port 8080, no host exposure
+# (D3 contract #293 section 2; external access goes through the frontend).
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend
+  namespace: onlinejudge-ci
+  labels:
+    app: backend
+    app.kubernetes.io/part-of: onlinejudge
+spec:
+  type: ClusterIP
+  selector:
+    app: backend
+  ports:
+    - port: 8080
+      name: http
+      targetPort: http

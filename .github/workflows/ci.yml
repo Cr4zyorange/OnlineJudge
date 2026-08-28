@@ -1,0 +1,173 @@
+name: ci-quality-gate
+
+on:
+  pull_request:
+    branches: [dev]
+    types: [opened, synchronize, reopened, ready_for_review]
+  push:
+    branches: [dev]
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  OJ_CI_JAVA_MAJOR: "21"
+  OJ_CI_NODE_MAJOR: "22"
+  OJ_CI_NPM_VERSION: "10.9.2"
+  OJ_CI_MAVEN_MIN_VERSION: "3.9.0"
+
+jobs:
+  validate-workflows:
+    name: Validate workflow contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Collect environment manifest
+        run: bash scripts/ci/collect-environment.sh "$GITHUB_WORKSPACE" ci-artifacts/validate-workflows/environment.json
+      - name: Static workflow checks
+        run: bash scripts/ci/check-workflows.sh "$GITHUB_WORKSPACE"
+      - name: Gate chain dry-run (all pass)
+        run: bash scripts/ci/verify-gate-chain.sh --checkout "$GITHUB_WORKSPACE" --dry-run
+      - name: Gate chain dry-run (failure must skip delivery)
+        run: |
+          set +e
+          bash scripts/ci/verify-gate-chain.sh --checkout "$GITHUB_WORKSPACE" --dry-run --fail-job backend-gate
+          status=$?
+          set -e
+          if [[ $status -eq 0 ]]; then
+            echo "expected the injected failure to fail the chain"
+            exit 1
+          fi
+          echo "injected failure correctly failed the chain"
+      - name: Upload validation evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ci-validate-workflows-${{ github.run_id }}
+          path: ci-artifacts/validate-workflows/**
+          if-no-files-found: warn
+          retention-days: 14
+
+  backend-gate:
+    name: Backend compile + unit + integration
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: [validate-workflows]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Set up Java 21
+        uses: actions/setup-java@8df1039502a15bceb9433410b1a100fbe190c53b # v4.5.0
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+          cache-dependency-path: backend/pom.xml
+      - name: Collect environment manifest
+        run: bash scripts/ci/collect-environment.sh "$GITHUB_WORKSPACE" ci-artifacts/backend-gate/environment.json
+      - name: Backend quality gates
+        run: bash scripts/ci/backend-verify.sh "$GITHUB_WORKSPACE"
+      - name: Summarize backend tests
+        if: always()
+        run: bash scripts/ci/summarize-tests.sh "$GITHUB_WORKSPACE" ci-artifacts/backend-gate
+      - name: Upload backend evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ci-backend-gate-${{ github.run_id }}
+          path: |
+            ci-artifacts/backend-gate/**
+            backend/target/surefire-reports/unit/**
+            backend/target/surefire-reports/integration/**
+          if-no-files-found: warn
+          retention-days: 14
+
+  frontend-gate:
+    name: Frontend typecheck + unit + build + runner contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    needs: [validate-workflows]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Set up Node 22
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Collect environment manifest
+        run: bash scripts/ci/collect-environment.sh "$GITHUB_WORKSPACE" ci-artifacts/frontend-gate/environment.json
+      - name: Frontend quality gates
+        run: bash scripts/ci/frontend-verify.sh "$GITHUB_WORKSPACE"
+      - name: Summarize frontend tests
+        if: always()
+        run: bash scripts/ci/summarize-tests.sh "$GITHUB_WORKSPACE" ci-artifacts/frontend-gate
+      - name: Upload frontend evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ci-frontend-gate-${{ github.run_id }}
+          path: |
+            ci-artifacts/frontend-gate/**
+            frontend/test-results/**
+          if-no-files-found: warn
+          retention-days: 14
+
+  contracts-gate:
+    name: Repo contract checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [validate-workflows]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Set up Java 21
+        uses: actions/setup-java@8df1039502a15bceb9433410b1a100fbe190c53b # v4.5.0
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+          cache-dependency-path: backend/pom.xml
+      - name: Collect environment manifest
+        run: bash scripts/ci/collect-environment.sh "$GITHUB_WORKSPACE" ci-artifacts/contracts-gate/environment.json
+      - name: Repository contract gates
+        run: bash scripts/ci/contract-verify.sh "$GITHUB_WORKSPACE"
+      - name: Upload contract evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ci-contracts-gate-${{ github.run_id }}
+          path: |
+            ci-artifacts/contracts-gate/**
+            backend/target/surefire-reports/contract/**
+          if-no-files-found: warn
+          retention-days: 14
+
+  # 后续镜像构建与 Kind 部署 job 必须以 needs: [delivery] 挂在本门禁之后；
+  # delivery 只在前置质量门禁全部成功后执行，失败或取消时自动 skipped。
+  delivery:
+    name: Delivery checkpoint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: [validate-workflows, backend-gate, frontend-gate, contracts-gate]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Collect delivery manifest
+        run: bash scripts/ci/collect-environment.sh "$GITHUB_WORKSPACE" ci-artifacts/delivery/environment.json
+      - name: Delivery checkpoint
+        run: bash scripts/ci/delivery-checkpoint.sh "$GITHUB_WORKSPACE"
+      - name: Upload delivery evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ci-delivery-${{ github.run_id }}
+          path: ci-artifacts/delivery/**
+          if-no-files-found: warn
+          retention-days: 14

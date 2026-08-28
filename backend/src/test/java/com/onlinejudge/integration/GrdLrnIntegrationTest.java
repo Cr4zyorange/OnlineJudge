@@ -1,11 +1,13 @@
 package com.onlinejudge.integration;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.JsonNode;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
@@ -110,6 +112,7 @@ class GrdLrnIntegrationTest {
                         ))))
                 .andExpect(status().isOk());
 
+        awaitGradeNotifications(studentHeaders(601L), 2, "成绩已变更");
         mockMvc.perform(get("/api/v1/notifications")
                         .headers(studentHeaders(601L))
                         .param("type", "GRADE")
@@ -134,6 +137,7 @@ class GrdLrnIntegrationTest {
                 .getContentAsString();
         long requestId = objectMapper.readTree(requestJson).at("/data/requestId").asLong();
 
+        awaitGradeNotifications(teacherHeaders(), 1, "收到成绩复核申请");
         mockMvc.perform(get("/api/v1/notifications")
                         .headers(teacherHeaders())
                         .param("type", "GRADE")
@@ -154,6 +158,7 @@ class GrdLrnIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.status").value("REJECTED"));
 
+        awaitGradeNotifications(studentHeaders(601L), 3, "成绩复核已处理");
         mockMvc.perform(get("/api/v1/notifications")
                         .headers(studentHeaders(601L))
                         .param("type", "GRADE")
@@ -183,6 +188,33 @@ class GrdLrnIntegrationTest {
                 .getResponse()
                 .getContentAsString();
         return objectMapper.readTree(responseJson).at("/data/id").asLong();
+    }
+
+    private void awaitGradeNotifications(HttpHeaders headers, int expectedTotal, String expectedTitle)
+            throws Exception {
+        // GRD 变更/复核类通知由异步 executor 投递，先有界轮询到预期标题，再在后续请求中做完整断言。
+        long deadline = System.currentTimeMillis() + 5000;
+        String lastBody = "";
+        while (System.currentTimeMillis() < deadline) {
+            lastBody = mockMvc.perform(get("/api/v1/notifications")
+                            .headers(headers)
+                            .param("type", "GRADE")
+                            .param("size", "10"))
+                    .andExpect(status().isOk())
+                    .andReturn()
+                    .getResponse()
+                    .getContentAsString();
+            JsonNode data = objectMapper.readTree(lastBody).path("data");
+            if (data.path("total").asInt() == expectedTotal
+                    && expectedTitle.equals(data.at("/records/0/title").asText())) {
+                return;
+            }
+            Thread.sleep(50);
+        }
+        throw new AssertionError(
+                "grade notification not observed within timeout (total=" + expectedTotal
+                        + ", title=" + expectedTitle + "): " + lastBody
+        );
     }
 
     private long courseSummaryId(long studentId) {

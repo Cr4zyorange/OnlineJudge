@@ -52,7 +52,7 @@ describe('LabStudentAttachments', () => {
       resource({ id: 12, name: '输入数据', originalFilename: 'very-long-input-data-name.zip', resourceType: 'ARCHIVE' }),
       resource({ id: 13, courseId: 202, name: '其他课程资料' }),
       resource({ id: 14, visibility: 'TEACHER', name: '教师答案' }),
-      resource({ id: 15, publishAt: '2026-08-19T09:00:00', name: '尚未发布' }),
+      resource({ id: 15, publishAt: '2026-08-19T09:00:00+08:00', name: '尚未发布' }),
       resource({ id: 16, publishAt: 'invalid-date', name: '发布时间异常' }),
       resource({ id: 99, name: '未被实验引用' })
     ]);
@@ -271,14 +271,14 @@ function resource(overrides: Partial<CourseResource> = {}): CourseResource {
     name: '实验附件',
     resourceType: 'COURSEWARE',
     visibility: 'STUDENT',
-    publishAt: '2026-08-18T08:00:00',
+    publishAt: '2026-08-18T08:00:00+08:00',
     originalFilename: 'attachment.pdf',
     contentType: 'application/pdf',
     fileSize: 2048,
     uploadUserId: 501,
     downloadUrl: `/api/v1/courses/${courseId}/resources/${id}/download`,
-    createdAt: '2026-08-18T08:00:00',
-    updatedAt: '2026-08-18T08:00:00',
+    createdAt: '2026-08-18T08:00:00+08:00',
+    updatedAt: '2026-08-18T08:00:00+08:00',
     ...overrides
   };
 }
