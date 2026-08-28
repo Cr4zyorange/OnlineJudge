@@ -516,6 +516,7 @@ const homeworkFileAccept = '.pdf,.zip,.docx,.xlsx,.pptx,.txt,.md,.csv,.png,.jpg,
 const homeworkFileExtensions = new Set(homeworkFileAccept.split(',').map((extension) => extension.slice(1)));
 const homeworkFileMaxSize = 10 * 1024 * 1024;
 let draftTimer: ReturnType<typeof setTimeout> | undefined;
+let draftSaveToken = 0;
 let attachmentExpiryTimer: ReturnType<typeof setTimeout> | undefined;
 let beforeUnloadRegistered = false;
 let draftWatchSuspended = false;
@@ -1270,9 +1271,15 @@ function scheduleDraftSave() {
   }
   cancelScheduledDraftSave();
   draftStatusMessage.value = '草稿待保存';
+  const token = ++draftSaveToken;
   draftTimer = setTimeout(() => {
-    saveDraftNow();
     draftTimer = undefined;
+    // 只保存仍属于当前编辑会话的调度：组件被重置、切换作业/模式或恢复草稿后，
+    // 旧调度的保存不得再执行（空内容会误删刚恢复的草稿）。
+    if (token !== draftSaveToken || props.mode !== 'submit' || !homework.value || draftWatchSuspended) {
+      return;
+    }
+    saveDraftNow();
   }, 500);
 }
 
@@ -1311,6 +1318,7 @@ function restoreDraft() {
   if (!homework.value || homework.value.type === 'FILE') {
     return;
   }
+  cancelScheduledDraftSave();
   let parsed: HomeworkDraft | undefined;
   try {
     const stored = window.sessionStorage.getItem(draftKey.value);
@@ -1536,6 +1544,7 @@ function cancelScheduledDraftSave() {
     clearTimeout(draftTimer);
     draftTimer = undefined;
   }
+  draftSaveToken += 1;
 }
 
 function registerBeforeUnload() {
