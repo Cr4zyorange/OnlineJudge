@@ -352,6 +352,28 @@ class AuthControllerTest {
     }
 
     @Test
+    void unsupportedAuthMediaTypePreservesMonolithErrorContract() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.TEXT_PLAIN)
+                        .content("account=student51&password=Student51@pass"))
+                .andExpect(status().isUnsupportedMediaType())
+                .andExpect(jsonPath("$.code").value("415"))
+                .andExpect(jsonPath("$.message").value("不支持的媒体类型"));
+    }
+
+    @Test
+    void typedAuthJsonFailurePreservesOffendingFieldName() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"account":{"unexpected":true},"password":"Student51@pass"}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("AUTH_400"))
+                .andExpect(jsonPath("$.message").value("参数错误：account 不合法"));
+    }
+
+    @Test
     void forgedBearerTokenUsesSafeAuthenticationFailureMessage() throws Exception {
         mockMvc.perform(get("/api/v1/auth/me")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer forged.token.value"))
