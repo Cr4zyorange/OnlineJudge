@@ -494,7 +494,7 @@ Create `application-compose.properties`:
 spring.datasource.url=jdbc:mysql://${AUTH_DB_HOST:auth-db}:${AUTH_DB_PORT:3306}/${AUTH_DB_NAME:onlinejudge_auth}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false
 spring.datasource.driver-class-name=com.mysql.cj.jdbc.Driver
 spring.datasource.username=${AUTH_DB_USER:onlinejudge_auth}
-spring.datasource.password=${AUTH_DB_PASSWORD:onlinejudge_auth}
+spring.datasource.password=${AUTH_DB_PASSWORD}
 spring.datasource.hikari.initialization-fail-timeout=60000
 spring.sql.init.mode=never
 onlinejudge.auth.seed-data-enabled=${AUTH_SEED_DATA_ENABLED:false}
