@@ -6,15 +6,16 @@
 - 初始基线：`2a3d355`
 - 交付前同步基线：`origin/dev@1f7c890`
 - 分支：`feature/311-auth-service`
-- 测试 SHA：`7bba68e0580ac4fd648ebfe9fbba48f186e4003d`
+- 初始容器测试 SHA：`7bba68e0580ac4fd648ebfe9fbba48f186e4003d`
 - 合并后验证 SHA：`69d7485c1c014258ceae363eb6a34fdc5ebc71b0`
+- 评审修复复核 SHA：`69c366d93c859dd0f73c85883a03e42519d76cfe`
 - 环境：Windows 11、Java 21.0.9、Maven 3.9.9、Docker Desktop 29.3.1（Linux Engine）
 
 ## 当前已验证
 
 | 检查 | 结果 | 证据 |
 | --- | --- | --- |
-| 独立服务测试 | PASS | 39 tests，0 failures，0 errors，0 skipped |
+| 独立服务测试 | PASS | 41 tests，0 failures，0 errors，0 skipped；新增 415 与 JSON 类型错误兼容测试 |
 | 独立打包 | PASS | `onlinejudge-auth-service-0.1.0-SNAPSHOT.jar` |
 | Java 模块边界 | PASS | forbidden-java=0 |
 | SQL 归属边界 | PASS | forbidden-sql=0，仅七张 `t_auth_*` 表 |
@@ -23,7 +24,7 @@
 | 单体全量回归（测试 SHA） | 基线内 | 410 tests，1 failure，0 errors，7 skipped；唯一失败为当时已知 GRD/LRN 时序用例；`raw/backend-full-regression.txt` |
 | 已知失败隔离重跑 | PASS | 1 test，0 failures；`raw/backend-known-flake-rerun.txt` |
 | 同步最新 `dev` 后全量回归 | PASS | 410 tests，0 failures，0 errors，7 skipped |
-| 镜像构建与 OCI 标签 | PASS | image `sha256:7076e3019370eaaf0012170d421071e7524004de927d7f2ebc18f02ac679a145`；revision/version 均等于测试 SHA；user=`10001:10001` |
+| 镜像构建与 OCI 标签 | PASS | 评审修复镜像 `sha256:f49252c1dbc77dd8e625e21b74d4a5e6ca197edaf0bce163356e4d5634d74f91`；revision/version 均等于评审修复复核 SHA；user=`10001:10001` |
 | Compose 服务 | PASS | `auth-db` 与 `auth-service` 均 healthy；`raw/auth-compose-smoke.txt`、`raw/auth-runtime.txt` |
 | HTTP 探针 | PASS | health/readiness=`UP`，version revision 等于测试 SHA；`raw/auth-probes-and-image.txt` |
 | MySQL 迁移与权限 | PASS | 迁移重复执行 exit 0；七张 AUTH 表；账号仅获 `onlinejudge_auth` 权限；读取 `mysql.user` 被拒绝；`raw/auth-db-boundary.txt` |
@@ -56,6 +57,6 @@
 
 ## 结论
 
-独立服务、AUTH 兼容、边界、打包、镜像、探针、数据库初始化、重复迁移和最小权限均通过。测试 SHA 上的单体全量回归相对初始基线新增 2 条 #311 仓库契约测试，已知 GRD/LRN 时序用例隔离重跑通过。交付前合入最新 `origin/dev@1f7c890` 后再次执行独立服务测试、边界检查和后端全量回归，最终 410 条后端测试全部通过（7 条按设计跳过）。
+独立服务、AUTH 兼容、边界、打包、镜像、探针、数据库初始化、重复迁移和最小权限均通过。测试 SHA 上的单体全量回归相对初始基线新增 2 条 #311 仓库契约测试，已知 GRD/LRN 时序用例隔离重跑通过。交付前合入最新 `origin/dev@1f7c890` 后再次执行独立服务测试、边界检查和后端全量回归，最终 410 条后端测试全部通过（7 条按设计跳过）。评审修复复核 SHA 上新增的请求异常兼容测试先确认 2 条失败，再修复为 41 条独立服务测试全部通过；精确 SHA 镜像重新构建后，health/readiness 为 `UP`，不支持媒体类型返回 HTTP 415，JSON 类型错误返回包含字段名的 HTTP 400。
 
 Docker 验证结束后已删除本次创建的 `onlinejudge-auth` 测试容器、网络和临时数据卷；没有删除用户已有的 `opengaussdb` 容器或其他 Docker 资源。
