@@ -1,5 +1,18 @@
 .git
+.github
 .vscode
+.idea
+*.iml
+
+**/.env*
+!**/.env.example
+**/*.pem
+**/*.key
+**/*.p12
+**/*.pfx
+**/*.crt
+**/*.cer
+**/*.log
 
 backend/target
 backend/data
@@ -7,4 +20,7 @@ backend/data
 frontend/node_modules
 frontend/dist
 
-deploy/docker/.env
+coverage
+output
+tmp
+temp

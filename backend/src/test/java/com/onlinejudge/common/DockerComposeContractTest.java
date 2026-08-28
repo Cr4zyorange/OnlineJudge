@@ -22,7 +22,31 @@ class DockerComposeContractTest {
         assertThat(compose).contains("mysql-data:/var/lib/mysql");
         assertThat(compose).contains("../../database/mysql/compose-schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro");
         assertThat(compose).contains("${OJ_HTTP_PORT:-8088}:80");
-        assertThat(compose).contains("/api/v1/system/health");
+        assertThat(compose).contains("/api/v1/system/readiness");
+        assertThat(compose).doesNotContain("container_name:");
+    }
+
+    @Test
+    void composeRequiresFullGitShaForBothApplicationImages() throws IOException {
+        Path composeFile = Path.of("..", "deploy", "docker", "compose.yml");
+        String compose = Files.readString(composeFile);
+        Path composeEntrypoint = Path.of("..", "scripts", "docker", "compose-images.sh");
+        String entrypoint = Files.readString(composeEntrypoint);
+
+        assertThat(compose).contains("image: onlinejudge/backend:${GIT_SHA:?GIT_SHA must be the current full 40-character commit SHA}");
+        assertThat(compose).contains("image: onlinejudge/frontend:${GIT_SHA:?GIT_SHA must be the current full 40-character commit SHA}");
+        assertThat(compose).contains("MYSQL_PASSWORD: ${MYSQL_PASSWORD:?MYSQL_PASSWORD is required}");
+        assertThat(compose).contains("MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD is required}");
+        assertThat(compose).contains("image: mysql:8.4");
+        assertThat(compose).doesNotContain("ONLINEJUDGE_NOTIFICATIONS_INTERNAL_TOKEN:");
+        assertThat(compose).doesNotContain("image: latest");
+        assertThat(compose).doesNotContain("    build:");
+
+        assertThat(composeEntrypoint).isExecutable();
+        assertThat(entrypoint).contains("require_full_git_sha");
+        assertThat(entrypoint).contains("require_matching_head \"$repo_root\"");
+        assertThat(entrypoint).contains("docker compose");
+        assertThat(entrypoint).contains("compose_files=(\"$compose_file\")");
     }
 
     @Test
@@ -72,14 +96,21 @@ class DockerComposeContractTest {
         assertThat(ignores).contains("backend/target");
         assertThat(ignores).contains("frontend/node_modules");
         assertThat(ignores).contains("frontend/dist");
+        assertThat(ignores).contains("output");
+        assertThat(ignores).contains("tmp");
+        assertThat(ignores).contains("**/.env*");
+        assertThat(ignores).contains("**/*.pem");
+        assertThat(ignores).contains("**/*.key");
     }
 
     @Test
-    void backendRuntimeImageInstallsHealthcheckProbeTool() throws IOException {
+    void backendRuntimeImageUsesProbeFromPinnedBaseWithoutMutablePackageInstall() throws IOException {
         Path dockerfile = Path.of("..", "deploy", "docker", "backend.Dockerfile");
         String backendDockerfile = Files.readString(dockerfile);
 
-        assertThat(backendDockerfile).contains("apt-get install -y --no-install-recommends wget");
+        assertThat(backendDockerfile).contains("command -v wget");
+        assertThat(backendDockerfile).doesNotContain("apt-get update");
+        assertThat(backendDockerfile).doesNotContain("apt-get install");
     }
 
     @Test
@@ -89,6 +120,29 @@ class DockerComposeContractTest {
 
         assertThat(backendDockerfile).contains("--mount=type=cache,target=/root/.m2");
         assertThat(backendDockerfile).contains("-Dmaven.test.skip=true package");
+    }
+
+    @Test
+    void applicationImagesCarryOciRevisionAndRunAsNonRootUsers() throws IOException {
+        String backendDockerfile = Files.readString(Path.of("..", "deploy", "docker", "backend.Dockerfile"));
+        String frontendDockerfile = Files.readString(Path.of("..", "deploy", "docker", "frontend.Dockerfile"));
+
+        assertThat(backendDockerfile).contains("FROM maven:3.9.9-eclipse-temurin-21@sha256:3a4ab3276a087bf276f79cae96b1af04f53731bec53fb2e651aca79e4b10211e AS build");
+        assertThat(backendDockerfile).contains("FROM eclipse-temurin:21-jre@sha256:7a65df4b22d2de92d4e04056e884f3b9122d70b21e2847fd66084278bd0ce037");
+        assertThat(frontendDockerfile).contains("FROM node:22-alpine@sha256:c610fcdfb1d5b4740dd70c284ed3cb16bb857e0f7166196e36a5501df7a3aa32 AS build");
+        assertThat(frontendDockerfile).contains("FROM nginx:1.27-alpine@sha256:65645c7bb6a0661892a8b03b89d0743208a18dd2f3f17a54ef4b76fb8e2f2a10");
+        assertThat(backendDockerfile).contains("ARG GIT_SHA");
+        assertThat(frontendDockerfile).contains("ARG GIT_SHA");
+        assertThat(backendDockerfile).contains("org.opencontainers.image.revision=\"$GIT_SHA\"");
+        assertThat(frontendDockerfile).contains("org.opencontainers.image.revision=\"$GIT_SHA\"");
+        assertThat(backendDockerfile).contains("org.opencontainers.image.version=\"$GIT_SHA\"");
+        assertThat(frontendDockerfile).contains("org.opencontainers.image.version=\"$GIT_SHA\"");
+        assertThat(backendDockerfile).contains("org.opencontainers.image.source=\"$IMAGE_SOURCE\"");
+        assertThat(frontendDockerfile).contains("org.opencontainers.image.source=\"$IMAGE_SOURCE\"");
+        assertThat(backendDockerfile).contains("USER 10001:10001");
+        assertThat(frontendDockerfile).contains("--mount=type=cache,target=/root/.npm");
+        assertThat(frontendDockerfile).contains("pid /tmp/nginx.pid;");
+        assertThat(frontendDockerfile).contains("USER nginx");
     }
 
     @Test
