@@ -154,7 +154,7 @@ docker compose -f deploy/docker/compose.yml down --volumes --remove-orphans
 - GitHub Secrets 和 Kubernetes Secret 只使用 `MYSQL_PASSWORD`、`MYSQL_ROOT_PASSWORD`、`ONLINEJUDGE_NOTIFICATIONS_INTERNAL_TOKEN` 三个键名，文档、日志和镜像都不得写入其值。
 - 完成交付时，backend liveness 为 `/api/v1/system/health`，数据库感知 readiness 为 `/api/v1/system/readiness`；Kind 验收还必须经 frontend 代理检查 readiness。
 
- #289 已随 PR #302 合入当前 `origin/dev`；#288 的 PR #303、#290 的 PR #298 尚未合入，#292 仍未创建 PR。上述 Kind、readiness 和 Actions 交付入口只有在对应 producer 合入后才可视为当前 checkout 的可执行能力，不能提前标记为 PASS。待 #288、#290 和 #292 合入后，未参与实现的人应在干净 checkout 依次执行各实现提供的入口，并记录环境、完整 SHA、实际命令、服务/测试数量、退出码和未经改写的输出。建议证据目录格式为 `output/issue-291/replay-<UTC>/`：`environment.txt`、`commands.txt`、`raw/`；只有命令退出码为 `0` 且原始断言成功时才记录 `PASS`。该目录是复演产生物，不应预先生成或提交伪造结果。
+ #289 已随 PR #302 合入当前 `origin/dev`，其中已提供匿名 readiness 接口及 Compose readiness 检查；#288 的 PR #303、#290 的 PR #298 尚未合入，#292 仍未创建 PR。Kind 部署、Kind 探针和 Actions/端到端交付入口只有在对应 producer 合入后才可视为当前 checkout 的可执行能力，不能提前标记为 PASS。待 #288、#290 和 #292 合入后，未参与实现的人应在干净 checkout 依次执行各实现提供的入口，并记录环境、完整 SHA、实际命令、服务/测试数量、退出码和未经改写的输出。建议证据目录格式为 `output/issue-291/replay-<UTC>/`：`environment.txt`、`commands.txt`、`raw/`；只有命令退出码为 `0` 且原始断言成功时才记录 `PASS`。该目录是复演产生物，不应预先生成或提交伪造结果。
 
 故障排查先查看 [部署文档的常见问题](docs/最终提交/部署文档.md#9-常见问题) 和相关容器日志；D3 合入后，GitHub Actions 的失败日志、测试报告和 Kind 诊断以 #290/#292 工作流归档为准。当前 Compose 路径不声明为长期生产部署或云端高可用方案。
 

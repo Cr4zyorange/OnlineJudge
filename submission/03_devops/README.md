@@ -28,7 +28,7 @@
 | 自建镜像 | `onlinejudge/backend:${GIT_SHA}`、`onlinejudge/frontend:${GIT_SHA}` | `GIT_SHA` 必须是本次 checkout 的完整 40 位 SHA；禁止仅用 `latest` |
 | MySQL 镜像 | `mysql:8.4` | 不伪造仓库 revision label |
 | 服务端口 | MySQL `3306`、backend `8080`、frontend `80` | 只有 frontend 是 Compose 宿主入口；默认 `OJ_HTTP_PORT=8088` |
-| 健康接口 | liveness `/api/v1/system/health`；readiness `/api/v1/system/readiness` | readiness 是 D3 待实现项，必须实际访问数据源；不能用 liveness 代替 |
+| 健康接口 | liveness `/api/v1/system/health`；readiness `/api/v1/system/readiness` | readiness 已由 #289/PR #302 合入 `origin/dev`，必须实际访问数据源；Kind 探针和端到端代理验收仍待 #288/#292 |
 | 初始化 | `database/mysql/compose-schema.sql` 加后端演示数据 | 当前 Compose 首次空卷启动行为；迁移/seed 正本以 #287 最终实现为准 |
 | 删除边界 | `down --remove-orphans` 保留卷；`down --volumes --remove-orphans` 删除 MySQL 与应用数据 | 后者不可恢复，复演前先导出需要保留的数据 |
 
