@@ -75,6 +75,25 @@ curl -i -X POST http://127.0.0.1:5173/api/v1/auth/login \
 
 第一个请求应返回前端页面，第二个请求应返回 `code: "0"` 和登录 token。
 
+### 6. MySQL 干净启动与保留数据升级
+
+Docker Compose 的空数据卷会按顺序执行 `database/mysql/compose-schema.sql` 和 `database/seeds/dev-ci.sql`。前者包含完整 schema 及 27 条可审计迁移基线；后者只写入带 `db_ci_*` / `D3-DATABASE-287` 标记且不可登录的 DEV/CI 验证数据，不替代后端维护的演示账号和业务闭环样例。
+
+已有数据卷统一通过清单驱动的迁移入口升级：
+
+```bash
+./database/mysql/migrate.sh --adapter compose
+```
+
+如果历史数据库已有业务表但尚无 `schema_migrations`，脚本会拒绝猜测版本。完成备份并人工核实最后已具备的迁移后，显式执行一次基线，例如：
+
+```bash
+./database/mysql/migrate.sh --adapter compose \
+  --baseline-through 20260822_03_create_hwk_submission_attachment.sql
+```
+
+DEV/CI 环境可追加 `--seed`，Kind 中使用同一脚本的 `kubectl` adapter。迁移按 `database/migrations/manifest.txt` 的固定顺序执行并校验 SHA-256；失败会返回非零状态并打印具体文件名。禁止通过删除持久化卷规避迁移失败。完整契约与 MySQL 8.4 验证命令见 [D3-DATABASE 数据库启动与迁移契约](docs/开发/D3-DATABASE-数据库启动与迁移契约.md)。
+
 ## 代码目录组织结构
 
 本目录结构基于 `docs/最终提交/软件详细设计说明书.md` 和 `docs/最终提交/软件实现说明书.md` 中的系统设计建立：系统采用前后端分离架构，前端为 Vue 3 + Vite + TypeScript，后端为 Spring Boot + Spring JDBC，数据库在本地开发使用 H2、Docker 部署使用 MySQL；实现边界按 AUTH、CRS、LRN、LAB、HWK、GRD 六个子系统拆分，跨模块复用能力集中放在 `common` 和 `integration` 下。
@@ -181,8 +200,10 @@ curl -i -X POST http://127.0.0.1:5173/api/v1/auth/login \
 │       ├── unit/                                # 前端组件、API 封装、工具函数和页面状态单元测试
 │       └── e2e/                                 # 端到端测试预留目录
 ├── database/
-│   ├── migrations/                              # MySQL 表结构迁移脚本，按 DB-AUTH/CRS/LRN/LAB/HWK/GRD 编号组织
-│   ├── seeds/                                   # 种子数据预留目录；当前演示数据由后端初始化器幂等写入
+│   ├── migrations/                              # MySQL 迁移 SQL 与固定顺序 manifest.txt
+│   ├── mysql/                                   # Compose 完整 schema 与统一迁移执行器
+│   ├── seeds/                                   # 可识别、不可登录、可清理的 DEV/CI 验证数据
+│   ├── tests/                                   # MySQL 8.4 fresh/upgrade/re-run 契约验证
 │   └── fixtures/                                # 测试夹具预留目录
 ├── scripts/
 │   ├── dev/                                     # 本地开发启动、环境检查、数据重置脚本
