@@ -1,0 +1,79 @@
+# Backend Deployment. The image tag is the __GIT_SHA__ placeholder rendered by
+# scripts/kind/k8s-deploy.sh with the full 40-char commit sha of the checkout
+# that built the image (D3 contract #293 section 3; latest is forbidden).
+# Probe paths are frozen by contract section 5: startup and readiness use the
+# database-aware /api/v1/system/readiness, liveness uses /api/v1/system/health.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  namespace: onlinejudge-ci
+  labels:
+    app: backend
+    app.kubernetes.io/part-of: onlinejudge
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+        app.kubernetes.io/part-of: onlinejudge
+    spec:
+      # The official #289 backend image runs as uid/gid 10001; fsGroup makes
+      # the writable emptyDir group-owned so the non-root process can write
+      # its upload/data directory.
+      securityContext:
+        fsGroup: 10001
+      containers:
+        - name: backend
+          image: onlinejudge/backend:__GIT_SHA__
+          ports:
+            - containerPort: 8080
+              name: http
+          envFrom:
+            - configMapRef:
+                name: onlinejudge-config
+            - secretRef:
+                name: onlinejudge-secrets
+          startupProbe:
+            httpGet:
+              path: /api/v1/system/readiness
+              port: 8080
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 42
+          readinessProbe:
+            httpGet:
+              path: /api/v1/system/readiness
+              port: 8080
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /api/v1/system/health
+              port: 8080
+            periodSeconds: 20
+            timeoutSeconds: 3
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 500m
+              memory: 768Mi
+            limits:
+              cpu: 1500m
+              memory: 1536Mi
+          volumeMounts:
+            - name: app-data
+              mountPath: /opt/onlinejudge/data
+      volumes:
+        - name: app-data
+          emptyDir: {}

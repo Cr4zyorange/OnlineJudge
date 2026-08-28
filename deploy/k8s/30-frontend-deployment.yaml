@@ -1,0 +1,61 @@
+# Frontend Deployment (Nginx serving the Vue build and proxying /api/ to
+# backend:8080). The image tag is the __GIT_SHA__ placeholder rendered by
+# scripts/kind/k8s-deploy.sh (D3 contract #293 section 3; latest is forbidden).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  namespace: onlinejudge-ci
+  labels:
+    app: frontend
+    app.kubernetes.io/part-of: onlinejudge
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+        app.kubernetes.io/part-of: onlinejudge
+    spec:
+      containers:
+        - name: frontend
+          image: onlinejudge/frontend:__GIT_SHA__
+          ports:
+            - containerPort: 80
+              name: http
+          startupProbe:
+            httpGet:
+              path: /
+              port: 80
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 24
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 80
+            periodSeconds: 20
+            timeoutSeconds: 2
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
