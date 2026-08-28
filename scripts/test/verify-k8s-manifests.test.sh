@@ -158,6 +158,7 @@ backend_health_count="$(count_occurrences "$backend_deploy" 'path: /api/v1/syste
 [[ "$backend_health_count" -eq 1 ]] || fail "backend liveness probe must use /api/v1/system/health exactly once (found $backend_health_count)"
 require_line "$backend_deploy" 'port: 8080' 'backend probe port'
 require_line "$backend_deploy" 'configMapRef:' 'backend env from configmap'
+require_line "$backend_deploy" 'fsGroup: 10001' 'backend volume writable by the non-root official image'
 require_line "$backend_deploy" 'secretRef:' 'backend env from secret'
 require_line "$backend_deploy" 'strategy:' 'backend update strategy declared'
 require_line "$backend_deploy" 'type: RollingUpdate' 'backend rolling update'
