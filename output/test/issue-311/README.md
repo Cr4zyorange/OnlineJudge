@@ -3,9 +3,11 @@
 ## 范围
 
 - Issue：`#311 [D6-SVC-AUTH] 抽取身份服务并完成独立交付`
-- 基线：`2a3d355`
+- 初始基线：`2a3d355`
+- 交付前同步基线：`origin/dev@1f7c890`
 - 分支：`feature/311-auth-service`
 - 测试 SHA：`7bba68e0580ac4fd648ebfe9fbba48f186e4003d`
+- 合并后验证 SHA：`69d7485c1c014258ceae363eb6a34fdc5ebc71b0`
 - 环境：Windows 11、Java 21.0.9、Maven 3.9.9、Docker Desktop 29.3.1（Linux Engine）
 
 ## 当前已验证
@@ -18,8 +20,9 @@
 | SQL 归属边界 | PASS | forbidden-sql=0，仅七张 `t_auth_*` 表 |
 | Compose 静态展开 | PASS | `docker compose ... config --quiet` exit 0 |
 | 单体 AUTH 兼容回归 | PASS | 33 tests，0 failures，0 errors，0 skipped；`raw/backend-auth-regression.txt` |
-| 单体全量回归 | 基线内 | 410 tests，1 failure，0 errors，7 skipped；唯一失败仍为已知 GRD/LRN 时序用例；`raw/backend-full-regression.txt` |
+| 单体全量回归（测试 SHA） | 基线内 | 410 tests，1 failure，0 errors，7 skipped；唯一失败为当时已知 GRD/LRN 时序用例；`raw/backend-full-regression.txt` |
 | 已知失败隔离重跑 | PASS | 1 test，0 failures；`raw/backend-known-flake-rerun.txt` |
+| 同步最新 `dev` 后全量回归 | PASS | 410 tests，0 failures，0 errors，7 skipped |
 | 镜像构建与 OCI 标签 | PASS | image `sha256:7076e3019370eaaf0012170d421071e7524004de927d7f2ebc18f02ac679a145`；revision/version 均等于测试 SHA；user=`10001:10001` |
 | Compose 服务 | PASS | `auth-db` 与 `auth-service` 均 healthy；`raw/auth-compose-smoke.txt`、`raw/auth-runtime.txt` |
 | HTTP 探针 | PASS | health/readiness=`UP`，version revision 等于测试 SHA；`raw/auth-probes-and-image.txt` |
@@ -53,6 +56,6 @@
 
 ## 结论
 
-独立服务、AUTH 兼容、边界、打包、镜像、探针、数据库初始化、重复迁移和最小权限均通过。单体全量回归相对基线新增 2 条 #311 仓库契约测试；失败数没有增加，唯一失败仍为 `GrdLrnIntegrationTest.grdGradeEventsCreateLrnNotificationsForPublishChangeAndReviewFlow`，且该用例隔离重跑通过，不属于 #311 改动范围。
+独立服务、AUTH 兼容、边界、打包、镜像、探针、数据库初始化、重复迁移和最小权限均通过。测试 SHA 上的单体全量回归相对初始基线新增 2 条 #311 仓库契约测试，已知 GRD/LRN 时序用例隔离重跑通过。交付前合入最新 `origin/dev@1f7c890` 后再次执行独立服务测试、边界检查和后端全量回归，最终 410 条后端测试全部通过（7 条按设计跳过）。
 
 Docker 验证结束后已删除本次创建的 `onlinejudge-auth` 测试容器、网络和临时数据卷；没有删除用户已有的 `opengaussdb` 容器或其他 Docker 资源。
