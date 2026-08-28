@@ -134,6 +134,7 @@ run conclusion: failure
 | `33055289509` | `b275a41` | backend（`LearningRecordControllerTest` 限流用例） | 异步写线程池先于循环落库，第 10 次请求被误判 429；测试内可控 executor 挂起写入使语义确定 |
 | `33057373593` | `587e537` | backend（基础设施） | Maven Central 429 + Actions 缓存服务 400，冷缓存依赖解析失败；门禁脚本增加仅针对依赖传输失败的 3 次有界重试 |
 | `33138722525` | `a1f5577` | backend（`GrdLrnIntegrationTest`） | 变更/复核通知由异步 executor 投递，断言时首条仍为发布通知；测试内增加 5s 有界轮询后再断言 |
+| `33151021489` | `cc4dbbe` | frontend（`HomeworkStudentView` 草稿保留用例） | 先前用例挂起的 500ms 防抖保存在新用例恢复草稿后触发，空内容分支误删刚恢复的草稿；草稿保存改为 token 校验，恢复草稿前取消挂起调度，旧调度不再执行 |
 
 ## 5. REFACTOR：本地/CI 共用脚本
 
