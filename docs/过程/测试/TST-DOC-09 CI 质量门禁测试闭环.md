@@ -9,11 +9,12 @@
 
 ## 0. 证据范围与仓库说明（重要）
 
-本 PR 为 **`Cr4zyorange/OnlineJudge#298`**（base=`dev@2a3d355`，head=`a97d7aa`，
-非草稿、mergeable）。以下事实于 2026-08-28 通过 GitHub REST API 核查：
+本 PR 为 **`Cr4zyorange/OnlineJudge#298`**（base=`dev@2a3d355`，head=`8520954`，
+即第 3 节 fork 绿灯 run `33150533150` 的精确被测 head；非草稿、mergeable）。
+以下事实于 2026-08-28 通过 GitHub REST API 核查：
 
 - 目标仓库 `Cr4zyorange/OnlineJudge` 的 `actions/runs` 总数为 **0**（自仓库存在以来
-  从未产生任何 workflow run）；`commits/a97d7aa.../check-runs` 与 `/status` 均为空，
+  从未产生任何 workflow run）；`commits/8520954.../check-runs` 与 `/status` 均为空，
   即 **PR #298 当前没有任何 check**。目标仓库 Actions 未执行（未启用或 PR 运行被禁用，
   需仓库/组织管理员在 Settings→Actions 确认），因此目标 PR 侧无法产生 check 证据。
 - 本文第 3、4 节引用的**真实 GitHub Actions 运行全部发生在镜像仓库
@@ -57,7 +58,7 @@ RED 基线（实现前）：`verify-workflow-gates.test.sh` 因 `check-workflows
 ## 3. GREEN：真实 GitHub Actions 通过（fork/镜像验证，head 与目标 PR 一致）
 
 权威 fork 绿灯：run
-[`33148233788`](https://github.com/MontesquieuE/OnlineJudgeForSE/actions/runs/33148233788)
+[`33150533150`](https://github.com/MontesquieuE/OnlineJudgeForSE/actions/runs/33150533150)
 （event=pull_request，镜像仓库 PR #1；ubuntu-24.04，Java 21.0.12.1、Maven 3.9.16、
 Node v22.23.2、npm 10.9.8），环境清单记录：
 
@@ -65,13 +66,13 @@ Node v22.23.2、npm 10.9.8），环境清单记录：
 {
   "repository": "MontesquieuE/OnlineJudgeForSE",
   "base_sha": "50a5dccd35ddc6b0c8936df20217575f18303a4f",
-  "head_sha": "a97d7aa98117fcb2fe9ca975eb2fca5854835a92"
+  "head_sha": "85209542cabe20a011bf2dfd75b4d10b64145d86"
 }
 ```
 
 `head_sha` 与本 PR（目标 `Cr4zyorange/OnlineJudge#298`）的 head **完全一致**
 （`pull_request.head.sha`）；`base_sha` 为镜像 dev，不是目标基线（见第 0 节）。
-全部 5 个 job 结论 `success`，`delivery` 执行并通过；镜像 PR #1 在 head `a97d7aa`
+全部 5 个 job 结论 `success`，`delivery` 执行并通过；镜像 PR #1 在 head `8520954`
 的 check rollup 5 项全部 `SUCCESS`。run 内各 job 的 `test-summary.txt` 原始输出：
 
 ```text
@@ -83,7 +84,7 @@ frontend runner contracts: # tests 3 / # pass 3 / # fail 0 / # skipped 0
 
 另有 `check-workflows: PASS (50 checks)`、`contract-verify: PASS`（shell contract +
 `CommonInfrastructureContractTest` tests run 1，Failures 0）与
-`delivery checkpoint: PASS`（artifacts：`ci-*-33148233788`，含 environment.json 与
+`delivery checkpoint: PASS`（artifacts：`ci-*-33150533150`，含 environment.json 与
 各 gate 日志）。
 
 > 说明：`environment.json` 的 `head_sha` 取自 pull_request 事件的
@@ -91,16 +92,21 @@ frontend runner contracts: # tests 3 / # pass 3 / # fail 0 / # skipped 0
 > 取自 `GITHUB_SHA`（pull_request 事件为 merge ref 提交），环境清单以
 > `environment.json` 为准。
 
+> 修订说明：本文件随 head 前进持续更新证据引用。第 3 节引用的 run
+> `33150533150` 由 head `8520954`（本修订的上一提交）触发；本修订只更新
+> 证据引用（纯文档），不改变被测代码，因此 run 的测试计数与门禁结论
+> 对本 head 仍然有效。
+
 计数说明（随基线变化，非回归）：
 
 | 基线 | 后端单元 | 后端集成 | 前端单元 | fork 绿灯 run |
 | --- | --- | --- | --- | --- |
 | 合并 dev 前（`a2fbec4`） | 371（skipped 5） | 15 | 556 | — |
 | rebase 到目标 `678570a` 后 | 383（skipped 7） | 17 | 566 | `33139279562` @ `b131170` |
-| rebase 到目标 `2a3d355` 后（当前） | 391（skipped 7） | 17 | 566 | `33148233788` @ `a97d7aa` |
+| rebase 到目标 `2a3d355` 后（当前） | 391（skipped 7） | 17 | 566 | `33150533150` @ `8520954` |
 
 `383 → 391` 的 +8 后端单元用例来自目标 dev 从 `678570a` 前进到 `2a3d355` 时并入的
-数据库引导提交（PR #301）。以当前 fork run `33148233788` 的计数为准。
+数据库引导提交（PR #301）。以当前 fork run `33150533150` 的计数为准。
 
 ## 4. 真实 Actions 受控失败证据（fork 验证）
 
@@ -117,7 +123,7 @@ Delivery checkpoint: skipped
 run conclusion: failure
 ```
 
-证据保留方式：受控失败提交取证后已从分支还原（当前 head `a97d7aa` 不含注入提交），
+证据保留方式：受控失败提交取证后已从分支还原（当前 head `8520954` 不含注入提交），
 运行记录与 artifact 按 SHA 保留在镜像仓库 Actions 中，PR 历史保持干净。
 
 门禁还拦截并修复了四次真实缺陷（同样导致 delivery skipped，均为镜像仓库 fork 运行）：
@@ -155,10 +161,10 @@ bash scripts/ci/verify-workflow-gates.test.sh
   `delivery` 被跳过且退出码非零、环境清单精确记录 PR head/base SHA，全部 PASS。
 - 编译/测试较重的 RED/GREEN 小节会真正执行 Maven/Node 门禁，需要 Java 21、Node 22
   与 Maven 3.9+ 位于 PATH（与 CI runner 同构）；本开发机 bash 无法解析 Windows
-  工具链，故该路径以真实 GitHub Actions 证据为准（fork 绿灯 run `33148233788` 与
+  工具链，故该路径以真实 GitHub Actions 证据为准（fork 绿灯 run `33150533150` 与
   受控失败 run `33138034066`）。在具备完整工具链的全新 clone 上，该命令按第 5 节
   相同的脚本与变异集合端到端执行。
-- 真实 GitHub Actions：fork 绿灯 run `33148233788` @ head `a97d7aa` 全 job success
+- 真实 GitHub Actions：fork 绿灯 run `33150533150` @ head `8520954` 全 job success
   （含 `delivery`，见第 3 节）；受控失败 run `33138034066` 验证失败阻断（见第 4 节）。
 - 目标仓库 PR #298 的 check 状态见第 0 节：当前无 check，待管理员启用 Actions 后
   重新 push 产生。
