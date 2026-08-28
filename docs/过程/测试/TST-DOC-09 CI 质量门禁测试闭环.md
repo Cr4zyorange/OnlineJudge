@@ -9,15 +9,16 @@
 
 ## 0. 证据范围与仓库说明（重要）
 
-本 PR 为 **`Cr4zyorange/OnlineJudge#298`**（base=`dev@2a3d355`；当前 head 以 PR
-页面为准；非草稿、mergeable）。第 3 节记录的是清理 CI 范围前的历史 fork 绿灯，不把
-它声明为当前 PR head 的目标仓库 check。
+本 PR 为 **`Cr4zyorange/OnlineJudge#298`**（base=`dev@2a3d355`；非草稿、mergeable）。
+第 3 节记录的是撤回无关 HWK 生产改动后的目标仓库真实绿灯；第 4 节保留此前 fork 的
+真实受控失败验证。
 以下事实于 2026-08-28 通过 GitHub REST API 核查：
 
-- 最后一次取证时，目标仓库 `Cr4zyorange/OnlineJudge` 的 `actions/runs` 总数为 **0**，
-  PR #298 没有任何 check。现已启用私有 fork PR 的只读、无 secrets workflow 权限；清理
-  范围后的当前 head push 必须在目标仓库产生新的 PR check 与 artifact，才是本 Issue 的
-  最终验收证据。
+- 目标仓库 `Cr4zyorange/OnlineJudge` 已启用私有 fork PR 的只读、无 secrets workflow
+  权限。清理范围后的 head `8d8a4ff` 已在目标仓库触发真实 PR run
+  [`33154839931`](https://github.com/Cr4zyorange/OnlineJudge/actions/runs/33154839931)，
+  5 个 job 均为 `success`；其 environment artifact 记录目标 repository、目标 base
+  和精确 head SHA（详见第 3 节）。
 - 本文第 3、4 节引用的**真实 GitHub Actions 运行全部发生在镜像仓库
   `MontesquieuE/OnlineJudgeForSE`（PR #1）**，运行环境清单记录
   `repository=MontesquieuE/OnlineJudgeForSE`、`base_sha=50a5dccd`（镜像 dev）。
@@ -27,8 +28,9 @@
   `base_sha=50a5dccd` 不是目标基线；目标基线以第 0 节首行为准。
   本分支已 rebase 到目标 `dev@2a3d355`（`git merge-base HEAD target/dev` =
   `2a3d355`），与最新 dev 无冲突。
-- 当前最终验证 push 后，按第 3 节同样方式核对目标运行的环境清单
-  （repository/base_sha/head_sha）与 PR check 状态。
+- 本次证据文档提交不改变 workflow、脚本或测试代码；其后续目标仓库 check 作为最终
+  head 的再验证，仍按第 3 节核对 environment artifact 的
+  `repository/base_sha/head_sha`。
 
 ## 1. 验证目标
 
@@ -56,26 +58,23 @@ RED 基线（实现前）：`verify-workflow-gates.test.sh` 因 `check-workflows
 
 真实 GitHub Actions 上的受控失败见第 4 节（fork 验证）。
 
-## 3. GREEN：真实 GitHub Actions 通过（fork/镜像历史验证）
+## 3. GREEN：目标仓库真实 GitHub Actions 通过
 
-权威 fork 绿灯：run
-[`33152784008`](https://github.com/MontesquieuE/OnlineJudgeForSE/actions/runs/33152784008)
-（event=pull_request，镜像仓库 PR #1；ubuntu-24.04，Java 21.0.12.1、Maven 3.9.16、
-Node v22.23.2、npm 10.9.8），环境清单记录：
+权威目标仓库绿灯：run
+[`33154839931`](https://github.com/Cr4zyorange/OnlineJudge/actions/runs/33154839931)
+（event=pull_request，目标仓库 PR #298），环境清单记录：
 
 ```json
 {
-  "repository": "MontesquieuE/OnlineJudgeForSE",
-  "base_sha": "50a5dccd35ddc6b0c8936df20217575f18303a4f",
-  "head_sha": "2d756797ad10b55bedee19569952044fb2ae90a4"
+  "repository": "Cr4zyorange/OnlineJudge",
+  "base_sha": "2a3d355804cc585cb9c2e52ad60e9e02a8a38b21",
+  "head_sha": "8d8a4ff483cd70956df821f72ba812186fa8d0d4"
 }
 ```
 
-`head_sha` 与当时 PR（目标 `Cr4zyorange/OnlineJudge#298`）的 head 一致；`base_sha`
-为镜像 dev，不是目标基线（见第 0 节）。范围清理后的当前 PR head 必须以目标仓库
-Actions 重新验证，不能用该历史 fork run 代替。
-全部 5 个 job 结论 `success`，`delivery` 执行并通过；镜像 PR #1 在 head `2d75679`
-的 check rollup 5 项全部 `SUCCESS`。run 内各 job 的 `test-summary.txt` 原始输出：
+`head_sha` 是撤回无关 HWK 生产改动后的精确 PR head，`base_sha` 是目标 `dev` 基线。
+全部 5 个 job 结论 `success`，`delivery` 执行并通过。run 内各 job 的
+`test-summary.txt` 原始输出：
 
 ```text
 backend unit: files=57 tests=391 failures=0 errors=0 skipped=7
@@ -86,7 +85,7 @@ frontend runner contracts: # tests 3 / # pass 3 / # fail 0 / # skipped 0
 
 另有 `check-workflows: PASS (50 checks)`、`contract-verify: PASS`（shell contract +
 `CommonInfrastructureContractTest` tests run 1，Failures 0）与
-`delivery checkpoint: PASS`（artifacts：`ci-*-33152784008`，含 environment.json 与
+`delivery checkpoint: PASS`（artifacts：`ci-*-33154839931`，含 environment.json 与
 各 gate 日志）。
 
 > 说明：`environment.json` 的 `head_sha` 取自 pull_request 事件的
@@ -94,20 +93,20 @@ frontend runner contracts: # tests 3 / # pass 3 / # fail 0 / # skipped 0
 > 取自 `GITHUB_SHA`（pull_request 事件为 merge ref 提交），环境清单以
 > `environment.json` 为准。
 
-> 修订说明：第 3 节 run `33152784008` 由历史 head `2d75679` 触发。随后为保持
-> #290 的 CI-only 范围，已撤回其中无关的 HWK 生产代码修复；该 run 保留为脚本历史
-> 验证，最终合入以前必须在目标仓库对当前 head 重新运行。
+> 修订说明：run `33154839931` 验证了所有 CI-only 代码改动。本文档随后只补充该 run
+> 的链接与原始结果，不修改 workflow、脚本或测试代码；该文档提交触发的目标仓库 run
+> 用于最终 head 的再验证。
 
 计数说明（随基线变化，非回归）：
 
-| 基线 | 后端单元 | 后端集成 | 前端单元 | fork 绿灯 run |
+| 基线 | 后端单元 | 后端集成 | 前端单元 | 绿灯 run |
 | --- | --- | --- | --- | --- |
 | 合并 dev 前（`a2fbec4`） | 371（skipped 5） | 15 | 556 | — |
 | rebase 到目标 `678570a` 后 | 383（skipped 7） | 17 | 566 | `33139279562` @ `b131170` |
-| rebase 到目标 `2a3d355` 后（历史 fork 验证） | 391（skipped 7） | 17 | 566 | `33152784008` @ `2d75679` |
+| rebase 到目标 `2a3d355` 后（目标仓库验证） | 391（skipped 7） | 17 | 566 | `33154839931` @ `8d8a4ff` |
 
 `383 → 391` 的 +8 后端单元用例来自目标 dev 从 `678570a` 前进到 `2a3d355` 时并入的
-数据库引导提交（PR #301）。当前最终 head 的计数以目标仓库重新运行产生的 artifact 为准。
+数据库引导提交（PR #301）。最终 head 的计数以目标仓库重新运行产生的 artifact 为准。
 
 ## 4. 真实 Actions 受控失败证据（fork 验证）
 
@@ -162,13 +161,13 @@ bash scripts/ci/verify-workflow-gates.test.sh
   `delivery` 被跳过且退出码非零、环境清单精确记录 PR head/base SHA，全部 PASS。
 - 编译/测试较重的 RED/GREEN 小节会真正执行 Maven/Node 门禁，需要 Java 21、Node 22
   与 Maven 3.9+ 位于 PATH（与 CI runner 同构）；本开发机 bash 无法解析 Windows
-  工具链，故该路径以真实 GitHub Actions 证据为准（fork 绿灯 run `33152784008` 与
-  受控失败 run `33138034066`）。在具备完整工具链的全新 clone 上，该命令按第 5 节
-  相同的脚本与变异集合端到端执行。
-- 真实 GitHub Actions：fork 历史绿灯 run `33152784008` @ head `2d75679` 全 job success
-  （含 `delivery`，见第 3 节）；受控失败 run `33138034066` 验证失败阻断（见第 4 节）。
-- 目标仓库 PR #298：当前 CI-only head push 后，必须在目标仓库产生 check 与 artifact；
-  fork 历史 run 不作为该最终验收的替代品。
+  工具链，故 GREEN 以目标仓库真实 run `33154839931`、RED 以受控失败 fork run
+  `33138034066` 为准。在具备完整工具链的全新 clone 上，该命令按第 5 节相同的脚本与
+  变异集合端到端执行。
+- 真实 GitHub Actions：目标仓库 run `33154839931` @ `8d8a4ff` 全 job success（含
+  `delivery`，见第 3 节）；受控失败 run `33138034066` 验证失败阻断（见第 4 节）。
+- 目标仓库 PR #298 的 check 与 artifact 已产生；本文档提交后触发的 run 用于最终 head
+  的再验证。
 
 验证范围说明：脚本在 Git Bash/WSL bash 下均可执行（不依赖脚本可执行位）；本机 Java
 25/Node 24 与 CI 固定版本（21/22）不一致时，脚本自动按本机工具链覆盖预期版本，CI 的
@@ -176,10 +175,9 @@ bash scripts/ci/verify-workflow-gates.test.sh
 
 ## 7. 残余风险
 
-- **目标仓库 Actions 未执行**：`Cr4zyorange/OnlineJudge` 的 workflow run 总数为 0，
-  PR #298 无任何 check。fork 验证覆盖了相同 head 内容的门禁行为，但目标 PR 侧的真实
-  check 需要仓库/组织管理员启用 Actions 后由真实 push 产生；在启用前无法提供目标 PR
-  check 截图级证据。
+- **第三方 Action runtime 弃用提示**：run `33154839931` 中 GitHub 提示
+  `actions/checkout@v4` 和 `actions/upload-artifact@v4` 的 Node 20 runtime 将被强制
+  迁移到 Node 24；本次 run 未受影响。后续应在独立维护变更中升级并重新固定相应 SHA。
 - MySQL 真库并发测试（`CrsMysqlConcurrencyTest`）与 Docker 沙箱测试
   （`DockerSandboxExecutorTest`）由环境变量显式启用，不纳入默认门禁；需要时由后续
   部署子任务在独立 job 中补充。
