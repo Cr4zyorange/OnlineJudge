@@ -33,17 +33,22 @@ RED 基线（实现前）：`verify-workflow-gates.test.sh` 因 `check-workflows
 
 ## 3. GREEN：全套质量门禁通过
 
-权威证据（真实 GitHub Actions）：run `33058441807`（event=pull_request，ubuntu-24.04，
-Java 21.0.12、Node 22.23.2、npm 10.9.2、Maven 3.9.x），PR head `c5fac2aeb344191900b0bc64e65cab35590927fb`，
-全部 5 个 job 结论 `success`，`delivery` 执行通过；PR check rollup 全部 `SUCCESS`。
-run 内各 job 的 `test-summary.txt` 原始输出：
+权威证据（真实 GitHub Actions）：run
+[`33137715535`](https://github.com/MontesquieuE/OnlineJudgeForSE/actions/runs/33137715535)
+（event=pull_request，ubuntu-24.04，Java 21.0.12、Node 22.23.2、npm 10.9.2、Maven 3.9.x），
+PR head `c83092b5fb05f1332e2014724206e2e4acc7717c`（rebase 至含 #299/#302 的
+`678570a` 基线后），全部 5 个 job 结论 `success`，`delivery` 执行通过；PR check
+rollup 全部 `SUCCESS`。run 内各 job 的 `test-summary.txt` 原始输出：
 
 ```text
-backend unit: files=54 tests=373 failures=0 errors=0 skipped=7
+backend unit: files=56 tests=383 failures=0 errors=0 skipped=7
 backend integration: files=7 tests=17 failures=0 errors=0 skipped=0
 frontend unit: files=1 tests=566 failures=0 errors=0 skipped=0
 frontend runner contracts: # tests 3 / # pass 3 / # fail 0 / # skipped 0
 ```
+
+`environment.json`（同一 artifact）记录 `head_sha: c83092b5fb05f1332e2014724206e2e4acc7717c`
+（pull_request 事件取 `pull_request.head.sha`，而非 merge 提交 SHA）。
 
 补充（隔离 checkout 重跑，2026-08-27 @ `68b4ee70ed6d2fae3f29a288d80a8bb3afa4ed47`）：
 
@@ -58,13 +63,15 @@ gate-chain: PASS
 ```
 
 > 计数说明：合并 dev 前（`a2fbec4`）记录为单元 371 tests/skipped 5、前端 556 tests、
-> shell contract 19 scripts；合并后新增测试使计数变化（单元 373/7、集成 17、前端 566）。
-> 计数差异来自基线变化而非行为回归；以真实 Actions run `33056398897` 的计数为准。
+> shell contract 19 scripts；合并 dev 并 rebase 到 `678570a` 后新增测试使计数变化
+> （单元 383/7、集成 17、前端 566）。计数差异来自基线变化而非行为回归；以真实
+> Actions run `33137715535` 的计数为准。
 
 ## 4. 真实 Actions 受控失败证据
 
 在 PR head 上临时注入编译错误（`backend/src/main/java/com/onlinejudge/ci/CiControlledFailure.java`
-语法错误，commit `53a5127`）并推送，真实运行 run `33056734060` 结论：
+语法错误，commit `91eb146`）并推送，真实运行
+[`33138034066`](https://github.com/MontesquieuE/OnlineJudgeForSE/actions/runs/33138034066) 结论：
 
 ```text
 Validate workflow contracts: success
@@ -75,7 +82,7 @@ Delivery checkpoint: skipped
 run conclusion: failure
 ```
 
-证据保留方式：受控失败提交取证后已从分支还原（head 回到 `9cbde1c`），运行记录与 artifact
+证据保留方式：受控失败提交取证后已从分支还原（head 回到 `c83092b`），运行记录与 artifact
 按 SHA 保留在 Actions 中，PR 历史保持干净。
 
 门禁还拦截并修复了两次真实缺陷（同样导致 delivery skipped）：
@@ -95,7 +102,8 @@ run conclusion: failure
 - dry-run 全 PASS 链路到达 `delivery`；注入失败时 `delivery` 被跳过且退出码非零。
 - 可移植性：`scripts/ci/*.sh` 已标记 100755，验收脚本统一用 `bash` 显式调用，
   变异编辑改用 BSD/GNU 兼容的 `sed -i.bak`，版本比较不依赖 GNU `sort -V`；
-  文档命令在全新 clone（`2ac6ec0`）中完整 PASS，不再出现 Permission denied。
+  macOS Bash 3.2 兼容（移除 `declare -A`，改用 case 函数与间接展开），
+  文档命令在全新 clone 中完整 PASS，不再出现 Permission denied。
 
 ## 6. 可重复执行方式
 
@@ -105,19 +113,17 @@ bash scripts/ci/verify-workflow-gates.test.sh
 
 最后全量执行：
 
-- 2026-08-27 全新 clone @ `2ac6ec0`，`bash scripts/ci/verify-workflow-gates.test.sh`
+- 全新 clone 中 `bash scripts/ci/verify-workflow-gates.test.sh`
   完整 PASS（静态校验、9 个变异全被拒绝、受控编译失败阻断 `delivery`、GREEN 到达并
   通过 `delivery`、环境清单精确记录 PR head/base SHA）。
-- 2026-08-27 最终 head `c5fac2a` 本地验收完整 PASS；真实 Actions run
-  `33058441807` @ `c5fac2a` 全 job success（含 `delivery`），PR check 全绿。
-- 2026-08-27 真实受控失败 run `33056734060` @ `53a5127`：backend/contracts FAIL、
-  `delivery` skipped（见第 4 节）。
+- 真实 Actions run `33137715535` @ head `c83092b` 全 job success（含 `delivery`），
+  PR check 全绿；受控失败 run `33138034066` 验证失败阻断（见第 4 节）。
 
 验证范围说明：脚本在 Git Bash/WSL bash 下均可执行（不依赖脚本可执行位）；本机 Java
 25/Node 24 与 CI 固定版本（21/22）不一致时，脚本自动按本机工具链覆盖预期版本，CI 的
 版本固定由 workflow `env:` 与门禁脚本默认值严格保证。
 
-## 6. 残余风险
+## 7. 残余风险
 
 - 未在本机执行真实 GitHub Actions 调度；`needs` 语义通过 `verify-gate-chain.sh` 按同一份 `ci.yml` 解析模拟验证，GitHub 侧首次运行时需人工确认 job 依赖与 skipped 表现。
 - MySQL 真库并发测试（`CrsMysqlConcurrencyTest`）与 Docker 沙箱测试（`DockerSandboxExecutorTest`）由环境变量显式启用，不纳入默认门禁；需要时由后续部署子任务在独立 job 中补充。
