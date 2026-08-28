@@ -27,6 +27,11 @@ spec:
         app: backend
         app.kubernetes.io/part-of: onlinejudge
     spec:
+      # The official #289 backend image runs as uid/gid 10001; fsGroup makes
+      # the writable emptyDir group-owned so the non-root process can write
+      # its upload/data directory.
+      securityContext:
+        fsGroup: 10001
       containers:
         - name: backend
           image: onlinejudge/backend:__GIT_SHA__
