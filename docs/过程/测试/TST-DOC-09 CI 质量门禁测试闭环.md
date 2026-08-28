@@ -7,6 +7,27 @@
 | 涉及模块 | 基础设施（AUTH/CRS/LAB/HWK/GRD/LRN 公共构建与测试链路） |
 | 文档依据 | `docs/开发/CI-质量门禁开发流程.md`、`AGENTS.md` |
 
+## 0. 证据范围与仓库说明（重要）
+
+本 PR 为 **`Cr4zyorange/OnlineJudge#298`**（base=`dev@2a3d355`，head=`a97d7aa`，
+非草稿、mergeable）。以下事实于 2026-08-28 通过 GitHub REST API 核查：
+
+- 目标仓库 `Cr4zyorange/OnlineJudge` 的 `actions/runs` 总数为 **0**（自仓库存在以来
+  从未产生任何 workflow run）；`commits/a97d7aa.../check-runs` 与 `/status` 均为空，
+  即 **PR #298 当前没有任何 check**。目标仓库 Actions 未执行（未启用或 PR 运行被禁用，
+  需仓库/组织管理员在 Settings→Actions 确认），因此目标 PR 侧无法产生 check 证据。
+- 本文第 3、4 节引用的**真实 GitHub Actions 运行全部发生在镜像仓库
+  `MontesquieuE/OnlineJudgeForSE`（PR #1）**，运行环境清单记录
+  `repository=MontesquieuE/OnlineJudgeForSE`、`base_sha=50a5dccd`（镜像 dev）。
+  这些运行明确属于 **fork/镜像验证**：验证的是与目标 PR 相同的分支内容在
+  GitHub-hosted runner 上的门禁行为，**不冒充目标仓库 PR 的 check/merge 证据**。
+- 镜像 dev（`50a5dccd`）落后于目标 dev（`2a3d355`），因此镜像运行记录的
+  `base_sha=50a5dccd` 不是目标基线；目标基线以第 0 节首行为准。
+  本分支已 rebase 到目标 `dev@2a3d355`（`git merge-base HEAD target/dev` =
+  `2a3d355`），与最新 dev 无冲突。
+- 一旦目标仓库管理员启用 Actions，重新 push 本分支即可在 PR #298 上产生真实 check；
+  届时按第 3 节同样方式核对 run 的环境清单（repository/base_sha/head_sha）即可。
+
 ## 1. 验证目标
 
 1. PR 与 `dev` push 自动触发质量门禁；并发策略避免旧提交覆盖新提交状态。
@@ -31,46 +52,60 @@ gate-chain: FAIL
 
 RED 基线（实现前）：`verify-workflow-gates.test.sh` 因 `check-workflows.sh`、`verify-gate-chain.sh` 与 `.github/workflows/ci.yml` 缺失而失败，证明测试先行。
 
-## 3. GREEN：全套质量门禁通过
+真实 GitHub Actions 上的受控失败见第 4 节（fork 验证）。
 
-权威证据（真实 GitHub Actions）：run
-[`33139279562`](https://github.com/MontesquieuE/OnlineJudgeForSE/actions/runs/33139279562)
-（event=pull_request，ubuntu-24.04，Java 21.0.12、Node 22.23.2、npm 10.9.2、Maven 3.9.x），
-PR head `b1311709ae74a8d7d913d4cc12bcaeafe6bebd5b`（rebase 至含 #299/#302 的
-`678570a` 基线后），全部 5 个 job 结论 `success`，`delivery` 执行通过；PR check
-rollup 全部 `SUCCESS`。run 内各 job 的 `test-summary.txt` 原始输出：
+## 3. GREEN：真实 GitHub Actions 通过（fork/镜像验证，head 与目标 PR 一致）
+
+权威 fork 绿灯：run
+[`33148233788`](https://github.com/MontesquieuE/OnlineJudgeForSE/actions/runs/33148233788)
+（event=pull_request，镜像仓库 PR #1；ubuntu-24.04，Java 21.0.12.1、Maven 3.9.16、
+Node v22.23.2、npm 10.9.8），环境清单记录：
+
+```json
+{
+  "repository": "MontesquieuE/OnlineJudgeForSE",
+  "base_sha": "50a5dccd35ddc6b0c8936df20217575f18303a4f",
+  "head_sha": "a97d7aa98117fcb2fe9ca975eb2fca5854835a92"
+}
+```
+
+`head_sha` 与本 PR（目标 `Cr4zyorange/OnlineJudge#298`）的 head **完全一致**
+（`pull_request.head.sha`）；`base_sha` 为镜像 dev，不是目标基线（见第 0 节）。
+全部 5 个 job 结论 `success`，`delivery` 执行并通过；镜像 PR #1 在 head `a97d7aa`
+的 check rollup 5 项全部 `SUCCESS`。run 内各 job 的 `test-summary.txt` 原始输出：
 
 ```text
-backend unit: files=56 tests=383 failures=0 errors=0 skipped=7
+backend unit: files=57 tests=391 failures=0 errors=0 skipped=7
 backend integration: files=7 tests=17 failures=0 errors=0 skipped=0
 frontend unit: files=1 tests=566 failures=0 errors=0 skipped=0
 frontend runner contracts: # tests 3 / # pass 3 / # fail 0 / # skipped 0
 ```
 
-`environment.json`（同一 artifact）记录 `head_sha: b1311709ae74a8d7d913d4cc12bcaeafe6bebd5b`
-（pull_request 事件取 `pull_request.head.sha`，而非 merge 提交 SHA）。
+另有 `check-workflows: PASS (50 checks)`、`contract-verify: PASS`（shell contract +
+`CommonInfrastructureContractTest` tests run 1，Failures 0）与
+`delivery checkpoint: PASS`（artifacts：`ci-*-33148233788`，含 environment.json 与
+各 gate 日志）。
 
-补充（隔离 checkout 重跑，2026-08-27 @ `68b4ee70ed6d2fae3f29a288d80a8bb3afa4ed47`）：
+> 说明：`environment.json` 的 `head_sha` 取自 pull_request 事件的
+> `pull_request.head.sha`（精确 PR head）；`delivery/checkpoint.txt` 的 `head_sha`
+> 取自 `GITHUB_SHA`（pull_request 事件为 merge ref 提交），环境清单以
+> `environment.json` 为准。
 
-```text
-PASS validate-workflows（check-workflows: PASS 50 checks）
-PASS backend-gate（compile + 单元 373 tests（skipped 7）+ 集成 15 tests）
-PASS frontend-gate（typecheck + 单元 563 tests + build + runner contracts 3 tests）
-PASS contracts-gate（shell contract 21 tracked scripts + CommonInfrastructureContractTest 1 test）
-RUN delivery（bash scripts/ci/delivery-checkpoint.sh）
-PASS delivery
-gate-chain: PASS
-```
+计数说明（随基线变化，非回归）：
 
-> 计数说明：合并 dev 前（`a2fbec4`）记录为单元 371 tests/skipped 5、前端 556 tests、
-> shell contract 19 scripts；合并 dev 并 rebase 到 `678570a` 后新增测试使计数变化
-> （单元 383/7、集成 17、前端 566）。计数差异来自基线变化而非行为回归；以真实
-> Actions run `33139279562` 的计数为准。
+| 基线 | 后端单元 | 后端集成 | 前端单元 | fork 绿灯 run |
+| --- | --- | --- | --- | --- |
+| 合并 dev 前（`a2fbec4`） | 371（skipped 5） | 15 | 556 | — |
+| rebase 到目标 `678570a` 后 | 383（skipped 7） | 17 | 566 | `33139279562` @ `b131170` |
+| rebase 到目标 `2a3d355` 后（当前） | 391（skipped 7） | 17 | 566 | `33148233788` @ `a97d7aa` |
 
-## 4. 真实 Actions 受控失败证据
+`383 → 391` 的 +8 后端单元用例来自目标 dev 从 `678570a` 前进到 `2a3d355` 时并入的
+数据库引导提交（PR #301）。以当前 fork run `33148233788` 的计数为准。
 
-在 PR head 上临时注入编译错误（`backend/src/main/java/com/onlinejudge/ci/CiControlledFailure.java`
-语法错误，commit `91eb146`）并推送，真实运行
+## 4. 真实 Actions 受控失败证据（fork 验证）
+
+在分支上临时注入编译错误（`backend/src/main/java/com/onlinejudge/ci/CiControlledFailure.java`
+语法错误，commit `91eb146`）并推送，镜像仓库真实运行
 [`33138034066`](https://github.com/MontesquieuE/OnlineJudgeForSE/actions/runs/33138034066) 结论：
 
 ```text
@@ -82,10 +117,10 @@ Delivery checkpoint: skipped
 run conclusion: failure
 ```
 
-证据保留方式：受控失败提交取证后已从分支还原（head 回到 `c83092b`），运行记录与 artifact
-按 SHA 保留在 Actions 中，PR 历史保持干净。
+证据保留方式：受控失败提交取证后已从分支还原（当前 head `a97d7aa` 不含注入提交），
+运行记录与 artifact 按 SHA 保留在镜像仓库 Actions 中，PR 历史保持干净。
 
-门禁还拦截并修复了两次真实缺陷（同样导致 delivery skipped）：
+门禁还拦截并修复了四次真实缺陷（同样导致 delivery skipped，均为镜像仓库 fork 运行）：
 
 | 运行 | head SHA | 失败 job | 根因与修复 |
 | --- | --- | --- | --- |
@@ -103,8 +138,9 @@ run conclusion: failure
 - dry-run 全 PASS 链路到达 `delivery`；注入失败时 `delivery` 被跳过且退出码非零。
 - 可移植性：`scripts/ci/*.sh` 已标记 100755，验收脚本统一用 `bash` 显式调用，
   变异编辑改用 BSD/GNU 兼容的 `sed -i.bak`，版本比较不依赖 GNU `sort -V`；
-  macOS Bash 3.2 兼容（移除 `declare -A`，改用 case 函数与间接展开），
-  文档命令在全新 clone 中完整 PASS，不再出现 Permission denied。
+  macOS Bash 3.2 兼容（移除 `declare -A`，改用 case 函数与间接展开）；
+  `.github/workflows/*.yml` 通过 `.gitattributes` 固定 `eol=lf`，`core.autocrlf=true`
+  的 Windows 全新 clone 也能通过锚定正则的静态校验（修复前 24/50 FAIL）。
 
 ## 6. 可重复执行方式
 
@@ -114,11 +150,18 @@ bash scripts/ci/verify-workflow-gates.test.sh
 
 最后全量执行：
 
-- 全新 clone 中 `bash scripts/ci/verify-workflow-gates.test.sh`
-  完整 PASS（静态校验、9 个变异全被拒绝、受控编译失败阻断 `delivery`、GREEN 到达并
-  通过 `delivery`、环境清单精确记录 PR head/base SHA）。
-- 真实 Actions run `33139279562` @ head `b131170` 全 job success（含 `delivery`），
-  PR check 全绿；受控失败 run `33138034066` 验证失败阻断（见第 4 节）。
+- 本地（当前 head）`bash scripts/ci/verify-workflow-gates.test.sh`：静态校验 50/50、
+  9 个变异 workflow 全被拒绝、dry-run 全 PASS 链路到达 `delivery`、注入失败后
+  `delivery` 被跳过且退出码非零、环境清单精确记录 PR head/base SHA，全部 PASS。
+- 编译/测试较重的 RED/GREEN 小节会真正执行 Maven/Node 门禁，需要 Java 21、Node 22
+  与 Maven 3.9+ 位于 PATH（与 CI runner 同构）；本开发机 bash 无法解析 Windows
+  工具链，故该路径以真实 GitHub Actions 证据为准（fork 绿灯 run `33148233788` 与
+  受控失败 run `33138034066`）。在具备完整工具链的全新 clone 上，该命令按第 5 节
+  相同的脚本与变异集合端到端执行。
+- 真实 GitHub Actions：fork 绿灯 run `33148233788` @ head `a97d7aa` 全 job success
+  （含 `delivery`，见第 3 节）；受控失败 run `33138034066` 验证失败阻断（见第 4 节）。
+- 目标仓库 PR #298 的 check 状态见第 0 节：当前无 check，待管理员启用 Actions 后
+  重新 push 产生。
 
 验证范围说明：脚本在 Git Bash/WSL bash 下均可执行（不依赖脚本可执行位）；本机 Java
 25/Node 24 与 CI 固定版本（21/22）不一致时，脚本自动按本机工具链覆盖预期版本，CI 的
@@ -126,6 +169,12 @@ bash scripts/ci/verify-workflow-gates.test.sh
 
 ## 7. 残余风险
 
-- 未在本机执行真实 GitHub Actions 调度；`needs` 语义通过 `verify-gate-chain.sh` 按同一份 `ci.yml` 解析模拟验证，GitHub 侧首次运行时需人工确认 job 依赖与 skipped 表现。
-- MySQL 真库并发测试（`CrsMysqlConcurrencyTest`）与 Docker 沙箱测试（`DockerSandboxExecutorTest`）由环境变量显式启用，不纳入默认门禁；需要时由后续部署子任务在独立 job 中补充。
-- Playwright 全量 E2E 需要 Compose/MySQL 与浏览器安装，不在本门禁默认范围；共享运行器契约（含“断言失败必须非零退出”）已纳入 `frontend-gate`。
+- **目标仓库 Actions 未执行**：`Cr4zyorange/OnlineJudge` 的 workflow run 总数为 0，
+  PR #298 无任何 check。fork 验证覆盖了相同 head 内容的门禁行为，但目标 PR 侧的真实
+  check 需要仓库/组织管理员启用 Actions 后由真实 push 产生；在启用前无法提供目标 PR
+  check 截图级证据。
+- MySQL 真库并发测试（`CrsMysqlConcurrencyTest`）与 Docker 沙箱测试
+  （`DockerSandboxExecutorTest`）由环境变量显式启用，不纳入默认门禁；需要时由后续
+  部署子任务在独立 job 中补充。
+- Playwright 全量 E2E 需要 Compose/MySQL 与浏览器安装，不在本门禁默认范围；共享
+  运行器契约（含“断言失败必须非零退出”）已纳入 `frontend-gate`。
