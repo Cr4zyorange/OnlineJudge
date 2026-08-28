@@ -151,7 +151,10 @@ jobs:
     name: Load images, verify Kind delivery, preserve diagnostics
     runs-on: ubuntu-latest
     timeout-minutes: 55
-    needs: [build-images]
+    # This job consumes the exact-SHA outputs produced by quality-gate as well
+    # as the image artifact from build-images; declaring both keeps those
+    # outputs in scope for checkout, deployment, and evidence collection.
+    needs: [quality-gate, build-images]
     env:
       GIT_SHA: ${{ needs.quality-gate.outputs.git_sha }}
       QUALITY_GATE_RUN_ID: ${{ needs.quality-gate.outputs.source_run_id }}
