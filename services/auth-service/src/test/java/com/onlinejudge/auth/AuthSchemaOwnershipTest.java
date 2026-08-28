@@ -27,6 +27,7 @@ class AuthSchemaOwnershipTest {
         String sql = sqlFiles.stream()
                 .map(this::read)
                 .reduce("", (left, right) -> left + "\n" + right);
+        String mysqlMigration = Files.readString(OWNED_MIGRATION);
 
         assertThat(sql).contains(
                 "t_auth_user",
@@ -45,6 +46,13 @@ class AuthSchemaOwnershipTest {
                 "t_grade_",
                 "t_course_grade_summary"
         );
+        assertThat(mysqlMigration)
+                .doesNotContain("CREATE INDEX IF NOT EXISTS")
+                .contains(
+                        "KEY idx_auth_user_type",
+                        "KEY idx_auth_session_status",
+                        "KEY idx_auth_audit_created"
+                );
     }
 
     private String read(Path path) {

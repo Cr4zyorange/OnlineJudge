@@ -16,16 +16,12 @@ CREATE TABLE IF NOT EXISTS t_auth_user (
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     deleted BOOLEAN NOT NULL DEFAULT FALSE,
     PRIMARY KEY (user_id),
+    KEY idx_auth_user_type (user_type),
+    KEY idx_auth_user_status (account_status),
     CONSTRAINT uk_auth_user_username UNIQUE (username),
     CONSTRAINT uk_auth_user_phone UNIQUE (phone),
     CONSTRAINT uk_auth_user_email UNIQUE (email)
 );
-
-CREATE INDEX IF NOT EXISTS idx_auth_user_type
-    ON t_auth_user (user_type);
-
-CREATE INDEX IF NOT EXISTS idx_auth_user_status
-    ON t_auth_user (account_status);
 
 CREATE TABLE IF NOT EXISTS t_auth_role (
     role_id BIGINT NOT NULL AUTO_INCREMENT,
@@ -37,11 +33,9 @@ CREATE TABLE IF NOT EXISTS t_auth_role (
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     deleted BOOLEAN NOT NULL DEFAULT FALSE,
     PRIMARY KEY (role_id),
+    KEY idx_auth_role_enabled (enabled),
     CONSTRAINT uk_auth_role_code UNIQUE (role_code)
 );
-
-CREATE INDEX IF NOT EXISTS idx_auth_role_enabled
-    ON t_auth_role (enabled);
 
 CREATE TABLE IF NOT EXISTS t_auth_permission (
     permission_id BIGINT NOT NULL AUTO_INCREMENT,
@@ -55,14 +49,10 @@ CREATE TABLE IF NOT EXISTS t_auth_permission (
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     deleted BOOLEAN NOT NULL DEFAULT FALSE,
     PRIMARY KEY (permission_id),
+    KEY idx_auth_permission_type (permission_type),
+    KEY idx_auth_permission_module (module_code),
     CONSTRAINT uk_auth_permission_code UNIQUE (permission_code)
 );
-
-CREATE INDEX IF NOT EXISTS idx_auth_permission_type
-    ON t_auth_permission (permission_type);
-
-CREATE INDEX IF NOT EXISTS idx_auth_permission_module
-    ON t_auth_permission (module_code);
 
 CREATE TABLE IF NOT EXISTS t_auth_user_role (
     id BIGINT NOT NULL AUTO_INCREMENT,
@@ -71,16 +61,12 @@ CREATE TABLE IF NOT EXISTS t_auth_user_role (
     assigned_by BIGINT NULL,
     assigned_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
+    KEY idx_auth_user_role_user (user_id),
+    KEY idx_auth_user_role_role (role_id),
     CONSTRAINT uk_auth_user_role UNIQUE (user_id, role_id),
     CONSTRAINT fk_auth_user_role_user FOREIGN KEY (user_id) REFERENCES t_auth_user (user_id),
     CONSTRAINT fk_auth_user_role_role FOREIGN KEY (role_id) REFERENCES t_auth_role (role_id)
 );
-
-CREATE INDEX IF NOT EXISTS idx_auth_user_role_user
-    ON t_auth_user_role (user_id);
-
-CREATE INDEX IF NOT EXISTS idx_auth_user_role_role
-    ON t_auth_user_role (role_id);
 
 CREATE TABLE IF NOT EXISTS t_auth_role_permission (
     id BIGINT NOT NULL AUTO_INCREMENT,
@@ -89,16 +75,12 @@ CREATE TABLE IF NOT EXISTS t_auth_role_permission (
     assigned_by BIGINT NULL,
     assigned_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
+    KEY idx_auth_role_permission_role (role_id),
+    KEY idx_auth_role_permission_permission (permission_id),
     CONSTRAINT uk_auth_role_permission UNIQUE (role_id, permission_id),
     CONSTRAINT fk_auth_role_permission_role FOREIGN KEY (role_id) REFERENCES t_auth_role (role_id),
     CONSTRAINT fk_auth_role_permission_permission FOREIGN KEY (permission_id) REFERENCES t_auth_permission (permission_id)
 );
-
-CREATE INDEX IF NOT EXISTS idx_auth_role_permission_role
-    ON t_auth_role_permission (role_id);
-
-CREATE INDEX IF NOT EXISTS idx_auth_role_permission_permission
-    ON t_auth_role_permission (permission_id);
 
 CREATE TABLE IF NOT EXISTS t_auth_session (
     session_id BIGINT NOT NULL AUTO_INCREMENT,
@@ -111,18 +93,12 @@ CREATE TABLE IF NOT EXISTS t_auth_session (
     user_agent VARCHAR(255) NULL,
     status VARCHAR(32) NOT NULL DEFAULT 'VALID',
     PRIMARY KEY (session_id),
+    KEY idx_auth_session_user (user_id),
+    KEY idx_auth_session_expires (expires_at),
+    KEY idx_auth_session_status (status),
     CONSTRAINT uk_auth_session_token UNIQUE (token_id),
     CONSTRAINT fk_auth_session_user FOREIGN KEY (user_id) REFERENCES t_auth_user (user_id)
 );
-
-CREATE INDEX IF NOT EXISTS idx_auth_session_user
-    ON t_auth_session (user_id);
-
-CREATE INDEX IF NOT EXISTS idx_auth_session_expires
-    ON t_auth_session (expires_at);
-
-CREATE INDEX IF NOT EXISTS idx_auth_session_status
-    ON t_auth_session (status);
 
 CREATE TABLE IF NOT EXISTS t_auth_audit_log (
     log_id BIGINT NOT NULL AUTO_INCREMENT,
@@ -135,17 +111,9 @@ CREATE TABLE IF NOT EXISTS t_auth_audit_log (
     client_ip VARCHAR(64) NULL,
     user_agent VARCHAR(255) NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (log_id)
+    PRIMARY KEY (log_id),
+    KEY idx_auth_audit_operator (operator_id),
+    KEY idx_auth_audit_operation (operation_type),
+    KEY idx_auth_audit_result (result_status),
+    KEY idx_auth_audit_created (created_at)
 );
-
-CREATE INDEX IF NOT EXISTS idx_auth_audit_operator
-    ON t_auth_audit_log (operator_id);
-
-CREATE INDEX IF NOT EXISTS idx_auth_audit_operation
-    ON t_auth_audit_log (operation_type);
-
-CREATE INDEX IF NOT EXISTS idx_auth_audit_result
-    ON t_auth_audit_log (result_status);
-
-CREATE INDEX IF NOT EXISTS idx_auth_audit_created
-    ON t_auth_audit_log (created_at);
