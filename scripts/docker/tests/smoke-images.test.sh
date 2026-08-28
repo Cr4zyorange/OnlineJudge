@@ -7,6 +7,7 @@ source_script="$repo_root/scripts/docker/smoke-images.sh"
 fixture_root="$(mktemp -d "${TMPDIR:-/tmp}/onlinejudge-smoke-images-test.XXXXXX")"
 fake_bin="$fixture_root/bin"
 docker_log="$fixture_root/docker.log"
+curl_log="$fixture_root/curl.log"
 verify_log="$fixture_root/verify.log"
 fake_verify="$fixture_root/verify-compose"
 
@@ -130,6 +131,7 @@ chmod +x "$fake_bin/docker"
 cat > "$fake_bin/curl" <<'EOF'
 #!/usr/bin/env bash
 set -Eeuo pipefail
+printf '%s\n' "$*" >> "$CONTAINER_TEST_CURL_LOG"
 if [[ "${CONTAINER_TEST_FAIL_FRONTEND_READINESS:-0}" == "1" ]]; then
   printf '{"code":"503","message":"service unavailable"}\n'
 else
@@ -156,6 +158,7 @@ common_env=(
   "MYSQL_ROOT_PASSWORD=contract-root-password"
   "PATH=$fake_bin:$PATH"
   "CONTAINER_TEST_DOCKER_LOG=$docker_log"
+  "CONTAINER_TEST_CURL_LOG=$curl_log"
   "CONTAINER_TEST_VERIFY_LOG=$verify_log"
   "VERIFY_COMPOSE_SCRIPT=$fake_verify"
   "CURL_BIN=$fake_bin/curl"
@@ -209,6 +212,7 @@ run_expected_failure frontend-readiness 'frontend-proxied readiness did not repo
 run_expected_failure http-verify 'simulated HTTP verification failure' CONTAINER_TEST_FAIL_VERIFY=1
 
 : > "$docker_log"
+: > "$curl_log"
 : > "$verify_log"
 env "${common_env[@]}" bash "$source_script" >"$fixture_root/success.out" 2>"$fixture_root/success.err" || {
   cat "$fixture_root/success.err" >&2
@@ -223,5 +227,16 @@ grep -Fq 'up -d --no-build --wait --wait-timeout 240' "$docker_log" || \
 grep -Fq 'down --volumes --remove-orphans' "$docker_log" || \
   fail "smoke did not clean volumes and orphans"
 [[ "$(wc -l < "$verify_log" | tr -d ' ')" -eq 1 ]] || fail "HTTP verifier did not run exactly once"
+
+: > "$docker_log"
+: > "$curl_log"
+: > "$verify_log"
+env "${common_env[@]}" OJ_HTTP_PORT=127.0.0.1:18090 bash "$source_script" \
+  >"$fixture_root/loopback-port.out" 2>"$fixture_root/loopback-port.err" || {
+    cat "$fixture_root/loopback-port.err" >&2
+    fail "loopback-only host binding did not complete the smoke flow"
+  }
+grep -Fq 'http://127.0.0.1:18090/api/v1/system/readiness' "$curl_log" || \
+  fail "smoke did not extract the host port from a loopback-only binding"
 
 printf 'smoke-images.test: PASS\n'

@@ -40,19 +40,20 @@ require_command grep
 CURL_BIN="${CURL_BIN:-curl}"
 require_command "$CURL_BIN"
 
-compose_file="$repo_root/deploy/docker/compose.yml"
+compose_entrypoint="${COMPOSE_IMAGES_SCRIPT:-$repo_root/scripts/docker/compose-images.sh}"
+[[ -x "$compose_entrypoint" ]] || fail "Compose entrypoint is not executable: $compose_entrypoint"
 run_id="${CONTAINER_SMOKE_RUN_ID:-$$}"
 [[ "$run_id" =~ ^[a-z0-9][a-z0-9_-]*$ ]] || fail "CONTAINER_SMOKE_RUN_ID contains unsupported characters"
 project_name="onlinejudge-smoke-${GIT_SHA:0:12}-${run_id}"
-base_url="${BASE:-http://127.0.0.1:${OJ_HTTP_PORT:-8088}}"
+http_port="$(published_http_port)"
+base_url="${BASE:-http://127.0.0.1:$http_port}"
 verify_script="${VERIFY_COMPOSE_SCRIPT:-$repo_root/scripts/deploy/verify-compose.sh}"
 
 [[ -x "$verify_script" ]] || fail "verification script is not executable: $verify_script"
 
 compose_command=(
-  docker compose
+  "$compose_entrypoint"
   --project-name "$project_name"
-  --file "$compose_file"
 )
 compose_ready=1
 

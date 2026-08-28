@@ -45,3 +45,15 @@ backend_image_ref() {
 frontend_image_ref() {
   printf 'onlinejudge/frontend:%s' "$GIT_SHA"
 }
+
+published_http_port() {
+  local port_binding="${OJ_HTTP_PORT:-8088}"
+  local host_port="${port_binding##*:}"
+
+  [[ "$host_port" =~ ^[1-9][0-9]{0,4}$ ]] || \
+    fail "OJ_HTTP_PORT must end with a TCP port between 1 and 65535"
+  (( host_port <= 65535 )) || \
+    fail "OJ_HTTP_PORT must end with a TCP port between 1 and 65535"
+
+  printf '%s' "$host_port"
+}

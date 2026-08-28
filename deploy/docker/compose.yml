@@ -23,11 +23,6 @@ services:
 
   backend:
     image: onlinejudge/backend:${GIT_SHA:?GIT_SHA must be the current full 40-character commit SHA}
-    build:
-      context: ../..
-      dockerfile: deploy/docker/backend.Dockerfile
-      args:
-        GIT_SHA: ${GIT_SHA:?GIT_SHA must be the current full 40-character commit SHA}
     depends_on:
       mysql:
         condition: service_healthy
@@ -50,11 +45,6 @@ services:
 
   frontend:
     image: onlinejudge/frontend:${GIT_SHA:?GIT_SHA must be the current full 40-character commit SHA}
-    build:
-      context: ../..
-      dockerfile: deploy/docker/frontend.Dockerfile
-      args:
-        GIT_SHA: ${GIT_SHA:?GIT_SHA must be the current full 40-character commit SHA}
     depends_on:
       backend:
         condition: service_healthy

@@ -30,15 +30,23 @@ class DockerComposeContractTest {
     void composeRequiresFullGitShaForBothApplicationImages() throws IOException {
         Path composeFile = Path.of("..", "deploy", "docker", "compose.yml");
         String compose = Files.readString(composeFile);
+        Path composeEntrypoint = Path.of("..", "scripts", "docker", "compose-images.sh");
+        String entrypoint = Files.readString(composeEntrypoint);
 
         assertThat(compose).contains("image: onlinejudge/backend:${GIT_SHA:?GIT_SHA must be the current full 40-character commit SHA}");
         assertThat(compose).contains("image: onlinejudge/frontend:${GIT_SHA:?GIT_SHA must be the current full 40-character commit SHA}");
-        assertThat(compose).contains("GIT_SHA: ${GIT_SHA:?GIT_SHA must be the current full 40-character commit SHA}");
         assertThat(compose).contains("MYSQL_PASSWORD: ${MYSQL_PASSWORD:?MYSQL_PASSWORD is required}");
         assertThat(compose).contains("MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD is required}");
         assertThat(compose).contains("image: mysql:8.4");
         assertThat(compose).doesNotContain("ONLINEJUDGE_NOTIFICATIONS_INTERNAL_TOKEN:");
         assertThat(compose).doesNotContain("image: latest");
+        assertThat(compose).doesNotContain("    build:");
+
+        assertThat(composeEntrypoint).isExecutable();
+        assertThat(entrypoint).contains("require_full_git_sha");
+        assertThat(entrypoint).contains("require_matching_head \"$repo_root\"");
+        assertThat(entrypoint).contains("docker compose");
+        assertThat(entrypoint).contains("compose_files=(\"$compose_file\")");
     }
 
     @Test
