@@ -51,7 +51,12 @@ public class AuthServiceExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Void>> unexpected(Exception exception, HttpServletRequest request) {
-        log.error("Unhandled exception for {} {}", request.getMethod(), request.getRequestURI(), exception);
+        log.error(
+                "Unhandled {} for {} {}",
+                exception.getClass().getSimpleName(),
+                request.getMethod(),
+                request.getRequestURI()
+        );
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(ApiResponse.error("500", "系统错误，请联系管理员"));
     }

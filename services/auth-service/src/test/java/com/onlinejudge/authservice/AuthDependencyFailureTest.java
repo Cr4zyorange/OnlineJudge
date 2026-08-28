@@ -6,12 +6,16 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import org.junit.jupiter.api.extension.ExtendWith;
 
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -21,6 +25,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringBootTest(properties = "onlinejudge.auth.seed-data-enabled=false")
 @AutoConfigureMockMvc
+@ExtendWith(OutputCaptureExtension.class)
 class AuthDependencyFailureTest {
     @Autowired
     private MockMvc mockMvc;
@@ -29,7 +34,7 @@ class AuthDependencyFailureTest {
     private AuthRepository authRepository;
 
     @Test
-    void loginDependencyFailureDoesNotLeakConnectionDetails() throws Exception {
+    void loginDependencyFailureDoesNotLeakConnectionDetails(CapturedOutput output) throws Exception {
         when(authRepository.findUserByLoginIdentifier(anyString()))
                 .thenThrow(new DataAccessResourceFailureException(
                         "jdbc:mysql://auth-db/onlinejudge_auth password=secret"
@@ -47,5 +52,9 @@ class AuthDependencyFailureTest {
                 .andExpect(content().string(not(containsString("auth-db"))))
                 .andExpect(content().string(not(containsString("onlinejudge_auth"))))
                 .andExpect(content().string(not(containsString("secret"))));
+
+        assertThat(output.getAll())
+                .doesNotContain("jdbc:mysql://auth-db")
+                .doesNotContain("password=secret");
     }
 }
