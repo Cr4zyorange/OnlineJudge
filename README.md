@@ -94,6 +94,16 @@ Docker Compose 的空数据卷会按顺序执行 `database/mysql/compose-schema.
 
 DEV/CI 环境可追加 `--seed`，Kind 中使用同一脚本的 `kubectl` adapter。迁移按 `database/migrations/manifest.txt` 的固定顺序执行并校验 SHA-256；失败会返回非零状态并打印具体文件名。禁止通过删除持久化卷规避迁移失败。完整契约与 MySQL 8.4 验证命令见 [D3-DATABASE 数据库启动与迁移契约](docs/开发/D3-DATABASE-数据库启动与迁移契约.md)。
 
+### 7. CI 质量门禁
+
+仓库使用 GitHub-hosted Actions 对 PR 与 `dev` push 执行质量门禁：workflow 静态校验、后端编译/单元/集成测试、前端 typecheck/单元测试/构建、公共契约验证，全部通过后 `delivery` 检查点才会执行；任一前置失败都会阻断后续镜像/部署阶段并保留测试报告、日志、环境与精确 SHA 证据。
+
+```bash
+bash scripts/ci/verify-workflow-gates.test.sh
+```
+
+详细说明（作业链、版本固定、Action 固定、Secrets 声明与本地运行方式）见 [docs/开发/CI-质量门禁开发流程.md](docs/开发/CI-质量门禁开发流程.md)。
+
 ## 代码目录组织结构
 
 本目录结构基于 `docs/最终提交/软件详细设计说明书.md` 和 `docs/最终提交/软件实现说明书.md` 中的系统设计建立：系统采用前后端分离架构，前端为 Vue 3 + Vite + TypeScript，后端为 Spring Boot + Spring JDBC，数据库在本地开发使用 H2、Docker 部署使用 MySQL；实现边界按 AUTH、CRS、LRN、LAB、HWK、GRD 六个子系统拆分，跨模块复用能力集中放在 `common` 和 `integration` 下。
