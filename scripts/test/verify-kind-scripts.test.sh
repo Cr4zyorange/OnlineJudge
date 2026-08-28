@@ -29,6 +29,16 @@ for script in lib.sh kind-create.sh kind-load-images.sh k8s-deploy.sh k8s-verify
 done
 pass "expected scripts/kind entrypoints exist"
 
+# The public README invokes these entrypoints directly, so every tracked
+# script must carry the executable bit (100755), matching the repository
+# convention for entrypoint scripts.
+mode_entries="$(git -C "$checkout" ls-files -s -- scripts/kind)"
+[[ -n "$mode_entries" ]] || fail "no tracked scripts/kind entries found under $checkout"
+while read -r mode _sha _stage path; do
+  [[ "$mode" == "100755" ]] || fail "scripts/kind entrypoint not executable (mode $mode): $path"
+done <<<"$mode_entries"
+pass "all tracked scripts/kind entrypoints are executable (100755)"
+
 for script in "$kind_scripts"/*.sh; do
   bash -n "$script" || fail "bash syntax failed for $script"
 done
@@ -51,11 +61,14 @@ cat > "$fake_bin/kubectl" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
 
-printf 'kubectl' >>"$KUBECTL_LOG"
+# One atomic append per invocation: the schema create|apply pipeline enters
+# this fake from two concurrent processes, so multi-write records would
+# interleave and corrupt the log.
+record="kubectl"
 for arg in "$@"; do
-  printf ' %q' "$arg" >>"$KUBECTL_LOG"
+  record+=" $(printf '%q' "$arg")"
 done
-printf '\n' >>"$KUBECTL_LOG"
+printf '%s\n' "$record" >>"$KUBECTL_LOG"
 
 for arg in "$@"; do
   if [[ "$arg" == "-" ]]; then
@@ -90,11 +103,11 @@ cat > "$fake_bin/docker" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
 
-printf 'docker' >>"$DOCKER_LOG"
+record="docker"
 for arg in "$@"; do
-  printf ' %q' "$arg" >>"$DOCKER_LOG"
+  record+=" $(printf '%q' "$arg")"
 done
-printf '\n' >>"$DOCKER_LOG"
+printf '%s\n' "$record" >>"$DOCKER_LOG"
 
 if [[ "${1:-}" == "image" && "${2:-}" == "inspect" ]]; then
   image="${3:-}"
@@ -115,11 +128,11 @@ cat > "$fake_bin/kind" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
 
-printf 'kind' >>"$KIND_LOG"
+record="kind"
 for arg in "$@"; do
-  printf ' %q' "$arg" >>"$KIND_LOG"
+  record+=" $(printf '%q' "$arg")"
 done
-printf '\n' >>"$KIND_LOG"
+printf '%s\n' "$record" >>"$KIND_LOG"
 
 if [[ "${1:-}" == "get" && "${2:-}" == "clusters" ]]; then
   printf 'onlinejudge-ci\n'
