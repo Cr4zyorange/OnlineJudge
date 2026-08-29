@@ -227,7 +227,7 @@
 | 全量 | 上述全部 | `bash scripts/ci/contract-verify.sh <checkout> all` 或不传 side |
 | 配置层/执行模型 | `GradeTimeoutConfigurationTest`：非默认 `timeout-ms` 生效并取消后台任务、饱和快速失败、非法 timeout/pool/queue 快速失败、Duration 校验；`SourceGradeConsumerContractTest`/`CoursePermissionConsumerContractTest` 断言超时后任务被中断 | `mvn test -Dtest=GradeTimeoutConfigurationTest`；随消费端套件与后端集成门禁运行 |
 
-`contract-verify.sh` 同时保留既有 shell 契约门禁；`ci.yml` 的 `contracts-gate` 以两个独立步骤顺序执行 consumer/producer 两侧并分别归档证据（`ci-artifacts/contracts-gate/consumer`、`/producer` 与 surefire `contract-consumer`/`contract-producer`），任一侧失败即阻断 delivery。
+`contract-verify.sh` 同时保留既有 shell 契约与 README 复演（zsh）契约门禁；`ci.yml` 的 `contracts-gate` 以两个独立步骤顺序执行 consumer/producer 两侧并分别归档证据（`ci-artifacts/contracts-gate/consumer`、`/producer` 与 surefire `contract-consumer`/`contract-producer`），任一侧失败即阻断 delivery。
 
 ## 本文件核对记录
 
@@ -244,4 +244,5 @@
 | RED：P1 有界执行模型 | 同上 | 被测 `0fa9b9d` | `mvn -B -ntp test -Dtest="GradeTimeoutConfigurationTest,SourceGradeConsumerContractTest,CoursePermissionConsumerContractTest"` | `exit 1`；编译失败（缺 `shutdown()`/有界构造器），且取消/饱和断言无实现支撑；日志 `output/issue-310/red-bounded-executor.log` |
 | GREEN：P1 有界执行模型 | 同上 | 被测 `bc76e52` | `mvn -B -ntp test -Dtest="GradeTimeoutConfigurationTest,SourceGradeConsumerContractTest,CoursePermissionConsumerContractTest"` | `exit 0`；14 total / 0 failures / 0 errors / 0 skipped（取消断言 + 饱和快速失败 + 非法配置快速失败） |
 | GREEN：全量回归（有界执行模型） | 同上 | 被测 `bc76e52` | `mvn -B -ntp test` | `exit 0`；448 total / 0 failures / 0 errors / 7 skipped；日志 `output/issue-310/backend-full-regression-bounded-executor.log` |
+| 合并：target/dev（#291/#292 等）进 feature/310 | 同上 | 基线 `origin/dev@1f7c890` + `target/dev@6ca04f3` | `git merge target/dev` 解决 `scripts/ci/contract-verify.sh` 冲突（保留 README 复演校验与 consumer/producer 双侧套件） | 冲突 1 处已解决；`bash -n` exit 0；shell-contract PASS（42 脚本）、check-workflows PASS（50 checks）、gate-chain dry-run PASS；消费端 21/21、生产端 27/27 exit 0；zsh 复演测试本机因 WSL 无法非交互安装 zsh 未本地执行，由 CI `Install zsh` 步骤覆盖 |
 | CI 流水线 | GitHub Actions（待 PR 触发） | 被测 `9758511` | `contracts-gate` job 顺序执行 consumer/producer 两侧 | 本机已按同一条命令与套件验证；Actions 链接待 PR 推送后回填 |
