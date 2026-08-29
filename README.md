@@ -93,6 +93,90 @@ Docker Compose 的空数据卷会按顺序执行 `database/mysql/compose-schema.
 ```
 
 DEV/CI 环境可追加 `--seed`，Kind 中使用同一脚本的 `kubectl` adapter。迁移按 `database/migrations/manifest.txt` 的固定顺序执行并校验 SHA-256；失败会返回非零状态并打印具体文件名。禁止通过删除持久化卷规避迁移失败。完整契约与 MySQL 8.4 验证命令见 [D3-DATABASE 数据库启动与迁移契约](docs/开发/D3-DATABASE-数据库启动与迁移契约.md)。
+## Docker Compose 最短启动
+
+这一节是当前 `dev` 已有 Compose 部署的最短复演路径。它运行 `mysql`、`backend`、`frontend` 三个服务；只有前端经 `OJ_HTTP_PORT` 暴露到宿主机，后端和 MySQL 只在 Compose 网络内通信。
+
+| 前置项 | 用途 | 检查命令 |
+| --- | --- | --- |
+| Git | 获取精确源码版本 | `git --version` |
+| Docker Engine / Docker Desktop | 构建和运行三容器 | `docker version` |
+| Docker Compose v2 | 编排容器和健康等待 | `docker compose version` |
+| Bash、curl 7.76+、Python 3、grep、sed | 执行验收脚本 | `bash --version`、`curl --version`、`python3 --version` |
+
+在 macOS、Linux 或 Windows 的 Git Bash/WSL 中执行以下命令。命令块显式使用 Bash，因此在 macOS 默认 zsh 中也可直接粘贴。先确认 checkout 干净：镜像构建脚本会拒绝任何已跟踪或未跟踪改动，防止镜像内容与 `GIT_SHA`/OCI revision 脱节。密码只在当前 shell 中保存；不要把值写入终端历史、日志或仓库文件。
+
+```bash
+bash -c '
+set -Eeuo pipefail
+git status --short
+export GIT_SHA="$(git rev-parse HEAD)"
+read -r -s -p "MYSQL_PASSWORD: " MYSQL_PASSWORD
+printf "\n"
+export MYSQL_PASSWORD
+read -r -s -p "MYSQL_ROOT_PASSWORD: " MYSQL_ROOT_PASSWORD
+printf "\n"
+export MYSQL_ROOT_PASSWORD
+bash scripts/docker/build-images.sh
+OJ_HTTP_PORT=127.0.0.1:18088 \
+  CONTAINER_SMOKE_RUN_ID=local-replay \
+  bash scripts/docker/smoke-images.sh
+'
+```
+
+`deploy/docker/.env.example` 只提供键名与非敏感默认值；复制出的 `.env` 不得提交，也不能用空密码绕过必填 Secret。`smoke-images.sh` 会建立带 SHA/运行标识的独立 Compose project，断言三服务 healthy、镜像 tag/OCI revision、两条 readiness 路径和登录至通知的业务只读链路，并在成功或失败后精确删除该 project 的容器、网络和卷。需要保留数据的手动启动、停止和迁移入口见 [部署文档](docs/最终提交/部署文档.md)。
+
+验收脚本会输出逐项 `PASS:` 或以非零退出码和 `FAIL:` 终止。它验证健康、登录、课程、学习任务、实验、作业、成绩和通知 API；原始输出是复演证据，登录 token 不应写入日志或提交到仓库。
+
+保留数据的停止命令是：
+
+```bash
+docker compose -f deploy/docker/compose.yml down --remove-orphans
+```
+
+只有确认不再需要 MySQL 数据和上传文件时，才执行会删除 `mysql-data` 与 `app-data` 卷的清理：
+
+```bash
+docker compose -f deploy/docker/compose.yml down --volumes --remove-orphans
+```
+
+### 统一脚本入口
+
+脚本本身才是参数、依赖和断言的唯一正本；这里仅提供入口索引，避免在多个文档复制会漂移的实现命令。
+
+| 场景 | 正本 | 当前状态 |
+| --- | --- | --- |
+| 本地 H2 开发 | `scripts/dev/start-dev.sh` | 已有 |
+| Compose 业务 API 验收 | `scripts/deploy/verify-compose.sh` | 已有 |
+| Compose 验收脚本自身契约 | `scripts/test/verify-compose.test.sh` | 已有 |
+| CRS HTTP 端到端验收 | `scripts/test/crs-e2e-http.ps1` | 已有，需先启动可访问的应用 |
+ | D3 容器镜像构建与标签校验 | #289 的 `deploy/docker/**`、`scripts/docker/**` | 已合入 `origin/dev`（PR #302） |
+| D3 临时 Kind 部署与精确清理 | #288 的 `deploy/k8s/**`、`scripts/kind/**`（PR #303） | 已合入 `origin/dev` |
+| D3 GitHub Actions 质量门禁 | #290 的 `.github/workflows/ci.yml` 与 `scripts/ci/**`（PR #298） | 已合入 `origin/dev` |
+| D3 GitHub Actions 交付编排 | #292 的 `.github/workflows/d3-delivery.yml` 与 `scripts/delivery/**`（PR #329） | 已合入 `origin/dev` |
+
+### D3 CI/CD 与临时 Kind 状态
+
+目标 D3 交付在 GitHub-hosted Runner 内创建并清理临时 Kind 集群，不使用额外服务器、长期集群或外部 `kubeconfig`。该目标的服务名、镜像、变量、Secret 和健康语义以 [D3 CI/CD 共享契约](docs/开发/D3-CICD-共享契约.md) 为唯一正本：
+
+- 服务只包括 `mysql`、`backend`、`frontend`；入口经 frontend 的 `/api/` 代理到 backend。
+- 两个自建镜像必须使用同一次构建的完整 `GIT_SHA`：`onlinejudge/backend:${GIT_SHA}` 与 `onlinejudge/frontend:${GIT_SHA}`，并具有同值的 `org.opencontainers.image.revision`。禁止以 `latest` 作为唯一构建、部署或验收版本。
+- GitHub Secrets 和 Kubernetes Secret 只使用 `MYSQL_PASSWORD`、`MYSQL_ROOT_PASSWORD`、`ONLINEJUDGE_NOTIFICATIONS_INTERNAL_TOKEN` 三个键名，文档、日志和镜像都不得写入其值。
+- 完成交付时，backend liveness 为 `/api/v1/system/health`，数据库感知 readiness 为 `/api/v1/system/readiness`；Kind 验收还必须经 frontend 代理检查 readiness。
+
+ #287、#289、#288（PR #303）、#290（PR #298）和 #292（PR #329）均已合入当前 `origin/dev@5cdbe8533991bb0c7cfbe23e08d81b78d47af483`。该 SHA 的目标仓库交付 run [33227922081](https://github.com/Cr4zyorange/OnlineJudge/actions/runs/33227922081) 已成功完成；它消费同一 SHA 的质量门禁、构建精确镜像、临时部署 Kind 并归档运行证据。未参与实现的人仍必须在干净 checkout 复演本地入口，并记录环境、完整 SHA、实际命令、服务/测试/资源数量、退出码和未经改写的输出。
+
+本地完整 Kind 复演在完成镜像构建后执行。把 `D3_EVIDENCE_DIR` 放在 checkout 外部，避免在构建前制造未跟踪文件；无论 GREEN 或受控 RED 都必须删除临时集群。
+
+```bash
+export D3_EVIDENCE_DIR="$(mktemp -d /tmp/onlinejudge-d3-replay.XXXXXX)"
+trap 'bash scripts/kind/k8s-cleanup.sh --cluster' EXIT
+bash scripts/delivery/run-kind-delivery.sh "$D3_EVIDENCE_DIR"
+```
+
+受控数据库故障使用同一入口的 `D3_DELIVERY_FORCED_FAILURE=health`，预期退出码为 `1`、backend readiness 为 HTTP `503`，并在 `D3_EVIDENCE_DIR/kubernetes-diagnostics/` 留下诊断；这证明失败未被当作 GREEN。复演归档可在构建结束后移入 `output/issue-291/replay-<UTC>/`，至少包含 `environment.txt`、`commands.txt`、`raw/` 和 `result.txt`；只有预期 GREEN 断言均成功且退出码为 `0` 时才写 `PASS`，不得预先生成或提交伪造结果。
+
+故障排查先查看 [部署文档的常见问题](docs/最终提交/部署文档.md#9-常见问题) 和相关容器日志；D3 合入后，GitHub Actions 的失败日志、测试报告和 Kind 诊断以 #290/#292 工作流归档为准。当前 Compose 路径不声明为长期生产部署或云端高可用方案。
 
 ### 7. CI 质量门禁
 

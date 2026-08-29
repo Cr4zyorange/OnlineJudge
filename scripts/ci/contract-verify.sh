@@ -51,6 +51,9 @@ java_major="$(java -version 2>&1 | sed -n '1s/.*version "\([0-9][0-9]*\).*/\1/p'
 # 仓库脚本契约：所有跟踪的 *.sh 必须 LF + bash 语法合法。
 log_run bash "$checkout/scripts/test/verify-shell-contract.sh" "$checkout"
 
+# 面向 macOS zsh 的 README 复演命令与 Compose 子命令不可回归。
+log_run bash "$checkout/scripts/test/verify-readme-d3-replay-shell.test.sh" "$checkout"
+
 # 后端公共契约：common/integration 共享对象结构不可回归。
 printf '\n$ mvn -B -ntp test -Dtest=CommonInfrastructureContractTest\n' | tee -a "$log"
 (cd "$checkout/backend" && rm -f target/surefire-reports/*.xml \
@@ -59,4 +62,4 @@ mkdir -p "$checkout/backend/target/surefire-reports/contract"
 rm -f "$checkout/backend/target/surefire-reports/contract"/*.xml
 (cd "$checkout/backend" && cp target/surefire-reports/*.xml target/surefire-reports/contract/)
 
-printf 'contract-verify: PASS (shell contract + common infrastructure contract)\n' | tee -a "$log"
+printf 'contract-verify: PASS (shell, README replay, and common infrastructure contracts)\n' | tee -a "$log"
