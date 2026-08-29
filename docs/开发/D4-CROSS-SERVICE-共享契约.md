@@ -164,7 +164,7 @@
 | 响应 | `List<SourceGradeDTO>`；`SourceGradeDTO` v1 字段：`courseId`、`sourceType`、`sourceId`、`studentId`、`score`、`fullScore`、`status`、`updatedAt`；来源不存在/跨课程 → `Optional.empty`（MISSING）；未发布/无成绩 → 空列表（EMPTY）；`status ∈ {SCORED, UNGRADED}`。 |
 | 版本 | `v1`（`SourceGradeDTO.VERSION`；字段集合由契约测试冻结）。 |
 | 鉴权 | 来源查询由 GRD 内部调用身份发起；对外成绩只经 GRD 发布接口暴露。 |
-| 错误码 | 无 HTTP 错误码；下游不可用/超时抛 `SourceGradeUnavailableException`，GRD 原子中止本次同步，不生成部分结果。 |
+| 错误码 | 无 HTTP 错误码；下游不可用/超时/饱和/**Provider 运行时故障**统一抛 `SourceGradeUnavailableException`（根因经 `cause` 保留，不原样泄漏内部异常类型），GRD 原子中止本次同步，不生成部分结果。 |
 | 超时 | `onlinejudge.integration.grade.timeout-ms`（默认 1000ms，已在 `application.properties` 显式声明）+ `max-pool-size`（默认 4）+ `queue-capacity`（默认 64，0=无缓冲）有界执行模型；Spring 通过 `@Value` 绑定生产 Bean，非默认值必须实际生效，非法值构造期快速失败；超时/中断必须取消后台 Provider 任务（`Future.cancel(true)`），饱和抛 `SourceGradeUnavailableException` 快速失败，`@PreDestroy` 关闭执行器；超时按下游失败处理（中止，不静默 MISSING）。 |
 | 幂等键 | 只读查询天然幂等；重复查询结果稳定。 |
 | 重试 | 不自动重试；GRD 侧由同步任务重跑（有界、人工可触发）。 |
@@ -202,7 +202,7 @@
 | C-03 课程权限 | 布尔/名单返回 | 1000ms 预算 → 拒绝/空名单 | 非成员/非管理者 → 业务 403 | 只读幂等，结果稳定 | 拒绝/空名单，禁止直连 CRS 表 |
 | C-04 公告→LRN | 公告落库 + 通知创建 | 执行器饱和 → 告警丢弃（有界） | 无效载荷 → `LRN-400-04` | `CRS_ANNOUNCEMENT_{id}` 去重 | 通知缺失由公告页兜底，不回滚公告 |
 | C-05 通知事件 | 通知落库（after-commit） | 有界队列饱和 → 拒绝告警 | 令牌/载荷拒绝 | 幂等键+接收人去重 | `publish` 告警丢弃；`publishRequired` 回滚来源 |
-| C-06 来源成绩 | 返回 DTO 列表 | 超时 → `SourceGradeUnavailableException`，GRD 中止 | MISSING/EMPTY 按语义返回 | 只读幂等 | 抛异常，GRD 原子中止，不写部分结果 |
+| C-06 来源成绩 | 返回 DTO 列表 | 超时 → `SourceGradeUnavailableException`，GRD 中止 | MISSING/EMPTY 按语义返回 | 只读幂等 | Provider 故障/超时/饱和统一抛 `SourceGradeUnavailableException`（根因经 cause 保留），GRD 原子中止，不写部分结果 |
 | C-07 评测/资产/事件 | 终态回写 + 完成事件 | 60s 用例上限 → 超时/系统错误 | 越权/非法提交 → 业务错误码 | `claimPending` + 事件幂等键 | `SYSTEM_ERROR` 保留提交，补偿删除/journal 收敛 |
 
 ## 禁止项清单
@@ -245,4 +245,7 @@
 | GREEN：P1 有界执行模型 | 同上 | 被测 `bc76e52` | `mvn -B -ntp test -Dtest="GradeTimeoutConfigurationTest,SourceGradeConsumerContractTest,CoursePermissionConsumerContractTest"` | `exit 0`；14 total / 0 failures / 0 errors / 0 skipped（取消断言 + 饱和快速失败 + 非法配置快速失败） |
 | GREEN：全量回归（有界执行模型） | 同上 | 被测 `bc76e52` | `mvn -B -ntp test` | `exit 0`；448 total / 0 failures / 0 errors / 7 skipped；日志 `output/issue-310/backend-full-regression-bounded-executor.log` |
 | 合并：target/dev（#291/#292 等）进 feature/310 | 同上 | 基线 `origin/dev@1f7c890` + `target/dev@6ca04f3` | `git merge target/dev` 解决 `scripts/ci/contract-verify.sh` 冲突（保留 README 复演校验与 consumer/producer 双侧套件） | 冲突 1 处已解决；`bash -n` exit 0；shell-contract PASS（42 脚本）、check-workflows PASS（50 checks）、gate-chain dry-run PASS；消费端 21/21、生产端 27/27 exit 0；zsh 复演测试本机因 WSL 无法非交互安装 zsh 未本地执行，由 CI `Install zsh` 步骤覆盖 |
+| RED：P1 来源故障统一异常 | 同上 | 被测 `6817378` | `mvn -B -ntp test -Dtest=SourceGradeConsumerContractTest` | `exit 1`；Provider 运行时故障仍原样抛 `IllegalStateException`，与 C-06 统一异常承诺不符；日志 `output/issue-310/red-unified-source-grade-exception.log` |
+| GREEN：P1 来源故障统一异常 | 同上 | 被测 `0c7dc4d` | `mvn -B -ntp test -Dtest="SourceGradeConsumerContractTest,GradeTimeoutConfigurationTest"` | `exit 0`；9 total / 0 failures / 0 errors / 0 skipped |
+| GREEN：全量回归（统一异常） | 同上 | 被测 `0c7dc4d` | `mvn -B -ntp test` | `exit 0`；448 total / 0 failures / 0 errors / 7 skipped；日志 `output/issue-310/backend-full-regression-unified-exception.log` |
 | CI 流水线 | GitHub Actions（待 PR 触发） | 被测 `9758511` | `contracts-gate` job 顺序执行 consumer/producer 两侧 | 本机已按同一条命令与套件验证；Actions 链接待 PR 推送后回填 |
