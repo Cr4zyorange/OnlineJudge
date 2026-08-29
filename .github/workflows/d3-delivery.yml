@@ -55,9 +55,19 @@ jobs:
           WORKFLOW_RUN_CONCLUSION: ${{ github.event.workflow_run.conclusion || '' }}
         run: |
           set -Eeuo pipefail
-          [[ "$SOURCE_RUN_ID" =~ ^[0-9]+$ ]] \
-            || { printf 'source_run_id must be a GitHub Actions run ID\n' >&2; exit 2; }
-          source_run="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN_ID")"
+          reject_source() {
+            printf 'source_validation_error=%s\n' "$1" >> "$GITHUB_OUTPUT"
+            exit 1
+          }
+
+          if ! [[ "$SOURCE_RUN_ID" =~ ^[0-9]+$ ]]; then
+            printf 'source_run_id must be a GitHub Actions run ID\n' >&2
+            reject_source source-run-id-invalid
+          fi
+          if ! source_run="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN_ID")"; then
+            printf 'source run %s could not be retrieved\n' "$SOURCE_RUN_ID" >&2
+            reject_source source-run-unavailable
+          fi
           source_name="$(jq -r '.name // empty' <<<"$source_run")"
           source_path="$(jq -r '.path // empty' <<<"$source_run")"
           source_event="$(jq -r '.event // empty' <<<"$source_run")"
@@ -65,27 +75,41 @@ jobs:
           source_sha="$(jq -r '.head_sha // empty' <<<"$source_run")"
           source_conclusion="$(jq -r '.conclusion // empty' <<<"$source_run")"
 
-          [[ "$source_name" == ci-quality-gate ]] \
-            || { printf 'source run %s is not ci-quality-gate (got %s)\n' "$SOURCE_RUN_ID" "$source_name" >&2; exit 1; }
-          [[ "$source_path" == .github/workflows/ci.yml ]] \
-            || { printf 'source run %s is not the #290 workflow (got %s)\n' "$SOURCE_RUN_ID" "$source_path" >&2; exit 1; }
-          [[ "$source_event" == push ]] \
-            || { printf 'source run %s must be a push run (got %s)\n' "$SOURCE_RUN_ID" "$source_event" >&2; exit 1; }
-          [[ "$source_head_branch" == dev ]] \
-            || { printf 'source run %s must target dev (got %s)\n' "$SOURCE_RUN_ID" "$source_head_branch" >&2; exit 1; }
-          [[ "$source_sha" =~ ^[0-9a-f]{40}$ ]] \
-            || { printf 'source run %s has invalid head SHA %s\n' "$SOURCE_RUN_ID" "$source_sha" >&2; exit 1; }
+          if [[ "$source_name" != ci-quality-gate ]]; then
+            printf 'source run %s is not ci-quality-gate (got %s)\n' "$SOURCE_RUN_ID" "$source_name" >&2
+            reject_source source-workflow-name-invalid
+          fi
+          if [[ "$source_path" != .github/workflows/ci.yml ]]; then
+            printf 'source run %s is not the #290 workflow (got %s)\n' "$SOURCE_RUN_ID" "$source_path" >&2
+            reject_source source-workflow-path-invalid
+          fi
+          if [[ "$source_event" != push ]]; then
+            printf 'source run %s must be a push run (got %s)\n' "$SOURCE_RUN_ID" "$source_event" >&2
+            reject_source source-event-invalid
+          fi
+          if [[ "$source_head_branch" != dev ]]; then
+            printf 'source run %s must target dev (got %s)\n' "$SOURCE_RUN_ID" "$source_head_branch" >&2
+            reject_source source-branch-invalid
+          fi
+          if ! [[ "$source_sha" =~ ^[0-9a-f]{40}$ ]]; then
+            printf 'source run %s has invalid head SHA %s\n' "$SOURCE_RUN_ID" "$source_sha" >&2
+            reject_source source-sha-invalid
+          fi
           if [[ "$GITHUB_EVENT_NAME" == workflow_run ]]; then
-            [[ "$source_conclusion" == "$WORKFLOW_RUN_CONCLUSION" ]] \
-              || { printf 'workflow_run conclusion disagrees with source run metadata\n' >&2; exit 1; }
+            if [[ "$source_conclusion" != "$WORKFLOW_RUN_CONCLUSION" ]]; then
+              printf 'workflow_run conclusion disagrees with source run metadata\n' >&2
+              reject_source source-conclusion-mismatch
+            fi
           fi
 
           printf 'git_sha=%s\n' "$source_sha" >> "$GITHUB_OUTPUT"
           printf 'source_run_id=%s\n' "$SOURCE_RUN_ID" >> "$GITHUB_OUTPUT"
           printf 'source_run_url=https://github.com/%s/actions/runs/%s\n' "$GITHUB_REPOSITORY" "$SOURCE_RUN_ID" >> "$GITHUB_OUTPUT"
           printf 'source_conclusion=%s\n' "$source_conclusion" >> "$GITHUB_OUTPUT"
-          [[ "$source_conclusion" == success ]] \
-            || { printf 'quality gate concluded %s; image build and Kind delivery are blocked\n' "$source_conclusion" >&2; exit 1; }
+          if [[ "$source_conclusion" != success ]]; then
+            printf 'quality gate concluded %s; image build and Kind delivery are blocked\n' "$source_conclusion" >&2
+            reject_source quality-gate-not-success
+          fi
       - name: Checkout exact quality-gate revision
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
@@ -96,17 +120,30 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           SOURCE_RUN_ID: ${{ steps.source.outputs.source_run_id }}
+          REQUESTED_SOURCE_RUN_ID: ${{ github.event.workflow_run.id || inputs.source_run_id }}
+          SOURCE_VALIDATION_ERROR: ${{ steps.source.outputs.source_validation_error }}
           EVIDENCE_DIR: d3-quality-gate-evidence
         run: |
           set -u
           mkdir -p "$EVIDENCE_DIR"
-          if ! gh run download "$SOURCE_RUN_ID" --repo "$GITHUB_REPOSITORY" --dir "$EVIDENCE_DIR"; then
-            printf 'quality-gate artifact download failed; the original run remains the authoritative evidence source\n' \
-              > "$EVIDENCE_DIR/download-warning.txt"
+          if [[ -n "$SOURCE_RUN_ID" ]]; then
+            if ! gh run download "$SOURCE_RUN_ID" --repo "$GITHUB_REPOSITORY" --dir "$EVIDENCE_DIR"; then
+              printf 'quality-gate artifact download failed; the original run remains the authoritative evidence source\n' \
+                > "$EVIDENCE_DIR/download-warning.txt"
+            fi
+            jq -n \
+              --arg run_id "$SOURCE_RUN_ID" \
+              --arg url "https://github.com/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN_ID" \
+              --arg conclusion "${{ steps.source.outputs.source_conclusion }}" \
+              '{run_id: $run_id, url: $url, conclusion: $conclusion}' \
+              > "$EVIDENCE_DIR/quality-gate-run.json"
+          else
+            jq -n \
+              --arg requested_run_id "$REQUESTED_SOURCE_RUN_ID" \
+              --arg validation_error "${SOURCE_VALIDATION_ERROR:-source-validation-failed-before-recording}" \
+              '{requested_run_id: $requested_run_id, validation_error: $validation_error, artifacts_downloaded: false}' \
+              > "$EVIDENCE_DIR/provenance-rejection.json"
           fi
-          printf '{"run_id":"%s","url":"https://github.com/%s/actions/runs/%s","conclusion":"%s"}\n' \
-            "$SOURCE_RUN_ID" "$GITHUB_REPOSITORY" "$SOURCE_RUN_ID" "${{ steps.source.outputs.source_conclusion }}" \
-            > "$EVIDENCE_DIR/quality-gate-run.json"
       - name: Upload consumed quality-gate evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
