@@ -232,7 +232,10 @@
 
 | 项目 | 环境 | 基线 SHA | 命令 | 原始结果 |
 | --- | --- | --- | --- | --- |
-| 文档空白与格式 | Windows 11 PowerShell | `1f7c890` | `git diff --check` | 实现完成后回填 |
+| 文档空白与格式 | Windows 11 PowerShell | `1f7c890` | `git diff --check` | `exit 0`；stdout 仅含本机 LF/CRLF 提示，无空白错误 |
 | RED：契约测试编译失败 | 同上 | `1f7c890` | `mvn -B -ntp test -Dtest="com.onlinejudge.contracts.*"` | 41 个编译错误（缺失 `CoursePermissionProvider`/`DefaultCoursePermissionClient`/`CrsCoursePermissionProvider`/`SourceGradeClient(Duration)`），日志 `output/issue-310/red-contract-suite-01-compile.log` |
 | RED：断言级失败 | 同上 | `1f7c890` | `mvn -B -ntp test -Dtest="com.onlinejudge.contracts.**"` | 35 测试中 2 失败 + 2 错误（契约正本缺失），日志 `output/issue-310/red-contract-suite-02-assertion.log` |
-| GREEN：契约测试全量 | 同上 | 被测 SHA | `mvn -B -ntp test -Dtest="com.onlinejudge.contracts.**"` | 实现完成后回填 |
+| GREEN：消费端契约套件独立运行 | Windows 11 + Java 21 | 被测 `9758511` | `mvn -B -ntp test -Dtest="CommonInfrastructureContractTest,CrossServiceContractRegistryTest,ContractDocumentationCompletenessTest,CoursePermissionConsumerContractTest,SourceGradeConsumerContractTest"` | `exit 0`；20 total / 0 failures / 0 errors / 0 skipped；日志 `output/issue-310/green-contract-consumer.log` |
+| GREEN：生产端契约套件独立运行 | 同上 | 被测 `9758511` | `mvn -B -ntp test -Dtest="CommonInfrastructureContractTest,CrossServiceContractRegistryTest,ContractDocumentationCompletenessTest,CoursePermissionProducerContractTest,SourceGradeProducerContractTest,EvaluationCompletionEventContractTest,AuthContextContractTest"` | `exit 0`；27 total / 0 failures / 0 errors / 0 skipped；日志 `output/issue-310/green-contract-producer.log` |
+| GREEN：后端全量回归 | 同上 | 被测 `9758511` | `mvn -B -ntp test` | `exit 0`；443 total / 0 failures / 0 errors / 7 skipped；日志 `output/issue-310/backend-full-regression-final.log` |
+| CI 流水线 | GitHub Actions（待 PR 触发） | 被测 `9758511` | `contracts-gate` job 顺序执行 consumer/producer 两侧 | 本机已按同一条命令与套件验证；Actions 链接待 PR 推送后回填 |
