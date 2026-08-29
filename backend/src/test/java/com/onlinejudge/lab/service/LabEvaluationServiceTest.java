@@ -110,7 +110,8 @@ class LabEvaluationServiceTest {
                 new ThrowingEvaluator(),
                 submissionRepository,
                 evaluationRepository,
-                resultRepository
+                resultRepository,
+                event -> { }
         );
 
         service.evaluateSubmissionAsync(experiment, submission, submission.codeContent());
