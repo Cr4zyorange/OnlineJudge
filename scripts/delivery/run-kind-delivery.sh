@@ -98,7 +98,9 @@ capture_http_index() {
 capture_forced_readiness_failure() {
   local output_file="$1"
   local status_file="$2"
-  local deadline=$(( $(date +%s) + 90 ))
+  # Hikari's database-connection timeout is 30 seconds.  Let one direct Pod
+  # request cover that real failure boundary instead of cancelling it first.
+  local deadline=$(( $(date +%s) + 150 ))
   local backend_pod status
 
   # This is a real, scoped RED path: stop only the disposable MySQL workload
@@ -114,7 +116,7 @@ capture_forced_readiness_failure() {
   kindlib_kubectl --namespace "$K8S_NAMESPACE" scale statefulset/mysql --replicas=0
   require_pod_port_forward "$backend_pod" 28081 8080 "$evidence_dir/forced-backend-pod-port-forward.log"
   while true; do
-    status="$(curl --silent --show-error --connect-timeout 3 --max-time 8 \
+    status="$(curl --silent --show-error --connect-timeout 3 --max-time 45 \
       --output "$output_file" --write-out '%{http_code}' \
       'http://127.0.0.1:28081/api/v1/system/readiness' || true)"
     printf '%s\n' "$status" > "$status_file"

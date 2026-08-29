@@ -89,6 +89,7 @@ require_text "$delivery_script" 'require_pod_port_forward "$backend_pod" 28081 8
 require_text "$delivery_script" 'port-forward "pod/$pod"'
 require_text "$delivery_script" 'controlled MySQL outage readiness body must not report UP'
 require_text "$delivery_script" '[[ "$status" == 503 ]]'
+require_text "$delivery_script" '--max-time 45'
 
 require_text "$evidence_script" 'docker image inspect'
 require_text "$evidence_script" 'org.opencontainers.image.revision'
