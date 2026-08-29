@@ -35,8 +35,20 @@ require_file "$evidence_script"
 require_text "$workflow" 'workflows: ["ci-quality-gate"]'
 require_text "$workflow" 'types: [completed]'
 require_text "$workflow" 'workflow_dispatch:'
+require_text "$workflow" 'source_run_id:'
 require_text "$workflow" 'quality-gate:'
 require_text "$workflow" 'github.event.workflow_run.conclusion'
+require_text "$workflow" 'gh api "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN_ID"'
+require_text "$workflow" 'source_name'
+require_text "$workflow" 'source_path'
+require_text "$workflow" 'source_event'
+require_text "$workflow" 'source_head_branch'
+require_text "$workflow" 'source_sha'
+require_text "$workflow" 'source_conclusion'
+require_text "$workflow" '.github/workflows/ci.yml'
+require_text "$workflow" 'source_event" == push'
+require_text "$workflow" 'source_head_branch" == dev'
+require_text "$workflow" 'ref: ${{ steps.source.outputs.git_sha }}'
 require_text "$workflow" 'build-images:'
 require_text "$workflow" 'needs: [quality-gate]'
 require_text "$workflow" 'deploy-kind:'
@@ -54,6 +66,11 @@ require_text "$workflow" 'bash scripts/kind/k8s-cleanup.sh'
 require_text "$workflow" 'actions/upload-artifact@'
 require_text "$workflow" 'forced_failure'
 
+manual_dispatch_inputs="$(sed -n '/^  workflow_dispatch:/,/^concurrency:/p' "$workflow")"
+if grep -Eq '^[[:space:]]*(ref|quality_gate_conclusion):' <<<"$manual_dispatch_inputs"; then
+  fail 'manual delivery must consume a real #290 run, not caller-provided ref or conclusion inputs'
+fi
+
 # GitHub resolves action `with:` inputs before a runner context exists, so a
 # runner.temp expression there rejects the workflow before it can dispatch.
 if grep -Fq '${{ runner.temp }}' "$workflow"; then
@@ -67,6 +84,11 @@ require_text "$delivery_script" 'forced failure'
 require_text "$delivery_script" 'backend-readiness.json'
 require_text "$delivery_script" 'frontend-readiness.json'
 require_text "$delivery_script" 'frontend-index.html'
+require_text "$delivery_script" 'forced-backend-pod-port-forward.log'
+require_text "$delivery_script" 'require_pod_port_forward "$backend_pod" 28081 8080'
+require_text "$delivery_script" 'port-forward "pod/$pod"'
+require_text "$delivery_script" 'controlled MySQL outage readiness body must not report UP'
+require_text "$delivery_script" '[[ "$status" == 503 ]]'
 
 require_text "$evidence_script" 'docker image inspect'
 require_text "$evidence_script" 'org.opencontainers.image.revision'

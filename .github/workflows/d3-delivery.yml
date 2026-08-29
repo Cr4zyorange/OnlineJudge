@@ -2,8 +2,9 @@ name: d3-delivery
 
 # #292 consumes the completion of #290 rather than recreating its three
 # quality-gate jobs.  Only a successful push to dev may reach image build and
-# Kind deployment.  workflow_dispatch exists solely to record the requested
-# controlled RED runs; it never pretends to be a real #290 result.
+# Kind deployment.  workflow_dispatch permits controlled RED runs only when
+# they name a completed real #290 run; it never accepts a caller-provided
+# conclusion or ref as a substitute for that prerequisite.
 on:
   workflow_run:
     workflows: ["ci-quality-gate"]
@@ -11,17 +12,10 @@ on:
     branches: [dev]
   workflow_dispatch:
     inputs:
-      ref:
-        description: Exact ref to exercise (use dev for controlled evidence)
+      source_run_id:
+        description: Completed ci-quality-gate push-to-dev run ID to consume
         required: true
-        default: dev
         type: string
-      quality_gate_conclusion:
-        description: Simulated #290 conclusion for a controlled RED run
-        required: true
-        default: success
-        type: choice
-        options: [success, failure]
       forced_failure:
         description: Optional controlled deployment failure after Kind is Ready
         required: true
@@ -30,7 +24,7 @@ on:
         options: [none, health]
 
 concurrency:
-  group: d3-delivery-${{ github.event.workflow_run.head_sha || inputs.ref || github.run_id }}
+  group: d3-delivery-${{ github.event.workflow_run.head_sha || inputs.source_run_id || github.run_id }}
   cancel-in-progress: false
 
 permissions:
@@ -53,30 +47,50 @@ jobs:
       source_run_url: ${{ steps.source.outputs.source_run_url }}
       source_conclusion: ${{ steps.source.outputs.source_conclusion }}
     steps:
-      - name: Checkout exact quality-gate revision
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-        with:
-          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || inputs.ref }}
-          fetch-depth: 0
       - name: Resolve source quality-gate metadata
         id: source
         env:
-          QUALITY_GATE_CONCLUSION: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.conclusion || inputs.quality_gate_conclusion }}
-          QUALITY_GATE_RUN_ID: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.id || github.run_id }}
-          FORCED_FAILURE: ${{ inputs.forced_failure || 'none' }}
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_RUN_ID: ${{ github.event.workflow_run.id || inputs.source_run_id }}
+          WORKFLOW_RUN_CONCLUSION: ${{ github.event.workflow_run.conclusion || '' }}
         run: |
           set -Eeuo pipefail
-          git_sha="$(git rev-parse HEAD)"
-          [[ "$git_sha" =~ ^[0-9a-f]{40}$ ]]
-          if [[ "$FORCED_FAILURE" == "quality-gate" ]]; then
-            QUALITY_GATE_CONCLUSION=failure
+          [[ "$SOURCE_RUN_ID" =~ ^[0-9]+$ ]] \
+            || { printf 'source_run_id must be a GitHub Actions run ID\n' >&2; exit 2; }
+          source_run="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN_ID")"
+          source_name="$(jq -r '.name // empty' <<<"$source_run")"
+          source_path="$(jq -r '.path // empty' <<<"$source_run")"
+          source_event="$(jq -r '.event // empty' <<<"$source_run")"
+          source_head_branch="$(jq -r '.head_branch // empty' <<<"$source_run")"
+          source_sha="$(jq -r '.head_sha // empty' <<<"$source_run")"
+          source_conclusion="$(jq -r '.conclusion // empty' <<<"$source_run")"
+
+          [[ "$source_name" == ci-quality-gate ]] \
+            || { printf 'source run %s is not ci-quality-gate (got %s)\n' "$SOURCE_RUN_ID" "$source_name" >&2; exit 1; }
+          [[ "$source_path" == .github/workflows/ci.yml ]] \
+            || { printf 'source run %s is not the #290 workflow (got %s)\n' "$SOURCE_RUN_ID" "$source_path" >&2; exit 1; }
+          [[ "$source_event" == push ]] \
+            || { printf 'source run %s must be a push run (got %s)\n' "$SOURCE_RUN_ID" "$source_event" >&2; exit 1; }
+          [[ "$source_head_branch" == dev ]] \
+            || { printf 'source run %s must target dev (got %s)\n' "$SOURCE_RUN_ID" "$source_head_branch" >&2; exit 1; }
+          [[ "$source_sha" =~ ^[0-9a-f]{40}$ ]] \
+            || { printf 'source run %s has invalid head SHA %s\n' "$SOURCE_RUN_ID" "$source_sha" >&2; exit 1; }
+          if [[ "$GITHUB_EVENT_NAME" == workflow_run ]]; then
+            [[ "$source_conclusion" == "$WORKFLOW_RUN_CONCLUSION" ]] \
+              || { printf 'workflow_run conclusion disagrees with source run metadata\n' >&2; exit 1; }
           fi
-          printf 'git_sha=%s\n' "$git_sha" >> "$GITHUB_OUTPUT"
-          printf 'source_run_id=%s\n' "$QUALITY_GATE_RUN_ID" >> "$GITHUB_OUTPUT"
-          printf 'source_run_url=https://github.com/%s/actions/runs/%s\n' "$GITHUB_REPOSITORY" "$QUALITY_GATE_RUN_ID" >> "$GITHUB_OUTPUT"
-          printf 'source_conclusion=%s\n' "$QUALITY_GATE_CONCLUSION" >> "$GITHUB_OUTPUT"
-          [[ "$QUALITY_GATE_CONCLUSION" == success ]] \
-            || { printf 'quality gate concluded %s; image build and Kind delivery are blocked\n' "$QUALITY_GATE_CONCLUSION" >&2; exit 1; }
+
+          printf 'git_sha=%s\n' "$source_sha" >> "$GITHUB_OUTPUT"
+          printf 'source_run_id=%s\n' "$SOURCE_RUN_ID" >> "$GITHUB_OUTPUT"
+          printf 'source_run_url=https://github.com/%s/actions/runs/%s\n' "$GITHUB_REPOSITORY" "$SOURCE_RUN_ID" >> "$GITHUB_OUTPUT"
+          printf 'source_conclusion=%s\n' "$source_conclusion" >> "$GITHUB_OUTPUT"
+          [[ "$source_conclusion" == success ]] \
+            || { printf 'quality gate concluded %s; image build and Kind delivery are blocked\n' "$source_conclusion" >&2; exit 1; }
+      - name: Checkout exact quality-gate revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ steps.source.outputs.git_sha }}
+          fetch-depth: 0
       - name: Download #290 JUnit and quality-gate evidence
         if: always()
         env:
@@ -86,13 +100,8 @@ jobs:
         run: |
           set -u
           mkdir -p "$EVIDENCE_DIR"
-          if [[ "${{ github.event_name }}" == workflow_run ]]; then
-            if ! gh run download "$SOURCE_RUN_ID" --repo "$GITHUB_REPOSITORY" --dir "$EVIDENCE_DIR"; then
-              printf 'quality-gate artifact download failed; the original run remains the authoritative evidence source\n' \
-                > "$EVIDENCE_DIR/download-warning.txt"
-            fi
-          else
-            printf 'manual controlled run: no external #290 artifact download was attempted\n' \
+          if ! gh run download "$SOURCE_RUN_ID" --repo "$GITHUB_REPOSITORY" --dir "$EVIDENCE_DIR"; then
+            printf 'quality-gate artifact download failed; the original run remains the authoritative evidence source\n' \
               > "$EVIDENCE_DIR/download-warning.txt"
           fi
           printf '{"run_id":"%s","url":"https://github.com/%s/actions/runs/%s","conclusion":"%s"}\n' \

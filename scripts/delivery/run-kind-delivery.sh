@@ -55,6 +55,16 @@ require_port_forward() {
   port_forward_pids+=("$!")
 }
 
+require_pod_port_forward() {
+  local pod="$1"
+  local local_port="$2"
+  local remote_port="$3"
+  local log_file="$4"
+  kindlib_kubectl --namespace "$K8S_NAMESPACE" port-forward "pod/$pod" "${local_port}:${remote_port}" \
+    >"$log_file" 2>&1 &
+  port_forward_pids+=("$!")
+}
+
 capture_http_up() {
   local url="$1"
   local output_file="$2"
@@ -86,20 +96,33 @@ capture_http_index() {
 }
 
 capture_forced_readiness_failure() {
-  local url="$1"
-  local output_file="$2"
-  local status_file="$3"
+  local output_file="$1"
+  local status_file="$2"
   local deadline=$(( $(date +%s) + 90 ))
-  local status
+  local backend_pod status
 
   # This is a real, scoped RED path: stop only the disposable MySQL workload
   # and wait for the database-aware backend readiness endpoint to return 503.
+  # A Service port-forward drops an unready backend from Endpoints, so select
+  # its running Pod before the outage and connect to that Pod directly after
+  # MySQL stops.  The backend remains alive because its liveness endpoint is
+  # independent of database readiness.
+  backend_pod="$(kindlib_kubectl --namespace "$K8S_NAMESPACE" get pods -l app=backend \
+    -o jsonpath='{.items[0].metadata.name}')"
+  [[ -n "$backend_pod" ]] \
+    || { printf 'unable to select the backend Pod for controlled readiness RED\n' >&2; return 1; }
   kindlib_kubectl --namespace "$K8S_NAMESPACE" scale statefulset/mysql --replicas=0
+  require_pod_port_forward "$backend_pod" 28081 8080 "$evidence_dir/forced-backend-pod-port-forward.log"
   while true; do
     status="$(curl --silent --show-error --connect-timeout 3 --max-time 8 \
-      --output "$output_file" --write-out '%{http_code}' "$url" || true)"
+      --output "$output_file" --write-out '%{http_code}' \
+      'http://127.0.0.1:28081/api/v1/system/readiness' || true)"
     printf '%s\n' "$status" > "$status_file"
-    [[ "$status" == 503 ]] && return 0
+    if [[ "$status" == 503 ]]; then
+      grep -Eq '"status"[[:space:]]*:[[:space:]]*"UP"' "$output_file" \
+        && { printf 'controlled MySQL outage readiness body must not report UP\n' >&2; return 1; }
+      return 0
+    fi
     [[ "$(date +%s)" -lt "$deadline" ]] \
       || { printf 'controlled MySQL outage did not produce a readiness 503 (last HTTP status %s)\n' "$status" >&2; return 1; }
     sleep 2
@@ -120,7 +143,6 @@ capture_http_up 'http://127.0.0.1:28088/api/v1/system/readiness' "$evidence_dir/
 
 if [[ "$forced_failure" == health ]]; then
   capture_forced_readiness_failure \
-    'http://127.0.0.1:28080/api/v1/system/readiness' \
     "$evidence_dir/forced-backend-readiness.json" \
     "$evidence_dir/forced-backend-readiness-status.txt"
   printf 'forced failure: backend readiness returned 503 after the controlled MySQL outage\n' >&2
