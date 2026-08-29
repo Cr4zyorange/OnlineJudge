@@ -11,8 +11,8 @@
 | Docker | Client 29.3.1 / Server 29.3.1，Linux engine |
 | Nginx | `nginx:1.27-alpine@sha256:65645c7bb6a0661892a8b03b89d0743208a18dd2f3f17a54ef4b76fb8e2f2a10` |
 | Java / Maven | Oracle JDK 24.0.2 / Maven 3.9.16 |
-| 基线 SHA | `1f7c890a6b4ad3756f086f487effccb09b4c9816`（`origin/dev`） |
-| 被测实现 SHA | `0846a6e4a5f2933199cc5dd7fce943a5b289b8ac` |
+| 基线 SHA | `6ca04f35d2b1ac139b8f765e5b0cb345904d0e76`（`origin/dev`） |
+| 被测实现 SHA | `334ca75f2b7dba80bc65a3b8099a962404d344ac` |
 | 分支 | `feature/317-gateway-routing` |
 
 ## Red-Green 记录
