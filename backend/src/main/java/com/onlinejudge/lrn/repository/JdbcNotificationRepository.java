@@ -1,5 +1,6 @@
 package com.onlinejudge.lrn.repository;
 
+import com.onlinejudge.integration.learning.LearningCourseClient;
 import com.onlinejudge.lrn.domain.Notification;
 import com.onlinejudge.lrn.service.NotificationCreateCommand;
 import org.springframework.dao.DuplicateKeyException;
@@ -13,27 +14,20 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 @Repository
 public class JdbcNotificationRepository {
     private final JdbcTemplate jdbcTemplate;
+    private final LearningCourseClient courseClient;
 
-    public JdbcNotificationRepository(JdbcTemplate jdbcTemplate) {
+    public JdbcNotificationRepository(JdbcTemplate jdbcTemplate, LearningCourseClient courseClient) {
         this.jdbcTemplate = jdbcTemplate;
+        this.courseClient = courseClient;
     }
 
     public boolean isActiveCourseMember(long userId, long courseId) {
-        Integer count = jdbcTemplate.queryForObject("""
-                SELECT COUNT(*)
-                FROM crs_course_member member
-                INNER JOIN crs_course course ON course.id = member.course_id
-                WHERE member.user_id = ?
-                  AND member.course_id = ?
-                  AND member.join_status = 'ACTIVE'
-                  AND member.is_deleted = FALSE
-                  AND course.is_deleted = FALSE
-                """, Integer.class, userId, courseId);
-        return count != null && count > 0;
+        return courseClient.isActiveMember(userId, courseId);
     }
 
     public Optional<Long> save(long userId, String type, NotificationCreateCommand command, String idempotencyKey) {
@@ -74,48 +68,31 @@ public class JdbcNotificationRepository {
                                          LocalDateTime startTime, LocalDateTime endTime,
                                          int page, int size) {
         QueryParts query = notificationFilter(userId, type, isRead, startTime, endTime);
-        List<Object> args = new ArrayList<>(query.args());
-        args.add(Math.max(0, (page - 1) * size));
-        args.add(size);
-        return jdbcTemplate.query("""
+        Set<Long> visibleCourses = Set.copyOf(courseClient.findActiveCourseIds(userId));
+        List<Notification> visible = jdbcTemplate.query("""
                 SELECT id, user_id, course_id, title, content, type, priority, is_read,
                        source_module, source_id, action_url, created_at, read_at
                 FROM lrn_notification notification
                 """ + query.whereClause() + """
                 ORDER BY created_at DESC, id DESC
-                LIMIT ?, ?
-                """, this::mapRow, args.toArray());
+                """, this::mapRow, query.args().toArray()).stream()
+                .filter(notification -> visible(notification.courseId(), visibleCourses)).toList();
+        int from = Math.min(Math.max(0, (page - 1) * size), visible.size());
+        return visible.subList(from, Math.min(from + size, visible.size()));
     }
 
     public long countByUser(long userId, String type, Boolean isRead, LocalDateTime startTime, LocalDateTime endTime) {
         QueryParts query = notificationFilter(userId, type, isRead, startTime, endTime);
-        Long count = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM lrn_notification notification " + query.whereClause(),
-                Long.class, query.args().toArray());
-        return count == null ? 0 : count;
+        Set<Long> visibleCourses = Set.copyOf(courseClient.findActiveCourseIds(userId));
+        return jdbcTemplate.query("""
+                SELECT id,user_id,course_id,title,content,type,priority,is_read,source_module,source_id,action_url,created_at,read_at
+                FROM lrn_notification notification
+                """ + query.whereClause(), this::mapRow, query.args().toArray()).stream()
+                .filter(notification -> visible(notification.courseId(), visibleCourses)).count();
     }
 
     public long countUnread(long userId) {
-        Long count = jdbcTemplate.queryForObject("""
-                SELECT COUNT(*)
-                FROM lrn_notification notification
-                WHERE notification.user_id = ?
-                  AND notification.is_read = FALSE
-                  AND notification.deleted_at IS NULL
-                  AND (
-                    notification.course_id IS NULL
-                    OR EXISTS (
-                        SELECT 1
-                        FROM crs_course_member member
-                        INNER JOIN crs_course course ON course.id = member.course_id
-                        WHERE member.course_id = notification.course_id
-                          AND member.user_id = notification.user_id
-                          AND member.join_status = 'ACTIVE'
-                          AND member.is_deleted = FALSE
-                          AND course.is_deleted = FALSE
-                    )
-                  )
-                """, Long.class, userId);
-        return count == null ? 0 : count;
+        return countByUser(userId, null, false, null, null);
     }
 
     public int markRead(long userId, List<Long> notificationIds, boolean readAll) {
@@ -162,19 +139,6 @@ public class JdbcNotificationRepository {
         StringBuilder where = new StringBuilder("""
                 WHERE notification.user_id = ?
                   AND notification.deleted_at IS NULL
-                  AND (
-                    notification.course_id IS NULL
-                    OR EXISTS (
-                        SELECT 1
-                        FROM crs_course_member member
-                        INNER JOIN crs_course course ON course.id = member.course_id
-                        WHERE member.course_id = notification.course_id
-                          AND member.user_id = notification.user_id
-                          AND member.join_status = 'ACTIVE'
-                          AND member.is_deleted = FALSE
-                          AND course.is_deleted = FALSE
-                    )
-                  )
                 """);
         List<Object> args = new ArrayList<>();
         args.add(userId);
@@ -208,8 +172,9 @@ public class JdbcNotificationRepository {
             idFilter = " AND notification.id IN (" + placeholders(notificationIds.size()) + ")";
             args.addAll(notificationIds);
         }
+        Set<Long> visibleCourses = Set.copyOf(courseClient.findActiveCourseIds(userId));
         return jdbcTemplate.query("""
-                SELECT notification.id,
+                SELECT notification.id,notification.course_id,
                        CASE WHEN notification.is_read = TRUE THEN 'READ' ELSE 'UNREAD' END AS current_status
                 FROM lrn_notification notification
                 """ + visibleNotificationWhere() + """
@@ -218,21 +183,24 @@ public class JdbcNotificationRepository {
                 ORDER BY notification.id
                 """, (rs, rowNum) -> new StatusTarget(
                 rs.getLong("id"),
+                nullableLong(rs, "course_id"),
                 rs.getString("current_status")
-        ), args.toArray());
+        ), args.toArray()).stream().filter(target -> visible(target.courseId(), visibleCourses)).toList();
     }
 
     private Optional<StatusTarget> findDeletableTarget(long userId, long notificationId) {
+        Set<Long> visibleCourses = Set.copyOf(courseClient.findActiveCourseIds(userId));
         List<StatusTarget> targets = jdbcTemplate.query("""
-                SELECT notification.id,
+                SELECT notification.id,notification.course_id,
                        CASE WHEN notification.is_read = TRUE THEN 'READ' ELSE 'UNREAD' END AS current_status
                 FROM lrn_notification notification
                 """ + visibleNotificationWhere() + """
                   AND notification.id = ?
                 """, (rs, rowNum) -> new StatusTarget(
                 rs.getLong("id"),
+                nullableLong(rs, "course_id"),
                 rs.getString("current_status")
-        ), userId, notificationId);
+        ), userId, notificationId).stream().filter(target -> visible(target.courseId(), visibleCourses)).toList();
         return targets.stream().findFirst();
     }
 
@@ -240,19 +208,6 @@ public class JdbcNotificationRepository {
         return """
                 WHERE notification.user_id = ?
                   AND notification.deleted_at IS NULL
-                  AND (
-                    notification.course_id IS NULL
-                    OR EXISTS (
-                        SELECT 1
-                        FROM crs_course_member member
-                        INNER JOIN crs_course course ON course.id = member.course_id
-                        WHERE member.course_id = notification.course_id
-                          AND member.user_id = notification.user_id
-                          AND member.join_status = 'ACTIVE'
-                          AND member.is_deleted = FALSE
-                          AND course.is_deleted = FALSE
-                    )
-                  )
                 """;
     }
 
@@ -296,6 +251,10 @@ public class JdbcNotificationRepository {
     private record QueryParts(String whereClause, List<Object> args) {
     }
 
-    private record StatusTarget(long notificationId, String status) {
+    private boolean visible(Long courseId, Set<Long> visibleCourses) {
+        return courseId == null || visibleCourses.contains(courseId);
+    }
+
+    private record StatusTarget(long notificationId, Long courseId, String status) {
     }
 }

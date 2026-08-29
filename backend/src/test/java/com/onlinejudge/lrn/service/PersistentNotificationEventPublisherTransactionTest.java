@@ -2,6 +2,7 @@ package com.onlinejudge.lrn.service;
 
 import com.onlinejudge.common.event.NotificationEvent;
 import com.onlinejudge.common.event.NotificationEventPublisher;
+import com.onlinejudge.integration.learning.LearningCourseClient;
 import com.onlinejudge.lrn.repository.JdbcNotificationRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -47,9 +48,17 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class PersistentNotificationEventPublisherTransactionTest {
     static class TestConfig {
         @Bean
+        LearningCourseClient learningCourseClient() {
+            return org.mockito.Mockito.mock(LearningCourseClient.class);
+        }
+
+        @Bean
         @Primary
-        TestNotificationRepository notificationRepository(JdbcTemplate jdbcTemplate) {
-            return new TestNotificationRepository(jdbcTemplate);
+        TestNotificationRepository notificationRepository(
+                JdbcTemplate jdbcTemplate,
+                LearningCourseClient learningCourseClient
+        ) {
+            return new TestNotificationRepository(jdbcTemplate, learningCourseClient);
         }
 
         @Bean
@@ -69,8 +78,8 @@ class PersistentNotificationEventPublisherTransactionTest {
     static class TestNotificationRepository extends JdbcNotificationRepository {
         private boolean failNextSave;
 
-        TestNotificationRepository(JdbcTemplate jdbcTemplate) {
-            super(jdbcTemplate);
+        TestNotificationRepository(JdbcTemplate jdbcTemplate, LearningCourseClient learningCourseClient) {
+            super(jdbcTemplate, learningCourseClient);
         }
 
         void failNextSave() {

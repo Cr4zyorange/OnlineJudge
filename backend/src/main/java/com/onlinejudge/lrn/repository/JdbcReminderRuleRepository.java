@@ -1,5 +1,7 @@
 package com.onlinejudge.lrn.repository;
 
+import com.onlinejudge.integration.learning.LearningAssessmentClient;
+import com.onlinejudge.integration.learning.LearningCourseClient;
 import com.onlinejudge.lrn.service.NotificationSettingItem;
 import com.onlinejudge.lrn.service.ReminderRuleItem;
 import com.onlinejudge.lrn.service.ReminderTaskTarget;
@@ -11,13 +13,20 @@ import java.sql.SQLException;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Repository
 public class JdbcReminderRuleRepository {
     private final JdbcTemplate jdbcTemplate;
+    private final LearningCourseClient courseClient;
+    private final LearningAssessmentClient assessmentClient;
 
-    public JdbcReminderRuleRepository(JdbcTemplate jdbcTemplate) {
+    public JdbcReminderRuleRepository(JdbcTemplate jdbcTemplate, LearningCourseClient courseClient,
+                                      LearningAssessmentClient assessmentClient) {
         this.jdbcTemplate = jdbcTemplate;
+        this.courseClient = courseClient;
+        this.assessmentClient = assessmentClient;
     }
 
     public List<ReminderRuleItem> findRules(long userId) {
@@ -87,103 +96,23 @@ public class JdbcReminderRuleRepository {
     }
 
     public List<Long> findUsersWithUpcomingDeadlineTasks(LocalDateTime now, LocalDateTime latestDeadline) {
-        return jdbcTemplate.queryForList("""
-                SELECT DISTINCT member.user_id
-                FROM crs_course_member member
-                INNER JOIN crs_course course ON course.id = member.course_id
-                WHERE member.role = 'STUDENT'
-                  AND member.join_status = 'ACTIVE'
-                  AND member.is_deleted = FALSE
-                  AND course.is_deleted = FALSE
-                  AND (
-                    EXISTS (
-                        SELECT 1
-                        FROM t_hwk_homework homework
-                        WHERE homework.course_id = member.course_id
-                          AND homework.status = 'PUBLISHED'
-                          AND homework.is_deleted = FALSE
-                          AND homework.deadline > ?
-                          AND homework.deadline <= ?
-                          AND NOT EXISTS (
-                              SELECT 1
-                              FROM t_hwk_submission submission
-                              WHERE submission.homework_id = homework.id
-                                AND submission.student_id = member.user_id
-                                AND submission.is_deleted = FALSE
-                          )
-                    )
-                    OR EXISTS (
-                        SELECT 1
-                        FROM lab_experiment lab
-                        WHERE lab.course_id = member.course_id
-                          AND lab.status = 'PUBLISHED'
-                          AND lab.deleted = FALSE
-                          AND lab.deadline > ?
-                          AND lab.deadline <= ?
-                          AND NOT EXISTS (
-                              SELECT 1
-                              FROM lab_submission submission
-                              WHERE submission.lab_id = lab.id
-                                AND submission.student_id = member.user_id
-                                AND submission.deleted = FALSE
-                          )
-                    )
-                  )
-                """, Long.class, now, latestDeadline, now, latestDeadline);
+        Map<Long, List<Long>> coursesByUser = courseClient.findAllActiveStudents().stream().collect(Collectors.groupingBy(
+                LearningCourseClient.StudentMembership::userId,
+                Collectors.mapping(LearningCourseClient.StudentMembership::courseId, Collectors.toList())));
+        return coursesByUser.entrySet().stream().filter(entry ->
+                !assessmentClient.findUpcomingTasks(entry.getKey(), entry.getValue(), now, latestDeadline, "HWK").isEmpty()
+                        || !assessmentClient.findUpcomingTasks(entry.getKey(), entry.getValue(), now, latestDeadline, "LAB").isEmpty())
+                .map(Map.Entry::getKey).sorted().toList();
     }
 
     public List<ReminderTaskTarget> findHomeworkTargets(long userId, LocalDateTime windowStart, LocalDateTime windowEnd) {
-        return jdbcTemplate.query("""
-                SELECT member.user_id, homework.course_id, homework.id AS source_id, homework.title, homework.deadline
-                FROM t_hwk_homework homework
-                INNER JOIN crs_course_member member ON member.course_id = homework.course_id
-                INNER JOIN crs_course course ON course.id = homework.course_id
-                WHERE member.user_id = ?
-                  AND member.role = 'STUDENT'
-                  AND member.join_status = 'ACTIVE'
-                  AND member.is_deleted = FALSE
-                  AND course.is_deleted = FALSE
-                  AND homework.status = 'PUBLISHED'
-                  AND homework.is_deleted = FALSE
-                  AND homework.deadline > ?
-                  AND homework.deadline <= ?
-                  AND NOT EXISTS (
-                      SELECT 1
-                      FROM t_hwk_submission submission
-                      WHERE submission.homework_id = homework.id
-                        AND submission.student_id = member.user_id
-                        AND submission.is_deleted = FALSE
-                  )
-                ORDER BY homework.deadline ASC, homework.id ASC
-                """, (rs, rowNum) -> mapTarget(rs, "HWK", "/courses/%d/homeworks/%d?role=student"),
-                userId, windowStart, windowEnd);
+        return assessmentClient.findUpcomingTasks(userId, courseClient.findActiveCourseIds(userId), windowStart, windowEnd, "HWK")
+                .stream().map(task -> target(userId, task)).toList();
     }
 
     public List<ReminderTaskTarget> findLabTargets(long userId, LocalDateTime windowStart, LocalDateTime windowEnd) {
-        return jdbcTemplate.query("""
-                SELECT member.user_id, lab.course_id, lab.id AS source_id, lab.title, lab.deadline
-                FROM lab_experiment lab
-                INNER JOIN crs_course_member member ON member.course_id = lab.course_id
-                INNER JOIN crs_course course ON course.id = lab.course_id
-                WHERE member.user_id = ?
-                  AND member.role = 'STUDENT'
-                  AND member.join_status = 'ACTIVE'
-                  AND member.is_deleted = FALSE
-                  AND course.is_deleted = FALSE
-                  AND lab.status = 'PUBLISHED'
-                  AND lab.deleted = FALSE
-                  AND lab.deadline > ?
-                  AND lab.deadline <= ?
-                  AND NOT EXISTS (
-                      SELECT 1
-                      FROM lab_submission submission
-                      WHERE submission.lab_id = lab.id
-                        AND submission.student_id = member.user_id
-                        AND submission.deleted = FALSE
-                  )
-                ORDER BY lab.deadline ASC, lab.id ASC
-                """, (rs, rowNum) -> mapTarget(rs, "LAB", "/courses/%d/labs/%d?role=student"),
-                userId, windowStart, windowEnd);
+        return assessmentClient.findUpcomingTasks(userId, courseClient.findActiveCourseIds(userId), windowStart, windowEnd, "LAB")
+                .stream().map(task -> target(userId, task)).toList();
     }
 
     public void insertScanLog(String batchId, LocalDateTime startedAt, LocalDateTime endedAt,
@@ -205,17 +134,9 @@ public class JdbcReminderRuleRepository {
         );
     }
 
-    private ReminderTaskTarget mapTarget(ResultSet rs, String sourceModule, String actionTemplate) throws SQLException {
-        long courseId = rs.getLong("course_id");
-        long sourceId = rs.getLong("source_id");
-        return new ReminderTaskTarget(
-                rs.getLong("user_id"),
-                courseId,
-                sourceId,
-                sourceModule,
-                rs.getString("title"),
-                rs.getObject("deadline", LocalDateTime.class),
-                actionTemplate.formatted(courseId, sourceId)
-        );
+    private ReminderTaskTarget target(long userId, LearningAssessmentClient.DeadlineTask task) {
+        String segment = "HWK".equals(task.sourceModule()) ? "homeworks" : "labs";
+        return new ReminderTaskTarget(userId, task.courseId(), task.sourceId(), task.sourceModule(), task.title(),
+                task.deadline(), "/courses/%d/%s/%d?role=student".formatted(task.courseId(), segment, task.sourceId()));
     }
 }
