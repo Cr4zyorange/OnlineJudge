@@ -137,8 +137,10 @@ jobs:
           cache-dependency-path: backend/pom.xml
       - name: Collect environment manifest
         run: bash scripts/ci/collect-environment.sh "$GITHUB_WORKSPACE" ci-artifacts/contracts-gate/environment.json
-      - name: Repository contract gates
-        run: bash scripts/ci/contract-verify.sh "$GITHUB_WORKSPACE"
+      - name: Repository contract gates (consumer side)
+        run: bash scripts/ci/contract-verify.sh "$GITHUB_WORKSPACE" consumer
+      - name: Repository contract gates (producer side)
+        run: bash scripts/ci/contract-verify.sh "$GITHUB_WORKSPACE" producer
       - name: Upload contract evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -147,6 +149,8 @@ jobs:
           path: |
             ci-artifacts/contracts-gate/**
             backend/target/surefire-reports/contract/**
+            backend/target/surefire-reports/contract-consumer/**
+            backend/target/surefire-reports/contract-producer/**
           if-no-files-found: warn
           retention-days: 14
 
