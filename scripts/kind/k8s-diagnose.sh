@@ -38,6 +38,9 @@ collect describe-mysql.txt --namespace "$K8S_NAMESPACE" describe statefulset mys
 collect describe-backend.txt --namespace "$K8S_NAMESPACE" describe deployment backend
 collect describe-frontend.txt --namespace "$K8S_NAMESPACE" describe deployment frontend
 collect describe-pods.txt --namespace "$K8S_NAMESPACE" describe pods
+collect gateway-config.txt --namespace "$K8S_NAMESPACE" get configmap gateway-config -o yaml
+collect gateway-mounted-config.txt --namespace "$K8S_NAMESPACE" exec deployment/frontend -- cat /etc/nginx/conf.d/default.conf
+collect gateway-nginx-test.txt --namespace "$K8S_NAMESPACE" exec deployment/frontend -- nginx -t
 collect logs-mysql.txt --namespace "$K8S_NAMESPACE" logs statefulset/mysql --all-containers --tail=200
 collect logs-backend.txt --namespace "$K8S_NAMESPACE" logs deployment/backend --all-containers --tail=200
 collect logs-frontend.txt --namespace "$K8S_NAMESPACE" logs deployment/frontend --all-containers --tail=200
