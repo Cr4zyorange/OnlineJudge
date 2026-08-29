@@ -104,17 +104,24 @@ DEV/CI 环境可追加 `--seed`，Kind 中使用同一脚本的 `kubectl` adapte
 | Docker Compose v2 | 编排容器和健康等待 | `docker compose version` |
 | Bash、curl 7.76+、Python 3、grep、sed | 执行验收脚本 | `bash --version`、`curl --version`、`python3 --version` |
 
-在 macOS、Linux 或 Windows 的 Git Bash/WSL 中执行以下命令。先确认 checkout 干净：镜像构建脚本会拒绝任何已跟踪或未跟踪改动，防止镜像内容与 `GIT_SHA`/OCI revision 脱节。密码只在当前 shell 中保存；不要把值写入终端历史、日志或仓库文件。
+在 macOS、Linux 或 Windows 的 Git Bash/WSL 中执行以下命令。命令块显式使用 Bash，因此在 macOS 默认 zsh 中也可直接粘贴。先确认 checkout 干净：镜像构建脚本会拒绝任何已跟踪或未跟踪改动，防止镜像内容与 `GIT_SHA`/OCI revision 脱节。密码只在当前 shell 中保存；不要把值写入终端历史、日志或仓库文件。
 
 ```bash
+bash -c '
+set -Eeuo pipefail
 git status --short
 export GIT_SHA="$(git rev-parse HEAD)"
-read -r -s -p 'MYSQL_PASSWORD: ' MYSQL_PASSWORD; printf '\n'; export MYSQL_PASSWORD
-read -r -s -p 'MYSQL_ROOT_PASSWORD: ' MYSQL_ROOT_PASSWORD; printf '\n'; export MYSQL_ROOT_PASSWORD
+read -r -s -p "MYSQL_PASSWORD: " MYSQL_PASSWORD
+printf "\n"
+export MYSQL_PASSWORD
+read -r -s -p "MYSQL_ROOT_PASSWORD: " MYSQL_ROOT_PASSWORD
+printf "\n"
+export MYSQL_ROOT_PASSWORD
 bash scripts/docker/build-images.sh
 OJ_HTTP_PORT=127.0.0.1:18088 \
   CONTAINER_SMOKE_RUN_ID=local-replay \
   bash scripts/docker/smoke-images.sh
+'
 ```
 
 `deploy/docker/.env.example` 只提供键名与非敏感默认值；复制出的 `.env` 不得提交，也不能用空密码绕过必填 Secret。`smoke-images.sh` 会建立带 SHA/运行标识的独立 Compose project，断言三服务 healthy、镜像 tag/OCI revision、两条 readiness 路径和登录至通知的业务只读链路，并在成功或失败后精确删除该 project 的容器、网络和卷。需要保留数据的手动启动、停止和迁移入口见 [部署文档](docs/最终提交/部署文档.md)。
