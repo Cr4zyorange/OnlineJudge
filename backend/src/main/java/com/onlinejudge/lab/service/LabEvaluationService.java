@@ -3,6 +3,8 @@ package com.onlinejudge.lab.service;
 import com.onlinejudge.common.evaluation.EvaluationStatus;
 import com.onlinejudge.common.evaluation.EvaluationTask;
 import com.onlinejudge.common.evaluation.Evaluator;
+import com.onlinejudge.common.event.NotificationEvent;
+import com.onlinejudge.common.event.NotificationEventPublisher;
 import com.onlinejudge.lab.domain.LabEvaluation;
 import com.onlinejudge.lab.domain.LabEvaluationCaseResult;
 import com.onlinejudge.lab.domain.LabEvaluationRepository;
@@ -31,17 +33,20 @@ public class LabEvaluationService {
     private final LabSubmissionRepository labSubmissionRepository;
     private final LabEvaluationRepository labEvaluationRepository;
     private final LabEvaluationResultRepository labEvaluationResultRepository;
+    private final NotificationEventPublisher notificationEventPublisher;
 
     public LabEvaluationService(
             Evaluator evaluator,
             LabSubmissionRepository labSubmissionRepository,
             LabEvaluationRepository labEvaluationRepository,
-            LabEvaluationResultRepository labEvaluationResultRepository
+            LabEvaluationResultRepository labEvaluationResultRepository,
+            NotificationEventPublisher notificationEventPublisher
     ) {
         this.evaluator = evaluator;
         this.labSubmissionRepository = labSubmissionRepository;
         this.labEvaluationRepository = labEvaluationRepository;
         this.labEvaluationResultRepository = labEvaluationResultRepository;
+        this.notificationEventPublisher = notificationEventPublisher;
     }
 
     @Async("labEvaluationExecutor")
@@ -109,7 +114,7 @@ public class LabEvaluationService {
                 ));
                 currentTestcase = null;
             }
-            return finalizeEvaluation(submission, startedAt, caseResults);
+            return finalizeEvaluation(experiment, submission, startedAt, caseResults);
         } catch (RuntimeException exception) {
             LocalDateTime failedAt = LocalDateTime.now();
             String failureMessage = resolveFailureMessage(exception);
@@ -149,13 +154,22 @@ public class LabEvaluationService {
                     startedAt,
                     failedAt
             );
-            return labSubmissionRepository.update(
+            LabSubmission updated = labSubmissionRepository.update(
                     submission.withEvaluationResult(EvaluationStatus.SYSTEM_ERROR, autoScore, submission.finalScore(), failedAt)
             );
+            publishCompletionEvent(
+                    experiment,
+                    submission,
+                    EvaluationStatus.SYSTEM_ERROR,
+                    passedCases,
+                    resolveEvaluationMessage(EvaluationStatus.SYSTEM_ERROR, passedCases)
+            );
+            return updated;
         }
     }
 
     private LabSubmission finalizeEvaluation(
+            LabExperiment experiment,
             LabSubmission submission,
             LocalDateTime startedAt,
             List<LabEvaluationCaseResult> caseResults
@@ -184,7 +198,39 @@ public class LabEvaluationService {
                 startedAt,
                 finishedAt
         );
-        return labSubmissionRepository.update(submission.withEvaluationResult(finalStatus, autoScore, submission.finalScore(), finishedAt));
+        LabSubmission updated = labSubmissionRepository.update(
+                submission.withEvaluationResult(finalStatus, autoScore, submission.finalScore(), finishedAt)
+        );
+        publishCompletionEvent(
+                experiment,
+                submission,
+                finalStatus,
+                passedCases,
+                resolveEvaluationMessage(finalStatus, passedCases)
+        );
+        return updated;
+    }
+
+    private void publishCompletionEvent(
+            LabExperiment experiment,
+            LabSubmission submission,
+            EvaluationStatus status,
+            int passedCases,
+            String message
+    ) {
+        notificationEventPublisher.publish(new NotificationEvent(
+                "LAB_EVALUATION_" + submission.id(),
+                "LAB_EVALUATION_COMPLETED",
+                experiment.courseId(),
+                List.of(submission.studentId()),
+                "实验评测完成",
+                "实验评测完成（" + status + "）：" + message
+                        + "（通过 " + passedCases + " 个用例）",
+                "LAB",
+                experiment.id(),
+                "/courses/" + experiment.courseId() + "/labs/" + experiment.id(),
+                LocalDateTime.now()
+        ));
     }
 
     private LabEvaluation upsertEvaluation(
