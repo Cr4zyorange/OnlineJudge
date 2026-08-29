@@ -15,4 +15,8 @@ public record EvaluationTask(
         Map<String, String> options,
         LocalDateTime submittedAt
 ) {
+    /**
+     * #310 C-07 评测任务契约版本。
+     */
+    public static final String VERSION = "v1";
 }

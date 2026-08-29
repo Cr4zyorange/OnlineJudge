@@ -12,4 +12,8 @@ public record EvaluationResult(
         List<String> caseResults,
         LocalDateTime finishedAt
 ) {
+    /**
+     * #310 C-07 评测结果契约版本。
+     */
+    public static final String VERSION = "v1";
 }
