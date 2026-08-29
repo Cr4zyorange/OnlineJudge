@@ -105,6 +105,20 @@ class DockerComposeContractTest {
     }
 
     @Test
+    void gatewayComposeOverrideStartsWithAllFourTargetsOnTheMonolith() throws IOException {
+        String override = Files.readString(Path.of("..", "deploy", "docker", "compose.gateway.yml"));
+        String defaults = Files.readString(Path.of("..", "deploy", "nginx", "gateway-defaults.env"));
+
+        assertThat(override).contains("gateway-runtime/default.conf:/etc/nginx/conf.d/default.conf:ro");
+        assertThat(defaults.lines().filter(line -> line.endsWith("=backend:8080"))).hasSize(4);
+        assertThat(defaults).contains(
+                "AUTH_UPSTREAM=backend:8080",
+                "CRS_UPSTREAM=backend:8080",
+                "ASSESSMENT_UPSTREAM=backend:8080",
+                "LEARNING_GRADE_UPSTREAM=backend:8080");
+    }
+
+    @Test
     void dockerBuildContextExcludesLocalBuildArtifacts() throws IOException {
         Path dockerIgnore = Path.of("..", ".dockerignore");
         String ignores = Files.readString(dockerIgnore);
