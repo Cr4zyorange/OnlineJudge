@@ -21,15 +21,25 @@ test.describe('@crs CRS 主流程闭环', () => {
     await page.goto('/courses');
     await expect(page.getByText('数据结构全流程演示课')).toBeVisible();
 
-    // 教师建课
+    // 教师建课：创建表单位于“我管理的”工作区，不能假设课程列表页直接显示它。
     const courseName = `E2E闭环课-${Date.now()}`;
-    await page.getByRole('button', { name: /创建课程/ }).click();
-    await page.getByLabel(/课程名称/).fill(courseName);
-    await page.getByRole('button', { name: /保存|创建/ }).click();
+    await page.getByRole('button', { name: '我管理的' }).click();
+    await expect(page.getByRole('heading', { name: '课程创建与管理' })).toBeVisible();
+    await page.getByLabel('课程名称').fill(courseName);
+    await page.getByLabel('学期').fill('2026秋');
+    await page.getByLabel('课程分类').fill('E2E');
+    await page.getByLabel('开课日期').fill('2026-09-01');
+    await page.getByLabel('结课日期').fill('2027-01-15');
+    await page.getByLabel('课程状态').selectOption('ACTIVE');
+    await page.getByRole('button', { name: '创建课程' }).click();
     await expect(page.getByText(courseName)).toBeVisible();
 
-    // 进入课程详情，验证管理入口
-    await page.getByText(courseName).click();
+    // 管理页的课程卡片不可直接打开详情；切回可进入详情的全部课程页。
+    await page.getByRole('button', { name: '全部课程' }).click();
+    const teacherCourseCard = page.locator('.course-card').filter({ hasText: courseName });
+    await teacherCourseCard.getByRole('button', { name: '管理课程' }).click();
+
+    // 进入课程详情，验证管理入口。
     await expect(page.getByRole('button', { name: /管理章节/ })).toBeVisible();
     await expect(page.getByRole('button', { name: /管理资源/ })).toBeVisible();
     await expect(page.getByRole('button', { name: /管理公告/ })).toBeVisible();
@@ -39,8 +49,10 @@ test.describe('@crs CRS 主流程闭环', () => {
     await expect(page).toHaveURL(/\/login(?:\?.*)?$/);
     await loginAs('student');
     await page.goto('/courses');
-    await page.getByText(courseName).click();
-    await page.getByRole('button', { name: /直接加入/ }).click();
+    const studentCourseCard = page.locator('.course-card').filter({ hasText: courseName });
+    // 非成员不可先进入课程详情；必须通过卡片上的公开加入动作取得成员关系。
+    await studentCourseCard.getByRole('button', { name: '直接加入' }).click();
+    await expect(page.getByTestId('course-detail-page')).toBeVisible();
     await waitForBusinessState(page.locator('body'), /课程详情|课程公告/);
   });
 
@@ -120,6 +132,7 @@ test.describe('@crs CRS 主流程闭环', () => {
     await page.getByRole('button', { name: /退出/ }).click();
     await expect(page).toHaveURL(/\/login(?:\?.*)?$/);
     await loginAs('student');
+    await page.goto('/courses');
     const afterApproval = await page.evaluate(async ({ courseId }) => {
       const token = window.localStorage.getItem('onlinejudge.authToken');
       return fetch(`/api/v1/courses/${courseId}/permissions/${window.localStorage.getItem('onlinejudge.userId')}`, {

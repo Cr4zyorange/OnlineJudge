@@ -84,6 +84,7 @@ script_for() {
     backend-gate) printf '%s' scripts/ci/backend-verify.sh ;;
     frontend-gate) printf '%s' scripts/ci/frontend-verify.sh ;;
     contracts-gate) printf '%s' scripts/ci/contract-verify.sh ;;
+    browser-e2e-gate) printf '%s' scripts/ci/browser-e2e-verify.sh ;;
     delivery) printf '%s' scripts/ci/delivery-checkpoint.sh ;;
     *) return 1 ;;
   esac
