@@ -165,7 +165,7 @@
 | 版本 | `v1`（`SourceGradeDTO.VERSION`；字段集合由契约测试冻结）。 |
 | 鉴权 | 来源查询由 GRD 内部调用身份发起；对外成绩只经 GRD 发布接口暴露。 |
 | 错误码 | 无 HTTP 错误码；下游不可用/超时抛 `SourceGradeUnavailableException`，GRD 原子中止本次同步，不生成部分结果。 |
-| 超时 | `onlinejudge.integration.grade.timeout-ms`（默认 1000ms）；超时按下游失败处理（中止，不静默 MISSING）。 |
+| 超时 | `onlinejudge.integration.grade.timeout-ms`（默认 1000ms，已在 `application.properties` 显式声明）；Spring 通过 `@Value` 绑定生产 Bean，非默认值必须实际生效，非法值（≤0）构造期快速失败；超时按下游失败处理（中止，不静默 MISSING）。 |
 | 幂等键 | 只读查询天然幂等；重复查询结果稳定。 |
 | 重试 | 不自动重试；GRD 侧由同步任务重跑（有界、人工可触发）。 |
 | 补偿/降级 | 禁止 GRD 直连 LAB/HWK 表或 Repository；来源不可用时保留既有成绩快照，不写不可解释总评。 |
@@ -222,9 +222,10 @@
 | --- | --- | --- |
 | 结构冻结 | `CrossServiceContractRegistryTest`：契约类型、版本常量、状态枚举、禁止 import | `mvn test -Dtest=CrossServiceContractRegistryTest` |
 | 文档完整性 | `ContractDocumentationCompletenessTest`：14 项属性、失败矩阵、consumer/producer 运行口径 | `mvn test -Dtest=ContractDocumentationCompletenessTest` |
-| 消费端 | `CommonInfrastructureContractTest` + 结构/文档冻结 + `CoursePermissionConsumerContractTest` + `SourceGradeConsumerContractTest` | `bash scripts/ci/contract-verify.sh <checkout> consumer` |
+| 消费端 | `CommonInfrastructureContractTest` + 结构/文档冻结 + `CoursePermissionConsumerContractTest` + `SourceGradeConsumerContractTest` + `GradeTimeoutConfigurationTest` | `bash scripts/ci/contract-verify.sh <checkout> consumer` |
 | 生产端 | `CommonInfrastructureContractTest` + 结构/文档冻结 + `CoursePermissionProducerContractTest` + `SourceGradeProducerContractTest` + `EvaluationCompletionEventContractTest` + `AuthContextContractTest` | `bash scripts/ci/contract-verify.sh <checkout> producer` |
 | 全量 | 上述全部 | `bash scripts/ci/contract-verify.sh <checkout> all` 或不传 side |
+| 配置层 | `GradeTimeoutConfigurationTest`：非默认 `timeout-ms` 生效、非法值快速失败、Duration 校验 | `mvn test -Dtest=GradeTimeoutConfigurationTest`；随消费端套件与后端集成门禁运行 |
 
 `contract-verify.sh` 同时保留既有 shell 契约门禁；`ci.yml` 的 `contracts-gate` 以两个独立步骤顺序执行 consumer/producer 两侧并分别归档证据（`ci-artifacts/contracts-gate/consumer`、`/producer` 与 surefire `contract-consumer`/`contract-producer`），任一侧失败即阻断 delivery。
 
@@ -238,4 +239,6 @@
 | GREEN：消费端契约套件独立运行 | Windows 11 + Java 21 | 被测 `9758511` | `mvn -B -ntp test -Dtest="CommonInfrastructureContractTest,CrossServiceContractRegistryTest,ContractDocumentationCompletenessTest,CoursePermissionConsumerContractTest,SourceGradeConsumerContractTest"` | `exit 0`；20 total / 0 failures / 0 errors / 0 skipped；日志 `output/issue-310/green-contract-consumer.log` |
 | GREEN：生产端契约套件独立运行 | 同上 | 被测 `9758511` | `mvn -B -ntp test -Dtest="CommonInfrastructureContractTest,CrossServiceContractRegistryTest,ContractDocumentationCompletenessTest,CoursePermissionProducerContractTest,SourceGradeProducerContractTest,EvaluationCompletionEventContractTest,AuthContextContractTest"` | `exit 0`；27 total / 0 failures / 0 errors / 0 skipped；日志 `output/issue-310/green-contract-producer.log` |
 | GREEN：后端全量回归 | 同上 | 被测 `9758511` | `mvn -B -ntp test` | `exit 0`；443 total / 0 failures / 0 errors / 7 skipped；日志 `output/issue-310/backend-full-regression-final.log` |
+| RED：P1 超时配置绑定 | 同上 | 被测 `9758511` | `mvn -B -ntp test -Dtest=GradeTimeoutConfigurationTest` | `exit 1`；3/3 失败（50ms 配置未生效、非法值未拒绝、Duration 未校验）；日志 `output/issue-310/red-grade-timeout-config.log` |
+| GREEN：P1 超时配置绑定 | 同上 | 被测 `0fa9b9d` | `mvn -B -ntp test -Dtest=GradeTimeoutConfigurationTest` | `exit 0`；3 total / 0 failures / 0 errors / 0 skipped；消费端套件 21/21、全量 446（0 fail/0 err/7 skip）exit 0，日志 `output/issue-310/green-contract-consumer-p1fix.log`、`backend-full-regression-p1fix.log` |
 | CI 流水线 | GitHub Actions（待 PR 触发） | 被测 `9758511` | `contracts-gate` job 顺序执行 consumer/producer 两侧 | 本机已按同一条命令与套件验证；Actions 链接待 PR 推送后回填 |
