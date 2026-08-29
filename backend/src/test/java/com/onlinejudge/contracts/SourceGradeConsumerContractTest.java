@@ -12,6 +12,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -67,8 +68,9 @@ class SourceGradeConsumerContractTest {
     }
 
     @Test
-    void consumerTimesOutAndAbortsWithoutPartialResults() {
-        CountDownLatch neverRelease = new CountDownLatch(1);
+    void consumerTimesOutAndAbortsWithoutPartialResults() throws Exception {
+        CountDownLatch blockLatch = new CountDownLatch(1);
+        AtomicBoolean interrupted = new AtomicBoolean(false);
         SourceGradeProvider blockingProvider = new SourceGradeProvider() {
             @Override
             public boolean supports(SourceGradeType sourceType) {
@@ -78,24 +80,36 @@ class SourceGradeConsumerContractTest {
             @Override
             public Optional<List<SourceGradeDTO>> findSourceGrades(long courseId, long sourceId) {
                 try {
-                    neverRelease.await();
+                    blockLatch.await();
                 } catch (InterruptedException exception) {
+                    interrupted.set(true);
                     Thread.currentThread().interrupt();
-                    throw new IllegalStateException(exception);
                 }
-                return Optional.of(List.of());
+                return Optional.empty();
             }
         };
         DefaultSourceGradeClient client = new DefaultSourceGradeClient(
                 List.of(blockingProvider), Duration.ofMillis(50)
         );
 
-        long startedAt = System.nanoTime();
-        assertThatThrownBy(() -> client.findSourceGrades(101L, SourceGradeType.LAB, 301L))
-                .isInstanceOf(DefaultSourceGradeClient.SourceGradeUnavailableException.class)
-                .hasMessageContaining("timed out");
-        long elapsedMs = Duration.ofNanos(System.nanoTime() - startedAt).toMillis();
-        assertThat(elapsedMs).isLessThan(5000L);
+        try {
+            long startedAt = System.nanoTime();
+            assertThatThrownBy(() -> client.findSourceGrades(101L, SourceGradeType.LAB, 301L))
+                    .isInstanceOf(DefaultSourceGradeClient.SourceGradeUnavailableException.class)
+                    .hasMessageContaining("timed out");
+            long elapsedMs = Duration.ofNanos(System.nanoTime() - startedAt).toMillis();
+            assertThat(elapsedMs).isLessThan(5000L);
+
+            long deadline = System.nanoTime() + Duration.ofSeconds(2).toNanos();
+            while (!interrupted.get() && System.nanoTime() < deadline) {
+                Thread.sleep(10);
+            }
+            assertThat(interrupted)
+                    .as("超时后后台 Provider 任务必须被取消，不能遗留永不结束的调用")
+                    .isTrue();
+        } finally {
+            client.shutdown();
+        }
     }
 
     @Test

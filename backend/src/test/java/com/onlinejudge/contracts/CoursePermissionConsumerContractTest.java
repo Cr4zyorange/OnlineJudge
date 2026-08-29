@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -45,44 +46,45 @@ class CoursePermissionConsumerContractTest {
 
     @Test
     void timeoutIsFailClosedAndNeverLeaksPartialAuthority() throws Exception {
-        CountDownLatch neverRelease = new CountDownLatch(1);
+        CountDownLatch blockLatch = new CountDownLatch(1);
+        AtomicBoolean interrupted = new AtomicBoolean(false);
         CoursePermissionProvider blockingProvider = new CoursePermissionProvider() {
             @Override
             public boolean courseExists(long courseId) {
-                await();
+                await(interrupted);
                 return true;
             }
 
             @Override
             public boolean canManageCourse(long courseId, long userId) {
-                await();
+                await(interrupted);
                 return true;
             }
 
             @Override
             public boolean canViewCourse(long courseId, long userId) {
-                await();
+                await(interrupted);
                 return true;
             }
 
             @Override
             public List<Long> listActiveStudentIds(long courseId) {
-                await();
+                await(interrupted);
                 return List.of(601L);
             }
 
             @Override
             public List<Long> listActiveTeacherIds(long courseId) {
-                await();
+                await(interrupted);
                 return List.of(501L);
             }
 
-            private void await() {
+            private void await(AtomicBoolean interruptedFlag) {
                 try {
-                    neverRelease.await();
+                    blockLatch.await();
                 } catch (InterruptedException exception) {
+                    interruptedFlag.set(true);
                     Thread.currentThread().interrupt();
-                    throw new IllegalStateException(exception);
                 }
             }
         };
@@ -90,14 +92,26 @@ class CoursePermissionConsumerContractTest {
                 false, blockingProvider, Duration.ofMillis(50)
         );
 
-        long startedAt = System.nanoTime();
-        assertThat(client.courseExists(101L)).isFalse();
-        assertThat(client.canViewCourse(101L, 601L)).isFalse();
-        assertThat(client.canManageCourse(101L, 501L)).isFalse();
-        assertThat(client.listCourseStudentIds(101L)).isEmpty();
-        long elapsedMs = Duration.ofNanos(System.nanoTime() - startedAt).toMillis();
+        try {
+            long startedAt = System.nanoTime();
+            assertThat(client.courseExists(101L)).isFalse();
+            assertThat(client.canViewCourse(101L, 601L)).isFalse();
+            assertThat(client.canManageCourse(101L, 501L)).isFalse();
+            assertThat(client.listCourseStudentIds(101L)).isEmpty();
+            long elapsedMs = Duration.ofNanos(System.nanoTime() - startedAt).toMillis();
 
-        assertThat(elapsedMs).isLessThan(5000L);
+            assertThat(elapsedMs).isLessThan(5000L);
+
+            long deadline = System.nanoTime() + Duration.ofSeconds(2).toNanos();
+            while (!interrupted.get() && System.nanoTime() < deadline) {
+                Thread.sleep(10);
+            }
+            assertThat(interrupted)
+                    .as("超时后后台 CRS Provider 任务必须被取消，不能遗留永不结束的调用")
+                    .isTrue();
+        } finally {
+            client.shutdown();
+        }
     }
 
     @Test

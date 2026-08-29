@@ -1,5 +1,6 @@
 package com.onlinejudge.integration.course;
 
+import jakarta.annotation.PreDestroy;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -12,10 +13,12 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.SynchronousQueue;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
@@ -23,27 +26,32 @@ import java.util.concurrent.TimeoutException;
  * #310 C-03 课程权限消费端默认实现（v1）。
  * <p>DEV/演示环境允许网关以 {@code X-Course-Ids} / {@code X-Manageable-Course-Ids} 等请求头
  * 模拟 CRS 权限（受 {@code onlinejudge.auth.allow-header-auth} 开关约束）；正式路径通过
- * {@link CoursePermissionProvider} 消费 CRS 契约。任何一次调用都有有界超时预算，超时或
- * 下游不可用一律失败关闭（拒绝/空名单），绝不回退到直连 CRS 表或实现。</p>
+ * {@link CoursePermissionProvider} 消费 CRS 契约。每次调用都有有界超时预算：超时或下游
+ * 不可用一律失败关闭（拒绝/空名单），并取消后台 Provider 任务；执行模型为有界线程池 +
+ * 有界队列，饱和即拒绝，绝不回退到直连 CRS 表或实现。</p>
  */
 @Component
 public class DefaultCoursePermissionClient implements CoursePermissionClient {
     private static final Logger log = LoggerFactory.getLogger(DefaultCoursePermissionClient.class);
 
     private static final Duration DEFAULT_TIMEOUT = Duration.ofMillis(1000);
+    private static final int DEFAULT_MAX_POOL_SIZE = 4;
+    private static final int DEFAULT_QUEUE_CAPACITY = 64;
 
     private final boolean allowHeaderAuth;
     private final CoursePermissionProvider provider;
     private final Duration timeout;
-    private final ExecutorService timeoutExecutor;
+    private final ThreadPoolExecutor executor;
 
     @Autowired
     public DefaultCoursePermissionClient(
             @Value("${onlinejudge.auth.allow-header-auth:false}") boolean allowHeaderAuth,
             CoursePermissionProvider provider,
-            @Value("${onlinejudge.integration.course.timeout-ms:1000}") long timeoutMs
+            @Value("${onlinejudge.integration.course.timeout-ms:1000}") long timeoutMs,
+            @Value("${onlinejudge.integration.course.max-pool-size:4}") int maxPoolSize,
+            @Value("${onlinejudge.integration.course.queue-capacity:64}") int queueCapacity
     ) {
-        this(allowHeaderAuth, provider, Duration.ofMillis(timeoutMs));
+        this(allowHeaderAuth, provider, requirePositiveTimeout(timeoutMs), maxPoolSize, queueCapacity);
     }
 
     public DefaultCoursePermissionClient(boolean allowHeaderAuth, CoursePermissionProvider provider) {
@@ -55,10 +63,30 @@ public class DefaultCoursePermissionClient implements CoursePermissionClient {
             CoursePermissionProvider provider,
             Duration timeout
     ) {
+        this(allowHeaderAuth, provider, timeout, DEFAULT_MAX_POOL_SIZE, DEFAULT_QUEUE_CAPACITY);
+    }
+
+    public DefaultCoursePermissionClient(
+            boolean allowHeaderAuth,
+            CoursePermissionProvider provider,
+            Duration timeout,
+            int maxPoolSize,
+            int queueCapacity
+    ) {
         this.allowHeaderAuth = allowHeaderAuth;
         this.provider = provider;
-        this.timeout = timeout == null ? DEFAULT_TIMEOUT : timeout;
-        this.timeoutExecutor = Executors.newVirtualThreadPerTaskExecutor();
+        this.timeout = requirePositiveTimeout(timeout);
+        this.executor = new ThreadPoolExecutor(
+                requirePositivePoolSize(maxPoolSize),
+                requirePositivePoolSize(maxPoolSize),
+                60,
+                TimeUnit.SECONDS,
+                queueCapacity == 0
+                        ? new SynchronousQueue<>()
+                        : new ArrayBlockingQueue<>(requireNonNegativeQueueCapacity(queueCapacity)),
+                Thread.ofPlatform().daemon(true).name("course-permission-timeout-", 0).factory(),
+                new ThreadPoolExecutor.AbortPolicy()
+        );
     }
 
     @Override
@@ -148,18 +176,28 @@ public class DefaultCoursePermissionClient implements CoursePermissionClient {
             long userId,
             String operation
     ) {
+        Future<Boolean> future;
         try {
-            return CompletableFuture.supplyAsync(call::getAsBoolean, timeoutExecutor)
-                    .get(timeout.toMillis(), TimeUnit.MILLISECONDS);
+            future = executor.submit(call::getAsBoolean);
+        } catch (RejectedExecutionException exception) {
+            log.warn("CoursePermissionClient {} saturated courseId={} userId={}; denying",
+                    operation, courseId, userId);
+            return fallback;
+        }
+        try {
+            return future.get(timeout.toMillis(), TimeUnit.MILLISECONDS);
         } catch (TimeoutException exception) {
+            future.cancel(true);
             log.warn("CoursePermissionClient {} timed out after {}ms courseId={} userId={}; denying",
                     operation, timeout.toMillis(), courseId, userId);
             return fallback;
         } catch (ExecutionException exception) {
+            future.cancel(true);
             log.warn("CoursePermissionClient {} failed downstream courseId={} userId={}; denying: {}",
                     operation, courseId, userId, rootMessage(exception));
             return fallback;
         } catch (InterruptedException exception) {
+            future.cancel(true);
             Thread.currentThread().interrupt();
             return fallback;
         }
@@ -170,21 +208,35 @@ public class DefaultCoursePermissionClient implements CoursePermissionClient {
             long courseId,
             String operation
     ) {
+        Future<List<Long>> future;
         try {
-            return CompletableFuture.supplyAsync(call, timeoutExecutor)
-                    .get(timeout.toMillis(), TimeUnit.MILLISECONDS);
+            future = executor.submit(call::get);
+        } catch (RejectedExecutionException exception) {
+            log.warn("CoursePermissionClient {} saturated courseId={}; returning empty roster", operation, courseId);
+            return List.of();
+        }
+        try {
+            return future.get(timeout.toMillis(), TimeUnit.MILLISECONDS);
         } catch (TimeoutException exception) {
+            future.cancel(true);
             log.warn("CoursePermissionClient {} timed out after {}ms courseId={}; returning empty roster",
                     operation, timeout.toMillis(), courseId);
             return List.of();
         } catch (ExecutionException exception) {
+            future.cancel(true);
             log.warn("CoursePermissionClient {} failed downstream courseId={}; returning empty roster: {}",
                     operation, courseId, rootMessage(exception));
             return List.of();
         } catch (InterruptedException exception) {
+            future.cancel(true);
             Thread.currentThread().interrupt();
             return List.of();
         }
+    }
+
+    @PreDestroy
+    public void shutdown() {
+        executor.shutdownNow();
     }
 
     private static String rootMessage(ExecutionException exception) {
@@ -243,5 +295,39 @@ public class DefaultCoursePermissionClient implements CoursePermissionClient {
             return null;
         }
         return attributes.getRequest();
+    }
+
+    private static Duration requirePositiveTimeout(long timeoutMs) {
+        if (timeoutMs <= 0) {
+            throw new IllegalArgumentException(
+                    "onlinejudge.integration.course.timeout-ms must be a positive value, got " + timeoutMs
+            );
+        }
+        return Duration.ofMillis(timeoutMs);
+    }
+
+    private static Duration requirePositiveTimeout(Duration timeout) {
+        if (timeout == null || timeout.isZero() || timeout.isNegative()) {
+            throw new IllegalArgumentException("course permission timeout must be a positive duration");
+        }
+        return timeout;
+    }
+
+    private static int requirePositivePoolSize(int maxPoolSize) {
+        if (maxPoolSize <= 0) {
+            throw new IllegalArgumentException(
+                    "onlinejudge.integration.course.max-pool-size must be positive, got " + maxPoolSize
+            );
+        }
+        return maxPoolSize;
+    }
+
+    private static int requireNonNegativeQueueCapacity(int queueCapacity) {
+        if (queueCapacity < 0) {
+            throw new IllegalArgumentException(
+                    "onlinejudge.integration.course.queue-capacity must not be negative, got " + queueCapacity
+            );
+        }
+        return queueCapacity;
     }
 }
