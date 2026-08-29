@@ -135,6 +135,8 @@ jobs:
           java-version: "21"
           cache: maven
           cache-dependency-path: backend/pom.xml
+      - name: Install zsh for macOS README replay regression
+        run: sudo apt-get update && sudo apt-get install --yes zsh
       - name: Collect environment manifest
         run: bash scripts/ci/collect-environment.sh "$GITHUB_WORKSPACE" ci-artifacts/contracts-gate/environment.json
       - name: Repository contract gates (consumer side)

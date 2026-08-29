@@ -58,6 +58,9 @@ java_major="$(java -version 2>&1 | sed -n '1s/.*version "\([0-9][0-9]*\).*/\1/p'
 # 仓库脚本契约：所有跟踪的 *.sh 必须 LF + bash 语法合法。
 log_run bash "$checkout/scripts/test/verify-shell-contract.sh" "$checkout"
 
+# 面向 macOS zsh 的 README 复演命令与 Compose 子命令不可回归。
+log_run bash "$checkout/scripts/test/verify-readme-d3-replay-shell.test.sh" "$checkout"
+
 # #310 跨服务契约测试：结构/文档冻结在两侧都运行；消费端与生产端套件可独立运行。
 # 命名约定：消费端 *ConsumerContractTest，生产端 *ProducerContractTest。
 run_side() {
@@ -83,4 +86,4 @@ if [[ "$side" == "producer" || "$side" == "all" ]]; then
   run_side "producer" "$producer_tests" "contract-producer"
 fi
 
-printf 'contract-verify: PASS (shell contract + %s-side contract suites)\n' "$side" | tee -a "$log"
+printf 'contract-verify: PASS (shell, README replay, and %s-side contract suites)\n' "$side" | tee -a "$log"
