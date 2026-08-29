@@ -11,11 +11,11 @@
 | AUTH | `/api/v1/auth/**`、`/api/v1/users/me/**`、`/api/v1/admin/**` |
 | CRS | `/api/v1/courses/**`（实验、作业、成绩子路径除外）、`/api/v1/chapters/**` |
 | Assessment | `/api/v1/labs/**`、`/api/v1/homeworks/**`、`/api/v1/submissions/**`、`/api/v1/evaluations/**`，以及课程下的实验/作业路径 |
-| Learning & Grade | `/api/v1/learning/**`、`/api/v1/notifications/**`、`/api/v1/reminder-rules/**`，以及课程下的成绩路径 |
+| Learning & Grade | `/api/v1/learning/**`、`/api/v1/notifications/**`、`/api/v1/reminder-rules/**`，课程下全部成绩路径，以及 `/api/v1/grade-items/**`、`/api/v1/grade-records/**`、`/api/v1/course-grade-summaries/**`、`/api/v1/grade-review-requests/**` |
 
 课程下的实验、作业和成绩规则优先于通用课程路由。网关仅转发浏览器携带的 `Authorization`；会在代理前清空 `X-User-*`、`X-Permissions`、`X-Course-Ids` 和 `X-Manageable-Course-Ids`，不伪造内部身份主体。未冻结的服务间主体契约仍由 #310 管理。
 
-请求体上限保持 55MB。普通代理的连接、读取、发送超时为 5s、60s、60s；Assessment 上传/提交读取与发送超时为 300s。下游 401、403、404 保持业务响应；网关连接失败返回 `GATEWAY_502`，超时返回 `GATEWAY_504`，不暴露内部地址、堆栈或凭据。
+精确根路径和子路径均被覆盖，例如 `/api/v1/courses` 与 `/api/v1/courses/**`、`/api/v1/homeworks` 与 `/api/v1/homeworks/**`。请求体上限保持 55MB。普通代理的连接、读取、发送超时为 5s、60s、60s；Assessment 上传/提交读取与发送超时为 300s。代理重试显式关闭，避免非幂等上传或提交被重复发送。下游 401、403、404 保持业务响应；网关连接失败返回 `GATEWAY_502`，超时返回 `GATEWAY_504`，不暴露内部地址、堆栈或凭据。
 
 ## 切流与回滚
 
@@ -52,6 +52,7 @@ bash scripts/gateway/tests/gateway-routing-contract.test.sh
 bash scripts/gateway/tests/switch-gateway-target.test.sh
 bash scripts/gateway/tests/verify-gateway.test.sh
 bash scripts/gateway/tests/kind-gateway-config.test.sh
+bash scripts/gateway/tests/gateway-runtime.test.sh
 ```
 
 随后在 Docker 引擎可用且各独立服务镜像/服务已交付时运行 Compose、Kind 和真实四服务切流冒烟。每次验证须在 `output/test/issue-317/README.md` 记录环境、基线 SHA、被测 SHA、命令、通过/失败/跳过计数、退出码与原始日志位置。

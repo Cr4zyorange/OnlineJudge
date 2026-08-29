@@ -1,0 +1,13 @@
+upstream must be a lowercase host:port value
+render-gateway-config.test: PASS
+gateway-default-config.test: PASS
+gateway-routing-contract.test: PASS
+gateway target switched: auth -> auth-service:8081
+gateway switch failed; restoring previous target set
+gateway rollback completed
+switch-gateway-target.test: PASS
+verify-gateway.test: PASS
+kind-gateway-config.test: PASS
+nginx: the configuration file /etc/nginx/nginx.conf syntax is ok
+nginx: configuration file /etc/nginx/nginx.conf test is successful
+gateway-runtime.test: PASS (routes=12 status=401/403/404/502/504 upload=1 spa=1)
