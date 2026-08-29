@@ -2,6 +2,7 @@ package com.onlinejudge.integration.grade;
 
 import org.springframework.context.annotation.Primary;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
@@ -23,14 +24,37 @@ public class DefaultSourceGradeClient implements SourceGradeClient {
     private final ExecutorService timeoutExecutor;
 
     @Autowired
+    public DefaultSourceGradeClient(
+            List<SourceGradeProvider> providers,
+            @Value("${onlinejudge.integration.grade.timeout-ms:1000}") long timeoutMs
+    ) {
+        this(providers, requirePositiveTimeout(timeoutMs));
+    }
+
     public DefaultSourceGradeClient(List<SourceGradeProvider> providers) {
         this(providers, DEFAULT_TIMEOUT);
     }
 
     public DefaultSourceGradeClient(List<SourceGradeProvider> providers, Duration timeout) {
         this.providers = providers;
-        this.timeout = timeout == null ? DEFAULT_TIMEOUT : timeout;
+        this.timeout = requirePositiveTimeout(timeout);
         this.timeoutExecutor = Executors.newVirtualThreadPerTaskExecutor();
+    }
+
+    private static Duration requirePositiveTimeout(long timeoutMs) {
+        if (timeoutMs <= 0) {
+            throw new IllegalArgumentException(
+                    "onlinejudge.integration.grade.timeout-ms must be a positive value, got " + timeoutMs
+            );
+        }
+        return Duration.ofMillis(timeoutMs);
+    }
+
+    private static Duration requirePositiveTimeout(Duration timeout) {
+        if (timeout == null || timeout.isZero() || timeout.isNegative()) {
+            throw new IllegalArgumentException("source grade timeout must be a positive duration");
+        }
+        return timeout;
     }
 
     @Override

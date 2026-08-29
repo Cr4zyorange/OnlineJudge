@@ -73,7 +73,7 @@ run_side() {
 }
 
 common_tests='CommonInfrastructureContractTest,CrossServiceContractRegistryTest,ContractDocumentationCompletenessTest'
-consumer_tests="$common_tests,CoursePermissionConsumerContractTest,SourceGradeConsumerContractTest"
+consumer_tests="$common_tests,CoursePermissionConsumerContractTest,SourceGradeConsumerContractTest,GradeTimeoutConfigurationTest"
 producer_tests="$common_tests,CoursePermissionProducerContractTest,SourceGradeProducerContractTest,EvaluationCompletionEventContractTest,AuthContextContractTest"
 
 if [[ "$side" == "consumer" || "$side" == "all" ]]; then
