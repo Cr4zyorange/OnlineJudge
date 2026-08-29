@@ -1,0 +1,72 @@
+{
+  "issue": 309,
+  "environment": "mysql@localhost:57622",
+  "baselineSha": "2d7103055fe4bd64d15afbac70d74b4213759f41",
+  "testedSha": "6884bee6996000fdaa13656068c81c5899204295",
+  "workingTreeDirty": false,
+  "startedAt": "2026-08-29T16:40:18.3210868+08:00",
+  "finishedAt": "2026-08-29T16:58:31.7102626+08:00",
+  "exitCode": 0,
+  "total": 11,
+  "passed": 11,
+  "failed": 0,
+  "skipped": 0,
+  "paths": [
+    {
+      "name": "fresh",
+      "passed": true,
+      "detail": "exitCode=0"
+    },
+    {
+      "name": "upgrade",
+      "passed": true,
+      "detail": "exitCode=0"
+    },
+    {
+      "name": "repeat",
+      "passed": true,
+      "detail": "exitCode=0 versions=27"
+    },
+    {
+      "name": "failure",
+      "passed": true,
+      "detail": "expectedNonZero=65 versions=27"
+    },
+    {
+      "name": "least_privilege",
+      "passed": true,
+      "detail": "four runtime roles can access only their owner schema"
+    },
+    {
+      "name": "rollback",
+      "passed": true,
+      "detail": "sourcePreserved=oj309_issue309202608291640_fresh"
+    },
+    {
+      "name": "row_count",
+      "passed": true,
+      "detail": "46 tables compared"
+    },
+    {
+      "name": "row_digest",
+      "passed": true,
+      "detail": "46 extended table checksums compared"
+    },
+    {
+      "name": "primary_key",
+      "passed": true,
+      "detail": "definitions and key sets compared"
+    },
+    {
+      "name": "unique_constraint",
+      "passed": true,
+      "detail": "all unique indexes compared"
+    },
+    {
+      "name": "business_invariant",
+      "passed": true,
+      "detail": "declared logical references checked for orphans"
+    }
+  ],
+  "rawLog": "C:\\mySet\\Learning_materials\\short_semester\\code\\OnlineJudge\\ci-artifacts\\data-ownership\\issue309-20260829164018-81314b\\raw.log"
+}

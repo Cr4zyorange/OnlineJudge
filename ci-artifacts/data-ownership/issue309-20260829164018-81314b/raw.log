@@ -1,0 +1,182 @@
+[2026-08-29T16:40:18.3975370+08:00] environment mysql=C:\Program Files\MySQL\MySQL Server 8.0\bin\mysql.exe  Ver 8.0.45 for Win64 on x86_64 (MySQL Community Server - GPL) host=localhost port=57622
+initializing empty database from database/mysql/compose-schema.sql
+skipped migration: DB-AUTH-01-auth-user-session.sql
+skipped migration: DB-CRS-01-course-and-member.sql
+skipped migration: DB-CRS-02-course-chapter.sql
+skipped migration: DB-CRS-03-course-resource.sql
+skipped migration: DB-CRS-05-course-announcement.sql
+skipped migration: 20260525_01_create_grd_grade_item.sql
+skipped migration: 20260525_02_create_lab_experiment.sql
+skipped migration: 20260526_01_create_lab_submission.sql
+skipped migration: 20260530_01_create_hwk_homework.sql
+skipped migration: 20260530_01_create_lrn_learning_task.sql
+skipped migration: 20260531_01_create_lrn_learning_progress.sql
+skipped migration: 20260601_01_create_hwk_submission.sql
+skipped migration: 20260601_01_create_lab_evaluation_result.sql
+skipped migration: 20260601_02_create_lab_evaluation.sql
+skipped migration: 20260602_01_create_hwk_evaluation.sql
+skipped migration: 20260602_01_create_lrn_learning_record.sql
+skipped migration: 20260602_02_create_hwk_review_log.sql
+skipped migration: 20260603_01_create_lrn_notification.sql
+skipped migration: 20260604_01_create_lab_report.sql
+skipped migration: 20260605_01_create_lrn_reminder_rule.sql
+skipped migration: 20260605_02_create_lab_score.sql
+skipped migration: 20260606_01_add_lab_published_at.sql
+skipped migration: 20260822_01_add_hwk_statistics_attention_indexes.sql
+skipped migration: 20260822_02_create_lab_submission_source_file.sql
+skipped migration: 20260822_03_create_hwk_submission_attachment.sql
+skipped migration: 20260825_01_add_grd_analysis_source_fingerprint.sql
+skipped migration: 20260825_02_add_grd_analysis_source_version.sql
+applying DEV/CI seed: database/seeds/dev-ci.sql
+migration run complete
+[2026-08-29T16:41:51.3574745+08:00] fresh PASS: exitCode=0
+baselined migration: DB-AUTH-01-auth-user-session.sql
+baselined migration: DB-CRS-01-course-and-member.sql
+baselined migration: DB-CRS-02-course-chapter.sql
+baselined migration: DB-CRS-03-course-resource.sql
+baselined migration: DB-CRS-05-course-announcement.sql
+baselined migration: 20260525_01_create_grd_grade_item.sql
+baselined migration: 20260525_02_create_lab_experiment.sql
+baselined migration: 20260526_01_create_lab_submission.sql
+baselined migration: 20260530_01_create_hwk_homework.sql
+baselined migration: 20260530_01_create_lrn_learning_task.sql
+baselined migration: 20260531_01_create_lrn_learning_progress.sql
+baselined migration: 20260601_01_create_hwk_submission.sql
+baselined migration: 20260601_01_create_lab_evaluation_result.sql
+baselined migration: 20260601_02_create_lab_evaluation.sql
+baselined migration: 20260602_01_create_hwk_evaluation.sql
+baselined migration: 20260602_01_create_lrn_learning_record.sql
+baselined migration: 20260602_02_create_hwk_review_log.sql
+baselined migration: 20260603_01_create_lrn_notification.sql
+baselined migration: 20260604_01_create_lab_report.sql
+baselined migration: 20260605_01_create_lrn_reminder_rule.sql
+baselined migration: 20260605_02_create_lab_score.sql
+baselined migration: 20260606_01_add_lab_published_at.sql
+baselined migration: 20260822_01_add_hwk_statistics_attention_indexes.sql
+baselined migration: 20260822_02_create_lab_submission_source_file.sql
+baselined migration: 20260822_03_create_hwk_submission_attachment.sql
+skipped migration: DB-AUTH-01-auth-user-session.sql
+skipped migration: DB-CRS-01-course-and-member.sql
+skipped migration: DB-CRS-02-course-chapter.sql
+skipped migration: DB-CRS-03-course-resource.sql
+skipped migration: DB-CRS-05-course-announcement.sql
+skipped migration: 20260525_01_create_grd_grade_item.sql
+skipped migration: 20260525_02_create_lab_experiment.sql
+skipped migration: 20260526_01_create_lab_submission.sql
+skipped migration: 20260530_01_create_hwk_homework.sql
+skipped migration: 20260530_01_create_lrn_learning_task.sql
+skipped migration: 20260531_01_create_lrn_learning_progress.sql
+skipped migration: 20260601_01_create_hwk_submission.sql
+skipped migration: 20260601_01_create_lab_evaluation_result.sql
+skipped migration: 20260601_02_create_lab_evaluation.sql
+skipped migration: 20260602_01_create_hwk_evaluation.sql
+skipped migration: 20260602_01_create_lrn_learning_record.sql
+skipped migration: 20260602_02_create_hwk_review_log.sql
+skipped migration: 20260603_01_create_lrn_notification.sql
+skipped migration: 20260604_01_create_lab_report.sql
+skipped migration: 20260605_01_create_lrn_reminder_rule.sql
+skipped migration: 20260605_02_create_lab_score.sql
+skipped migration: 20260606_01_add_lab_published_at.sql
+skipped migration: 20260822_01_add_hwk_statistics_attention_indexes.sql
+skipped migration: 20260822_02_create_lab_submission_source_file.sql
+skipped migration: 20260822_03_create_hwk_submission_attachment.sql
+applied migration: 20260825_01_add_grd_analysis_source_fingerprint.sql
+applied migration: 20260825_02_add_grd_analysis_source_version.sql
+applying DEV/CI seed: database/seeds/dev-ci.sql
+migration run complete
+[2026-08-29T16:44:25.8976148+08:00] upgrade PASS: exitCode=0
+skipped migration: DB-AUTH-01-auth-user-session.sql
+skipped migration: DB-CRS-01-course-and-member.sql
+skipped migration: DB-CRS-02-course-chapter.sql
+skipped migration: DB-CRS-03-course-resource.sql
+skipped migration: DB-CRS-05-course-announcement.sql
+skipped migration: 20260525_01_create_grd_grade_item.sql
+skipped migration: 20260525_02_create_lab_experiment.sql
+skipped migration: 20260526_01_create_lab_submission.sql
+skipped migration: 20260530_01_create_hwk_homework.sql
+skipped migration: 20260530_01_create_lrn_learning_task.sql
+skipped migration: 20260531_01_create_lrn_learning_progress.sql
+skipped migration: 20260601_01_create_hwk_submission.sql
+skipped migration: 20260601_01_create_lab_evaluation_result.sql
+skipped migration: 20260601_02_create_lab_evaluation.sql
+skipped migration: 20260602_01_create_hwk_evaluation.sql
+skipped migration: 20260602_01_create_lrn_learning_record.sql
+skipped migration: 20260602_02_create_hwk_review_log.sql
+skipped migration: 20260603_01_create_lrn_notification.sql
+skipped migration: 20260604_01_create_lab_report.sql
+skipped migration: 20260605_01_create_lrn_reminder_rule.sql
+skipped migration: 20260605_02_create_lab_score.sql
+skipped migration: 20260606_01_add_lab_published_at.sql
+skipped migration: 20260822_01_add_hwk_statistics_attention_indexes.sql
+skipped migration: 20260822_02_create_lab_submission_source_file.sql
+skipped migration: 20260822_03_create_hwk_submission_attachment.sql
+skipped migration: 20260825_01_add_grd_analysis_source_fingerprint.sql
+skipped migration: 20260825_02_add_grd_analysis_source_version.sql
+applying DEV/CI seed: database/seeds/dev-ci.sql
+migration run complete
+[2026-08-29T16:45:49.0881632+08:00] repeat PASS: exitCode=0 versions=27
+initializing empty database from database/mysql/compose-schema.sql
+skipped migration: DB-AUTH-01-auth-user-session.sql
+skipped migration: DB-CRS-01-course-and-member.sql
+skipped migration: DB-CRS-02-course-chapter.sql
+skipped migration: DB-CRS-03-course-resource.sql
+skipped migration: DB-CRS-05-course-announcement.sql
+skipped migration: 20260525_01_create_grd_grade_item.sql
+skipped migration: 20260525_02_create_lab_experiment.sql
+skipped migration: 20260526_01_create_lab_submission.sql
+skipped migration: 20260530_01_create_hwk_homework.sql
+skipped migration: 20260530_01_create_lrn_learning_task.sql
+skipped migration: 20260531_01_create_lrn_learning_progress.sql
+skipped migration: 20260601_01_create_hwk_submission.sql
+skipped migration: 20260601_01_create_lab_evaluation_result.sql
+skipped migration: 20260601_02_create_lab_evaluation.sql
+skipped migration: 20260602_01_create_hwk_evaluation.sql
+skipped migration: 20260602_01_create_lrn_learning_record.sql
+skipped migration: 20260602_02_create_hwk_review_log.sql
+skipped migration: 20260603_01_create_lrn_notification.sql
+skipped migration: 20260604_01_create_lab_report.sql
+skipped migration: 20260605_01_create_lrn_reminder_rule.sql
+skipped migration: 20260605_02_create_lab_score.sql
+skipped migration: 20260606_01_add_lab_published_at.sql
+skipped migration: 20260822_01_add_hwk_statistics_attention_indexes.sql
+skipped migration: 20260822_02_create_lab_submission_source_file.sql
+skipped migration: 20260822_03_create_hwk_submission_attachment.sql
+skipped migration: 20260825_01_add_grd_analysis_source_fingerprint.sql
+skipped migration: 20260825_02_add_grd_analysis_source_version.sql
+migration run complete
+skipped migration: DB-AUTH-01-auth-user-session.sql
+skipped migration: DB-CRS-01-course-and-member.sql
+skipped migration: DB-CRS-02-course-chapter.sql
+skipped migration: DB-CRS-03-course-resource.sql
+skipped migration: DB-CRS-05-course-announcement.sql
+skipped migration: 20260525_01_create_grd_grade_item.sql
+skipped migration: 20260525_02_create_lab_experiment.sql
+skipped migration: 20260526_01_create_lab_submission.sql
+skipped migration: 20260530_01_create_hwk_homework.sql
+skipped migration: 20260530_01_create_lrn_learning_task.sql
+skipped migration: 20260531_01_create_lrn_learning_progress.sql
+skipped migration: 20260601_01_create_hwk_submission.sql
+skipped migration: 20260601_01_create_lab_evaluation_result.sql
+skipped migration: 20260601_02_create_lab_evaluation.sql
+skipped migration: 20260602_01_create_hwk_evaluation.sql
+skipped migration: 20260602_01_create_lrn_learning_record.sql
+skipped migration: 20260602_02_create_hwk_review_log.sql
+skipped migration: 20260603_01_create_lrn_notification.sql
+skipped migration: 20260604_01_create_lab_report.sql
+skipped migration: 20260605_01_create_lrn_reminder_rule.sql
+skipped migration: 20260605_02_create_lab_score.sql
+skipped migration: 20260606_01_add_lab_published_at.sql
+skipped migration: 20260822_01_add_hwk_statistics_attention_indexes.sql
+skipped migration: 20260822_02_create_lab_submission_source_file.sql
+skipped migration: 20260822_03_create_hwk_submission_attachment.sql
+skipped migration: 20260825_01_add_grd_analysis_source_fingerprint.sql
+checksum mismatch for migration: 20260825_02_add_grd_analysis_source_version.sql
+database checksum: 0000000000000000000000000000000000000000000000000000000000000000
+repository checksum: d40f5b9a41a0a836960f9b3d445e0d1f6fc6cbcc4f2b48b210387fcfc9f21b2c
+[2026-08-29T16:48:27.3253171+08:00] failure PASS: expectedNonZero=65 versions=27
+split migration complete: source=oj309_issue309202608291640_fresh tables=46
+{"result":"split_schema_contract_ok","tables":46,"checks":{"row_count":46,"row_digest":46,"primary_key":46,"unique_constraint":46,"foreign_key":33,"business_invariant":9}}
+split migration complete: source=oj309_issue309202608291640_fresh tables=46
+{"result":"split_schema_contract_ok","tables":46,"checks":{"row_count":46,"row_digest":46,"primary_key":46,"unique_constraint":46,"foreign_key":33,"business_invariant":9}}
+[2026-08-29T16:57:42.0472110+08:00] least_privilege PASS: four runtime roles can access only their owner schema
+[2026-08-29T16:57:56.8491296+08:00] rollback PASS: sourcePreserved=oj309_issue309202608291640_fresh
