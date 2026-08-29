@@ -48,7 +48,7 @@ class SourceGradeConsumerContractTest {
     }
 
     @Test
-    void consumerPropagatesDownstreamFailureSoGradeSyncCanAbortAtomically() {
+    void consumerUnifiesDownstreamFailureAsSourceGradeUnavailable() {
         SourceGradeProvider brokenProvider = new SourceGradeProvider() {
             @Override
             public boolean supports(SourceGradeType sourceType) {
@@ -63,8 +63,9 @@ class SourceGradeConsumerContractTest {
         DefaultSourceGradeClient client = new DefaultSourceGradeClient(List.of(brokenProvider));
 
         assertThatThrownBy(() -> client.findSourceGrades(101L, SourceGradeType.LAB, 301L))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("source service unavailable");
+                .isInstanceOf(DefaultSourceGradeClient.SourceGradeUnavailableException.class)
+                .hasMessageContaining("source grade provider failed")
+                .hasRootCauseMessage("source service unavailable");
     }
 
     @Test

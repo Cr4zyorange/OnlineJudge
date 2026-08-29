@@ -100,12 +100,9 @@ public class DefaultSourceGradeClient implements SourceGradeClient {
             } catch (ExecutionException exception) {
                 future.cancel(true);
                 Throwable cause = exception.getCause();
-                if (cause instanceof RuntimeException runtimeException) {
-                    throw runtimeException;
-                }
                 throw new SourceGradeUnavailableException(
                         "source grade provider failed for " + sourceType + " sourceId=" + sourceId,
-                        cause
+                        cause == null ? exception : cause
                 );
             } catch (InterruptedException exception) {
                 future.cancel(true);
