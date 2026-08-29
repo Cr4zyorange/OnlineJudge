@@ -1,0 +1,12 @@
+owner,table,column,target_owner,target_table,target_column,on_missing,on_delete,consistency
+CRS,crs_course,teacher_id,AUTH,t_auth_user,user_id,reject write,retain course and resolve user as unavailable,eventual
+CRS,crs_course_member,user_id,AUTH,t_auth_user,user_id,reject membership write,soft-delete membership after USER_DISABLED event,eventual
+ASSESSMENT,lab_experiment,course_id,CRS,crs_course,id,reject publish,archive after COURSE_ARCHIVED event,eventual
+ASSESSMENT,lab_submission,student_id,AUTH,t_auth_user,user_id,reject submission,retain immutable submission,eventual
+ASSESSMENT,t_hwk_homework,course_id,CRS,crs_course,id,reject publish,archive after COURSE_ARCHIVED event,eventual
+ASSESSMENT,t_hwk_submission,student_id,AUTH,t_auth_user,user_id,reject submission,retain immutable submission,eventual
+LEARNING_GRADE,lrn_learning_task,course_id,CRS,crs_course,id,reject task creation,retain snapshot and mark source unavailable,eventual
+LEARNING_GRADE,lrn_learning_task,source_id,ASSESSMENT,logical source,id,reject unknown source,retain snapshot and mark source unavailable,eventual
+LEARNING_GRADE,t_grade_item,course_id,CRS,crs_course,id,reject grade item creation,retain grades and archive,eventual
+LEARNING_GRADE,t_grade_item,source_id,ASSESSMENT,logical source,id,reject unknown source,retain grade history,eventual
+LEARNING_GRADE,t_grade_record,student_id,AUTH,t_auth_user,user_id,reject grade write,retain immutable grade history,eventual
