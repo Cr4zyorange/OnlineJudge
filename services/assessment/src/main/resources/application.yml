@@ -31,7 +31,7 @@ assessment:
     port: ${ASSESSMENT_RABBIT_PORT:${RABBITMQ_PORT:5672}}
     username: ${ASSESSMENT_RABBIT_USERNAME:${RABBITMQ_USERNAME:guest}}
     password: ${ASSESSMENT_RABBIT_PASSWORD:${RABBITMQ_PASSWORD:guest}}
-    exchange: ${ASSESSMENT_RABBIT_EXCHANGE:onlinejudge.events}
+    exchange: ${ASSESSMENT_RABBIT_EXCHANGE:onlinejudge.events.v2}
     course-member-queue: ${ASSESSMENT_COURSE_MEMBER_QUEUE:assessment.course-members.v2}
     course-membership-snapshot-routing-key: ${ASSESSMENT_COURSE_MEMBERSHIP_SNAPSHOT_ROUTING_KEY:onlinejudge.course.membership.snapshot.v2}
     course-member-dead-letter-exchange: ${ASSESSMENT_COURSE_MEMBER_DEAD_LETTER_EXCHANGE:onlinejudge.events.dlx.v2}
@@ -42,6 +42,7 @@ assessment:
     identity-security-version-dead-letter-exchange: ${ASSESSMENT_IDENTITY_SECURITY_VERSION_DEAD_LETTER_EXCHANGE:onlinejudge.events.dlx.v2}
     identity-security-version-dead-letter-queue: ${ASSESSMENT_IDENTITY_SECURITY_VERSION_DEAD_LETTER_QUEUE:assessment.identity-security-version.dlq.v2}
     identity-security-version-dead-letter-routing-key: ${ASSESSMENT_IDENTITY_SECURITY_VERSION_DEAD_LETTER_ROUTING_KEY:onlinejudge.identity.security-version.changed.invalid.v2}
+    replay-identity-security-version-event-id: ${ASSESSMENT_REPLAY_IDENTITY_SECURITY_VERSION_EVENT_ID:}
     relay-enabled: ${ASSESSMENT_RABBIT_RELAY_ENABLED:true}
     relay-interval: ${ASSESSMENT_RABBIT_RELAY_INTERVAL:1000}
   identity:

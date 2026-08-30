@@ -42,6 +42,7 @@ services:
       # never prevent a submission from being accepted durably.
       ASSESSMENT_RABBIT_ENABLED: "false"
       ASSESSMENT_RABBIT_RELAY_ENABLED: "false"
+      ASSESSMENT_RABBIT_EXCHANGE: onlinejudge.events.v2
       ASSESSMENT_STORAGE_ROOT: /var/lib/onlinejudge-assessment
     volumes:
       - assessment-files:/var/lib/onlinejudge-assessment
@@ -65,6 +66,7 @@ services:
       ASSESSMENT_WORKER_ENABLED: "true"
       ASSESSMENT_RABBIT_ENABLED: "true"
       ASSESSMENT_RABBIT_HOST: rabbitmq
+      ASSESSMENT_RABBIT_EXCHANGE: onlinejudge.events.v2
       # The worker is the broker-facing delivery workload.  It relays API
       # outbox rows and runs the two durable consumers.
       ASSESSMENT_RABBIT_RELAY_ENABLED: "true"

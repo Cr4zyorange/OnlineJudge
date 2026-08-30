@@ -40,6 +40,11 @@ CREATE TABLE IF NOT EXISTS assessment_course_member_dead_letter (
   event_id VARCHAR(80) PRIMARY KEY, payload_json LONGTEXT NOT NULL, failure_reason VARCHAR(256) NOT NULL,
   replay_count INTEGER NOT NULL DEFAULT 0, received_at TIMESTAMP NOT NULL, replayed_at TIMESTAMP NULL
 );
+CREATE TABLE IF NOT EXISTS assessment_identity_security_version_dead_letter (
+  event_id VARCHAR(80) PRIMARY KEY, correlation_id VARCHAR(80) NOT NULL, payload_json LONGTEXT NOT NULL,
+  failure_reason VARCHAR(256) NOT NULL, delivery_attempt INTEGER NOT NULL DEFAULT 1, replay_count INTEGER NOT NULL DEFAULT 0,
+  received_at TIMESTAMP NOT NULL, replayed_at TIMESTAMP NULL
+);
 CREATE TABLE IF NOT EXISTS assessment_identity_security_version (
   user_id VARCHAR(80) PRIMARY KEY, minimum_security_version BIGINT NOT NULL,
   aggregate_version BIGINT NOT NULL

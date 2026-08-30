@@ -21,7 +21,7 @@ public class CourseMembershipDeadLetterReplayCommand implements ApplicationRunne
             @Value("${assessment.rabbit.replay-course-member-event-id}") String eventId,
             @Value("${assessment.rabbit.host:127.0.0.1}") String host, @Value("${assessment.rabbit.port:5672}") int port,
             @Value("${assessment.rabbit.username:guest}") String username, @Value("${assessment.rabbit.password:guest}") String password,
-            @Value("${assessment.rabbit.exchange:onlinejudge.events}") String exchange) {
+            @Value("${assessment.rabbit.exchange:onlinejudge.events.v2}") String exchange) {
         this.deadLetters = deadLetters; this.eventId = eventId; this.host = host; this.port = port; this.username = username; this.password = password; this.exchange = exchange;
     }
     @Override public void run(ApplicationArguments ignored) throws Exception {

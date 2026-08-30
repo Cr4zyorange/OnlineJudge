@@ -25,7 +25,7 @@ public class CourseMembershipRabbitConsumer implements SmartLifecycle {
     public CourseMembershipRabbitConsumer(CourseMembershipProjectionService projection, CourseMembershipDeadLetterRepository deadLetters, ObjectMapper json,
             @Value("${assessment.rabbit.host:127.0.0.1}") String host, @Value("${assessment.rabbit.port:5672}") int port,
             @Value("${assessment.rabbit.username:guest}") String username, @Value("${assessment.rabbit.password:guest}") String password,
-            @Value("${assessment.rabbit.exchange:onlinejudge.events}") String exchange,
+            @Value("${assessment.rabbit.exchange:onlinejudge.events.v2}") String exchange,
             @Value("${assessment.rabbit.course-member-queue:assessment.course-members.v2}") String queue,
             @Value("${assessment.rabbit.course-membership-snapshot-routing-key:onlinejudge.course.membership.snapshot.v2}") String snapshotRoutingKey,
             @Value("${assessment.rabbit.course-member-dead-letter-exchange:onlinejudge.events.dlx.v2}") String deadLetterExchange,

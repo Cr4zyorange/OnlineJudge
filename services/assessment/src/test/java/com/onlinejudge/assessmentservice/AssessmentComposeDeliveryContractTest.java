@@ -17,6 +17,7 @@ class AssessmentComposeDeliveryContractTest {
         String primaryDockerfile = Files.readString(repository.resolve("services/assessment/Dockerfile"));
         String cachedDockerfile = Files.readString(repository.resolve("services/assessment/Dockerfile.cached-runtime"));
         String migration = Files.readString(repository.resolve("database/migrations/assessment/20260831_01_create_assessment_service_tables.sql"));
+        String dlqUpgradeMigration = Files.readString(repository.resolve("database/migrations/assessment/20260831_03_identity_security_version_dead_letter.sql"));
 
         assertThat(compose).contains("ASSESSMENT_STORAGE_ROOT: /var/lib/onlinejudge-assessment");
         assertThat(compose).contains("ASSESSMENT_SANDBOX_COMMAND: ${ASSESSMENT_SANDBOX_COMMAND:?ASSESSMENT_SANDBOX_COMMAND is required}");
@@ -26,7 +27,8 @@ class AssessmentComposeDeliveryContractTest {
         String worker = compose.substring(compose.indexOf("  assessment-worker:"), compose.indexOf("\nvolumes:"));
         assertThat(api).contains("ASSESSMENT_RABBIT_ENABLED: \"false\"", "ASSESSMENT_RABBIT_RELAY_ENABLED: \"false\"", "healthcheck:")
                 .doesNotContain("rabbitmq: {condition: service_healthy}");
-        assertThat(worker).contains("ASSESSMENT_RABBIT_ENABLED: \"true\"", "ASSESSMENT_RABBIT_RELAY_ENABLED: \"true\"", "healthcheck:", "test -f /tmp/assessment-worker-ready", "retries: 3");
+        assertThat(api).contains("ASSESSMENT_RABBIT_EXCHANGE: onlinejudge.events.v2");
+        assertThat(worker).contains("ASSESSMENT_RABBIT_ENABLED: \"true\"", "ASSESSMENT_RABBIT_RELAY_ENABLED: \"true\"", "ASSESSMENT_RABBIT_EXCHANGE: onlinejudge.events.v2", "healthcheck:", "test -f /tmp/assessment-worker-ready", "retries: 3");
         assertThat(Files.readString(repository.resolve("services/assessment/src/main/java/com/onlinejudge/assessmentservice/worker/AssessmentWorkerReadiness.java")))
                 .contains("factory.setConnectionTimeout(1_000)", "Files.deleteIfExists(MARKER)");
         assertThat(Files.readString(repository.resolve("services/assessment/src/main/java/com/onlinejudge/assessmentservice/messaging/RabbitOutboxRelay.java")))
@@ -42,6 +44,7 @@ class AssessmentComposeDeliveryContractTest {
         assertThat(primaryDockerfile).contains("/var/lib/onlinejudge-assessment");
         assertThat(cachedDockerfile).contains("/var/lib/onlinejudge-assessment", "USER 10003:10003", "getent group 10003");
         assertThat(migration).contains("assessment_deferred_course_member_event");
+        assertThat(dlqUpgradeMigration).contains("CREATE TABLE IF NOT EXISTS assessment_identity_security_version_dead_letter");
         assertThat(cachedCompose).contains("assessment-worker:${GIT_SHA:?GIT_SHA is required}");
     }
 

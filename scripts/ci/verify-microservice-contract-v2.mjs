@@ -810,6 +810,51 @@ function validateRejectingMutations(asyncApi) {
   }
 }
 
+function assessmentRabbitTopologyProblems(documents) {
+  const required = [
+    'services/assessment/src/main/resources/application.yml',
+    'services/assessment/src/main/java/com/onlinejudge/assessmentservice/messaging/RabbitOutboxRelay.java',
+    'services/assessment/src/main/java/com/onlinejudge/assessmentservice/messaging/CourseMembershipRabbitConsumer.java',
+    'services/assessment/src/main/java/com/onlinejudge/assessmentservice/messaging/CourseMembershipDeadLetterReplayCommand.java',
+    'services/assessment/src/main/java/com/onlinejudge/assessmentservice/messaging/IdentitySecurityVersionRabbitConsumer.java',
+    'services/assessment/src/main/java/com/onlinejudge/assessmentservice/messaging/IdentitySecurityVersionDeadLetterReplayCommand.java',
+    'deploy/docker/compose.assessment.yml'
+  ];
+  return required.filter((path) => !documents.get(path)?.includes('onlinejudge.events.v2'))
+    .map((path) => `${path} must use canonical durable exchange onlinejudge.events.v2`);
+}
+
+function validateAssessmentRabbitTopology() {
+  const paths = [
+    'services/assessment/src/main/resources/application.yml',
+    'services/assessment/src/main/java/com/onlinejudge/assessmentservice/messaging/RabbitOutboxRelay.java',
+    'services/assessment/src/main/java/com/onlinejudge/assessmentservice/messaging/CourseMembershipRabbitConsumer.java',
+    'services/assessment/src/main/java/com/onlinejudge/assessmentservice/messaging/CourseMembershipDeadLetterReplayCommand.java',
+    'services/assessment/src/main/java/com/onlinejudge/assessmentservice/messaging/IdentitySecurityVersionRabbitConsumer.java',
+    'services/assessment/src/main/java/com/onlinejudge/assessmentservice/messaging/IdentitySecurityVersionDeadLetterReplayCommand.java',
+    'deploy/docker/compose.assessment.yml'
+  ];
+  const documents = new Map();
+  for (const path of paths) {
+    const absolutePath = resolve(repoRoot, path);
+    if (!existsSync(absolutePath)) {
+      problem(`missing ${path}`);
+      continue;
+    }
+    documents.set(path, readFileSync(absolutePath, 'utf8'));
+  }
+  for (const failure of assessmentRabbitTopologyProblems(documents)) problem(failure);
+
+  const legacyDefaultMutation = new Map(documents);
+  const application = legacyDefaultMutation.get('services/assessment/src/main/resources/application.yml');
+  if (application) {
+    legacyDefaultMutation.set('services/assessment/src/main/resources/application.yml', application.replace('onlinejudge.events.v2', 'onlinejudge.events'));
+    const failures = assessmentRabbitTopologyProblems(legacyDefaultMutation);
+    assert(failures.length > 0, 'mutation: Assessment legacy onlinejudge.events default was accepted');
+    if (failures.length > 0) rejectedMutationCount += 1;
+  }
+}
+
 for (const [service, expectedPaths] of Object.entries(serviceContracts)) {
   validateOpenApi(service, expectedPaths);
 }
@@ -818,6 +863,7 @@ validateDocumentation();
 validateHomeworkPublicationMigrationDocs();
 validateFixtures(asyncApi);
 validateRejectingMutations(asyncApi);
+validateAssessmentRabbitTopology();
 
 if (errors.length > 0) {
   console.error(`microservice-contract-v2: FAIL (${errors.length} problem(s))`);
