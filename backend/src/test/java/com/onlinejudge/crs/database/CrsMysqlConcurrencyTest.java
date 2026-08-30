@@ -12,6 +12,7 @@ import com.onlinejudge.crs.domain.dto.CourseMemberResponse;
 import com.onlinejudge.crs.domain.dto.CourseMemberUpdateRequest;
 import com.onlinejudge.crs.domain.dto.CourseResponse;
 import com.onlinejudge.crs.mapper.CourseRepository;
+import com.onlinejudge.crs.repository.CourseEventOutboxRepository;
 import com.onlinejudge.crs.service.CourseService;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
@@ -77,7 +78,8 @@ class CrsMysqlConcurrencyTest {
             "DB-CRS-01-course-and-member.sql",
             "DB-CRS-02-course-chapter.sql",
             "DB-CRS-03-course-resource.sql",
-            "DB-CRS-05-course-announcement.sql"
+            "DB-CRS-05-course-announcement.sql",
+            "20260830_01_create_reliable_event_storage.sql"
     );
     private static final Pattern URL_PATTERN =
             Pattern.compile("^(jdbc:mysql://[^/]+)/([^?]*)(\\?.*)?$");
@@ -116,7 +118,7 @@ class CrsMysqlConcurrencyTest {
             TransactionAutoConfiguration.class,
             JdbcTemplateAutoConfiguration.class
     })
-    @Import({CourseService.class, CourseRepository.class})
+    @Import({CourseService.class, CourseRepository.class, CourseEventOutboxRepository.class})
     static class MysqlTestConfig {
     }
 

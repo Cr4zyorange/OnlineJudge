@@ -16,6 +16,7 @@ import com.onlinejudge.hwk.domain.HomeworkSubmission;
 import com.onlinejudge.hwk.domain.HomeworkSubmissionRepository;
 import com.onlinejudge.hwk.domain.HomeworkTestCase;
 import com.onlinejudge.hwk.domain.HomeworkType;
+import com.onlinejudge.hwk.repository.AssessmentEventOutboxRepository;
 import com.onlinejudge.integration.course.CoursePermissionClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -43,19 +44,22 @@ public class HomeworkService {
     private final HomeworkReviewLogRepository reviewLogRepository;
     private final CoursePermissionClient coursePermissionClient;
     private final NotificationEventPublisher notificationEventPublisher;
+    private final AssessmentEventOutboxRepository assessmentEventOutboxRepository;
 
     public HomeworkService(
             HomeworkRepository repository,
             HomeworkSubmissionRepository submissionRepository,
             HomeworkReviewLogRepository reviewLogRepository,
             CoursePermissionClient coursePermissionClient,
-            NotificationEventPublisher notificationEventPublisher
+            NotificationEventPublisher notificationEventPublisher,
+            AssessmentEventOutboxRepository assessmentEventOutboxRepository
     ) {
         this.repository = repository;
         this.submissionRepository = submissionRepository;
         this.reviewLogRepository = reviewLogRepository;
         this.coursePermissionClient = coursePermissionClient;
         this.notificationEventPublisher = notificationEventPublisher;
+        this.assessmentEventOutboxRepository = assessmentEventOutboxRepository;
     }
 
     @Transactional
@@ -203,28 +207,7 @@ public class HomeworkService {
             throw new HomeworkApiException("HWK_4005", "objective homework requires at least one question", HttpStatus.BAD_REQUEST);
         }
         Homework published = requireActiveWrite(repository.update(existing.publish(LocalDateTime.now())));
-        try {
-            notificationEventPublisher.publishRequired(new NotificationEvent(
-                    "homework-published-" + published.id() + "-" + published.updatedAt(),
-                    "HOMEWORK_PUBLISHED",
-                    published.courseId(),
-                    coursePermissionClient.listCourseStudentIds(published.courseId()),
-                    "homework published",
-                    "New homework: " + published.title(),
-                    "HWK",
-                    published.id(),
-                    "/courses/" + published.courseId() + "/homeworks/" + published.id(),
-                    published.updatedAt()
-            ));
-        } catch (RuntimeException ex) {
-            log.error("Required HOMEWORK_PUBLISHED notification failed for homework {}; rolling back publish",
-                    published.id(), ex);
-            throw new HomeworkApiException(
-                    "HWK_5003",
-                    "homework notification delivery failed; publish rolled back",
-                    HttpStatus.SERVICE_UNAVAILABLE
-            );
-        }
+        assessmentEventOutboxRepository.appendHomeworkPublished(published);
         return published;
     }
 

@@ -26,6 +26,7 @@ const serviceContracts = {
 const expectedEventTypes = [
   'identity.security-version.changed.v2',
   'course.member.changed.v2',
+  'course.membership.snapshot.v2',
   'course.announcement.published.v2',
   'assessment.source-grade.changed.v2',
   'assessment.evaluation.completed.v2',
@@ -48,6 +49,13 @@ const eventContracts = {
     envelopeSchema: 'CourseMemberChangedEvent',
     payloadSchema: 'CourseMemberChangedPayload',
     requiredPayload: ['courseId', 'userId', 'membershipStatus', 'memberVersion']
+  },
+  'course.membership.snapshot.v2': {
+    aggregateType: 'course-membership-roster',
+    aggregateIdTemplate: '{courseId}',
+    envelopeSchema: 'CourseMembershipSnapshotEvent',
+    payloadSchema: 'CourseMembershipSnapshotPayload',
+    requiredPayload: ['courseId', 'rosterVersion', 'members']
   },
   'course.announcement.published.v2': {
     aggregateType: 'course-announcement',
@@ -161,6 +169,38 @@ function sourceGradeConditionalProblems(schema, label) {
       && branches.some((branch) => isBranch(branch, 'SCORED', 'number'))
       && branches.some((branch) => isBranch(branch, 'UNGRADED', 'null')),
   'must use mutually exclusive SCORED:number and UNGRADED:null score branches');
+  return problems;
+}
+
+function courseMembershipSnapshotProblems(schema, label) {
+  const problems = [];
+  const check = (condition, message) => {
+    if (!condition) problems.push(`${label}: ${message}`);
+  };
+  const rosterVersion = schema?.properties?.rosterVersion;
+  const members = schema?.properties?.members;
+  const member = schema?.components?.schemas?.CourseMembershipSnapshotMember;
+  check(schema?.type === 'object' && schema?.additionalProperties === false,
+    'must be a closed object');
+  check(hasRequiredProperties(schema, ['courseId', 'rosterVersion', 'members']),
+    'must require courseId, rosterVersion, members');
+  check(rosterVersion?.type === 'integer' && rosterVersion?.minimum === 1,
+    'rosterVersion must be a positive integer watermark');
+  check(members?.type === 'array'
+      && members?.items?.$ref === '#/components/schemas/CourseMembershipSnapshotMember',
+  'members must be an atomic array of CourseMembershipSnapshotMember');
+  check(member?.type === 'object' && member?.additionalProperties === false
+      && hasRequiredProperties(member, ['userId', 'membershipStatus', 'memberVersion'])
+      && member?.properties?.userId?.type === 'string'
+      && member?.properties?.userId?.minLength === 1
+      && member?.properties?.membershipStatus?.type === 'string'
+      && Array.isArray(member?.properties?.membershipStatus?.enum)
+      && member.properties.membershipStatus.enum.length === 2
+      && member.properties.membershipStatus.enum.includes('ACTIVE')
+      && member.properties.membershipStatus.enum.includes('REMOVED')
+      && member?.properties?.memberVersion?.type === 'integer'
+      && member.properties.memberVersion.minimum === 1,
+  'members must be closed userId/status/memberVersion facts');
   return problems;
 }
 
@@ -388,6 +428,33 @@ function validateEnvelope(envelope, asyncApi) {
   if (envelope?.aggregateId !== expectedAggregateId) failures.push(`envelope.aggregateId: must equal ${expectedAggregateId}`);
   const payloadSchema = asyncApi?.components?.schemas?.[contract.payloadSchema];
   failures.push(...validateValue(envelope.payload, payloadSchema, 'envelope.payload'));
+  if (envelope?.eventType === 'course.membership.snapshot.v2') {
+    const members = envelope?.payload?.members;
+    if (!Array.isArray(members)) {
+      failures.push('envelope.payload.members: must be an array');
+    } else {
+      const seenUserIds = new Set();
+      for (const [index, member] of members.entries()) {
+        const memberPath = `envelope.payload.members[${index}]`;
+        if (!isObject(member)) {
+          failures.push(`${memberPath}: must be an object`);
+          continue;
+        }
+        const allowed = new Set(['userId', 'membershipStatus', 'memberVersion']);
+        for (const property of Object.keys(member)) {
+          if (!allowed.has(property)) failures.push(`${memberPath}: unexpected ${property}`);
+        }
+        if (typeof member.userId !== 'string' || member.userId.length === 0) failures.push(`${memberPath}.userId: must be a non-empty string`);
+        if (seenUserIds.has(member.userId)) failures.push(`${memberPath}.userId: must be unique within a complete roster`);
+        seenUserIds.add(member.userId);
+        if (!['ACTIVE', 'REMOVED'].includes(member.membershipStatus)) failures.push(`${memberPath}.membershipStatus: must be ACTIVE or REMOVED`);
+        if (!Number.isInteger(member.memberVersion) || member.memberVersion < 1) failures.push(`${memberPath}.memberVersion: must be a positive integer`);
+      }
+    }
+    if (envelope?.payload?.rosterVersion !== envelope?.aggregateVersion) {
+      failures.push('envelope.payload.rosterVersion: must equal envelope.aggregateVersion');
+    }
+  }
   return failures;
 }
 
@@ -447,6 +514,18 @@ function validateAsyncApiDocument(document) {
 
     if (eventType === 'assessment.source-grade.changed.v2') {
       for (const failure of sourceGradeConditionalProblems(payloadSchema, `${eventType} payload`)) failures.push(failure);
+    }
+
+    if (eventType === 'course.membership.snapshot.v2') {
+      for (const failure of courseMembershipSnapshotProblems(
+        { ...payloadSchema, components: document.components },
+        `${eventType} payload`
+      )) failures.push(failure);
+      check(
+        message['x-onlinejudge-completeness']?.includes('atomic complete roster')
+          && message['x-onlinejudge-completeness']?.includes('course.member.changed.v2'),
+        `${eventType} must state that it is the atomic bootstrap watermark and member events are incremental`
+      );
     }
 
     if (eventType === 'assessment.homework.published.v2') {
@@ -688,6 +767,15 @@ function validateRejectingMutations(asyncApi) {
   const missingStatusFailures = validateAsyncApiDocument(missingStatusMutation);
   assert(missingStatusFailures.length > 0, 'mutation: source-grade event without status was accepted');
   if (missingStatusFailures.length > 0) rejectedMutationCount += 1;
+
+  const missingRosterWatermarkMutation = JSON.parse(JSON.stringify(asyncApi));
+  delete missingRosterWatermarkMutation.components.schemas.CourseMembershipSnapshotPayload.properties.rosterVersion;
+  missingRosterWatermarkMutation.components.schemas.CourseMembershipSnapshotPayload.required =
+    missingRosterWatermarkMutation.components.schemas.CourseMembershipSnapshotPayload.required
+      .filter((field) => field !== 'rosterVersion');
+  const missingRosterWatermarkFailures = validateAsyncApiDocument(missingRosterWatermarkMutation);
+  assert(missingRosterWatermarkFailures.length > 0, 'mutation: course snapshot without rosterVersion was accepted');
+  if (missingRosterWatermarkFailures.length > 0) rejectedMutationCount += 1;
 
   const validFixture = readJson('contracts/v2/examples/event-envelope.valid.json');
   if (!validFixture) return;

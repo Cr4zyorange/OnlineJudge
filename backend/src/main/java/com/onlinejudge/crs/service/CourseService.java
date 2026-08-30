@@ -17,6 +17,7 @@ import com.onlinejudge.crs.domain.dto.CoursePermissionResponse;
 import com.onlinejudge.crs.domain.dto.CourseResponse;
 import com.onlinejudge.crs.domain.dto.CourseUpdateRequest;
 import com.onlinejudge.crs.mapper.CourseRepository;
+import com.onlinejudge.crs.repository.CourseEventOutboxRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,9 +27,11 @@ import java.util.List;
 @Service
 public class CourseService {
     private final CourseRepository courseRepository;
+    private final CourseEventOutboxRepository eventOutbox;
 
-    public CourseService(CourseRepository courseRepository) {
+    public CourseService(CourseRepository courseRepository, CourseEventOutboxRepository eventOutbox) {
         this.courseRepository = courseRepository;
+        this.eventOutbox = eventOutbox;
     }
 
     @Transactional
@@ -36,6 +39,7 @@ public class CourseService {
         requireTeacher(user);
         Course course = courseRepository.insert(request, user.id());
         courseRepository.insertMember(course.id(), user.id(), CourseMemberRole.TEACHER, CourseMemberStatus.ACTIVE, "CREATED", user.id());
+        eventOutbox.appendBootstrapRoster(course.id());
         return toResponse(course, user);
     }
 
@@ -77,6 +81,7 @@ public class CourseService {
     @Transactional
     public CoursePermissionResponse join(Long courseId, CourseJoinRequest request, CurrentUser user) {
         Course course = getCourse(courseId);
+        courseRepository.lockCourseForMembershipEvents(courseId);
         if (course.status() == CourseStatus.ARCHIVED || course.status() == CourseStatus.CLOSED) {
             throw new BusinessException(HttpStatus.CONFLICT, "COURSE_CLOSED");
         }
@@ -95,11 +100,13 @@ public class CourseService {
                 throw new BusinessException(HttpStatus.CONFLICT, "JOIN_PENDING");
             }
             requireCapacity(course, targetStatus);
-            return toPermission(courseId, user.id(),
-                    courseRepository.updateMemberForJoin(courseId, user.id(), targetStatus, method, null));
+            CourseMember updated = courseRepository.updateMemberForJoin(courseId, user.id(), targetStatus, method, null);
+            eventOutbox.appendMembershipMutation(updated);
+            return toPermission(courseId, user.id(), updated);
         }
         requireCapacity(course, targetStatus);
         CourseMember member = courseRepository.insertMember(courseId, user.id(), CourseMemberRole.STUDENT, targetStatus, method, null);
+        eventOutbox.appendMembershipMutation(member);
         return toPermission(courseId, user.id(), member);
     }
 
@@ -123,6 +130,7 @@ public class CourseService {
     @Transactional
     public CourseMemberResponse updateMember(Long courseId, Long userId, CourseMemberUpdateRequest request, CurrentUser user) {
         requireManagePermission(courseId, user);
+        courseRepository.lockCourseForMembershipEvents(courseId);
         CourseMember member = courseRepository.findMember(courseId, userId)
                 .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "MEMBER_NOT_FOUND"));
         CourseMemberRole role = request.role() == null ? member.role() : request.role();
@@ -146,12 +154,15 @@ public class CourseService {
         if (updated == 0) {
             throw new BusinessException(HttpStatus.CONFLICT, "INVALID_MEMBER_STATUS_TRANSITION");
         }
-        return toMemberResponse(courseRepository.findMember(courseId, userId).orElseThrow());
+        CourseMember updatedMember = courseRepository.findMember(courseId, userId).orElseThrow();
+        eventOutbox.appendMembershipMutation(updatedMember);
+        return toMemberResponse(updatedMember);
     }
 
     @Transactional
     public void removeMember(Long courseId, Long userId, CurrentUser user) {
         requireManagePermission(courseId, user);
+        courseRepository.lockCourseForMembershipEvents(courseId);
         CourseMember member = courseRepository.findMember(courseId, userId)
                 .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "MEMBER_NOT_FOUND"));
         if (user.id() == userId) {
@@ -166,6 +177,7 @@ public class CourseService {
         if (updated == 0) {
             throw new BusinessException(HttpStatus.CONFLICT, "INVALID_MEMBER_STATUS_TRANSITION");
         }
+        eventOutbox.appendMembershipMutation(courseRepository.findMember(courseId, userId).orElseThrow());
     }
 
     private Course getCourse(Long courseId) {
