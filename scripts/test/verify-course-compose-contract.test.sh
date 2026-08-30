@@ -40,6 +40,7 @@ require "$config" 'COURSE_DATABASE_USER' 'Course Compose username does not use t
 require "$migrator" 'oj_course_rw' 'migration entrypoint does not provision the canonical Course account'
 require "$migrator" 'schema_migrations' 'migration entrypoint has no durable version checkpoint'
 require "$cached_runtime" 'ARG RUNTIME_BASE' 'cached Course runtime does not require a pinned local base'
+require "$cached_runtime" 'ARG RUNTIME_BASE=onlinejudge/backend:' 'cached Course runtime has no immutable local-base default'
 require "$cached_runtime" 'FROM ${RUNTIME_BASE}' 'cached Course runtime does not use the supplied local base'
 require "$cached_runtime" 'org.opencontainers.image.revision' 'cached Course runtime does not retain OCI revision'
 require "$cached_runtime" 'COPY --chown=10002:10002 services/course/target/onlinejudge-course-service-0.1.0-SNAPSHOT.jar app.jar' 'cached Course runtime does not run the same Course jar'

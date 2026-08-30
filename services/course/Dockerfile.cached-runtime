@@ -2,7 +2,7 @@
 # Build services/course/target first, then provide a locally cached immutable
 # Java 21 image that was verified to contain java and wget.  The normal
 # Dockerfile remains the primary reproducible build path.
-ARG RUNTIME_BASE
+ARG RUNTIME_BASE=onlinejudge/backend:a6a5da0faa2eb68369cc13f12ce9506cfa99190a
 FROM ${RUNTIME_BASE}
 
 USER root
