@@ -14,10 +14,14 @@ import java.net.http.HttpResponse;
 import java.security.PublicKey;
 import java.time.Duration;
 import java.util.Map;
+import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /** A deployable bootstrap bundle plus bounded refresh gives existing sessions an Identity-outage path. */
 @Component
 public class JwksCache {
+    private static final Pattern CACHE_MAX_AGE = Pattern.compile("(?:^|,)\\s*max-age=(\\d+)(?:\\s*,|$)", Pattern.CASE_INSENSITIVE);
     private final ObjectMapper objectMapper;
     private final CourseIdentityProperties properties;
     private final HttpClient client;
@@ -62,16 +66,35 @@ public class JwksCache {
         try {
             HttpRequest request = HttpRequest.newBuilder(URI.create(properties.getJwksUri()))
                     .timeout(properties.getRequestTimeout())
+                    .header("Accept", "application/json")
+                    .header("X-Request-Id", UUID.randomUUID().toString())
                     .GET().build();
             HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
-            if (response.statusCode() != 200) {
+            if (response.statusCode() != 200 || !isJson(response) || !hasPositiveCacheMaxAge(response)) {
                 return false;
             }
-            // Parse once here to reject response bodies that are not JSON before replacing trusted keys.
+            // Parse the full canonical Identity bundle before replacing trusted keys; failed refreshes retain the old bundle.
             objectMapper.readValue(response.body(), new TypeReference<Map<String, Object>>() { });
             keys = JwtVerifier.parseJwks(objectMapper, response.body());
             return true;
         } catch (Exception ignored) {
+            return false;
+        }
+    }
+
+    private boolean isJson(HttpResponse<String> response) {
+        return response.headers().firstValue("Content-Type")
+                .map(value -> value.toLowerCase(java.util.Locale.ROOT).contains("application/json"))
+                .orElse(false);
+    }
+
+    private boolean hasPositiveCacheMaxAge(HttpResponse<String> response) {
+        String cacheControl = response.headers().firstValue("Cache-Control").orElse("");
+        Matcher matcher = CACHE_MAX_AGE.matcher(cacheControl);
+        if (!matcher.find()) return false;
+        try {
+            return Long.parseLong(matcher.group(1)) > 0;
+        } catch (NumberFormatException ignored) {
             return false;
         }
     }
