@@ -22,17 +22,25 @@ class AssessmentComposeDeliveryContractTest {
         assertThat(compose).contains("ASSESSMENT_SANDBOX_COMMAND: ${ASSESSMENT_SANDBOX_COMMAND:?ASSESSMENT_SANDBOX_COMMAND is required}");
         assertThat(compose).contains("ASSESSMENT_SANDBOX_PRE_EXECUTION_DELAY: ${ASSESSMENT_SANDBOX_PRE_EXECUTION_DELAY:-PT0S}");
         assertThat(compose).contains("ASSESSMENT_RABBIT_ENABLED: \"true\"", "ASSESSMENT_RABBIT_HOST: rabbitmq");
-        assertThat(compose).contains("ASSESSMENT_RABBIT_RELAY_ENABLED: \"false\"");
+        String api = compose.substring(compose.indexOf("  assessment-api:"), compose.indexOf("  assessment-worker:"));
+        String worker = compose.substring(compose.indexOf("  assessment-worker:"), compose.indexOf("\nvolumes:"));
+        assertThat(api).contains("ASSESSMENT_RABBIT_ENABLED: \"false\"", "ASSESSMENT_RABBIT_RELAY_ENABLED: \"false\"", "healthcheck:")
+                .doesNotContain("rabbitmq: {condition: service_healthy}");
+        assertThat(worker).contains("ASSESSMENT_RABBIT_ENABLED: \"true\"", "ASSESSMENT_RABBIT_RELAY_ENABLED: \"true\"", "healthcheck:", "test -f /tmp/assessment-worker-ready", "retries: 3");
+        assertThat(Files.readString(repository.resolve("services/assessment/src/main/java/com/onlinejudge/assessmentservice/worker/AssessmentWorkerReadiness.java")))
+                .contains("factory.setConnectionTimeout(1_000)", "Files.deleteIfExists(MARKER)");
+        assertThat(Files.readString(repository.resolve("services/assessment/src/main/java/com/onlinejudge/assessmentservice/messaging/RabbitOutboxRelay.java")))
+                .contains("factory.setConnectionTimeout(1_000)");
         assertThat(compose).contains("ASSESSMENT_IDENTITY_JWKS_TRUST_BUNDLE: ${ASSESSMENT_IDENTITY_JWKS_TRUST_BUNDLE:?ASSESSMENT_IDENTITY_JWKS_TRUST_BUNDLE is required}");
         assertThat(compose).contains("ASSESSMENT_IDENTITY_JWKS_URI: ${ASSESSMENT_IDENTITY_JWKS_URI:?ASSESSMENT_IDENTITY_JWKS_URI is required}");
         assertThat(compose).contains("ASSESSMENT_WORKER_LEASE: ${ASSESSMENT_WORKER_LEASE:-PT30S}", "ASSESSMENT_WORKER_HEARTBEAT_INTERVAL: ${ASSESSMENT_WORKER_HEARTBEAT_INTERVAL:-PT5S}");
         assertThat(compose).contains("ASSESSMENT_WORKER_MAX_ATTEMPTS: ${ASSESSMENT_WORKER_MAX_ATTEMPTS:-3}", "ASSESSMENT_WORKER_RETRY_BACKOFF: ${ASSESSMENT_WORKER_RETRY_BACKOFF:-PT5S}");
-        assertThat(compose).contains("rabbitmq: {condition: service_healthy}");
+        assertThat(worker).contains("rabbitmq: {condition: service_healthy}");
         assertThat(compose).contains("assessment-storage-init: {condition: service_completed_successfully}", "user: \"0:0\"", "chown -R 10003:10003 /var/lib/onlinejudge-assessment");
         assertThat(count(compose, "assessment-files:/var/lib/onlinejudge-assessment")).isEqualTo(3);
         assertThat(compose).contains("volumes:\n  assessment-files:");
         assertThat(primaryDockerfile).contains("/var/lib/onlinejudge-assessment");
-        assertThat(cachedDockerfile).contains("/var/lib/onlinejudge-assessment", "USER 10003:10003");
+        assertThat(cachedDockerfile).contains("/var/lib/onlinejudge-assessment", "USER 10003:10003", "getent group 10003");
         assertThat(migration).contains("assessment_deferred_course_member_event");
         assertThat(cachedCompose).contains("assessment-worker:${GIT_SHA:?GIT_SHA is required}");
     }

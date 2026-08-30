@@ -33,6 +33,10 @@ public class RabbitOutboxRelay {
     public void publishPending() {
         ConnectionFactory factory = new ConnectionFactory();
         factory.setHost(host); factory.setPort(port); factory.setUsername(username); factory.setPassword(password);
+        // A broker outage is expected.  Return promptly so the readiness
+        // scheduler can withdraw the worker marker instead of reporting a
+        // stale consumer as healthy for the client's one-minute default.
+        factory.setConnectionTimeout(1_000); factory.setHandshakeTimeout(1_000);
         try (Connection connection = factory.newConnection("assessment-outbox-relay"); Channel channel = connection.createChannel()) {
             channel.exchangeDeclare(exchange, "topic", true);
             channel.confirmSelect();

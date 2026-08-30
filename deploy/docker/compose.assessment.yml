@@ -32,20 +32,25 @@ services:
       dockerfile: services/assessment/Dockerfile
     depends_on:
       assessment-db: {condition: service_healthy}
-      rabbitmq: {condition: service_healthy}
       assessment-storage-init: {condition: service_completed_successfully}
     environment:
       ASSESSMENT_DATABASE_HOST: assessment-db
       ASSESSMENT_DATABASE_PASSWORD: assessment-password
       ASSESSMENT_IDENTITY_JWKS_TRUST_BUNDLE: ${ASSESSMENT_IDENTITY_JWKS_TRUST_BUNDLE:?ASSESSMENT_IDENTITY_JWKS_TRUST_BUNDLE is required}
       ASSESSMENT_IDENTITY_JWKS_URI: ${ASSESSMENT_IDENTITY_JWKS_URI:?ASSESSMENT_IDENTITY_JWKS_URI is required}
-      ASSESSMENT_RABBIT_ENABLED: "true"
-      ASSESSMENT_RABBIT_HOST: rabbitmq
-      ASSESSMENT_RABBIT_RELAY_ENABLED: "true"
+      # The API owns its MySQL transaction and outbox.  A broker outage must
+      # never prevent a submission from being accepted durably.
+      ASSESSMENT_RABBIT_ENABLED: "false"
+      ASSESSMENT_RABBIT_RELAY_ENABLED: "false"
       ASSESSMENT_STORAGE_ROOT: /var/lib/onlinejudge-assessment
     volumes:
       - assessment-files:/var/lib/onlinejudge-assessment
     ports: ["18083:8083"]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8083/health/ready >/dev/null"]
+      interval: 5s
+      timeout: 3s
+      retries: 24
   assessment-worker:
     build:
       context: ../..
@@ -60,7 +65,9 @@ services:
       ASSESSMENT_WORKER_ENABLED: "true"
       ASSESSMENT_RABBIT_ENABLED: "true"
       ASSESSMENT_RABBIT_HOST: rabbitmq
-      ASSESSMENT_RABBIT_RELAY_ENABLED: "false"
+      # The worker is the broker-facing delivery workload.  It relays API
+      # outbox rows and runs the two durable consumers.
+      ASSESSMENT_RABBIT_RELAY_ENABLED: "true"
       ASSESSMENT_IDENTITY_JWKS_TRUST_BUNDLE: ${ASSESSMENT_IDENTITY_JWKS_TRUST_BUNDLE:?ASSESSMENT_IDENTITY_JWKS_TRUST_BUNDLE is required}
       ASSESSMENT_IDENTITY_JWKS_URI: ${ASSESSMENT_IDENTITY_JWKS_URI:?ASSESSMENT_IDENTITY_JWKS_URI is required}
       ASSESSMENT_STORAGE_ROOT: /var/lib/onlinejudge-assessment
@@ -73,6 +80,11 @@ services:
     volumes:
       - assessment-files:/var/lib/onlinejudge-assessment
     command: ["--spring.main.web-application-type=none", "--assessment.worker.enabled=true"]
+    healthcheck:
+      test: ["CMD-SHELL", "test -f /tmp/assessment-worker-ready"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
 
 volumes:
   assessment-files:

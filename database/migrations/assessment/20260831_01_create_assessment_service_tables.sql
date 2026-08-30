@@ -24,6 +24,9 @@ CREATE TABLE IF NOT EXISTS assessment_course_member_projection (
   course_id VARCHAR(80) NOT NULL, user_id VARCHAR(80) NOT NULL, membership_status VARCHAR(16) NOT NULL,
   member_version BIGINT NOT NULL, PRIMARY KEY (course_id, user_id)
 );
+CREATE TABLE IF NOT EXISTS assessment_course_membership_watermark (
+  course_id VARCHAR(80) PRIMARY KEY, roster_version BIGINT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS assessment_event_inbox (
   event_id VARCHAR(36) PRIMARY KEY, event_type VARCHAR(120) NOT NULL
 );

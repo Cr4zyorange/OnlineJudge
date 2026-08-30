@@ -27,12 +27,13 @@ assessment:
     retry-backoff: ${ASSESSMENT_WORKER_RETRY_BACKOFF:PT5S}
   rabbit:
     enabled: ${ASSESSMENT_RABBIT_ENABLED:false}
-    host: ${RABBITMQ_HOST:127.0.0.1}
-    port: ${RABBITMQ_PORT:5672}
-    username: ${RABBITMQ_USERNAME:guest}
-    password: ${RABBITMQ_PASSWORD:guest}
+    host: ${ASSESSMENT_RABBIT_HOST:${RABBITMQ_HOST:127.0.0.1}}
+    port: ${ASSESSMENT_RABBIT_PORT:${RABBITMQ_PORT:5672}}
+    username: ${ASSESSMENT_RABBIT_USERNAME:${RABBITMQ_USERNAME:guest}}
+    password: ${ASSESSMENT_RABBIT_PASSWORD:${RABBITMQ_PASSWORD:guest}}
     exchange: ${ASSESSMENT_RABBIT_EXCHANGE:onlinejudge.events}
     course-member-queue: ${ASSESSMENT_COURSE_MEMBER_QUEUE:assessment.course-members.v2}
+    course-membership-snapshot-routing-key: ${ASSESSMENT_COURSE_MEMBERSHIP_SNAPSHOT_ROUTING_KEY:onlinejudge.course.membership.snapshot.v2}
     course-member-dead-letter-exchange: ${ASSESSMENT_COURSE_MEMBER_DEAD_LETTER_EXCHANGE:onlinejudge.events.dlx.v2}
     course-member-dead-letter-queue: ${ASSESSMENT_COURSE_MEMBER_DEAD_LETTER_QUEUE:assessment.course-members.dlq.v2}
     course-member-dead-letter-routing-key: ${ASSESSMENT_COURSE_MEMBER_DEAD_LETTER_ROUTING_KEY:onlinejudge.course.member.changed.invalid.v2}

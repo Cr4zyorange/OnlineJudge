@@ -1,6 +1,5 @@
 package com.onlinejudge.assessmentservice.messaging;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.onlinejudge.assessmentservice.service.CourseMembershipProjectionService;
 import com.onlinejudge.assessmentservice.persistence.CourseMembershipDeadLetterRepository;
@@ -21,17 +20,18 @@ import java.util.Map;
 @ConditionalOnProperty(name = "assessment.rabbit.enabled", havingValue = "true")
 public class CourseMembershipRabbitConsumer implements SmartLifecycle {
     private final CourseMembershipProjectionService projection; private final CourseMembershipDeadLetterRepository deadLetters; private final ObjectMapper json;
-    private final String host, username, password, exchange, queue, deadLetterExchange, deadLetterQueue, deadLetterRoutingKey; private final int port;
+    private final String host, username, password, exchange, queue, snapshotRoutingKey, deadLetterExchange, deadLetterQueue, deadLetterRoutingKey; private final int port;
     private volatile boolean running; private Connection connection; private Channel channel;
     public CourseMembershipRabbitConsumer(CourseMembershipProjectionService projection, CourseMembershipDeadLetterRepository deadLetters, ObjectMapper json,
             @Value("${assessment.rabbit.host:127.0.0.1}") String host, @Value("${assessment.rabbit.port:5672}") int port,
             @Value("${assessment.rabbit.username:guest}") String username, @Value("${assessment.rabbit.password:guest}") String password,
             @Value("${assessment.rabbit.exchange:onlinejudge.events}") String exchange,
             @Value("${assessment.rabbit.course-member-queue:assessment.course-members.v2}") String queue,
+            @Value("${assessment.rabbit.course-membership-snapshot-routing-key:onlinejudge.course.membership.snapshot.v2}") String snapshotRoutingKey,
             @Value("${assessment.rabbit.course-member-dead-letter-exchange:onlinejudge.events.dlx.v2}") String deadLetterExchange,
             @Value("${assessment.rabbit.course-member-dead-letter-queue:assessment.course-members.dlq.v2}") String deadLetterQueue,
             @Value("${assessment.rabbit.course-member-dead-letter-routing-key:onlinejudge.course.member.changed.invalid.v2}") String deadLetterRoutingKey) {
-        this.projection = projection; this.deadLetters = deadLetters; this.json = json; this.host = host; this.port = port; this.username = username; this.password = password; this.exchange = exchange; this.queue = queue; this.deadLetterExchange = deadLetterExchange; this.deadLetterQueue = deadLetterQueue; this.deadLetterRoutingKey = deadLetterRoutingKey;
+        this.projection = projection; this.deadLetters = deadLetters; this.json = json; this.host = host; this.port = port; this.username = username; this.password = password; this.exchange = exchange; this.queue = queue; this.snapshotRoutingKey = snapshotRoutingKey; this.deadLetterExchange = deadLetterExchange; this.deadLetterQueue = deadLetterQueue; this.deadLetterRoutingKey = deadLetterRoutingKey;
     }
     @Override public void start() {
         try {
@@ -40,18 +40,24 @@ public class CourseMembershipRabbitConsumer implements SmartLifecycle {
             channel.exchangeDeclare(exchange, "topic", true); channel.exchangeDeclare(deadLetterExchange, "topic", true);
             channel.queueDeclare(deadLetterQueue, true, false, false, null); channel.queueBind(deadLetterQueue, deadLetterExchange, deadLetterRoutingKey);
             channel.queueDeclare(queue, true, false, false, Map.of("x-dead-letter-exchange", deadLetterExchange, "x-dead-letter-routing-key", deadLetterRoutingKey));
-            channel.queueBind(queue, exchange, "onlinejudge.course.member.changed.v2"); channel.basicQos(1);
+            channel.queueBind(queue, exchange, "onlinejudge.course.member.changed.v2"); channel.queueBind(queue, exchange, snapshotRoutingKey); channel.basicQos(1);
             channel.basicConsume(queue, false, (tag, message) -> {
                 try {
-                    CourseMembershipEventEnvelope event = CourseMembershipEventEnvelope.parse(json.readTree(message.getBody()));
-                    var decision = projection.apply(new CourseMembershipProjectionService.MemberChanged(event.eventId(), event.courseId(),
-                            event.userId(), event.membershipStatus(), event.memberVersion()));
+                    var root = json.readTree(message.getBody());
+                    if ("course.member.changed.v2".equals(root.path("eventType").asText())) {
+                        CourseMembershipEventEnvelope event = CourseMembershipEventEnvelope.parse(root);
+                        projection.apply(new CourseMembershipProjectionService.MemberChanged(event.eventId(), event.courseId(), event.userId(), event.membershipStatus(), event.memberVersion()));
+                    } else if ("course.membership.snapshot.v2".equals(root.path("eventType").asText())) {
+                        CourseMembershipSnapshotEventEnvelope snapshot = CourseMembershipSnapshotEventEnvelope.parse(root);
+                        projection.applySnapshot(new CourseMembershipProjectionService.RosterSnapshot(snapshot.eventId(), snapshot.courseId(), snapshot.rosterVersion(),
+                                snapshot.members().stream().map(member -> new CourseMembershipProjectionService.RosterMember(member.userId(), member.membershipStatus(), member.memberVersion())).toList()));
+                    } else throw new IllegalArgumentException("unsupported Course membership event");
                     // GAP is durable in the Assessment schema; acknowledging prevents a
                     // requeue loop from starving the missing lower aggregate version.
                     channel.basicAck(message.getEnvelope().getDeliveryTag(), false);
                 } catch (IllegalArgumentException invalidEnvelope) {
                     // Untrusted wire data is terminal: never requeue an invalid v1/malformed envelope.
-                    // A broker DLX policy may retain it; without one Rabbit discards it after this NACK.
+                    // The declared durable DLX retains it for audit and controlled replay.
                     channel.basicNack(message.getEnvelope().getDeliveryTag(), false, false);
                 } catch (Exception unavailable) { channel.basicNack(message.getEnvelope().getDeliveryTag(), false, true); }
             }, tag -> { });
