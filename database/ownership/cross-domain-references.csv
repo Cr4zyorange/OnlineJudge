@@ -1,0 +1,12 @@
+consumer,consumer_table,column,target_owner,target_table,target_column,replacement,contract,consistency
+COURSE,crs_course,teacher_id,IDENTITY,t_auth_user,user_id,JWT-subject-and-identity-security-event,contracts/v2/openapi/identity.openapi.json,eventual
+COURSE,crs_course_member,user_id,IDENTITY,t_auth_user,user_id,JWT-subject-and-identity-security-event,contracts/v2/openapi/identity.openapi.json,eventual
+ASSESSMENT,lab_experiment,course_id,COURSE,crs_course,id,course-authorization-API-and-course-events,contracts/v2/openapi/course.openapi.json,eventual
+ASSESSMENT,lab_submission,student_id,IDENTITY,t_auth_user,user_id,JWT-subject-and-identity-security-event,contracts/v2/openapi/identity.openapi.json,eventual
+ASSESSMENT,t_hwk_homework,course_id,COURSE,crs_course,id,course-authorization-API-and-course-events,contracts/v2/openapi/course.openapi.json,eventual
+ASSESSMENT,t_hwk_submission,student_id,IDENTITY,t_auth_user,user_id,JWT-subject-and-identity-security-event,contracts/v2/openapi/identity.openapi.json,eventual
+GRADE,t_grade_item,course_id,COURSE,crs_course,id,course-authorization-API-and-course-events,contracts/v2/openapi/course.openapi.json,eventual
+GRADE,t_grade_item,source_id,ASSESSMENT,logical_source,id,source-grade-API-and-event-projection,contracts/v2/openapi/assessment.openapi.json,eventual
+GRADE,t_grade_record,student_id,IDENTITY,t_auth_user,user_id,JWT-subject-and-identity-security-event,contracts/v2/openapi/identity.openapi.json,eventual
+LEARNING,lrn_learning_task,course_id,COURSE,crs_course,id,course-member-event-and-local-projection,contracts/v2/asyncapi/events.asyncapi.json,eventual
+LEARNING,lrn_learning_task,source_id,ASSESSMENT,logical_source,id,assessment-event-and-local-projection,contracts/v2/asyncapi/events.asyncapi.json,eventual
