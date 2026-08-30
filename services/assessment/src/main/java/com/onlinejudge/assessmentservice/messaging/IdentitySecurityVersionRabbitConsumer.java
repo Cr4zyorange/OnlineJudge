@@ -26,7 +26,7 @@ public class IdentitySecurityVersionRabbitConsumer implements SmartLifecycle {
 
     public IdentitySecurityVersionRabbitConsumer(IdentitySecurityVersionProjectionService projection, IdentitySecurityVersionDeadLetterRepository deadLetters, ObjectMapper json,
             @Value("${assessment.rabbit.host:127.0.0.1}") String host, @Value("${assessment.rabbit.port:5672}") int port,
-            @Value("${assessment.rabbit.username:guest}") String username, @Value("${assessment.rabbit.password:guest}") String password,
+            @Value("${assessment.rabbit.username}") String username, @Value("${assessment.rabbit.password}") String password,
             @Value("${assessment.rabbit.exchange:onlinejudge.events.v2}") String exchange,
             @Value("${assessment.rabbit.identity-security-version-queue:assessment.identity-security-version.v2}") String queue,
             @Value("${assessment.rabbit.identity-security-version-dead-letter-exchange:onlinejudge.events.dlx.v2}") String deadLetterExchange,

@@ -23,7 +23,7 @@ public class IdentitySecurityVersionDeadLetterReplayCommand implements Applicati
     public IdentitySecurityVersionDeadLetterReplayCommand(IdentitySecurityVersionDeadLetterRepository deadLetters,
             @Value("${assessment.rabbit.replay-identity-security-version-event-id}") String eventId,
             @Value("${assessment.rabbit.host:127.0.0.1}") String host, @Value("${assessment.rabbit.port:5672}") int port,
-            @Value("${assessment.rabbit.username:guest}") String username, @Value("${assessment.rabbit.password:guest}") String password,
+            @Value("${assessment.rabbit.username}") String username, @Value("${assessment.rabbit.password}") String password,
             @Value("${assessment.rabbit.exchange:onlinejudge.events.v2}") String exchange) {
         this.deadLetters = deadLetters; this.eventId = eventId; this.host = host; this.port = port; this.username = username;
         this.password = password; this.exchange = exchange;

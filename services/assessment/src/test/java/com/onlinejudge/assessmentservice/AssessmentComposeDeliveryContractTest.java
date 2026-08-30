@@ -40,6 +40,11 @@ class AssessmentComposeDeliveryContractTest {
         assertThat(compose).contains("ASSESSMENT_WORKER_LEASE: ${ASSESSMENT_WORKER_LEASE:-PT30S}", "ASSESSMENT_WORKER_HEARTBEAT_INTERVAL: ${ASSESSMENT_WORKER_HEARTBEAT_INTERVAL:-PT5S}");
         assertThat(compose).contains("ASSESSMENT_WORKER_MAX_ATTEMPTS: ${ASSESSMENT_WORKER_MAX_ATTEMPTS:-3}", "ASSESSMENT_WORKER_RETRY_BACKOFF: ${ASSESSMENT_WORKER_RETRY_BACKOFF:-PT5S}");
         assertThat(worker).contains("rabbitmq: {condition: service_healthy}");
+        String broker = compose.substring(compose.indexOf("  rabbitmq:"), compose.indexOf("  assessment-storage-init:"));
+        assertThat(broker).contains("RABBITMQ_DEFAULT_USER: ${ASSESSMENT_RABBIT_USERNAME:?ASSESSMENT_RABBIT_USERNAME is required}", "RABBITMQ_DEFAULT_PASS: ${ASSESSMENT_RABBIT_PASSWORD:?ASSESSMENT_RABBIT_PASSWORD is required}")
+                .doesNotContain("guest");
+        assertThat(worker).contains("ASSESSMENT_RABBIT_USERNAME: ${ASSESSMENT_RABBIT_USERNAME:?ASSESSMENT_RABBIT_USERNAME is required}", "ASSESSMENT_RABBIT_PASSWORD: ${ASSESSMENT_RABBIT_PASSWORD:?ASSESSMENT_RABBIT_PASSWORD is required}")
+                .doesNotContain("guest");
         assertThat(worker).contains("assessment-migrations: {condition: service_completed_successfully}");
         assertThat(compose).contains("assessment-runtime-account-init:", "export MYSQL_PWD=\"$$MYSQL_ROOT_PASSWORD\"", "REVOKE ALL PRIVILEGES, GRANT OPTION", "GRANT SELECT, INSERT, UPDATE, DELETE ON oj_assessment.*", "assessment-migrations:", "MIGRATION_DATABASE_USER: root", "migrate-service.sh", "MIGRATION_ROOT: /workspace/migrations");
         assertThat(runtimeProperties).contains("spring.sql.init.mode=never");

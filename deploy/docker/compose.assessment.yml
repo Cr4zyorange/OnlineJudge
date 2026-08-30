@@ -14,6 +14,9 @@ services:
       retries: 24
   rabbitmq:
     image: rabbitmq:4.1-management
+    environment:
+      RABBITMQ_DEFAULT_USER: ${ASSESSMENT_RABBIT_USERNAME:?ASSESSMENT_RABBIT_USERNAME is required}
+      RABBITMQ_DEFAULT_PASS: ${ASSESSMENT_RABBIT_PASSWORD:?ASSESSMENT_RABBIT_PASSWORD is required}
     healthcheck:
       test: ["CMD-SHELL", "rabbitmq-diagnostics -q ping"]
       interval: 5s
@@ -100,6 +103,8 @@ services:
       ASSESSMENT_WORKER_ENABLED: "true"
       ASSESSMENT_RABBIT_ENABLED: "true"
       ASSESSMENT_RABBIT_HOST: rabbitmq
+      ASSESSMENT_RABBIT_USERNAME: ${ASSESSMENT_RABBIT_USERNAME:?ASSESSMENT_RABBIT_USERNAME is required}
+      ASSESSMENT_RABBIT_PASSWORD: ${ASSESSMENT_RABBIT_PASSWORD:?ASSESSMENT_RABBIT_PASSWORD is required}
       ASSESSMENT_RABBIT_EXCHANGE: onlinejudge.events.v2
       # The worker is the broker-facing delivery workload.  It relays API
       # outbox rows and runs the two durable consumers.

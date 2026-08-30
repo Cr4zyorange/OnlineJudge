@@ -29,8 +29,8 @@ assessment:
     enabled: ${ASSESSMENT_RABBIT_ENABLED:false}
     host: ${ASSESSMENT_RABBIT_HOST:${RABBITMQ_HOST:127.0.0.1}}
     port: ${ASSESSMENT_RABBIT_PORT:${RABBITMQ_PORT:5672}}
-    username: ${ASSESSMENT_RABBIT_USERNAME:${RABBITMQ_USERNAME:guest}}
-    password: ${ASSESSMENT_RABBIT_PASSWORD:${RABBITMQ_PASSWORD:guest}}
+    username: ${ASSESSMENT_RABBIT_USERNAME:${RABBITMQ_USERNAME:}}
+    password: ${ASSESSMENT_RABBIT_PASSWORD:${RABBITMQ_PASSWORD:}}
     exchange: ${ASSESSMENT_RABBIT_EXCHANGE:onlinejudge.events.v2}
     course-member-queue: ${ASSESSMENT_COURSE_MEMBER_QUEUE:assessment.course-members.v2}
     course-membership-snapshot-routing-key: ${ASSESSMENT_COURSE_MEMBERSHIP_SNAPSHOT_ROUTING_KEY:onlinejudge.course.membership.snapshot.v2}

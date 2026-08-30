@@ -38,8 +38,8 @@ public class AssessmentWorkerReadiness implements ApplicationRunner {
             IdentitySecurityVersionRabbitConsumer securityVersions,
             @Value("${assessment.rabbit.host:127.0.0.1}") String host,
             @Value("${assessment.rabbit.port:5672}") int port,
-            @Value("${assessment.rabbit.username:guest}") String username,
-            @Value("${assessment.rabbit.password:guest}") String password) {
+            @Value("${assessment.rabbit.username}") String username,
+            @Value("${assessment.rabbit.password}") String password) {
         this.jdbc = jdbc;
         this.courseMembers = courseMembers;
         this.securityVersions = securityVersions;
