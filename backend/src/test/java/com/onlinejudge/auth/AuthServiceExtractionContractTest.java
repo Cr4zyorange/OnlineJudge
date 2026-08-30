@@ -70,4 +70,33 @@ class AuthServiceExtractionContractTest {
                 "build:"
         );
     }
+
+    @Test
+    void businessConsumersDeclareTheCanonicalJwksTrustBundleAndRefreshConfiguration() throws IOException {
+        String application = Files.readString(Path.of("src/main/resources/application.yml"));
+        String composeProperties = Files.readString(Path.of("src/main/resources/application-compose.properties"));
+        String compose = Files.readString(REPOSITORY.resolve("deploy/docker/compose.yml"));
+        String workloads = Files.readString(REPOSITORY.resolve("deploy/platform/workloads.json"));
+
+        assertThat(application).contains(
+                "trust-bundle: ${IDENTITY_JWKS_TRUST_BUNDLE:}",
+                "uri: ${IDENTITY_JWKS_URI:}",
+                "refresh-interval: ${IDENTITY_JWKS_REFRESH_INTERVAL:PT5M}"
+        );
+        assertThat(composeProperties).contains(
+                "onlinejudge.identity.jwks.trust-bundle=${IDENTITY_JWKS_TRUST_BUNDLE}",
+                "onlinejudge.identity.jwks.uri=${IDENTITY_JWKS_URI}"
+        );
+        assertThat(compose).contains(
+                "IDENTITY_JWKS_TRUST_BUNDLE: ${IDENTITY_JWKS_TRUST_BUNDLE:?IDENTITY_JWKS_TRUST_BUNDLE is required}",
+                "IDENTITY_JWKS_URI: ${IDENTITY_JWKS_URI:?IDENTITY_JWKS_URI is required}"
+        );
+        assertThat(count(workloads, "IDENTITY_JWKS_TRUST_BUNDLE")).isGreaterThanOrEqualTo(5);
+        assertThat(count(workloads, "IDENTITY_JWKS_URI")).isGreaterThanOrEqualTo(4);
+        assertThat(count(workloads, "IDENTITY_JWKS_REFRESH_INTERVAL")).isGreaterThanOrEqualTo(4);
+    }
+
+    private static int count(String value, String fragment) {
+        return value.split(java.util.regex.Pattern.quote(fragment), -1).length - 1;
+    }
 }

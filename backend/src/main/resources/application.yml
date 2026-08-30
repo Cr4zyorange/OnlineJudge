@@ -32,6 +32,17 @@ server:
 onlinejudge:
   auth:
     allow-header-auth: false
+  identity:
+    jwt:
+      issuer: ${IDENTITY_JWT_ISSUER:onlinejudge.identity.v2}
+      audience: ${IDENTITY_JWT_AUDIENCE:onlinejudge.api}
+    jwks:
+      trust-bundle: ${IDENTITY_JWKS_TRUST_BUNDLE:}
+      uri: ${IDENTITY_JWKS_URI:}
+      refresh-interval: ${IDENTITY_JWKS_REFRESH_INTERVAL:PT5M}
+      refresh-initial-delay: ${IDENTITY_JWKS_REFRESH_INITIAL_DELAY:PT30S}
+      request-timeout: ${IDENTITY_JWKS_REQUEST_TIMEOUT:PT1S}
+      refresh-request-id: ${IDENTITY_JWKS_REFRESH_REQUEST_ID:identity-jwks-refresh}
   hwk:
     attachments:
       max-size-bytes: 10485760

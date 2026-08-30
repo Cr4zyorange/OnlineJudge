@@ -18,9 +18,9 @@ userId, roles[], permissions[], sessionId, securityVersion, iat, exp,
 iss=onlinejudge.identity.v2, aud=onlinejudge.api
 ```
 
-`GET /.well-known/jwks.json` 返回当前与轮换重叠窗口内的 RSA 公钥，键均含 `kty=RSA`、`use=sig`、`alg=RS256`、`kid`、`n`、`e`。旧公钥必须保留至少一个最大 Token 生命周期加消费端缓存窗口。私钥只由 `IDENTITY_JWT_SIGNING_KEY` 注入；Compose/生产显式关闭临时开发密钥。
+`GET /.well-known/jwks.json` 返回当前与轮换重叠窗口内的 RSA 公钥，键均含 `kty=RSA`、`use=sig`、`alg=RS256`、`kid`、`n`、`e`。此 v2 操作必须携带非空 `X-Request-Id`；缺失时返回 `400 REQUEST_ID_REQUIRED` 及标准错误体。成功响应是 `Cache-Control: public, max-age=<IDENTITY_JWKS_CACHE_MAX_AGE>, must-revalidate`，消费端以该有界缓存窗口安排刷新。旧公钥必须保留至少一个最大 Token 生命周期加消费端缓存窗口。私钥只由 `IDENTITY_JWT_SIGNING_KEY` 注入；Compose/生产显式关闭临时开发密钥。
 
-`OfflineJwtVerifier` 是业务服务应复用的纯协议实现，没有 Identity HTTP 客户端或 Identity 数据库依赖。它在请求路径拒绝未知 `kid`、非 RS256、签名错误、错误 issuer/audience、未来签发、过期和低于本地最小 `securityVersion` 的令牌。消费端负责定时 JWKS 刷新、一次受限未知 `kid` 刷新和安全版本事件投影，不得用网关 Header 代替验证。
+`OfflineJwtVerifier` 是业务服务应复用的纯协议实现，没有 Identity HTTP 客户端或 Identity 数据库依赖。它在请求路径拒绝未知 `kid`、非 RS256、签名错误、错误 issuer/audience、未来签发、过期和低于本地最小 `securityVersion` 的令牌。每个业务服务在启动时从运行时 Secret `IDENTITY_JWKS_TRUST_BUNDLE` 载入公开 JWKS，随后在请求路径之外按 `IDENTITY_JWKS_URI`、刷新间隔和超时定时刷新；刷新失败保留最后一个有效快照。因此 Identity 停机时，已启动或从 bundle 重启的服务仍可离线验证未过期会话，新登录和无初始 bundle 的实例失败关闭。不得用网关 Header 代替验证。
 
 ## 3. 会话失效和安全版本
 
@@ -42,7 +42,7 @@ iss=onlinejudge.identity.v2, aud=onlinejudge.api
 | 鉴权 | `POST /api/v1/auth/check-permission` | 校验当前主体权限码 |
 | 资料、管理、审计 | 既有 `/api/v1/users/**`、`/api/v1/admin/**` | 保持 AUTH 兼容行为并提升安全版本 |
 
-`POST /internal/v2/service-tokens` 已按 `contracts/v2/openapi/identity.openapi.json` 实现。Identity 只读取 TLS 终结器写入 servlet request 的客户端证书属性，按证书 subject 的显式工作负载策略限制 `audience` 与 `scopes`，再签发最长 5 分钟、单一受众的 RS256 JWT；不会接受共享静态密钥、`X-Internal-Token` 或伪造身份 Header。请求携带 `X-Request-Id` 和 16–128 位 `Idempotency-Key`；同一工作负载以不同请求重用该 key 返回 `409 IDEMPOTENCY_KEY_REUSED`。mTLS 身份缺失或无效返回 `401 SERVICE_IDENTITY_INVALID`，已认证但策略不足返回 `403 SERVICE_IDENTITY_FORBIDDEN`，格式错误返回 `400 SERVICE_TOKEN_INVALID`，均使用 v2 的 `{code,message,requestId,retryable}` 错误体而不使用兼容 API 包络。
+`POST /internal/v2/service-tokens` 已按 `contracts/v2/openapi/identity.openapi.json` 实现。请求体是 closed object：仅可有 `audience` 和 `scopes`，未知字段在 mTLS 身份解析之前返回 `400 SERVICE_TOKEN_INVALID`。Identity 只读取 TLS 终结器写入 servlet request 的客户端证书属性，按证书 subject 的显式工作负载策略限制 `audience` 与 `scopes`，再签发最长 5 分钟、单一受众的 RS256 JWT；不会接受共享静态密钥、`X-Internal-Token` 或伪造身份 Header。请求携带 `X-Request-Id` 和 16–128 位 `Idempotency-Key`；同一工作负载以不同请求重用该 key 返回 `409 IDEMPOTENCY_KEY_REUSED`。mTLS 身份缺失或无效返回 `401 SERVICE_IDENTITY_INVALID`，已认证但策略不足返回 `403 SERVICE_IDENTITY_FORBIDDEN`，格式错误返回 `400 SERVICE_TOKEN_INVALID`，均使用 v2 的 `{code,message,requestId,retryable}` 错误体而不使用兼容 API 包络。
 
 ## 5. 数据库、配置与镜像
 
@@ -64,6 +64,9 @@ Compose 仅在初始化空 `onlinejudge_identity` 数据库时只读挂载此文
 | `IDENTITY_JWT_KID` | 无 | 必填可轮换 key id |
 | `IDENTITY_JWT_PREVIOUS_PUBLIC_KEYS` | 空 | `kid:base64-x509` 逗号列表 |
 | `IDENTITY_JWT_ISSUER` / `AUDIENCE` | v2 默认值 | 消费端精确匹配 |
+| `IDENTITY_JWKS_TRUST_BUNDLE` | 无 | 各业务服务启动时必须注入的公开 JWKS JSON；仅公钥、可轮换，绝不含私钥 |
+| `IDENTITY_JWKS_URI` / `REFRESH_INTERVAL` / `REFRESH_INITIAL_DELAY` / `REQUEST_TIMEOUT` | URI 无默认，其余有界默认 | 业务服务在请求路径外刷新；失败保留最后有效 bundle |
+| `IDENTITY_JWKS_CACHE_MAX_AGE` | `PT5M` | Identity JWKS 成功响应的 `Cache-Control` max-age |
 | `IDENTITY_SERVICE_TOKEN_WORKLOADS` | `{}` | JSON 的客户端证书 subject -> audiences/scopes 最小授权映射；仅由部署 Secret/配置注入 |
 | `IDENTITY_SERVICE_TOKEN_TTL` | `PT5M` | 不超过 5 分钟的 service JWT 生命周期 |
 | `IDENTITY_SEED_DATA_ENABLED` | `false` | 仅 DEV/CI 可启用 |
@@ -95,4 +98,4 @@ docker compose -f deploy/docker/compose.identity.yml up -d --wait
 
 ## 7. 合并和集成门槛
 
-#338 已确定五服务与 v2 契约，#309 已合入 `dev`，因此它不再阻止 #311 结束 Draft。#337 的 outbox 投递和各业务服务的在线 JWKS 刷新仍是独立后续工作：本交付只声明已缓存 JWKS 的本地验证与 securityVersion 投影，不宣称这些异步消费链路已经投产。
+#338 已确定五服务与 v2 契约，#309 已合入 `dev`，因此它不再阻止 #311 结束 Draft。#337 的 outbox 投递仍是独立后续工作；本交付已投产业务服务的 bundle bootstrap 和请求路径外 JWKS 刷新，但不虚报 securityVersion 事件的跨服务投递已经完成。

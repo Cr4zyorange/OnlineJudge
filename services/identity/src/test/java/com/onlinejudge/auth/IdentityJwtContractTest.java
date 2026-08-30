@@ -15,6 +15,8 @@ import java.util.Base64;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -82,8 +84,15 @@ class IdentityJwtContractTest {
 
     @Test
     void publishesPublicSigningKeysAtTheStandardJwksEndpoint() throws Exception {
-        String response = mockMvc.perform(get("/.well-known/jwks.json"))
+        mockMvc.perform(get("/.well-known/jwks.json"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("REQUEST_ID_REQUIRED"))
+                .andExpect(jsonPath("$.requestId").value("unknown"));
+
+        String response = mockMvc.perform(get("/.well-known/jwks.json")
+                        .header("X-Request-Id", "jwks-contract-request"))
                 .andExpect(status().isOk())
+                .andExpect(header().string("Cache-Control", org.hamcrest.Matchers.containsString("max-age=")))
                 .andReturn()
                 .getResponse()
                 .getContentAsString();

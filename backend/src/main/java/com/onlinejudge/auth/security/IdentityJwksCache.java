@@ -22,7 +22,7 @@ public class IdentityJwksCache {
             ObjectMapper objectMapper,
             @Value("${onlinejudge.identity.jwt.issuer:onlinejudge.identity.v2}") String issuer,
             @Value("${onlinejudge.identity.jwt.audience:onlinejudge.api}") String audience,
-            @Value("${onlinejudge.identity.jwks:}") String initialJwks
+            @Value("${onlinejudge.identity.jwks.trust-bundle:}") String initialJwks
     ) {
         this.objectMapper = objectMapper;
         this.issuer = issuer;
@@ -47,7 +47,7 @@ public class IdentityJwksCache {
             Map<String, Object> jwks = objectMapper.readValue(jwksJson, new TypeReference<>() { });
             verifier.set(OfflineJwtVerifier.fromJwks(objectMapper, Clock.systemUTC(), issuer, audience, jwks));
         } catch (Exception exception) {
-            throw new IllegalArgumentException("IDENTITY_JWKS must be a valid v2 RS256 JWKS document", exception);
+            throw new IllegalArgumentException("IDENTITY_JWKS_TRUST_BUNDLE must be a valid v2 RS256 JWKS document", exception);
         }
     }
 }

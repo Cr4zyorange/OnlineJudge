@@ -88,6 +88,21 @@ class ServiceTokenControllerTest {
                 .andExpect(jsonPath("$.retryable").value(false));
     }
 
+    @Test
+    void rejectsUndeclaredFieldsBeforeCheckingTheMtlsWorkloadIdentity() throws Exception {
+        mockMvc.perform(post("/internal/v2/service-tokens")
+                        .header("X-Request-Id", "request-service-token-closed-input")
+                        .header("Idempotency-Key", "service-token-idempotency-0006")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"audience":"course","scopes":["course:read"],"unexpected":true}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("SERVICE_TOKEN_INVALID"))
+                .andExpect(jsonPath("$.requestId").value("request-service-token-closed-input"))
+                .andExpect(jsonPath("$.retryable").value(false));
+    }
+
     private org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder mint(
             X509Certificate certificate, String audience, String scope, String idempotencyKey
     ) throws Exception {
