@@ -1,0 +1,40 @@
+name: onlinejudge-assessment
+services:
+  assessment-db:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: oj_assessment
+      MYSQL_USER: onlinejudge_assessment
+      MYSQL_PASSWORD: assessment-password
+      MYSQL_ROOT_PASSWORD: root-password
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -proot-password --silent"]
+      interval: 5s
+      timeout: 3s
+      retries: 24
+  rabbitmq:
+    image: rabbitmq:4.1-management
+  assessment-api:
+    build:
+      context: ../..
+      dockerfile: services/assessment/Dockerfile
+    depends_on:
+      assessment-db: {condition: service_healthy}
+    environment:
+      ASSESSMENT_DATABASE_HOST: assessment-db
+      ASSESSMENT_DATABASE_PASSWORD: assessment-password
+      IDENTITY_JWKS_TRUST_BUNDLE: ${IDENTITY_JWKS_TRUST_BUNDLE:-}
+    ports: ["18083:8083"]
+  assessment-worker:
+    build:
+      context: ../..
+      dockerfile: services/assessment/Dockerfile
+    depends_on:
+      assessment-db: {condition: service_healthy}
+      rabbitmq: {condition: service_started}
+    environment:
+      ASSESSMENT_DATABASE_HOST: assessment-db
+      ASSESSMENT_DATABASE_PASSWORD: assessment-password
+      ASSESSMENT_WORKER_ENABLED: "true"
+      RABBITMQ_HOST: rabbitmq
+    command: ["--spring.main.web-application-type=none", "--assessment.worker.enabled=true"]
