@@ -1,0 +1,13 @@
+$ node scripts/ci/verify-microservice-contract-v2.mjs
+microservice-contract-v2: FAIL (10 problem(s))
+- missing contracts/v2/openapi/identity.openapi.json
+- missing contracts/v2/openapi/course.openapi.json
+- missing contracts/v2/openapi/assessment.openapi.json
+- missing contracts/v2/openapi/grade.openapi.json
+- missing contracts/v2/openapi/learning.openapi.json
+- missing contracts/v2/asyncapi/events.asyncapi.json
+- missing docs/开发/D6-D7-五服务共享契约-v2.md
+- missing docs/adr/ADR-006-五业务服务与可靠消息契约.md
+- docs/开发/D4-CROSS-SERVICE-共享契约.md: must identify v1 as historical and link v2
+- missing contracts/v2/examples
+exit 1

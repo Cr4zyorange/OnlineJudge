@@ -1,0 +1,16 @@
+$ node scripts/ci/verify-microservice-contract-v2.mjs
+microservice-contract-v2: FAIL (85 problem(s))
+- contracts/v2/openapi/identity.openapi.json: POST /internal/v2/service-tokens must declare 401 SERVICE_IDENTITY_INVALID for missing, invalid, expired, or wrong-audience service identity
+- contracts/v2/openapi/course.openapi.json: GET /internal/v2/courses/{courseId}/authorizations/{userId} must reserve 403 SERVICE_IDENTITY_FORBIDDEN for an authenticated principal without required scope
+- contracts/v2/openapi/assessment.openapi.json: GET /internal/v2/source-grades 401 must explicitly cover invalid, expired, and wrong-audience service JWTs
+- contracts/v2/openapi/grade.openapi.json: GET /internal/v2/courses/{courseId}/grade-publications must declare 401 SERVICE_IDENTITY_INVALID for missing, invalid, expired, or wrong-audience service identity
+- contracts/v2/openapi/learning.openapi.json: POST /internal/v2/notifications/reconciliation-requests must reserve 403 SERVICE_IDENTITY_FORBIDDEN for an authenticated principal without required scope
+- contracts/v2/asyncapi/events.asyncapi.json: identity.security-version.changed.v2 must use IdentitySecurityVersionChangedEvent
+- contracts/v2/asyncapi/events.asyncapi.json: course.member.changed.v2 payload schema must require courseId, userId, membershipStatus, memberVersion
+- contracts/v2/asyncapi/events.asyncapi.json: assessment.source-grade.changed.v2 ordering must be assessment-source-grade aggregateVersion
+- contracts/v2/asyncapi/events.asyncapi.json: assessment.evaluation.completed.v2 must bind aggregateType assessment-submission
+- contracts/v2/asyncapi/events.asyncapi.json: grade.published.v2 payload schema must require courseId, publicationId, publishedAt, publicationVersion
+- contracts/v2/examples/event-envelope.valid.json: valid fixture rejected: envelope: missing AssessmentSourceGradeChangedEvent
+
+The unabridged stderr was 85 deterministic assertions: 23 internal-operation 401/403 assertions, 61 typed-event/ordering/aggregate/payload assertions, and the valid fixture assertion above.
+exit 1

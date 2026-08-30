@@ -1,0 +1,15 @@
+$ bash -n scripts/ci/contract-verify.sh
+exit 0
+
+$ bash scripts/ci/check-workflows.sh "$PWD"
+check-workflows: PASS (50 checks)
+exit 0
+
+$ bash scripts/ci/verify-gate-chain.sh --checkout "$PWD" --dry-run
+DRY-RUN validate-workflows (bash scripts/ci/check-workflows.sh)
+DRY-RUN backend-gate (bash scripts/ci/backend-verify.sh)
+DRY-RUN frontend-gate (bash scripts/ci/frontend-verify.sh)
+DRY-RUN contracts-gate (bash scripts/ci/contract-verify.sh)
+DRY-RUN delivery (bash scripts/ci/delivery-checkpoint.sh)
+gate-chain: PASS
+exit 0

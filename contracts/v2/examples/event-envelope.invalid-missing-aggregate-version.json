@@ -1,0 +1,10 @@
+{
+  "eventId": "77e696e1-799d-4a73-8a4c-0ec1628a0d04",
+  "eventType": "grade.published.v2",
+  "payloadVersion": 2,
+  "aggregateType": "grade-publication",
+  "aggregateId": "publish-6",
+  "occurredAt": "2026-08-30T09:15:30Z",
+  "correlationId": "fcb8483c-6b56-4035-8ab2-1fe6dd877fa9",
+  "payload": { "courseId": "course-88", "publicationId": "publish-6" }
+}

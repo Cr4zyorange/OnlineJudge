@@ -1,0 +1,20 @@
+{
+  "eventId": "63bb8cb7-756c-4413-bf4d-8952d39bb579",
+  "eventType": "assessment.source-grade.changed.v2",
+  "payloadVersion": 2,
+  "aggregateType": "assessment-source-grade",
+  "aggregateId": "HWK:homework-91:student-42",
+  "aggregateVersion": 9,
+  "occurredAt": "2026-08-30T10:25:30Z",
+  "correlationId": "1ecdc5bf-336c-46eb-88f7-5eea9b16dddc",
+  "payload": {
+    "courseId": "course-88",
+    "sourceType": "HWK",
+    "sourceId": "homework-91",
+    "studentId": "student-42",
+    "score": null,
+    "fullScore": 100,
+    "status": "SCORED",
+    "sourceVersion": 9
+  }
+}
