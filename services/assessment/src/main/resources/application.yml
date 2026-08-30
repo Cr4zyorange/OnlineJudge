@@ -14,6 +14,21 @@ management:
   endpoint.health.probes.enabled: true
   endpoints.web.exposure.include: health,info
 assessment:
+  storage:
+    root: ${ASSESSMENT_STORAGE_ROOT:./var/assessment-files}
+  sandbox:
+    command: ${ASSESSMENT_SANDBOX_COMMAND:}
+    timeout: ${ASSESSMENT_SANDBOX_TIMEOUT:PT30S}
+    pre-execution-delay: ${ASSESSMENT_SANDBOX_PRE_EXECUTION_DELAY:PT0S}
+  rabbit:
+    enabled: ${ASSESSMENT_RABBIT_ENABLED:false}
+    host: ${RABBITMQ_HOST:127.0.0.1}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
+    exchange: ${ASSESSMENT_RABBIT_EXCHANGE:assessment.events.v2}
+    course-member-queue: ${ASSESSMENT_COURSE_MEMBER_QUEUE:assessment.course-members.v2}
+    relay-interval: ${ASSESSMENT_RABBIT_RELAY_INTERVAL:1000}
   identity:
     issuer: ${IDENTITY_JWT_ISSUER:onlinejudge.identity.v2}
     audience: ${IDENTITY_JWT_AUDIENCE:onlinejudge.api}
