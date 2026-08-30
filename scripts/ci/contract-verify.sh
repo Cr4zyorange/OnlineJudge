@@ -66,6 +66,15 @@ log_run node "$checkout/scripts/ci/verify-microservice-contract-v2.mjs"
 log_run node "$checkout/scripts/ci/verify-data-ownership-contract.mjs"
 log_run node --test "$checkout/scripts/test/verify-data-ownership-contract.test.mjs"
 
+# #341 turns #309's static owner catalog into executable five-schema data
+# migration.  Keep its pure Node contract test on both sides; run the real
+# disposable MySQL 8.4 lifecycle once on the consumer gate so its Docker work
+# is not duplicated by producer-side Java contracts.
+log_run node --test "$checkout/scripts/test/verify-five-domain-data-migration.test.mjs"
+if [[ "$side" == "consumer" || "$side" == "all" ]]; then
+  log_run bash "$checkout/database/tests/verify-five-domain-migration.sh"
+fi
+
 # 仓库脚本契约：所有跟踪的 *.sh 必须 LF + bash 语法合法。
 log_run bash "$checkout/scripts/test/verify-shell-contract.sh" "$checkout"
 
