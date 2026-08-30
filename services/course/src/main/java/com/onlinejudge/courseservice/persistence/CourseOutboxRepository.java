@@ -121,7 +121,7 @@ public class CourseOutboxRepository {
         String reference = incidentReference == null || incidentReference.isBlank() ? "operator-recovery" : incidentReference.trim();
         return jdbcTemplate.update("""
                 UPDATE course_event_outbox
-                   SET delivery_status = 'PENDING', next_attempt_at = ?, lease_owner = NULL, lease_until = NULL,
+                   SET delivery_status = 'PENDING', attempt_count = 0, next_attempt_at = ?, lease_owner = NULL, lease_until = NULL,
                        last_error = CONCAT('RECOVERED[', ?, '] ', COALESCE(last_error, '')), updated_at = CURRENT_TIMESTAMP
                  WHERE id = ? AND delivery_status = 'FAILED'
                 """, Timestamp.from(now), reference.length() > 128 ? reference.substring(0, 128) : reference, id) == 1;

@@ -79,7 +79,10 @@ class CourseOutboxLeaseTest {
                 .containsEntry("delivery_status", "FAILED").containsEntry("attempt_count", 1)
                 .containsEntry("last_error", "permanent broker refusal");
         assertThat(outbox.recoverFailed(claim.id(), "operator-incident-312", now.minusSeconds(1))).isTrue();
-        assertThat(outbox.claimDue("manual-recovery-relay", now, Duration.ofSeconds(30), 1)).hasSize(1);
+        CourseOutboxRepository.OutboxRecord recovered = outbox.claimDue("manual-recovery-relay", now, Duration.ofSeconds(30), 1).getFirst();
+        assertThat(recovered.attemptCount()).isZero();
+        assertThat(outbox.markFailedAttempt(recovered, now, "second outage", 2,
+                Duration.ofSeconds(5), Duration.ofSeconds(60))).isEqualTo(CourseOutboxRepository.DeliveryUpdate.RETRY);
     }
 
     private List<CourseOutboxRepository.OutboxRecord> claimAfterStart(String owner, Instant now, CountDownLatch ready,
