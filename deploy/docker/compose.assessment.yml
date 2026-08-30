@@ -24,6 +24,9 @@ services:
       ASSESSMENT_DATABASE_HOST: assessment-db
       ASSESSMENT_DATABASE_PASSWORD: assessment-password
       IDENTITY_JWKS_TRUST_BUNDLE: ${IDENTITY_JWKS_TRUST_BUNDLE:-}
+      ASSESSMENT_STORAGE_ROOT: /var/lib/onlinejudge-assessment
+    volumes:
+      - assessment-files:/var/lib/onlinejudge-assessment
     ports: ["18083:8083"]
   assessment-worker:
     build:
@@ -37,4 +40,11 @@ services:
       ASSESSMENT_DATABASE_PASSWORD: assessment-password
       ASSESSMENT_WORKER_ENABLED: "true"
       RABBITMQ_HOST: rabbitmq
+      ASSESSMENT_STORAGE_ROOT: /var/lib/onlinejudge-assessment
+      ASSESSMENT_SANDBOX_COMMAND: ${ASSESSMENT_SANDBOX_COMMAND:?ASSESSMENT_SANDBOX_COMMAND is required}
+    volumes:
+      - assessment-files:/var/lib/onlinejudge-assessment
     command: ["--spring.main.web-application-type=none", "--assessment.worker.enabled=true"]
+
+volumes:
+  assessment-files:

@@ -10,7 +10,11 @@ ARG GIT_SHA
 ARG IMAGE_SOURCE=https://github.com/Cr4zyorange/OnlineJudge
 LABEL org.opencontainers.image.revision="$GIT_SHA" org.opencontainers.image.version="$GIT_SHA" org.opencontainers.image.source="$IMAGE_SOURCE"
 
-COPY --chown=10001:10001 services/assessment/target/onlinejudge-assessment-service-0.1.0-SNAPSHOT.jar app.jar
+USER root
+RUN groupadd --system --gid 10003 assessment \
+    && useradd --system --uid 10003 --gid 10003 --home-dir /opt/onlinejudge-assessment --shell /usr/sbin/nologin assessment \
+    && install -d -o assessment -g assessment /var/lib/onlinejudge-assessment
+COPY --chown=10003:10003 services/assessment/target/onlinejudge-assessment-service-0.1.0-SNAPSHOT.jar app.jar
 EXPOSE 8083
-USER 10001:10001
+USER 10003:10003
 ENTRYPOINT ["java", "-jar", "/opt/onlinejudge-assessment/app.jar", "--spring.config.additional-location=classpath:/application-compose.properties"]

@@ -10,7 +10,8 @@ WORKDIR /opt/onlinejudge-assessment
 ARG GIT_SHA
 ARG IMAGE_SOURCE=https://github.com/Cr4zyorange/OnlineJudge
 LABEL org.opencontainers.image.revision="$GIT_SHA" org.opencontainers.image.version="$GIT_SHA" org.opencontainers.image.source="$IMAGE_SOURCE"
-RUN command -v wget >/dev/null && groupadd --system --gid 10003 onlinejudge && useradd --system --uid 10003 --gid 10003 --home-dir /opt/onlinejudge-assessment --shell /usr/sbin/nologin onlinejudge
+RUN command -v wget >/dev/null && groupadd --system --gid 10003 onlinejudge && useradd --system --uid 10003 --gid 10003 --home-dir /opt/onlinejudge-assessment --shell /usr/sbin/nologin onlinejudge \
+    && install -d -o 10003 -g 10003 /var/lib/onlinejudge-assessment
 COPY --from=build --chown=10003:10003 /workspace/services/assessment/target/onlinejudge-assessment-service-0.1.0-SNAPSHOT.jar app.jar
 EXPOSE 8083
 USER 10003:10003
