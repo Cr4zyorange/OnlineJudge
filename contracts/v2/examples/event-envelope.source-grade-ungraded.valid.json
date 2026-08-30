@@ -1,0 +1,20 @@
+{
+  "eventId": "77b44f0d-f3a0-4cfe-9bf0-77b15d88c303",
+  "eventType": "assessment.source-grade.changed.v2",
+  "payloadVersion": 2,
+  "aggregateType": "assessment-source-grade",
+  "aggregateId": "LAB:lab-301:student-601",
+  "aggregateVersion": 8,
+  "occurredAt": "2026-08-30T10:20:30Z",
+  "correlationId": "761dd1b8-8d7f-4f58-87a6-17f1189ced64",
+  "payload": {
+    "courseId": "course-101",
+    "sourceType": "LAB",
+    "sourceId": "lab-301",
+    "studentId": "student-601",
+    "score": null,
+    "fullScore": 100,
+    "status": "UNGRADED",
+    "sourceVersion": 8
+  }
+}

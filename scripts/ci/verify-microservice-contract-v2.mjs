@@ -61,7 +61,7 @@ const eventContracts = {
     aggregateIdTemplate: '{sourceType}:{sourceId}:{studentId}',
     envelopeSchema: 'AssessmentSourceGradeChangedEvent',
     payloadSchema: 'AssessmentSourceGradeChangedPayload',
-    requiredPayload: ['courseId', 'sourceType', 'sourceId', 'studentId', 'score', 'fullScore', 'sourceVersion']
+    requiredPayload: ['courseId', 'sourceType', 'sourceId', 'studentId', 'score', 'fullScore', 'status', 'sourceVersion']
   },
   'assessment.evaluation.completed.v2': {
     aggregateType: 'assessment-submission',
@@ -126,6 +126,71 @@ function hasRequiredProperties(schema, names) {
   return names.every((name) => required.has(name));
 }
 
+function schemaHasTypes(schema, expectedTypes) {
+  const actual = new Set(Array.isArray(schema?.type) ? schema.type : [schema?.type]);
+  return actual.size === expectedTypes.length && expectedTypes.every((type) => actual.has(type));
+}
+
+function sourceGradeConditionalProblems(schema, label) {
+  const problems = [];
+  const check = (condition, message) => {
+    if (!condition) problems.push(`${label}: ${message}`);
+  };
+  const score = schema?.properties?.score;
+  const fullScore = schema?.properties?.fullScore;
+  const status = schema?.properties?.status;
+  const branches = schema?.oneOf;
+  const isBranch = (branch, expectedStatus, expectedScoreType) =>
+    branch?.type === 'object'
+      && hasRequiredProperties(branch, ['status', 'score'])
+      && branch?.properties?.status?.const === expectedStatus
+      && schemaHasTypes(branch?.properties?.score, [expectedScoreType])
+      && (expectedScoreType !== 'number' || branch?.properties?.score?.minimum === 0);
+
+  check(schema?.type === 'object' && schema?.additionalProperties === false, 'must be a closed object');
+  check(hasRequiredProperties(schema, ['courseId', 'sourceType', 'sourceId', 'studentId', 'score', 'fullScore', 'status']),
+    'must require courseId, sourceType, sourceId, studentId, score, fullScore, status');
+  check(status?.type === 'string' && Array.isArray(status?.enum)
+      && status.enum.length === 2 && status.enum.includes('SCORED') && status.enum.includes('UNGRADED'),
+  'status must be the SCORED/UNGRADED discriminator');
+  check(schemaHasTypes(score, ['number', 'null']) && score?.minimum === 0,
+    'score must be nullable only at the shared field and retain minimum 0 for numeric values');
+  check(fullScore?.type === 'number' && fullScore?.exclusiveMinimum === 0,
+    'fullScore must be a positive number');
+  check(Array.isArray(branches) && branches.length === 2
+      && branches.some((branch) => isBranch(branch, 'SCORED', 'number'))
+      && branches.some((branch) => isBranch(branch, 'UNGRADED', 'null')),
+  'must use mutually exclusive SCORED:number and UNGRADED:null score branches');
+  return problems;
+}
+
+function serviceTokenResponseProblems(document, label) {
+  const problems = [];
+  const check = (condition, message) => {
+    if (!condition) problems.push(`${label}: ${message}`);
+  };
+  const operation = document?.paths?.['/internal/v2/service-tokens']?.post;
+  const requestReference = operation?.requestBody?.content?.['application/json']?.schema?.$ref;
+  const responseReference = operation?.responses?.['201']?.content?.['application/json']?.schema?.$ref;
+  const request = document?.components?.schemas?.ServiceTokenRequest;
+  const response = document?.components?.schemas?.ServiceTokenResponse;
+  const accessToken = response?.properties?.accessToken;
+
+  check(requestReference === '#/components/schemas/ServiceTokenRequest', 'mint request must use ServiceTokenRequest');
+  check(responseReference === '#/components/schemas/ServiceTokenResponse', '201 mint response must use ServiceTokenResponse');
+  check(request?.type === 'object' && request?.additionalProperties === false,
+    'ServiceTokenRequest must be a closed input object');
+  check(!Object.hasOwn(request?.properties ?? {}, 'accessToken'),
+    'ServiceTokenRequest must never accept an accessToken supplied by the caller');
+  check(response?.type === 'object' && response?.additionalProperties === false,
+    'ServiceTokenResponse must be a closed output object');
+  check(hasRequiredProperties(response, ['accessToken', 'expiresAt', 'audience']),
+    'ServiceTokenResponse must require accessToken, expiresAt, audience');
+  check(accessToken?.type === 'string' && accessToken?.readOnly === true && accessToken?.writeOnly !== true,
+    '201 accessToken must be a readOnly consumable response field, never writeOnly');
+  return problems;
+}
+
 function operationHasRequestId(operation) {
   return (operation?.parameters ?? []).some(
     (parameter) => parameter?.in === 'header' && parameter?.name === 'X-Request-Id' && parameter?.required === true
@@ -172,6 +237,15 @@ function validateOpenApi(service, expectedPaths) {
     hasRequiredProperties(document.components?.schemas?.Page, ['items', 'page', 'size', 'total']),
     `${relativePath}: Page schema must require items, page, size, total`
   );
+
+  if (service === 'identity') {
+    for (const failure of serviceTokenResponseProblems(document, relativePath)) problem(failure);
+  }
+  if (service === 'assessment') {
+    for (const failure of sourceGradeConditionalProblems(document.components?.schemas?.SourceGrade, `${relativePath}: SourceGrade`)) {
+      problem(failure);
+    }
+  }
 
   for (const expectedPath of expectedPaths) {
     const pathItem = document.paths?.[expectedPath];
@@ -233,12 +307,34 @@ function isDateTime(value) {
     && !Number.isNaN(Date.parse(value));
 }
 
+function valueMatchesType(value, type) {
+  switch (type) {
+    case 'object': return isObject(value);
+    case 'string': return typeof value === 'string';
+    case 'integer': return Number.isInteger(value);
+    case 'number': return typeof value === 'number' && Number.isFinite(value);
+    case 'null': return value === null;
+    default: return true;
+  }
+}
+
 function validateValue(value, schema, path) {
   const failures = [];
   if (!schema) return [`${path}: missing schema`];
+  if (Array.isArray(schema.allOf)) {
+    for (const branch of schema.allOf) failures.push(...validateValue(value, branch, path));
+  }
+  if (Array.isArray(schema.oneOf)) {
+    const matchingBranches = schema.oneOf.filter((branch) => validateValue(value, branch, path).length === 0);
+    if (matchingBranches.length !== 1) failures.push(`${path}: must match exactly one conditional branch`);
+  }
   if (Object.hasOwn(schema, 'const') && value !== schema.const) failures.push(`${path}: must equal ${JSON.stringify(schema.const)}`);
   if (Array.isArray(schema.enum) && !schema.enum.includes(value)) failures.push(`${path}: must be one of ${schema.enum.join(', ')}`);
-  if (schema.type === 'object') {
+  const declaredTypes = Array.isArray(schema.type) ? schema.type : [schema.type];
+  if (declaredTypes[0] !== undefined && !declaredTypes.some((type) => valueMatchesType(value, type))) {
+    return [`${path}: must be ${declaredTypes.join(' or ')}`];
+  }
+  if (schema.type === 'object' || Object.hasOwn(schema, 'properties') || Object.hasOwn(schema, 'required')) {
     if (!isObject(value)) return [`${path}: must be an object`];
     const required = schema.required ?? [];
     for (const property of required) if (!Object.hasOwn(value, property)) failures.push(`${path}: missing ${property}`);
@@ -251,21 +347,20 @@ function validateValue(value, schema, path) {
     }
     return failures;
   }
-  if (schema.type === 'string') {
-    if (typeof value !== 'string') return [`${path}: must be a string`];
+  if (declaredTypes.includes('string') && typeof value === 'string') {
     if (Number.isInteger(schema.minLength) && value.length < schema.minLength) failures.push(`${path}: too short`);
     if (schema.format === 'uuid' && !isUuid(value)) failures.push(`${path}: must be a UUID`);
     if (schema.format === 'date-time' && !isDateTime(value)) failures.push(`${path}: must be an RFC3339 date-time`);
     return failures;
   }
-  if (schema.type === 'integer') {
-    if (!Number.isInteger(value)) return [`${path}: must be an integer`];
+  if (declaredTypes.includes('integer') && Number.isInteger(value)) {
     if (typeof schema.minimum === 'number' && value < schema.minimum) failures.push(`${path}: below minimum`);
+    if (typeof schema.exclusiveMinimum === 'number' && value <= schema.exclusiveMinimum) failures.push(`${path}: below or equal to exclusive minimum`);
     return failures;
   }
-  if (schema.type === 'number') {
-    if (typeof value !== 'number' || !Number.isFinite(value)) return [`${path}: must be a finite number`];
+  if (declaredTypes.includes('number') && typeof value === 'number' && Number.isFinite(value)) {
     if (typeof schema.minimum === 'number' && value < schema.minimum) failures.push(`${path}: below minimum`);
+    if (typeof schema.exclusiveMinimum === 'number' && value <= schema.exclusiveMinimum) failures.push(`${path}: below or equal to exclusive minimum`);
     return failures;
   }
   return failures;
@@ -350,6 +445,10 @@ function validateAsyncApiDocument(document) {
     check(hasRequiredProperties(payloadSchema, contract.requiredPayload),
       `${eventType} payload schema must require ${contract.requiredPayload.join(', ')}`);
 
+    if (eventType === 'assessment.source-grade.changed.v2') {
+      for (const failure of sourceGradeConditionalProblems(payloadSchema, `${eventType} payload`)) failures.push(failure);
+    }
+
     if (eventType === 'assessment.homework.published.v2') {
       const title = payloadSchema?.properties?.title;
       const deadline = payloadSchema?.properties?.deadline;
@@ -378,19 +477,71 @@ function validateAsyncApi() {
   return document;
 }
 
+function sourceGradeDocumentationProblems(relativePath, text) {
+  const problems = [];
+  const check = (condition, message) => {
+    if (!condition) problems.push(`${relativePath}: ${message}`);
+  };
+  check(/SCORED[\s\S]{0,160}(?:`?number`?|数值)/.test(text),
+    'must state SCORED as a numeric source-grade fact');
+  check(/UNGRADED[\s\S]{0,160}`?null`?/.test(text),
+    'must state UNGRADED as score=null, never a fabricated score');
+  return problems;
+}
+
+function serviceTokenDocumentationProblems(relativePath, text) {
+  const problems = [];
+  const check = (condition, message) => {
+    if (!condition) problems.push(`${relativePath}: ${message}`);
+  };
+  check(text.includes('accessToken') && text.includes('readOnly') && text.includes('response-only'),
+    'must state that minted accessToken is a readOnly response-only field');
+  check(/accessToken[\s\S]{0,180}(?:请求体|request)/.test(text),
+    'must forbid accepting accessToken in the mint request body');
+  return problems;
+}
+
 function validateDocumentation() {
   const currentContract = 'docs/开发/D6-D7-五服务共享契约-v2.md';
   const adr = 'docs/adr/ADR-006-五业务服务与可靠消息契约.md';
   const v1Contract = 'docs/开发/D4-CROSS-SERVICE-共享契约.md';
-  for (const relativePath of [currentContract, adr, v1Contract]) {
+  const finalOverview = 'docs/最终提交/软件概要设计说明书.md';
+  const finalDetail = 'docs/最终提交/软件详细设计说明书.md';
+  for (const relativePath of [currentContract, adr, v1Contract, finalOverview, finalDetail]) {
     const absolutePath = resolve(repoRoot, relativePath);
     assert(existsSync(absolutePath), `missing ${relativePath}`);
+  }
+  const sourceGradeDocuments = [currentContract, adr, finalOverview, finalDetail];
+  for (const relativePath of sourceGradeDocuments) {
+    const absolutePath = resolve(repoRoot, relativePath);
+    if (!existsSync(absolutePath)) continue;
+    const text = readFileSync(absolutePath, 'utf8');
+    for (const failure of sourceGradeDocumentationProblems(relativePath, text)) problem(failure);
   }
   if (existsSync(resolve(repoRoot, currentContract))) {
     const text = readFileSync(resolve(repoRoot, currentContract), 'utf8');
     for (const expectedText of ['Identity', 'Course', 'Assessment', 'Grade', 'Learning', 'at-least-once', 'DLQ', 'X-Internal-Token']) {
       assert(text.includes(expectedText), `${currentContract}: missing required policy text ${expectedText}`);
     }
+    for (const failure of serviceTokenDocumentationProblems(currentContract, text)) problem(failure);
+
+    const ungradedMutationFailures = sourceGradeDocumentationProblems(
+      'mutation:D6 source-grade',
+      text.replaceAll('UNGRADED', 'UNSCORED')
+    );
+    assert(ungradedMutationFailures.length > 0, 'mutation: D6 accepted an omitted UNGRADED=null source-grade rule');
+    if (ungradedMutationFailures.length > 0) rejectedMutationCount += 1;
+
+    const tokenDirectionMutationFailures = serviceTokenDocumentationProblems(
+      'mutation:D6 service-token',
+      text.replaceAll('readOnly', 'writeOnly')
+    );
+    assert(tokenDirectionMutationFailures.length > 0, 'mutation: D6 accepted a writeOnly minted accessToken');
+    if (tokenDirectionMutationFailures.length > 0) rejectedMutationCount += 1;
+  }
+  if (existsSync(resolve(repoRoot, adr))) {
+    const text = readFileSync(resolve(repoRoot, adr), 'utf8');
+    for (const failure of serviceTokenDocumentationProblems(adr, text)) problem(failure);
   }
   if (existsSync(resolve(repoRoot, v1Contract))) {
     const text = readFileSync(resolve(repoRoot, v1Contract), 'utf8');
@@ -501,6 +652,43 @@ function validateRejectingMutations(asyncApi) {
   assert(orderingFailures.length > 0, 'mutation: deleting x-onlinejudge-ordering was accepted');
   if (orderingFailures.length > 0) rejectedMutationCount += 1;
 
+  const identity = readJson('contracts/v2/openapi/identity.openapi.json');
+  if (identity) {
+    const writeOnlyTokenMutation = JSON.parse(JSON.stringify(identity));
+    const accessToken = writeOnlyTokenMutation.components.schemas.ServiceTokenResponse.properties.accessToken;
+    delete accessToken.readOnly;
+    accessToken.writeOnly = true;
+    const writeOnlyFailures = serviceTokenResponseProblems(writeOnlyTokenMutation, 'mutation: identity service token');
+    assert(writeOnlyFailures.length > 0, 'mutation: writeOnly 201 accessToken was accepted');
+    if (writeOnlyFailures.length > 0) rejectedMutationCount += 1;
+
+    const inputLeakMutation = JSON.parse(JSON.stringify(identity));
+    inputLeakMutation.components.schemas.ServiceTokenRequest.properties.accessToken = { type: 'string' };
+    const inputLeakFailures = serviceTokenResponseProblems(inputLeakMutation, 'mutation: identity service token');
+    assert(inputLeakFailures.length > 0, 'mutation: ServiceTokenRequest accepting accessToken was accepted');
+    if (inputLeakFailures.length > 0) rejectedMutationCount += 1;
+  }
+
+  const assessment = readJson('contracts/v2/openapi/assessment.openapi.json');
+  if (assessment) {
+    const numberOnlySourceMutation = JSON.parse(JSON.stringify(assessment));
+    numberOnlySourceMutation.components.schemas.SourceGrade.properties.score.type = 'number';
+    const numberOnlyFailures = sourceGradeConditionalProblems(
+      numberOnlySourceMutation.components.schemas.SourceGrade,
+      'mutation: OpenAPI SourceGrade'
+    );
+    assert(numberOnlyFailures.length > 0, 'mutation: OpenAPI UNGRADED source grade without nullable score was accepted');
+    if (numberOnlyFailures.length > 0) rejectedMutationCount += 1;
+  }
+
+  const missingStatusMutation = JSON.parse(JSON.stringify(asyncApi));
+  delete missingStatusMutation.components.schemas.AssessmentSourceGradeChangedPayload.properties.status;
+  missingStatusMutation.components.schemas.AssessmentSourceGradeChangedPayload.required =
+    missingStatusMutation.components.schemas.AssessmentSourceGradeChangedPayload.required.filter((field) => field !== 'status');
+  const missingStatusFailures = validateAsyncApiDocument(missingStatusMutation);
+  assert(missingStatusFailures.length > 0, 'mutation: source-grade event without status was accepted');
+  if (missingStatusFailures.length > 0) rejectedMutationCount += 1;
+
   const validFixture = readJson('contracts/v2/examples/event-envelope.valid.json');
   if (!validFixture) return;
   const emptyPayloadMutation = JSON.parse(JSON.stringify(validFixture));
@@ -514,6 +702,14 @@ function validateRejectingMutations(asyncApi) {
   const aggregateFailures = validateEnvelope(aggregateMutation, asyncApi);
   assert(aggregateFailures.length > 0, 'mutation: wrong event aggregate was accepted');
   if (aggregateFailures.length > 0) rejectedMutationCount += 1;
+
+  const ungradedFixture = readJson('contracts/v2/examples/event-envelope.source-grade-ungraded.valid.json');
+  if (ungradedFixture) {
+    ungradedFixture.payload.score = 10;
+    const ungradedWithScoreFailures = validateEnvelope(ungradedFixture, asyncApi);
+    assert(ungradedWithScoreFailures.length > 0, 'mutation: UNGRADED source grade with numeric score was accepted');
+    if (ungradedWithScoreFailures.length > 0) rejectedMutationCount += 1;
+  }
 
   const homeworkFixture = readJson('contracts/v2/examples/event-envelope.homework-published.valid.json');
   if (!homeworkFixture) return;
