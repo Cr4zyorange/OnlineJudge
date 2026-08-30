@@ -34,6 +34,8 @@ require_command git
 require_matching_head "$repo_root"
 require_secret MYSQL_PASSWORD
 require_secret MYSQL_ROOT_PASSWORD
+require_secret IDENTITY_JWKS_TRUST_BUNDLE
+require_secret IDENTITY_JWKS_URI
 require_command docker
 require_command grep
 

@@ -1,0 +1,24 @@
+SHOW GRANTS:
+mysql: [Warning] Using a password on the command line interface can be insecure.
+Grants for onlinejudge_auth@%
+GRANT USAGE ON *.* TO `onlinejudge_auth`@`%`
+GRANT ALL PRIVILEGES ON `onlinejudge\\_auth`.* TO `onlinejudge_auth`@`%`
+grants-exit=0
+mysql.user denial:
+mysql: [Warning] Using a password on the command line interface can be insecure.
+ERROR 1142 (42000) at line 1: SELECT command denied to user 'onlinejudge_auth'@'localhost' for table 'user'
+denial-check-exit=0
+repeat migration:
+mysql: [Warning] Using a password on the command line interface can be insecure.
+repeat-exit=0
+owned tables:
+mysql: [Warning] Using a password on the command line interface can be insecure.
+Tables_in_onlinejudge_auth
+t_auth_audit_log
+t_auth_permission
+t_auth_role
+t_auth_role_permission
+t_auth_session
+t_auth_user
+t_auth_user_role
+tables-exit=0

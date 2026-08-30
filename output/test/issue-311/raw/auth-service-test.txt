@@ -1,0 +1,214 @@
+[INFO] Scanning for projects...
+[INFO]
+[INFO] --------------< com.onlinejudge:onlinejudge-auth-service >--------------
+[INFO] Building onlinejudge-auth-service 0.1.0-SNAPSHOT
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO]
+[INFO] --- resources:3.3.1:resources (default-resources) @ onlinejudge-auth-service ---
+[INFO] Copying 2 resources from src\main\resources to target\classes
+[INFO] Copying 2 resources from src\main\resources to target\classes
+[INFO]
+[INFO] --- compiler:3.13.0:compile (default-compile) @ onlinejudge-auth-service ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO]
+[INFO] --- resources:3.3.1:testResources (default-testResources) @ onlinejudge-auth-service ---
+[INFO] Copying 1 resource from src\test\resources to target\test-classes
+[INFO]
+[INFO] --- compiler:3.13.0:testCompile (default-testCompile) @ onlinejudge-auth-service ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO]
+[INFO] --- surefire:3.5.3:test (default-test) @ onlinejudge-auth-service ---
+[INFO] Using auto detected provider org.apache.maven.surefire.junitplatform.JUnitPlatformProvider
+[INFO]
+[INFO] -------------------------------------------------------
+[INFO]  T E S T S
+[INFO] -------------------------------------------------------
+[INFO] Running com.onlinejudge.auth.AuthAdminControllerTest
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+
+ :: Spring Boot ::                (v3.4.5)
+
+2026-08-28T16:54:25.767+08:00  INFO 39972 --- [           main] c.o.auth.AuthAdminControllerTest         : Starting AuthAdminControllerTest using Java 21.0.9 with PID 39972 (started by 67231 in C:\Users\67231\.config\superpowers\worktrees\OnlineJudge\feature\311-auth-service\services\auth-service)
+2026-08-28T16:54:25.773+08:00  INFO 39972 --- [           main] c.o.auth.AuthAdminControllerTest         : No active profile set, falling back to 1 default profile: "default"
+2026-08-28T16:54:28.476+08:00  INFO 39972 --- [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
+2026-08-28T16:54:29.274+08:00  INFO 39972 --- [           main] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Added connection conn0: url=jdbc:h2:mem:auth_admin_controller user=SA
+2026-08-28T16:54:29.283+08:00  INFO 39972 --- [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
+2026-08-28T16:54:31.581+08:00  INFO 39972 --- [           main] o.s.b.t.m.w.SpringBootMockServletContext : Initializing Spring TestDispatcherServlet ''
+2026-08-28T16:54:31.581+08:00  INFO 39972 --- [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-08-28T16:54:31.592+08:00  INFO 39972 --- [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 5 ms
+2026-08-28T16:54:31.662+08:00  INFO 39972 --- [           main] c.o.auth.AuthAdminControllerTest         : Started AuthAdminControllerTest in 7.206 seconds (process running for 9.895)
+Mockito is currently self-attaching to enable the inline-mock-maker. This will no longer work in future releases of the JDK. Please add Mockito as an agent to your build what is described in Mockito's documentation: https://javadoc.io/doc/org.mockito/mockito-core/latest/org/mockito/Mockito.html#0.3
+WARNING: A Java agent has been loaded dynamically (C:\Users\67231\.m2\repository\net\bytebuddy\byte-buddy-agent\1.15.11\byte-buddy-agent-1.15.11.jar)
+WARNING: If a serviceability tool is in use, please run with -XX:+EnableDynamicAgentLoading to hide this warning
+WARNING: If a serviceability tool is not in use, please run with -Djdk.instrument.traceUsage for more information
+WARNING: Dynamic loading of agents will be disallowed by default in a future release
+OpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended
+[INFO] Tests run: 9, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 16.05 s -- in com.onlinejudge.auth.AuthAdminControllerTest
+[INFO] Running com.onlinejudge.auth.AuthControllerTest
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+
+ :: Spring Boot ::                (v3.4.5)
+
+2026-08-28T16:54:39.135+08:00  INFO 39972 --- [           main] c.onlinejudge.auth.AuthControllerTest    : Starting AuthControllerTest using Java 21.0.9 with PID 39972 (started by 67231 in C:\Users\67231\.config\superpowers\worktrees\OnlineJudge\feature\311-auth-service\services\auth-service)
+2026-08-28T16:54:39.139+08:00  INFO 39972 --- [           main] c.onlinejudge.auth.AuthControllerTest    : No active profile set, falling back to 1 default profile: "default"
+2026-08-28T16:54:39.828+08:00  INFO 39972 --- [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-2 - Starting...
+2026-08-28T16:54:39.833+08:00  INFO 39972 --- [           main] com.zaxxer.hikari.pool.HikariPool        : HikariPool-2 - Added connection conn10: url=jdbc:h2:mem:auth_controller user=SA
+2026-08-28T16:54:39.833+08:00  INFO 39972 --- [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-2 - Start completed.
+2026-08-28T16:54:40.261+08:00  INFO 39972 --- [           main] o.s.b.t.m.w.SpringBootMockServletContext : Initializing Spring TestDispatcherServlet ''
+2026-08-28T16:54:40.261+08:00  INFO 39972 --- [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-08-28T16:54:40.263+08:00  INFO 39972 --- [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 2 ms
+2026-08-28T16:54:40.277+08:00  INFO 39972 --- [           main] c.onlinejudge.auth.AuthControllerTest    : Started AuthControllerTest in 1.295 seconds (process running for 18.513)
+[INFO] Tests run: 21, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 5.548 s -- in com.onlinejudge.auth.AuthControllerTest
+[INFO] Running com.onlinejudge.auth.AuthSchemaOwnershipTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.041 s -- in com.onlinejudge.auth.AuthSchemaOwnershipTest
+[INFO] Running com.onlinejudge.auth.AuthSeedDataDisabledTest
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+
+ :: Spring Boot ::                (v3.4.5)
+
+2026-08-28T16:54:44.630+08:00  INFO 39972 --- [           main] c.o.auth.AuthSeedDataDisabledTest        : Starting AuthSeedDataDisabledTest using Java 21.0.9 with PID 39972 (started by 67231 in C:\Users\67231\.config\superpowers\worktrees\OnlineJudge\feature\311-auth-service\services\auth-service)
+2026-08-28T16:54:44.630+08:00  INFO 39972 --- [           main] c.o.auth.AuthSeedDataDisabledTest        : No active profile set, falling back to 1 default profile: "default"
+2026-08-28T16:54:45.157+08:00  INFO 39972 --- [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-3 - Starting...
+2026-08-28T16:54:45.163+08:00  INFO 39972 --- [           main] com.zaxxer.hikari.pool.HikariPool        : HikariPool-3 - Added connection conn20: url=jdbc:h2:mem:auth_seed_disabled user=SA
+2026-08-28T16:54:45.163+08:00  INFO 39972 --- [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-3 - Start completed.
+2026-08-28T16:54:45.458+08:00  INFO 39972 --- [           main] c.o.auth.AuthSeedDataDisabledTest        : Started AuthSeedDataDisabledTest in 0.888 seconds (process running for 23.693)
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.917 s -- in com.onlinejudge.auth.AuthSeedDataDisabledTest
+[INFO] Running com.onlinejudge.auth.AuthSeedDataEnabledTest
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+
+ :: Spring Boot ::                (v3.4.5)
+
+2026-08-28T16:54:45.549+08:00  INFO 39972 --- [           main] c.o.auth.AuthSeedDataEnabledTest         : Starting AuthSeedDataEnabledTest using Java 21.0.9 with PID 39972 (started by 67231 in C:\Users\67231\.config\superpowers\worktrees\OnlineJudge\feature\311-auth-service\services\auth-service)
+2026-08-28T16:54:45.549+08:00  INFO 39972 --- [           main] c.o.auth.AuthSeedDataEnabledTest         : No active profile set, falling back to 1 default profile: "default"
+2026-08-28T16:54:46.114+08:00  INFO 39972 --- [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-4 - Starting...
+2026-08-28T16:54:46.118+08:00  INFO 39972 --- [           main] com.zaxxer.hikari.pool.HikariPool        : HikariPool-4 - Added connection conn30: url=jdbc:h2:mem:auth_seed_enabled user=SA
+2026-08-28T16:54:46.137+08:00  INFO 39972 --- [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-4 - Start completed.
+2026-08-28T16:54:46.414+08:00  INFO 39972 --- [           main] c.o.auth.AuthSeedDataEnabledTest         : Started AuthSeedDataEnabledTest in 0.925 seconds (process running for 24.649)
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.333 s -- in com.onlinejudge.auth.AuthSeedDataEnabledTest
+[INFO] Running com.onlinejudge.auth.AuthSubjectSecurityTest
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+
+ :: Spring Boot ::                (v3.4.5)
+
+2026-08-28T16:54:46.902+08:00  INFO 39972 --- [           main] c.o.auth.AuthSubjectSecurityTest         : Starting AuthSubjectSecurityTest using Java 21.0.9 with PID 39972 (started by 67231 in C:\Users\67231\.config\superpowers\worktrees\OnlineJudge\feature\311-auth-service\services\auth-service)
+2026-08-28T16:54:46.902+08:00  INFO 39972 --- [           main] c.o.auth.AuthSubjectSecurityTest         : No active profile set, falling back to 1 default profile: "default"
+2026-08-28T16:54:47.397+08:00  INFO 39972 --- [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-5 - Starting...
+2026-08-28T16:54:47.401+08:00  INFO 39972 --- [           main] com.zaxxer.hikari.pool.HikariPool        : HikariPool-5 - Added connection conn40: url=jdbc:h2:mem:auth_subject_security user=SA
+2026-08-28T16:54:47.401+08:00  INFO 39972 --- [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-5 - Start completed.
+2026-08-28T16:54:47.634+08:00  INFO 39972 --- [           main] o.s.b.t.m.w.SpringBootMockServletContext : Initializing Spring TestDispatcherServlet ''
+2026-08-28T16:54:47.636+08:00  INFO 39972 --- [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-08-28T16:54:47.636+08:00  INFO 39972 --- [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-08-28T16:54:47.654+08:00  INFO 39972 --- [           main] c.o.auth.AuthSubjectSecurityTest         : Started AuthSubjectSecurityTest in 0.806 seconds (process running for 25.888)
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.822 s -- in com.onlinejudge.auth.AuthSubjectSecurityTest
+[INFO] Running com.onlinejudge.authservice.AuthDependencyFailureTest
+2026-08-28T16:54:48.668+08:00  INFO 39972 --- [           main] t.c.s.AnnotationConfigContextLoaderUtils : Could not detect default configuration classes for test class [com.onlinejudge.authservice.AuthDependencyFailureTest]: AuthDependencyFailureTest does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+2026-08-28T16:54:48.700+08:00  INFO 39972 --- [           main] .b.t.c.SpringBootTestContextBootstrapper : Found @SpringBootConfiguration com.onlinejudge.authservice.AuthServiceApplication for test class com.onlinejudge.authservice.AuthDependencyFailureTest
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+
+ :: Spring Boot ::                (v3.4.5)
+
+2026-08-28T16:54:48.776+08:00  INFO 39972 --- [           main] c.o.a.AuthDependencyFailureTest          : Starting AuthDependencyFailureTest using Java 21.0.9 with PID 39972 (started by 67231 in C:\Users\67231\.config\superpowers\worktrees\OnlineJudge\feature\311-auth-service\services\auth-service)
+2026-08-28T16:54:48.777+08:00  INFO 39972 --- [           main] c.o.a.AuthDependencyFailureTest          : No active profile set, falling back to 1 default profile: "default"
+2026-08-28T16:54:50.151+08:00  INFO 39972 --- [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-6 - Starting...
+2026-08-28T16:54:50.166+08:00  INFO 39972 --- [           main] com.zaxxer.hikari.pool.HikariPool        : HikariPool-6 - Added connection conn50: url=jdbc:h2:mem:auth_service user=SA
+2026-08-28T16:54:50.166+08:00  INFO 39972 --- [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-6 - Start completed.
+2026-08-28T16:54:51.018+08:00  INFO 39972 --- [           main] o.s.b.t.m.w.SpringBootMockServletContext : Initializing Spring TestDispatcherServlet ''
+2026-08-28T16:54:51.018+08:00  INFO 39972 --- [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-08-28T16:54:51.020+08:00  INFO 39972 --- [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 2 ms
+2026-08-28T16:54:51.064+08:00  INFO 39972 --- [           main] c.o.a.AuthDependencyFailureTest          : Started AuthDependencyFailureTest in 2.35 seconds (process running for 29.299)
+2026-08-28T16:54:51.329+08:00 ERROR 39972 --- [           main] c.o.a.e.AuthServiceExceptionHandler      : Unhandled DataAccessResourceFailureException for POST /api/v1/auth/login
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 2.697 s -- in com.onlinejudge.authservice.AuthDependencyFailureTest
+[INFO] Running com.onlinejudge.authservice.AuthReadinessFailureTest
+2026-08-28T16:54:51.380+08:00  INFO 39972 --- [           main] t.c.s.AnnotationConfigContextLoaderUtils : Could not detect default configuration classes for test class [com.onlinejudge.authservice.AuthReadinessFailureTest]: AuthReadinessFailureTest does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+2026-08-28T16:54:51.403+08:00  INFO 39972 --- [           main] .b.t.c.SpringBootTestContextBootstrapper : Found @SpringBootConfiguration com.onlinejudge.authservice.AuthServiceApplication for test class com.onlinejudge.authservice.AuthReadinessFailureTest
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+
+ :: Spring Boot ::                (v3.4.5)
+
+2026-08-28T16:54:51.579+08:00  INFO 39972 --- [           main] c.o.a.AuthReadinessFailureTest           : Starting AuthReadinessFailureTest using Java 21.0.9 with PID 39972 (started by 67231 in C:\Users\67231\.config\superpowers\worktrees\OnlineJudge\feature\311-auth-service\services\auth-service)
+2026-08-28T16:54:51.581+08:00  INFO 39972 --- [           main] c.o.a.AuthReadinessFailureTest           : No active profile set, falling back to 1 default profile: "default"
+2026-08-28T16:54:53.550+08:00  INFO 39972 --- [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-7 - Starting...
+2026-08-28T16:54:53.552+08:00  INFO 39972 --- [           main] com.zaxxer.hikari.pool.HikariPool        : HikariPool-7 - Added connection conn60: url=jdbc:h2:mem:auth_service user=SA
+2026-08-28T16:54:53.554+08:00  INFO 39972 --- [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-7 - Start completed.
+2026-08-28T16:54:53.739+08:00  INFO 39972 --- [           main] o.s.b.t.m.w.SpringBootMockServletContext : Initializing Spring TestDispatcherServlet ''
+2026-08-28T16:54:53.739+08:00  INFO 39972 --- [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-08-28T16:54:53.739+08:00  INFO 39972 --- [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-08-28T16:54:53.791+08:00  INFO 39972 --- [           main] c.o.a.AuthReadinessFailureTest           : Started AuthReadinessFailureTest in 2.366 seconds (process running for 32.023)
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 2.525 s -- in com.onlinejudge.authservice.AuthReadinessFailureTest
+[INFO] Running com.onlinejudge.authservice.AuthSystemControllerTest
+2026-08-28T16:54:53.900+08:00  INFO 39972 --- [           main] t.c.s.AnnotationConfigContextLoaderUtils : Could not detect default configuration classes for test class [com.onlinejudge.authservice.AuthSystemControllerTest]: AuthSystemControllerTest does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+2026-08-28T16:54:53.905+08:00  INFO 39972 --- [           main] .b.t.c.SpringBootTestContextBootstrapper : Found @SpringBootConfiguration com.onlinejudge.authservice.AuthServiceApplication for test class com.onlinejudge.authservice.AuthSystemControllerTest
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+
+ :: Spring Boot ::                (v3.4.5)
+
+2026-08-28T16:54:53.982+08:00  INFO 39972 --- [           main] c.o.a.AuthSystemControllerTest           : Starting AuthSystemControllerTest using Java 21.0.9 with PID 39972 (started by 67231 in C:\Users\67231\.config\superpowers\worktrees\OnlineJudge\feature\311-auth-service\services\auth-service)
+2026-08-28T16:54:53.986+08:00  INFO 39972 --- [           main] c.o.a.AuthSystemControllerTest           : No active profile set, falling back to 1 default profile: "default"
+2026-08-28T16:54:54.651+08:00  INFO 39972 --- [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-8 - Starting...
+2026-08-28T16:54:54.653+08:00  INFO 39972 --- [           main] com.zaxxer.hikari.pool.HikariPool        : HikariPool-8 - Added connection conn70: url=jdbc:h2:mem:auth_service user=SA
+2026-08-28T16:54:54.653+08:00  INFO 39972 --- [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-8 - Start completed.
+2026-08-28T16:54:54.958+08:00  INFO 39972 --- [           main] o.s.b.t.m.w.SpringBootMockServletContext : Initializing Spring TestDispatcherServlet ''
+2026-08-28T16:54:54.958+08:00  INFO 39972 --- [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-08-28T16:54:54.958+08:00  INFO 39972 --- [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-08-28T16:54:54.972+08:00  INFO 39972 --- [           main] c.o.a.AuthSystemControllerTest           : Started AuthSystemControllerTest in 1.06 seconds (process running for 33.207)
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.146 s -- in com.onlinejudge.authservice.AuthSystemControllerTest
+[INFO]
+[INFO] Results:
+[INFO]
+[INFO] Tests run: 39, Failures: 0, Errors: 0, Skipped: 0
+[INFO]
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD SUCCESS
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  36.734 s
+[INFO] Finished at: 2026-08-28T16:54:55+08:00
+[INFO] ------------------------------------------------------------------------

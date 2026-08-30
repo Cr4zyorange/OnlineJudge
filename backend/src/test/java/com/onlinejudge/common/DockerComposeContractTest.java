@@ -50,6 +50,23 @@ class DockerComposeContractTest {
     }
 
     @Test
+    void supportedThreeServiceEntrypointDocumentsAndSuppliesTheOfflineJwtBootstrapInputs() throws IOException {
+        String compose = Files.readString(Path.of("..", "deploy", "docker", "compose.yml"));
+        String environmentTemplate = Files.readString(Path.of("..", "deploy", "docker", ".env.example"));
+        String composeEntrypoint = Files.readString(Path.of("..", "scripts", "docker", "compose-images.sh"));
+        String smokeEntrypoint = Files.readString(Path.of("..", "scripts", "docker", "smoke-images.sh"));
+
+        assertThat(compose).contains("IDENTITY_JWKS_TRUST_BUNDLE: ${IDENTITY_JWKS_TRUST_BUNDLE:?IDENTITY_JWKS_TRUST_BUNDLE is required}");
+        assertThat(compose).contains("IDENTITY_JWKS_URI: ${IDENTITY_JWKS_URI:?IDENTITY_JWKS_URI is required}");
+        assertThat(environmentTemplate).contains("IDENTITY_JWKS_TRUST_BUNDLE=");
+        assertThat(environmentTemplate).contains("IDENTITY_JWKS_URI=");
+        assertThat(composeEntrypoint).contains("IDENTITY_JWKS_TRUST_BUNDLE");
+        assertThat(composeEntrypoint).contains("IDENTITY_JWKS_URI");
+        assertThat(smokeEntrypoint).contains("IDENTITY_JWKS_TRUST_BUNDLE");
+        assertThat(smokeEntrypoint).contains("IDENTITY_JWKS_URI");
+    }
+
+    @Test
     void backendBuildProducesExecutableSpringBootJar() throws IOException {
         Path pomFile = Path.of("pom.xml");
         String pom = Files.readString(pomFile);
