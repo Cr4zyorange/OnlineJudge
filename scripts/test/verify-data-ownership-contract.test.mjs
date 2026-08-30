@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import test from 'node:test';
@@ -144,6 +144,104 @@ test('the ledger rejects a column that does not exist in the source table', () =
     assert.throws(
       () => verifyDataOwnershipContract({ rootPath: root }),
       /source column does not exist: crs_course\.teacher_id_not_a_column/
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('the ledger rejects traversal that escapes canonical contracts/v2', () => {
+  const root = fixtureRoot();
+  try {
+    const outsideContractPath = join(root, 'outside.json');
+    writeFileSync(outsideContractPath, JSON.stringify({
+      components: { messages: { 'identity.security-version.changed.v2': {} } }
+    }), 'utf8');
+    const ledgerPath = join(root, 'database', 'ownership', 'cross-domain-references.csv');
+    const ledger = readFileSync(ledgerPath, 'utf8').replace(
+      'contracts/v2/asyncapi/events.asyncapi.json#/components/messages/identity.security-version.changed.v2',
+      'contracts/v2/../../outside.json#/components/messages/identity.security-version.changed.v2'
+    );
+    writeFileSync(ledgerPath, ledger, 'utf8');
+
+    assert.throws(
+      () => verifyDataOwnershipContract({ rootPath: root }),
+      /contract artifact cannot contain traversal: contracts\/v2\/\.\.\/\.\.\/outside\.json/
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('the ledger rejects an equivalent canonical path containing traversal', () => {
+  const root = fixtureRoot();
+  try {
+    const ledgerPath = join(root, 'database', 'ownership', 'cross-domain-references.csv');
+    const ledger = readFileSync(ledgerPath, 'utf8').replace(
+      'contracts/v2/asyncapi/events.asyncapi.json#/components/messages/identity.security-version.changed.v2',
+      'contracts/v2/asyncapi/../asyncapi/events.asyncapi.json#/components/messages/identity.security-version.changed.v2'
+    );
+    writeFileSync(ledgerPath, ledger, 'utf8');
+
+    assert.throws(
+      () => verifyDataOwnershipContract({ rootPath: root }),
+      /contract artifact cannot contain traversal: contracts\/v2\/asyncapi\/\.\.\/asyncapi\/events\.asyncapi\.json/
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('the ledger rejects an absolute contract artifact', () => {
+  const root = fixtureRoot();
+  try {
+    const outsideContractPath = join(root, 'outside.json');
+    writeFileSync(outsideContractPath, JSON.stringify({
+      components: { messages: { 'identity.security-version.changed.v2': {} } }
+    }), 'utf8');
+    const ledgerPath = join(root, 'database', 'ownership', 'cross-domain-references.csv');
+    const ledger = readFileSync(ledgerPath, 'utf8').replace(
+      'contracts/v2/asyncapi/events.asyncapi.json#/components/messages/identity.security-version.changed.v2',
+      `${outsideContractPath}#/components/messages/identity.security-version.changed.v2`
+    );
+    writeFileSync(ledgerPath, ledger, 'utf8');
+
+    assert.throws(
+      () => verifyDataOwnershipContract({ rootPath: root }),
+      /contract artifact must be relative: /
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('the ledger rejects a canonical v2 symlink that resolves outside the boundary', (t) => {
+  const root = fixtureRoot();
+  try {
+    const outsideContractPath = join(root, 'outside.json');
+    writeFileSync(outsideContractPath, JSON.stringify({
+      components: { messages: { 'identity.security-version.changed.v2': {} } }
+    }), 'utf8');
+    const escapedArtifact = join(root, 'contracts', 'v2', 'asyncapi', 'identity-escape.json');
+    try {
+      symlinkSync(outsideContractPath, escapedArtifact);
+    } catch (error) {
+      if (['EPERM', 'EACCES', 'ENOTSUP', 'EINVAL'].includes(error.code)) {
+        t.skip(`symbolic links are unavailable on this platform (${error.code})`);
+        return;
+      }
+      throw error;
+    }
+    const ledgerPath = join(root, 'database', 'ownership', 'cross-domain-references.csv');
+    const ledger = readFileSync(ledgerPath, 'utf8').replace(
+      'contracts/v2/asyncapi/events.asyncapi.json#/components/messages/identity.security-version.changed.v2',
+      'contracts/v2/asyncapi/identity-escape.json#/components/messages/identity.security-version.changed.v2'
+    );
+    writeFileSync(ledgerPath, ledger, 'utf8');
+
+    assert.throws(
+      () => verifyDataOwnershipContract({ rootPath: root }),
+      /contract artifact escapes canonical contracts\/v2: contracts\/v2\/asyncapi\/identity-escape\.json/
     );
   } finally {
     rmSync(root, { recursive: true, force: true });

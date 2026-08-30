@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { existsSync, readFileSync, realpathSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { isAbsolute, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const defaultRoot = resolve(fileURLToPath(new URL('../..', import.meta.url)));
@@ -113,25 +113,77 @@ function resolveJsonPointer(document, fragment) {
   return current;
 }
 
-function validateContractReference(rootPath, reference, targetOwner, label, errors) {
-  if (!reference.startsWith('contracts/v2/')) {
-    errors.push(`contract must be under contracts/v2: ${label} -> ${reference}`);
-    return;
+function isContainedBy(directory, candidate) {
+  const relativeCandidate = relative(directory, candidate);
+  return relativeCandidate !== ''
+    && relativeCandidate !== '..'
+    && !relativeCandidate.startsWith(`..${sep}`)
+    && !isAbsolute(relativeCandidate);
+}
+
+function canonicalContractArtifact(rootPath, artifact, errors) {
+  if (isAbsolute(artifact) || /^[A-Za-z]:[\\/]/.test(artifact)) {
+    errors.push(`contract artifact must be relative: ${artifact}`);
+    return undefined;
   }
+  if (artifact.split(/[\\/]+/).includes('..')) {
+    errors.push(`contract artifact cannot contain traversal: ${artifact}`);
+    return undefined;
+  }
+
+  const canonicalDirectory = resolve(rootPath, 'contracts', 'v2');
+  let canonicalDirectoryReal;
+  try {
+    canonicalDirectoryReal = realpathSync(canonicalDirectory);
+  } catch (error) {
+    errors.push(`canonical contracts/v2 directory is unavailable: ${error.message}`);
+    return undefined;
+  }
+
+  const absoluteArtifact = resolve(rootPath, artifact);
+  if (!isContainedBy(canonicalDirectory, absoluteArtifact)) {
+    errors.push(`contract artifact escapes canonical contracts/v2: ${artifact}`);
+    return undefined;
+  }
+  if (!existsSync(absoluteArtifact)) {
+    errors.push(`contract artifact does not exist: ${artifact}`);
+    return undefined;
+  }
+
+  let realArtifact;
+  try {
+    realArtifact = realpathSync(absoluteArtifact);
+  } catch (error) {
+    errors.push(`contract artifact cannot be resolved: ${artifact} (${error.message})`);
+    return undefined;
+  }
+  if (!isContainedBy(canonicalDirectoryReal, realArtifact)) {
+    errors.push(`contract artifact escapes canonical contracts/v2: ${artifact}`);
+    return undefined;
+  }
+  return realArtifact;
+}
+
+function validateContractReference(rootPath, reference, targetOwner, label, errors) {
   const parts = reference.split('#');
   if (parts.length !== 2 || !parts[0] || !parts[1]) {
     errors.push(`contract must name a canonical JSON pointer: ${label} -> ${reference}`);
     return;
   }
   const [artifact, fragment] = parts;
-  const absoluteArtifact = resolve(rootPath, artifact);
-  if (!existsSync(absoluteArtifact)) {
-    errors.push(`contract artifact does not exist: ${artifact}`);
+  if (isAbsolute(artifact) || /^[A-Za-z]:[\\/]/.test(artifact)) {
+    errors.push(`contract artifact must be relative: ${artifact}`);
     return;
   }
+  if (!artifact.startsWith('contracts/v2/')) {
+    errors.push(`contract must be under contracts/v2: ${label} -> ${reference}`);
+    return;
+  }
+  const canonicalArtifact = canonicalContractArtifact(rootPath, artifact, errors);
+  if (!canonicalArtifact) return;
   let document;
   try {
-    document = JSON.parse(readFileSync(absoluteArtifact, 'utf8'));
+    document = JSON.parse(readFileSync(canonicalArtifact, 'utf8'));
   } catch (error) {
     errors.push(`contract artifact is not valid JSON: ${artifact} (${error.message})`);
     return;
