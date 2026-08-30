@@ -4,6 +4,7 @@ set -euo pipefail
 
 repo_root="$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"
 checkout="${1:-$repo_root}"
+checkout="$(CDPATH= cd -- "$checkout" && pwd)"
 backend_dir="$checkout/backend"
 assessment_dir="$checkout/services/assessment"
 artifact_dir="$checkout/ci-artifacts/backend-gate"
