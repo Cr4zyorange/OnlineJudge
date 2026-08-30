@@ -140,6 +140,7 @@ class CourseMembershipRabbitMySqlLiveTest {
         jdbc.update("DELETE FROM learning_deferred_event");
         jdbc.update("DELETE FROM learning_course_member_projection");
         jdbc.update("DELETE FROM learning_course_membership_watermark");
+        jdbc.update("DELETE FROM course_membership_reconciliation_checkpoint");
         jdbc.update("DELETE FROM course_event_outbox");
         jdbc.update("DELETE FROM crs_course_member");
         jdbc.update("DELETE FROM crs_course");
@@ -243,6 +244,73 @@ class CourseMembershipRabbitMySqlLiveTest {
         System.out.printf("course-roster-bootstrap-live courseId=%d eventId=%s correlationId=%s "
                         + "bootstrapped=1 repeated=0 delivered=1 watermark=1 notificationsForStudent=1%n",
                 course.id(), delivered.getFirst().eventId(), delivered.getFirst().correlationId());
+    }
+
+    @Test
+    void publishedCourseSnapshotMustBeReissuedWhenLearningRestoresAnEmptyProjection() throws Exception {
+        long suffix = Math.abs(System.nanoTime());
+        CurrentUser teacher = user(8_500_000L + suffix % 100_000L, "TEACHER");
+        CurrentUser student = user(8_600_000L + suffix % 100_000L, "STUDENT");
+        CourseResponse course = courses.create(new CourseCreateRequest(
+                "restored-learning-projection-" + suffix, "", "2026-F", "SE", null,
+                EnrollmentMode.PUBLIC, null, null, null, null, CourseStatus.ACTIVE
+        ), teacher);
+        courses.join(course.id(), new CourseJoinRequest(null, ""), student);
+
+        // Course has already published its v1/v2 snapshots.  Simulate an
+        // independent Learning projection restore after those facts are gone.
+        for (ReliableEventEnvelope event : publishAndReceive(3)) {
+            assertThat(learning.consume(event)).isEqualTo(EventProcessingDecision.ACK);
+        }
+        assertThat(jdbc.queryForObject(
+                "SELECT snapshot_version FROM learning_course_membership_watermark WHERE course_id = ?",
+                Long.class, course.id())).isEqualTo(2L);
+        jdbc.update("DELETE FROM lrn_notification_status_log");
+        jdbc.update("DELETE FROM lrn_notification");
+        jdbc.update("DELETE FROM learning_event_inbox");
+        jdbc.update("DELETE FROM learning_course_member_projection");
+        jdbc.update("DELETE FROM learning_course_membership_watermark");
+
+        ReliableEventEnvelope homework = homework(course.id(), "restored-projection-homework-" + suffix);
+        assertThat(learning.consume(homework)).isEqualTo(EventProcessingDecision.ACK);
+        assertThat(count("learning_deferred_event WHERE event_id = '" + homework.eventId() + "'"))
+                .isEqualTo(1);
+        assertThat(count("lrn_notification WHERE user_id = " + student.id())).isZero();
+        assertThat(count("course_event_outbox WHERE aggregate_type = 'course-membership-roster' "
+                + "AND aggregate_id = '" + course.id() + "' AND delivery_status = 'PUBLISHED'"))
+                .isEqualTo(2);
+
+        // RED: an old PUBLISHED snapshot is not a usable recovery trigger.
+        // Course must own a durable reconciliation path that emits v3 without
+        // Learning synchronously asking it to do so.
+        CourseMembershipBootstrapper bootstrapper = new CourseMembershipBootstrapper(outbox, 10);
+        assertThat(bootstrapper.reconcilePublishedRosters(Instant.parse("2030-01-01T00:00:00Z")))
+                .as("Course reconciliation must reissue a snapshot after Learning projection restore")
+                .isEqualTo(1);
+        assertThat(bootstrapper.reconcilePublishedRosters(Instant.parse("2030-01-01T00:00:00Z")))
+                .as("a durable checkpoint must suppress a repeated recovery trigger")
+                .isZero();
+        assertThat(count("course_event_outbox WHERE aggregate_type = 'course-membership-roster' "
+                + "AND aggregate_id = '" + course.id() + "' AND aggregate_version = 3"))
+                .as("source reconciliation must advance the Course roster aggregate version")
+                .isEqualTo(1);
+
+        List<ReliableEventEnvelope> recovered = publishAndReceive(1);
+        assertThat(recovered).singleElement().satisfies(envelope -> {
+            assertThat(envelope.eventType()).isEqualTo(CourseEventOutboxRepository.MEMBERSHIP_SNAPSHOT);
+            assertThat(envelope.aggregateVersion()).isEqualTo(3L);
+        });
+        assertThat(learning.consume(recovered.getFirst())).isEqualTo(EventProcessingDecision.ACK);
+        assertThat(reconciliation.reconcileDue(Instant.parse("2030-01-01T00:00:01Z"))).isEqualTo(1);
+        assertThat(jdbc.queryForObject(
+                "SELECT snapshot_version FROM learning_course_membership_watermark WHERE course_id = ?",
+                Long.class, course.id())).isEqualTo(3L);
+        assertThat(count("lrn_notification WHERE user_id = " + student.id())).isEqualTo(1);
+
+        System.out.printf("course-roster-reconciliation-live courseId=%d eventId=%s correlationId=%s "
+                        + "oldSnapshotVersion=2 reconciledSnapshotVersion=3 reconciled=1 repeated=0 delivered=1 "
+                        + "watermark=3 notificationsForStudent=1%n",
+                course.id(), recovered.getFirst().eventId(), recovered.getFirst().correlationId());
     }
 
     private List<ReliableEventEnvelope> publishAndReceive(int expected) {

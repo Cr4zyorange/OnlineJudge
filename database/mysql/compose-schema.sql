@@ -1123,6 +1123,17 @@ CREATE TABLE IF NOT EXISTS course_event_outbox (
     KEY idx_course_event_outbox_correlation (correlation_id)
 );
 
+-- Source: database/migrations/20260831_03_create_course_membership_reconciliation_checkpoint.sql
+CREATE TABLE IF NOT EXISTS course_membership_reconciliation_checkpoint (
+    course_id BIGINT NOT NULL PRIMARY KEY,
+    snapshot_event_id VARCHAR(64) NOT NULL,
+    snapshot_version BIGINT NOT NULL,
+    next_reconcile_at TIMESTAMP NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    KEY idx_course_membership_reconciliation_due (next_reconcile_at)
+);
+
 CREATE TABLE IF NOT EXISTS grade_event_outbox (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     event_id VARCHAR(64) NOT NULL,
@@ -1314,4 +1325,5 @@ VALUES
     ('20260825_01_add_grd_analysis_source_fingerprint.sql', 'f650506d22e00f48f23da6f6dd76ca11d3f1e1083a59f805be20cf7b98315b59', 'COMPOSE_BASELINE', 0, 1),
     ('20260825_02_add_grd_analysis_source_version.sql', 'd40f5b9a41a0a836960f9b3d445e0d1f6fc6cbcc4f2b48b210387fcfc9f21b2c', 'COMPOSE_BASELINE', 0, 1),
     ('20260830_01_create_reliable_event_storage.sql', '9c20588263045d59dd55730741aa46c2f973828ba3270fc8c3717505e5c2ee45', 'COMPOSE_BASELINE', 0, 1),
-    ('20260831_02_create_learning_membership_watermark.sql', '9a60d1a32ce5b3305cfa7663aabf5dc5e19b6831376d2374c9c158b2435d35b4', 'COMPOSE_BASELINE', 0, 1);
+    ('20260831_02_create_learning_membership_watermark.sql', '9a60d1a32ce5b3305cfa7663aabf5dc5e19b6831376d2374c9c158b2435d35b4', 'COMPOSE_BASELINE', 0, 1),
+    ('20260831_03_create_course_membership_reconciliation_checkpoint.sql', '2e3698cbf45df00da05275fd5d7f54073c3a57aa9369856f5ff8beb82d087d3f', 'COMPOSE_BASELINE', 0, 1);

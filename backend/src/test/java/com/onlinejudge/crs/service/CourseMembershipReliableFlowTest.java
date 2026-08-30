@@ -104,6 +104,7 @@ class CourseMembershipReliableFlowTest {
         jdbc.update("DELETE FROM learning_deferred_event");
         jdbc.update("DELETE FROM learning_course_member_projection");
         jdbc.update("DELETE FROM learning_course_membership_watermark");
+        jdbc.update("DELETE FROM course_membership_reconciliation_checkpoint");
         jdbc.update("DELETE FROM course_event_outbox");
         jdbc.update("DELETE FROM crs_course_member");
         jdbc.update("DELETE FROM crs_course");
@@ -183,6 +184,44 @@ class CourseMembershipReliableFlowTest {
         assertThat(jdbc.queryForObject(
                 "SELECT snapshot_version FROM learning_course_membership_watermark WHERE course_id = ?",
                 Long.class, course.id())).isEqualTo(1L);
+    }
+
+    @Test
+    void sourceOwnedReconciliationReissuesTheNextRosterVersionAfterLearningProjectionRestoreOnce() throws Exception {
+        CurrentUser teacher = user(901L, "TEACHER");
+        CurrentUser student = user(1001L, "STUDENT");
+        CourseResponse course = courses.create(new CourseCreateRequest(
+                "Recovered Learning projection", "", "2026-F", "SE", null,
+                EnrollmentMode.PUBLIC, null, null, null, null, CourseStatus.ACTIVE
+        ), teacher);
+        courses.join(course.id(), new CourseJoinRequest(null, ""), student);
+        deliverCourseOutbox();
+        assertThat(jdbc.queryForObject(
+                "SELECT snapshot_version FROM learning_course_membership_watermark WHERE course_id = ?",
+                Long.class, course.id())).isEqualTo(2L);
+
+        jdbc.update("DELETE FROM lrn_notification_status_log");
+        jdbc.update("DELETE FROM lrn_notification");
+        jdbc.update("DELETE FROM learning_event_inbox");
+        jdbc.update("DELETE FROM learning_course_member_projection");
+        jdbc.update("DELETE FROM learning_course_membership_watermark");
+        ReliableEventEnvelope homework = homework(course.id(), "homework-after-learning-restore");
+        assertThat(learning.consume(homework)).isEqualTo(EventProcessingDecision.ACK);
+        assertThat(count("learning_deferred_event")).isEqualTo(1);
+
+        CourseMembershipBootstrapper bootstrapper = new CourseMembershipBootstrapper(outbox, 10);
+        Instant recoveryTime = Instant.parse("2030-01-01T00:00:00Z");
+        assertThat(bootstrapper.reconcilePublishedRosters(recoveryTime)).isEqualTo(1);
+        assertThat(bootstrapper.reconcilePublishedRosters(recoveryTime)).isZero();
+        assertThat(count("course_event_outbox WHERE event_type = 'course.membership.snapshot.v2' "
+                + "AND aggregate_version = 3")).isEqualTo(1);
+
+        deliverCourseOutbox();
+        assertThat(reconciliation.reconcileDue(recoveryTime.plusSeconds(1))).isEqualTo(1);
+        assertThat(jdbc.queryForObject(
+                "SELECT snapshot_version FROM learning_course_membership_watermark WHERE course_id = ?",
+                Long.class, course.id())).isEqualTo(3L);
+        assertThat(count("lrn_notification WHERE user_id = 1001")).isEqualTo(1);
     }
 
     private void deliverCourseOutbox() {

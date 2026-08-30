@@ -7,7 +7,7 @@
 
 本文件冻结 Identity、Course、Assessment、Grade、Learning 五域的数据库边界；它不创建 Schema、账号、迁移脚本、回滚脚本或生产 Repository 改造。当前模块化单体仍使用一个物理 MySQL；`database/ownership/*.csv` 描述目标 Schema 的契约，#341 才能实施并验证数据库变更。
 
-`table-ownership.csv` 是当前 58 张业务表的唯一 owner 正本。它保留真实主键、外部 ID、owner 内约束、现有 owner 内索引的保留策略和 #341 的迁移策略。源表集合来自 `database/mysql/compose-schema.sql`，不得凭业务名称新增、遗漏或重复登记表。`service-local-tables.csv` 则冻结每个 Schema 的本地 inbox/outbox；#337 已实现 Assessment/Course/Grade outbox、Assessment/Grade/Learning inbox，以及 Learning 的 `learning_course_member_projection` 和课程级 `learning_course_membership_watermark`。该水位只由 `course.membership.snapshot.v2` 的完整 roster 推进，不能由任意一个成员事件推断。Grade 的 `t_grade_record` 仍为来源成绩投影；其余服务本地表的物理 Schema 切换属于 #341。
+`table-ownership.csv` 是当前 59 张业务与 service-local 可靠性表的唯一 owner 正本。它保留真实主键、外部 ID、owner 内约束、现有 owner 内索引的保留策略和 #341 的迁移策略。源表集合来自 `database/mysql/compose-schema.sql`，不得凭业务名称新增、遗漏或重复登记表。`service-local-tables.csv` 则冻结每个 Schema 的本地 inbox/outbox；#337 已实现 Assessment/Course/Grade outbox、Assessment/Grade/Learning inbox、Course 的 `course_membership_reconciliation_checkpoint`，以及 Learning 的 `learning_course_member_projection` 和课程级 `learning_course_membership_watermark`。该水位只由 `course.membership.snapshot.v2` 的完整 roster 推进，不能由任意一个成员事件推断。Grade 的 `t_grade_record` 仍为来源成绩投影；其余服务本地表的物理 Schema 切换属于 #341。
 
 ## 2. 五域、Schema 与运行时账号
 

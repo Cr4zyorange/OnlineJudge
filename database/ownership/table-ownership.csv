@@ -47,6 +47,7 @@ lab_score_change_log,ASSESSMENT,oj_assessment,id,operator_id->IDENTITY.t_auth_us
 t_hwk_submission_attachment,ASSESSMENT,oj_assessment,id,course_id->COURSE.crs_course.id;uploader_id->IDENTITY.t_auth_user.user_id,ID-only-no-cross-FK,retain-owner-local-indexes,#341-copy-after-homework-submission
 assessment_event_outbox,ASSESSMENT,oj_assessment,id,-,assessment-local-event-dedup-and-lease,retain-owner-local-indexes,#341-rebuild-from-owner-events
 course_event_outbox,COURSE,oj_course,id,-,course-local-event-dedup-and-lease,retain-owner-local-indexes,#341-rebuild-from-owner-events
+course_membership_reconciliation_checkpoint,COURSE,oj_course,course_id,-,course-local-roster-reconciliation-checkpoint,retain-owner-local-indexes,#341-rebuild-from-course-roster-events
 grade_event_outbox,GRADE,oj_grade,id,-,grade-local-event-dedup-and-lease,retain-owner-local-indexes,#341-rebuild-from-owner-events
 assessment_event_inbox,ASSESSMENT,oj_assessment,id,-,assessment-local-consumer-dedup,retain-owner-local-indexes,#341-rebuild-from-owner-events
 grade_event_inbox,GRADE,oj_grade,id,-,grade-local-consumer-dedup,retain-owner-local-indexes,#341-rebuild-from-owner-events

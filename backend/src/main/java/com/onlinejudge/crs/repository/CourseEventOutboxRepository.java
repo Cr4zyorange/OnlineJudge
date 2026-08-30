@@ -7,10 +7,12 @@ import com.onlinejudge.common.reliability.ReliableEventEnvelope;
 import com.onlinejudge.crs.domain.CourseMember;
 import com.onlinejudge.crs.domain.CourseMemberRole;
 import com.onlinejudge.crs.domain.CourseMemberStatus;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -31,16 +33,23 @@ public class CourseEventOutboxRepository {
 
     private final JdbcTemplate jdbcTemplate;
     private final ObjectMapper objectMapper;
+    private final Duration reconciliationInterval;
 
-    public CourseEventOutboxRepository(JdbcTemplate jdbcTemplate, ObjectMapper objectMapper) {
+    public CourseEventOutboxRepository(
+            JdbcTemplate jdbcTemplate,
+            ObjectMapper objectMapper,
+            @Value("${onlinejudge.reliability.course-bootstrap.reconciliation-interval-ms:300000}") long reconciliationIntervalMs
+    ) {
         this.jdbcTemplate = jdbcTemplate;
         this.objectMapper = objectMapper;
+        this.reconciliationInterval = Duration.ofMillis(Math.max(1L, reconciliationIntervalMs));
     }
 
     /** A newly created course has an authoritative (possibly empty) student roster. */
     public void appendBootstrapRoster(long courseId) {
         Instant occurredAt = Instant.now();
-        appendRosterSnapshot(courseId, UUID.randomUUID().toString(), occurredAt, null, 0L);
+        RosterSnapshotPublication snapshot = appendRosterSnapshot(courseId, UUID.randomUUID().toString(), occurredAt, null, 0L);
+        checkpointRosterReconciliation(courseId, snapshot, occurredAt.plus(reconciliationInterval));
     }
 
     /**
@@ -99,6 +108,70 @@ public class CourseEventOutboxRepository {
     }
 
     /**
+     * Finds Course aggregates whose latest source-owned reconciliation
+     * checkpoint is due.  It deliberately considers only a previously
+     * published roster: a PENDING bootstrap is already recoverable through
+     * the outbox publisher and must not be duplicated by this scan.
+     */
+    public List<Long> coursesDueForRosterReconciliation(Instant now, int limit) {
+        return jdbcTemplate.queryForList("""
+                        SELECT c.id
+                        FROM crs_course c
+                        WHERE c.is_deleted = FALSE
+                          AND EXISTS (
+                              SELECT 1
+                              FROM course_event_outbox o
+                              WHERE o.aggregate_type = 'course-membership-roster'
+                                AND CAST(o.aggregate_id AS DECIMAL(20, 0)) = c.id
+                                AND o.delivery_status = 'PUBLISHED'
+                          )
+                          AND NOT EXISTS (
+                              SELECT 1
+                              FROM course_membership_reconciliation_checkpoint r
+                              WHERE r.course_id = c.id AND r.next_reconcile_at > ?
+                          )
+                        ORDER BY c.id
+                        LIMIT ?
+                        """, Long.class, now, Math.max(1, limit));
+    }
+
+    /**
+     * Atomically turns one due durable Course checkpoint into the next
+     * complete roster version.  The Course row serializes concurrent runners;
+     * the checkpoint and new outbox fact commit or roll back together, so no
+     * Learning callback or in-memory retry state can create a phantom repair.
+     */
+    @Transactional
+    public boolean appendReconciliationRosterIfDue(long courseId, Instant now) {
+        List<Long> courses = jdbcTemplate.queryForList("""
+                        SELECT id
+                        FROM crs_course
+                        WHERE id = ? AND is_deleted = FALSE
+                        FOR UPDATE
+                        """, Long.class, courseId);
+        if (courses.isEmpty() || !hasPublishedRoster(courseId)) {
+            return false;
+        }
+        List<Timestamp> nextDue = jdbcTemplate.queryForList("""
+                        SELECT next_reconcile_at
+                        FROM course_membership_reconciliation_checkpoint
+                        WHERE course_id = ?
+                        """, Timestamp.class, courseId);
+        if (!nextDue.isEmpty() && nextDue.getFirst().toInstant().isAfter(now)) {
+            return false;
+        }
+        // `now` is the durable due-gate clock.  The emitted fact itself must
+        // carry the real source commit time so the normal publisher can claim
+        // it immediately even when a deterministic recovery test uses a
+        // future due-gate instant.
+        RosterSnapshotPublication snapshot = appendRosterSnapshot(
+                courseId, UUID.randomUUID().toString(), Instant.now(), null, 0L
+        );
+        checkpointRosterReconciliation(courseId, snapshot, now.plus(reconciliationInterval));
+        return true;
+    }
+
+    /**
      * Emits an incremental member fact and a complete replacement roster for
      * the Course's current student receiver scope.  Snapshot first prevents a
      * following incremental fact from making a stale partial roster appear
@@ -109,7 +182,10 @@ public class CourseEventOutboxRepository {
         long memberVersion = nextVersion("course-member", courseId + ":" + changedMember.userId());
         Instant occurredAt = Instant.now();
         String correlationId = UUID.randomUUID().toString();
-        appendRosterSnapshot(courseId, correlationId, occurredAt, changedMember.userId(), memberVersion);
+        RosterSnapshotPublication snapshot = appendRosterSnapshot(
+                courseId, correlationId, occurredAt, changedMember.userId(), memberVersion
+        );
+        checkpointRosterReconciliation(courseId, snapshot, occurredAt.plus(reconciliationInterval));
         appendMemberChanged(changedMember, memberVersion, correlationId, occurredAt);
     }
 
@@ -185,7 +261,7 @@ public class CourseEventOutboxRepository {
                 id, leaseOwner, updatedAt);
     }
 
-    private void appendRosterSnapshot(
+    private RosterSnapshotPublication appendRosterSnapshot(
             long courseId, String correlationId, Instant occurredAt, Long changedUserId, long changedUserVersion
     ) {
         long rosterVersion = nextVersion("course-membership-roster", String.valueOf(courseId));
@@ -211,11 +287,41 @@ public class CourseEventOutboxRepository {
         payload.put("courseId", String.valueOf(courseId));
         payload.put("rosterVersion", rosterVersion);
         payload.put("members", members);
+        String eventId = UUID.randomUUID().toString();
         append(new ReliableEventEnvelope(
-                UUID.randomUUID().toString(), MEMBERSHIP_SNAPSHOT, 2,
+                eventId, MEMBERSHIP_SNAPSHOT, 2,
                 "course-membership-roster", String.valueOf(courseId), rosterVersion,
                 occurredAt, correlationId, objectMapper.valueToTree(payload)
         ));
+        return new RosterSnapshotPublication(eventId, correlationId, rosterVersion);
+    }
+
+    private boolean hasPublishedRoster(long courseId) {
+        Integer count = jdbcTemplate.queryForObject("""
+                        SELECT COUNT(*)
+                        FROM course_event_outbox
+                        WHERE aggregate_type = 'course-membership-roster'
+                          AND aggregate_id = ?
+                          AND delivery_status = 'PUBLISHED'
+                        """, Integer.class, String.valueOf(courseId));
+        return count != null && count > 0;
+    }
+
+    private void checkpointRosterReconciliation(
+            long courseId, RosterSnapshotPublication snapshot, Instant nextReconcileAt
+    ) {
+        int updated = jdbcTemplate.update("""
+                        UPDATE course_membership_reconciliation_checkpoint
+                        SET snapshot_event_id = ?, snapshot_version = ?, next_reconcile_at = ?, updated_at = ?
+                        WHERE course_id = ?
+                        """, snapshot.eventId(), snapshot.version(), nextReconcileAt, Instant.now(), courseId);
+        if (updated == 0) {
+            jdbcTemplate.update("""
+                            INSERT INTO course_membership_reconciliation_checkpoint
+                            (course_id, snapshot_event_id, snapshot_version, next_reconcile_at, created_at, updated_at)
+                            VALUES (?, ?, ?, ?, ?, ?)
+                            """, courseId, snapshot.eventId(), snapshot.version(), nextReconcileAt, Instant.now(), Instant.now());
+        }
     }
 
     private void appendMemberChanged(CourseMember member, long memberVersion, String correlationId, Instant occurredAt) {
@@ -259,6 +365,9 @@ public class CourseEventOutboxRepository {
 
     private String normalizedStudentStatus(CourseMemberRole role, CourseMemberStatus status) {
         return role == CourseMemberRole.STUDENT && status == CourseMemberStatus.ACTIVE ? "ACTIVE" : "REMOVED";
+    }
+
+    private record RosterSnapshotPublication(String eventId, String correlationId, long version) {
     }
 
     private ReliableEventEnvelope deserialize(

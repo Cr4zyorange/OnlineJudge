@@ -6,8 +6,8 @@ BEGIN
     DECLARE actual_count INT DEFAULT 0;
 
     SELECT COUNT(*) INTO actual_count FROM schema_migrations WHERE success = 1;
-    IF actual_count <> 29 THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'schema_migrations must contain 29 successful versions';
+    IF actual_count <> 30 THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'schema_migrations must contain 30 successful versions';
     END IF;
 
     SELECT COUNT(*) INTO actual_count
@@ -71,13 +71,13 @@ BEGIN
       FROM information_schema.tables
      WHERE table_schema = DATABASE()
        AND table_name IN (
-           'assessment_event_outbox', 'course_event_outbox', 'grade_event_outbox',
+           'assessment_event_outbox', 'course_event_outbox', 'course_membership_reconciliation_checkpoint', 'grade_event_outbox',
            'assessment_event_inbox', 'grade_event_inbox', 'learning_event_inbox',
            'learning_event_dead_letter', 'learning_event_reconciliation_request',
            'learning_deferred_event',
            'learning_course_member_projection', 'learning_course_membership_watermark'
        );
-    IF actual_count <> 11 THEN
+    IF actual_count <> 12 THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'reliable messaging ownership tables are incomplete';
     END IF;
 

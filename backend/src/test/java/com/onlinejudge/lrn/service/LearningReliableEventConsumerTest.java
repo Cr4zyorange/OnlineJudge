@@ -221,7 +221,7 @@ class LearningReliableEventConsumerTest {
     }
 
     @Test
-    void rosterSnapshotVersionGapAndOutOfOrderRecoveryApplyHomeworkOnlyAfterRequiredWatermarkArrives() {
+    void completeRosterSnapshotFastForwardsOnlyItsOwnAggregateAndMakesOlderSnapshotsNoOps() {
         clearCourseRoster();
 
         assertThat(consumer.consume(courseMembershipSnapshotEvent("roster-v2", 2,
@@ -234,12 +234,34 @@ class LearningReliableEventConsumerTest {
                 new MemberFact(42L, "ACTIVE", 1L))))
                 .isEqualTo(EventProcessingDecision.ACK);
 
-        assertThat(reconciliationWorker.reconcileDue(Instant.parse("2030-01-01T00:00:00.123456789Z"))).isEqualTo(2);
+        assertThat(reconciliationWorker.reconcileDue(Instant.parse("2030-01-01T00:00:00.123456789Z"))).isZero();
         assertThat(countByEventId("learning_event_inbox", "homework-after-roster-gap")).isEqualTo(1);
         assertThat(count("lrn_notification")).isEqualTo(2);
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT snapshot_version FROM learning_course_membership_watermark WHERE course_id = 88", Long.class
         )).isEqualTo(2L);
+    }
+
+    @Test
+    void authoritativeReconciliationSnapshotCanRestoreAnEmptyProjectionAtANewerRosterVersion() {
+        clearCourseRoster();
+
+        // A Course-owned reconciliation emits the next canonical roster
+        // version. Learning may have lost its own inbox/projection, so it
+        // must accept this complete replacement fact rather than wait for
+        // historical partial member events that Course will not recreate.
+        assertThat(consumer.consume(courseMembershipSnapshotEvent("reconciled-roster-v3", 3,
+                new MemberFact(42L, "ACTIVE", 1L))))
+                .isEqualTo(EventProcessingDecision.ACK);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT snapshot_version FROM learning_course_membership_watermark WHERE course_id = 88", Long.class
+        )).isEqualTo(3L);
+
+        assertThat(consumer.consume(homeworkEvent("homework-after-reconciled-roster", 1, "Java collections homework")))
+                .isEqualTo(EventProcessingDecision.ACK);
+        assertThat(countByEventId("learning_event_inbox", "homework-after-reconciled-roster")).isEqualTo(1);
+        assertThat(count("learning_deferred_event")).isZero();
+        assertThat(count("lrn_notification")).isEqualTo(1);
     }
 
     @Test

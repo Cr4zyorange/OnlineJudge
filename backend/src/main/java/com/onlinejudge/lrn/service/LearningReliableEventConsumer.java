@@ -89,6 +89,18 @@ public class LearningReliableEventConsumer {
             inbox.record(CONSUMER, envelope, "IGNORED_OLD", Instant.now());
             return EventProcessingDecision.ACK;
         }
+        // A Course roster snapshot is a complete replacement fact, not a
+        // partial delta.  It is the only aggregate allowed to fast-forward a
+        // restored Learning projection: Course reconciliation emits vN+1
+        // after Learning may have lost v1..vN, and waiting for those retired
+        // historical facts would leave every deferred homework permanent.
+        // Ordinary events, including course.member.changed.v2, still require
+        // strict contiguous ordering below.
+        if (isAuthoritativeCourseRosterSnapshot(envelope)) {
+            apply(envelope);
+            inbox.record(CONSUMER, envelope, "APPLIED", Instant.now());
+            return EventProcessingDecision.ACK;
+        }
         if (envelope.aggregateVersion() > current + 1) {
             persistDeferred(envelope, "PROJECTION_GAP");
             reliability.recordGap(
@@ -99,6 +111,11 @@ public class LearningReliableEventConsumer {
         apply(envelope);
         inbox.record(CONSUMER, envelope, "APPLIED", Instant.now());
         return EventProcessingDecision.ACK;
+    }
+
+    private boolean isAuthoritativeCourseRosterSnapshot(ReliableEventEnvelope envelope) {
+        return LearningCourseMembershipSnapshotHandler.EVENT_TYPE.equals(envelope.eventType())
+                && LearningCourseMembershipSnapshotHandler.AGGREGATE_TYPE.equals(envelope.aggregateType());
     }
 
     private void apply(ReliableEventEnvelope envelope) {

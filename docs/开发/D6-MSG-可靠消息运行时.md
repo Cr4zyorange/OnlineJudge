@@ -15,13 +15,13 @@
 | 事实拥有者 | 表 | 运行时代码 | 说明 |
 | --- | --- | --- | --- |
 | Assessment | `assessment_event_outbox` | `AssessmentEventOutboxRepository`、`AssessmentOutboxPublisher` | API-HWK-03 已将 `Homework=PUBLISHED` 与 `assessment.homework.published.v2` outbox 同事务落库。 |
-| Course | `course_event_outbox` | 同一 outbox 状态模型的预置 owner table | Course 服务事件接入由对应服务 Issue 消费；#337 不从 Assessment/Learning 跨表代写。 |
+| Course | `course_event_outbox`、`course_membership_reconciliation_checkpoint` | `CourseEventOutboxRepository`、`CourseMembershipBootstrapper` | Course 以本地事务写 membership snapshot/change outbox；checkpoint 由 Course 定时扫描并原子推进下一完整 snapshot，不读取或同步回调 Learning。 |
 | Grade | `grade_event_outbox` | 同一 outbox 状态模型的预置 owner table | Grade 服务事件接入由对应服务 Issue 消费；#337 不从 Assessment/Learning 跨表代写。 |
 | Assessment | `assessment_event_inbox` | 预置 owner table | 消费者接入由 Assessment 服务 Issue 消费。 |
 | Grade | `grade_event_inbox` | 预置 owner table | 消费者接入由 Grade 服务 Issue 消费。 |
 | Learning | `learning_event_inbox`、`learning_event_dead_letter`、`learning_event_reconciliation_request`、`learning_deferred_event`、`learning_course_member_projection`、`learning_course_membership_watermark` | `LearningReliableEventConsumer`、`LearningCourseMemberChangedHandler`、`LearningCourseMembershipSnapshotHandler`、`LearningReconciliationWorker`、`LearningDeadLetterReplayService` | `course.member.changed.v2` 仅更新单成员投影；`course.membership.snapshot.v2` 原子替换完整 roster 并推进课程级 watermark。Homework 在水位不存在或 gap 未追平时保持 durable deferred，追平后 worker 按原 eventId 只收敛一次，消息没有学生 roster。 |
 
-迁移文件是 `database/migrations/20260830_01_create_reliable_event_storage.sql` 与 `20260831_02_create_learning_membership_watermark.sql`，并同步进 `database/mysql/compose-schema.sql` 与基线历史。真正的五 schema、每服务 runtime account 和数据库授权只能在 #309/#341 的合并设计与迁移完成后启用；在此之前测试环境的单一账号不是隔离证据。
+迁移文件是 `database/migrations/20260830_01_create_reliable_event_storage.sql`、`20260831_02_create_learning_membership_watermark.sql` 与 `20260831_03_create_course_membership_reconciliation_checkpoint.sql`，并同步进 `database/mysql/compose-schema.sql` 与基线历史。真正的五 schema、每服务 runtime account 和数据库授权只能在 #309/#341 的合并设计与迁移完成后启用；在此之前测试环境的单一账号不是隔离证据。
 
 ## RabbitMQ 拓扑
 
@@ -44,5 +44,6 @@
 - `LearningReliableEventConsumerTest`：同一消息 10 次重投只产生一个通知，版本缺口对账，毒消息隔离后健康消息继续，受控 replay 只在 confirm 后标记。
 - `RabbitMqReliabilityConfigurationTest`：durable main/retry/DLQ 声明和延迟路由。
 - `scripts/test/verify-reliable-messaging-live.sh`：使用 disposable RabbitMQ 完整执行 confirmed publish、broker pause 的明确失败、恢复后的再次 confirmed publish；日志输出 event/correlation ID。
+- `scripts/test/verify-course-membership-reliable-live.sh`：使用 disposable MySQL/Rabbit 覆盖无历史 outbox 的存量 Course bootstrap，以及旧 roster 已 `PUBLISHED` 后 Learning 投影清空时的 Course checkpoint 对账。后者只写 `vN+1` 完整 snapshot；重复 trigger 不产生第二个 outbox 副作用，Learning 以该完整替换事实恢复 watermark 并按原 homework eventId 一次收敛。
 
 运行真实 RabbitMQ 验收前，先确认 Docker 能拉取 `rabbitmq:4.1-management`；该镜像不可用时不得把 H2/mock 测试称作 broker 故障验收通过。
