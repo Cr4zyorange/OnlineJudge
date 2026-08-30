@@ -1,5 +1,12 @@
-import { config, flushPromises, mount, RouterLinkStub, type VueWrapper } from '@vue/test-utils';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  config,
+  enableAutoUnmount,
+  flushPromises,
+  mount,
+  RouterLinkStub,
+  type VueWrapper
+} from '@vue/test-utils';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import HomeworkStudentView from '../../../src/views/hwk/HomeworkStudentView.vue';
 import * as homeworkApi from '../../../src/api/hwk/homeworks';
 import * as learningProgressApi from '../../../src/api/lrn/learningProgress';
@@ -36,6 +43,7 @@ config.global.stubs = {
   ...config.global.stubs,
   RouterLink: RouterLinkStub
 };
+enableAutoUnmount(afterEach);
 
 describe('HomeworkStudentView', () => {
   beforeEach(() => {
