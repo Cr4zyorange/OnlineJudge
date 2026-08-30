@@ -44,6 +44,15 @@ SHARED_BACKEND_INPUTS = [
     "backend/src/main/resources/**",
     "backend/pom.xml",
 ]
+MICROSERVICE_V2_CONTRACT_INPUTS = [
+    "contracts/v2/**",
+    "docs/adr/ADR-006-五业务服务与可靠消息契约.md",
+    "docs/开发/D4-CROSS-SERVICE-共享契约.md",
+    "docs/开发/D6-D7-五服务共享契约-v2.md",
+    "scripts/ci/contract-verify.sh",
+    "scripts/ci/verify-microservice-contract-v2.mjs",
+    "scripts/ci/verify-workflow-gates.test.sh",
+]
 
 
 class WorkloadManifestValidationTest(unittest.TestCase):
@@ -280,6 +289,59 @@ class WorkloadManifestValidationTest(unittest.TestCase):
                 self.assertEqual(result.returncode, 0, result.stderr)
                 resolved = json.loads(result.stdout)
                 self.assertEqual(resolved["affectedWorkloads"], BACKEND_APPLICATION_WORKLOADS)
+
+    def test_canonical_microservice_v2_contract_inputs_select_backend_consumers_and_producers(self) -> None:
+        changed_paths = [
+            "contracts/v2/openapi/course.openapi.json",
+            "contracts/v2/asyncapi/events.asyncapi.json",
+            "contracts/v2/examples/event-envelope.valid.json",
+            "docs/adr/ADR-006-五业务服务与可靠消息契约.md",
+            "docs/开发/D4-CROSS-SERVICE-共享契约.md",
+            "docs/开发/D6-D7-五服务共享契约-v2.md",
+            "scripts/ci/contract-verify.sh",
+            "scripts/ci/verify-microservice-contract-v2.mjs",
+            "scripts/ci/verify-workflow-gates.test.sh",
+        ]
+
+        for changed_path in changed_paths:
+            with self.subTest(changed_path=changed_path):
+                result = self.run_validator(MANIFEST, "--changed-path", changed_path)
+
+                self.assertEqual(result.returncode, 0, result.stderr)
+                resolved = json.loads(result.stdout)
+                self.assertEqual(resolved["affectedWorkloads"], BACKEND_APPLICATION_WORKLOADS)
+
+    def test_removing_a_microservice_v2_contract_input_binding_is_rejected(self) -> None:
+        def apply_microservice_v2_contract_inputs(manifest: dict) -> None:
+            manifest["sharedServiceContractPaths"] = list(MICROSERVICE_V2_CONTRACT_INPUTS)
+            for workload in manifest["workloads"]:
+                if workload["name"] not in BACKEND_APPLICATION_WORKLOADS:
+                    continue
+                for required_path in MICROSERVICE_V2_CONTRACT_INPUTS:
+                    if required_path not in workload["sourcePaths"]:
+                        workload["sourcePaths"].append(required_path)
+                    if required_path not in workload["pathTriggers"]:
+                        workload["pathTriggers"].append(required_path)
+
+        for workload_name in BACKEND_APPLICATION_WORKLOADS:
+            for required_path in MICROSERVICE_V2_CONTRACT_INPUTS:
+                with self.subTest(workload=workload_name, missing=required_path):
+                    def mutate(manifest: dict) -> None:
+                        apply_microservice_v2_contract_inputs(manifest)
+                        workload = next(
+                            item for item in manifest["workloads"] if item["name"] == workload_name
+                        )
+                        workload["sourcePaths"].remove(required_path)
+                        workload["pathTriggers"].remove(required_path)
+
+                    temporary_directory = self.write_variant(mutate)
+                    self.addCleanup(temporary_directory.cleanup)
+
+                    result = self.run_validator(Path(temporary_directory.name) / "workloads.json")
+
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertIn("shared service contract input", result.stderr)
+                    self.assertIn(workload_name, result.stderr)
 
     def test_removing_a_required_current_backend_input_is_rejected(self) -> None:
         def apply_current_backend_inputs(manifest: dict) -> None:

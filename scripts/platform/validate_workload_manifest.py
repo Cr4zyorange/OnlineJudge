@@ -62,6 +62,15 @@ SHARED_BACKEND_INPUTS = (
     "backend/src/main/resources/**",
     "backend/pom.xml",
 )
+MICROSERVICE_V2_SHARED_SERVICE_CONTRACT_INPUTS = (
+    "contracts/v2/**",
+    "docs/adr/ADR-006-五业务服务与可靠消息契约.md",
+    "docs/开发/D4-CROSS-SERVICE-共享契约.md",
+    "docs/开发/D6-D7-五服务共享契约-v2.md",
+    "scripts/ci/contract-verify.sh",
+    "scripts/ci/verify-microservice-contract-v2.mjs",
+    "scripts/ci/verify-workflow-gates.test.sh",
+)
 
 
 class ManifestValidationError(ValueError):
@@ -199,6 +208,7 @@ def validate_manifest_shape(manifest: dict[str, Any]) -> list[dict[str, Any]]:
         "kind",
         "metadata",
         "sharedTriggerPaths",
+        "sharedServiceContractPaths",
         "workloads",
         "migrationJobs",
         "promotion",
@@ -215,6 +225,13 @@ def validate_manifest_shape(manifest: dict[str, Any]) -> list[dict[str, Any]]:
         raise ManifestValidationError("metadata must identify the #336 onlinejudge-platform v2 contract")
     if not isinstance(manifest["sharedTriggerPaths"], list) or not manifest["sharedTriggerPaths"]:
         raise ManifestValidationError("manifest.sharedTriggerPaths must be a non-empty array")
+    if (
+        not isinstance(manifest["sharedServiceContractPaths"], list)
+        or not manifest["sharedServiceContractPaths"]
+    ):
+        raise ManifestValidationError(
+            "manifest.sharedServiceContractPaths must be a non-empty array"
+        )
     workloads = manifest["workloads"]
     if not isinstance(workloads, list) or not workloads:
         raise ManifestValidationError("manifest.workloads must be a non-empty array")
@@ -352,6 +369,53 @@ def validate_current_repository_source_mappings(
             if required_path not in workload["pathTriggers"]:
                 raise ManifestValidationError(
                     f"workload '{name}' must trigger current repository source path "
+                    f"'{required_path}' in pathTriggers"
+                )
+
+
+def validate_microservice_v2_contract_mappings(
+    manifest: dict[str, Any], workload_by_name: dict[str, dict[str, Any]]
+) -> None:
+    """Bind each v2 cross-service contract input to its actual backend participants.
+
+    These files describe five business services plus the Assessment API/Worker
+    deployment pair.  The current gateway routes opaque public traffic and the
+    SPA does not consume generated v2 clients, so neither is rebuilt merely for
+    a v2 contract-document or verifier change.
+    """
+    declared_paths = manifest["sharedServiceContractPaths"]
+    if len(declared_paths) != len(set(declared_paths)):
+        raise ManifestValidationError("manifest.sharedServiceContractPaths must not contain duplicates")
+    unexpected_paths = sorted(
+        set(declared_paths).difference(MICROSERVICE_V2_SHARED_SERVICE_CONTRACT_INPUTS)
+    )
+    missing_paths = [
+        path
+        for path in MICROSERVICE_V2_SHARED_SERVICE_CONTRACT_INPUTS
+        if path not in declared_paths
+    ]
+    if missing_paths or unexpected_paths:
+        details = []
+        if missing_paths:
+            details.append(f"missing {', '.join(missing_paths)}")
+        if unexpected_paths:
+            details.append(f"unexpected {', '.join(unexpected_paths)}")
+        raise ManifestValidationError(
+            "manifest.sharedServiceContractPaths must declare the canonical v2 "
+            f"shared service contract inputs ({'; '.join(details)})"
+        )
+
+    for name in BACKEND_APPLICATION_WORKLOADS:
+        workload = workload_by_name[name]
+        for required_path in MICROSERVICE_V2_SHARED_SERVICE_CONTRACT_INPUTS:
+            if required_path not in workload["sourcePaths"]:
+                raise ManifestValidationError(
+                    f"workload '{name}' must declare shared service contract input "
+                    f"'{required_path}' in sourcePaths"
+                )
+            if required_path not in workload["pathTriggers"]:
+                raise ManifestValidationError(
+                    f"workload '{name}' must trigger shared service contract input "
                     f"'{required_path}' in pathTriggers"
                 )
 
@@ -495,6 +559,7 @@ def validate(manifest: dict[str, Any], schema: dict[str, Any]) -> dict[str, dict
     workload_by_name = validate_workloads(workloads)
     validate_workload_source_path_triggers(workload_by_name)
     validate_current_repository_source_mappings(workload_by_name)
+    validate_microservice_v2_contract_mappings(manifest, workload_by_name)
     validate_dependency_graph(workload_by_name)
     validate_migration_jobs(manifest, workload_by_name)
     validate_promotion_and_retirement(manifest)
