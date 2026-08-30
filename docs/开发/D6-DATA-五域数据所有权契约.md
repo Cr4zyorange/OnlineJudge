@@ -7,7 +7,7 @@
 
 本文件冻结 Identity、Course、Assessment、Grade、Learning 五域的数据库边界；它不创建 Schema、账号、迁移脚本、回滚脚本或生产 Repository 改造。当前模块化单体仍使用一个物理 MySQL；`database/ownership/*.csv` 描述目标 Schema 的契约，#341 才能实施并验证数据库变更。
 
-`table-ownership.csv` 是现有 46 张业务表的唯一 owner 正本。它保留真实主键、外部 ID、owner 内约束、现有 owner 内索引的保留策略和 #341 的迁移策略。源表集合来自 `database/mysql/compose-schema.sql`，不得凭业务名称新增、遗漏或重复登记表。`service-local-tables.csv` 则预留每个 Schema 自己的 inbox/outbox，并冻结 Grade 的 `t_grade_record` 为来源成绩投影、Learning 的 `learning_course_projection` 为课程最小投影；这些表的创建仍属于 #337/#341。
+`table-ownership.csv` 是当前 57 张业务表的唯一 owner 正本。它保留真实主键、外部 ID、owner 内约束、现有 owner 内索引的保留策略和 #341 的迁移策略。源表集合来自 `database/mysql/compose-schema.sql`，不得凭业务名称新增、遗漏或重复登记表。`service-local-tables.csv` 则冻结每个 Schema 的本地 inbox/outbox；#337 已实现 Assessment/Course/Grade outbox、Assessment/Grade/Learning inbox，以及 Learning 的 `learning_course_member_projection`。Grade 的 `t_grade_record` 仍为来源成绩投影；其余服务本地表的物理 Schema 切换属于 #341。
 
 ## 2. 五域、Schema 与运行时账号
 
@@ -48,4 +48,4 @@ node scripts/ci/verify-data-ownership-contract.mjs
 git diff --check
 ```
 
-门禁从当前 `compose-schema.sql` 读取表、主键和源列，要求 46 张业务表恰有一个五域 owner，五个 Schema/账号一一对应，四个外域均被拒绝，owner 外 FK 被拒绝。它会从 56 条有效 `external_ids` 推导精确 ledger；历史账本中的 `lab_evaluation.student_id` 声明已因源列不存在而移除。门禁拒绝数量不变的列替换、删除真实映射、伪源列和不存在的 v2 契约路径，并以受控 mutation 证明账号越权和 owner 漂移会失败。
+门禁从当前 `compose-schema.sql` 读取表、主键和源列，要求 57 张业务表恰有一个五域 owner，五个 Schema/账号一一对应，四个外域均被拒绝，owner 外 FK 被拒绝。它会从 58 条有效 `external_ids` 推导精确 ledger；历史账本中的 `lab_evaluation.student_id` 声明已因源列不存在而移除。门禁拒绝数量不变的列替换、删除真实映射、伪源列和不存在的 v2 契约路径，并以受控 mutation 证明账号越权和 owner 漂移会失败。

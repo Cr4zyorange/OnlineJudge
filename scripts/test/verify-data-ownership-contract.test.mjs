@@ -34,12 +34,12 @@ function createSymlinkOrSkip(t, target, linkPath) {
 test('Issue #309 contract assigns every current business table to exactly one of five schemas', () => {
   const summary = verifyDataOwnershipContract({ rootPath: repoRoot });
 
-  assert.equal(summary.tableCount, 46);
+  assert.equal(summary.tableCount, 57);
   assert.deepEqual(summary.owners, ['ASSESSMENT', 'COURSE', 'GRADE', 'IDENTITY', 'LEARNING']);
   assert.deepEqual(summary.schemas, ['oj_assessment', 'oj_course', 'oj_grade', 'oj_identity', 'oj_learning']);
   assert.equal(summary.accountCount, 5);
-  assert.equal(summary.crossDomainReferenceCount, 56);
-  assert.equal(summary.expectedReferenceCount, 56);
+  assert.equal(summary.crossDomainReferenceCount, 58);
+  assert.equal(summary.expectedReferenceCount, 58);
   assert.equal(summary.serviceLocalTableCount, 12);
 });
 
@@ -87,7 +87,7 @@ test('the verifier still executes when CI invokes the /tmp worktree alias', () =
     encoding: 'utf8'
   });
 
-  assert.match(output, /data ownership contract passed: 46 tables, 5 accounts/);
+  assert.match(output, /data ownership contract passed: 57 tables, 5 accounts/);
 });
 
 test('the ledger rejects a count-preserving replacement of a declared mapping', () => {
