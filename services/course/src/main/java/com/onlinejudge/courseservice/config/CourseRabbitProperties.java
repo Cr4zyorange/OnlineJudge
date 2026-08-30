@@ -10,6 +10,7 @@ public class CourseRabbitProperties {
     private String username = "guest";
     private String password = "guest";
     private String exchange = "onlinejudge.events";
+    private String identitySecurityVersionQueue = "course.identity-security-version.v2";
 
     public boolean isEnabled() { return enabled; }
     public void setEnabled(boolean enabled) { this.enabled = enabled; }
@@ -23,4 +24,6 @@ public class CourseRabbitProperties {
     public void setPassword(String password) { this.password = password; }
     public String getExchange() { return exchange; }
     public void setExchange(String exchange) { this.exchange = exchange; }
+    public String getIdentitySecurityVersionQueue() { return identitySecurityVersionQueue; }
+    public void setIdentitySecurityVersionQueue(String identitySecurityVersionQueue) { this.identitySecurityVersionQueue = identitySecurityVersionQueue; }
 }

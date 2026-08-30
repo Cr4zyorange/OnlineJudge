@@ -1,6 +1,7 @@
 package com.onlinejudge.courseservice.security;
 
 import com.onlinejudge.courseservice.config.CourseIdentityProperties;
+import com.onlinejudge.courseservice.persistence.CourseEventInboxRepository;
 import com.onlinejudge.courseservice.web.CourseException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
@@ -12,10 +13,12 @@ import java.util.LinkedHashSet;
 public class CourseAuthentication {
     private final JwksCache jwksCache;
     private final CourseIdentityProperties properties;
+    private final CourseEventInboxRepository inbox;
 
-    public CourseAuthentication(JwksCache jwksCache, CourseIdentityProperties properties) {
+    public CourseAuthentication(JwksCache jwksCache, CourseIdentityProperties properties, CourseEventInboxRepository inbox) {
         this.jwksCache = jwksCache;
         this.properties = properties;
+        this.inbox = inbox;
     }
 
     public CurrentUser user(HttpServletRequest request) {
@@ -23,6 +26,9 @@ public class CourseAuthentication {
             JwtVerifier.Claims claims = jwksCache.verify(request.getHeader("Authorization"), properties.getAudience());
             long id = Long.parseLong(claims.string("userId"));
             long securityVersion = claims.number("securityVersion");
+            if (!inbox.accepts(id, securityVersion)) {
+                throw new CourseException(HttpStatus.UNAUTHORIZED, "AUTHENTICATION_REQUIRED", "valid bearer token is required", false);
+            }
             return new CurrentUser(id, new LinkedHashSet<>(claims.strings("roles")),
                     new LinkedHashSet<>(claims.strings("permissions")), securityVersion);
         } catch (CourseException exception) {

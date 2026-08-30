@@ -36,8 +36,12 @@ public final class TestJwtFactory {
     }
 
     public static String userToken(KeyPair pair, String kid, String userId, List<String> roles, List<String> permissions) {
+        return userToken(pair, kid, userId, roles, permissions, 1);
+    }
+
+    public static String userToken(KeyPair pair, String kid, String userId, List<String> roles, List<String> permissions, long securityVersion) {
         Map<String, Object> claims = baseClaims();
-        claims.put("userId", userId); claims.put("sessionId", "test-session"); claims.put("securityVersion", 1);
+        claims.put("userId", userId); claims.put("sessionId", "test-session"); claims.put("securityVersion", securityVersion);
         claims.put("roles", roles); claims.put("permissions", permissions); claims.put("aud", "onlinejudge.api");
         return signed(pair, kid, claims);
     }

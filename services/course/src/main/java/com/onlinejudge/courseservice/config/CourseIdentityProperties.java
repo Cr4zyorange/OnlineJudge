@@ -12,6 +12,7 @@ public class CourseIdentityProperties {
     private String jwksTrustBundle = "";
     private Duration requestTimeout = Duration.ofSeconds(1);
     private boolean refreshEnabled = true;
+    private Duration refreshInitialDelay = Duration.ofSeconds(30);
     private Duration refreshInterval = Duration.ofMinutes(5);
 
     public String getIssuer() { return issuer; }
@@ -26,6 +27,8 @@ public class CourseIdentityProperties {
     public void setRequestTimeout(Duration requestTimeout) { this.requestTimeout = requestTimeout; }
     public boolean isRefreshEnabled() { return refreshEnabled; }
     public void setRefreshEnabled(boolean refreshEnabled) { this.refreshEnabled = refreshEnabled; }
+    public Duration getRefreshInitialDelay() { return refreshInitialDelay; }
+    public void setRefreshInitialDelay(Duration refreshInitialDelay) { this.refreshInitialDelay = refreshInitialDelay; }
     public Duration getRefreshInterval() { return refreshInterval; }
     public void setRefreshInterval(Duration refreshInterval) { this.refreshInterval = refreshInterval; }
 }

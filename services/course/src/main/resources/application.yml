@@ -9,7 +9,11 @@ spring:
   sql:
     init:
       mode: always
-      schema-locations: classpath:schema-course.sql
+      schema-locations: classpath:schema-course.sql,classpath:schema-course-event-inbox.sql
+  servlet:
+    multipart:
+      max-file-size: 50MB
+      max-request-size: 50MB
 
 server:
   port: ${COURSE_HTTP_PORT:8082}
@@ -32,6 +36,7 @@ course:
     jwks-trust-bundle: ${IDENTITY_JWKS_TRUST_BUNDLE:}
     request-timeout: ${IDENTITY_JWKS_REQUEST_TIMEOUT:PT1S}
     refresh-enabled: ${IDENTITY_JWKS_REFRESH_ENABLED:true}
+    refresh-initial-delay: ${IDENTITY_JWKS_REFRESH_INITIAL_DELAY:PT30S}
     refresh-interval: ${IDENTITY_JWKS_REFRESH_INTERVAL:PT5M}
   rabbit:
     enabled: ${COURSE_RABBIT_ENABLED:false}
@@ -40,3 +45,6 @@ course:
     username: ${RABBITMQ_USER:guest}
     password: ${RABBITMQ_PASSWORD:guest}
     exchange: ${RABBITMQ_EXCHANGE:onlinejudge.events}
+    identity-security-version-queue: ${COURSE_IDENTITY_SECURITY_VERSION_QUEUE:course.identity-security-version.v2}
+  storage:
+    root: ${COURSE_STORAGE_ROOT:${java.io.tmpdir}/onlinejudge-course}

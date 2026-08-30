@@ -48,7 +48,7 @@ public class JwksCache {
         }
     }
 
-    @Scheduled(fixedDelayString = "${course.identity.refresh-interval:300000}")
+    @Scheduled(initialDelayString = "${course.identity.refresh-initial-delay:30000}", fixedDelayString = "${course.identity.refresh-interval:300000}")
     public void scheduledRefresh() {
         if (properties.isRefreshEnabled()) {
             refreshOnce();
