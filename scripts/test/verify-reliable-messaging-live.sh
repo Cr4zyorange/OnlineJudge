@@ -47,11 +47,13 @@ run_live_test() {
         -Dtest=RabbitMqConfirmedPublisherLiveTest \
         -Doj.rabbit.host=127.0.0.1 \
         -Doj.rabbit.port="$rabbit_port" \
+        -Doj.rabbit.docker-container="$container_name" \
         -Doj.rabbit.expected="$expected" test
 }
 
 echo "reliable-messaging-live: broker ready container=$container_name port=$rabbit_port"
 run_live_test available
+run_live_test retry-window
 
 docker pause "$container_name" >/dev/null
 echo "reliable-messaging-live: injected broker pause"
@@ -61,4 +63,4 @@ docker unpause "$container_name" >/dev/null
 echo "reliable-messaging-live: broker recovered"
 run_live_test available
 
-echo "reliable-messaging-live: PASS confirmed=2 unavailable=1"
+echo "reliable-messaging-live: PASS confirmed=2 unavailable=1 retry-window=1"
