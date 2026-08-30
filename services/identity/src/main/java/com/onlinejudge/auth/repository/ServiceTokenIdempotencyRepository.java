@@ -20,11 +20,24 @@ public class ServiceTokenIdempotencyRepository {
     }
 
     public Optional<StoredRequest> findActive(String workloadSubject, String idempotencyKey, Instant now) {
+        return find(workloadSubject, idempotencyKey, now, "");
+    }
+
+    /**
+     * InnoDB current read used only after a duplicate unique-key insert.  It
+     * is deliberately a separate, autocommit statement after the service has
+     * suspended any caller transaction, so it can observe the winning pod.
+     */
+    public Optional<StoredRequest> findActiveCurrent(String workloadSubject, String idempotencyKey, Instant now) {
+        return find(workloadSubject, idempotencyKey, now, " FOR UPDATE");
+    }
+
+    private Optional<StoredRequest> find(String workloadSubject, String idempotencyKey, Instant now, String lockClause) {
         List<StoredRequest> rows = jdbc.query("""
                         SELECT request_fingerprint, access_token, expires_at
                           FROM t_identity_service_token_idempotency
                          WHERE workload_subject = ? AND idempotency_key = ? AND expires_at > ?
-                        """,
+                        """ + lockClause,
                 (resultSet, rowNumber) -> new StoredRequest(
                         resultSet.getString("request_fingerprint"),
                         new JwtTokenService.IssuedServiceToken(

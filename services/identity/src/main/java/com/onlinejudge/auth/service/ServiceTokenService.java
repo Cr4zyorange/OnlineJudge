@@ -5,6 +5,7 @@ import com.onlinejudge.auth.repository.ServiceTokenIdempotencyRepository;
 import com.onlinejudge.auth.security.JwtTokenService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.charset.StandardCharsets;
@@ -37,7 +38,13 @@ public class ServiceTokenService {
         this.ttl = ttl;
     }
 
-    @Transactional
+    /**
+     * A replay record is a single-row uniqueness race, not a request-wide
+     * transaction.  In particular, keep the retry read out of an InnoDB
+     * REPEATABLE-READ snapshot: after a duplicate key, it must use a fresh
+     * current read of the winning replica's committed row.
+     */
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public JwtTokenService.IssuedServiceToken mint(
             String workloadSubject,
             String audience,
@@ -59,7 +66,7 @@ public class ServiceTokenService {
         }
         // A second replica may have won the unique key between our read and
         // insert.  Return that exact response, or reject a changed request.
-        return existing(workloadSubject, idempotencyKey, fingerprint, Instant.now())
+        return existingCurrent(workloadSubject, idempotencyKey, fingerprint, Instant.now())
                 .orElseThrow(() -> new IllegalStateException("service-token idempotency record disappeared"));
     }
 
@@ -79,6 +86,17 @@ public class ServiceTokenService {
             String workloadSubject, String idempotencyKey, String fingerprint, Instant now
     ) {
         return idempotency.findActive(workloadSubject, idempotencyKey, now).map(stored -> {
+            if (!stored.fingerprint().equals(fingerprint)) {
+                throw ServiceTokenException.idempotencyConflict();
+            }
+            return stored.token();
+        });
+    }
+
+    private Optional<JwtTokenService.IssuedServiceToken> existingCurrent(
+            String workloadSubject, String idempotencyKey, String fingerprint, Instant now
+    ) {
+        return idempotency.findActiveCurrent(workloadSubject, idempotencyKey, now).map(stored -> {
             if (!stored.fingerprint().equals(fingerprint)) {
                 throw ServiceTokenException.idempotencyConflict();
             }
