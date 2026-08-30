@@ -7,7 +7,7 @@
  */
 import { createHash } from 'node:crypto';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -107,7 +107,6 @@ function parseArguments(argv) {
     adminPasswordEnv: 'OJ_MYSQL_ADMIN_PASSWORD',
     runtimePasswordEnvPrefix: 'OJ341_RUNTIME_PASSWORD_',
     sourceReadOnlyAck: false,
-    skipPermissions: false,
   };
   for (let index = 0; index < argv.length; index += 1) {
     const argument = argv[index];
@@ -115,8 +114,11 @@ function parseArguments(argv) {
       options.help = true;
       continue;
     }
-    if (argument === '--source-read-only-ack' || argument === '--skip-permissions') {
-      options[argument === '--source-read-only-ack' ? 'sourceReadOnlyAck' : 'skipPermissions'] = true;
+    if (argument === '--skip-permissions') {
+      fail('--skip-permissions is not supported: every production migration must provision and prove all five runtime accounts');
+    }
+    if (argument === '--source-read-only-ack') {
+      options.sourceReadOnlyAck = true;
       continue;
     }
     if (!argument.startsWith('--')) {
@@ -423,10 +425,11 @@ function initializeLocalArtifacts(admin, plan, sourceSchema) {
            'assessment.source-grade.changed.v2',
            CONCAT(r.source_type, ':', COALESCE(r.source_id, 0), ':', r.student_id),
            1,
-           JSON_OBJECT('courseId', r.course_id, 'sourceType', r.source_type,
-                       'sourceId', r.source_id, 'studentId', r.student_id,
-                       'score', r.raw_score, 'fullScore', i.full_score,
-                       'status', CASE WHEN r.grade_status = 'SCORED' THEN 'SCORED' ELSE 'UNGRADED' END,
+           JSON_OBJECT('courseId', CAST(r.course_id AS CHAR), 'sourceType', r.source_type,
+                       'sourceId', CAST(COALESCE(r.source_id, 0) AS CHAR), 'studentId', CAST(r.student_id AS CHAR),
+                       'score', CASE WHEN r.grade_status IN ('SCORED', 'ADJUSTED') AND r.raw_score IS NOT NULL THEN r.raw_score ELSE NULL END,
+                       'fullScore', i.full_score,
+                       'status', CASE WHEN r.grade_status IN ('SCORED', 'ADJUSTED') AND r.raw_score IS NOT NULL THEN 'SCORED' ELSE 'UNGRADED' END,
                        'sourceVersion', 1)
       FROM ${quoteIdentifier(sourceSchema)}.t_grade_record r
       JOIN ${quoteIdentifier(sourceSchema)}.t_grade_item i ON i.id = r.grade_item_id
@@ -440,8 +443,9 @@ function initializeLocalArtifacts(admin, plan, sourceSchema) {
            'course.member.changed.v2',
            CONCAT(m.course_id, ':', m.user_id),
            1,
-           JSON_OBJECT('courseId', m.course_id, 'userId', m.user_id,
-                       'membershipStatus', m.join_status, 'memberVersion', 1)
+           JSON_OBJECT('courseId', CAST(m.course_id AS CHAR), 'userId', CAST(m.user_id AS CHAR),
+                       'membershipStatus', CASE WHEN m.join_status = 'ACTIVE' THEN 'ACTIVE' ELSE 'REMOVED' END,
+                       'memberVersion', 1)
       FROM ${quoteIdentifier(sourceSchema)}.crs_course_member m
     ON DUPLICATE KEY UPDATE payload = VALUES(payload), received_at = CURRENT_TIMESTAMP
   ` });
@@ -537,6 +541,50 @@ function verifyProjectionCounts(admin, plan, sourceSchema) {
   const gradeReplay = Number(admin({ sql: `SELECT COUNT(*) FROM ${quoteIdentifier(grade)}.event_inbox WHERE event_type = 'assessment.source-grade.changed.v2'` }).stdout.trim());
   const learningReplay = Number(admin({ sql: `SELECT COUNT(*) FROM ${quoteIdentifier(learning)}.event_inbox WHERE event_type = 'course.member.changed.v2'` }).stdout.trim());
   const sourceMembers = Number(admin({ sql: `SELECT COUNT(*) FROM ${quoteIdentifier(sourceSchema)}.crs_course_member` }).stdout.trim());
+  const invalidGradePayloads = Number(admin({ sql: `
+    SELECT COUNT(*)
+      FROM ${quoteIdentifier(grade)}.event_inbox
+     WHERE event_type = 'assessment.source-grade.changed.v2'
+       AND (
+         COALESCE(JSON_TYPE(JSON_EXTRACT(payload, '$.courseId')), 'MISSING') <> 'STRING'
+         OR COALESCE(JSON_TYPE(JSON_EXTRACT(payload, '$.sourceId')), 'MISSING') <> 'STRING'
+         OR COALESCE(JSON_TYPE(JSON_EXTRACT(payload, '$.studentId')), 'MISSING') <> 'STRING'
+         OR JSON_UNQUOTE(JSON_EXTRACT(payload, '$.sourceType')) NOT IN ('LAB', 'HWK')
+         OR JSON_UNQUOTE(JSON_EXTRACT(payload, '$.status')) NOT IN ('SCORED', 'UNGRADED')
+         OR COALESCE(JSON_TYPE(JSON_EXTRACT(payload, '$.fullScore')), 'MISSING') NOT IN ('INTEGER', 'DOUBLE', 'DECIMAL')
+         OR CAST(JSON_UNQUOTE(JSON_EXTRACT(payload, '$.fullScore')) AS DECIMAL(12, 2)) <= 0
+         OR (JSON_UNQUOTE(JSON_EXTRACT(payload, '$.status')) = 'SCORED'
+             AND COALESCE(JSON_TYPE(JSON_EXTRACT(payload, '$.score')), 'MISSING') NOT IN ('INTEGER', 'DOUBLE', 'DECIMAL'))
+         OR (JSON_UNQUOTE(JSON_EXTRACT(payload, '$.status')) = 'UNGRADED'
+             AND COALESCE(JSON_TYPE(JSON_EXTRACT(payload, '$.score')), 'MISSING') <> 'NULL')
+       )
+  ` }).stdout.trim());
+  const invalidMemberPayloads = Number(admin({ sql: `
+    SELECT COUNT(*)
+      FROM ${quoteIdentifier(learning)}.event_inbox
+     WHERE event_type = 'course.member.changed.v2'
+       AND (
+         COALESCE(JSON_TYPE(JSON_EXTRACT(payload, '$.courseId')), 'MISSING') <> 'STRING'
+         OR COALESCE(JSON_TYPE(JSON_EXTRACT(payload, '$.userId')), 'MISSING') <> 'STRING'
+         OR JSON_UNQUOTE(JSON_EXTRACT(payload, '$.membershipStatus')) NOT IN ('ACTIVE', 'REMOVED')
+         OR COALESCE(JSON_TYPE(JSON_EXTRACT(payload, '$.memberVersion')), 'MISSING') <> 'INTEGER'
+         OR CAST(JSON_UNQUOTE(JSON_EXTRACT(payload, '$.memberVersion')) AS UNSIGNED) < 1
+       )
+  ` }).stdout.trim());
+  const gradePayloadDiagnostics = parseTabRows(admin({ sql: `
+    SELECT event_id,
+           JSON_TYPE(JSON_EXTRACT(payload, '$.courseId')),
+           JSON_TYPE(JSON_EXTRACT(payload, '$.sourceId')),
+           JSON_TYPE(JSON_EXTRACT(payload, '$.studentId')),
+           JSON_TYPE(JSON_EXTRACT(payload, '$.score')),
+           JSON_TYPE(JSON_EXTRACT(payload, '$.fullScore')),
+           JSON_UNQUOTE(JSON_EXTRACT(payload, '$.status'))
+      FROM ${quoteIdentifier(grade)}.event_inbox
+     WHERE event_type = 'assessment.source-grade.changed.v2'
+     ORDER BY event_id
+  ` }).stdout).map(([eventId, courseIdType, sourceIdType, studentIdType, scoreType, fullScoreType, status]) => ({
+    eventId, courseIdType, sourceIdType, studentIdType, scoreType, fullScoreType, status,
+  }));
   const localArtifacts = [];
   for (const owner of requiredOwners) {
     const schema = plan.schemaByOwner.get(owner);
@@ -544,8 +592,11 @@ function verifyProjectionCounts(admin, plan, sourceSchema) {
     localArtifacts.push({ owner, tablesPresent: count });
   }
   return {
-    gradeSourceProjection: { sourceRecords, targetRecords, replayedInbox: gradeReplay },
-    learningCourseProjection: { sourceCourses, targetCourses, sourceMembers, replayedInbox: learningReplay },
+    gradeSourceProjection: {
+      sourceRecords, targetRecords, replayedInbox: gradeReplay,
+      invalidPayloads: invalidGradePayloads, payloadDiagnostics: gradePayloadDiagnostics,
+    },
+    learningCourseProjection: { sourceCourses, targetCourses, sourceMembers, replayedInbox: learningReplay, invalidPayloads: invalidMemberPayloads },
     localArtifacts,
   };
 }
@@ -565,7 +616,7 @@ function provisionRuntimeUsers(admin, plan, options) {
   return passwords;
 }
 
-function verifyPermissions(plan, options, passwords) {
+function verifyPermissions(admin, plan, options, passwords) {
   const probes = [];
   for (const owner of requiredOwners) {
     const account = plan.accountByOwner.get(owner);
@@ -586,10 +637,27 @@ function verifyPermissions(plan, options, passwords) {
       const denied = mysql({ sql: `SELECT 1 FROM ${quoteIdentifier(foreignSchema)}.${quoteIdentifier(foreignTable)} LIMIT 0`, allowFailure: true });
       probes.push({ owner, kind: `foreign_select:${foreignOwner}`, expected: 'deny', passed: denied.code !== 0, raw: denied.raw.trim() });
     }
-    const ddl = mysql({ sql: `CREATE TABLE ${quoteIdentifier(account.schema)}.__issue341_ddl_probe (id INT)`, allowFailure: true });
-    probes.push({ owner, kind: 'own_ddl', expected: 'deny', passed: ddl.code !== 0, raw: ddl.raw.trim() });
+    const ddlProbeTable = `__issue341_ddl_probe_${owner.toLowerCase()}_${Date.now()}`;
+    const ddl = mysql({ sql: `CREATE TABLE ${quoteIdentifier(account.schema)}.${quoteIdentifier(ddlProbeTable)} (id INT)`, allowFailure: true });
+    if (ddl.code === 0) {
+      // A misconfigured account must make verification fail, but cleanup is
+      // still required so a later run cannot mistake "already exists" for a
+      // permission denial.
+      admin({ sql: `DROP TABLE IF EXISTS ${quoteIdentifier(account.schema)}.${quoteIdentifier(ddlProbeTable)}` });
+    }
+    probes.push({
+      owner,
+      kind: 'own_ddl',
+      expected: 'deny',
+      passed: ddl.code !== 0 && isMysqlAuthorizationDenied(ddl.raw),
+      raw: ddl.raw.trim(),
+    });
   }
   return probes;
+}
+
+function isMysqlAuthorizationDenied(raw) {
+  return /ERROR 1142|command denied/i.test(raw);
 }
 
 function verifyAll(admin, plan, options, sourceSchema, passwords) {
@@ -632,10 +700,15 @@ function verifyAll(admin, plan, options, sourceSchema, passwords) {
   const projections = verifyProjectionCounts(admin, plan, sourceSchema);
   if (projections.gradeSourceProjection.sourceRecords !== projections.gradeSourceProjection.targetRecords) failures.push('grade source projection count mismatch');
   if (projections.gradeSourceProjection.sourceRecords !== projections.gradeSourceProjection.replayedInbox) failures.push('grade source projection replay mismatch');
+  if (projections.gradeSourceProjection.invalidPayloads !== 0) failures.push('grade source replay payload contract mismatch');
   if (projections.learningCourseProjection.sourceCourses !== projections.learningCourseProjection.targetCourses) failures.push('learning course projection count mismatch');
   if (projections.learningCourseProjection.sourceMembers !== projections.learningCourseProjection.replayedInbox) failures.push('learning inbox replay mismatch');
+  if (projections.learningCourseProjection.invalidPayloads !== 0) failures.push('learning member replay payload contract mismatch');
   for (const artifact of projections.localArtifacts) if (artifact.tablesPresent !== 2) failures.push(`missing local outbox/inbox tables: ${artifact.owner}`);
-  const permissions = options.skipPermissions ? [] : verifyPermissions(plan, options, passwords);
+  const permissions = verifyPermissions(admin, plan, options, passwords);
+  if (permissions.length !== requiredOwners.length * 9) {
+    failures.push('permission evidence must contain 45 complete allow/deny probes');
+  }
   for (const probe of permissions) if (!probe.passed) failures.push(`permission validation failed: ${probe.owner}.${probe.kind}`);
   return { passed: failures.length === 0, failures, tables, logicalReferences, foreignKeys, projections, permissions };
 }
@@ -643,6 +716,7 @@ function verifyAll(admin, plan, options, sourceSchema, passwords) {
 function writeEvidence(path, evidence) {
   if (!path) return;
   const absolute = resolve(path);
+  mkdirSync(dirname(absolute), { recursive: true });
   writeFileSync(absolute, `${JSON.stringify(evidence, null, 2)}\n`, 'utf8');
 }
 
@@ -717,7 +791,7 @@ export async function main(argv = process.argv.slice(2)) {
   if ((options.action === 'migrate' || options.action === 'replay') && !options.sourceReadOnlyAck) {
     fail(`${options.action} requires --source-read-only-ack; do not copy a live writable legacy schema`);
   }
-  const passwords = options.skipPermissions ? new Map() : requiredRuntimePasswords(plan, options);
+  const passwords = requiredRuntimePasswords(plan, options);
   const beforeFingerprint = sourceFingerprint(admin, plan, options.sourceSchema);
 
   if (options.action === 'migrate') {
@@ -732,7 +806,7 @@ export async function main(argv = process.argv.slice(2)) {
     if (afterFingerprint !== beforeFingerprint) {
       fail('legacy source changed during migration; no traffic switch is allowed, fix the source and rerun from checkpoints');
     }
-    if (!options.skipPermissions) provisionRuntimeUsers(admin, plan, options);
+    provisionRuntimeUsers(admin, plan, options);
     const verification = verifyAll(admin, plan, options, options.sourceSchema, passwords);
     if (!verification.passed) {
       writeEvidence(options.evidence, { ...base, result: 'FAIL', migrationId, sourceFingerprint: afterFingerprint, verification, finishedAt: new Date().toISOString() });

@@ -38,8 +38,8 @@ command -v docker >/dev/null 2>&1 || blocked 'Docker client is unavailable; real
 command -v mysql >/dev/null 2>&1 || blocked 'mysql client is unavailable; real MySQL migration is unverified'
 docker info >/dev/null 2>&1 || blocked 'Docker daemon is unavailable; real MySQL migration is unverified'
 case "$scenario" in
-  all|empty-cutover|empty-recovery|seed|bad) ;;
-  *) fail "unknown scenario: $scenario (expected all|empty-cutover|empty-recovery|seed|bad)" ;;
+  all|empty-cutover|empty-recovery|permissions|seed|bad) ;;
+  *) fail "unknown scenario: $scenario (expected all|empty-cutover|empty-recovery|permissions|seed|bad)" ;;
 esac
 
 admin_mysql() {
@@ -72,6 +72,15 @@ add_seeded_projection_facts() {
     INSERT INTO oj341_seed.t_grade_record
       (id, course_id, student_id, grade_item_id, source_type, source_id, raw_score, weighted_score, grade_status, publish_status, source_updated_at)
     VALUES (870287102, 870287, 870287001, 870287101, 'HWK', 870287201, 92.00, 92.00, 'SCORED', 'PUBLISHED', CURRENT_TIMESTAMP);
+    INSERT INTO oj341_seed.t_grade_item
+      (id, course_id, name, source_type, source_id, full_score, weight, included_in_final, enabled, sort_order, created_by, deleted)
+    VALUES (870287103, 870287, 'D6 adjusted source fact', 'LAB', 870287202, 100.00, 1.0000, TRUE, TRUE, 1, 870287002, FALSE);
+    INSERT INTO oj341_seed.t_grade_record
+      (id, course_id, student_id, grade_item_id, source_type, source_id, raw_score, weighted_score, grade_status, publish_status, source_updated_at)
+    VALUES (870287104, 870287, 870287002, 870287103, 'LAB', 870287202, 88.00, 88.00, 'ADJUSTED', 'PUBLISHED', CURRENT_TIMESTAMP);
+    UPDATE oj341_seed.crs_course_member
+       SET join_status = 'PENDING'
+     WHERE course_id = 870287 AND user_id = 870287001;
   " >>"$raw_log" 2>&1
 }
 
@@ -134,6 +143,44 @@ if [[ "$scenario" == all || "$scenario" == empty-recovery ]]; then
   migrate replay oj341_empty "$artifact_dir/empty-replay.json"
 fi
 
+if [[ "$scenario" == all || "$scenario" == permissions ]]; then
+  # These negatives are deliberately exercised against the same disposable
+  # MySQL 8.4 server, rather than trusting an argument parser or mocks.
+  create_source oj341_permissions false
+  reset_targets
+  if env OJ_MYSQL_ADMIN_PASSWORD="$admin_password" node "$repository_root/database/mysql/migrate-five-domain-schemas.mjs" \
+    --action migrate --admin-user root --source-schema oj341_permissions --host "$mysql_host" --port "$mysql_port" \
+    --source-read-only-ack --skip-permissions --evidence "$artifact_dir/negative/skip-permissions-bypass.json" >>"$raw_log" 2>&1; then
+    fail 'permission bypass flag unexpectedly produced PASS'
+  fi
+  if [[ -f "$artifact_dir/negative/skip-permissions-bypass.json" ]] && grep -Fq '"result": "PASS"' "$artifact_dir/negative/skip-permissions-bypass.json"; then
+    fail 'permission bypass wrote PASS evidence'
+  fi
+  if env -u OJ341_RUNTIME_PASSWORD_IDENTITY -u OJ341_RUNTIME_PASSWORD_COURSE \
+    -u OJ341_RUNTIME_PASSWORD_ASSESSMENT -u OJ341_RUNTIME_PASSWORD_GRADE -u OJ341_RUNTIME_PASSWORD_LEARNING \
+    OJ_MYSQL_ADMIN_PASSWORD="$admin_password" node "$repository_root/database/mysql/migrate-five-domain-schemas.mjs" \
+    --action migrate --admin-user root --source-schema oj341_permissions --host "$mysql_host" --port "$mysql_port" \
+    --source-read-only-ack --evidence "$artifact_dir/negative/no-runtime-passwords.json" >>"$raw_log" 2>&1; then
+    fail 'missing runtime passwords unexpectedly produced PASS'
+  fi
+  if [[ -f "$artifact_dir/negative/no-runtime-passwords.json" ]] && grep -Fq '"result": "PASS"' "$artifact_dir/negative/no-runtime-passwords.json"; then
+    fail 'missing runtime passwords wrote PASS evidence'
+  fi
+  migrate migrate oj341_permissions "$artifact_dir/permissions-migrate.json"
+  migrate verify oj341_permissions "$artifact_dir/nested/evidence/verify.json"
+  test -f "$artifact_dir/nested/evidence/verify.json" || fail 'nested evidence path was not created'
+  grep -Fq '"result": "PASS"' "$artifact_dir/nested/evidence/verify.json" || fail 'nested evidence is not PASS'
+  admin_mysql -e "GRANT CREATE ON oj_identity.* TO 'oj_identity_rw'@'%';" >>"$raw_log" 2>&1
+  if migrate verify oj341_permissions "$artifact_dir/negative/ddl-misconfigured-first.json"; then
+    fail 'CREATE privilege unexpectedly passed the DDL denial probe'
+  fi
+  if migrate verify oj341_permissions "$artifact_dir/negative/ddl-misconfigured-second.json"; then
+    fail 'repeat CREATE privilege unexpectedly passed the DDL denial probe'
+  fi
+  grep -Fq '"result": "FAIL"' "$artifact_dir/negative/ddl-misconfigured-first.json" || fail 'first DDL negative did not write FAIL evidence'
+  grep -Fq '"result": "FAIL"' "$artifact_dir/negative/ddl-misconfigured-second.json" || fail 'repeat DDL negative did not write FAIL evidence'
+fi
+
 if [[ "$scenario" == all || "$scenario" == seed ]]; then
   # Seeded legacy schema: gives non-zero user/course/member rows, real logical
   # ID checks, Grade/Learning projection replay and all 45 account matrix
@@ -143,8 +190,26 @@ if [[ "$scenario" == all || "$scenario" == seed ]]; then
   reset_targets
   migrate migrate oj341_seed "$artifact_dir/seed-migrate.json"
   grep -Fq 'ERROR 1142' "$artifact_dir/seed-migrate.json" || fail 'permission evidence lacks raw cross-schema MySQL denial'
-  grep -Eq '"sourceRecords":[[:space:]]*1' "$artifact_dir/seed-migrate.json" || fail 'seed projection evidence is missing Grade counts'
+  grep -Eq '"sourceRecords":[[:space:]]*2' "$artifact_dir/seed-migrate.json" || fail 'seed projection evidence is missing Grade counts'
   grep -Eq '"sourceCourses":[[:space:]]*1' "$artifact_dir/seed-migrate.json" || fail 'seed projection evidence is missing Learning counts'
+  grep -Eq '"invalidPayloads":[[:space:]]*0' "$artifact_dir/seed-migrate.json" || fail 'seed projection evidence contains an invalid v2 replay payload'
+  # Verification itself must reject malformed stored replay events; a valid
+  # migration result alone does not prove a bad payload cannot be marked PASS.
+  admin_mysql -e "
+    UPDATE oj_grade.event_inbox
+       SET payload = JSON_SET(payload, '$.courseId', 870287)
+     WHERE event_type = 'assessment.source-grade.changed.v2'
+     LIMIT 1;
+    UPDATE oj_learning.event_inbox
+       SET payload = JSON_SET(payload, '$.membershipStatus', 'PENDING')
+     WHERE event_type = 'course.member.changed.v2'
+     LIMIT 1;
+  " >>"$raw_log" 2>&1
+  if migrate verify oj341_seed "$artifact_dir/negative/invalid-v2-replay.json"; then
+    fail 'malformed v2 replay payload unexpectedly passed verification'
+  fi
+  grep -Fq 'grade source replay payload contract mismatch' "$artifact_dir/negative/invalid-v2-replay.json" || fail 'invalid Grade replay payload was not reported'
+  grep -Fq 'learning member replay payload contract mismatch' "$artifact_dir/negative/invalid-v2-replay.json" || fail 'invalid Learning replay payload was not reported'
 fi
 
 if [[ "$scenario" == all || "$scenario" == bad ]]; then
