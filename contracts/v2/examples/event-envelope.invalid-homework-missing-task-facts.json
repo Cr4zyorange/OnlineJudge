@@ -1,0 +1,15 @@
+{
+  "eventId": "534b1e53-b16f-4a8c-92a1-4a02f7eb8eb3",
+  "eventType": "assessment.homework.published.v2",
+  "payloadVersion": 2,
+  "aggregateType": "assessment-homework",
+  "aggregateId": "homework-91",
+  "aggregateVersion": 4,
+  "occurredAt": "2026-08-30T09:15:30Z",
+  "correlationId": "435669bc-c4bf-43a9-9d74-7150da38f499",
+  "payload": {
+    "courseId": "course-88",
+    "homeworkId": "homework-91",
+    "publishedAt": "2026-08-30T09:15:30Z"
+  }
+}

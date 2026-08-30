@@ -6,6 +6,8 @@ import com.onlinejudge.common.evaluation.EvaluationResult;
 import com.onlinejudge.common.evaluation.EvaluationStatus;
 import com.onlinejudge.common.evaluation.EvaluationTask;
 import com.onlinejudge.common.evaluation.Evaluator;
+import com.onlinejudge.common.event.NotificationEvent;
+import com.onlinejudge.common.event.NotificationEventPublisher;
 import com.onlinejudge.common.web.PageResponse;
 import com.onlinejudge.hwk.domain.CreateHomeworkSubmissionCommand;
 import com.onlinejudge.hwk.domain.Homework;
@@ -62,6 +64,7 @@ public class HomeworkSubmissionService {
     private final Evaluator evaluator;
     private final HomeworkAttachmentService attachmentService;
     private final ApplicationEventPublisher eventPublisher;
+    private final NotificationEventPublisher notificationEventPublisher;
 
     @Autowired
     public HomeworkSubmissionService(
@@ -72,7 +75,8 @@ public class HomeworkSubmissionService {
             CoursePermissionClient coursePermissionClient,
             Evaluator evaluator,
             HomeworkAttachmentService attachmentService,
-            ApplicationEventPublisher eventPublisher
+            ApplicationEventPublisher eventPublisher,
+            NotificationEventPublisher notificationEventPublisher
     ) {
         this.homeworkRepository = homeworkRepository;
         this.submissionRepository = submissionRepository;
@@ -82,6 +86,7 @@ public class HomeworkSubmissionService {
         this.evaluator = evaluator;
         this.attachmentService = attachmentService;
         this.eventPublisher = eventPublisher;
+        this.notificationEventPublisher = notificationEventPublisher;
     }
 
     public HomeworkSubmissionService(
@@ -93,7 +98,7 @@ public class HomeworkSubmissionService {
             Evaluator evaluator
     ) {
         this(homeworkRepository, submissionRepository, evaluationRepository, reviewLogRepository,
-                coursePermissionClient, evaluator, null, event -> { });
+                coursePermissionClient, evaluator, null, event -> { }, event -> { });
     }
 
     @Transactional
@@ -255,6 +260,12 @@ public class HomeworkSubmissionService {
         ));
         submissionRepository.update(submission.withEvaluationResult(
                 EvaluationStatus.SYSTEM_ERROR, HomeworkReviewStatus.NEED_REVIEW, 0, null, now));
+        publishEvaluationCompletionEvent(
+                homeworkOf(submission.homeworkId()),
+                submission,
+                EvaluationStatus.SYSTEM_ERROR,
+                "评测失败：评测任务执行异常"
+        );
     }
 
     @Transactional
@@ -575,7 +586,36 @@ public class HomeworkSubmissionService {
                 : HomeworkReviewStatus.NEED_REVIEW;
         Integer finalScore = finalStatus == EvaluationStatus.ACCEPTED ? score : null;
         submissionRepository.update(submission.withEvaluationResult(finalStatus, reviewStatus, score, finalScore, finishedAt));
+        publishEvaluationCompletionEvent(homework, submission, finalStatus, feedback);
         return saved;
+    }
+
+    private void publishEvaluationCompletionEvent(
+            Homework homework,
+            HomeworkSubmission submission,
+            EvaluationStatus status,
+            String feedback
+    ) {
+        if (homework == null) {
+            return;
+        }
+        notificationEventPublisher.publish(new NotificationEvent(
+                "HWK_EVALUATION_" + submission.id(),
+                "HWK_EVALUATION_COMPLETED",
+                homework.courseId(),
+                List.of(submission.studentId()),
+                "作业评测完成",
+                "作业评测完成（" + status + "）："
+                        + (feedback == null || feedback.isBlank() ? status.name() : feedback),
+                "HWK",
+                homework.id(),
+                "/courses/" + homework.courseId() + "/homeworks/" + homework.id(),
+                LocalDateTime.now()
+        ));
+    }
+
+    private Homework homeworkOf(long homeworkId) {
+        return homeworkRepository.findById(homeworkId).filter(item -> !item.deleted()).orElse(null);
     }
 
     private EvaluationStatus resolveCodeEvaluationStatus(List<CaseEvaluation> caseEvaluations) {

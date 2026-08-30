@@ -1,0 +1,29 @@
+{
+  "openapi": "3.1.0",
+  "info": { "title": "OnlineJudge Grade Service internal contract", "version": "2.0.0" },
+  "x-onlinejudge-service": "grade",
+  "paths": {
+    "/internal/v2/courses/{courseId}/grade-publications": {
+      "get": {
+        "operationId": "listGradePublications", "x-onlinejudge-timeout-ms": 1000,
+        "description": "A reconciliation-only projection lookup for Learning. Normal notification delivery consumes Grade events and never waits for this endpoint.",
+        "security": [{ "serviceJwt": [] }, { "mTLS": [] }],
+        "parameters": [
+          { "name": "X-Request-Id", "in": "header", "required": true, "schema": { "type": "string" } },
+          { "name": "courseId", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "page", "in": "query", "required": false, "schema": { "type": "integer", "minimum": 0, "default": 0 } },
+          { "name": "size", "in": "query", "required": false, "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 50 } }
+        ],
+        "responses": { "200": { "description": "Publication records", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Page" } } } }, "401": { "description": "Missing, invalid, expired, or wrong-audience service JWT; or invalid workload mTLS service identity", "x-onlinejudge-error-codes": ["SERVICE_IDENTITY_INVALID"], "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }, "403": { "description": "Authenticated service principal lacks the grade-publication reconciliation scope", "x-onlinejudge-error-codes": ["SERVICE_IDENTITY_FORBIDDEN"], "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }, "503": { "description": "Unavailable; Learning creates a reconciliation task and does not change Grade", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } } }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": { "userJwt": { "type": "http", "scheme": "bearer" }, "serviceJwt": { "type": "apiKey", "in": "header", "name": "X-OnlineJudge-Service-Authorization" }, "mTLS": { "type": "mutualTLS" } },
+    "schemas": {
+      "Error": { "type": "object", "required": ["code", "message", "requestId", "retryable"], "properties": { "code": { "type": "string" }, "message": { "type": "string" }, "requestId": { "type": "string" }, "retryable": { "type": "boolean" } } },
+      "Page": { "type": "object", "required": ["items", "page", "size", "total"], "properties": { "items": { "type": "array", "items": { "$ref": "#/components/schemas/GradePublication" } }, "page": { "type": "integer" }, "size": { "type": "integer" }, "total": { "type": "integer" } } },
+      "GradePublication": { "type": "object", "required": ["publicationId", "courseId", "publishedAt", "publicationVersion"], "properties": { "publicationId": { "type": "string" }, "courseId": { "type": "string" }, "publishedAt": { "type": "string", "format": "date-time" }, "publicationVersion": { "type": "integer", "minimum": 1 } } }
+    }
+  }
+}

@@ -46,8 +46,8 @@ HWK 保持两个已经确认的独立业务场景。页面动作、权限检查�
 | 统计与待处理名单 | Statistics/Repository/Attention 测试及统计页面测试 | PASS |
 | 共享 E2E #267 | `homework-lifecycle.spec.ts` 复用 PR #268 的 Playwright runner 与公共夹具 | PASS 契约：第二个场景不调用 API-HWK-11，只轮询提交详情并要求 AC 与编译错误样本均进入终态且保留提交 |
 | GRD 来源成绩真实链路 | PASS | 创建仅绑定本次 `homeworkId` 且 `includedInFinal=true` 的 HWK 成绩项，调用 GRD `/grades/sync` 后按 `gradeItemId` 与当前学生查询成绩记录，精确断言 `sourceId=homeworkId` 和原始分 88；将 `includedInFinal` 变异为 false 时该断言按预期 RED |
-| LRN 发布/成绩通知成功链路 | PASS | 真实发布/成绩发布后从 LRN 通知 API 按 `sourceModule=HWK` 与 `sourceId=homeworkId` 断言落库 |
-| 通知投递失败设计/实现一致性 | PASS | #281 / PR #285 已合并；`HomeworkControllerTest#publishRollsBackHomeworkWhenRequiredNotificationDeliveryFails` 证明必需通知投递失败时返回 `503/HWK_5003`，发布事务整体回滚，作业保持 `DRAFT` 且不留下通知记录 |
+| LRN 发布/成绩通知成功链路 | v1 历史 PASS | 真实发布/成绩发布后从 LRN 通知 API 按 `sourceModule=HWK` 与 `sourceId=homeworkId` 断言落库；不证明 #338 v2 的 outbox/异步投影语义 |
+| 通知投递失败设计/实现一致性 | v1 历史 PASS，v2 不可接受 | #281 / PR #285 的 `publishRollsBackHomeworkWhenRequiredNotificationDeliveryFails` 证明旧 `publishRequired` 行为；#338 已用契约 RED/GREEN 替换 v2 目标：仅本地 Homework/outbox 失败返回 `503/HWK_5003`/DRAFT，Learning/broker 失败不回滚，事件须含 title/deadline/`receiverScope=COURSE_ACTIVE_STUDENTS` 且无 roster；运行时实现与 E2E 由 #337/服务拆分 Issue 验收 |
 
 ## 4 执行结果
 
@@ -70,11 +70,11 @@ HWK 保持两个已经确认的独立业务场景。页面动作、权限检查�
 
 ## 5 缺陷关闭与残余风险
 
-### 5.1 #281：通知投递失败契约已关闭
+### 5.1 #281：通知投递失败 v1 历史契约
 
-- 确认契约：`HOMEWORK_PUBLISHED` 是发布事务的必需通知；投递失败则发布整体失败并回滚。
+- 确认的**历史 v1**契约：`HOMEWORK_PUBLISHED` 是发布事务的必需通知；投递失败则发布整体失败并回滚。
 - 合并证据：#281 / PR #285 已合并到 `dev`，合并提交 `a30a096281a01d7169cc0c2d18360aa1a65cd6b0`。
-- 定向复测：`publishRollsBackHomeworkWhenRequiredNotificationDeliveryFails`、`PersistentNotificationEventPublisherTest`、`NotificationControllerTest` 共 9/9 PASS；失败响应为 `503/HWK_5003`，作业保持 `DRAFT`。
+- 定向复测：`publishRollsBackHomeworkWhenRequiredNotificationDeliveryFails`、`PersistentNotificationEventPublisherTest`、`NotificationControllerTest` 共 9/9 PASS；这是旧行为的证据，不可充当 v2 验收。#338 的 v2 合同要求 Homework + outbox 本地成功即 PUBLISHED，Learning/broker 失败不回滚；仅本地事务失败使用 `503/HWK_5003`/DRAFT。
 - 闭环复测：通知成功链路、四类提交、批阅/手动重评与 GRD 精确成绩消费的既有证据保留；CODE 提交后的独立后台评测已由 #296 后端自动化通过，共享 E2E runner 待 Compose 环境复跑。
 
 ### 5.2 FR-HWK-04：CODE 后台自动评测已由 #296 闭环

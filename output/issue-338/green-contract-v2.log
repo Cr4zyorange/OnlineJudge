@@ -1,0 +1,3 @@
+$ node scripts/ci/verify-microservice-contract-v2.mjs
+microservice-contract-v2: PASS (5 OpenAPI, 8 AsyncAPI messages, 1 valid fixture(s), 2 incompatible fixture(s) rejected)
+exit 0

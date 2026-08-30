@@ -106,7 +106,7 @@ LRN 前端必须包含：
 - 业务对象已删除或无权限时，点击通知应给出清晰提示
 - 普通通知使用 `publish` 尽力而为投递：有活动业务事务时只注册 after-commit 回调，回调仅把不可变通知快照提交到专用有界执行器；来源事务回滚时不得生成通知，提交后由工作线程使用独立新事务落库，避免提交回调持有来源连接时再同步申请数据库连接
 - 普通通知调度被拒绝或落库失败时只记录告警，不反向污染已提交业务；当前执行器队列仅在内存中，尚未实现持久重试/outbox，进程退出或队列拒绝时允许丢失
-- 必达通知使用 `publishRequired` 同步加入来源事务并向上抛出失败。`HOMEWORK_PUBLISHED` 必须采用该契约，通知失败时回滚作业发布，不得降级为普通通知
+- **v2 作业发布投影：** `assessment.homework.published.v2` 在 Assessment 的 Homework + outbox 本地事务提交后异步消费；Learning 必须仅使用有界 title、RFC3339 deadline 和 receiverScope=COURSE_ACTIVE_STUDENTS，结合本地 Course 成员投影幂等生成任务/通知，禁止消费 roster。Learning/broker 不可用不得回滚发布；仅本地事务失败使用 `503/HWK_5003` 并保持 DRAFT
 
 LRN 不直接维护课程成员、实验提交、作业提交或成绩数据，只保存任务快照、通知和学习行为。
 

@@ -92,6 +92,7 @@ class GrdLrnIntegrationTest {
                 .getContentAsString();
         long publishId = objectMapper.readTree(publishJson).at("/data/publishId").asLong();
 
+        awaitGradeNotifications(studentHeaders(601L), 1, "成绩已发布");
         mockMvc.perform(get("/api/v1/notifications")
                         .headers(studentHeaders(601L))
                         .param("type", "GRADE")

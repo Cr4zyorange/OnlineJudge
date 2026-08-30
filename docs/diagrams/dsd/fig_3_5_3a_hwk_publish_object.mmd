@@ -5,7 +5,8 @@ sequenceDiagram
   participant Service as HomeworkService
   participant Permission as CoursePermissionClient
   participant Repository as JdbcHomeworkRepository
-  participant Publisher as NotificationEventPublisher
+  participant Outbox as HomeworkOutboxRepository
+  participant Learning as LearningEventConsumer
   Teacher->>View: 填写配置并保存草稿
   View->>Controller: POST/PUT /api/v1/homeworks
   Controller->>Service: create/update(command, currentUser)
@@ -23,13 +24,13 @@ sequenceDiagram
   Repository-->>Service: 返回 Homework、题目和测试用例
   Service->>Service: 校验类型配置完整性
   alt 合法且未删除
-    Service->>Repository: 在事务中更新 PUBLISHED/publishedAt
-    Service->>Publisher: publishRequired(HOMEWORK_PUBLISHED)
-    alt 必需通知持久化成功
-      Publisher-->>Service: 返回成功
+    Service->>Repository: 同一本地事务更新 PUBLISHED/publishedAt
+    Service->>Outbox: 同一事务写入 homework.published.v2(title, deadline, receiverScope)
+    alt 本地 Homework + outbox 事务成功
       Service-->>Controller: 返回发布结果
-    else 必需通知持久化失败
-      Publisher--xService: 抛出投递异常
+      Outbox-->>Learning: 至少一次异步投递
+      Learning->>Learning: 成员投影解析 receiverScope 并幂等落库
+    else 本地事务失败
       Service->>Repository: 回滚并保持 DRAFT
       Service-->>Controller: 返回 HWK_5003
     end
