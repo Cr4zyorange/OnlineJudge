@@ -341,9 +341,12 @@
       "schema": "course",
       "forWorkload": "course-service",
       "sourcePaths": ["database/migrations/course/**"],
-      "command": "./database/mysql/migrate-service.sh --schema course",
-      "configuration": ["MYSQL_HOST", "MYSQL_PORT", "MIGRATION_DATABASE_NAME", "MIGRATION_DATABASE_USER"],
-      "secrets": [{"key": "MIGRATION_DATABASE_PASSWORD", "injectedAs": "migration-secret", "redact": true, "imageBuild": "forbidden"}],
+      "command": "./database/mysql/migrate-course-service.sh",
+      "configuration": ["COURSE_DATABASE_HOST", "COURSE_DATABASE_PORT", "COURSE_DATABASE_NAME", "COURSE_DATABASE_USER"],
+      "secrets": [
+        {"key": "MYSQL_ROOT_PASSWORD", "injectedAs": "migration-secret", "redact": true, "imageBuild": "forbidden"},
+        {"key": "COURSE_DATABASE_PASSWORD", "injectedAs": "migration-secret", "redact": true, "imageBuild": "forbidden"}
+      ],
       "dependsOnWorkloads": ["mysql"],
       "dependsOnMigrationJobs": ["identity-migrations"],
       "runOnce": true,

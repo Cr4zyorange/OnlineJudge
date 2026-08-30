@@ -46,6 +46,10 @@ frontend_image_ref() {
   printf 'onlinejudge/frontend:%s' "$GIT_SHA"
 }
 
+course_image_ref() {
+  printf 'onlinejudge/course-service:%s' "$GIT_SHA"
+}
+
 published_http_port() {
   local port_binding="${OJ_HTTP_PORT:-8088}"
   local host_port="${port_binding##*:}"

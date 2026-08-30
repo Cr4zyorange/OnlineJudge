@@ -22,6 +22,74 @@ services:
       retries: 12
       start_period: 20s
 
+  rabbitmq:
+    image: rabbitmq:4.1-management
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-oj_course_events}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?RABBITMQ_PASSWORD is required}
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD-SHELL", "rabbitmq-diagnostics -q ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  course-migrations:
+    image: mysql:8.4
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      COURSE_DATABASE_HOST: mysql
+      COURSE_DATABASE_PORT: 3306
+      COURSE_DATABASE_NAME: oj_course
+      COURSE_DATABASE_USER: oj_course_rw
+      COURSE_DATABASE_PASSWORD: ${COURSE_DATABASE_PASSWORD:?COURSE_DATABASE_PASSWORD is required}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD is required}
+      COURSE_MIGRATIONS_DIR: /migrations/course
+    volumes:
+      - ../../database/migrations/course:/migrations/course:ro
+      - ../../database/mysql/migrate-course-service.sh:/migrations/migrate-course-service.sh:ro
+    entrypoint: ["bash", "/migrations/migrate-course-service.sh"]
+    restart: "no"
+
+  course-service:
+    image: onlinejudge/course-service:${GIT_SHA:?GIT_SHA must be the current full 40-character commit SHA}
+    depends_on:
+      course-migrations:
+        condition: service_completed_successfully
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      COURSE_DATABASE_HOST: mysql
+      COURSE_DATABASE_PORT: 3306
+      COURSE_DATABASE_NAME: oj_course
+      COURSE_DATABASE_USER: oj_course_rw
+      COURSE_DATABASE_PASSWORD: ${COURSE_DATABASE_PASSWORD:?COURSE_DATABASE_PASSWORD is required}
+      COURSE_RABBIT_ENABLED: "true"
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ${RABBITMQ_USER:-oj_course_events}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?RABBITMQ_PASSWORD is required}
+      IDENTITY_JWT_ISSUER: ${IDENTITY_JWT_ISSUER:-onlinejudge.identity.v2}
+      IDENTITY_JWT_AUDIENCE: ${IDENTITY_JWT_AUDIENCE:-onlinejudge.api}
+      IDENTITY_JWKS_TRUST_BUNDLE: ${IDENTITY_JWKS_TRUST_BUNDLE:?IDENTITY_JWKS_TRUST_BUNDLE is required}
+      IDENTITY_JWKS_URI: ${IDENTITY_JWKS_URI:?IDENTITY_JWKS_URI is required}
+      IDENTITY_JWKS_REFRESH_INTERVAL: ${IDENTITY_JWKS_REFRESH_INTERVAL:-PT5M}
+      IDENTITY_JWKS_REFRESH_INITIAL_DELAY: ${IDENTITY_JWKS_REFRESH_INITIAL_DELAY:-PT30S}
+      IDENTITY_JWKS_REQUEST_TIMEOUT: ${IDENTITY_JWKS_REQUEST_TIMEOUT:-PT1S}
+      COURSE_STORAGE_ROOT: /opt/onlinejudge-course/data
+    volumes:
+      - course-data:/opt/onlinejudge-course/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8082/actuator/health/readiness | grep -q '\"status\":\"UP\"'"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+
   backend:
     image: onlinejudge/backend:${GIT_SHA:?GIT_SHA must be the current full 40-character commit SHA}
     depends_on:
@@ -68,3 +136,5 @@ services:
 volumes:
   mysql-data:
   app-data:
+  rabbitmq-data:
+  course-data:

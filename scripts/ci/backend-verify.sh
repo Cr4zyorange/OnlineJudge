@@ -111,6 +111,7 @@ preserve_course_reports
 if [[ "${OJ312_COURSE_GATE_MUTATION:-0}" != "1" ]]; then
   log_run bash "$checkout/scripts/test/verify-course-service-ci-gate.test.sh" "$checkout"
 fi
+log_run bash "$checkout/scripts/test/verify-course-compose-contract.test.sh" "$checkout"
 
 # 编译门禁：主代码必须可编译。
 printf '\n$ mvn -B -ntp -q -DskipTests compile\n' | tee -a "$log"
@@ -139,4 +140,4 @@ printf '\n$ mvn -B -ntp -f services/assessment/pom.xml test\n' | tee -a "$log"
 (cd "$checkout" && rm -f services/assessment/target/surefire-reports/*.xml \
   && run_mvn_retry mvn -B -ntp -f services/assessment/pom.xml test)
 
-printf 'backend-verify: PASS (Course and Assessment compile/test; legacy backend compile + unit + integration)\n' | tee -a "$log"
+printf 'backend-verify: PASS (Course compile/test/Compose contract; Assessment compile/test; legacy backend compile + unit + integration)\n' | tee -a "$log"

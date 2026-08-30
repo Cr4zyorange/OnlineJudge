@@ -39,13 +39,25 @@ if [[ "$args" == *" compose "* && "$args" == *" up "* ]]; then
 fi
 
 if [[ "$args" == *" compose "* && "$args" == *" ps --services --filter status=running "* ]]; then
-  printf 'mysql\nbackend\n'
+  printf 'mysql\nrabbitmq\ncourse-service\nbackend\n'
   [[ "${CONTAINER_TEST_UNHEALTHY:-0}" == "1" ]] || printf 'frontend\n'
   exit 0
 fi
 
 if [[ "$args" == *" compose "* && "$args" == *" ps -q mysql "* ]]; then
   printf 'mysql-container\n'
+  exit 0
+fi
+if [[ "$args" == *" compose "* && "$args" == *" ps -q rabbitmq "* ]]; then
+  printf 'rabbitmq-container\n'
+  exit 0
+fi
+if [[ "$args" == *" compose "* && "$args" == *" ps -q course-migrations "* ]]; then
+  printf 'course-migrations-container\n'
+  exit 0
+fi
+if [[ "$args" == *" compose "* && "$args" == *" ps -q course-service "* ]]; then
+  printf 'course-service-container\n'
   exit 0
 fi
 if [[ "$args" == *" compose "* && "$args" == *" ps -q backend "* ]]; then
@@ -65,6 +77,14 @@ if [[ "$args" == *" compose "* && "$args" == *" exec -T backend "* ]]; then
   fi
   exit 0
 fi
+if [[ "$args" == *" compose "* && "$args" == *" exec -T course-service "* ]]; then
+  if [[ "${CONTAINER_TEST_FAIL_COURSE_READINESS:-0}" == "1" ]]; then
+    printf '{"status":"DOWN"}\n'
+  else
+    printf '{"status":"UP"}\n'
+  fi
+  exit 0
+fi
 
 if [[ "${1:-}" == "inspect" ]]; then
   container_id="${*: -1}"
@@ -81,6 +101,8 @@ if [[ "${1:-}" == "inspect" ]]; then
           printf 'mysql:8.4\n'
         fi
         ;;
+      rabbitmq-container) printf 'rabbitmq:4.1-management\n' ;;
+      course-service-container) printf 'onlinejudge/course-service:%s\n' "$GIT_SHA" ;;
       backend-container) printf 'onlinejudge/backend:%s\n' "$GIT_SHA" ;;
       frontend-container) printf 'onlinejudge/frontend:%s\n' "$GIT_SHA" ;;
       *) exit 32 ;;
@@ -96,7 +118,15 @@ if [[ "${1:-}" == "inspect" ]]; then
       printf '%s\n' "$CONTAINER_TEST_FRONTEND_USER"
     elif [[ "$container_id" == "frontend-container" ]]; then
       printf 'nginx\n'
+    elif [[ "$container_id" == "course-service-container" && -n "${CONTAINER_TEST_COURSE_USER:-}" ]]; then
+      printf '%s\n' "$CONTAINER_TEST_COURSE_USER"
+    elif [[ "$container_id" == "course-service-container" ]]; then
+      printf '10002:10002\n'
     fi
+    exit 0
+  fi
+  if [[ "$args" == *".State.ExitCode"* && "$container_id" == "course-migrations-container" ]]; then
+    printf '0\n'
     exit 0
   fi
 fi
@@ -156,6 +186,8 @@ common_env=(
   "GIT_SHA=$head_sha"
   "MYSQL_PASSWORD=contract-password"
   "MYSQL_ROOT_PASSWORD=contract-root-password"
+  "COURSE_DATABASE_PASSWORD=contract-course-password"
+  "RABBITMQ_PASSWORD=contract-rabbit-password"
   "IDENTITY_JWKS_TRUST_BUNDLE={\"keys\":[]}"
   "IDENTITY_JWKS_URI=https://identity.example.test/.well-known/jwks.json"
   "PATH=$fake_bin:$PATH"
@@ -200,6 +232,7 @@ grep -Fq 'MYSQL_PASSWORD is required' "$fixture_root/missing-secret.err" || \
   fail "missing MYSQL_PASSWORD did not produce the required diagnostic"
 
 if env -u IDENTITY_JWKS_TRUST_BUNDLE GIT_SHA="$head_sha" MYSQL_PASSWORD=contract-password MYSQL_ROOT_PASSWORD=contract-root-password \
+  COURSE_DATABASE_PASSWORD=contract-course-password RABBITMQ_PASSWORD=contract-rabbit-password \
   IDENTITY_JWKS_URI=https://identity.example.test/.well-known/jwks.json \
   PATH="$fake_bin:$PATH" CONTAINER_TEST_DOCKER_LOG="$docker_log" \
   bash "$source_script" >"$fixture_root/missing-jwks-bundle.out" 2>"$fixture_root/missing-jwks-bundle.err"; then
@@ -209,6 +242,7 @@ grep -Fq 'IDENTITY_JWKS_TRUST_BUNDLE is required' "$fixture_root/missing-jwks-bu
   fail "missing IDENTITY_JWKS_TRUST_BUNDLE did not produce the required diagnostic"
 
 if env -u IDENTITY_JWKS_URI GIT_SHA="$head_sha" MYSQL_PASSWORD=contract-password MYSQL_ROOT_PASSWORD=contract-root-password \
+  COURSE_DATABASE_PASSWORD=contract-course-password RABBITMQ_PASSWORD=contract-rabbit-password \
   IDENTITY_JWKS_TRUST_BUNDLE='{"keys":[]}' \
   PATH="$fake_bin:$PATH" CONTAINER_TEST_DOCKER_LOG="$docker_log" \
   bash "$source_script" >"$fixture_root/missing-jwks-uri.out" 2>"$fixture_root/missing-jwks-uri.err"; then
@@ -221,13 +255,15 @@ run_expected_failure startup 'simulated compose startup failure' CONTAINER_TEST_
 grep -Fq ' logs ' "$docker_log" || fail "startup failure did not collect logs"
 grep -Fq ' down --volumes --remove-orphans' "$docker_log" || fail "startup failure did not clean scoped resources"
 
-run_expected_failure unhealthy 'expected 3 running services, got 2' CONTAINER_TEST_UNHEALTHY=1
+run_expected_failure unhealthy 'expected 5 running services, got 4' CONTAINER_TEST_UNHEALTHY=1
 run_expected_failure revision 'backend OCI revision did not match GIT_SHA' CONTAINER_TEST_BAD_REVISION=1
 run_expected_failure root-user 'backend container must not run as root' CONTAINER_TEST_BACKEND_USER=root:root
 run_expected_failure numeric-root-user 'backend container must not run as root' CONTAINER_TEST_BACKEND_USER=0:10001
 run_expected_failure frontend-root-user 'frontend container must not run as root' CONTAINER_TEST_FRONTEND_USER=root:root
+run_expected_failure course-root-user 'course-service container must not run as root' CONTAINER_TEST_COURSE_USER=root:root
 run_expected_failure mysql-image 'MySQL container must use mysql:8.4' CONTAINER_TEST_WRONG_MYSQL_IMAGE=1
 run_expected_failure backend-readiness 'backend readiness did not report UP' CONTAINER_TEST_FAIL_BACKEND_READINESS=1
+run_expected_failure course-readiness 'Course readiness did not report UP' CONTAINER_TEST_FAIL_COURSE_READINESS=1
 run_expected_failure frontend-readiness 'frontend-proxied readiness did not report UP' CONTAINER_TEST_FAIL_FRONTEND_READINESS=1
 run_expected_failure http-verify 'simulated HTTP verification failure' CONTAINER_TEST_FAIL_VERIFY=1
 
@@ -236,7 +272,7 @@ run_expected_failure http-verify 'simulated HTTP verification failure' CONTAINER
 : > "$verify_log"
 env "${common_env[@]}" bash "$source_script" >"$fixture_root/success.out" 2>"$fixture_root/success.err" || {
   cat "$fixture_root/success.err" >&2
-  fail "valid three-service smoke failed"
+  fail "valid five-service smoke failed"
 }
 
 project_suffix="${head_sha:0:12}-contract"
