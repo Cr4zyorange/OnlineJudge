@@ -22,8 +22,10 @@ class AuthServiceExtractionContractTest {
     @Test
     void identityHasIndependentHardenedContainerDeployment() throws IOException {
         Path dockerfilePath = REPOSITORY.resolve("services/identity/Dockerfile");
+        Path cachedRuntimeDockerfile = REPOSITORY.resolve("services/identity/Dockerfile.cached-runtime");
         Path composePath = REPOSITORY.resolve("deploy/docker/compose.identity.yml");
         assertThat(dockerfilePath).isRegularFile();
+        assertThat(cachedRuntimeDockerfile).isRegularFile();
         assertThat(composePath).isRegularFile();
 
         String dockerfile = Files.readString(dockerfilePath);
@@ -40,6 +42,13 @@ class AuthServiceExtractionContractTest {
                 .hasSize(2)
                 .allMatch(line -> line.contains("@sha256:"));
         assertThat(dockerfile).doesNotContain("apt-get");
+        String cachedRuntime = Files.readString(cachedRuntimeDockerfile);
+        assertThat(cachedRuntime).contains(
+                "ARG RUNTIME_BASE",
+                "FROM ${RUNTIME_BASE}",
+                "USER 10001:10001",
+                "onlinejudge-identity-service-0.1.0-SNAPSHOT.jar"
+        );
 
         String compose = Files.readString(composePath);
         assertThat(compose).contains(
@@ -49,6 +58,7 @@ class AuthServiceExtractionContractTest {
                 "${IDENTITY_DATABASE_PASSWORD:?IDENTITY_DATABASE_PASSWORD is required}",
                 "${IDENTITY_DATABASE_ROOT_PASSWORD:?IDENTITY_DATABASE_ROOT_PASSWORD is required}",
                 "${IDENTITY_JWT_SIGNING_KEY:?IDENTITY_JWT_SIGNING_KEY is required}",
+                "IDENTITY_JWT_PREVIOUS_PUBLIC_KEYS: ${IDENTITY_JWT_PREVIOUS_PUBLIC_KEYS:-}",
                 "onlinejudge_identity",
                 "IDENTITY_DATABASE_HOST: identity-db",
                 "IDENTITY_DATABASE_NAME: onlinejudge_identity",
