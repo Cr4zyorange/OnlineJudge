@@ -16,7 +16,8 @@
         ],
         "responses": {
           "200": { "description": "Permission decision", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AuthorizationDecision" } } } },
-          "403": { "description": "Service principal lacks scope", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "401": { "description": "Missing, invalid, expired, or wrong-audience service JWT; or invalid workload mTLS service identity", "x-onlinejudge-error-codes": ["SERVICE_IDENTITY_INVALID"], "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "403": { "description": "Authenticated service principal lacks the required course authorization scope", "x-onlinejudge-error-codes": ["SERVICE_IDENTITY_FORBIDDEN"], "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
           "404": { "description": "Course does not exist", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
           "503": { "description": "Decision cannot be made; caller rejects the user operation without a local data fallback", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
         }
@@ -33,7 +34,7 @@
           { "name": "page", "in": "query", "required": false, "schema": { "type": "integer", "minimum": 0, "default": 0 } },
           { "name": "size", "in": "query", "required": false, "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 50 } }
         ],
-        "responses": { "200": { "description": "Member page", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Page" } } } }, "503": { "description": "Unavailable", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } } }
+        "responses": { "200": { "description": "Member page", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Page" } } } }, "401": { "description": "Missing, invalid, expired, or wrong-audience service JWT; or invalid workload mTLS service identity", "x-onlinejudge-error-codes": ["SERVICE_IDENTITY_INVALID"], "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }, "403": { "description": "Authenticated service principal lacks the required course member-read scope", "x-onlinejudge-error-codes": ["SERVICE_IDENTITY_FORBIDDEN"], "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }, "503": { "description": "Unavailable", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } } }
       }
     }
   },

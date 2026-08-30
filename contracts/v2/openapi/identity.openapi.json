@@ -36,7 +36,8 @@
         "responses": {
           "201": { "description": "A token with audience equal to the requested target service", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ServiceTokenResponse" } } } },
           "400": { "description": "Malformed request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
-          "403": { "description": "Workload is not allowed to call the requested audience", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "401": { "description": "Missing, invalid, or expired workload mTLS service identity", "x-onlinejudge-error-codes": ["SERVICE_IDENTITY_INVALID"], "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "403": { "description": "Authenticated workload service identity lacks scope for the requested audience", "x-onlinejudge-error-codes": ["SERVICE_IDENTITY_FORBIDDEN"], "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
           "409": { "description": "Idempotency key was reused with a different request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
           "503": { "description": "Identity cannot mint a new token", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
         }

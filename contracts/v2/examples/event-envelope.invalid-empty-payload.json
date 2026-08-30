@@ -1,0 +1,11 @@
+{
+  "eventId": "0eb0e534-d19c-42f1-bd73-7cad07e45d57",
+  "eventType": "assessment.source-grade.changed.v2",
+  "payloadVersion": 2,
+  "aggregateType": "assessment-source-grade",
+  "aggregateId": "HWK:homework-91:student-42",
+  "aggregateVersion": 7,
+  "occurredAt": "2026-08-30T09:15:30Z",
+  "correlationId": "6504f1af-3d1a-4ed7-b1f8-177775a0ca98",
+  "payload": {}
+}

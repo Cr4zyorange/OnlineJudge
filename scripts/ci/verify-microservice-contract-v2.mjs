@@ -10,6 +10,7 @@ let openApiCount = 0;
 let asyncMessageCount = 0;
 let validFixtureCount = 0;
 let rejectedFixtureCount = 0;
+let rejectedMutationCount = 0;
 
 const serviceContracts = {
   identity: ['/.well-known/jwks.json', '/internal/v2/service-tokens'],
@@ -32,6 +33,65 @@ const expectedEventTypes = [
   'grade.published.v2',
   'grade.review.processed.v2'
 ];
+
+const eventContracts = {
+  'identity.security-version.changed.v2': {
+    aggregateType: 'identity-user',
+    aggregateIdTemplate: '{userId}',
+    envelopeSchema: 'IdentitySecurityVersionChangedEvent',
+    payloadSchema: 'IdentitySecurityVersionChangedPayload',
+    requiredPayload: ['userId', 'securityVersion', 'changeReason']
+  },
+  'course.member.changed.v2': {
+    aggregateType: 'course-member',
+    aggregateIdTemplate: '{courseId}:{userId}',
+    envelopeSchema: 'CourseMemberChangedEvent',
+    payloadSchema: 'CourseMemberChangedPayload',
+    requiredPayload: ['courseId', 'userId', 'membershipStatus', 'memberVersion']
+  },
+  'course.announcement.published.v2': {
+    aggregateType: 'course-announcement',
+    aggregateIdTemplate: '{announcementId}',
+    envelopeSchema: 'CourseAnnouncementPublishedEvent',
+    payloadSchema: 'CourseAnnouncementPublishedPayload',
+    requiredPayload: ['courseId', 'announcementId', 'publishedAt']
+  },
+  'assessment.source-grade.changed.v2': {
+    aggregateType: 'assessment-source-grade',
+    aggregateIdTemplate: '{sourceType}:{sourceId}:{studentId}',
+    envelopeSchema: 'AssessmentSourceGradeChangedEvent',
+    payloadSchema: 'AssessmentSourceGradeChangedPayload',
+    requiredPayload: ['courseId', 'sourceType', 'sourceId', 'studentId', 'score', 'fullScore', 'sourceVersion']
+  },
+  'assessment.evaluation.completed.v2': {
+    aggregateType: 'assessment-submission',
+    aggregateIdTemplate: '{submissionId}',
+    envelopeSchema: 'AssessmentEvaluationCompletedEvent',
+    payloadSchema: 'AssessmentEvaluationCompletedPayload',
+    requiredPayload: ['courseId', 'submissionId', 'evaluationStatus', 'evaluationVersion', 'completedAt']
+  },
+  'assessment.homework.published.v2': {
+    aggregateType: 'assessment-homework',
+    aggregateIdTemplate: '{homeworkId}',
+    envelopeSchema: 'AssessmentHomeworkPublishedEvent',
+    payloadSchema: 'AssessmentHomeworkPublishedPayload',
+    requiredPayload: ['courseId', 'homeworkId', 'publishedAt']
+  },
+  'grade.published.v2': {
+    aggregateType: 'grade-publication',
+    aggregateIdTemplate: '{publicationId}',
+    envelopeSchema: 'GradePublishedEvent',
+    payloadSchema: 'GradePublishedPayload',
+    requiredPayload: ['courseId', 'publicationId', 'publishedAt', 'publicationVersion']
+  },
+  'grade.review.processed.v2': {
+    aggregateType: 'grade-review',
+    aggregateIdTemplate: '{reviewRequestId}',
+    envelopeSchema: 'GradeReviewProcessedEvent',
+    payloadSchema: 'GradeReviewProcessedPayload',
+    requiredPayload: ['courseId', 'reviewRequestId', 'studentId', 'reviewStatus', 'resultVersion', 'processedAt']
+  }
+};
 
 function relative(absolutePath) {
   return absolutePath.slice(repoRoot.length + 1);
@@ -79,6 +139,14 @@ function operationHasAudienceBoundServiceIdentity(operation) {
   );
 }
 
+function responseHasErrorSchema(response) {
+  return response?.content?.['application/json']?.schema?.$ref === '#/components/schemas/Error';
+}
+
+function responseHasErrorCode(response, code) {
+  return Array.isArray(response?.['x-onlinejudge-error-codes']) && response['x-onlinejudge-error-codes'].includes(code);
+}
+
 function validateOpenApi(service, expectedPaths) {
   const relativePath = `contracts/v2/openapi/${service}.openapi.json`;
   const document = readJson(relativePath);
@@ -118,6 +186,29 @@ function validateOpenApi(service, expectedPaths) {
           operationHasAudienceBoundServiceIdentity(operation),
           `${relativePath}: ${method.toUpperCase()} ${expectedPath} must accept audience-bound service JWT or mTLS`
         );
+        const unauthenticated = operation.responses?.['401'];
+        const forbidden = operation.responses?.['403'];
+        assert(
+          responseHasErrorSchema(unauthenticated) && responseHasErrorCode(unauthenticated, 'SERVICE_IDENTITY_INVALID'),
+          `${relativePath}: ${method.toUpperCase()} ${expectedPath} must declare 401 SERVICE_IDENTITY_INVALID for missing, invalid, expired, or wrong-audience service identity`
+        );
+        assert(
+          responseHasErrorSchema(forbidden) && responseHasErrorCode(forbidden, 'SERVICE_IDENTITY_FORBIDDEN'),
+          `${relativePath}: ${method.toUpperCase()} ${expectedPath} must reserve 403 SERVICE_IDENTITY_FORBIDDEN for an authenticated principal without required scope`
+        );
+        const acceptsServiceJwt = (operation.security ?? []).some((requirement) => Object.hasOwn(requirement, 'serviceJwt'));
+        if (acceptsServiceJwt) {
+          assert(
+            /invalid/i.test(unauthenticated?.description ?? '')
+              && /expired/i.test(unauthenticated?.description ?? '')
+              && /audience/i.test(unauthenticated?.description ?? ''),
+            `${relativePath}: ${method.toUpperCase()} ${expectedPath} 401 must explicitly cover invalid, expired, and wrong-audience service JWTs`
+          );
+        }
+        assert(
+          /authenticated/i.test(forbidden?.description ?? '') && /scope/i.test(forbidden?.description ?? ''),
+          `${relativePath}: ${method.toUpperCase()} ${expectedPath} 403 must explicitly cover authenticated service identity without scope`
+        );
       }
       assert(
         Number.isInteger(operation['x-onlinejudge-timeout-ms']) && operation['x-onlinejudge-timeout-ms'] > 0,
@@ -127,42 +218,93 @@ function validateOpenApi(service, expectedPaths) {
   }
 }
 
-function validateEnvelope(envelope) {
+function isObject(value) {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isUuid(value) {
+  return typeof value === 'string'
+    && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+}
+
+function isDateTime(value) {
+  return typeof value === 'string'
+    && /^\d{4}-\d{2}-\d{2}T/.test(value)
+    && !Number.isNaN(Date.parse(value));
+}
+
+function validateValue(value, schema, path) {
   const failures = [];
-  const required = [
-    'eventId',
-    'eventType',
-    'payloadVersion',
-    'aggregateType',
-    'aggregateId',
-    'aggregateVersion',
-    'occurredAt',
-    'correlationId',
-    'payload'
-  ];
-  for (const field of required) {
-    if (!(field in (envelope ?? {}))) failures.push(`missing ${field}`);
+  if (!schema) return [`${path}: missing schema`];
+  if (Object.hasOwn(schema, 'const') && value !== schema.const) failures.push(`${path}: must equal ${JSON.stringify(schema.const)}`);
+  if (Array.isArray(schema.enum) && !schema.enum.includes(value)) failures.push(`${path}: must be one of ${schema.enum.join(', ')}`);
+  if (schema.type === 'object') {
+    if (!isObject(value)) return [`${path}: must be an object`];
+    const required = schema.required ?? [];
+    for (const property of required) if (!Object.hasOwn(value, property)) failures.push(`${path}: missing ${property}`);
+    if (schema.additionalProperties === false) {
+      const permitted = new Set(Object.keys(schema.properties ?? {}));
+      for (const property of Object.keys(value)) if (!permitted.has(property)) failures.push(`${path}: unexpected ${property}`);
+    }
+    for (const [property, propertySchema] of Object.entries(schema.properties ?? {})) {
+      if (Object.hasOwn(value, property)) failures.push(...validateValue(value[property], propertySchema, `${path}.${property}`));
+    }
+    return failures;
   }
-  if (!expectedEventTypes.includes(envelope?.eventType)) failures.push(`unknown eventType ${envelope?.eventType}`);
-  if (envelope?.payloadVersion !== 2) failures.push(`unsupported payloadVersion ${envelope?.payloadVersion}`);
-  if (!Number.isInteger(envelope?.aggregateVersion) || envelope.aggregateVersion < 1) {
-    failures.push('aggregateVersion must be a positive integer');
+  if (schema.type === 'string') {
+    if (typeof value !== 'string') return [`${path}: must be a string`];
+    if (Number.isInteger(schema.minLength) && value.length < schema.minLength) failures.push(`${path}: too short`);
+    if (schema.format === 'uuid' && !isUuid(value)) failures.push(`${path}: must be a UUID`);
+    if (schema.format === 'date-time' && !isDateTime(value)) failures.push(`${path}: must be an RFC3339 date-time`);
+    return failures;
   }
-  if (typeof envelope?.payload !== 'object' || envelope.payload === null || Array.isArray(envelope.payload)) {
-    failures.push('payload must be an object');
+  if (schema.type === 'integer') {
+    if (!Number.isInteger(value)) return [`${path}: must be an integer`];
+    if (typeof schema.minimum === 'number' && value < schema.minimum) failures.push(`${path}: below minimum`);
+    return failures;
+  }
+  if (schema.type === 'number') {
+    if (typeof value !== 'number' || !Number.isFinite(value)) return [`${path}: must be a finite number`];
+    if (typeof schema.minimum === 'number' && value < schema.minimum) failures.push(`${path}: below minimum`);
+    return failures;
   }
   return failures;
 }
 
-function validateAsyncApi() {
-  const relativePath = 'contracts/v2/asyncapi/events.asyncapi.json';
-  const document = readJson(relativePath);
-  if (!document) return;
+function eventExtensionSchema(asyncApi, contract) {
+  const schema = asyncApi?.components?.schemas?.[contract.envelopeSchema];
+  return (schema?.allOf ?? []).find((part) => isObject(part) && isObject(part.properties));
+}
 
-  assert(String(document.asyncapi ?? '').startsWith('3.'), `${relativePath}: asyncapi must be 3.x`);
-  assert(document.info?.version === '2.0.0', `${relativePath}: info.version must be 2.0.0`);
+function validateEnvelope(envelope, asyncApi) {
+  const failures = [];
+  const baseSchema = asyncApi?.components?.schemas?.EventEnvelope;
+  failures.push(...validateValue(envelope, baseSchema, 'envelope'));
+  const contract = eventContracts[envelope?.eventType];
+  if (!contract) return failures;
+  const extension = eventExtensionSchema(asyncApi, contract);
+  if (!extension) return [...failures, `envelope: missing ${contract.envelopeSchema}`];
+  const payloadReference = extension.properties?.payload?.$ref;
+  const expectedReference = `#/components/schemas/${contract.payloadSchema}`;
+  if (payloadReference !== expectedReference) failures.push(`envelope: ${contract.envelopeSchema} must reference ${contract.payloadSchema}`);
+  failures.push(...validateValue(envelope.eventType, extension.properties?.eventType, 'envelope.eventType'));
+  failures.push(...validateValue(envelope.aggregateType, extension.properties?.aggregateType, 'envelope.aggregateType'));
+  const expectedAggregateId = contract.aggregateIdTemplate.replace(/\{([^}]+)\}/g, (_, field) => String(envelope?.payload?.[field] ?? ''));
+  if (envelope?.aggregateId !== expectedAggregateId) failures.push(`envelope.aggregateId: must equal ${expectedAggregateId}`);
+  const payloadSchema = asyncApi?.components?.schemas?.[contract.payloadSchema];
+  failures.push(...validateValue(envelope.payload, payloadSchema, 'envelope.payload'));
+  return failures;
+}
+
+function validateAsyncApiDocument(document) {
+  const failures = [];
+  const check = (condition, message) => {
+    if (!condition) failures.push(message);
+  };
+  check(String(document?.asyncapi ?? '').startsWith('3.'), 'asyncapi must be 3.x');
+  check(document?.info?.version === '2.0.0', 'info.version must be 2.0.0');
   const envelope = document.components?.schemas?.EventEnvelope;
-  assert(
+  check(
     hasRequiredProperties(envelope, [
       'eventId',
       'eventType',
@@ -174,21 +316,51 @@ function validateAsyncApi() {
       'correlationId',
       'payload'
     ]),
-    `${relativePath}: EventEnvelope required fields are incomplete`
+    'EventEnvelope required fields are incomplete'
   );
 
   const messages = document.components?.messages ?? {};
   for (const eventType of expectedEventTypes) {
+    const contract = eventContracts[eventType];
     const message = messages[eventType];
-    assert(message, `${relativePath}: missing message ${eventType}`);
+    check(message, `missing message ${eventType}`);
     if (!message) continue;
-    asyncMessageCount += 1;
-    assert(message.payload?.$ref === '#/components/schemas/EventEnvelope', `${relativePath}: ${eventType} must use EventEnvelope`);
-    assert(typeof message['x-onlinejudge-producer'] === 'string', `${relativePath}: ${eventType} needs a producer`);
-    assert(Array.isArray(message['x-onlinejudge-consumers']) && message['x-onlinejudge-consumers'].length > 0,
-      `${relativePath}: ${eventType} needs at least one consumer`);
-    assert(typeof message['x-onlinejudge-idempotency-key'] === 'string', `${relativePath}: ${eventType} needs idempotency semantics`);
+    check(message.payload?.$ref === `#/components/schemas/${contract.envelopeSchema}`, `${eventType} must use ${contract.envelopeSchema}`);
+    check(typeof message['x-onlinejudge-producer'] === 'string', `${eventType} needs a producer`);
+    check(Array.isArray(message['x-onlinejudge-consumers']) && message['x-onlinejudge-consumers'].length > 0,
+      `${eventType} needs at least one consumer`);
+    check(typeof message['x-onlinejudge-idempotency-key'] === 'string', `${eventType} needs idempotency semantics`);
+    check(message['x-onlinejudge-ordering'] === `${contract.aggregateType} aggregateVersion`,
+      `${eventType} ordering must be ${contract.aggregateType} aggregateVersion`);
+
+    const eventSchema = document.components?.schemas?.[contract.envelopeSchema];
+    const extension = eventExtensionSchema(document, contract);
+    check(Array.isArray(eventSchema?.allOf) && eventSchema.allOf.some((part) => part?.$ref === '#/components/schemas/EventEnvelope'),
+      `${eventType} must compose EventEnvelope`);
+    check(extension?.properties?.eventType?.const === eventType, `${eventType} must bind eventType with const`);
+    check(extension?.properties?.aggregateType?.const === contract.aggregateType,
+      `${eventType} must bind aggregateType ${contract.aggregateType}`);
+    check(extension?.['x-onlinejudge-aggregate-id-template'] === contract.aggregateIdTemplate,
+      `${eventType} aggregateId template must be ${contract.aggregateIdTemplate}`);
+    check(extension?.properties?.payload?.$ref === `#/components/schemas/${contract.payloadSchema}`,
+      `${eventType} must bind payload schema ${contract.payloadSchema}`);
+    const payloadSchema = document.components?.schemas?.[contract.payloadSchema];
+    check(payloadSchema?.type === 'object' && payloadSchema?.additionalProperties === false,
+      `${eventType} payload schema must be a closed object`);
+    check(hasRequiredProperties(payloadSchema, contract.requiredPayload),
+      `${eventType} payload schema must require ${contract.requiredPayload.join(', ')}`);
   }
+  return failures;
+}
+
+function validateAsyncApi() {
+  const relativePath = 'contracts/v2/asyncapi/events.asyncapi.json';
+  const document = readJson(relativePath);
+  if (!document) return undefined;
+  const failures = validateAsyncApiDocument(document);
+  for (const failure of failures) problem(`${relativePath}: ${failure}`);
+  asyncMessageCount += expectedEventTypes.filter((eventType) => document.components?.messages?.[eventType]).length;
+  return document;
 }
 
 function validateDocumentation() {
@@ -212,7 +384,7 @@ function validateDocumentation() {
   }
 }
 
-function validateFixtures() {
+function validateFixtures(asyncApi) {
   const examplesDirectory = resolve(repoRoot, 'contracts/v2/examples');
   if (!existsSync(examplesDirectory)) {
     problem('missing contracts/v2/examples');
@@ -226,25 +398,49 @@ function validateFixtures() {
   for (const name of valid) {
     const envelope = readJson(`contracts/v2/examples/${name}`);
     if (!envelope) continue;
-    const failures = validateEnvelope(envelope);
+    const failures = validateEnvelope(envelope, asyncApi);
     assert(failures.length === 0, `contracts/v2/examples/${name}: valid fixture rejected: ${failures.join(', ')}`);
     if (failures.length === 0) validFixtureCount += 1;
   }
   for (const name of invalid) {
     const envelope = readJson(`contracts/v2/examples/${name}`);
     if (!envelope) continue;
-    const failures = validateEnvelope(envelope);
+    const failures = validateEnvelope(envelope, asyncApi);
     assert(failures.length > 0, `contracts/v2/examples/${name}: incompatible fixture was accepted`);
     if (failures.length > 0) rejectedFixtureCount += 1;
   }
 }
 
+function validateRejectingMutations(asyncApi) {
+  if (!asyncApi) return;
+  const orderingMutation = JSON.parse(JSON.stringify(asyncApi));
+  delete orderingMutation.components.messages['grade.published.v2']['x-onlinejudge-ordering'];
+  const orderingFailures = validateAsyncApiDocument(orderingMutation);
+  assert(orderingFailures.length > 0, 'mutation: deleting x-onlinejudge-ordering was accepted');
+  if (orderingFailures.length > 0) rejectedMutationCount += 1;
+
+  const validFixture = readJson('contracts/v2/examples/event-envelope.valid.json');
+  if (!validFixture) return;
+  const emptyPayloadMutation = JSON.parse(JSON.stringify(validFixture));
+  emptyPayloadMutation.payload = {};
+  const emptyPayloadFailures = validateEnvelope(emptyPayloadMutation, asyncApi);
+  assert(emptyPayloadFailures.length > 0, 'mutation: empty event payload was accepted');
+  if (emptyPayloadFailures.length > 0) rejectedMutationCount += 1;
+
+  const aggregateMutation = JSON.parse(JSON.stringify(validFixture));
+  aggregateMutation.aggregateType = 'unrelated-aggregate';
+  const aggregateFailures = validateEnvelope(aggregateMutation, asyncApi);
+  assert(aggregateFailures.length > 0, 'mutation: wrong event aggregate was accepted');
+  if (aggregateFailures.length > 0) rejectedMutationCount += 1;
+}
+
 for (const [service, expectedPaths] of Object.entries(serviceContracts)) {
   validateOpenApi(service, expectedPaths);
 }
-validateAsyncApi();
+const asyncApi = validateAsyncApi();
 validateDocumentation();
-validateFixtures();
+validateFixtures(asyncApi);
+validateRejectingMutations(asyncApi);
 
 if (errors.length > 0) {
   console.error(`microservice-contract-v2: FAIL (${errors.length} problem(s))`);
@@ -252,6 +448,6 @@ if (errors.length > 0) {
   process.exitCode = 1;
 } else {
   console.log(
-    `microservice-contract-v2: PASS (${openApiCount} OpenAPI, ${asyncMessageCount} AsyncAPI messages, ${validFixtureCount} valid fixture(s), ${rejectedFixtureCount} incompatible fixture(s) rejected)`
+    `microservice-contract-v2: PASS (${openApiCount} OpenAPI, ${asyncMessageCount} AsyncAPI messages, ${validFixtureCount} valid fixture(s), ${rejectedFixtureCount} incompatible fixture(s), ${rejectedMutationCount} review mutation(s) rejected)`
   );
 }
