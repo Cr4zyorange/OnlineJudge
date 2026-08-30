@@ -42,6 +42,7 @@ services:
       RABBITMQ_HOST: rabbitmq
       ASSESSMENT_STORAGE_ROOT: /var/lib/onlinejudge-assessment
       ASSESSMENT_SANDBOX_COMMAND: ${ASSESSMENT_SANDBOX_COMMAND:?ASSESSMENT_SANDBOX_COMMAND is required}
+      ASSESSMENT_SANDBOX_PRE_EXECUTION_DELAY: ${ASSESSMENT_SANDBOX_PRE_EXECUTION_DELAY:-PT0S}
     volumes:
       - assessment-files:/var/lib/onlinejudge-assessment
     command: ["--spring.main.web-application-type=none", "--assessment.worker.enabled=true"]

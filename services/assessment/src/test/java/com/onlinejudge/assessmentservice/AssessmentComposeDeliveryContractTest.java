@@ -18,6 +18,7 @@ class AssessmentComposeDeliveryContractTest {
 
         assertThat(compose).contains("ASSESSMENT_STORAGE_ROOT: /var/lib/onlinejudge-assessment");
         assertThat(compose).contains("ASSESSMENT_SANDBOX_COMMAND: ${ASSESSMENT_SANDBOX_COMMAND:?ASSESSMENT_SANDBOX_COMMAND is required}");
+        assertThat(compose).contains("ASSESSMENT_SANDBOX_PRE_EXECUTION_DELAY: ${ASSESSMENT_SANDBOX_PRE_EXECUTION_DELAY:-PT0S}");
         assertThat(count(compose, "assessment-files:/var/lib/onlinejudge-assessment")).isEqualTo(2);
         assertThat(compose).contains("volumes:\n  assessment-files:");
         assertThat(primaryDockerfile).contains("/var/lib/onlinejudge-assessment");
