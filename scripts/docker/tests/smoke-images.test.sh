@@ -156,6 +156,8 @@ common_env=(
   "GIT_SHA=$head_sha"
   "MYSQL_PASSWORD=contract-password"
   "MYSQL_ROOT_PASSWORD=contract-root-password"
+  "IDENTITY_JWKS_TRUST_BUNDLE={\"keys\":[]}"
+  "IDENTITY_JWKS_URI=https://identity.example.test/.well-known/jwks.json"
   "PATH=$fake_bin:$PATH"
   "CONTAINER_TEST_DOCKER_LOG=$docker_log"
   "CONTAINER_TEST_CURL_LOG=$curl_log"
@@ -196,6 +198,24 @@ if env -u MYSQL_PASSWORD GIT_SHA="$head_sha" MYSQL_ROOT_PASSWORD=contract-root-p
 fi
 grep -Fq 'MYSQL_PASSWORD is required' "$fixture_root/missing-secret.err" || \
   fail "missing MYSQL_PASSWORD did not produce the required diagnostic"
+
+if env -u IDENTITY_JWKS_TRUST_BUNDLE GIT_SHA="$head_sha" MYSQL_PASSWORD=contract-password MYSQL_ROOT_PASSWORD=contract-root-password \
+  IDENTITY_JWKS_URI=https://identity.example.test/.well-known/jwks.json \
+  PATH="$fake_bin:$PATH" CONTAINER_TEST_DOCKER_LOG="$docker_log" \
+  bash "$source_script" >"$fixture_root/missing-jwks-bundle.out" 2>"$fixture_root/missing-jwks-bundle.err"; then
+  fail "missing IDENTITY_JWKS_TRUST_BUNDLE unexpectedly succeeded"
+fi
+grep -Fq 'IDENTITY_JWKS_TRUST_BUNDLE is required' "$fixture_root/missing-jwks-bundle.err" || \
+  fail "missing IDENTITY_JWKS_TRUST_BUNDLE did not produce the required diagnostic"
+
+if env -u IDENTITY_JWKS_URI GIT_SHA="$head_sha" MYSQL_PASSWORD=contract-password MYSQL_ROOT_PASSWORD=contract-root-password \
+  IDENTITY_JWKS_TRUST_BUNDLE='{"keys":[]}' \
+  PATH="$fake_bin:$PATH" CONTAINER_TEST_DOCKER_LOG="$docker_log" \
+  bash "$source_script" >"$fixture_root/missing-jwks-uri.out" 2>"$fixture_root/missing-jwks-uri.err"; then
+  fail "missing IDENTITY_JWKS_URI unexpectedly succeeded"
+fi
+grep -Fq 'IDENTITY_JWKS_URI is required' "$fixture_root/missing-jwks-uri.err" || \
+  fail "missing IDENTITY_JWKS_URI did not produce the required diagnostic"
 
 run_expected_failure startup 'simulated compose startup failure' CONTAINER_TEST_FAIL_UP=1
 grep -Fq ' logs ' "$docker_log" || fail "startup failure did not collect logs"

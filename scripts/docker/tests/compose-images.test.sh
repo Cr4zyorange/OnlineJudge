@@ -73,9 +73,13 @@ run_failure missing 'GIT_SHA is required' env -u GIT_SHA
 run_failure latest 'GIT_SHA must be a full 40-character Git SHA' GIT_SHA=latest
 run_failure short-sha 'GIT_SHA must be a full 40-character Git SHA' GIT_SHA="${head_sha:0:12}"
 run_failure mismatch 'GIT_SHA must match the current HEAD' GIT_SHA="$wrong_sha"
+run_failure missing-jwks-bundle 'IDENTITY_JWKS_TRUST_BUNDLE is required' \
+  env -u IDENTITY_JWKS_TRUST_BUNDLE GIT_SHA="$head_sha" IDENTITY_JWKS_URI='https://identity.example.test/.well-known/jwks.json'
+run_failure missing-jwks-uri 'IDENTITY_JWKS_URI is required' \
+  env -u IDENTITY_JWKS_URI GIT_SHA="$head_sha" IDENTITY_JWKS_TRUST_BUNDLE='{"keys":[]}'
 
 : > "$docker_log"
-if GIT_SHA="$head_sha" PATH="$fake_bin:$PATH" CONTAINER_TEST_DOCKER_LOG="$docker_log" \
+if GIT_SHA="$head_sha" IDENTITY_JWKS_TRUST_BUNDLE='{"keys":[]}' IDENTITY_JWKS_URI='https://identity.example.test/.well-known/jwks.json' PATH="$fake_bin:$PATH" CONTAINER_TEST_DOCKER_LOG="$docker_log" \
   CONTAINER_TEST_DIRTY_SOURCE=1 bash "$source_script" up --build \
   >"$fixture_root/dirty-build.out" 2>"$fixture_root/dirty-build.err"; then
   fail 'dirty source tree unexpectedly built through the Compose entrypoint'
@@ -85,7 +89,7 @@ grep -Fq 'source tree must be clean before building versioned images' "$fixture_
 [[ ! -s "$docker_log" ]] || fail 'dirty Compose build invoked Docker before validation'
 
 : > "$docker_log"
-GIT_SHA="$head_sha" PATH="$fake_bin:$PATH" CONTAINER_TEST_DOCKER_LOG="$docker_log" \
+GIT_SHA="$head_sha" IDENTITY_JWKS_TRUST_BUNDLE='{"keys":[]}' IDENTITY_JWKS_URI='https://identity.example.test/.well-known/jwks.json' PATH="$fake_bin:$PATH" CONTAINER_TEST_DOCKER_LOG="$docker_log" \
   bash "$source_script" --project-name contract config --services \
   >"$fixture_root/success.out" 2>"$fixture_root/success.err" || {
     cat "$fixture_root/success.err" >&2
@@ -96,7 +100,7 @@ grep -Fq -- "compose --file $repo_root/deploy/docker/compose.yml --project-name 
   fail 'Compose entrypoint did not pin the repository Compose file'
 
 : > "$docker_log"
-GIT_SHA="$head_sha" PATH="$fake_bin:$PATH" CONTAINER_TEST_DOCKER_LOG="$docker_log" \
+GIT_SHA="$head_sha" IDENTITY_JWKS_TRUST_BUNDLE='{"keys":[]}' IDENTITY_JWKS_URI='https://identity.example.test/.well-known/jwks.json' PATH="$fake_bin:$PATH" CONTAINER_TEST_DOCKER_LOG="$docker_log" \
   COMPOSE_EXTRA_FILES='deploy/docker/compose.eval.yml' bash "$source_script" config \
   >"$fixture_root/override.out" 2>"$fixture_root/override.err" || {
     cat "$fixture_root/override.err" >&2

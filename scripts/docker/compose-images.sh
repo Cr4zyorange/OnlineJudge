@@ -9,6 +9,8 @@ require_full_git_sha
 require_command git
 require_matching_head "$repo_root"
 require_command docker
+require_secret IDENTITY_JWKS_TRUST_BUNDLE
+require_secret IDENTITY_JWKS_URI
 
 compose_file="$repo_root/deploy/docker/compose.yml"
 compose_files=("$compose_file")

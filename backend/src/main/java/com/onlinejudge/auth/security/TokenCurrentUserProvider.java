@@ -32,12 +32,15 @@ public class TokenCurrentUserProvider implements CurrentUserProvider {
     public Optional<CurrentUser> getCurrentUser() {
         Optional<String> token = bearerToken();
         if (token.isPresent()) {
-            if (!isLegacyIdentitySessionEndpoint()) {
-                return identityJwksCache.verify(token.get(), securityVersions)
-                        .flatMap(this::toCurrentUser);
-            }
+            // The three-service deployment still routes login to this backend.
+            // Keep its persisted opaque sessions valid on every protected route
+            // until that complete login flow is cut over to Identity.  An
+            // unrecognised bearer value is then handled strictly by the offline
+            // JWT verifier; gateway X-User-* headers remain credentials never.
             return sessionTokenService.resolveCurrentUser(token.get())
-                    .map(this::toCurrentUser);
+                    .map(this::toCurrentUser)
+                    .or(() -> identityJwksCache.verify(token.get(), securityVersions)
+                            .flatMap(this::toCurrentUser));
         }
         return Optional.empty();
     }
@@ -83,14 +86,5 @@ public class TokenCurrentUserProvider implements CurrentUserProvider {
         }
         String token = authorization.substring("Bearer ".length()).trim();
         return token.isEmpty() ? Optional.empty() : Optional.of(token);
-    }
-
-    private boolean isLegacyIdentitySessionEndpoint() {
-        ServletRequestAttributes attributes = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
-        if (attributes == null) {
-            return false;
-        }
-        String uri = attributes.getRequest().getRequestURI();
-        return "/api/v1/auth/me".equals(uri) || "/api/v1/auth/logout".equals(uri);
     }
 }

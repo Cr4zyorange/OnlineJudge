@@ -23,7 +23,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringBootTest(properties = {
         "spring.datasource.url=jdbc:h2:mem:auth_crs_integration;MODE=MySQL;DATABASE_TO_LOWER=TRUE;CASE_INSENSITIVE_IDENTIFIERS=TRUE;DB_CLOSE_DELAY=-1",
-        "onlinejudge.auth.allow-header-auth=false"
+        "onlinejudge.auth.allow-header-auth=false",
+        // Exercise the production provider: the test-only gateway-header bridge
+        // must not conceal a broken opaque-session-to-business-route hand-off.
+        "onlinejudge.test.legacy-header-auth=false"
 })
 @AutoConfigureMockMvc
 @Sql(

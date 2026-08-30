@@ -3,6 +3,9 @@ package com.onlinejudge.auth;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.onlinejudge.identityservice.IdentityServiceApplication;
+import com.onlinejudge.auth.repository.ServiceTokenIdempotencyRepository;
+import com.onlinejudge.auth.security.JwtTokenService;
+import com.onlinejudge.auth.service.ServiceTokenService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -14,6 +17,7 @@ import javax.security.auth.x500.X500Principal;
 import java.security.cert.X509Certificate;
 import java.util.Base64;
 import java.util.Map;
+import java.time.Duration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
@@ -34,6 +38,12 @@ class ServiceTokenControllerTest {
 
     @Autowired
     private ObjectMapper objectMapper;
+
+    @Autowired
+    private ServiceTokenIdempotencyRepository idempotency;
+
+    @Autowired
+    private JwtTokenService jwtTokenService;
 
     @Test
     void mtlsWorkloadMintsAShortLivedAudienceBoundServiceToken() throws Exception {
@@ -72,6 +82,24 @@ class ServiceTokenControllerTest {
 
         mockMvc.perform(mint(courseCertificate(), "course", "course:write", "service-token-idempotency-0004"))
                 .andExpect(status().isConflict());
+    }
+
+    @Test
+    void idempotencySurvivesAProcessRestartInsteadOfRelyingOnTheLocalHeap() throws Exception {
+        String key = "service-token-idempotency-restart-0001";
+        String first = mockMvc.perform(mint(courseCertificate(), "course", "course:read", key))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+
+        // A second service object represents a freshly started Identity pod
+        // sharing only its durable database with the first pod.
+        ServiceTokenService restarted = new ServiceTokenService(jwtTokenService, idempotency, Duration.ofMinutes(5));
+        var replayed = restarted.mint("CN=course-service", "course", java.util.List.of("course:read"), key);
+
+        assertThat(replayed.token()).isEqualTo(objectMapper.readTree(first).path("accessToken").asText());
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> restarted.mint(
+                        "CN=course-service", "course", java.util.List.of("course:write"), key))
+                .isInstanceOf(com.onlinejudge.auth.exception.ServiceTokenException.class);
     }
 
     @Test
