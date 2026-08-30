@@ -6,6 +6,8 @@ import com.onlinejudge.assessmentservice.persistence.CourseMembershipDeadLetterR
 import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.Connection;
 import com.rabbitmq.client.ConnectionFactory;
+import com.rabbitmq.client.Recoverable;
+import com.rabbitmq.client.RecoveryListener;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.SmartLifecycle;
@@ -21,7 +23,8 @@ import java.util.Map;
 public class CourseMembershipRabbitConsumer implements SmartLifecycle {
     private final CourseMembershipProjectionService projection; private final CourseMembershipDeadLetterRepository deadLetters; private final ObjectMapper json;
     private final String host, username, password, exchange, queue, snapshotRoutingKey, deadLetterExchange, deadLetterQueue, deadLetterRoutingKey; private final int port;
-    private volatile boolean running; private Connection connection; private Channel channel;
+    private final RabbitSubscriptionHealth subscriptionHealth = new RabbitSubscriptionHealth();
+    private Connection connection; private Channel channel;
     public CourseMembershipRabbitConsumer(CourseMembershipProjectionService projection, CourseMembershipDeadLetterRepository deadLetters, ObjectMapper json,
             @Value("${assessment.rabbit.host:127.0.0.1}") String host, @Value("${assessment.rabbit.port:5672}") int port,
             @Value("${assessment.rabbit.username}") String username, @Value("${assessment.rabbit.password}") String password,
@@ -36,7 +39,14 @@ public class CourseMembershipRabbitConsumer implements SmartLifecycle {
     @Override public void start() {
         try {
             var factory = new ConnectionFactory(); factory.setHost(host); factory.setPort(port); factory.setUsername(username); factory.setPassword(password);
+            factory.setAutomaticRecoveryEnabled(true); factory.setTopologyRecoveryEnabled(true); factory.setNetworkRecoveryInterval(1_000);
             connection = factory.newConnection("assessment-course-member-consumer"); channel = connection.createChannel();
+            connection.addShutdownListener(signal -> subscriptionHealth.unavailable());
+            channel.addShutdownListener(signal -> subscriptionHealth.unavailable());
+            if (connection instanceof Recoverable recoverable) recoverable.addRecoveryListener(new RecoveryListener() {
+                @Override public void handleRecoveryStarted(Recoverable ignored) { subscriptionHealth.unavailable(); }
+                @Override public void handleRecovery(Recoverable ignored) { subscriptionHealth.recovered(); }
+            });
             channel.exchangeDeclare(exchange, "topic", true); channel.exchangeDeclare(deadLetterExchange, "topic", true);
             channel.queueDeclare(deadLetterQueue, true, false, false, null); channel.queueBind(deadLetterQueue, deadLetterExchange, deadLetterRoutingKey);
             channel.queueDeclare(queue, true, false, false, Map.of("x-dead-letter-exchange", deadLetterExchange, "x-dead-letter-routing-key", deadLetterRoutingKey));
@@ -60,7 +70,7 @@ public class CourseMembershipRabbitConsumer implements SmartLifecycle {
                     // The declared durable DLX retains it for audit and controlled replay.
                     channel.basicNack(message.getEnvelope().getDeliveryTag(), false, false);
                 } catch (Exception unavailable) { channel.basicNack(message.getEnvelope().getDeliveryTag(), false, true); }
-            }, tag -> { });
+            }, tag -> subscriptionHealth.primaryConsumerCancelled());
             channel.basicConsume(deadLetterQueue, false, (tag, message) -> {
                 try {
                     String raw = new String(message.getBody(), StandardCharsets.UTF_8);
@@ -68,12 +78,12 @@ public class CourseMembershipRabbitConsumer implements SmartLifecycle {
                     deadLetters.capture(eventId, raw, "INVALID_COURSE_MEMBER_ENVELOPE", Instant.now());
                     channel.basicAck(message.getEnvelope().getDeliveryTag(), false);
                 } catch (Exception unavailable) { channel.basicNack(message.getEnvelope().getDeliveryTag(), false, true); }
-            }, tag -> { });
-            running = true;
+            }, tag -> subscriptionHealth.deadLetterConsumerCancelled());
+            subscriptionHealth.subscriptionsEstablished();
         } catch (Exception unavailable) { stop(); }
     }
-    @Override public void stop() { running = false; try { if (channel != null) channel.close(); } catch (Exception ignored) { } try { if (connection != null) connection.close(); } catch (Exception ignored) { } }
-    @Override public boolean isRunning() { return running; }
+    @Override public void stop() { subscriptionHealth.unavailable(); try { if (channel != null) channel.close(); } catch (Exception ignored) { } try { if (connection != null) connection.close(); } catch (Exception ignored) { } }
+    @Override public boolean isRunning() { return subscriptionHealth.isHealthy(connection, channel); }
     @Override public int getPhase() { return 1; }
     private String deadLetterId(String raw, String messageId) {
         try { String eventId = json.readTree(raw).path("eventId").asText(); if (!eventId.isBlank()) return eventId; } catch (Exception ignored) { }
