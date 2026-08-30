@@ -59,6 +59,14 @@ java_major="$(java -version 2>&1 | sed -n '1s/.*version "\([0-9][0-9]*\).*/\1/p'
 # 因而可以在生产者和消费者 Java 套件之外先阻断不兼容的文档、事件信封或反例回归。
 log_run node "$checkout/scripts/ci/verify-microservice-contract-v2.mjs"
 
+# #305 is the integration freeze over the merged ownership, v2 and workload
+# inputs.  Keep its lightweight, dependency-free semantic verifier in both
+# producer and consumer gates so stale merge evidence, a four-service rewrite,
+# or removal of Assessment Worker fencing cannot pass as documentation-only
+# drift.
+log_run node "$checkout/scripts/ci/verify-final-architecture-305.mjs"
+log_run node --test "$checkout/scripts/test/verify-final-architecture-305.test.mjs"
+
 # #309 freezes the five-domain ownership input for #341.  Run both the
 # source-schema catalog verifier and its mutation tests in the canonical gate,
 # so no future schema/account change can silently restore a fourth combined
