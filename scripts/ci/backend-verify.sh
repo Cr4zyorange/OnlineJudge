@@ -112,6 +112,7 @@ if [[ "${OJ312_COURSE_GATE_MUTATION:-0}" != "1" ]]; then
   log_run bash "$checkout/scripts/test/verify-course-service-ci-gate.test.sh" "$checkout"
 fi
 log_run bash "$checkout/scripts/test/verify-course-compose-contract.test.sh" "$checkout"
+log_run bash "$checkout/scripts/test/verify-course-reproducible-build.sh" "$checkout"
 
 # 编译门禁：主代码必须可编译。
 printf '\n$ mvn -B -ntp -q -DskipTests compile\n' | tee -a "$log"
