@@ -400,7 +400,7 @@ function validateDocumentation() {
 }
 
 function validateHomeworkPublicationMigrationDocs() {
-  const requiredDocuments = [
+  const currentV2Documents = [
     'docs/最终提交/软件需求规格说明书.md',
     'docs/最终提交/软件概要设计说明书.md',
     'docs/最终提交/软件详细设计说明书.md',
@@ -416,17 +416,53 @@ function validateHomeworkPublicationMigrationDocs() {
     'docs/开发/HWK-作业与自动评测模块开发流程.md',
     'docs/开发/LRN-学习过程与通知提醒模块开发流程.md',
     'docs/adr/ADR-006-五业务服务与可靠消息契约.md',
-    'docs/开发/D6-D7-五服务共享契约-v2.md'
+    'docs/开发/D6-D7-五服务共享契约-v2.md',
+    'docs/diagrams/srs/fig_4_14b_hwk_publish_ssd.mmd',
+    'docs/diagrams/arch/fig_5_2_hwk_02_publish_component.mmd',
+    'docs/diagrams/dsd/fig_3_5_3a_hwk_publish_object.mmd'
   ];
-  for (const relativePath of requiredDocuments) {
+
+  const currentV2RequiredTerms = ['HWK_5003', 'outbox', 'receiverScope'];
+  const unqualifiedLegacyRules = [
+    '必达通知同步加入来源事务，失败必须回滚关键业务状态',
+    '必达通知与来源事务原子提交，通知失败必须回滚关键业务状态',
+    'HOMEWORK_PUBLISHED 使用该契约以保证通知失败时作业发布整体回滚',
+    '通过 `publishRequired` 同步必达，失败向上抛出并回滚发布事务'
+  ];
+
+  function migrationProblems(relativePath, text) {
+    const problems = [];
+    for (const requiredText of currentV2RequiredTerms) {
+      if (!text.includes(requiredText)) {
+        problems.push(`${relativePath}: must state the v2 HOMEWORK_PUBLISHED ${requiredText} migration rule`);
+      }
+    }
+    for (const legacyRule of unqualifiedLegacyRules) {
+      if (text.includes(legacyRule)) {
+        problems.push(`${relativePath}: retains the unqualified retired v1 rule: ${legacyRule}`);
+      }
+    }
+    if (text.includes('publishRequired') && !/(?:v1.{0,240}(?:历史|退役)|(?:历史|退役).{0,240}v1)/s.test(text)) {
+      problems.push(`${relativePath}: publishRequired may appear only as explicitly retired v1 historical evidence`);
+    }
+    return problems;
+  }
+
+  let finalSrsText;
+  for (const relativePath of currentV2Documents) {
     const absolutePath = resolve(repoRoot, relativePath);
     assert(existsSync(absolutePath), `missing ${relativePath}`);
     if (!existsSync(absolutePath)) continue;
     const text = readFileSync(absolutePath, 'utf8');
-    for (const requiredText of ['HWK_5003', 'outbox', 'receiverScope']) {
-      assert(text.includes(requiredText),
-        `${relativePath}: must state the v2 HOMEWORK_PUBLISHED ${requiredText} migration rule`);
-    }
+    for (const migrationProblem of migrationProblems(relativePath, text)) problem(migrationProblem);
+    if (relativePath === 'docs/最终提交/软件需求规格说明书.md') finalSrsText = text;
+  }
+
+  if (finalSrsText) {
+    const reintroducedLegacyRule = `${finalSrsText}\n${unqualifiedLegacyRules[0]}`;
+    const mutationFailures = migrationProblems('mutation:SRS', reintroducedLegacyRule);
+    assert(mutationFailures.length > 0, 'mutation: reintroducing the unqualified v1 required-notification rollback rule was accepted');
+    if (mutationFailures.length > 0) rejectedMutationCount += 1;
   }
 }
 
@@ -505,6 +541,6 @@ if (errors.length > 0) {
   process.exitCode = 1;
 } else {
   console.log(
-    `microservice-contract-v2: PASS (${openApiCount} OpenAPI, ${asyncMessageCount} AsyncAPI messages, ${validFixtureCount} valid fixture(s), ${rejectedFixtureCount} incompatible fixture(s), ${rejectedMutationCount} review mutation(s) rejected)`
+    `microservice-contract-v2: PASS (${openApiCount} OpenAPI, ${asyncMessageCount} AsyncAPI messages, ${validFixtureCount} valid fixture(s), ${rejectedFixtureCount} incompatible fixture(s), ${rejectedMutationCount} rejecting mutation(s) rejected)`
   );
 }
