@@ -11,3 +11,4 @@ LEARNING,oj_learning,event_outbox,OUTBOX,planned,#337
 LEARNING,oj_learning,learning_event_inbox,INBOX,implemented,#337
 GRADE,oj_grade,t_grade_record,PROJECTION,existing,#341
 LEARNING,oj_learning,learning_course_member_projection,PROJECTION,implemented,#337
+LEARNING,oj_learning,learning_course_membership_watermark,PROJECTION,implemented,#337

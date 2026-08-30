@@ -79,6 +79,9 @@ public class RabbitMqLearningReliableListener {
         if ("course.member.changed.v2".equals(envelope.eventType())) {
             return RabbitMqReliabilityConfiguration.LEARNING_COURSE_MEMBER_RETRY_QUEUE;
         }
+        if (LearningCourseMembershipSnapshotHandler.EVENT_TYPE.equals(envelope.eventType())) {
+            return RabbitMqReliabilityConfiguration.LEARNING_COURSE_ROSTER_RETRY_QUEUE;
+        }
         return RabbitMqReliabilityConfiguration.LEARNING_RETRY_QUEUE;
     }
 

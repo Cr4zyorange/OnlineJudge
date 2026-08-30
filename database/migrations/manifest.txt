@@ -27,3 +27,4 @@ DB-CRS-05-course-announcement.sql
 20260825_01_add_grd_analysis_source_fingerprint.sql
 20260825_02_add_grd_analysis_source_version.sql
 20260830_01_create_reliable_event_storage.sql
+20260831_02_create_learning_membership_watermark.sql

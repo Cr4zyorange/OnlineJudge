@@ -44,11 +44,11 @@ public class LearningHomeworkPublishedHandler {
         String deadline = requiredRfc3339(payload, "deadline");
         requiredRfc3339(payload, "publishedAt");
 
-        List<Long> recipients = courseMembers.activeStudentIds(courseId);
-        if (recipients.isEmpty() && !courseMembers.hasObservedCourse(courseId)) {
+        if (!courseMembers.hasCompleteRoster(courseId)) {
             throw new CourseProjectionUnavailableException(
-                    "Learning has not yet received course.member.changed.v2 for course " + courseId);
+                    "Learning has not yet received a complete course.membership.snapshot.v2 for course " + courseId);
         }
+        List<Long> recipients = courseMembers.activeStudentIds(courseId);
         for (Long recipient : recipients) {
             NotificationCreateCommand command = new NotificationCreateCommand(
                     "homework:" + homeworkId + ":" + recipient,

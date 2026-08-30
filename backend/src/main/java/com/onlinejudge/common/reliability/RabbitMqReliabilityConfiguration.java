@@ -21,9 +21,11 @@ public class RabbitMqReliabilityConfiguration {
     public static final String LEARNING_QUEUE = "onlinejudge.learning.events.v2";
     public static final String LEARNING_RETRY_QUEUE = "onlinejudge.learning.retry.v2";
     public static final String LEARNING_COURSE_MEMBER_RETRY_QUEUE = "onlinejudge.learning.course-member.retry.v2";
+    public static final String LEARNING_COURSE_ROSTER_RETRY_QUEUE = "onlinejudge.learning.course-roster.retry.v2";
     public static final String LEARNING_DLQ = "onlinejudge.learning.dlq.v2";
     public static final String HOMEWORK_PUBLISHED_ROUTING_KEY = "onlinejudge.assessment.homework.published.v2";
     public static final String COURSE_MEMBER_CHANGED_ROUTING_KEY = "onlinejudge.course.member.changed.v2";
+    public static final String COURSE_MEMBERSHIP_SNAPSHOT_ROUTING_KEY = "onlinejudge.course.membership.snapshot.v2";
 
     @Bean
     TopicExchange onlinejudgeEventsExchange() {
@@ -62,6 +64,15 @@ public class RabbitMqReliabilityConfiguration {
     }
 
     @Bean
+    Queue learningCourseRosterRetryQueue() {
+        return QueueBuilder.durable(LEARNING_COURSE_ROSTER_RETRY_QUEUE)
+                .ttl(1_000)
+                .deadLetterExchange(EVENTS_EXCHANGE)
+                .deadLetterRoutingKey(COURSE_MEMBERSHIP_SNAPSHOT_ROUTING_KEY)
+                .build();
+    }
+
+    @Bean
     Queue learningDeadLetterQueue() {
         return QueueBuilder.durable(LEARNING_DLQ).build();
     }
@@ -78,6 +89,13 @@ public class RabbitMqReliabilityConfiguration {
         return BindingBuilder.bind(learningEventsQueue)
                 .to(onlinejudgeEventsExchange)
                 .with(COURSE_MEMBER_CHANGED_ROUTING_KEY);
+    }
+
+    @Bean
+    Binding courseMembershipSnapshotToLearning(TopicExchange onlinejudgeEventsExchange, Queue learningEventsQueue) {
+        return BindingBuilder.bind(learningEventsQueue)
+                .to(onlinejudgeEventsExchange)
+                .with(COURSE_MEMBERSHIP_SNAPSHOT_ROUTING_KEY);
     }
 
     @Bean

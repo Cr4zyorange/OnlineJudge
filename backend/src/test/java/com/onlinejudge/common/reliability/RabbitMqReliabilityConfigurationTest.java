@@ -19,6 +19,7 @@ class RabbitMqReliabilityConfigurationTest {
                 .run(context -> {
                     Queue main = context.getBean("learningEventsQueue", Queue.class);
                     Queue retry = context.getBean("learningRetryQueue", Queue.class);
+                    Queue rosterRetry = context.getBean("learningCourseRosterRetryQueue", Queue.class);
                     Queue deadLetter = context.getBean("learningDeadLetterQueue", Queue.class);
 
                     assertThat(main.isDurable()).isTrue();
@@ -31,6 +32,11 @@ class RabbitMqReliabilityConfigurationTest {
                     assertThat(deadLetter.isDurable()).isTrue();
                     assertThat(context.getBean("courseMemberChangedToLearning", Binding.class).getRoutingKey())
                             .isEqualTo("onlinejudge.course.member.changed.v2");
+                    assertThat(rosterRetry.getArguments())
+                            .containsEntry("x-message-ttl", 1_000)
+                            .containsEntry("x-dead-letter-routing-key", "onlinejudge.course.membership.snapshot.v2");
+                    assertThat(context.getBean("courseMembershipSnapshotToLearning", Binding.class).getRoutingKey())
+                            .isEqualTo("onlinejudge.course.membership.snapshot.v2");
                 });
     }
 }

@@ -57,3 +57,4 @@ LEARNING,lrn_reminder_rule,user_id,IDENTITY.t_auth_user.user_id,identity-securit
 LEARNING,lrn_notification_setting,user_id,IDENTITY.t_auth_user.user_id,identity-security-version-event,contracts/v2/asyncapi/events.asyncapi.json#/components/messages/identity.security-version.changed.v2,eventual
 LEARNING,learning_course_member_projection,course_id,COURSE.crs_course.id,course-member-changed-event,contracts/v2/asyncapi/events.asyncapi.json#/components/messages/course.member.changed.v2,eventual
 LEARNING,learning_course_member_projection,user_id,IDENTITY.t_auth_user.user_id,identity-security-version-event,contracts/v2/asyncapi/events.asyncapi.json#/components/messages/identity.security-version.changed.v2,eventual
+LEARNING,learning_course_membership_watermark,course_id,COURSE.crs_course.id,course-membership-snapshot-event,contracts/v2/asyncapi/events.asyncapi.json#/components/messages/course.membership.snapshot.v2,eventual

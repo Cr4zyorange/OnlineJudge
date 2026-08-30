@@ -1272,6 +1272,15 @@ CREATE TABLE IF NOT EXISTS learning_course_member_projection (
     KEY idx_learning_course_member_active (course_id, membership_status)
 );
 
+-- Source: database/migrations/20260831_02_create_learning_membership_watermark.sql
+CREATE TABLE IF NOT EXISTS learning_course_membership_watermark (
+    course_id BIGINT NOT NULL PRIMARY KEY,
+    snapshot_version BIGINT NOT NULL,
+    completed_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    KEY idx_learning_roster_watermark_version (snapshot_version)
+);
+
 -- The clean snapshot already contains every migration below. Checksums are
 -- validated by database/mysql/migrate.sh before a retained database is reused.
 INSERT INTO schema_migrations
@@ -1304,4 +1313,5 @@ VALUES
     ('20260822_03_create_hwk_submission_attachment.sql', 'c45eeca539e8a56522826833cc533789cfad169e7c6712420de1208e6b014979', 'COMPOSE_BASELINE', 0, 1),
     ('20260825_01_add_grd_analysis_source_fingerprint.sql', 'f650506d22e00f48f23da6f6dd76ca11d3f1e1083a59f805be20cf7b98315b59', 'COMPOSE_BASELINE', 0, 1),
     ('20260825_02_add_grd_analysis_source_version.sql', 'd40f5b9a41a0a836960f9b3d445e0d1f6fc6cbcc4f2b48b210387fcfc9f21b2c', 'COMPOSE_BASELINE', 0, 1),
-    ('20260830_01_create_reliable_event_storage.sql', '9c20588263045d59dd55730741aa46c2f973828ba3270fc8c3717505e5c2ee45', 'COMPOSE_BASELINE', 0, 1);
+    ('20260830_01_create_reliable_event_storage.sql', '9c20588263045d59dd55730741aa46c2f973828ba3270fc8c3717505e5c2ee45', 'COMPOSE_BASELINE', 0, 1),
+    ('20260831_02_create_learning_membership_watermark.sql', '9a60d1a32ce5b3305cfa7663aabf5dc5e19b6831376d2374c9c158b2435d35b4', 'COMPOSE_BASELINE', 0, 1);

@@ -37,6 +37,7 @@ import static org.assertj.core.api.Assertions.assertThat;
         LearningReliabilityRepository.class,
         LearningHomeworkPublishedHandler.class,
         LearningCourseMemberChangedHandler.class,
+        LearningCourseMembershipSnapshotHandler.class,
         LearningReliableEventConsumer.class,
         LearningReconciliationWorker.class,
         LearningDeadLetterReplayService.class,
@@ -44,7 +45,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 })
 @Sql(scripts = {
         "file:../database/migrations/20260603_01_create_lrn_notification.sql",
-        "file:../database/migrations/20260830_01_create_reliable_event_storage.sql"
+        "file:../database/migrations/20260830_01_create_reliable_event_storage.sql",
+        "file:../database/migrations/20260831_02_create_learning_membership_watermark.sql"
 })
 class LearningReliableEventConsumerTest {
     static class TestConfig {
@@ -90,7 +92,9 @@ class LearningReliableEventConsumerTest {
         jdbcTemplate.update("DELETE FROM learning_event_reconciliation_request");
         jdbcTemplate.update("DELETE FROM learning_deferred_event");
         jdbcTemplate.update("DELETE FROM learning_course_member_projection");
-        courseMembers.upsert(88L, 42L, "ACTIVE", 1L, Instant.parse("2026-08-30T09:00:00Z"));
+        jdbcTemplate.update("DELETE FROM learning_course_membership_watermark");
+        assertThat(consumer.consume(courseMembershipSnapshotEvent("baseline-roster", 1,
+                new MemberFact(42L, "ACTIVE", 1L)))).isEqualTo(EventProcessingDecision.ACK);
         publisher.publishedEventIds.clear();
     }
 
@@ -103,7 +107,7 @@ class LearningReliableEventConsumerTest {
         }
 
         assertThat(count("lrn_notification")).isEqualTo(1);
-        assertThat(count("learning_event_inbox")).isEqualTo(1);
+        assertThat(countByEventId("learning_event_inbox", "event-1")).isEqualTo(1);
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT idempotency_key FROM lrn_notification", String.class
         )).isEqualTo("homework:91:42");
@@ -115,7 +119,7 @@ class LearningReliableEventConsumerTest {
                 .isEqualTo(EventProcessingDecision.ACK);
 
         assertThat(count("lrn_notification")).isZero();
-        assertThat(count("learning_event_inbox")).isZero();
+        assertThat(countByEventId("learning_event_inbox", "event-gap")).isZero();
         assertThat(count("learning_deferred_event")).isEqualTo(1);
         assertThat(count("learning_event_reconciliation_request")).isEqualTo(1);
     }
@@ -124,13 +128,14 @@ class LearningReliableEventConsumerTest {
     void reconciliationEventuallyAppliesDeferredV2AfterTheMissingVersionArrives() {
         assertThat(consumer.consume(homeworkEvent("event-v2", 2, "Java collections homework")))
                 .isEqualTo(EventProcessingDecision.ACK);
-        assertThat(count("learning_event_inbox")).isZero();
+        assertThat(countByEventId("learning_event_inbox", "event-v2")).isZero();
 
         assertThat(consumer.consume(homeworkEvent("event-v1", 1, "Java collections homework")))
                 .isEqualTo(EventProcessingDecision.ACK);
         assertThat(reconciliationWorker.reconcileDue(Instant.parse("2030-01-01T00:00:00.123456789Z"))).isEqualTo(1);
 
-        assertThat(count("learning_event_inbox")).isEqualTo(2);
+        assertThat(countByEventId("learning_event_inbox", "event-v1")).isEqualTo(1);
+        assertThat(countByEventId("learning_event_inbox", "event-v2")).isEqualTo(1);
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT processing_status FROM learning_event_inbox WHERE event_id = 'event-v2'", String.class
         )).isEqualTo("APPLIED");
@@ -149,12 +154,12 @@ class LearningReliableEventConsumerTest {
 
     @Test
     void courseMemberEventBuildsTheProjectionAndUnblocksADeferredHomeworkNotification() {
-        jdbcTemplate.update("DELETE FROM learning_course_member_projection");
+        clearCourseRoster();
 
         assertThat(consumer.consume(homeworkEvent("homework-before-members", 1, "Java collections homework")))
                 .isEqualTo(EventProcessingDecision.ACK);
         assertThat(count("lrn_notification")).isZero();
-        assertThat(count("learning_event_inbox")).isZero();
+        assertThat(countByEventId("learning_event_inbox", "homework-before-members")).isZero();
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT deferral_reason FROM learning_deferred_event", String.class
         )).isEqualTo("MEMBERSHIP_PROJECTION_PENDING");
@@ -164,12 +169,77 @@ class LearningReliableEventConsumerTest {
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT member_version FROM learning_course_member_projection WHERE course_id = 88 AND user_id = 42", Long.class
         )).isEqualTo(1L);
+        assertThat(consumer.consume(courseMembershipSnapshotEvent("course-roster-1", 1,
+                new MemberFact(42L, "ACTIVE", 1L)))).isEqualTo(EventProcessingDecision.ACK);
 
         assertThat(reconciliationWorker.reconcileDue(Instant.parse("2030-01-01T00:00:00.123456789Z"))).isEqualTo(1);
         assertThat(count("lrn_notification")).isEqualTo(1);
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT processing_status FROM learning_event_inbox WHERE event_id = 'homework-before-members'", String.class
         )).isEqualTo("APPLIED");
+    }
+
+    @Test
+    void partialMemberProjectionMustNotAcknowledgeHomeworkBeforeTheFullCourseRosterIsKnown() {
+        clearCourseRoster();
+
+        assertThat(consumer.consume(courseMemberEvent("member-a", 42L, "ACTIVE", 1)))
+                .isEqualTo(EventProcessingDecision.ACK);
+        assertThat(consumer.consume(homeworkEvent("homework-partial-roster", 1, "Java collections homework")))
+                .isEqualTo(EventProcessingDecision.ACK);
+
+        assertThat(countByEventId("learning_event_inbox", "homework-partial-roster")).isZero();
+        assertThat(count("lrn_notification")).isZero();
+        assertThat(count("learning_deferred_event")).isEqualTo(1);
+
+        assertThat(consumer.consume(courseMembershipSnapshotEvent("course-roster-partial", 1,
+                new MemberFact(42L, "ACTIVE", 1L),
+                new MemberFact(43L, "ACTIVE", 1L)))).isEqualTo(EventProcessingDecision.ACK);
+        assertThat(reconciliationWorker.reconcileDue(Instant.parse("2030-01-01T00:00:00.123456789Z"))).isEqualTo(1);
+        assertThat(countByEventId("learning_event_inbox", "homework-partial-roster")).isEqualTo(1);
+        assertThat(count("lrn_notification")).isEqualTo(2);
+    }
+
+    @Test
+    void removedOnlyMemberProjectionMustNotAcknowledgeHomeworkAsAnAuthoritativeEmptyRoster() {
+        clearCourseRoster();
+
+        assertThat(consumer.consume(courseMemberEvent("removed-only", 42L, "REMOVED", 1)))
+                .isEqualTo(EventProcessingDecision.ACK);
+        assertThat(consumer.consume(homeworkEvent("homework-removed-only", 1, "Java collections homework")))
+                .isEqualTo(EventProcessingDecision.ACK);
+
+        assertThat(countByEventId("learning_event_inbox", "homework-removed-only")).isZero();
+        assertThat(count("lrn_notification")).isZero();
+        assertThat(count("learning_deferred_event")).isEqualTo(1);
+
+        assertThat(consumer.consume(courseMembershipSnapshotEvent("course-roster-empty", 1)))
+                .isEqualTo(EventProcessingDecision.ACK);
+        assertThat(reconciliationWorker.reconcileDue(Instant.parse("2030-01-01T00:00:00.123456789Z"))).isEqualTo(1);
+        assertThat(countByEventId("learning_event_inbox", "homework-removed-only")).isEqualTo(1);
+        assertThat(count("lrn_notification")).isZero();
+    }
+
+    @Test
+    void rosterSnapshotVersionGapAndOutOfOrderRecoveryApplyHomeworkOnlyAfterRequiredWatermarkArrives() {
+        clearCourseRoster();
+
+        assertThat(consumer.consume(courseMembershipSnapshotEvent("roster-v2", 2,
+                new MemberFact(42L, "ACTIVE", 1L),
+                new MemberFact(43L, "ACTIVE", 1L))))
+                .isEqualTo(EventProcessingDecision.ACK);
+        assertThat(consumer.consume(homeworkEvent("homework-after-roster-gap", 1, "Java collections homework")))
+                .isEqualTo(EventProcessingDecision.ACK);
+        assertThat(consumer.consume(courseMembershipSnapshotEvent("roster-v1", 1,
+                new MemberFact(42L, "ACTIVE", 1L))))
+                .isEqualTo(EventProcessingDecision.ACK);
+
+        assertThat(reconciliationWorker.reconcileDue(Instant.parse("2030-01-01T00:00:00.123456789Z"))).isEqualTo(2);
+        assertThat(countByEventId("learning_event_inbox", "homework-after-roster-gap")).isEqualTo(1);
+        assertThat(count("lrn_notification")).isEqualTo(2);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT snapshot_version FROM learning_course_membership_watermark WHERE course_id = 88", Long.class
+        )).isEqualTo(2L);
     }
 
     @Test
@@ -218,6 +288,10 @@ class LearningReliableEventConsumerTest {
     }
 
     private ReliableEventEnvelope courseMemberEvent(String eventId, String membershipStatus, long memberVersion) {
+        return courseMemberEvent(eventId, 42L, membershipStatus, memberVersion);
+    }
+
+    private ReliableEventEnvelope courseMemberEvent(String eventId, long userId, String membershipStatus, long memberVersion) {
         try {
             ObjectMapper mapper = new ObjectMapper();
             return new ReliableEventEnvelope(
@@ -225,13 +299,39 @@ class LearningReliableEventConsumerTest {
                     "course.member.changed.v2",
                     2,
                     "course-member",
-                    "88:42",
+                    "88:" + userId,
                     memberVersion,
                     Instant.parse("2026-08-30T09:15:30Z"),
                     "34c3bdce-e3ff-45b0-8c75-3e46d0e57f5b",
                     mapper.readTree("""
-                            {"courseId":"88","userId":"42","membershipStatus":"%s","memberVersion":%d}
-                            """.formatted(membershipStatus, memberVersion))
+                            {"courseId":"88","userId":"%d","membershipStatus":"%s","memberVersion":%d}
+                            """.formatted(userId, membershipStatus, memberVersion))
+            );
+        } catch (Exception exception) {
+            throw new AssertionError(exception);
+        }
+    }
+
+    private ReliableEventEnvelope courseMembershipSnapshotEvent(String eventId, long rosterVersion, MemberFact... members) {
+        try {
+            ObjectMapper mapper = new ObjectMapper();
+            String memberJson = java.util.Arrays.stream(members)
+                    .map(member -> """
+                            {"userId":"%d","membershipStatus":"%s","memberVersion":%d}
+                            """.formatted(member.userId(), member.membershipStatus(), member.memberVersion()))
+                    .collect(java.util.stream.Collectors.joining(","));
+            return new ReliableEventEnvelope(
+                    eventId,
+                    "course.membership.snapshot.v2",
+                    2,
+                    "course-membership-roster",
+                    "88",
+                    rosterVersion,
+                    Instant.parse("2026-08-30T09:15:30Z"),
+                    "34c3bdce-e3ff-45b0-8c75-3e46d0e57f5b",
+                    mapper.readTree("""
+                            {"courseId":"88","rosterVersion":%d,"members":[%s]}
+                            """.formatted(rosterVersion, memberJson))
             );
         } catch (Exception exception) {
             throw new AssertionError(exception);
@@ -240,6 +340,19 @@ class LearningReliableEventConsumerTest {
 
     private int count(String table) {
         return jdbcTemplate.queryForObject("SELECT COUNT(*) FROM " + table, Integer.class);
+    }
+
+    private int countByEventId(String table, String eventId) {
+        return jdbcTemplate.queryForObject("SELECT COUNT(*) FROM " + table + " WHERE event_id = ?", Integer.class, eventId);
+    }
+
+    private void clearCourseRoster() {
+        jdbcTemplate.update("DELETE FROM learning_course_member_projection");
+        jdbcTemplate.update("DELETE FROM learning_course_membership_watermark");
+        jdbcTemplate.update("DELETE FROM learning_event_inbox WHERE aggregate_type = 'course-membership-roster'");
+    }
+
+    private record MemberFact(long userId, String membershipStatus, long memberVersion) {
     }
 
     static class RecordingPublisher implements ConfirmedEventPublisher {

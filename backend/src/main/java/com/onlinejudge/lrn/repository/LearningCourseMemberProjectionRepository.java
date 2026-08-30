@@ -43,9 +43,56 @@ public class LearningCourseMemberProjectionRepository {
                         """, Long.class, courseId);
     }
 
-    public boolean hasObservedCourse(long courseId) {
+    /**
+     * A row for one member is not a roster.  Homework receiver resolution is
+     * allowed only after Course has supplied one complete course-scoped
+     * snapshot, whose aggregate version is persisted as the local watermark.
+     */
+    public boolean hasCompleteRoster(long courseId) {
         Integer count = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM learning_course_member_projection WHERE course_id = ?", Integer.class, courseId);
+                "SELECT COUNT(*) FROM learning_course_membership_watermark WHERE course_id = ?", Integer.class, courseId);
         return count != null && count > 0;
+    }
+
+    public void replaceWithCompleteRoster(long courseId, long snapshotVersion, List<MemberSnapshot> members, Instant updatedAt) {
+        int claimed = jdbcTemplate.update("""
+                        UPDATE learning_course_membership_watermark
+                        SET snapshot_version = ?, completed_at = ?, updated_at = ?
+                        WHERE course_id = ? AND snapshot_version < ?
+                        """, snapshotVersion, updatedAt, updatedAt, courseId, snapshotVersion);
+        if (claimed == 0) {
+            try {
+                jdbcTemplate.update("""
+                                INSERT INTO learning_course_membership_watermark
+                                (course_id, snapshot_version, completed_at, updated_at)
+                                VALUES (?, ?, ?, ?)
+                                """, courseId, snapshotVersion, updatedAt, updatedAt);
+                claimed = 1;
+            } catch (org.springframework.dao.DuplicateKeyException ignored) {
+                // Another transaction created the waterline first. Claim the
+                // newer snapshot if this one is still ahead of it.
+                claimed = jdbcTemplate.update("""
+                                UPDATE learning_course_membership_watermark
+                                SET snapshot_version = ?, completed_at = ?, updated_at = ?
+                                WHERE course_id = ? AND snapshot_version < ?
+                                """, snapshotVersion, updatedAt, updatedAt, courseId, snapshotVersion);
+            }
+        }
+        if (claimed == 0) return;
+
+        // This repository is invoked inside the consumer's local transaction:
+        // no reader can observe the new watermark until the replacement is
+        // complete, so receiver resolution never sees a half-written roster.
+        jdbcTemplate.update("DELETE FROM learning_course_member_projection WHERE course_id = ?", courseId);
+        for (MemberSnapshot member : members) {
+            jdbcTemplate.update("""
+                            INSERT INTO learning_course_member_projection
+                            (course_id, user_id, membership_status, member_version, updated_at)
+                            VALUES (?, ?, ?, ?, ?)
+                            """, courseId, member.userId(), member.membershipStatus(), member.memberVersion(), updatedAt);
+        }
+    }
+
+    public record MemberSnapshot(long userId, String membershipStatus, long memberVersion) {
     }
 }

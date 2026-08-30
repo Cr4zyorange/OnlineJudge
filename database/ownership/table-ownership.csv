@@ -56,3 +56,4 @@ learning_event_dead_letter,LEARNING,oj_learning,id,-,learning-local-dlq-dedup,re
 learning_event_reconciliation_request,LEARNING,oj_learning,id,-,learning-local-gap-reconciliation,retain-owner-local-indexes,#341-rebuild-from-events
 learning_deferred_event,LEARNING,oj_learning,id,-,learning-local-deferred-event-dedup-and-lease,retain-owner-local-indexes,#341-rebuild-from-events
 learning_course_member_projection,LEARNING,oj_learning,course_id+user_id,course_id->COURSE.crs_course.id;user_id->IDENTITY.t_auth_user.user_id,ID-only-projection-from-course-member-event,retain-owner-local-indexes,#341-rebuild-from-course-member-events
+learning_course_membership_watermark,LEARNING,oj_learning,course_id,course_id->COURSE.crs_course.id,ID-only-complete-roster-watermark,retain-owner-local-indexes,#337-rebuild-from-course-membership-snapshot

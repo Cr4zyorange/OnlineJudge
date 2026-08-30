@@ -30,6 +30,7 @@ public class LearningReliableEventConsumer {
     private final LearningReliabilityRepository reliability;
     private final LearningHomeworkPublishedHandler homeworkHandler;
     private final LearningCourseMemberChangedHandler courseMemberHandler;
+    private final LearningCourseMembershipSnapshotHandler courseMembershipSnapshotHandler;
     private final ObjectMapper objectMapper;
     private final TransactionTemplate localTransaction;
     private final TransactionTemplate recoveryTransaction;
@@ -40,6 +41,7 @@ public class LearningReliableEventConsumer {
             LearningReliabilityRepository reliability,
             LearningHomeworkPublishedHandler homeworkHandler,
             LearningCourseMemberChangedHandler courseMemberHandler,
+            LearningCourseMembershipSnapshotHandler courseMembershipSnapshotHandler,
             ObjectMapper objectMapper,
             PlatformTransactionManager transactionManager,
             @Value("${onlinejudge.reliability.consumer.max-attempts:3}") int maxAttempts
@@ -48,6 +50,7 @@ public class LearningReliableEventConsumer {
         this.reliability = reliability;
         this.homeworkHandler = homeworkHandler;
         this.courseMemberHandler = courseMemberHandler;
+        this.courseMembershipSnapshotHandler = courseMembershipSnapshotHandler;
         this.objectMapper = objectMapper;
         this.localTransaction = new TransactionTemplate(transactionManager);
         this.recoveryTransaction = new TransactionTemplate(transactionManager);
@@ -105,6 +108,10 @@ public class LearningReliableEventConsumer {
         }
         if ("course.member.changed.v2".equals(envelope.eventType())) {
             courseMemberHandler.apply(envelope);
+            return;
+        }
+        if (LearningCourseMembershipSnapshotHandler.EVENT_TYPE.equals(envelope.eventType())) {
+            courseMembershipSnapshotHandler.apply(envelope);
             return;
         }
         throw new NonRetryableEventException("Learning does not consume eventType " + envelope.eventType());
