@@ -167,7 +167,7 @@ HWK 前端必须包含：
 | 测试点 | 验收标准 |
 | --- | --- |
 | 作业发布 | 教师可创建、编辑、发布作业 |
-| 作业发布事务 | `HOMEWORK_PUBLISHED` 必达通知成功后才提交发布；通知失败返回 `503/HWK_5003`，作业保持 DRAFT 且学生不可见 |
+| 作业发布事务 | **v2 语义变更：** Homework `PUBLISHED` 与 `assessment.homework.published.v2` outbox 同一**本地**事务成功后学生可见；事件必须含 title（1–100 字符）、RFC3339 deadline、receiverScope=COURSE_ACTIVE_STUDENTS，禁止 roster。Learning/broker 不可用不得回滚；仅本地 Homework/outbox 事务失败返回 `503/HWK_5003`，作业保持 DRAFT |
 | 草稿逻辑删除 | 仅课程管理者可删除 DRAFT；确认取消不发请求；重复删除为 404、非 DRAFT 为 409；并发编辑/发布不能复活，父表删除后全部子表和历史仍保留 |
 | 学生提交 | 文本、附件或代码提交至少一种主流程可演示 |
 | 附件上传生命周期 | API-HWK-23 覆盖单文件上传、安全元数据查询、本人未绑定删除、24 小时过期和 `UPLOADED -> BOUND/DELETED`；`active_slot` 保证同学生/作业仅一份 active 上传，顺序上传原子替换旧件；不返回存储键或裸 URL |

@@ -4,7 +4,8 @@ sequenceDiagram
   participant API as HWK API
   participant Permission as CRS 课程权限边界
   participant DB as HWK 数据表
-  participant Notification as LRN 通知事件边界
+  participant Outbox as Assessment 本地 Outbox
+  participant Learning as Learning 异步投影
   Teacher->>Frontend: 填写作业、题目和测试用例
   Frontend->>API: 保存草稿或请求发布
   API->>Permission: 校验课程管理权限
@@ -14,14 +15,14 @@ sequenceDiagram
     DB-->>API: 返回草稿与更新时间
     API-->>Frontend: 返回草稿结果
   else 请求发布且配置完整
-    API->>DB: 在发布事务中更新 PUBLISHED/publishedAt
-    API->>Notification: 必需投递 HOMEWORK_PUBLISHED
-    alt 通知投递成功
-      Notification-->>API: 返回持久化成功
-      API-->>Frontend: 返回发布成功
-    else 通知投递失败
-      Notification--xAPI: 返回投递异常
-      API->>DB: 回滚事务并保持 DRAFT
+    API->>DB: 本地事务更新 PUBLISHED/publishedAt
+    API->>Outbox: 同一事务写入 homework.published.v2(title, deadline, receiverScope)
+    alt 本地 Homework + outbox 事务成功
+      API-->>Frontend: 返回 PUBLISHED，学生可见
+      Outbox-->>Learning: 至少一次异步投递
+      Learning->>Learning: 用成员投影按 receiverScope 幂等创建任务/通知
+    else 本地事务失败
+      API->>DB: 回滚并保持 DRAFT
       API-->>Frontend: 返回 503/HWK_5003
     end
   else 权限、配置或状态校验失败

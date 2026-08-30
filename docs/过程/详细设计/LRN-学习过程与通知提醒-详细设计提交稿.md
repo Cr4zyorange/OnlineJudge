@@ -161,16 +161,26 @@
 **API-LRN-09 请求体**（事件格式）：
 ```json
 {
-  "eventType": "HOMEWORK_PUBLISHED",
-  "sourceModule": "HWK",
-  "sourceId": 123,
-  "receiverUserIds": [1001, 1002],
-  "title": "新作业发布：Java编程题",
-  "content": "作业截止时间：2026-06-01",
-  "priority": 1,
-  "actionUrl": "/courses/10/homeworks/123"
+  "eventId": "f7bc323f-e1c3-4db1-9e68-a4667e94fc34",
+  "eventType": "assessment.homework.published.v2",
+  "payloadVersion": 2,
+  "aggregateType": "assessment-homework",
+  "aggregateId": "123",
+  "aggregateVersion": 4,
+  "occurredAt": "2026-05-25T09:00:00Z",
+  "correlationId": "34c3bdce-e3ff-45b0-8c75-3e46d0e57f5b",
+  "payload": {
+    "courseId": "10",
+    "homeworkId": "123",
+    "title": "新作业发布：Java编程题",
+    "deadline": "2026-06-01T16:00:00Z",
+    "receiverScope": "COURSE_ACTIVE_STUDENTS",
+    "publishedAt": "2026-05-25T09:00:00Z"
+  }
 }
 ```
+
+v2 事件使用统一 `EventEnvelope`，不得携带 `receiverUserIds` 或学生 roster；Learning 用本地 Course 成员投影解析 `receiverScope`，并以 `homeworkId:recipientUserId` 幂等创建任务和通知。
 
 ### 4.3 提醒规则与通知偏好接口
 
@@ -206,7 +216,7 @@
 | SVC-LRN-04 | ReminderRuleService   | 管理用户提醒规则和通知偏好，定时扫描即将截止任务并触发提醒   | userId, ruleDTO            | 规则列表、成功/失败   |
 | SVC-LRN-05 | EventConsumerService  | 监听来自 LAB/HWK/GRD 的事件（MQ或直接调用），调用 NotificationService 创建通知 | ModuleEvent                | 通知ID列表            |
 
-应用内直接调用由 `PersistentNotificationEventPublisher` 提供两种明确契约。普通 `publish` 在存在活动来源事务时登记事务同步回调，`afterCommit` 回调只把不可变命令快照提交到 `notificationDeliveryExecutor`，不在仍绑定来源事务资源的回调线程中同步申请新连接；工作线程随后以 `REQUIRES_NEW` 调用 `NotificationService`。来源事务回滚时不执行回调；没有活动事务时立即开启独立事务落库。执行器拒绝或通知落库失败仅记录告警，不回滚已提交来源业务；队列为有界内存队列，持久重试/outbox 不在本次实现范围。必达 `publishRequired` 则同步调用 `NotificationService` 并加入来源事务，异常向上抛出；`HOMEWORK_PUBLISHED` 使用该契约以保证通知失败时作业发布整体回滚。
+v1 应用内直接调用曾由 `PersistentNotificationEventPublisher` 提供同步 `publishRequired`，作为历史实现保留。v2 不把 Learning 通知持久化加入 Assessment 发布事务：Homework `PUBLISHED` 与 `assessment.homework.published.v2` outbox 同一本地事务成功即提交；Learning 至少一次消费后，从事件的有界 `title`、RFC3339 `deadline`、`receiverScope=COURSE_ACTIVE_STUDENTS` 和自己的 Course 成员投影创建任务与通知。`receiverUserIds`/学生 roster 被禁止；消费者以 `homeworkId:recipientUserId` 幂等。Learning、broker 或网络失败进入 outbox 重试、DLQ、重放和对账，不回滚发布；只有 Homework/outbox **本地**事务失败才使 API-HWK-03 返回 `503/HWK_5003` 并保持 DRAFT。
 
 ## 6 数据结构与数据库设计
 
@@ -373,7 +383,7 @@ stateDiagram-v2
 | ---------------------------- | ----------------------------------------------------------- | ------ | ------------- |
 | 任务快照数据过期且无法拉取   | 返回缓存旧数据，记录错误日志，提示“部分任务可能未更新”      | 30001  | 200（带警告） |
 | 普通通知调度或持久化失败 | after-commit 回调的执行器拒绝或工作线程独立事务失败时记录告警，不反向回滚来源业务；有界内存队列当前未实现持久重试/outbox | 30002  | 来源业务响应不反向改写 |
-| 必达通知持久化失败 | `publishRequired` 异常向上抛出并回滚来源事务；作业发布映射为 `503/HWK_5003` | HWK_5003 | 503 |
+| API-HWK-03 本地 Homework/outbox 事务失败 | 事务不提交，作业保持 DRAFT，返回 `503/HWK_5003`；Learning/broker 失败走异步重试/DLQ，不反向回滚 | HWK_5003 | 503 |
 | 通知列表网络短时中断         | 前端保留已落库状态的恢复入口，显示失败提示；网络恢复后重试查询 | -      | -             |
 | 学习进度保存时唯一键冲突     | 使用 `ON DUPLICATE KEY UPDATE` 更新                         | 0      | 200           |
 | 用户尝试修改他人通知         | 接口层校验 `notification.user_id == currentUserId`，否则403 | 403    | 403           |

@@ -276,7 +276,7 @@ graph TD
 
 | 事件名称                            | 触发时机            | 接收模块    | 主要字段                                                       | 说明                   |
 | ------------------------------- | --------------- | ------- | ---------------------------------------------------------- | -------------------- |
-| `HOMEWORK_PUBLISHED`            | 教师发布作业时         | LRN     | `homeworkId, courseId, title, deadline, receiverScope`     | 必达通知；生成作业发布通知和任务中心条目，失败时发布事务整体回滚并保持 DRAFT。     |
+| `assessment.homework.published.v2` | 教师发布作业时      | LRN     | `homeworkId, courseId, title`（1–100 字符）, RFC3339 `deadline`, `receiverScope=COURSE_ACTIVE_STUDENTS`, `publishedAt`；无 roster | **v2 语义变更：** Homework `PUBLISHED` 与 outbox 本地事务成功即发布；Learning 使用自己的 Course 成员投影幂等生成通知和任务。Learning/broker 失败不回滚；仅本地 Homework/outbox 事务失败返回 `503/HWK_5003` 并保持 DRAFT。 |
 | `HOMEWORK_UPDATED`              | 教师修改已发布作业的重要信息后 | LRN     | `homeworkId, courseId, title, updatedFields`               | 提醒学生查看最新要求。          |
 | `HOMEWORK_DEADLINE_APPROACHING` | 作业截止前定时扫描       | LRN     | `homeworkId, courseId, deadline, unsubmittedStudentIds`    | 生成截止提醒。              |
 | `HOMEWORK_EVALUATION_FINISHED`  | 自动评测完成后         | LRN     | `homeworkId, submissionId, studentId, status`              | 通知学生查看评测结果。          |

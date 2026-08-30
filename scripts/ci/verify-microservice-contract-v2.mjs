@@ -75,7 +75,7 @@ const eventContracts = {
     aggregateIdTemplate: '{homeworkId}',
     envelopeSchema: 'AssessmentHomeworkPublishedEvent',
     payloadSchema: 'AssessmentHomeworkPublishedPayload',
-    requiredPayload: ['courseId', 'homeworkId', 'publishedAt']
+    requiredPayload: ['courseId', 'homeworkId', 'title', 'deadline', 'receiverScope', 'publishedAt']
   },
   'grade.published.v2': {
     aggregateType: 'grade-publication',
@@ -349,6 +349,21 @@ function validateAsyncApiDocument(document) {
       `${eventType} payload schema must be a closed object`);
     check(hasRequiredProperties(payloadSchema, contract.requiredPayload),
       `${eventType} payload schema must require ${contract.requiredPayload.join(', ')}`);
+
+    if (eventType === 'assessment.homework.published.v2') {
+      const title = payloadSchema?.properties?.title;
+      const deadline = payloadSchema?.properties?.deadline;
+      const receiverScope = payloadSchema?.properties?.receiverScope;
+      check(title?.type === 'string' && title?.minLength === 1 && title?.maxLength === 100,
+        `${eventType} title must be a non-empty string bounded to 100 characters`);
+      check(deadline?.type === 'string' && deadline?.format === 'date-time',
+        `${eventType} deadline must be an RFC3339 date-time`);
+      check(receiverScope?.type === 'string'
+          && Array.isArray(receiverScope?.enum)
+          && receiverScope.enum.length === 1
+          && receiverScope.enum[0] === 'COURSE_ACTIVE_STUDENTS',
+        `${eventType} receiverScope must be the bounded COURSE_ACTIVE_STUDENTS selector, never a roster`);
+    }
   }
   return failures;
 }
@@ -381,6 +396,37 @@ function validateDocumentation() {
     const text = readFileSync(resolve(repoRoot, v1Contract), 'utf8');
     assert(text.includes('历史基线') && text.includes('D6-D7-五服务共享契约-v2.md'),
       `${v1Contract}: must identify v1 as historical and link v2`);
+  }
+}
+
+function validateHomeworkPublicationMigrationDocs() {
+  const requiredDocuments = [
+    'docs/最终提交/软件需求规格说明书.md',
+    'docs/最终提交/软件概要设计说明书.md',
+    'docs/最终提交/软件详细设计说明书.md',
+    'docs/过程/概要/作业与自动评测模块概要设计提交稿（hwk）.md',
+    'docs/过程/详细设计/HWK-作业与自动评测模块-详细设计提交稿.md',
+    'docs/过程/概要/学习过程与通知提醒 - 概要设计.md',
+    'docs/过程/概要/评测服务拆分设计与迁移边界.md',
+    'docs/过程/需求/学习过程与通知提醒模块（前端总设计师负责）.md',
+    'docs/过程/详细设计/LRN-学习过程与通知提醒-详细设计提交稿.md',
+    'docs/过程/测试/D2-HWK业务场景与测试闭环.md',
+    'docs/过程/测试/TST-DOC-06 HWK 作业与自动评测测试文档.md',
+    'docs/最终提交/测试文档.md',
+    'docs/开发/HWK-作业与自动评测模块开发流程.md',
+    'docs/开发/LRN-学习过程与通知提醒模块开发流程.md',
+    'docs/adr/ADR-006-五业务服务与可靠消息契约.md',
+    'docs/开发/D6-D7-五服务共享契约-v2.md'
+  ];
+  for (const relativePath of requiredDocuments) {
+    const absolutePath = resolve(repoRoot, relativePath);
+    assert(existsSync(absolutePath), `missing ${relativePath}`);
+    if (!existsSync(absolutePath)) continue;
+    const text = readFileSync(absolutePath, 'utf8');
+    for (const requiredText of ['HWK_5003', 'outbox', 'receiverScope']) {
+      assert(text.includes(requiredText),
+        `${relativePath}: must state the v2 HOMEWORK_PUBLISHED ${requiredText} migration rule`);
+    }
   }
 }
 
@@ -432,6 +478,16 @@ function validateRejectingMutations(asyncApi) {
   const aggregateFailures = validateEnvelope(aggregateMutation, asyncApi);
   assert(aggregateFailures.length > 0, 'mutation: wrong event aggregate was accepted');
   if (aggregateFailures.length > 0) rejectedMutationCount += 1;
+
+  const homeworkFixture = readJson('contracts/v2/examples/event-envelope.homework-published.valid.json');
+  if (!homeworkFixture) return;
+  for (const field of ['title', 'deadline', 'receiverScope']) {
+    const missingTaskFactMutation = JSON.parse(JSON.stringify(homeworkFixture));
+    delete missingTaskFactMutation.payload[field];
+    const missingTaskFactFailures = validateEnvelope(missingTaskFactMutation, asyncApi);
+    assert(missingTaskFactFailures.length > 0, `mutation: homework publication without ${field} was accepted`);
+    if (missingTaskFactFailures.length > 0) rejectedMutationCount += 1;
+  }
 }
 
 for (const [service, expectedPaths] of Object.entries(serviceContracts)) {
@@ -439,6 +495,7 @@ for (const [service, expectedPaths] of Object.entries(serviceContracts)) {
 }
 const asyncApi = validateAsyncApi();
 validateDocumentation();
+validateHomeworkPublicationMigrationDocs();
 validateFixtures(asyncApi);
 validateRejectingMutations(asyncApi);
 
