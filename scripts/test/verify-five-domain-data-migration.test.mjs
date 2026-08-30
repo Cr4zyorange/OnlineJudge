@@ -16,6 +16,8 @@ const liveAcceptanceScript = resolve('database/tests/verify-five-domain-migratio
 test('five-domain plan retains all 46 canonical business tables exactly once', () => {
   const plan = loadFiveDomainPlan();
 
+  assert.equal(plan.allTables.length, 59);
+  assert.equal(plan.runtimeTables.length, 13);
   assert.equal(plan.tables.length, 46);
   assert.deepEqual(
     [...plan.schemaByOwner.entries()],
@@ -28,6 +30,24 @@ test('five-domain plan retains all 46 canonical business tables exactly once', (
     ],
   );
   assert.equal(new Set(plan.tables.map((entry) => entry.table)).size, 46);
+  assert.deepEqual(
+    plan.runtimeTables.map((entry) => entry.table).sort(),
+    [
+      'assessment_event_inbox',
+      'assessment_event_outbox',
+      'course_event_outbox',
+      'course_membership_reconciliation_checkpoint',
+      'grade_event_inbox',
+      'grade_event_outbox',
+      'learning_course_member_projection',
+      'learning_course_membership_watermark',
+      'learning_deferred_event',
+      'learning_event_dead_letter',
+      'learning_event_delivery_attempt',
+      'learning_event_inbox',
+      'learning_event_reconciliation_request',
+    ],
+  );
 });
 
 test('copy SQL is idempotent and never needs a cross-schema foreign key', () => {
@@ -61,6 +81,11 @@ test('migration implementation creates nested evidence parents and validates all
   const source = readFileSync(migrationScript, 'utf8');
 
   assert.match(source, /mkdirSync\(dirname\(absolute\), \{ recursive: true \}\)/);
+  assert.match(source, /CREATE TABLE IF NOT EXISTS .* LIKE .*entry\.table/);
+  assert.match(source, /assessment_event_outbox/);
+  assert.match(source, /course\.membership\.snapshot\.v2/);
+  assert.doesNotMatch(source, /learning_course_projection/);
+  assert.match(source, /migration_checkpoints \(migration_id, phase, source_schema, source_fingerprint\)/);
   assert.match(source, /permissions\.length !== requiredOwners\.length \* 9/);
   assert.match(source, /permission evidence must contain 45 complete allow\/deny probes/);
 });
@@ -109,6 +134,8 @@ test('disposable MySQL acceptance keeps bypass, missing-password, rollback, nest
   assert.match(source, /no-runtime-passwords\.json/);
   assert.match(source, /rollback-no-runtime-passwords\.json/);
   assert.match(source, /verification\.permissions\.length !== 45/);
+  assert.match(source, /oj_assessment\.assessment_event_outbox/);
+  assert.match(source, /oj_course\.course_event_outbox/);
   assert.match(source, /nested\/evidence\/verify\.json/);
   assert.match(source, /ddl-misconfigured-first\.json/);
   assert.match(source, /ddl-misconfigured-second\.json/);

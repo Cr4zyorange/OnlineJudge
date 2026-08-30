@@ -213,12 +213,12 @@ if [[ "$scenario" == all || "$scenario" == seed ]]; then
   # Verification itself must reject malformed stored replay events; a valid
   # migration result alone does not prove a bad payload cannot be marked PASS.
   admin_mysql -e "
-    UPDATE oj_grade.event_inbox
-       SET payload = JSON_SET(payload, '$.courseId', 870287)
+    UPDATE oj_assessment.assessment_event_outbox
+       SET payload_json = JSON_SET(payload_json, '$.courseId', 870287)
      WHERE event_type = 'assessment.source-grade.changed.v2'
      LIMIT 1;
-    UPDATE oj_learning.event_inbox
-       SET payload = JSON_SET(payload, '$.membershipStatus', 'PENDING')
+    UPDATE oj_course.course_event_outbox
+       SET payload_json = JSON_SET(payload_json, '$.membershipStatus', 'PENDING')
      WHERE event_type = 'course.member.changed.v2'
      LIMIT 1;
   " >>"$raw_log" 2>&1

@@ -15,6 +15,25 @@ const scriptPath = fileURLToPath(import.meta.url);
 const repositoryRoot = resolve(dirname(scriptPath), '..', '..');
 const migrationId = 'V20260831_01__five_domain_data_migration';
 const requiredOwners = ['IDENTITY', 'COURSE', 'ASSESSMENT', 'GRADE', 'LEARNING'];
+// #337 adds service-owned reliable-delivery state to the same ownership
+// ledger.  These are operational tables, not legacy business facts: #341
+// recreates their structure in the target and replays the required facts
+// below, rather than copying lease, retry, inbox or dead-letter state.
+const runtimeTableNames = new Set([
+  'assessment_event_inbox',
+  'assessment_event_outbox',
+  'course_event_outbox',
+  'course_membership_reconciliation_checkpoint',
+  'grade_event_inbox',
+  'grade_event_outbox',
+  'learning_course_member_projection',
+  'learning_course_membership_watermark',
+  'learning_deferred_event',
+  'learning_event_dead_letter',
+  'learning_event_delivery_attempt',
+  'learning_event_inbox',
+  'learning_event_reconciliation_request',
+]);
 
 function fail(message) {
   throw new Error(`five-domain-migration: ${message}`);
@@ -64,27 +83,37 @@ function parseCsv(filePath) {
 }
 
 export function loadFiveDomainPlan(root = repositoryRoot) {
-  const tables = parseCsv(resolve(root, 'database/ownership/table-ownership.csv'));
+  const allTables = parseCsv(resolve(root, 'database/ownership/table-ownership.csv'));
   const accounts = parseCsv(resolve(root, 'database/ownership/schema-account-matrix.csv'));
   const localTables = parseCsv(resolve(root, 'database/ownership/service-local-tables.csv'));
   const crossDomainReferences = parseCsv(resolve(root, 'database/ownership/cross-domain-references.csv'));
   const schemaByOwner = new Map(accounts.map((account) => [account.owner, account.schema]));
   const accountByOwner = new Map(accounts.map((account) => [account.owner, account]));
+  const runtimeTables = allTables.filter((entry) => runtimeTableNames.has(entry.table));
+  const tables = allTables.filter((entry) => !runtimeTableNames.has(entry.table));
 
+  if (new Set(allTables.map((entry) => entry.table)).size !== allTables.length) {
+    fail('canonical ownership has duplicate table rows');
+  }
+  if (runtimeTables.length !== runtimeTableNames.size) {
+    fail(`canonical ownership must contain ${runtimeTableNames.size} reliable runtime tables, found ${runtimeTables.length}`);
+  }
   if (tables.length !== 46 || new Set(tables.map((entry) => entry.table)).size !== 46) {
     fail(`canonical ownership must contain exactly 46 unique tables, found ${tables.length}`);
   }
   if (accounts.length !== 5 || requiredOwners.some((owner) => !schemaByOwner.has(owner))) {
     fail('canonical ownership must contain the five required schema/account owners');
   }
-  for (const entry of tables) {
+  for (const entry of allTables) {
     if (!schemaByOwner.has(entry.owner) || entry.schema !== schemaByOwner.get(entry.owner)) {
       fail(`ownership row has a non-canonical schema: ${entry.table}`);
     }
     assertIdentifier(entry.table, 'table');
     assertIdentifier(entry.schema, 'schema');
   }
-  return { tables, accounts, localTables, crossDomainReferences, schemaByOwner, accountByOwner };
+  return {
+    allTables, tables, runtimeTables, accounts, localTables, crossDomainReferences, schemaByOwner, accountByOwner,
+  };
 }
 
 export function buildCopyStatement({ sourceSchema, targetSchema, table, columns }) {
@@ -205,7 +234,7 @@ function sourceTableCount(admin, sourceSchema) {
 
 function sourceFingerprint(admin, plan, sourceSchema) {
   const parts = [];
-  for (const entry of plan.tables) {
+  for (const entry of plan.allTables) {
     const count = admin({ sql: `SELECT COUNT(*) FROM ${quoteIdentifier(sourceSchema)}.${quoteIdentifier(entry.table)}` }).stdout.trim();
     const checksum = parseTabRows(admin({ sql: `CHECKSUM TABLE ${quoteIdentifier(sourceSchema)}.${quoteIdentifier(entry.table)} EXTENDED` }).stdout)[0]?.[1] ?? 'missing';
     parts.push(`${entry.table}:${count}:${checksum}`);
@@ -350,48 +379,18 @@ function restoreOwnerInternalForeignKeys(admin, plan, sourceSchema) {
 }
 
 function initializeLocalArtifacts(admin, plan, sourceSchema) {
-  for (const owner of requiredOwners) {
-    const schema = plan.schemaByOwner.get(owner);
-    admin({ sql: `
-      CREATE TABLE IF NOT EXISTS ${quoteIdentifier(schema)}.event_outbox (
-        event_id VARCHAR(128) NOT NULL,
-        event_type VARCHAR(128) NOT NULL,
-        aggregate_id VARCHAR(160) NOT NULL,
-        aggregate_version BIGINT NOT NULL,
-        payload JSON NOT NULL,
-        occurred_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        published_at DATETIME NULL,
-        PRIMARY KEY (event_id),
-        KEY idx_event_outbox_pending (published_at, occurred_at)
-      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-    ` });
-    admin({ sql: `
-      CREATE TABLE IF NOT EXISTS ${quoteIdentifier(schema)}.event_inbox (
-        event_id VARCHAR(128) NOT NULL,
-        event_type VARCHAR(128) NOT NULL,
-        aggregate_id VARCHAR(160) NOT NULL,
-        aggregate_version BIGINT NOT NULL,
-        payload JSON NOT NULL,
-        received_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        PRIMARY KEY (event_id),
-        KEY idx_event_inbox_received (received_at)
-      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-    ` });
+  // Keep #337's concrete per-service names and schema shape.  A generic
+  // event_inbox/event_outbox table would be an unowned sixth contract and
+  // would leave the real publishers/consumers without their storage.
+  for (const entry of plan.runtimeTables) {
+    const targetSchema = plan.schemaByOwner.get(entry.owner);
+    admin({ sql: `CREATE TABLE IF NOT EXISTS ${quoteIdentifier(targetSchema)}.${quoteIdentifier(entry.table)} LIKE ${quoteIdentifier(sourceSchema)}.${quoteIdentifier(entry.table)}` });
   }
 
   const learning = plan.schemaByOwner.get('LEARNING');
   const grade = plan.schemaByOwner.get('GRADE');
-  admin({ sql: `
-    CREATE TABLE IF NOT EXISTS ${quoteIdentifier(learning)}.learning_course_projection (
-      course_id BIGINT NOT NULL,
-      course_name VARCHAR(200) NOT NULL,
-      course_code VARCHAR(100) NULL,
-      course_status VARCHAR(32) NOT NULL,
-      source_version BIGINT NOT NULL,
-      projected_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      PRIMARY KEY (course_id)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-  ` });
+  const course = plan.schemaByOwner.get('COURSE');
+  const assessment = plan.schemaByOwner.get('ASSESSMENT');
 
   // Grade's current t_grade_record is the canonical legacy source-grade
   // projection. Replaying it replaces partial copies and is safe before
@@ -400,54 +399,137 @@ function initializeLocalArtifacts(admin, plan, sourceSchema) {
   const gradeColumns = sourceColumns(admin, sourceSchema, 't_grade_record');
   admin({ sql: `INSERT INTO ${quoteIdentifier(grade)}.t_grade_record (${gradeColumns.map(quoteIdentifier).join(', ')}) SELECT ${gradeColumns.map((column) => `s.${quoteIdentifier(column)}`).join(', ')} FROM ${quoteIdentifier(sourceSchema)}.t_grade_record s` });
 
-  admin({ sql: `DELETE FROM ${quoteIdentifier(learning)}.learning_course_projection` });
+  // Rebuild the complete Learning roster and its course-level watermark from
+  // the quiescent Course source.  One complete snapshot is authoritative even
+  // for an empty course; member rows alone never prove readiness.
+  admin({ sql: `DELETE FROM ${quoteIdentifier(learning)}.learning_course_member_projection` });
   admin({ sql: `
-    INSERT INTO ${quoteIdentifier(learning)}.learning_course_projection
-      (course_id, course_name, course_code, course_status, source_version, projected_at)
-    SELECT c.id, c.course_name, NULL, c.status, 1, CURRENT_TIMESTAMP
-      FROM ${quoteIdentifier(sourceSchema)}.crs_course c
+    INSERT INTO ${quoteIdentifier(learning)}.learning_course_member_projection
+      (course_id, user_id, membership_status, member_version, updated_at)
+    SELECT m.course_id, m.user_id,
+           CASE WHEN m.join_status = 'ACTIVE' THEN 'ACTIVE' ELSE 'REMOVED' END,
+           1, CURRENT_TIMESTAMP
+      FROM ${quoteIdentifier(sourceSchema)}.crs_course_member m
     ON DUPLICATE KEY UPDATE
-      course_name = VALUES(course_name),
-      course_code = VALUES(course_code),
-      course_status = VALUES(course_status),
-      source_version = VALUES(source_version),
-      projected_at = CURRENT_TIMESTAMP
+      membership_status = VALUES(membership_status),
+      member_version = VALUES(member_version),
+      updated_at = CURRENT_TIMESTAMP
+  ` });
+  admin({ sql: `DELETE FROM ${quoteIdentifier(learning)}.learning_course_membership_watermark` });
+  admin({ sql: `
+    INSERT INTO ${quoteIdentifier(learning)}.learning_course_membership_watermark
+      (course_id, snapshot_version, completed_at, updated_at)
+    SELECT c.id, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+      FROM ${quoteIdentifier(sourceSchema)}.crs_course c
+    ON DUPLICATE KEY UPDATE snapshot_version = VALUES(snapshot_version), updated_at = CURRENT_TIMESTAMP
   ` });
 
-  // Replay real contract event types into the two consumer inboxes.  Outboxes
-  // are intentionally initialized empty: migration must not synthesize new
-  // business facts or emit duplicate external events during cutover.
-  admin({ sql: `DELETE FROM ${quoteIdentifier(grade)}.event_inbox WHERE event_type = 'assessment.source-grade.changed.v2'` });
+  // The rebuilt records below are historical facts: use the concrete #337
+  // producer/consumer tables, mark them PUBLISHED/APPLIED, and never enqueue
+  // them for a second external delivery at cutover.
+  admin({ sql: `DELETE FROM ${quoteIdentifier(assessment)}.assessment_event_outbox WHERE event_id LIKE 'legacy-grade-%'` });
   admin({ sql: `
-    INSERT INTO ${quoteIdentifier(grade)}.event_inbox
-      (event_id, event_type, aggregate_id, aggregate_version, payload)
+    INSERT INTO ${quoteIdentifier(assessment)}.assessment_event_outbox
+      (event_id, event_type, payload_version, aggregate_type, aggregate_id, aggregate_version,
+       correlation_id, payload_json, routing_key, delivery_status, attempt_count, next_attempt_at, published_at)
     SELECT CONCAT('legacy-grade-', r.id),
            'assessment.source-grade.changed.v2',
+           2,
+           'assessment-source-grade',
            CONCAT(r.source_type, ':', COALESCE(r.source_id, 0), ':', r.student_id),
            1,
+           'issue-341-migration',
            JSON_OBJECT('courseId', CAST(r.course_id AS CHAR), 'sourceType', r.source_type,
                        'sourceId', CAST(COALESCE(r.source_id, 0) AS CHAR), 'studentId', CAST(r.student_id AS CHAR),
                        'score', CASE WHEN r.grade_status IN ('SCORED', 'ADJUSTED') AND r.raw_score IS NOT NULL THEN r.raw_score ELSE NULL END,
                        'fullScore', i.full_score,
                        'status', CASE WHEN r.grade_status IN ('SCORED', 'ADJUSTED') AND r.raw_score IS NOT NULL THEN 'SCORED' ELSE 'UNGRADED' END,
-                       'sourceVersion', 1)
+                       'sourceVersion', 1),
+           'onlinejudge.assessment.source-grade.changed.v2',
+           'PUBLISHED', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
       FROM ${quoteIdentifier(sourceSchema)}.t_grade_record r
       JOIN ${quoteIdentifier(sourceSchema)}.t_grade_item i ON i.id = r.grade_item_id
-    ON DUPLICATE KEY UPDATE payload = VALUES(payload), received_at = CURRENT_TIMESTAMP
+    ON DUPLICATE KEY UPDATE payload_json = VALUES(payload_json), delivery_status = 'PUBLISHED',
+                            published_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
   ` });
-  admin({ sql: `DELETE FROM ${quoteIdentifier(learning)}.event_inbox WHERE event_type = 'course.member.changed.v2'` });
+  admin({ sql: `DELETE FROM ${quoteIdentifier(grade)}.grade_event_inbox WHERE consumer_name = 'grade' AND event_id LIKE 'legacy-grade-%'` });
   admin({ sql: `
-    INSERT INTO ${quoteIdentifier(learning)}.event_inbox
-      (event_id, event_type, aggregate_id, aggregate_version, payload)
+    INSERT INTO ${quoteIdentifier(grade)}.grade_event_inbox
+      (consumer_name, event_id, event_type, aggregate_type, aggregate_id, aggregate_version,
+       correlation_id, processing_status, processed_at)
+    SELECT 'grade', CONCAT('legacy-grade-', r.id), 'assessment.source-grade.changed.v2',
+           'assessment-source-grade', CONCAT(r.source_type, ':', COALESCE(r.source_id, 0), ':', r.student_id),
+           1, 'issue-341-migration', 'APPLIED', CURRENT_TIMESTAMP
+      FROM ${quoteIdentifier(sourceSchema)}.t_grade_record r
+    ON DUPLICATE KEY UPDATE processing_status = 'APPLIED', processed_at = CURRENT_TIMESTAMP
+  ` });
+
+  admin({ sql: `DELETE FROM ${quoteIdentifier(course)}.course_event_outbox WHERE event_id LIKE 'legacy-member-%' OR event_id LIKE 'legacy-roster-%'` });
+  admin({ sql: `
+    INSERT INTO ${quoteIdentifier(course)}.course_event_outbox
+      (event_id, event_type, payload_version, aggregate_type, aggregate_id, aggregate_version,
+       correlation_id, payload_json, routing_key, delivery_status, attempt_count, next_attempt_at, published_at)
     SELECT CONCAT('legacy-member-', m.id),
            'course.member.changed.v2',
+           2,
+           'course-member',
            CONCAT(m.course_id, ':', m.user_id),
            1,
+           'issue-341-migration',
            JSON_OBJECT('courseId', CAST(m.course_id AS CHAR), 'userId', CAST(m.user_id AS CHAR),
                        'membershipStatus', CASE WHEN m.join_status = 'ACTIVE' THEN 'ACTIVE' ELSE 'REMOVED' END,
-                       'memberVersion', 1)
+                       'memberVersion', 1),
+           'onlinejudge.course.member.changed.v2',
+           'PUBLISHED', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
       FROM ${quoteIdentifier(sourceSchema)}.crs_course_member m
-    ON DUPLICATE KEY UPDATE payload = VALUES(payload), received_at = CURRENT_TIMESTAMP
+    ON DUPLICATE KEY UPDATE payload_json = VALUES(payload_json), delivery_status = 'PUBLISHED',
+                            published_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+  ` });
+  admin({ sql: `
+    INSERT INTO ${quoteIdentifier(course)}.course_event_outbox
+      (event_id, event_type, payload_version, aggregate_type, aggregate_id, aggregate_version,
+       correlation_id, payload_json, routing_key, delivery_status, attempt_count, next_attempt_at, published_at)
+    SELECT CONCAT('legacy-roster-', c.id),
+           'course.membership.snapshot.v2', 2, 'course-membership-roster', CAST(c.id AS CHAR), 1,
+           'issue-341-migration',
+           JSON_OBJECT(
+             'courseId', CAST(c.id AS CHAR), 'rosterVersion', 1,
+             'members', COALESCE((
+               SELECT JSON_ARRAYAGG(JSON_OBJECT(
+                 'userId', CAST(m.user_id AS CHAR),
+                 'membershipStatus', CASE WHEN m.join_status = 'ACTIVE' THEN 'ACTIVE' ELSE 'REMOVED' END,
+                 'memberVersion', 1
+               ))
+                 FROM ${quoteIdentifier(sourceSchema)}.crs_course_member m
+                WHERE m.course_id = c.id
+             ), JSON_ARRAY())
+           ),
+           'onlinejudge.course.membership.snapshot.v2',
+           'PUBLISHED', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+      FROM ${quoteIdentifier(sourceSchema)}.crs_course c
+    ON DUPLICATE KEY UPDATE payload_json = VALUES(payload_json), delivery_status = 'PUBLISHED',
+                            published_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+  ` });
+  admin({ sql: `DELETE FROM ${quoteIdentifier(learning)}.learning_event_inbox WHERE consumer_name = 'learning' AND (event_id LIKE 'legacy-member-%' OR event_id LIKE 'legacy-roster-%')` });
+  admin({ sql: `
+    INSERT INTO ${quoteIdentifier(learning)}.learning_event_inbox
+      (consumer_name, event_id, event_type, aggregate_type, aggregate_id, aggregate_version,
+       correlation_id, processing_status, processed_at)
+    SELECT 'learning', CONCAT('legacy-member-', m.id), 'course.member.changed.v2',
+           'course-member', CONCAT(m.course_id, ':', m.user_id), 1,
+           'issue-341-migration', 'APPLIED', CURRENT_TIMESTAMP
+      FROM ${quoteIdentifier(sourceSchema)}.crs_course_member m
+    ON DUPLICATE KEY UPDATE processing_status = 'APPLIED', processed_at = CURRENT_TIMESTAMP
+  ` });
+  admin({ sql: `
+    INSERT INTO ${quoteIdentifier(learning)}.learning_event_inbox
+      (consumer_name, event_id, event_type, aggregate_type, aggregate_id, aggregate_version,
+       correlation_id, processing_status, processed_at)
+    SELECT 'learning', CONCAT('legacy-roster-', c.id), 'course.membership.snapshot.v2',
+           'course-membership-roster', CAST(c.id AS CHAR), 1,
+           'issue-341-migration', 'APPLIED', CURRENT_TIMESTAMP
+      FROM ${quoteIdentifier(sourceSchema)}.crs_course c
+    ON DUPLICATE KEY UPDATE processing_status = 'APPLIED', processed_at = CURRENT_TIMESTAMP
   ` });
 }
 
@@ -534,52 +616,55 @@ function verifyForeignKeys(admin, plan) {
 function verifyProjectionCounts(admin, plan, sourceSchema) {
   const learning = plan.schemaByOwner.get('LEARNING');
   const grade = plan.schemaByOwner.get('GRADE');
+  const assessment = plan.schemaByOwner.get('ASSESSMENT');
+  const course = plan.schemaByOwner.get('COURSE');
   const sourceCourses = Number(admin({ sql: `SELECT COUNT(*) FROM ${quoteIdentifier(sourceSchema)}.crs_course` }).stdout.trim());
-  const targetCourses = Number(admin({ sql: `SELECT COUNT(*) FROM ${quoteIdentifier(learning)}.learning_course_projection` }).stdout.trim());
+  const targetCourses = Number(admin({ sql: `SELECT COUNT(*) FROM ${quoteIdentifier(learning)}.learning_course_membership_watermark` }).stdout.trim());
   const sourceRecords = Number(admin({ sql: `SELECT COUNT(*) FROM ${quoteIdentifier(sourceSchema)}.t_grade_record` }).stdout.trim());
   const targetRecords = Number(admin({ sql: `SELECT COUNT(*) FROM ${quoteIdentifier(grade)}.t_grade_record` }).stdout.trim());
-  const gradeReplay = Number(admin({ sql: `SELECT COUNT(*) FROM ${quoteIdentifier(grade)}.event_inbox WHERE event_type = 'assessment.source-grade.changed.v2'` }).stdout.trim());
-  const learningReplay = Number(admin({ sql: `SELECT COUNT(*) FROM ${quoteIdentifier(learning)}.event_inbox WHERE event_type = 'course.member.changed.v2'` }).stdout.trim());
+  const gradeReplay = Number(admin({ sql: `SELECT COUNT(*) FROM ${quoteIdentifier(grade)}.grade_event_inbox WHERE consumer_name = 'grade' AND event_type = 'assessment.source-grade.changed.v2'` }).stdout.trim());
+  const learningReplay = Number(admin({ sql: `SELECT COUNT(*) FROM ${quoteIdentifier(learning)}.learning_event_inbox WHERE consumer_name = 'learning' AND event_type = 'course.member.changed.v2'` }).stdout.trim());
   const sourceMembers = Number(admin({ sql: `SELECT COUNT(*) FROM ${quoteIdentifier(sourceSchema)}.crs_course_member` }).stdout.trim());
+  const targetMembers = Number(admin({ sql: `SELECT COUNT(*) FROM ${quoteIdentifier(learning)}.learning_course_member_projection` }).stdout.trim());
   const invalidGradePayloads = Number(admin({ sql: `
     SELECT COUNT(*)
-      FROM ${quoteIdentifier(grade)}.event_inbox
+      FROM ${quoteIdentifier(assessment)}.assessment_event_outbox
      WHERE event_type = 'assessment.source-grade.changed.v2'
        AND (
-         COALESCE(JSON_TYPE(JSON_EXTRACT(payload, '$.courseId')), 'MISSING') <> 'STRING'
-         OR COALESCE(JSON_TYPE(JSON_EXTRACT(payload, '$.sourceId')), 'MISSING') <> 'STRING'
-         OR COALESCE(JSON_TYPE(JSON_EXTRACT(payload, '$.studentId')), 'MISSING') <> 'STRING'
-         OR JSON_UNQUOTE(JSON_EXTRACT(payload, '$.sourceType')) NOT IN ('LAB', 'HWK')
-         OR JSON_UNQUOTE(JSON_EXTRACT(payload, '$.status')) NOT IN ('SCORED', 'UNGRADED')
-         OR COALESCE(JSON_TYPE(JSON_EXTRACT(payload, '$.fullScore')), 'MISSING') NOT IN ('INTEGER', 'DOUBLE', 'DECIMAL')
-         OR CAST(JSON_UNQUOTE(JSON_EXTRACT(payload, '$.fullScore')) AS DECIMAL(12, 2)) <= 0
-         OR (JSON_UNQUOTE(JSON_EXTRACT(payload, '$.status')) = 'SCORED'
-             AND COALESCE(JSON_TYPE(JSON_EXTRACT(payload, '$.score')), 'MISSING') NOT IN ('INTEGER', 'DOUBLE', 'DECIMAL'))
-         OR (JSON_UNQUOTE(JSON_EXTRACT(payload, '$.status')) = 'UNGRADED'
-             AND COALESCE(JSON_TYPE(JSON_EXTRACT(payload, '$.score')), 'MISSING') <> 'NULL')
+         COALESCE(JSON_TYPE(JSON_EXTRACT(payload_json, '$.courseId')), 'MISSING') <> 'STRING'
+         OR COALESCE(JSON_TYPE(JSON_EXTRACT(payload_json, '$.sourceId')), 'MISSING') <> 'STRING'
+         OR COALESCE(JSON_TYPE(JSON_EXTRACT(payload_json, '$.studentId')), 'MISSING') <> 'STRING'
+         OR JSON_UNQUOTE(JSON_EXTRACT(payload_json, '$.sourceType')) NOT IN ('LAB', 'HWK')
+         OR JSON_UNQUOTE(JSON_EXTRACT(payload_json, '$.status')) NOT IN ('SCORED', 'UNGRADED')
+         OR COALESCE(JSON_TYPE(JSON_EXTRACT(payload_json, '$.fullScore')), 'MISSING') NOT IN ('INTEGER', 'DOUBLE', 'DECIMAL')
+         OR CAST(JSON_UNQUOTE(JSON_EXTRACT(payload_json, '$.fullScore')) AS DECIMAL(12, 2)) <= 0
+         OR (JSON_UNQUOTE(JSON_EXTRACT(payload_json, '$.status')) = 'SCORED'
+             AND COALESCE(JSON_TYPE(JSON_EXTRACT(payload_json, '$.score')), 'MISSING') NOT IN ('INTEGER', 'DOUBLE', 'DECIMAL'))
+         OR (JSON_UNQUOTE(JSON_EXTRACT(payload_json, '$.status')) = 'UNGRADED'
+             AND COALESCE(JSON_TYPE(JSON_EXTRACT(payload_json, '$.score')), 'MISSING') <> 'NULL')
        )
   ` }).stdout.trim());
   const invalidMemberPayloads = Number(admin({ sql: `
     SELECT COUNT(*)
-      FROM ${quoteIdentifier(learning)}.event_inbox
+      FROM ${quoteIdentifier(course)}.course_event_outbox
      WHERE event_type = 'course.member.changed.v2'
        AND (
-         COALESCE(JSON_TYPE(JSON_EXTRACT(payload, '$.courseId')), 'MISSING') <> 'STRING'
-         OR COALESCE(JSON_TYPE(JSON_EXTRACT(payload, '$.userId')), 'MISSING') <> 'STRING'
-         OR JSON_UNQUOTE(JSON_EXTRACT(payload, '$.membershipStatus')) NOT IN ('ACTIVE', 'REMOVED')
-         OR COALESCE(JSON_TYPE(JSON_EXTRACT(payload, '$.memberVersion')), 'MISSING') <> 'INTEGER'
-         OR CAST(JSON_UNQUOTE(JSON_EXTRACT(payload, '$.memberVersion')) AS UNSIGNED) < 1
+         COALESCE(JSON_TYPE(JSON_EXTRACT(payload_json, '$.courseId')), 'MISSING') <> 'STRING'
+         OR COALESCE(JSON_TYPE(JSON_EXTRACT(payload_json, '$.userId')), 'MISSING') <> 'STRING'
+         OR JSON_UNQUOTE(JSON_EXTRACT(payload_json, '$.membershipStatus')) NOT IN ('ACTIVE', 'REMOVED')
+         OR COALESCE(JSON_TYPE(JSON_EXTRACT(payload_json, '$.memberVersion')), 'MISSING') <> 'INTEGER'
+         OR CAST(JSON_UNQUOTE(JSON_EXTRACT(payload_json, '$.memberVersion')) AS UNSIGNED) < 1
        )
   ` }).stdout.trim());
   const gradePayloadDiagnostics = parseTabRows(admin({ sql: `
     SELECT event_id,
-           JSON_TYPE(JSON_EXTRACT(payload, '$.courseId')),
-           JSON_TYPE(JSON_EXTRACT(payload, '$.sourceId')),
-           JSON_TYPE(JSON_EXTRACT(payload, '$.studentId')),
-           JSON_TYPE(JSON_EXTRACT(payload, '$.score')),
-           JSON_TYPE(JSON_EXTRACT(payload, '$.fullScore')),
-           JSON_UNQUOTE(JSON_EXTRACT(payload, '$.status'))
-      FROM ${quoteIdentifier(grade)}.event_inbox
+           JSON_TYPE(JSON_EXTRACT(payload_json, '$.courseId')),
+           JSON_TYPE(JSON_EXTRACT(payload_json, '$.sourceId')),
+           JSON_TYPE(JSON_EXTRACT(payload_json, '$.studentId')),
+           JSON_TYPE(JSON_EXTRACT(payload_json, '$.score')),
+           JSON_TYPE(JSON_EXTRACT(payload_json, '$.fullScore')),
+           JSON_UNQUOTE(JSON_EXTRACT(payload_json, '$.status'))
+      FROM ${quoteIdentifier(assessment)}.assessment_event_outbox
      WHERE event_type = 'assessment.source-grade.changed.v2'
      ORDER BY event_id
   ` }).stdout).map(([eventId, courseIdType, sourceIdType, studentIdType, scoreType, fullScoreType, status]) => ({
@@ -588,15 +673,16 @@ function verifyProjectionCounts(admin, plan, sourceSchema) {
   const localArtifacts = [];
   for (const owner of requiredOwners) {
     const schema = plan.schemaByOwner.get(owner);
-    const count = Number(admin({ sql: `SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = ${quoteLiteral(schema)} AND table_name IN ('event_outbox', 'event_inbox')` }).stdout.trim());
-    localArtifacts.push({ owner, tablesPresent: count });
+    const expectedTables = plan.runtimeTables.filter((entry) => entry.owner === owner).map((entry) => entry.table);
+    const count = expectedTables.length === 0 ? 0 : Number(admin({ sql: `SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = ${quoteLiteral(schema)} AND table_name IN (${expectedTables.map(quoteLiteral).join(', ')})` }).stdout.trim());
+    localArtifacts.push({ owner, tablesPresent: count, expectedTables: expectedTables.length });
   }
   return {
     gradeSourceProjection: {
       sourceRecords, targetRecords, replayedInbox: gradeReplay,
       invalidPayloads: invalidGradePayloads, payloadDiagnostics: gradePayloadDiagnostics,
     },
-    learningCourseProjection: { sourceCourses, targetCourses, sourceMembers, replayedInbox: learningReplay, invalidPayloads: invalidMemberPayloads },
+    learningCourseProjection: { sourceCourses, targetCourses, sourceMembers, targetMembers, replayedInbox: learningReplay, invalidPayloads: invalidMemberPayloads },
     localArtifacts,
   };
 }
@@ -624,12 +710,15 @@ function verifyPermissions(admin, plan, options, passwords) {
     const mysql = createMysql(options, account.account, passwords.get(owner));
     const own = mysql({ sql: `SELECT 1 FROM ${quoteIdentifier(account.schema)}.${quoteIdentifier(ownTable)} LIMIT 0`, allowFailure: true });
     probes.push({ owner, kind: 'own_select', expected: 'allow', passed: own.code === 0, raw: own.raw.trim() });
-    const dmlEventId = `issue341-permission-${owner.toLowerCase()}-${Date.now()}`;
-    const insert = mysql({ sql: `INSERT INTO ${quoteIdentifier(account.schema)}.event_inbox (event_id, event_type, aggregate_id, aggregate_version, payload) VALUES (${quoteLiteral(dmlEventId)}, 'migration.permission.probe.v2', ${quoteLiteral(owner)}, 1, JSON_OBJECT('probe', TRUE))`, allowFailure: true });
+    const dmlProbeId = `issue341-permission-${owner.toLowerCase()}-${Date.now()}`;
+    // migration_checkpoints is in every owner schema and exists before
+    // application runtime.  It gives the 45-probe matrix a genuine DML target
+    // without fabricating generic #337 inbox tables.
+    const insert = mysql({ sql: `INSERT INTO ${quoteIdentifier(account.schema)}.migration_checkpoints (migration_id, phase, source_schema, source_fingerprint) VALUES (${quoteLiteral(dmlProbeId)}, 'PROBE', ${quoteLiteral(options.sourceSchema)}, REPEAT('0', 64))`, allowFailure: true });
     probes.push({ owner, kind: 'own_insert', expected: 'allow', passed: insert.code === 0, raw: insert.raw.trim() });
-    const update = mysql({ sql: `UPDATE ${quoteIdentifier(account.schema)}.event_inbox SET aggregate_version = 2 WHERE event_id = ${quoteLiteral(dmlEventId)}`, allowFailure: true });
+    const update = mysql({ sql: `UPDATE ${quoteIdentifier(account.schema)}.migration_checkpoints SET phase = 'PROBE_UPDATED' WHERE migration_id = ${quoteLiteral(dmlProbeId)}`, allowFailure: true });
     probes.push({ owner, kind: 'own_update', expected: 'allow', passed: update.code === 0, raw: update.raw.trim() });
-    const remove = mysql({ sql: `DELETE FROM ${quoteIdentifier(account.schema)}.event_inbox WHERE event_id = ${quoteLiteral(dmlEventId)}`, allowFailure: true });
+    const remove = mysql({ sql: `DELETE FROM ${quoteIdentifier(account.schema)}.migration_checkpoints WHERE migration_id = ${quoteLiteral(dmlProbeId)}`, allowFailure: true });
     probes.push({ owner, kind: 'own_delete', expected: 'allow', passed: remove.code === 0, raw: remove.raw.trim() });
     for (const foreignOwner of requiredOwners.filter((candidate) => candidate !== owner)) {
       const foreignSchema = plan.schemaByOwner.get(foreignOwner);
@@ -702,9 +791,14 @@ function verifyAll(admin, plan, options, sourceSchema, passwords) {
   if (projections.gradeSourceProjection.sourceRecords !== projections.gradeSourceProjection.replayedInbox) failures.push('grade source projection replay mismatch');
   if (projections.gradeSourceProjection.invalidPayloads !== 0) failures.push('grade source replay payload contract mismatch');
   if (projections.learningCourseProjection.sourceCourses !== projections.learningCourseProjection.targetCourses) failures.push('learning course projection count mismatch');
+  if (projections.learningCourseProjection.sourceMembers !== projections.learningCourseProjection.targetMembers) failures.push('learning member projection count mismatch');
   if (projections.learningCourseProjection.sourceMembers !== projections.learningCourseProjection.replayedInbox) failures.push('learning inbox replay mismatch');
   if (projections.learningCourseProjection.invalidPayloads !== 0) failures.push('learning member replay payload contract mismatch');
-  for (const artifact of projections.localArtifacts) if (artifact.tablesPresent !== 2) failures.push(`missing local outbox/inbox tables: ${artifact.owner}`);
+  for (const artifact of projections.localArtifacts) {
+    if (artifact.tablesPresent !== artifact.expectedTables) {
+      failures.push(`missing local reliable tables: ${artifact.owner}`);
+    }
+  }
   const permissions = verifyPermissions(admin, plan, options, passwords);
   if (permissions.length !== requiredOwners.length * 9) {
     failures.push('permission evidence must contain 45 complete allow/deny probes');
@@ -770,8 +864,8 @@ export async function main(argv = process.argv.slice(2)) {
     sourceVersion: sourceVersion(admin, options.sourceSchema),
     startedAt: new Date().toISOString(),
   };
-  if (sourceTableCount(admin, options.sourceSchema) !== plan.tables.length) {
-    fail(`source schema ${options.sourceSchema} does not contain the canonical 46 business tables`);
+  if (sourceTableCount(admin, options.sourceSchema) !== plan.allTables.length) {
+    fail(`source schema ${options.sourceSchema} does not contain the 46 business tables and ${plan.runtimeTables.length} reliable runtime tables`);
   }
 
   if (options.action === 'rollback') {
