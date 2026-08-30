@@ -1,0 +1,265 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://onlinejudge.example/schemas/delivery/workload-manifest-v2.json",
+  "title": "OnlineJudge v2 delivery workload manifest",
+  "type": "object",
+  "required": [
+    "apiVersion",
+    "kind",
+    "metadata",
+    "sharedTriggerPaths",
+    "workloads",
+    "migrationJobs",
+    "promotion",
+    "d3Retirement"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "apiVersion": {"const": "delivery.onlinejudge.io/v2"},
+    "kind": {"const": "WorkloadManifest"},
+    "metadata": {
+      "type": "object",
+      "required": ["name", "version", "ownerIssue"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {"const": "onlinejudge-platform"},
+        "version": {"const": "v2"},
+        "ownerIssue": {"const": "#336"}
+      }
+    },
+    "sharedTriggerPaths": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"type": "string", "minLength": 1}
+    },
+    "workloads": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/workload"}
+    },
+    "migrationJobs": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/migrationJob"}
+    },
+    "promotion": {"$ref": "#/$defs/promotion"},
+    "d3Retirement": {"$ref": "#/$defs/d3Retirement"}
+  },
+  "$defs": {
+    "workload": {
+      "type": "object",
+      "required": [
+        "name",
+        "type",
+        "sourcePaths",
+        "dockerfile",
+        "image",
+        "ports",
+        "health",
+        "dependsOn",
+        "migrationJob",
+        "configuration",
+        "secrets",
+        "resources",
+        "pathTriggers",
+        "traffic"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "name": {"type": "string", "pattern": "^[a-z][a-z0-9-]*$"},
+        "type": {
+          "enum": ["gateway", "service", "worker", "frontend", "broker", "database"]
+        },
+        "sourcePaths": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"type": "string", "minLength": 1}
+        },
+        "dockerfile": {"type": ["string", "null"]},
+        "image": {
+          "type": "object",
+          "required": ["repository", "tagTemplate", "build", "sbomRequired"],
+          "additionalProperties": false,
+          "properties": {
+            "repository": {"type": "string", "minLength": 1},
+            "tagTemplate": {"type": "string", "minLength": 1},
+            "build": {"type": "boolean"},
+            "sbomRequired": {"type": "boolean"}
+          }
+        },
+        "ports": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/port"}
+        },
+        "health": {"$ref": "#/$defs/health"},
+        "dependsOn": {
+          "type": "array",
+          "items": {"type": "string", "pattern": "^[a-z][a-z0-9-]*$"}
+        },
+        "migrationJob": {"type": ["string", "null"]},
+        "configuration": {
+          "type": "array",
+          "items": {"type": "string", "pattern": "^[A-Z][A-Z0-9_]*$"}
+        },
+        "secrets": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/secret"}
+        },
+        "resources": {"$ref": "#/$defs/resources"},
+        "pathTriggers": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"type": "string", "minLength": 1}
+        },
+        "traffic": {
+          "type": "object",
+          "required": ["exposed", "routePrefixes", "browserEntry"],
+          "additionalProperties": false,
+          "properties": {
+            "exposed": {"type": "boolean"},
+            "routePrefixes": {
+              "type": "array",
+              "items": {"type": "string"}
+            },
+            "browserEntry": {"$ref": "#/$defs/browserEntry"}
+          }
+        }
+      }
+    },
+    "port": {
+      "type": "object",
+      "required": ["name", "containerPort", "protocol", "external"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {"type": "string", "pattern": "^[a-z][a-z0-9-]*$"},
+        "containerPort": {"type": "integer", "minimum": 1, "maximum": 65535},
+        "protocol": {"enum": ["TCP"]},
+        "external": {"type": "boolean"}
+      }
+    },
+    "health": {
+      "type": "object",
+      "required": ["startup", "liveness", "readiness"],
+      "additionalProperties": false,
+      "properties": {
+        "startup": {"$ref": "#/$defs/probe"},
+        "liveness": {"$ref": "#/$defs/probe"},
+        "readiness": {"$ref": "#/$defs/probe"}
+      }
+    },
+    "probe": {
+      "type": "object",
+      "required": ["kind", "target", "requiredDependencies"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": {"enum": ["http", "command", "process"]},
+        "target": {"type": "string", "minLength": 1},
+        "requiredDependencies": {
+          "type": "array",
+          "items": {"type": "string", "pattern": "^[a-z][a-z0-9-]*$"}
+        }
+      }
+    },
+    "secret": {
+      "type": "object",
+      "required": ["key", "injectedAs", "redact", "imageBuild"],
+      "additionalProperties": false,
+      "properties": {
+        "key": {"type": "string", "pattern": "^[A-Z][A-Z0-9_]*$"},
+        "injectedAs": {"enum": ["runtime-secret", "workload-identity"]},
+        "redact": {"const": true},
+        "imageBuild": {"const": "forbidden"}
+      }
+    },
+    "resources": {
+      "type": "object",
+      "required": ["requests", "limits"],
+      "additionalProperties": false,
+      "properties": {
+        "requests": {"$ref": "#/$defs/resourceQuantity"},
+        "limits": {"$ref": "#/$defs/resourceQuantity"}
+      }
+    },
+    "resourceQuantity": {
+      "type": "object",
+      "required": ["cpu", "memory"],
+      "additionalProperties": false,
+      "properties": {
+        "cpu": {"type": "string", "pattern": "^[0-9]+m?$"},
+        "memory": {"type": "string", "pattern": "^[0-9]+(Mi|Gi)$"}
+      }
+    },
+    "browserEntry": {
+      "type": ["object", "null"],
+      "required": ["path", "targetWorkload"],
+      "additionalProperties": false,
+      "properties": {
+        "path": {"type": "string", "minLength": 1},
+        "targetWorkload": {"type": "string", "pattern": "^[a-z][a-z0-9-]*$"}
+      }
+    },
+    "migrationJob": {
+      "type": "object",
+      "required": [
+        "name",
+        "schema",
+        "forWorkload",
+        "sourcePaths",
+        "command",
+        "dependsOnWorkloads",
+        "dependsOnMigrationJobs",
+        "runOnce",
+        "blocksTraffic",
+        "failurePolicy",
+        "retryPolicy",
+        "rollback"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "name": {"type": "string", "pattern": "^[a-z][a-z0-9-]*$"},
+        "schema": {"enum": ["identity", "course", "assessment", "grade", "learning"]},
+        "forWorkload": {"type": "string", "pattern": "^[a-z][a-z0-9-]*$"},
+        "sourcePaths": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+        "command": {"type": "string", "minLength": 1},
+        "dependsOnWorkloads": {"type": "array", "items": {"type": "string"}},
+        "dependsOnMigrationJobs": {"type": "array", "items": {"type": "string"}},
+        "runOnce": {"const": true},
+        "blocksTraffic": {"const": true},
+        "failurePolicy": {"const": "block"},
+        "retryPolicy": {"const": "safe-to-rerun"},
+        "rollback": {"enum": ["forward-fix-or-approved-restore"]}
+      }
+    },
+    "promotion": {
+      "type": "object",
+      "required": ["environments", "requiredEvidence"],
+      "additionalProperties": false,
+      "properties": {
+        "environments": {
+          "type": "array",
+          "minItems": 4,
+          "items": {"enum": ["DEV", "FAT", "UAT", "PRO"]}
+        },
+        "requiredEvidence": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"type": "string"}
+        }
+      }
+    },
+    "d3Retirement": {
+      "type": "object",
+      "required": ["legacyContract", "compatibilityWindow", "retirementGates"],
+      "additionalProperties": false,
+      "properties": {
+        "legacyContract": {"const": "docs/开发/D3-CICD-共享契约.md"},
+        "compatibilityWindow": {"enum": ["v2-parallel-until-gates-pass"]},
+        "retirementGates": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"type": "string"}
+        }
+      }
+    }
+  }
+}

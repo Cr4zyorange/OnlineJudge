@@ -1,0 +1,400 @@
+{
+  "apiVersion": "delivery.onlinejudge.io/v2",
+  "kind": "WorkloadManifest",
+  "metadata": {
+    "name": "onlinejudge-platform",
+    "version": "v2",
+    "ownerIssue": "#336"
+  },
+  "sharedTriggerPaths": [
+    "deploy/platform/**",
+    "scripts/platform/**",
+    "docs/开发/D7-平台工作负载清单契约.md",
+    "docs/开发/D6-*.md"
+  ],
+  "workloads": [
+    {
+      "name": "gateway",
+      "type": "gateway",
+      "sourcePaths": ["services/gateway/**", "deploy/gateway/**"],
+      "dockerfile": "services/gateway/Dockerfile",
+      "image": {
+        "repository": "onlinejudge/gateway",
+        "tagTemplate": "${GIT_SHA}",
+        "build": true,
+        "sbomRequired": true
+      },
+      "ports": [{"name": "http", "containerPort": 8080, "protocol": "TCP", "external": true}],
+      "health": {
+        "startup": {"kind": "http", "target": "/health/startup", "requiredDependencies": []},
+        "liveness": {"kind": "http", "target": "/health/live", "requiredDependencies": []},
+        "readiness": {"kind": "http", "target": "/health/ready", "requiredDependencies": []}
+      },
+      "dependsOn": ["identity-service", "course-service", "assessment-api", "grade-service", "learning-service", "frontend"],
+      "migrationJob": null,
+      "configuration": ["GATEWAY_HTTP_PORT", "REQUEST_ID_HEADER"],
+      "secrets": [
+        {"key": "GATEWAY_SERVICE_IDENTITY", "injectedAs": "workload-identity", "redact": true, "imageBuild": "forbidden"},
+        {"key": "IDENTITY_JWKS_TRUST_BUNDLE", "injectedAs": "runtime-secret", "redact": true, "imageBuild": "forbidden"}
+      ],
+      "resources": {"requests": {"cpu": "100m", "memory": "128Mi"}, "limits": {"cpu": "500m", "memory": "512Mi"}},
+      "pathTriggers": ["services/gateway/**", "deploy/gateway/**"],
+      "traffic": {
+        "exposed": true,
+        "routePrefixes": ["/api"],
+        "browserEntry": {"path": "/", "targetWorkload": "frontend"}
+      }
+    },
+    {
+      "name": "identity-service",
+      "type": "service",
+      "sourcePaths": ["services/identity/**", "backend/src/main/java/com/onlinejudge/auth/**", "backend/src/main/java/com/onlinejudge/common/**", "backend/src/main/java/com/onlinejudge/integration/**", "backend/src/main/resources/**", "backend/pom.xml"],
+      "dockerfile": "services/identity/Dockerfile",
+      "image": {
+        "repository": "onlinejudge/identity-service",
+        "tagTemplate": "${GIT_SHA}",
+        "build": true,
+        "sbomRequired": true
+      },
+      "ports": [{"name": "http", "containerPort": 8081, "protocol": "TCP", "external": false}],
+      "health": {
+        "startup": {"kind": "http", "target": "/actuator/health/readiness", "requiredDependencies": ["mysql"]},
+        "liveness": {"kind": "http", "target": "/actuator/health/liveness", "requiredDependencies": []},
+        "readiness": {"kind": "http", "target": "/actuator/health/readiness", "requiredDependencies": ["mysql"]}
+      },
+      "dependsOn": ["mysql"],
+      "migrationJob": "identity-migrations",
+      "configuration": ["IDENTITY_HTTP_PORT", "IDENTITY_JWT_ISSUER", "IDENTITY_JWT_AUDIENCE", "MYSQL_HOST", "MYSQL_PORT", "IDENTITY_DATABASE_NAME", "IDENTITY_DATABASE_USER"],
+      "secrets": [
+        {"key": "IDENTITY_DATABASE_PASSWORD", "injectedAs": "runtime-secret", "redact": true, "imageBuild": "forbidden"},
+        {"key": "IDENTITY_JWT_SIGNING_KEY", "injectedAs": "runtime-secret", "redact": true, "imageBuild": "forbidden"}
+      ],
+      "resources": {"requests": {"cpu": "200m", "memory": "256Mi"}, "limits": {"cpu": "1000m", "memory": "1Gi"}},
+      "pathTriggers": ["services/identity/**", "backend/src/main/java/com/onlinejudge/auth/**", "backend/src/main/java/com/onlinejudge/common/**", "backend/src/main/java/com/onlinejudge/integration/**", "backend/src/main/resources/**", "backend/pom.xml", "database/migrations/identity/**"],
+      "traffic": {"exposed": false, "routePrefixes": ["/api/v1/auth", "/.well-known/jwks.json"], "browserEntry": null}
+    },
+    {
+      "name": "course-service",
+      "type": "service",
+      "sourcePaths": ["services/course/**", "backend/src/main/java/com/onlinejudge/crs/**", "backend/src/main/java/com/onlinejudge/common/**", "backend/src/main/java/com/onlinejudge/integration/**", "backend/src/main/resources/**", "backend/pom.xml"],
+      "dockerfile": "services/course/Dockerfile",
+      "image": {
+        "repository": "onlinejudge/course-service",
+        "tagTemplate": "${GIT_SHA}",
+        "build": true,
+        "sbomRequired": true
+      },
+      "ports": [{"name": "http", "containerPort": 8082, "protocol": "TCP", "external": false}],
+      "health": {
+        "startup": {"kind": "http", "target": "/actuator/health/readiness", "requiredDependencies": ["mysql"]},
+        "liveness": {"kind": "http", "target": "/actuator/health/liveness", "requiredDependencies": []},
+        "readiness": {"kind": "http", "target": "/actuator/health/readiness", "requiredDependencies": ["mysql"]}
+      },
+      "dependsOn": ["mysql"],
+      "migrationJob": "course-migrations",
+      "configuration": ["COURSE_HTTP_PORT", "MYSQL_HOST", "MYSQL_PORT", "COURSE_DATABASE_NAME", "COURSE_DATABASE_USER", "IDENTITY_JWT_ISSUER", "IDENTITY_JWT_AUDIENCE", "IDENTITY_JWKS_URI"],
+      "secrets": [
+        {"key": "COURSE_DATABASE_PASSWORD", "injectedAs": "runtime-secret", "redact": true, "imageBuild": "forbidden"},
+        {"key": "COURSE_SERVICE_IDENTITY", "injectedAs": "workload-identity", "redact": true, "imageBuild": "forbidden"}
+      ],
+      "resources": {"requests": {"cpu": "200m", "memory": "256Mi"}, "limits": {"cpu": "1000m", "memory": "1Gi"}},
+      "pathTriggers": ["services/course/**", "backend/src/main/java/com/onlinejudge/crs/**", "backend/src/main/java/com/onlinejudge/common/**", "backend/src/main/java/com/onlinejudge/integration/**", "backend/src/main/resources/**", "backend/pom.xml", "database/migrations/course/**"],
+      "traffic": {"exposed": false, "routePrefixes": ["/api/v1/courses"], "browserEntry": null}
+    },
+    {
+      "name": "assessment-api",
+      "type": "service",
+      "sourcePaths": ["services/assessment/**", "backend/src/main/java/com/onlinejudge/lab/**", "backend/src/main/java/com/onlinejudge/hwk/**", "backend/src/main/java/com/onlinejudge/common/**", "backend/src/main/java/com/onlinejudge/integration/**", "backend/src/main/resources/**", "backend/pom.xml"],
+      "dockerfile": "services/assessment/Dockerfile",
+      "image": {
+        "repository": "onlinejudge/assessment-api",
+        "tagTemplate": "${GIT_SHA}",
+        "build": true,
+        "sbomRequired": true
+      },
+      "ports": [{"name": "http", "containerPort": 8083, "protocol": "TCP", "external": false}],
+      "health": {
+        "startup": {"kind": "http", "target": "/actuator/health/readiness", "requiredDependencies": ["mysql"]},
+        "liveness": {"kind": "http", "target": "/actuator/health/liveness", "requiredDependencies": []},
+        "readiness": {"kind": "http", "target": "/actuator/health/readiness", "requiredDependencies": ["mysql"]}
+      },
+      "dependsOn": ["mysql"],
+      "migrationJob": "assessment-migrations",
+      "configuration": ["ASSESSMENT_HTTP_PORT", "MYSQL_HOST", "MYSQL_PORT", "ASSESSMENT_DATABASE_NAME", "ASSESSMENT_DATABASE_USER", "IDENTITY_JWT_ISSUER", "IDENTITY_JWT_AUDIENCE", "IDENTITY_JWKS_URI", "RABBITMQ_HOST", "RABBITMQ_PORT"],
+      "secrets": [
+        {"key": "ASSESSMENT_DATABASE_PASSWORD", "injectedAs": "runtime-secret", "redact": true, "imageBuild": "forbidden"},
+        {"key": "ASSESSMENT_SERVICE_IDENTITY", "injectedAs": "workload-identity", "redact": true, "imageBuild": "forbidden"},
+        {"key": "RABBITMQ_PASSWORD", "injectedAs": "runtime-secret", "redact": true, "imageBuild": "forbidden"}
+      ],
+      "resources": {"requests": {"cpu": "300m", "memory": "512Mi"}, "limits": {"cpu": "1500m", "memory": "2Gi"}},
+      "pathTriggers": ["services/assessment/**", "backend/src/main/java/com/onlinejudge/lab/**", "backend/src/main/java/com/onlinejudge/hwk/**", "backend/src/main/java/com/onlinejudge/common/**", "backend/src/main/java/com/onlinejudge/integration/**", "backend/src/main/resources/**", "backend/pom.xml", "database/migrations/assessment/**"],
+      "traffic": {"exposed": false, "routePrefixes": ["/api/v1/labs", "/api/v1/homeworks", "/api/v1/submissions", "/api/v1/evaluations"], "browserEntry": null}
+    },
+    {
+      "name": "assessment-worker",
+      "type": "worker",
+      "sourcePaths": ["services/assessment/**", "backend/src/main/java/com/onlinejudge/lab/**", "backend/src/main/java/com/onlinejudge/hwk/**", "backend/src/main/java/com/onlinejudge/common/**", "backend/src/main/java/com/onlinejudge/integration/**", "backend/src/main/resources/**", "backend/pom.xml"],
+      "dockerfile": "services/assessment/Dockerfile",
+      "image": {
+        "repository": "onlinejudge/assessment-worker",
+        "tagTemplate": "${GIT_SHA}",
+        "build": true,
+        "sbomRequired": true
+      },
+      "ports": [],
+      "health": {
+        "startup": {"kind": "process", "target": "worker-started", "requiredDependencies": ["mysql", "rabbitmq"]},
+        "liveness": {"kind": "process", "target": "worker-event-loop", "requiredDependencies": []},
+        "readiness": {"kind": "process", "target": "lease-and-consumer-ready", "requiredDependencies": ["mysql", "rabbitmq"]}
+      },
+      "dependsOn": ["mysql", "rabbitmq"],
+      "migrationJob": null,
+      "configuration": ["ASSESSMENT_WORKER_CONCURRENCY", "MYSQL_HOST", "MYSQL_PORT", "ASSESSMENT_DATABASE_NAME", "ASSESSMENT_DATABASE_USER", "RABBITMQ_HOST", "RABBITMQ_PORT", "EVALUATION_SANDBOX_MODE"],
+      "secrets": [
+        {"key": "ASSESSMENT_DATABASE_PASSWORD", "injectedAs": "runtime-secret", "redact": true, "imageBuild": "forbidden"},
+        {"key": "ASSESSMENT_WORKER_IDENTITY", "injectedAs": "workload-identity", "redact": true, "imageBuild": "forbidden"},
+        {"key": "RABBITMQ_PASSWORD", "injectedAs": "runtime-secret", "redact": true, "imageBuild": "forbidden"}
+      ],
+      "resources": {"requests": {"cpu": "500m", "memory": "1Gi"}, "limits": {"cpu": "2000m", "memory": "4Gi"}},
+      "pathTriggers": ["services/assessment/**", "backend/src/main/java/com/onlinejudge/lab/**", "backend/src/main/java/com/onlinejudge/hwk/**", "backend/src/main/java/com/onlinejudge/common/**", "backend/src/main/java/com/onlinejudge/integration/**", "backend/src/main/resources/**", "backend/pom.xml"],
+      "traffic": {"exposed": false, "routePrefixes": [], "browserEntry": null}
+    },
+    {
+      "name": "grade-service",
+      "type": "service",
+      "sourcePaths": ["services/grade/**", "backend/src/main/java/com/onlinejudge/grd/**", "backend/src/main/java/com/onlinejudge/common/**", "backend/src/main/java/com/onlinejudge/integration/**", "backend/src/main/resources/**", "backend/pom.xml"],
+      "dockerfile": "services/grade/Dockerfile",
+      "image": {
+        "repository": "onlinejudge/grade-service",
+        "tagTemplate": "${GIT_SHA}",
+        "build": true,
+        "sbomRequired": true
+      },
+      "ports": [{"name": "http", "containerPort": 8084, "protocol": "TCP", "external": false}],
+      "health": {
+        "startup": {"kind": "http", "target": "/actuator/health/readiness", "requiredDependencies": ["mysql"]},
+        "liveness": {"kind": "http", "target": "/actuator/health/liveness", "requiredDependencies": []},
+        "readiness": {"kind": "http", "target": "/actuator/health/readiness", "requiredDependencies": ["mysql"]}
+      },
+      "dependsOn": ["mysql"],
+      "migrationJob": "grade-migrations",
+      "configuration": ["GRADE_HTTP_PORT", "MYSQL_HOST", "MYSQL_PORT", "GRADE_DATABASE_NAME", "GRADE_DATABASE_USER", "IDENTITY_JWT_ISSUER", "IDENTITY_JWT_AUDIENCE", "IDENTITY_JWKS_URI", "RABBITMQ_HOST", "RABBITMQ_PORT"],
+      "secrets": [
+        {"key": "GRADE_DATABASE_PASSWORD", "injectedAs": "runtime-secret", "redact": true, "imageBuild": "forbidden"},
+        {"key": "GRADE_SERVICE_IDENTITY", "injectedAs": "workload-identity", "redact": true, "imageBuild": "forbidden"},
+        {"key": "RABBITMQ_PASSWORD", "injectedAs": "runtime-secret", "redact": true, "imageBuild": "forbidden"}
+      ],
+      "resources": {"requests": {"cpu": "200m", "memory": "256Mi"}, "limits": {"cpu": "1000m", "memory": "1Gi"}},
+      "pathTriggers": ["services/grade/**", "backend/src/main/java/com/onlinejudge/grd/**", "backend/src/main/java/com/onlinejudge/common/**", "backend/src/main/java/com/onlinejudge/integration/**", "backend/src/main/resources/**", "backend/pom.xml", "database/migrations/grade/**"],
+      "traffic": {"exposed": false, "routePrefixes": ["/api/v1/grades"], "browserEntry": null}
+    },
+    {
+      "name": "learning-service",
+      "type": "service",
+      "sourcePaths": ["services/learning/**", "backend/src/main/java/com/onlinejudge/lrn/**", "backend/src/main/java/com/onlinejudge/common/**", "backend/src/main/java/com/onlinejudge/integration/**", "backend/src/main/resources/**", "backend/pom.xml"],
+      "dockerfile": "services/learning/Dockerfile",
+      "image": {
+        "repository": "onlinejudge/learning-service",
+        "tagTemplate": "${GIT_SHA}",
+        "build": true,
+        "sbomRequired": true
+      },
+      "ports": [{"name": "http", "containerPort": 8085, "protocol": "TCP", "external": false}],
+      "health": {
+        "startup": {"kind": "http", "target": "/actuator/health/readiness", "requiredDependencies": ["mysql"]},
+        "liveness": {"kind": "http", "target": "/actuator/health/liveness", "requiredDependencies": []},
+        "readiness": {"kind": "http", "target": "/actuator/health/readiness", "requiredDependencies": ["mysql"]}
+      },
+      "dependsOn": ["mysql"],
+      "migrationJob": "learning-migrations",
+      "configuration": ["LEARNING_HTTP_PORT", "MYSQL_HOST", "MYSQL_PORT", "LEARNING_DATABASE_NAME", "LEARNING_DATABASE_USER", "IDENTITY_JWT_ISSUER", "IDENTITY_JWT_AUDIENCE", "IDENTITY_JWKS_URI", "RABBITMQ_HOST", "RABBITMQ_PORT"],
+      "secrets": [
+        {"key": "LEARNING_DATABASE_PASSWORD", "injectedAs": "runtime-secret", "redact": true, "imageBuild": "forbidden"},
+        {"key": "LEARNING_SERVICE_IDENTITY", "injectedAs": "workload-identity", "redact": true, "imageBuild": "forbidden"},
+        {"key": "RABBITMQ_PASSWORD", "injectedAs": "runtime-secret", "redact": true, "imageBuild": "forbidden"}
+      ],
+      "resources": {"requests": {"cpu": "200m", "memory": "256Mi"}, "limits": {"cpu": "1000m", "memory": "1Gi"}},
+      "pathTriggers": ["services/learning/**", "backend/src/main/java/com/onlinejudge/lrn/**", "backend/src/main/java/com/onlinejudge/common/**", "backend/src/main/java/com/onlinejudge/integration/**", "backend/src/main/resources/**", "backend/pom.xml", "database/migrations/learning/**"],
+      "traffic": {"exposed": false, "routePrefixes": ["/api/v1/learning", "/api/v1/notifications"], "browserEntry": null}
+    },
+    {
+      "name": "frontend",
+      "type": "frontend",
+      "sourcePaths": ["frontend/**"],
+      "dockerfile": "deploy/docker/frontend.Dockerfile",
+      "image": {
+        "repository": "onlinejudge/frontend",
+        "tagTemplate": "${GIT_SHA}",
+        "build": true,
+        "sbomRequired": true
+      },
+      "ports": [{"name": "http", "containerPort": 80, "protocol": "TCP", "external": false}],
+      "health": {
+        "startup": {"kind": "http", "target": "/", "requiredDependencies": []},
+        "liveness": {"kind": "http", "target": "/", "requiredDependencies": []},
+        "readiness": {"kind": "http", "target": "/", "requiredDependencies": []}
+      },
+      "dependsOn": [],
+      "migrationJob": null,
+      "configuration": ["PUBLIC_API_BASE_URL"],
+      "secrets": [],
+      "resources": {"requests": {"cpu": "100m", "memory": "128Mi"}, "limits": {"cpu": "500m", "memory": "512Mi"}},
+      "pathTriggers": ["frontend/**"],
+      "traffic": {"exposed": false, "routePrefixes": [], "browserEntry": null}
+    },
+    {
+      "name": "rabbitmq",
+      "type": "broker",
+      "sourcePaths": ["deploy/rabbitmq/**"],
+      "dockerfile": null,
+      "image": {
+        "repository": "rabbitmq",
+        "tagTemplate": "4.1-management",
+        "build": false,
+        "sbomRequired": true
+      },
+      "ports": [
+        {"name": "amqp", "containerPort": 5672, "protocol": "TCP", "external": false},
+        {"name": "management", "containerPort": 15672, "protocol": "TCP", "external": false}
+      ],
+      "health": {
+        "startup": {"kind": "command", "target": "rabbitmq-diagnostics -q ping", "requiredDependencies": []},
+        "liveness": {"kind": "command", "target": "rabbitmq-diagnostics -q ping", "requiredDependencies": []},
+        "readiness": {"kind": "command", "target": "rabbitmq-diagnostics -q check_running", "requiredDependencies": []}
+      },
+      "dependsOn": [],
+      "migrationJob": null,
+      "configuration": ["RABBITMQ_DEFAULT_USER", "RABBITMQ_VHOST"],
+      "secrets": [{"key": "RABBITMQ_PASSWORD", "injectedAs": "runtime-secret", "redact": true, "imageBuild": "forbidden"}],
+      "resources": {"requests": {"cpu": "200m", "memory": "256Mi"}, "limits": {"cpu": "1000m", "memory": "1Gi"}},
+      "pathTriggers": ["deploy/rabbitmq/**"],
+      "traffic": {"exposed": false, "routePrefixes": [], "browserEntry": null}
+    },
+    {
+      "name": "mysql",
+      "type": "database",
+      "sourcePaths": ["database/**", "deploy/mysql/**"],
+      "dockerfile": null,
+      "image": {
+        "repository": "mysql",
+        "tagTemplate": "8.4",
+        "build": false,
+        "sbomRequired": true
+      },
+      "ports": [{"name": "mysql", "containerPort": 3306, "protocol": "TCP", "external": false}],
+      "health": {
+        "startup": {"kind": "command", "target": "mysqladmin ping --silent", "requiredDependencies": []},
+        "liveness": {"kind": "command", "target": "mysqladmin ping --silent", "requiredDependencies": []},
+        "readiness": {"kind": "command", "target": "mysqladmin ping --silent", "requiredDependencies": []}
+      },
+      "dependsOn": [],
+      "migrationJob": null,
+      "configuration": ["MYSQL_HOST", "MYSQL_PORT", "MYSQL_PHYSICAL_INSTANCE_MODE"],
+      "secrets": [
+        {"key": "MYSQL_ROOT_PASSWORD", "injectedAs": "runtime-secret", "redact": true, "imageBuild": "forbidden"},
+        {"key": "IDENTITY_DATABASE_PASSWORD", "injectedAs": "runtime-secret", "redact": true, "imageBuild": "forbidden"},
+        {"key": "COURSE_DATABASE_PASSWORD", "injectedAs": "runtime-secret", "redact": true, "imageBuild": "forbidden"},
+        {"key": "ASSESSMENT_DATABASE_PASSWORD", "injectedAs": "runtime-secret", "redact": true, "imageBuild": "forbidden"},
+        {"key": "GRADE_DATABASE_PASSWORD", "injectedAs": "runtime-secret", "redact": true, "imageBuild": "forbidden"},
+        {"key": "LEARNING_DATABASE_PASSWORD", "injectedAs": "runtime-secret", "redact": true, "imageBuild": "forbidden"}
+      ],
+      "resources": {"requests": {"cpu": "500m", "memory": "1Gi"}, "limits": {"cpu": "2000m", "memory": "4Gi"}},
+      "pathTriggers": ["database/**", "deploy/mysql/**"],
+      "traffic": {"exposed": false, "routePrefixes": [], "browserEntry": null}
+    }
+  ],
+  "migrationJobs": [
+    {
+      "name": "identity-migrations",
+      "schema": "identity",
+      "forWorkload": "identity-service",
+      "sourcePaths": ["database/migrations/identity/**"],
+      "command": "./database/mysql/migrate-service.sh --schema identity",
+      "dependsOnWorkloads": ["mysql"],
+      "dependsOnMigrationJobs": [],
+      "runOnce": true,
+      "blocksTraffic": true,
+      "failurePolicy": "block",
+      "retryPolicy": "safe-to-rerun",
+      "rollback": "forward-fix-or-approved-restore"
+    },
+    {
+      "name": "course-migrations",
+      "schema": "course",
+      "forWorkload": "course-service",
+      "sourcePaths": ["database/migrations/course/**"],
+      "command": "./database/mysql/migrate-service.sh --schema course",
+      "dependsOnWorkloads": ["mysql"],
+      "dependsOnMigrationJobs": ["identity-migrations"],
+      "runOnce": true,
+      "blocksTraffic": true,
+      "failurePolicy": "block",
+      "retryPolicy": "safe-to-rerun",
+      "rollback": "forward-fix-or-approved-restore"
+    },
+    {
+      "name": "assessment-migrations",
+      "schema": "assessment",
+      "forWorkload": "assessment-api",
+      "sourcePaths": ["database/migrations/assessment/**"],
+      "command": "./database/mysql/migrate-service.sh --schema assessment",
+      "dependsOnWorkloads": ["mysql"],
+      "dependsOnMigrationJobs": ["course-migrations"],
+      "runOnce": true,
+      "blocksTraffic": true,
+      "failurePolicy": "block",
+      "retryPolicy": "safe-to-rerun",
+      "rollback": "forward-fix-or-approved-restore"
+    },
+    {
+      "name": "grade-migrations",
+      "schema": "grade",
+      "forWorkload": "grade-service",
+      "sourcePaths": ["database/migrations/grade/**"],
+      "command": "./database/mysql/migrate-service.sh --schema grade",
+      "dependsOnWorkloads": ["mysql"],
+      "dependsOnMigrationJobs": ["assessment-migrations"],
+      "runOnce": true,
+      "blocksTraffic": true,
+      "failurePolicy": "block",
+      "retryPolicy": "safe-to-rerun",
+      "rollback": "forward-fix-or-approved-restore"
+    },
+    {
+      "name": "learning-migrations",
+      "schema": "learning",
+      "forWorkload": "learning-service",
+      "sourcePaths": ["database/migrations/learning/**"],
+      "command": "./database/mysql/migrate-service.sh --schema learning",
+      "dependsOnWorkloads": ["mysql"],
+      "dependsOnMigrationJobs": ["grade-migrations"],
+      "runOnce": true,
+      "blocksTraffic": true,
+      "failurePolicy": "block",
+      "retryPolicy": "safe-to-rerun",
+      "rollback": "forward-fix-or-approved-restore"
+    }
+  ],
+  "promotion": {
+    "environments": ["DEV", "FAT", "UAT", "PRO"],
+    "requiredEvidence": [
+      "immutable git SHA and image digest for every workload",
+      "SBOM and checksum artifact manifest",
+      "schema validation and path-resolution output",
+      "migration-job output and zero failed jobs",
+      "startup/liveness/readiness evidence",
+      "rollback drill evidence for the promoted environment"
+    ]
+  },
+  "d3Retirement": {
+    "legacyContract": "docs/开发/D3-CICD-共享契约.md",
+    "compatibilityWindow": "v2-parallel-until-gates-pass",
+    "retirementGates": [
+      "the recorded #305/#309/#338 cross-contract comparison has no service, schema, identity or failure-semantics mismatch; OPEN or merged status is not a gate",
+      "#318 proves a disposable environment with all five services, assessment-worker, gateway, frontend, RabbitMQ and MySQL",
+      "all five migration jobs are rerunnable, failure-blocking and have a recorded rollback drill",
+      "the v2 pipeline publishes digest, SBOM and checksum evidence for every workload",
+      "no route or CI consumer still depends on D3 backend/frontend-only variables"
+    ]
+  }
+}
