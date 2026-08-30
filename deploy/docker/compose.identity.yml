@@ -1,0 +1,51 @@
+name: onlinejudge-auth
+
+services:
+  identity-db:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: onlinejudge_identity
+      MYSQL_USER: ${IDENTITY_DATABASE_USERNAME:-onlinejudge_identity}
+      MYSQL_PASSWORD: ${IDENTITY_DATABASE_PASSWORD:?IDENTITY_DATABASE_PASSWORD is required}
+      MYSQL_ROOT_PASSWORD: ${IDENTITY_DATABASE_ROOT_PASSWORD:?IDENTITY_DATABASE_ROOT_PASSWORD is required}
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    volumes:
+      - identity-mysql-data:/var/lib/mysql
+      - ../../database/migrations/identity/DB-IDENTITY-01-identity-user-session.sql:/docker-entrypoint-initdb.d/01-identity-schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  identity-service:
+    image: onlinejudge/identity-service:${GIT_SHA:?GIT_SHA must be the current full 40-character commit SHA}
+    depends_on:
+      identity-db:
+        condition: service_healthy
+    environment:
+      IDENTITY_DATABASE_HOST: identity-db
+      IDENTITY_DATABASE_PORT: 3306
+      IDENTITY_DATABASE_NAME: onlinejudge_identity
+      IDENTITY_DATABASE_USERNAME: ${IDENTITY_DATABASE_USERNAME:-onlinejudge_identity}
+      IDENTITY_DATABASE_PASSWORD: ${IDENTITY_DATABASE_PASSWORD:?IDENTITY_DATABASE_PASSWORD is required}
+      IDENTITY_JWT_SIGNING_KEY: ${IDENTITY_JWT_SIGNING_KEY:?IDENTITY_JWT_SIGNING_KEY is required}
+      IDENTITY_JWT_KID: ${IDENTITY_JWT_KID:?IDENTITY_JWT_KID is required}
+      IDENTITY_JWT_ISSUER: onlinejudge.identity.v2
+      IDENTITY_JWT_AUDIENCE: onlinejudge.api
+      IDENTITY_SEED_DATA_ENABLED: ${IDENTITY_SEED_DATA_ENABLED:-false}
+      IDENTITY_SERVICE_REVISION: ${GIT_SHA:?GIT_SHA must be the current full 40-character commit SHA}
+    ports:
+      - "${IDENTITY_HTTP_PORT:-8081}:8081"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8081/api/v1/system/readiness | grep -q '\"status\":\"UP\"'"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+volumes:
+  identity-mysql-data:

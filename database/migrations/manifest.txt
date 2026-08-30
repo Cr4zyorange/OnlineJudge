@@ -1,5 +1,5 @@
 # Canonical MySQL migration order. Append new migrations; never reorder or edit applied entries.
-DB-AUTH-01-auth-user-session.sql
+identity/DB-IDENTITY-01-identity-user-session.sql
 DB-CRS-01-course-and-member.sql
 DB-CRS-02-course-chapter.sql
 DB-CRS-03-course-resource.sql

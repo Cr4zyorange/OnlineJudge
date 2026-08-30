@@ -1,122 +1,87 @@
-# D6-AUTH 独立身份服务交付
+# D6-AUTH 独立身份服务交付（v2）
 
-本文档是 Issue #311 的服务消费与运维契约。身份服务位于 `services/auth-service`，保持现有 AUTH HTTP 路径与响应包络兼容，并独立拥有构建、配置、数据库、探针和容器交付物。
+本文件是 Issue #311 的交付与消费契约。身份服务唯一入口为 `services/identity`，是五服务架构中的 `identity` 服务；它独立拥有账号、角色、权限、会话、安全版本、签名密钥和身份失效事实。既有 `/api/v1/auth/**` 兼容入口保留，但 Bearer 凭证已改为短时、受众绑定的 JWT。
 
-## 1. 服务边界
+## 1. 信任边界
 
-- 服务只包含 AUTH 领域代码及其最小公共 Web、安全和异常契约，不包含 CRS、LAB、HWK、GRD、LRN、评测、存储或跨模块事件实现。
-- 数据库只拥有 `t_auth_user`、`t_auth_role`、`t_auth_permission`、`t_auth_user_role`、`t_auth_role_permission`、`t_auth_session`、`t_auth_audit_log`。
-- 其他服务不得直接查询、写入或关联 `t_auth_*`。当前兼容入口是 AUTH HTTP API；后续内部身份契约由 #310 固化，统一入口与流量切换由 #317 完成。
-- 为避免迁移期间破坏现有主流程，本 Issue 不删除单体中的 AUTH 兼容实现，也不修改前端路由。
+- `identity` 只包含身份领域及最小 Web、安全、异常代码，不包含 course、assessment、grade、learning、评测、存储或业务事件实现。
+- `identity` 只拥有 `t_auth_*` 身份表和 `t_identity_outbox_event`；其他服务不得直接查询或写入这些表。
+- 网关只做 TLS 终结、限流、路由并剥离外部伪造身份 Header；它不是唯一信任边界。业务服务必须用缓存 JWKS 在本地验证签名、`iss`、`aud`、允许的 `alg`、`kid`、`iat`、`exp` 和其本地安全版本投影。
+- Identity 不可用时，已缓存公钥且未过期的会话仍可离线验证；JWKS 未缓存、未知 `kid` 的受限刷新及新登录会失败关闭，不能降级信任 Header 或跳过验证。
 
-## 2. HTTP API
+## 2. 用户 JWT、JWKS 与轮换
 
-除注册、登录和三个系统探针外，所有 `/api/v1/**` 请求都必须携带：
+登录成功创建 15 分钟有效的服务端会话记录并签发 RS256 JWT。JWT 头部必须为 `alg=RS256` 并有 `kid`；负载至少含：
 
-```http
-Authorization: Bearer <opaque-session-token>
+```text
+userId, roles[], permissions[], sessionId, securityVersion, iat, exp,
+iss=onlinejudge.identity.v2, aud=onlinejudge.api
 ```
 
-服务不信任 `X-User-Id`、`X-User-Name`、`X-User-Role` 等调用方可伪造 Header，不接受 Header 降级认证，也不把任意 JWT 字符串当作会话。
+`GET /.well-known/jwks.json` 返回当前与轮换重叠窗口内的 RSA 公钥，键均含 `kty=RSA`、`use=sig`、`alg=RS256`、`kid`、`n`、`e`。旧公钥必须保留至少一个最大 Token 生命周期加消费端缓存窗口。私钥只由 `IDENTITY_JWT_SIGNING_KEY` 注入；Compose/生产显式关闭临时开发密钥。
 
-现有兼容端点如下：
+`OfflineJwtVerifier` 是业务服务应复用的纯协议实现，没有 Identity HTTP 客户端或 Identity 数据库依赖。它在请求路径拒绝未知 `kid`、非 RS256、签名错误、错误 issuer/audience、未来签发、过期和低于本地最小 `securityVersion` 的令牌。消费端负责定时 JWKS 刷新、一次受限未知 `kid` 刷新和安全版本事件投影，不得用网关 Header 代替验证。
+
+## 3. 会话失效和安全版本
+
+`securityVersion` 初始为 1。登出、密码变更、角色变更、角色权限变更和账号状态变更，在同一数据库事务中撤销相应会话、增加安全版本，并写入 PENDING outbox 事实 `identity.security-version.changed.v2`。事件负载含 `userId`、`securityVersion`（大于等于 1）与 `changeReason`：`LOGOUT`、`PASSWORD_CHANGED`、`ROLE_CHANGED`、`PERMISSION_CHANGED`、`ACCOUNT_STATUS_CHANGED`。
+
+#337 负责将 outbox 事实以至少一次语义投递给业务服务；本 Issue 只创建原子、可投递的事实而不虚报投递器已完成。Identity 当前用户解析同时验证 JWT、会话状态、账号状态和安全版本，因此禁用、登出或版本落后的会话不能继续使用。
+
+## 4. API
+
+兼容 API 继续使用 `{code, message, data}` 包络。
 
 | 分组 | 方法与路径 | 说明 |
 | --- | --- | --- |
-| 会话 | `POST /api/v1/auth/register` | 公开注册，仅允许学生身份 |
-| 会话 | `POST /api/v1/auth/login` | 账号、邮箱或手机号登录，返回不透明 Bearer 会话 |
-| 会话 | `POST /api/v1/auth/logout` | 只撤销本次携带的会话 |
-| 会话 | `GET /api/v1/auth/me` | 返回当前可信身份主体 |
-| 鉴权 | `POST /api/v1/auth/check-permission` | 校验当前主体的权限码 |
-| 资料 | `GET /api/v1/users/me` | 查询当前用户资料 |
-| 资料 | `PUT /api/v1/users/me` | 更新当前用户资料 |
-| 资料 | `PUT /api/v1/users/me/password` | 修改密码并撤销该用户全部已有会话 |
-| 管理 | `/api/v1/admin/users/**` | 用户查询、创建、状态和角色管理 |
-| 管理 | `/api/v1/admin/roles/**` | 角色和角色权限管理 |
-| 管理 | `GET /api/v1/admin/permissions` | 权限清单 |
-| 审计 | `GET /api/v1/admin/audit-logs` | 审计日志分页查询 |
+| 会话 | `POST /api/v1/auth/register` | 公开注册，仅学生身份 |
+| 会话 | `POST /api/v1/auth/login` | 返回短时 RS256 Bearer JWT 与到期时间 |
+| 会话 | `POST /api/v1/auth/logout` | 撤销当前会话并提升安全版本 |
+| 会话 | `GET /api/v1/auth/me` | 返回经 JWT、会话和版本校验的主体 |
+| 密钥 | `GET /.well-known/jwks.json` | 供业务服务缓存与离线验签的当前/重叠公钥 |
+| 鉴权 | `POST /api/v1/auth/check-permission` | 校验当前主体权限码 |
+| 资料、管理、审计 | 既有 `/api/v1/users/**`、`/api/v1/admin/**` | 保持 AUTH 兼容行为并提升安全版本 |
 
-所有业务响应继续使用 `{code, message, data}` 包络。认证缺失、伪造、过期或已撤销会话返回 HTTP `401`、`ERR-AUTH-04`；主体已认证但权限不足返回 HTTP `403`、`ERR-AUTH-05`。账号禁用、冻结或锁定按既有 AUTH 错误码处理。依赖故障返回安全的通用错误，不向 HTTP 响应暴露连接串、口令或堆栈。
+`contracts/v2/openapi/identity.openapi.json` 中的 `POST /internal/v2/service-tokens` 是服务工作负载 mTLS 令牌契约；在完整 mTLS 运行时配置落地前，不得用共享静态密钥或伪造 Header 代替它。
 
-## 3. 可信身份主体
+## 5. 数据库、配置与镜像
 
-`GET /api/v1/auth/me` 的 `data` 字段保持以下字段：
+MySQL 身份迁移正本：
 
 ```text
-id, username, userType, displayName, phone, email, avatarUrl,
-accountStatus, roles[], permissions[]
+database/migrations/identity/DB-IDENTITY-01-identity-user-session.sql
 ```
 
-调用方只能把身份服务通过已验证 Bearer 会话返回的主体作为权限决策输入。身份服务不可用、超时或响应不合法时必须 fail closed：不得使用请求 Header、缓存中的过期角色或匿名默认角色继续执行受保护操作。
+Compose 仅在初始化空 `onlinejudge_identity` 数据库时只读挂载此文件。业务账号、根口令和 JWT 私钥必须由环境显式提供，不能提交。
 
-当前 #311 不新增未定稿的服务间 Header、JWT、刷新令牌或内部接口。需要跨服务传播身份时，必须等待 #310 的契约和 #317 的网关接入，不得自行扩展公共 DTO。
-
-## 4. 数据库与种子数据
-
-MySQL 正本位于：
-
-```text
-services/auth-service/src/main/resources/db/migration/DB-AUTH-01-auth-user-session.sql
-```
-
-Compose 将该文件只读挂载到空 `onlinejudge_auth` 数据库的初始化目录。`auth-db` 中的业务账号由 MySQL 官方镜像创建，只获得该数据库的权限；根口令和业务口令均必须由环境显式提供。
-
-| 变量 | 默认值 | 要求 |
+| 变量 | 默认/用途 | 要求 |
 | --- | --- | --- |
-| `AUTH_DB_HOST` | `auth-db` | Compose 服务名或数据库主机 |
-| `AUTH_DB_PORT` | `3306` | MySQL 端口 |
-| `AUTH_DB_NAME` | `onlinejudge_auth` | AUTH 独占数据库 |
-| `AUTH_DB_USER` | `onlinejudge_auth` | AUTH 独占账号 |
-| `AUTH_DB_PASSWORD` | 无 | 必填，不得提交到仓库 |
-| `AUTH_DB_ROOT_PASSWORD` | 无 | 仅数据库容器初始化必填 |
-| `AUTH_SEED_DATA_ENABLED` | `false` | 只允许 DEV/CI 显式启用 |
+| `IDENTITY_DATABASE_HOST` / `PORT` | `identity-db` / `3306` | Identity 独占数据库地址 |
+| `IDENTITY_DATABASE_NAME` | `onlinejudge_identity` | Identity 独占 schema |
+| `IDENTITY_DATABASE_USERNAME` | `onlinejudge_identity` | 最小权限业务账号 |
+| `IDENTITY_DATABASE_PASSWORD` / `ROOT_PASSWORD` | 无 | 必填密钥 |
+| `IDENTITY_JWT_SIGNING_KEY` | 无 | 必填 base64 PKCS#8 RSA 私钥 |
+| `IDENTITY_JWT_KID` | 无 | 必填可轮换 key id |
+| `IDENTITY_JWT_PREVIOUS_PUBLIC_KEYS` | 空 | `kid:base64-x509` 逗号列表 |
+| `IDENTITY_JWT_ISSUER` / `AUDIENCE` | v2 默认值 | 消费端精确匹配 |
+| `IDENTITY_SEED_DATA_ENABLED` | `false` | 仅 DEV/CI 可启用 |
 
-启用种子数据时会创建 `student001`、`teacher001`、`admin001` 三个既有演示账号及对应角色；默认和生产环境均关闭。已有持久卷不会重复执行 MySQL 初始化脚本；后续结构调整必须新增前向迁移，不能原地修改已发布迁移。
+Dockerfile 位于 `services/identity/Dockerfile`，镜像为 `onlinejudge/identity-service`，使用固定摘要基础镜像和 non-root `10001:10001`。Compose 文件为 `deploy/docker/compose.identity.yml`，只引用当前完整 SHA 标签。
 
-## 5. 构建、启动与探针
-
-本地 Java 21 构建：
-
-```powershell
-mvn -f services/auth-service/pom.xml test
-mvn -f services/auth-service/pom.xml package -DskipTests
-java -jar services/auth-service/target/onlinejudge-auth-service-0.1.0-SNAPSHOT.jar
-```
-
-默认本地端口为 `8081`。三个公开探针为：
-
-- `GET /api/v1/system/health`：进程存活，不探测外部依赖。
-- `GET /api/v1/system/readiness`：执行最小数据库查询；数据库不可用时返回 HTTP `503`、`service unavailable`。
-- `GET /api/v1/system/version`：返回 `service=auth-service`、版本与源码修订号。
-
-边界与独立构建验证：
+## 6. 构建、探针和验收
 
 ```powershell
-$env:MAVEN_CMD = "mvn"
-./scripts/test/verify-auth-service-boundary.ps1
-```
+mvn -f services/identity/pom.xml test
+mvn -f services/identity/pom.xml package -DskipTests
+./scripts/test/verify-identity-service-boundary.ps1
 
-## 6. 容器交付
-
-镜像必须用当前完整 Git SHA 构建并标记，运行时使用固定基础镜像摘要和非 root 用户 `10001:10001`：
-
-```powershell
 $env:GIT_SHA = git rev-parse HEAD
-docker build --build-arg "GIT_SHA=$env:GIT_SHA" `
-  -f deploy/docker/auth-service.Dockerfile `
-  -t "onlinejudge/auth-service:$env:GIT_SHA" .
+docker build --build-arg "GIT_SHA=$env:GIT_SHA" -f services/identity/Dockerfile -t "onlinejudge/identity-service:$env:GIT_SHA" .
+docker compose -f deploy/docker/compose.identity.yml up -d --wait
 ```
 
-提供 `AUTH_DB_PASSWORD`、`AUTH_DB_ROOT_PASSWORD` 和当前 `GIT_SHA` 后启动：
+默认端口为 `8081`。`/health` 只检查进程，`/readiness` 执行最小数据库查询且依赖故障返回 503，`/version` 返回 `service=identity-service`、版本和 revision。验收覆盖 JWT 声明、JWKS 格式、轮换重叠、离线验签、issuer/audience/alg/kid/exp/securityVersion 拒绝、禁用/登出失效、迁移、非 root 镜像与 readiness。
 
-```powershell
-docker compose -f deploy/docker/compose.auth.yml up -d --wait
-```
+## 7. 合并和集成门槛
 
-Compose 不隐式构建镜像，只引用精确 SHA 标签。发布证据必须记录镜像 ID、OCI revision、运行用户、三个探针、数据库账号授权范围，以及读取 `mysql.user` 被拒绝的结果。
-
-## 7. 验收边界
-
-自动化覆盖现有注册、登录、登出、当前用户、资料、角色权限、审计、伪造 Header/Bearer、禁用账号、越权、并发会话、密码变更全会话撤销、探针、依赖故障、种子开关和数据库归属。最终证据索引位于 `output/test/issue-311/README.md`。
-
-Issue #310 和 #317 未完成前，独立服务可单独构建、启动和验收，但生产流量仍不能擅自切换；这是明确的集成依赖，不是 #311 内自行发明契约的授权。
+#338 已确定五服务与 v2 契约，#311 可独立实现和评审。#309 服务分库迁移仍是最终非草稿/合并门槛：在其合并及使用方完成契约消费前，不切换生产流量，也不声称业务服务已接入在线 JWKS 刷新或 outbox 投递。

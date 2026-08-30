@@ -10,26 +10,26 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class AuthServiceExtractionContractTest {
     private static final Path REPOSITORY = Path.of("..").toAbsolutePath().normalize();
-    private static final Path SERVICE = REPOSITORY.resolve("services/auth-service");
+    private static final Path SERVICE = REPOSITORY.resolve("services/identity");
 
     @Test
-    void authHasIndependentBuildAndApplication() {
+    void identityHasIndependentBuildAndApplication() {
         assertThat(SERVICE.resolve("pom.xml")).isRegularFile();
-        assertThat(SERVICE.resolve("src/main/java/com/onlinejudge/authservice/AuthServiceApplication.java"))
+        assertThat(SERVICE.resolve("src/main/java/com/onlinejudge/identityservice/IdentityServiceApplication.java"))
                 .isRegularFile();
     }
 
     @Test
-    void authHasIndependentHardenedContainerDeployment() throws IOException {
-        Path dockerfilePath = REPOSITORY.resolve("deploy/docker/auth-service.Dockerfile");
-        Path composePath = REPOSITORY.resolve("deploy/docker/compose.auth.yml");
+    void identityHasIndependentHardenedContainerDeployment() throws IOException {
+        Path dockerfilePath = REPOSITORY.resolve("services/identity/Dockerfile");
+        Path composePath = REPOSITORY.resolve("deploy/docker/compose.identity.yml");
         assertThat(dockerfilePath).isRegularFile();
         assertThat(composePath).isRegularFile();
 
         String dockerfile = Files.readString(dockerfilePath);
         assertThat(dockerfile).contains(
-                "services/auth-service/pom.xml",
-                "onlinejudge-auth-service-0.1.0-SNAPSHOT.jar",
+                "services/identity/pom.xml",
+                "onlinejudge-identity-service-0.1.0-SNAPSHOT.jar",
                 "EXPOSE 8081",
                 "USER 10001:10001",
                 "org.opencontainers.image.revision",
@@ -43,14 +43,15 @@ class AuthServiceExtractionContractTest {
 
         String compose = Files.readString(composePath);
         assertThat(compose).contains(
-                "  auth-db:",
-                "  auth-service:",
-                "onlinejudge/auth-service:${GIT_SHA:?GIT_SHA must be the current full 40-character commit SHA}",
-                "${AUTH_DB_PASSWORD:?AUTH_DB_PASSWORD is required}",
-                "${AUTH_DB_ROOT_PASSWORD:?AUTH_DB_ROOT_PASSWORD is required}",
-                "onlinejudge_auth",
-                "AUTH_DB_HOST: auth-db",
-                "AUTH_DB_NAME: onlinejudge_auth",
+                "  identity-db:",
+                "  identity-service:",
+                "onlinejudge/identity-service:${GIT_SHA:?GIT_SHA must be the current full 40-character commit SHA}",
+                "${IDENTITY_DATABASE_PASSWORD:?IDENTITY_DATABASE_PASSWORD is required}",
+                "${IDENTITY_DATABASE_ROOT_PASSWORD:?IDENTITY_DATABASE_ROOT_PASSWORD is required}",
+                "${IDENTITY_JWT_SIGNING_KEY:?IDENTITY_JWT_SIGNING_KEY is required}",
+                "onlinejudge_identity",
+                "IDENTITY_DATABASE_HOST: identity-db",
+                "IDENTITY_DATABASE_NAME: onlinejudge_identity",
                 "/api/v1/system/readiness"
         );
         assertThat(compose).doesNotContain(

@@ -1,0 +1,26 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:identity_service;MODE=MySQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:schema-auth-h2.sql
+server:
+  port: 8081
+onlinejudge:
+  auth:
+    seed-data-enabled: false
+  identity:
+    jwt:
+      issuer: ${IDENTITY_JWT_ISSUER:onlinejudge.identity.v2}
+      audience: ${IDENTITY_JWT_AUDIENCE:onlinejudge.api}
+      current-kid: ${IDENTITY_JWT_KID:identity-dev-1}
+      current-private-key: ${IDENTITY_JWT_SIGNING_KEY:}
+      previous-public-keys: ${IDENTITY_JWT_PREVIOUS_PUBLIC_KEYS:}
+      allow-ephemeral-keys: ${IDENTITY_JWT_ALLOW_EPHEMERAL_KEYS:true}
+  build:
+    version: ${IDENTITY_SERVICE_VERSION:0.1.0-SNAPSHOT}
+    revision: ${IDENTITY_SERVICE_REVISION:unknown}
