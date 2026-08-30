@@ -151,8 +151,7 @@ public class CourseService {
         int order = order(sortOrder);
         int type = chapterType == null ? 1 : chapterType;
         if (type < 1 || type > 9) throw new CourseException(HttpStatus.BAD_REQUEST, "CHAPTER_TYPE_INVALID", "chapter type is invalid", false);
-        courses.createChapter(courseId, chapterTitle(title), parent, order, objective(objective), visible == null || visible, type);
-        return chapterView(courses.chapters(courseId, true).getLast());
+        return chapterView(courses.createChapter(courseId, chapterTitle(title), parent, order, objective(objective), visible == null || visible, type));
     }
 
     @Transactional
@@ -194,9 +193,8 @@ public class CourseService {
         String normalizedTitle = resourceTitle(title);
         String type = resourceType == null || resourceType.isBlank() ? "LINK" : resourceType(resourceType);
         String visible = resourceVisibility(visibility, "STUDENT");
-        courses.createResource(courseId, chapter, normalizedTitle, type, visible, publishAt, normalizedUrl, normalizedUrl,
-                normalizedTitle, "text/uri-list", 0, actor.id());
-        return resourceView(courses.resources(courseId, true).getLast());
+        return resourceView(courses.createResource(courseId, chapter, normalizedTitle, type, visible, publishAt, normalizedUrl, normalizedUrl,
+                normalizedTitle, "text/uri-list", 0, actor.id()));
     }
 
     @Transactional
@@ -208,9 +206,8 @@ public class CourseService {
         try {
             String name = title == null || title.isBlank() ? stored.originalFilename() : resourceTitle(title);
             String type = resourceType == null || resourceType.isBlank() ? resourceTypeFromFilename(stored.originalFilename()) : resourceType(resourceType);
-            courses.createResource(courseId, chapter, name, type, resourceVisibility(visibility, "STUDENT"), publishAt,
-                    stored.storageKey(), null, stored.originalFilename(), stored.contentType(), stored.size(), actor.id());
-            return resourceView(courses.resources(courseId, true).getLast());
+            return resourceView(courses.createResource(courseId, chapter, name, type, resourceVisibility(visibility, "STUDENT"), publishAt,
+                    stored.storageKey(), null, stored.originalFilename(), stored.contentType(), stored.size(), actor.id()));
         } catch (RuntimeException failure) {
             fileStorage.deleteQuietly(stored.storageKey());
             throw failure;

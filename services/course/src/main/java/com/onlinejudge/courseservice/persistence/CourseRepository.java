@@ -21,12 +21,22 @@ public class CourseRepository {
     public CourseRepository(JdbcTemplate jdbcTemplate) { this.jdbcTemplate = jdbcTemplate; }
 
     public long createCourse(String name, String description, long teacherId, String enrollmentMode, String inviteCode, Integer maxStudents) {
-        jdbcTemplate.update("""
-                INSERT INTO crs_course
-                    (course_name, description, teacher_id, enrollment_mode, invite_code, max_students, status, is_deleted, roster_version)
-                VALUES (?, ?, ?, ?, ?, ?, 'ACTIVE', FALSE, 0)
-                """, name, description, teacherId, enrollmentMode, inviteCode, maxStudents);
-        return jdbcTemplate.queryForObject("SELECT id FROM crs_course WHERE teacher_id = ? ORDER BY id DESC LIMIT 1", Long.class, teacherId);
+        KeyHolder keyHolder = new GeneratedKeyHolder();
+        jdbcTemplate.update(connection -> {
+            PreparedStatement statement = connection.prepareStatement("""
+                    INSERT INTO crs_course
+                        (course_name, description, teacher_id, enrollment_mode, invite_code, max_students, status, is_deleted, roster_version)
+                    VALUES (?, ?, ?, ?, ?, ?, 'ACTIVE', FALSE, 0)
+                    """, Statement.RETURN_GENERATED_KEYS);
+            statement.setString(1, name);
+            statement.setString(2, description);
+            statement.setLong(3, teacherId);
+            statement.setString(4, enrollmentMode);
+            statement.setString(5, inviteCode);
+            if (maxStudents == null) statement.setNull(6, java.sql.Types.INTEGER); else statement.setInt(6, maxStudents);
+            return statement;
+        }, keyHolder);
+        return generatedId(keyHolder);
     }
 
     public Optional<Course> findCourse(long courseId) {
@@ -129,12 +139,24 @@ public class CourseRepository {
         return findCourse(courseId).orElseThrow();
     }
 
-    public void createChapter(long courseId, String title, Long parentId, int sortOrder, String objective, boolean visible, int chapterType) {
-        jdbcTemplate.update("""
-                INSERT INTO crs_chapter
-                    (course_id, parent_id, chapter_name, sort_order, objective, visible_status, chapter_type, is_deleted)
-                VALUES (?, ?, ?, ?, ?, ?, ?, FALSE)
-                """, courseId, parentId, title, sortOrder, objective, visible, chapterType);
+    public Chapter createChapter(long courseId, String title, Long parentId, int sortOrder, String objective, boolean visible, int chapterType) {
+        KeyHolder keyHolder = new GeneratedKeyHolder();
+        jdbcTemplate.update(connection -> {
+            PreparedStatement statement = connection.prepareStatement("""
+                    INSERT INTO crs_chapter
+                        (course_id, parent_id, chapter_name, sort_order, objective, visible_status, chapter_type, is_deleted)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, FALSE)
+                    """, Statement.RETURN_GENERATED_KEYS);
+            statement.setLong(1, courseId);
+            if (parentId == null) statement.setNull(2, java.sql.Types.BIGINT); else statement.setLong(2, parentId);
+            statement.setString(3, title);
+            statement.setInt(4, sortOrder);
+            statement.setString(5, objective);
+            statement.setBoolean(6, visible);
+            statement.setInt(7, chapterType);
+            return statement;
+        }, keyHolder);
+        return chapter(courseId, generatedId(keyHolder)).orElseThrow();
     }
 
     public List<Chapter> chapters(long courseId, boolean includeHidden) {
@@ -167,14 +189,31 @@ public class CourseRepository {
         jdbcTemplate.update("UPDATE crs_chapter SET is_deleted = TRUE, updated_at = CURRENT_TIMESTAMP WHERE course_id = ? AND id = ? AND is_deleted = FALSE", courseId, chapterId);
     }
 
-    public void createResource(long courseId, Long chapterId, String name, String type, String visibility, LocalDateTime publishAt,
-                               String storageKey, String externalUrl, String originalFilename, String contentType, long fileSize, long actorId) {
-        jdbcTemplate.update("""
-                INSERT INTO crs_resource
-                    (course_id, chapter_id, resource_name, resource_type, visibility, publish_at, storage_key, external_url,
-                     original_filename, content_type, file_size, version, download_count, upload_user_id, is_deleted)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 0, ?, FALSE)
-                """, courseId, chapterId, name, type, visibility, publishAt, storageKey, externalUrl, originalFilename, contentType, fileSize, actorId);
+    public Resource createResource(long courseId, Long chapterId, String name, String type, String visibility, LocalDateTime publishAt,
+                                   String storageKey, String externalUrl, String originalFilename, String contentType, long fileSize, long actorId) {
+        KeyHolder keyHolder = new GeneratedKeyHolder();
+        jdbcTemplate.update(connection -> {
+            PreparedStatement statement = connection.prepareStatement("""
+                    INSERT INTO crs_resource
+                        (course_id, chapter_id, resource_name, resource_type, visibility, publish_at, storage_key, external_url,
+                         original_filename, content_type, file_size, version, download_count, upload_user_id, is_deleted)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 0, ?, FALSE)
+                    """, Statement.RETURN_GENERATED_KEYS);
+            statement.setLong(1, courseId);
+            if (chapterId == null) statement.setNull(2, java.sql.Types.BIGINT); else statement.setLong(2, chapterId);
+            statement.setString(3, name);
+            statement.setString(4, type);
+            statement.setString(5, visibility);
+            if (publishAt == null) statement.setNull(6, java.sql.Types.TIMESTAMP); else statement.setObject(6, publishAt);
+            statement.setString(7, storageKey);
+            statement.setString(8, externalUrl);
+            statement.setString(9, originalFilename);
+            statement.setString(10, contentType);
+            statement.setLong(11, fileSize);
+            statement.setLong(12, actorId);
+            return statement;
+        }, keyHolder);
+        return resource(courseId, generatedId(keyHolder)).orElseThrow();
     }
 
     public List<Resource> resources(long courseId, boolean manager) {
@@ -252,7 +291,7 @@ public class CourseRepository {
     private Resource resource(ResultSet rs) throws SQLException { return new Resource(rs.getLong("id"), rs.getLong("course_id"), nullableLong(rs, "chapter_id"), rs.getString("resource_name"), rs.getString("resource_type"), rs.getString("visibility"), rs.getObject("publish_at", LocalDateTime.class), rs.getString("storage_key"), rs.getString("external_url"), rs.getString("original_filename"), rs.getString("content_type"), rs.getLong("file_size"), rs.getInt("version"), rs.getLong("download_count"), rs.getLong("upload_user_id")); }
     private Long nullableLong(ResultSet rs, String name) throws SQLException { long value = rs.getLong(name); return rs.wasNull() ? null : value; }
     private long generatedId(KeyHolder keyHolder) {
-        if (keyHolder.getKeyList().isEmpty()) throw new IllegalStateException("no announcement generated key returned");
+        if (keyHolder.getKeyList().isEmpty()) throw new IllegalStateException("no Course generated key returned");
         Object value = keyHolder.getKeyList().getFirst().get("id");
         if (value == null) value = keyHolder.getKeyList().getFirst().values().iterator().next();
         return ((Number) value).longValue();

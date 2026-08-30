@@ -429,6 +429,30 @@ class CourseServiceContractTest {
         assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM crs_course_member", Integer.class)).isEqualTo(memberBefore);
     }
 
+    @Test
+    void chapterCreationReturnsItsGeneratedRowInsteadOfTheLastSortedChapter() throws Exception {
+        String teacher = userToken("981", List.of("TEACHER"));
+        String courseId = createdCourse(teacher, "generated chapter key");
+        String existing = mockMvc.perform(post("/api/v1/courses/{courseId}/chapters", courseId)
+                        .header("Authorization", teacher).header("X-Request-Id", requestId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"existing last sorted row\",\"sortOrder\":99}"))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        long existingId = objectMapper.readTree(existing).at("/data/id").asLong();
+
+        String created = mockMvc.perform(post("/api/v1/courses/{courseId}/chapters", courseId)
+                        .header("Authorization", teacher).header("X-Request-Id", requestId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"new lower sort row\",\"sortOrder\":1}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.title").value("new lower sort row"))
+                .andReturn().getResponse().getContentAsString();
+        long createdId = objectMapper.readTree(created).at("/data/id").asLong();
+
+        assertThat(createdId).isNotEqualTo(existingId);
+        assertThat(jdbcTemplate.queryForObject("SELECT chapter_name FROM crs_chapter WHERE id = ?", String.class, createdId))
+                .isEqualTo("new lower sort row");
+    }
+
     private String createdCourse(String teacherToken, String name) throws Exception {
         String response = mockMvc.perform(post("/api/v1/courses")
                         .header("Authorization", teacherToken)
