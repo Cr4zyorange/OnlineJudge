@@ -19,19 +19,32 @@ public class CourseOutboxRepository {
         this.objectMapper = objectMapper;
     }
 
-    public void append(String eventType, String aggregateType, String aggregateId, long aggregateVersion,
-                       String correlationId, Map<String, Object> payload) {
+    public String append(String eventType, String aggregateType, String aggregateId, long aggregateVersion,
+                         String correlationId, Map<String, Object> payload) {
         try {
+            String eventId = UUID.randomUUID().toString();
             jdbcTemplate.update("""
                     INSERT INTO course_event_outbox
                     (event_id, event_type, payload_version, aggregate_type, aggregate_id, aggregate_version,
                      correlation_id, payload_json, routing_key, delivery_status, attempt_count, next_attempt_at)
                     VALUES (?, ?, 2, ?, ?, ?, ?, ?, ?, 'PENDING', 0, CURRENT_TIMESTAMP)
-                    """, UUID.randomUUID().toString(), eventType, aggregateType, aggregateId, aggregateVersion,
+                    """, eventId, eventType, aggregateType, aggregateId, aggregateVersion,
                     correlationId, objectMapper.writeValueAsString(payload), eventType);
+            return eventId;
         } catch (Exception exception) {
             throw new IllegalStateException("course outbox write failed", exception);
         }
+    }
+
+    /** Only a successfully published authoritative roster can become due for a source-owned repair. */
+    public List<Long> publishedRosterCourseIds() {
+        return jdbcTemplate.queryForList("""
+                SELECT DISTINCT aggregate_id FROM course_event_outbox
+                 WHERE event_type = 'course.membership.snapshot.v2'
+                   AND aggregate_type = 'course-membership-roster'
+                   AND delivery_status = 'PUBLISHED'
+                 ORDER BY aggregate_id
+                """, String.class).stream().map(Long::parseLong).toList();
     }
 
     public List<OutboxRecord> due(int limit) {

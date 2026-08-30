@@ -21,7 +21,8 @@ public class InternalCourseController {
 
     @GetMapping("/{courseId}/members")
     public CourseService.MemberPage members(@PathVariable long courseId, @RequestParam(required = false) String role,
+                                             @RequestParam(required = false) String status,
                                              @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "50") int size) {
-        return service.memberPage(courseId, role, page, size);
+        return service.memberPage(courseId, role, status, page, size);
     }
 }
