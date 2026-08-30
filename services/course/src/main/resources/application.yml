@@ -1,0 +1,42 @@
+spring:
+  application:
+    name: course-service
+  datasource:
+    url: ${COURSE_DATASOURCE_URL:jdbc:h2:mem:course_service;MODE=MySQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1}
+    username: ${COURSE_DATABASE_USER:sa}
+    password: ${COURSE_DATABASE_PASSWORD:}
+    driver-class-name: ${COURSE_DATABASE_DRIVER:org.h2.Driver}
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:schema-course.sql
+
+server:
+  port: ${COURSE_HTTP_PORT:8082}
+
+management:
+  endpoint:
+    health:
+      probes:
+        enabled: true
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+course:
+  identity:
+    issuer: ${IDENTITY_JWT_ISSUER:onlinejudge.identity.v2}
+    audience: ${IDENTITY_JWT_AUDIENCE:onlinejudge.api}
+    jwks-uri: ${IDENTITY_JWKS_URI:}
+    jwks-trust-bundle: ${IDENTITY_JWKS_TRUST_BUNDLE:}
+    request-timeout: ${IDENTITY_JWKS_REQUEST_TIMEOUT:PT1S}
+    refresh-enabled: ${IDENTITY_JWKS_REFRESH_ENABLED:true}
+    refresh-interval: ${IDENTITY_JWKS_REFRESH_INTERVAL:PT5M}
+  rabbit:
+    enabled: ${COURSE_RABBIT_ENABLED:false}
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USER:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
+    exchange: ${RABBITMQ_EXCHANGE:onlinejudge.events}
