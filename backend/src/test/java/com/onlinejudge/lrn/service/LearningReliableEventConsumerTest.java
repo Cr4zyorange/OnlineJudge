@@ -15,6 +15,7 @@ import org.springframework.boot.test.autoconfigure.jdbc.JdbcTest;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.test.context.jdbc.Sql;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -132,6 +133,13 @@ class LearningReliableEventConsumerTest {
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT request_status FROM learning_event_reconciliation_request WHERE triggering_event_id = 'event-v2'", String.class
         )).isEqualTo("RESOLVED");
+    }
+
+    @Test
+    void reconciliationWorkerIsNotItsOwnScheduledAdapterSoExplicitReplaysCannotRaceATimer() throws Exception {
+        assertThat(LearningReconciliationWorker.class
+                .getDeclaredMethod("reconcileDueMessages")
+                .isAnnotationPresent(Scheduled.class)).isFalse();
     }
 
     @Test

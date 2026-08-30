@@ -3,7 +3,6 @@ package com.onlinejudge.lrn.service;
 import com.onlinejudge.common.reliability.EventProcessingDecision;
 import com.onlinejudge.lrn.repository.LearningEventInboxRepository;
 import com.onlinejudge.lrn.repository.LearningReliabilityRepository;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
@@ -36,7 +35,6 @@ public class LearningReconciliationWorker {
         this.inbox = inbox;
     }
 
-    @Scheduled(fixedDelayString = "${onlinejudge.reliability.reconciliation.fixed-delay-ms:5000}")
     public void reconcileDueMessages() {
         reconcileDue(Instant.now());
     }
