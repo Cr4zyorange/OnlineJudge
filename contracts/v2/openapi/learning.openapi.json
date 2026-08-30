@@ -1,0 +1,29 @@
+{
+  "openapi": "3.1.0",
+  "info": { "title": "OnlineJudge Learning Service internal contract", "version": "2.0.0" },
+  "x-onlinejudge-service": "learning",
+  "paths": {
+    "/internal/v2/notifications/reconciliation-requests": {
+      "post": {
+        "operationId": "requestNotificationReconciliation", "x-onlinejudge-timeout-ms": 1000,
+        "description": "Operations use this only after an event was placed in DLQ or a projection gap was detected. Source business facts are never rolled back because Learning is unavailable.",
+        "security": [{ "serviceJwt": [] }, { "mTLS": [] }],
+        "parameters": [
+          { "name": "X-Request-Id", "in": "header", "required": true, "schema": { "type": "string" } },
+          { "name": "Idempotency-Key", "in": "header", "required": true, "schema": { "type": "string", "minLength": 16, "maxLength": 128 } }
+        ],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ReconciliationRequest" } } } },
+        "responses": { "202": { "description": "A durable reconciliation request was accepted", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ReconciliationAccepted" } } } }, "409": { "description": "Idempotency key conflict", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }, "503": { "description": "Learning cannot accept reconciliation now; caller records an operational alert", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } } }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": { "userJwt": { "type": "http", "scheme": "bearer" }, "serviceJwt": { "type": "apiKey", "in": "header", "name": "X-OnlineJudge-Service-Authorization" }, "mTLS": { "type": "mutualTLS" } },
+    "schemas": {
+      "Error": { "type": "object", "required": ["code", "message", "requestId", "retryable"], "properties": { "code": { "type": "string" }, "message": { "type": "string" }, "requestId": { "type": "string" }, "retryable": { "type": "boolean" } } },
+      "Page": { "type": "object", "required": ["items", "page", "size", "total"], "properties": { "items": { "type": "array", "items": {} }, "page": { "type": "integer" }, "size": { "type": "integer" }, "total": { "type": "integer" } } },
+      "ReconciliationRequest": { "type": "object", "required": ["sourceService", "eventId", "reason"], "properties": { "sourceService": { "enum": ["course", "assessment", "grade"] }, "eventId": { "type": "string", "format": "uuid" }, "reason": { "enum": ["DLQ", "PROJECTION_GAP", "OPERATOR_REPLAY"] } } },
+      "ReconciliationAccepted": { "type": "object", "required": ["requestId", "status"], "properties": { "requestId": { "type": "string", "format": "uuid" }, "status": { "const": "ACCEPTED" } } }
+    }
+  }
+}

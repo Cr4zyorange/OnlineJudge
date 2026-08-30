@@ -55,6 +55,10 @@ java_major="$(java -version 2>&1 | sed -n '1s/.*version "\([0-9][0-9]*\).*/\1/p'
   fail "expected Java $expected_java_major, got $java_major (override with OJ_CI_JAVA_MAJOR)"
 }
 
+# #338 五服务 v2 契约完全由版本化 OpenAPI/AsyncAPI 制品表达；校验器只依赖 Node 标准库，
+# 因而可以在生产者和消费者 Java 套件之外先阻断不兼容的文档、事件信封或反例回归。
+log_run node "$checkout/scripts/ci/verify-microservice-contract-v2.mjs"
+
 # 仓库脚本契约：所有跟踪的 *.sh 必须 LF + bash 语法合法。
 log_run bash "$checkout/scripts/test/verify-shell-contract.sh" "$checkout"
 

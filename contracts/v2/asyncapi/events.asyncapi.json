@@ -1,0 +1,62 @@
+{
+  "asyncapi": "3.0.0",
+  "info": {
+    "title": "OnlineJudge five-service domain events",
+    "version": "2.0.0",
+    "description": "All messages are at-least-once domain facts. Consumers deduplicate eventId and reject or reconcile stale aggregateVersion values; this contract never promises exactly-once delivery."
+  },
+  "defaultContentType": "application/json",
+  "servers": {
+    "broker": { "host": "${RABBITMQ_HOST}", "protocol": "amqp", "protocolVersion": "0.9.1", "description": "The future broker implementation belongs to #337; this file fixes its message contract now." }
+  },
+  "channels": {
+    "identitySecurityVersionChanged": { "address": "onlinejudge.identity.security-version.changed.v2", "messages": { "identitySecurityVersionChanged": { "$ref": "#/components/messages/identity.security-version.changed.v2" } } },
+    "courseMemberChanged": { "address": "onlinejudge.course.member.changed.v2", "messages": { "courseMemberChanged": { "$ref": "#/components/messages/course.member.changed.v2" } } },
+    "courseAnnouncementPublished": { "address": "onlinejudge.course.announcement.published.v2", "messages": { "courseAnnouncementPublished": { "$ref": "#/components/messages/course.announcement.published.v2" } } },
+    "assessmentSourceGradeChanged": { "address": "onlinejudge.assessment.source-grade.changed.v2", "messages": { "assessmentSourceGradeChanged": { "$ref": "#/components/messages/assessment.source-grade.changed.v2" } } },
+    "assessmentEvaluationCompleted": { "address": "onlinejudge.assessment.evaluation.completed.v2", "messages": { "assessmentEvaluationCompleted": { "$ref": "#/components/messages/assessment.evaluation.completed.v2" } } },
+    "assessmentHomeworkPublished": { "address": "onlinejudge.assessment.homework.published.v2", "messages": { "assessmentHomeworkPublished": { "$ref": "#/components/messages/assessment.homework.published.v2" } } },
+    "gradePublished": { "address": "onlinejudge.grade.published.v2", "messages": { "gradePublished": { "$ref": "#/components/messages/grade.published.v2" } } },
+    "gradeReviewProcessed": { "address": "onlinejudge.grade.review.processed.v2", "messages": { "gradeReviewProcessed": { "$ref": "#/components/messages/grade.review.processed.v2" } } }
+  },
+  "operations": {
+    "identityPublishesSecurityVersion": { "action": "send", "channel": { "$ref": "#/channels/identitySecurityVersionChanged" }, "messages": [{ "$ref": "#/channels/identitySecurityVersionChanged/messages/identitySecurityVersionChanged" }] },
+    "coursePublishesMembership": { "action": "send", "channel": { "$ref": "#/channels/courseMemberChanged" }, "messages": [{ "$ref": "#/channels/courseMemberChanged/messages/courseMemberChanged" }] },
+    "coursePublishesAnnouncement": { "action": "send", "channel": { "$ref": "#/channels/courseAnnouncementPublished" }, "messages": [{ "$ref": "#/channels/courseAnnouncementPublished/messages/courseAnnouncementPublished" }] },
+    "assessmentPublishesSourceGrade": { "action": "send", "channel": { "$ref": "#/channels/assessmentSourceGradeChanged" }, "messages": [{ "$ref": "#/channels/assessmentSourceGradeChanged/messages/assessmentSourceGradeChanged" }] },
+    "assessmentPublishesEvaluation": { "action": "send", "channel": { "$ref": "#/channels/assessmentEvaluationCompleted" }, "messages": [{ "$ref": "#/channels/assessmentEvaluationCompleted/messages/assessmentEvaluationCompleted" }] },
+    "assessmentPublishesHomework": { "action": "send", "channel": { "$ref": "#/channels/assessmentHomeworkPublished" }, "messages": [{ "$ref": "#/channels/assessmentHomeworkPublished/messages/assessmentHomeworkPublished" }] },
+    "gradePublishesPublication": { "action": "send", "channel": { "$ref": "#/channels/gradePublished" }, "messages": [{ "$ref": "#/channels/gradePublished/messages/gradePublished" }] },
+    "gradePublishesReview": { "action": "send", "channel": { "$ref": "#/channels/gradeReviewProcessed" }, "messages": [{ "$ref": "#/channels/gradeReviewProcessed/messages/gradeReviewProcessed" }] }
+  },
+  "components": {
+    "schemas": {
+      "EventEnvelope": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["eventId", "eventType", "payloadVersion", "aggregateType", "aggregateId", "aggregateVersion", "occurredAt", "correlationId", "payload"],
+        "properties": {
+          "eventId": { "type": "string", "format": "uuid", "description": "Transport deduplication key; immutable across redelivery and replay." },
+          "eventType": { "type": "string", "enum": ["identity.security-version.changed.v2", "course.member.changed.v2", "course.announcement.published.v2", "assessment.source-grade.changed.v2", "assessment.evaluation.completed.v2", "assessment.homework.published.v2", "grade.published.v2", "grade.review.processed.v2"] },
+          "payloadVersion": { "const": 2, "description": "A breaking payload change creates a new event type or a new payloadVersion; consumers do not guess field meanings." },
+          "aggregateType": { "type": "string", "minLength": 1 },
+          "aggregateId": { "type": "string", "minLength": 1 },
+          "aggregateVersion": { "type": "integer", "minimum": 1, "description": "Strictly increasing per aggregate at the producer. Consumers retain their last processed version and reconcile a gap." },
+          "occurredAt": { "type": "string", "format": "date-time" },
+          "correlationId": { "type": "string", "format": "uuid", "description": "Originating X-Request-Id propagated across sync and async hops." },
+          "payload": { "type": "object", "description": "Event-specific public fact; never an internal table row or repository object." }
+        }
+      }
+    },
+    "messages": {
+      "identity.security-version.changed.v2": { "name": "identity.security-version.changed.v2", "title": "User security version changed", "payload": { "$ref": "#/components/schemas/EventEnvelope" }, "x-onlinejudge-producer": "identity", "x-onlinejudge-consumers": ["course", "assessment", "grade", "learning"], "x-onlinejudge-idempotency-key": "eventId; consumers store eventId before applying the new minimum securityVersion", "x-onlinejudge-ordering": "user aggregateVersion" },
+      "course.member.changed.v2": { "name": "course.member.changed.v2", "title": "Course membership changed", "payload": { "$ref": "#/components/schemas/EventEnvelope" }, "x-onlinejudge-producer": "course", "x-onlinejudge-consumers": ["assessment", "learning"], "x-onlinejudge-idempotency-key": "eventId; projection key courseId:userId:memberVersion", "x-onlinejudge-ordering": "course-member aggregateVersion" },
+      "course.announcement.published.v2": { "name": "course.announcement.published.v2", "title": "Course announcement published", "payload": { "$ref": "#/components/schemas/EventEnvelope" }, "x-onlinejudge-producer": "course", "x-onlinejudge-consumers": ["learning"], "x-onlinejudge-idempotency-key": "eventId; notification key announcementId:recipientUserId", "x-onlinejudge-ordering": "announcement aggregateVersion" },
+      "assessment.source-grade.changed.v2": { "name": "assessment.source-grade.changed.v2", "title": "Published assessment source grade changed", "payload": { "$ref": "#/components/schemas/EventEnvelope" }, "x-onlinejudge-producer": "assessment", "x-onlinejudge-consumers": ["grade"], "x-onlinejudge-idempotency-key": "eventId; source projection key sourceType:sourceId:studentId:sourceVersion", "x-onlinejudge-ordering": "source-grade aggregateVersion" },
+      "assessment.evaluation.completed.v2": { "name": "assessment.evaluation.completed.v2", "title": "Assessment evaluation reached a terminal state", "payload": { "$ref": "#/components/schemas/EventEnvelope" }, "x-onlinejudge-producer": "assessment", "x-onlinejudge-consumers": ["learning"], "x-onlinejudge-idempotency-key": "eventId; notification key submissionId:evaluationVersion", "x-onlinejudge-ordering": "submission aggregateVersion" },
+      "assessment.homework.published.v2": { "name": "assessment.homework.published.v2", "title": "Homework published", "payload": { "$ref": "#/components/schemas/EventEnvelope" }, "x-onlinejudge-producer": "assessment", "x-onlinejudge-consumers": ["learning"], "x-onlinejudge-idempotency-key": "eventId; notification key homeworkId:recipientUserId", "x-onlinejudge-ordering": "homework aggregateVersion" },
+      "grade.published.v2": { "name": "grade.published.v2", "title": "Grade publication completed", "payload": { "$ref": "#/components/schemas/EventEnvelope" }, "x-onlinejudge-producer": "grade", "x-onlinejudge-consumers": ["learning"], "x-onlinejudge-idempotency-key": "eventId; notification key publicationId:recipientUserId", "x-onlinejudge-ordering": "grade-publication aggregateVersion" },
+      "grade.review.processed.v2": { "name": "grade.review.processed.v2", "title": "Grade review processed", "payload": { "$ref": "#/components/schemas/EventEnvelope" }, "x-onlinejudge-producer": "grade", "x-onlinejudge-consumers": ["learning"], "x-onlinejudge-idempotency-key": "eventId; notification key reviewRequestId:resultVersion", "x-onlinejudge-ordering": "grade-review aggregateVersion" }
+    }
+  }
+}

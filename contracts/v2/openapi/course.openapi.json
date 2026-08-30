@@ -1,0 +1,49 @@
+{
+  "openapi": "3.1.0",
+  "info": { "title": "OnlineJudge Course Service internal contract", "version": "2.0.0" },
+  "x-onlinejudge-service": "course",
+  "paths": {
+    "/internal/v2/courses/{courseId}/authorizations/{userId}": {
+      "get": {
+        "operationId": "getCourseAuthorization", "x-onlinejudge-timeout-ms": 800,
+        "description": "A live permission decision. Callers must not fall back to a Course table, repository, cache, or local SPI when this endpoint is unavailable.",
+        "security": [{ "serviceJwt": [] }, { "mTLS": [] }],
+        "parameters": [
+          { "name": "X-Request-Id", "in": "header", "required": true, "schema": { "type": "string" } },
+          { "name": "courseId", "in": "path", "required": true, "schema": { "type": "string", "minLength": 1 } },
+          { "name": "userId", "in": "path", "required": true, "schema": { "type": "string", "minLength": 1 } },
+          { "name": "action", "in": "query", "required": true, "schema": { "enum": ["VIEW", "MANAGE", "MANAGE_GRADE", "LIST_MEMBERS"] } }
+        ],
+        "responses": {
+          "200": { "description": "Permission decision", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AuthorizationDecision" } } } },
+          "403": { "description": "Service principal lacks scope", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "404": { "description": "Course does not exist", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "503": { "description": "Decision cannot be made; caller rejects the user operation without a local data fallback", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      }
+    },
+    "/internal/v2/courses/{courseId}/members": {
+      "get": {
+        "operationId": "listCourseMembers", "x-onlinejudge-timeout-ms": 1000,
+        "security": [{ "serviceJwt": [] }, { "mTLS": [] }],
+        "parameters": [
+          { "name": "X-Request-Id", "in": "header", "required": true, "schema": { "type": "string" } },
+          { "name": "courseId", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "role", "in": "query", "required": false, "schema": { "enum": ["STUDENT", "TEACHER", "ASSISTANT"] } },
+          { "name": "page", "in": "query", "required": false, "schema": { "type": "integer", "minimum": 0, "default": 0 } },
+          { "name": "size", "in": "query", "required": false, "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 50 } }
+        ],
+        "responses": { "200": { "description": "Member page", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Page" } } } }, "503": { "description": "Unavailable", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } } }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": { "userJwt": { "type": "http", "scheme": "bearer" }, "serviceJwt": { "type": "apiKey", "in": "header", "name": "X-OnlineJudge-Service-Authorization" }, "mTLS": { "type": "mutualTLS" } },
+    "schemas": {
+      "Error": { "type": "object", "required": ["code", "message", "requestId", "retryable"], "properties": { "code": { "type": "string" }, "message": { "type": "string" }, "requestId": { "type": "string" }, "retryable": { "type": "boolean" } } },
+      "Page": { "type": "object", "required": ["items", "page", "size", "total"], "properties": { "items": { "type": "array", "items": { "$ref": "#/components/schemas/Member" } }, "page": { "type": "integer" }, "size": { "type": "integer" }, "total": { "type": "integer" } } },
+      "Member": { "type": "object", "required": ["userId", "role", "memberVersion"], "properties": { "userId": { "type": "string" }, "role": { "type": "string" }, "memberVersion": { "type": "integer", "minimum": 1 } } },
+      "AuthorizationDecision": { "type": "object", "required": ["allowed", "courseId", "userId", "action", "memberVersion"], "properties": { "allowed": { "type": "boolean" }, "courseId": { "type": "string" }, "userId": { "type": "string" }, "action": { "type": "string" }, "memberVersion": { "type": "integer", "minimum": 1 } } }
+    }
+  }
+}
