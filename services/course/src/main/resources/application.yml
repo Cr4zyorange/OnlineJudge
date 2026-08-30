@@ -44,7 +44,7 @@ course:
     port: ${RABBITMQ_PORT:5672}
     username: ${RABBITMQ_USER:guest}
     password: ${RABBITMQ_PASSWORD:guest}
-    exchange: ${RABBITMQ_EXCHANGE:onlinejudge.events}
+    exchange: ${RABBITMQ_EXCHANGE:onlinejudge.events.v2}
     identity-security-version-queue: ${COURSE_IDENTITY_SECURITY_VERSION_QUEUE:course.identity-security-version.v2}
   storage:
     root: ${COURSE_STORAGE_ROOT:${java.io.tmpdir}/onlinejudge-course}

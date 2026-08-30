@@ -149,6 +149,10 @@ Course 服务使用 `services/course/Dockerfile` 构建为
 `oj_course_rw` 账号执行版本化迁移；Course 仅在迁移 job 成功、MySQL 和 RabbitMQ
 健康后启动。运行期禁止以 `spring.sql.init` 创建测试 schema，readiness 为
 `/actuator/health/readiness`，进程用户固定为非 root 的 `10002:10002`。
+Course 的 outbox 固定发布到 `onlinejudge.events.v2`，routing key 固定为
+`onlinejudge.<eventType>`；Compose 的 Learning runtime 也必须使用同一 Rabbit
+连接。独立 Course API 在 Learning 未启动时保留 `PENDING` 事实，Learning 绑定恢复后
+以原 `eventId` 消费 member/snapshot 并推进课程级 watermark，不能用 H2 fixture 代替。
 
 受外部 registry 或 BuildKit frontend 超时影响时，不能跳过镜像或 Compose 验收。
 应先运行 `mvn -f services/course/pom.xml -DskipTests package`，再使用

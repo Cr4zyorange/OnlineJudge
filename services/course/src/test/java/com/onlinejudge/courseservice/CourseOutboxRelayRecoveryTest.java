@@ -62,7 +62,7 @@ class CourseOutboxRelayRecoveryTest {
         try (Connection connection = connection(); Channel channel = connection.createChannel()) {
             channel.exchangeDeclare(rabbit.getExchange(), "topic", true);
             channel.queueDeclare("course-outbox-recovery", true, false, false, null);
-            channel.queueBind("course-outbox-recovery", rabbit.getExchange(), "course.member.changed.v2");
+            channel.queueBind("course-outbox-recovery", rabbit.getExchange(), "onlinejudge.course.member.changed.v2");
         }
         jdbcTemplate.update("UPDATE course_event_outbox SET next_attempt_at = CURRENT_TIMESTAMP");
         relay.relay();

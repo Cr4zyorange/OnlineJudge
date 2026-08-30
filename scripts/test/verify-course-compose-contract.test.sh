@@ -11,6 +11,8 @@ config="$checkout/services/course/src/main/resources/application-compose.propert
 migrator="$checkout/database/mysql/migrate-course-service.sh"
 cached_runtime="$checkout/services/course/Dockerfile.cached-runtime"
 live_smoke="$checkout/scripts/test/verify-course-compose-live.sh"
+live_learning="$checkout/scripts/test/verify-course-to-learning-live.sh"
+learning_overlay="$checkout/deploy/docker/compose.course-learning-live.yml"
 
 fail() {
   printf 'course-compose-contract: FAIL: %s\n' "$*" >&2
@@ -22,6 +24,8 @@ fail() {
 [[ -x "$migrator" ]] || fail "missing executable Course migration entrypoint"
 [[ -f "$cached_runtime" ]] || fail "missing Course cached-runtime Dockerfile"
 [[ -x "$live_smoke" ]] || fail "missing executable Course Compose live smoke"
+[[ -x "$live_learning" ]] || fail "missing executable Course-to-Learning live proof"
+[[ -f "$learning_overlay" ]] || fail "missing Course-to-Learning disposable Compose overlay"
 
 require() {
   local file="$1" text="$2" label="$3"
@@ -35,6 +39,8 @@ require "$compose" 'service_completed_successfully' 'Course service does not wai
 require "$compose" 'onlinejudge/course-service:${GIT_SHA' 'Course image is not SHA-versioned'
 require "$compose" 'COURSE_DATABASE_PASSWORD' 'Course database password is not injected'
 require "$compose" 'RABBITMQ_PASSWORD' 'Rabbit password is not injected'
+require "$compose" 'RABBITMQ_EXCHANGE: onlinejudge.events.v2' 'Course does not use the canonical v2 Rabbit exchange'
+require "$compose" 'SPRING_RABBITMQ_HOST: rabbitmq' 'Compose backend cannot consume Course v2 events'
 require "$compose" 'course-data:' 'Course non-root storage volume is missing'
 require "$compose" '/actuator/health/readiness' 'Course readiness probe is missing'
 require "$config" 'spring.sql.init.mode=never' 'Course Compose runtime still creates test schema'
@@ -49,6 +55,9 @@ require "$cached_runtime" 'COPY --chown=10002:10002 services/course/target/onlin
 require "$cached_runtime" 'USER 10002:10002' 'cached Course runtime is not non-root'
 require "$live_smoke" 'cross-schema=DENIED' 'Course Compose live smoke does not prove schema isolation'
 require "$live_smoke" 'course-id=' 'Course Compose live smoke does not prove an authenticated Course API'
+require "$live_learning" 'pending-before-binding=4' 'Course-to-Learning proof does not retain unbound durable facts'
+require "$live_learning" 'watermark=2 notifications=1' 'Course-to-Learning proof does not verify Learning convergence'
+require "$learning_overlay" 'OJ312_MYSQL_PORT' 'Course-to-Learning overlay does not isolate the disposable MySQL port'
 
 # Mutation: a superficial workload entry must not be enough; removing the
 # actual Compose Course service must make the formal contract fail.
@@ -58,10 +67,13 @@ trap cleanup EXIT INT TERM
 mkdir -p "$fixture/deploy/docker" "$fixture/services/course/src/main/resources" "$fixture/database/mysql"
 mkdir -p "$fixture/scripts/test"
 cp "$compose" "$fixture/deploy/docker/compose.yml"
+cp "$learning_overlay" "$fixture/deploy/docker/compose.course-learning-live.yml"
 cp "$config" "$fixture/services/course/src/main/resources/application-compose.properties"
 cp "$cached_runtime" "$fixture/services/course/Dockerfile.cached-runtime"
 cp "$live_smoke" "$fixture/scripts/test/verify-course-compose-live.sh"
 chmod +x "$fixture/scripts/test/verify-course-compose-live.sh"
+cp "$live_learning" "$fixture/scripts/test/verify-course-to-learning-live.sh"
+chmod +x "$fixture/scripts/test/verify-course-to-learning-live.sh"
 cp "$migrator" "$fixture/database/mysql/migrate-course-service.sh"
 chmod +x "$fixture/database/mysql/migrate-course-service.sh"
 awk '

@@ -2,6 +2,7 @@ package com.onlinejudge.courseservice;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.onlinejudge.courseservice.config.CourseRabbitProperties;
 import com.onlinejudge.courseservice.security.TestJwtFactory;
 import com.onlinejudge.courseservice.service.CourseService;
 import org.junit.jupiter.api.BeforeEach;
@@ -51,6 +52,9 @@ class CourseServiceContractTest {
     @Autowired
     private CourseService courseService;
 
+    @Autowired
+    private CourseRabbitProperties rabbit;
+
     @DynamicPropertySource
     static void properties(DynamicPropertyRegistry registry) {
         registry.add("course.identity.jwks-trust-bundle", () -> BOOTSTRAP_JWKS);
@@ -86,8 +90,13 @@ class CourseServiceContractTest {
         List<String> eventTypes = jdbcTemplate.queryForList(
                 "SELECT event_type FROM course_event_outbox WHERE aggregate_id IN (?, ?)",
                 String.class, courseId + ":101", courseId);
+        List<String> routingKeys = jdbcTemplate.queryForList(
+                "SELECT routing_key FROM course_event_outbox WHERE aggregate_id IN (?, ?) ORDER BY routing_key",
+                String.class, courseId + ":101", courseId);
 
         assertThat(eventTypes).contains("course.member.changed.v2", "course.membership.snapshot.v2");
+        assertThat(rabbit.getExchange()).isEqualTo("onlinejudge.events.v2");
+        assertThat(routingKeys).containsExactly("onlinejudge.course.member.changed.v2", "onlinejudge.course.membership.snapshot.v2");
         assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM crs_course", Integer.class)).isEqualTo(1);
     }
 

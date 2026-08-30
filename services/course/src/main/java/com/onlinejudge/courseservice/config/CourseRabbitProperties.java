@@ -9,7 +9,10 @@ public class CourseRabbitProperties {
     private int port = 5672;
     private String username = "guest";
     private String password = "guest";
-    private String exchange = "onlinejudge.events";
+    // D6-MSG owns the shared durable topology.  Course must not invent a
+    // second exchange or consumers will correctly treat its outbox as
+    // unroutable instead of silently missing membership facts.
+    private String exchange = "onlinejudge.events.v2";
     private String identitySecurityVersionQueue = "course.identity-security-version.v2";
 
     public boolean isEnabled() { return enabled; }

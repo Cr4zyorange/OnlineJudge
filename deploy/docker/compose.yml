@@ -73,6 +73,7 @@ services:
       RABBITMQ_PORT: 5672
       RABBITMQ_USER: ${RABBITMQ_USER:-oj_course_events}
       RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?RABBITMQ_PASSWORD is required}
+      RABBITMQ_EXCHANGE: onlinejudge.events.v2
       IDENTITY_JWT_ISSUER: ${IDENTITY_JWT_ISSUER:-onlinejudge.identity.v2}
       IDENTITY_JWT_AUDIENCE: ${IDENTITY_JWT_AUDIENCE:-onlinejudge.api}
       IDENTITY_JWKS_TRUST_BUNDLE: ${IDENTITY_JWKS_TRUST_BUNDLE:?IDENTITY_JWKS_TRUST_BUNDLE is required}
@@ -95,12 +96,18 @@ services:
     depends_on:
       mysql:
         condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
     environment:
       MYSQL_HOST: mysql
       MYSQL_PORT: 3306
       MYSQL_DATABASE: ${MYSQL_DATABASE:-onlinejudge}
       MYSQL_USER: ${MYSQL_USER:-onlinejudge}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:?MYSQL_PASSWORD is required}
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: 5672
+      SPRING_RABBITMQ_USERNAME: ${RABBITMQ_USER:-oj_course_events}
+      SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?RABBITMQ_PASSWORD is required}
       IDENTITY_JWT_ISSUER: ${IDENTITY_JWT_ISSUER:-onlinejudge.identity.v2}
       IDENTITY_JWT_AUDIENCE: ${IDENTITY_JWT_AUDIENCE:-onlinejudge.api}
       IDENTITY_JWKS_TRUST_BUNDLE: ${IDENTITY_JWKS_TRUST_BUNDLE:?IDENTITY_JWKS_TRUST_BUNDLE is required}

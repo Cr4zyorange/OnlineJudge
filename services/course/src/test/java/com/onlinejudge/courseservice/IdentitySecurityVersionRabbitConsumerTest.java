@@ -49,7 +49,7 @@ class IdentitySecurityVersionRabbitConsumerTest {
         consumer.drain(); // declares Course's durable binding before Identity publishes
         try (Connection connection = connection(); Channel channel = connection.createChannel()) {
             channel.exchangeDeclare(rabbit.getExchange(), "topic", true);
-            channel.basicPublish(rabbit.getExchange(), "identity.security-version.changed.v2", null,
+            channel.basicPublish(rabbit.getExchange(), "onlinejudge.identity.security-version.changed.v2", null,
                     envelope("identity-security-9201-v2", 2).getBytes(java.nio.charset.StandardCharsets.UTF_8));
         }
 

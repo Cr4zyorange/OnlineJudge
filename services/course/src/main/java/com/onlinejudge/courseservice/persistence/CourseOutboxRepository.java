@@ -29,7 +29,7 @@ public class CourseOutboxRepository {
                      correlation_id, payload_json, routing_key, delivery_status, attempt_count, next_attempt_at)
                     VALUES (?, ?, 2, ?, ?, ?, ?, ?, ?, 'PENDING', 0, CURRENT_TIMESTAMP)
                     """, eventId, eventType, aggregateType, aggregateId, aggregateVersion,
-                    correlationId, objectMapper.writeValueAsString(payload), eventType);
+                    correlationId, objectMapper.writeValueAsString(payload), "onlinejudge." + eventType);
             return eventId;
         } catch (Exception exception) {
             throw new IllegalStateException("course outbox write failed", exception);

@@ -20,7 +20,7 @@ import java.nio.charset.StandardCharsets;
 @Component
 public class IdentitySecurityVersionRabbitConsumer {
     private static final Logger log = LoggerFactory.getLogger(IdentitySecurityVersionRabbitConsumer.class);
-    private static final String ROUTING_KEY = "identity.security-version.changed.v2";
+    private static final String ROUTING_KEY = "onlinejudge.identity.security-version.changed.v2";
     private static final int MAX_MESSAGES_PER_DRAIN = 50;
 
     private final CourseRabbitProperties rabbit;
