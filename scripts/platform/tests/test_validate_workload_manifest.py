@@ -49,7 +49,10 @@ MICROSERVICE_V2_CONTRACT_INPUTS = [
     "docs/adr/ADR-006-五业务服务与可靠消息契约.md",
     "docs/开发/D4-CROSS-SERVICE-共享契约.md",
     "docs/开发/D6-D7-五服务共享契约-v2.md",
+    "docs/开发/D6-D7-五服务架构冻结-305.md",
+    "docs/diagrams/arch/issue305-*.mmd",
     "scripts/ci/contract-verify.sh",
+    "scripts/ci/verify-final-architecture-305.mjs",
     "scripts/ci/verify-microservice-contract-v2.mjs",
     "scripts/ci/verify-workflow-gates.test.sh",
 ]
@@ -298,7 +301,10 @@ class WorkloadManifestValidationTest(unittest.TestCase):
             "docs/adr/ADR-006-五业务服务与可靠消息契约.md",
             "docs/开发/D4-CROSS-SERVICE-共享契约.md",
             "docs/开发/D6-D7-五服务共享契约-v2.md",
+            "docs/开发/D6-D7-五服务架构冻结-305.md",
+            "docs/diagrams/arch/issue305-five-service-context.mmd",
             "scripts/ci/contract-verify.sh",
+            "scripts/ci/verify-final-architecture-305.mjs",
             "scripts/ci/verify-microservice-contract-v2.mjs",
             "scripts/ci/verify-workflow-gates.test.sh",
         ]

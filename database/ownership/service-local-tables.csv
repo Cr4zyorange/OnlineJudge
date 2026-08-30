@@ -1,6 +1,6 @@
 owner,schema,table,kind,lifecycle,implementation_issue
-IDENTITY,oj_identity,event_outbox,OUTBOX,planned,#337
-IDENTITY,oj_identity,event_inbox,INBOX,planned,#337
+IDENTITY,oj_identity,t_identity_outbox_event,OUTBOX,implemented,#311
+IDENTITY,oj_identity,t_identity_service_token_idempotency,IDEMPOTENCY,implemented,#311
 COURSE,oj_course,course_event_outbox,OUTBOX,implemented,#337
 COURSE,oj_course,course_membership_reconciliation_checkpoint,PROJECTION,implemented,#337
 COURSE,oj_course,event_inbox,INBOX,planned,#337
