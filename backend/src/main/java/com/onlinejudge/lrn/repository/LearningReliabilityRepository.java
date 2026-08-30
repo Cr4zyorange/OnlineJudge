@@ -7,6 +7,7 @@ import org.springframework.stereotype.Repository;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -101,22 +102,30 @@ public class LearningReliabilityRepository {
                         LIMIT ?
                         """, Long.class, now, now, Math.max(1, limit));
         Instant leaseUntil = now.plus(leaseDuration);
+        List<Long> claimedIds = new ArrayList<>();
         for (Long id : candidates) {
-            jdbcTemplate.update("""
+            int updated = jdbcTemplate.update("""
                             UPDATE learning_deferred_event
                             SET delivery_status = 'IN_FLIGHT', lease_owner = ?, lease_until = ?, updated_at = ?
                             WHERE id = ? AND ((delivery_status = 'PENDING' AND next_attempt_at <= ?)
                                                OR (delivery_status = 'IN_FLIGHT' AND lease_until < ?))
                             """, leaseOwner, leaseUntil, now, id, now, now);
+            if (updated == 1) {
+                claimedIds.add(id);
+            }
         }
+        if (claimedIds.isEmpty()) {
+            return List.of();
+        }
+        String placeholders = String.join(",", java.util.Collections.nCopies(claimedIds.size(), "?"));
         return jdbcTemplate.query("""
                         SELECT id, event_id, envelope_json
                         FROM learning_deferred_event
-                        WHERE delivery_status = 'IN_FLIGHT' AND lease_owner = ? AND lease_until = ?
+                        WHERE id IN (%s)
                         ORDER BY id
-                        """, (rs, rowNum) -> new DeferredEvent(
+                        """.formatted(placeholders), (rs, rowNum) -> new DeferredEvent(
                 rs.getLong("id"), rs.getString("event_id"), rs.getString("envelope_json")
-        ), leaseOwner, leaseUntil);
+        ), claimedIds.toArray());
     }
 
     public void markDeferredResolved(long id, String leaseOwner, Instant now) {

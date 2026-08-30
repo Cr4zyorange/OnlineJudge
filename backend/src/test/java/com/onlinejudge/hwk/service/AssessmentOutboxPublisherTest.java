@@ -99,6 +99,18 @@ class AssessmentOutboxPublisherTest {
         assertThat(broker.eventIds).hasSize(1);
     }
 
+    @Test
+    void claimReturnsTheRowsItActuallyWonWhenTheLeaseTimestampHasNanoseconds() {
+        repository.appendHomeworkPublished(publishedHomework());
+
+        assertThat(repository.claimDue(
+                "nanosecond-lease-owner",
+                Instant.parse("2026-08-30T10:00:00.123456789Z"),
+                java.time.Duration.ofSeconds(30),
+                1
+        )).hasSize(1);
+    }
+
     private AssessmentOutboxPublisher publisher() {
         return new AssessmentOutboxPublisher(repository, broker, 10, 3, 30, 1, 16);
     }

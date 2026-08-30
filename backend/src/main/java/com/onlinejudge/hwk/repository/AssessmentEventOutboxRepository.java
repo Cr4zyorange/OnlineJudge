@@ -15,6 +15,7 @@ import java.time.ZoneOffset;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.List;
+import java.util.ArrayList;
 import java.util.UUID;
 
 /**
@@ -97,8 +98,9 @@ public class AssessmentEventOutboxRepository {
                         LIMIT ?
                         """, Long.class, now, now, now, Math.max(1, limit));
         Instant leaseUntil = now.plus(leaseDuration);
+        List<Long> claimedIds = new ArrayList<>();
         for (Long id : candidateIds) {
-            jdbcTemplate.update("""
+            int updated = jdbcTemplate.update("""
                             UPDATE assessment_event_outbox
                             SET delivery_status = 'IN_FLIGHT', lease_owner = ?, lease_until = ?, updated_at = ?
                             WHERE id = ?
@@ -107,14 +109,21 @@ public class AssessmentEventOutboxRepository {
                                     AND (lease_until IS NULL OR lease_until < ?))
                                    OR (delivery_status = 'IN_FLIGHT' AND lease_until < ?))
                             """, leaseOwner, leaseUntil, now, id, now, now, now);
+            if (updated == 1) {
+                claimedIds.add(id);
+            }
         }
+        if (claimedIds.isEmpty()) {
+            return List.of();
+        }
+        String placeholders = String.join(",", java.util.Collections.nCopies(claimedIds.size(), "?"));
         return jdbcTemplate.query("""
                         SELECT id, event_id, event_type, payload_version, aggregate_type, aggregate_id,
                                aggregate_version, correlation_id, payload_json, routing_key, attempt_count, next_attempt_at
                         FROM assessment_event_outbox
-                        WHERE lease_owner = ? AND delivery_status = 'IN_FLIGHT' AND lease_until = ?
+                        WHERE id IN (%s)
                         ORDER BY id
-                        """, (resultSet, rowNum) -> new OutboxRecord(
+                        """.formatted(placeholders), (resultSet, rowNum) -> new OutboxRecord(
                 resultSet.getLong("id"),
                 deserialize(
                         resultSet.getString("event_id"),
@@ -129,7 +138,7 @@ public class AssessmentEventOutboxRepository {
                 resultSet.getString("routing_key"),
                 resultSet.getInt("attempt_count"),
                 resultSet.getTimestamp("next_attempt_at").toInstant()
-        ), leaseOwner, leaseUntil);
+        ), claimedIds.toArray());
     }
 
     public void markPublished(long id, String leaseOwner, Instant publishedAt) {

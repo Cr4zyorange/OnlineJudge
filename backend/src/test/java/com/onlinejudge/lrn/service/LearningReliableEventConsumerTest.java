@@ -14,6 +14,7 @@ import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabas
 import org.springframework.boot.test.autoconfigure.jdbc.JdbcTest;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
+import org.springframework.context.ApplicationContext;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.test.context.jdbc.Sql;
@@ -76,6 +77,9 @@ class LearningReliableEventConsumerTest {
     @org.springframework.beans.factory.annotation.Autowired
     private RecordingPublisher publisher;
 
+    @org.springframework.beans.factory.annotation.Autowired
+    private ApplicationContext applicationContext;
+
     @BeforeEach
     void reset() {
         jdbcTemplate.update("DELETE FROM lrn_notification_status_log");
@@ -124,7 +128,7 @@ class LearningReliableEventConsumerTest {
 
         assertThat(consumer.consume(homeworkEvent("event-v1", 1, "Java collections homework")))
                 .isEqualTo(EventProcessingDecision.ACK);
-        assertThat(reconciliationWorker.reconcileDue(Instant.now().plusSeconds(10))).isEqualTo(1);
+        assertThat(reconciliationWorker.reconcileDue(Instant.parse("2030-01-01T00:00:00.123456789Z"))).isEqualTo(1);
 
         assertThat(count("learning_event_inbox")).isEqualTo(2);
         assertThat(jdbcTemplate.queryForObject(
@@ -140,6 +144,7 @@ class LearningReliableEventConsumerTest {
         assertThat(LearningReconciliationWorker.class
                 .getDeclaredMethod("reconcileDueMessages")
                 .isAnnotationPresent(Scheduled.class)).isFalse();
+        assertThat(applicationContext.getBeansOfType(LearningReconciliationScheduler.class)).isEmpty();
     }
 
     @Test
@@ -160,7 +165,7 @@ class LearningReliableEventConsumerTest {
                 "SELECT member_version FROM learning_course_member_projection WHERE course_id = 88 AND user_id = 42", Long.class
         )).isEqualTo(1L);
 
-        assertThat(reconciliationWorker.reconcileDue(Instant.now().plusSeconds(10))).isEqualTo(1);
+        assertThat(reconciliationWorker.reconcileDue(Instant.parse("2030-01-01T00:00:00.123456789Z"))).isEqualTo(1);
         assertThat(count("lrn_notification")).isEqualTo(1);
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT processing_status FROM learning_event_inbox WHERE event_id = 'homework-before-members'", String.class
