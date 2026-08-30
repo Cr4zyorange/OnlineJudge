@@ -1,0 +1,18 @@
+{
+  "eventId": "cb9b5653-c1a4-44e7-8ce8-4d030ef1db3c",
+  "eventType": "course.membership.snapshot.v2",
+  "payloadVersion": 2,
+  "aggregateType": "course-membership-roster",
+  "aggregateId": "course-88",
+  "aggregateVersion": 7,
+  "occurredAt": "2026-08-31T09:15:30Z",
+  "correlationId": "dbfbbda3-0b13-4b24-af68-a481368a8060",
+  "payload": {
+    "courseId": "course-88",
+    "rosterVersion": 7,
+    "members": [
+      { "userId": "user-10", "membershipStatus": "ACTIVE", "memberVersion": 3 },
+      { "userId": "user-10", "membershipStatus": "REMOVED", "memberVersion": 4 }
+    ]
+  }
+}

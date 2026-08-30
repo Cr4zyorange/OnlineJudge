@@ -310,6 +310,11 @@ public class CourseRepository {
      * 必须先于 {@link #activeStudentCount(Long)} 调用，避免成员区间锁互相等待造成死锁。
      */
     public void lockCourseForCapacity(Long courseId) {
+        lockCourseForMembershipEvents(courseId);
+    }
+
+    /** Serializes Course-owned roster aggregate versions with the member write. */
+    public void lockCourseForMembershipEvents(Long courseId) {
         jdbcTemplate.queryForObject("""
                 SELECT id FROM crs_course
                  WHERE id = ? AND is_deleted = FALSE

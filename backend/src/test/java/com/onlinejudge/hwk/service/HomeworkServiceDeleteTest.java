@@ -9,6 +9,7 @@ import com.onlinejudge.hwk.domain.HomeworkStatus;
 import com.onlinejudge.hwk.domain.HomeworkSubmissionRepository;
 import com.onlinejudge.hwk.domain.HomeworkTestCase;
 import com.onlinejudge.hwk.domain.HomeworkType;
+import com.onlinejudge.hwk.repository.AssessmentEventOutboxRepository;
 import com.onlinejudge.integration.course.CoursePermissionClient;
 import org.junit.jupiter.api.Test;
 
@@ -72,7 +73,8 @@ class HomeworkServiceDeleteTest {
                 mock(HomeworkSubmissionRepository.class),
                 mock(HomeworkReviewLogRepository.class),
                 permissions,
-                mock(NotificationEventPublisher.class)
+                mock(NotificationEventPublisher.class),
+                mock(AssessmentEventOutboxRepository.class)
         );
     }
 
