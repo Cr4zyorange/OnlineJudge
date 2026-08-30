@@ -7,8 +7,8 @@ public class CourseRabbitProperties {
     private boolean enabled;
     private String host = "localhost";
     private int port = 5672;
-    private String username = "guest";
-    private String password = "guest";
+    private String username = "oj_course_events";
+    private String password = "";
     // D6-MSG owns the shared durable topology.  Course must not invent a
     // second exchange or consumers will correctly treat its outbox as
     // unroutable instead of silently missing membership facts.

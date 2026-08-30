@@ -54,6 +54,8 @@ require "$compose" 'service_completed_successfully' 'Course service does not wai
 require "$compose" 'onlinejudge/course-service:${GIT_SHA' 'Course image is not SHA-versioned'
 require "$compose" 'COURSE_DATABASE_PASSWORD' 'Course database password is not injected'
 require "$compose" 'RABBITMQ_PASSWORD' 'Rabbit password is not injected'
+require "$compose" 'RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-oj_course_events}' 'Rabbit broker has no dedicated Course event user'
+require "$compose" 'RABBITMQ_USER: ${RABBITMQ_USER:-oj_course_events}' 'Course does not receive the dedicated Rabbit user'
 require "$compose" 'RABBITMQ_EXCHANGE: onlinejudge.events.v2' 'Course does not use the canonical v2 Rabbit exchange'
 require "$compose" 'SPRING_RABBITMQ_HOST: rabbitmq' 'Compose backend cannot consume Course v2 events'
 require "$compose" 'course-data:' 'Course non-root storage volume is missing'
@@ -109,6 +111,17 @@ fi
 grep -Fq 'Course migration manifest command' "$fixture/migration-command.err" || \
   fail "unresolvable Course migration command mutation was not detected"
 cp "$repo_root/deploy/platform/workloads.json" "$fixture/deploy/platform/workloads.json"
+
+# Mutation: a guest account works only through Rabbit's loopback exception;
+# a containerized Course service must be wired to the dedicated event user.
+sed -i.bak 's/oj_course_events/guest/g' "$fixture/deploy/docker/compose.yml"
+rm -f "$fixture/deploy/docker/compose.yml.bak"
+if bash "$0" "$fixture" --fixture >"$fixture/rabbit-user.out" 2>"$fixture/rabbit-user.err"; then
+  fail "guest Rabbit credential mutation unexpectedly passed"
+fi
+grep -Fq 'dedicated Course event user' "$fixture/rabbit-user.err" || \
+  fail "guest Rabbit credential mutation was not detected"
+cp "$compose" "$fixture/deploy/docker/compose.yml"
 
 awk '
   /^  course-service:$/ { skip = 1; next }

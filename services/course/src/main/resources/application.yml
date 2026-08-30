@@ -42,8 +42,8 @@ course:
     enabled: ${COURSE_RABBIT_ENABLED:false}
     host: ${RABBITMQ_HOST:localhost}
     port: ${RABBITMQ_PORT:5672}
-    username: ${RABBITMQ_USER:guest}
-    password: ${RABBITMQ_PASSWORD:guest}
+    username: ${RABBITMQ_USER:oj_course_events}
+    password: ${RABBITMQ_PASSWORD:}
     exchange: ${RABBITMQ_EXCHANGE:onlinejudge.events.v2}
     identity-security-version-queue: ${COURSE_IDENTITY_SECURITY_VERSION_QUEUE:course.identity-security-version.v2}
   storage:

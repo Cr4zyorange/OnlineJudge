@@ -68,13 +68,21 @@ token="$(printf '%s' "$auth_json" | jq -r .token)"
 export MYSQL_PASSWORD="${MYSQL_PASSWORD:-course-live-app-password}"
 export MYSQL_ROOT_PASSWORD="${MYSQL_ROOT_PASSWORD:-course-live-root-password}"
 export COURSE_DATABASE_PASSWORD="${COURSE_DATABASE_PASSWORD:-course-live-course-password}"
+export RABBITMQ_USER="${RABBITMQ_USER:-oj_course_events}"
 export RABBITMQ_PASSWORD="${RABBITMQ_PASSWORD:-course-live-rabbit-password}"
+[[ "$RABBITMQ_USER" != 'guest' ]] || fail "Course Compose must not use Rabbit guest outside loopback"
 export IDENTITY_JWKS_TRUST_BUNDLE="$jwks"
 export IDENTITY_JWKS_URI="${IDENTITY_JWKS_URI:-http://127.0.0.1:9/.well-known/jwks.json}"
 export IDENTITY_JWKS_REFRESH_INITIAL_DELAY="PT1H"
 
 compose_started=1
 "${compose[@]}" up -d --no-build --wait --wait-timeout 180 course-service
+
+rabbit_runtime_user="$("${compose[@]}" exec -T course-service printenv RABBITMQ_USER)"
+[[ "$rabbit_runtime_user" == "$RABBITMQ_USER" && "$rabbit_runtime_user" != 'guest' ]] || \
+  fail "Course container did not receive a dedicated non-guest Rabbit user"
+"${compose[@]}" exec -T rabbitmq rabbitmqctl authenticate_user "$RABBITMQ_USER" "$RABBITMQ_PASSWORD" >/dev/null || \
+  fail "Rabbit did not authenticate the dedicated Course event user"
 
 readiness="$("${compose[@]}" exec -T course-service wget -qO- http://127.0.0.1:8082/actuator/health/readiness)"
 printf '%s' "$readiness" | grep -Eq '"status"[[:space:]]*:[[:space:]]*"UP"' || \

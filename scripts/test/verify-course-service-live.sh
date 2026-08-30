@@ -10,6 +10,8 @@ run_id="$(date +%s)-$$"
 mysql_name="oj312-course-mysql-$run_id"
 rabbit_name="oj312-course-rabbit-$run_id"
 mysql_password="oj312-live-root"
+rabbit_user="oj_course_events"
+rabbit_password="oj312-live-rabbit-password"
 database_name="course_live"
 evidence_dir="$repo_root/ci-artifacts/issue312-course-live-$run_id"
 mkdir -p "$evidence_dir"
@@ -55,6 +57,7 @@ apply_course_migrations() {
   mysql_file "$repo_root/database/migrations/course/V20260831_01__course_service_schema.sql"
   mysql_file "$repo_root/database/migrations/course/V20260831_02__course_security_version_inbox.sql"
   mysql_file "$repo_root/database/migrations/course/V20260831_03__course_runtime_version_columns.sql"
+  mysql_file "$repo_root/database/migrations/course/V20260831_04__course_outbox_fencing.sql"
 }
 
 verify_upgrade_red_green_and_repeat() {
@@ -116,8 +119,9 @@ verify_upgrade_red_green_and_repeat() {
 }
 
 mysql_id="$(docker run -d --rm --name "$mysql_name" -e MYSQL_ROOT_PASSWORD="$mysql_password" \
-  -e MYSQL_DATABASE="$database_name" -P mysql:8.4)"
-rabbit_id="$(docker run -d --rm --name "$rabbit_name" -P rabbitmq:4.1-management)"
+  -e MYSQL_DATABASE="$database_name" -p 127.0.0.1::3306 mysql:8.4)"
+rabbit_id="$(docker run -d --rm --name "$rabbit_name" -e RABBITMQ_DEFAULT_USER="$rabbit_user" \
+  -e RABBITMQ_DEFAULT_PASS="$rabbit_password" -p 127.0.0.1::5672 rabbitmq:4.1-management)"
 wait_for_mysql
 wait_for_rabbit
 
@@ -134,15 +138,22 @@ verify_upgrade_red_green_and_repeat
   docker exec "$mysql_name" mysql -N -uroot -p"$mysql_password" "$database_name" -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name IN ('crs_course','crs_course_member','crs_chapter','crs_resource','crs_announcement','course_event_outbox','course_membership_reconciliation_checkpoint','event_inbox')"
 } | tee "$evidence_dir/runtime.txt"
 
+java_home="${OJ312_JAVA_HOME:-$(/usr/libexec/java_home -v 21)}"
+[[ -x "$java_home/bin/java" ]] || { echo "OJ312_JAVA_HOME must point to Java 21" >&2; exit 1; }
+
 COURSE_DATASOURCE_URL="jdbc:mysql://127.0.0.1:$mysql_port/$database_name?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC" \
 COURSE_DATABASE_USER=root \
 COURSE_DATABASE_PASSWORD="$mysql_password" \
 COURSE_DATABASE_DRIVER=com.mysql.cj.jdbc.Driver \
 SPRING_SQL_INIT_MODE=never \
+RABBITMQ_USER="$rabbit_user" \
+RABBITMQ_PASSWORD="$rabbit_password" \
+JAVA_HOME="$java_home" PATH="$java_home/bin:$PATH" \
 mvn -B -ntp -f "$repo_root/services/course/pom.xml" \
   -Dcourse.test.rabbit=true \
+  -Dcourse.test.mysql=true \
   -Dcourse.test.rabbit.port="$rabbit_port" \
-  -Dtest=CourseServiceContractTest,CourseSecurityVersionProjectionTest,CourseOutboxRelayRecoveryTest,IdentitySecurityVersionRabbitConsumerTest \
+  -Dtest=CourseServiceContractTest,CourseSecurityVersionProjectionTest,CourseOutboxRelayRecoveryTest,IdentitySecurityVersionRabbitConsumerTest,CourseOutboxLeaseTest,CourseGeneratedKeyMySqlConcurrencyTest,JwksCacheTest \
   test | tee "$evidence_dir/course-service-live.log"
 
-printf 'issue312-course-live: PASS mysql=8.4 rabbit=4.1 upgrade=RED-GREEN-rollback-remigrate tables=8 tests=14 evidence=%s\n' "$evidence_dir"
+printf 'issue312-course-live: PASS mysql=8.4 rabbit=4.1 upgrade=RED-GREEN-rollback-remigrate tables=8 tests=22 evidence=%s\n' "$evidence_dir"

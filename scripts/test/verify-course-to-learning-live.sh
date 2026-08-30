@@ -75,7 +75,9 @@ student_token="$(printf '%s' "$auth_json" | jq -r .student)"
 export MYSQL_PASSWORD="${MYSQL_PASSWORD:-course-learning-live-app-password}"
 export MYSQL_ROOT_PASSWORD="${MYSQL_ROOT_PASSWORD:-course-learning-live-root-password}"
 export COURSE_DATABASE_PASSWORD="${COURSE_DATABASE_PASSWORD:-course-learning-live-course-password}"
+export RABBITMQ_USER="${RABBITMQ_USER:-oj_course_events}"
 export RABBITMQ_PASSWORD="${RABBITMQ_PASSWORD:-course-learning-live-rabbit-password}"
+[[ "$RABBITMQ_USER" != 'guest' ]] || fail "Course-to-Learning disposable Compose must not use Rabbit guest"
 export IDENTITY_JWKS_TRUST_BUNDLE="$jwks"
 export IDENTITY_JWKS_URI="${IDENTITY_JWKS_URI:-http://127.0.0.1:9/.well-known/jwks.json}"
 export IDENTITY_JWKS_REFRESH_INITIAL_DELAY="PT1H"
@@ -104,12 +106,13 @@ joined="$("${compose[@]}" exec -T course-service wget -qO- \
 [[ "$(printf '%s' "$joined" | jq -r '.data.userId')" == '7412' ]] || fail "Course HTTP join did not persist the student membership"
 
 # No Learning queue exists yet.  A mandatory producer must retain all four
-# source facts (teacher/member snapshots + student/member snapshots) PENDING.
+# source facts (teacher/member snapshots + student/member snapshots).  A failed
+# publish is either initially PENDING or waiting under its bounded RETRY lease.
 pending_ready=0
 for _ in $(seq 1 30); do
   pending="$("${compose[@]}" exec -T -e "MYSQL_PWD=$COURSE_DATABASE_PASSWORD" mysql \
     mysql --protocol=TCP -h 127.0.0.1 -u oj_course_rw -D oj_course -N -e \
-    "SELECT COUNT(*) FROM course_event_outbox WHERE delivery_status = 'PENDING' AND (aggregate_id = '$course_id' OR aggregate_id LIKE '$course_id:%')")"
+    "SELECT COUNT(*) FROM course_event_outbox WHERE delivery_status IN ('PENDING', 'RETRY') AND (aggregate_id = '$course_id' OR aggregate_id LIKE '$course_id:%')")"
   attempts="$("${compose[@]}" exec -T -e "MYSQL_PWD=$COURSE_DATABASE_PASSWORD" mysql \
     mysql --protocol=TCP -h 127.0.0.1 -u oj_course_rw -D oj_course -N -e \
     "SELECT COALESCE(SUM(attempt_count), 0) FROM course_event_outbox WHERE aggregate_id = '$course_id' OR aggregate_id LIKE '$course_id:%'")"
