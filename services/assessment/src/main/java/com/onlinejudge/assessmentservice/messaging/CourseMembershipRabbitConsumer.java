@@ -37,8 +37,9 @@ public class CourseMembershipRabbitConsumer implements SmartLifecycle {
                     String eventId = root.path("eventId").asText(message.getProperties().getMessageId());
                     var decision = projection.apply(new CourseMembershipProjectionService.MemberChanged(eventId, payload.path("courseId").asText(),
                             payload.path("userId").asText(), payload.path("membershipStatus").asText(), payload.path("memberVersion").asLong()));
-                    if ("GAP".equals(decision.decision())) channel.basicNack(message.getEnvelope().getDeliveryTag(), false, true);
-                    else channel.basicAck(message.getEnvelope().getDeliveryTag(), false);
+                    // GAP is durable in the Assessment schema; acknowledging prevents a
+                    // requeue loop from starving the missing lower aggregate version.
+                    channel.basicAck(message.getEnvelope().getDeliveryTag(), false);
                 } catch (Exception rejected) { channel.basicNack(message.getEnvelope().getDeliveryTag(), false, true); }
             }, tag -> { });
             running = true;

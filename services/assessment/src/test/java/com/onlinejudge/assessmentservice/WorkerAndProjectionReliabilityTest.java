@@ -29,6 +29,7 @@ class WorkerAndProjectionReliabilityTest {
         jdbc.update("DELETE FROM evaluation_task");
         jdbc.update("DELETE FROM assessment_submission");
         jdbc.update("DELETE FROM assessment_event_inbox");
+        jdbc.update("DELETE FROM assessment_deferred_course_member_event");
         jdbc.update("DELETE FROM assessment_course_projection_gap");
         jdbc.update("DELETE FROM assessment_course_member_projection");
     }
@@ -60,7 +61,7 @@ class WorkerAndProjectionReliabilityTest {
         var late = members.apply(new CourseMembershipProjectionService.MemberChanged("event-2", "course-1", "student-1", "ACTIVE", 2));
         assertThat(late.decision()).isEqualTo("GAP");
         assertThat(members.apply(new CourseMembershipProjectionService.MemberChanged("event-1", "course-1", "student-1", "ACTIVE", 1)).decision()).isEqualTo("APPLIED");
-        assertThat(members.apply(new CourseMembershipProjectionService.MemberChanged("event-2", "course-1", "student-1", "ACTIVE", 2)).decision()).isEqualTo("APPLIED");
+        assertThat(jdbc.queryForObject("SELECT member_version FROM assessment_course_member_projection WHERE course_id = 'course-1' AND user_id = 'student-1'", Long.class)).isEqualTo(2L);
         assertThat(members.apply(new CourseMembershipProjectionService.MemberChanged("event-2", "course-1", "student-1", "ACTIVE", 2)).decision()).isEqualTo("DUPLICATE");
         assertThat(jdbc.queryForObject("SELECT member_version FROM assessment_course_member_projection WHERE course_id = 'course-1' AND user_id = 'student-1'", Long.class)).isEqualTo(2L);
     }

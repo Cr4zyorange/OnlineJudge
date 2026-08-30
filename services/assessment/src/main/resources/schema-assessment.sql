@@ -26,6 +26,11 @@ CREATE TABLE IF NOT EXISTS assessment_course_projection_gap (
   course_id VARCHAR(80) NOT NULL, user_id VARCHAR(80) NOT NULL, expected_version BIGINT NOT NULL,
   observed_version BIGINT NOT NULL, PRIMARY KEY (course_id, user_id)
 );
+CREATE TABLE IF NOT EXISTS assessment_deferred_course_member_event (
+  event_id VARCHAR(36) PRIMARY KEY, course_id VARCHAR(80) NOT NULL, user_id VARCHAR(80) NOT NULL,
+  membership_status VARCHAR(16) NOT NULL, member_version BIGINT NOT NULL,
+  UNIQUE KEY uq_assessment_deferred_member_version (course_id, user_id, member_version)
+);
 CREATE TABLE IF NOT EXISTS assessment_source_grade (
   source_type VARCHAR(8) NOT NULL, source_id VARCHAR(80) NOT NULL, course_id VARCHAR(80) NOT NULL,
   student_id VARCHAR(80) NOT NULL, score DECIMAL(10,2), full_score DECIMAL(10,2) NOT NULL,
