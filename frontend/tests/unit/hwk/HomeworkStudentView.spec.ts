@@ -864,7 +864,6 @@ describe('HomeworkStudentView', () => {
 
     expect(event.defaultPrevented).toBe(true);
     expect(window.sessionStorage.getItem('oj:hwk-file-upload:v1:601:101:11')).toContain('000000000011');
-    wrapper.unmount();
   });
 
   it('retains the selected File after upload failure and retries the same file', async () => {
@@ -1245,7 +1244,6 @@ describe('HomeworkStudentView', () => {
     await flushPromises();
 
     expect(removeListener).toHaveBeenCalledWith('beforeunload', expect.any(Function));
-    wrapper.unmount();
   });
 
   it('reloads the homework when a reused route changes its homework id', async () => {
