@@ -5,9 +5,9 @@
  * only with a database administrator: application accounts are created after
  * the copy and are used only for the allow/deny acceptance probe.
  */
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -814,6 +814,18 @@ function writeEvidence(path, evidence) {
   writeFileSync(absolute, `${JSON.stringify(evidence, null, 2)}\n`, 'utf8');
 }
 
+// Traffic-state files are deployment control-plane inputs.  They must be
+// publishable from an empty evidence workspace, and readers must never see a
+// truncated state after the migration command has claimed a switch happened.
+export function writeControlState(path, state) {
+  const absolute = resolve(path);
+  const parent = dirname(absolute);
+  mkdirSync(parent, { recursive: true });
+  const temporary = resolve(parent, `.${migrationId}.${process.pid}.${randomUUID()}.tmp`);
+  writeFileSync(temporary, `${JSON.stringify(state, null, 2)}\n`, 'utf8');
+  renameSync(temporary, absolute);
+}
+
 function currentGitSha() {
   try {
     return execFileSync('git', ['-C', repositoryRoot, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
@@ -887,7 +899,7 @@ export async function main(argv = process.argv.slice(2)) {
       priorTopology: prior?.topology ?? null,
       recovery,
     };
-    writeFileSync(resolve(options.cutoverState), `${JSON.stringify(state, null, 2)}\n`, 'utf8');
+    writeControlState(options.cutoverState, state);
     const evidence = { ...base, result: 'PASS', verification, rollback: state, finishedAt: new Date().toISOString() };
     writeEvidence(options.evidence, evidence);
     process.stdout.write(`${JSON.stringify(evidence)}\n`);
@@ -954,7 +966,7 @@ export async function main(argv = process.argv.slice(2)) {
       topology: 'FIVE_DOMAIN', migrationId, sourceSchema: options.sourceSchema,
       targetSchemas: Object.fromEntries(plan.schemaByOwner), cutoverAt: new Date().toISOString(),
     };
-    writeFileSync(resolve(options.cutoverState), `${JSON.stringify(state, null, 2)}\n`, 'utf8');
+    writeControlState(options.cutoverState, state);
     const evidence = { ...base, result: 'PASS', verification, cutover: state, finishedAt: new Date().toISOString() };
     writeEvidence(options.evidence, evidence);
     process.stdout.write(`${JSON.stringify(evidence)}\n`);

@@ -11,7 +11,10 @@ run_id="issue341-$(date +%Y%m%d%H%M%S)-$$"
 container_name="oj341_mysql_${run_id//[^A-Za-z0-9_]/_}"
 artifact_dir="${OJ341_EVIDENCE_DIR:-$(mktemp -d "${TMPDIR:-/tmp}/onlinejudge-issue341.XXXXXX")}"
 raw_log="$artifact_dir/raw.log"
-cutover_state="$artifact_dir/cutover-state.json"
+# This is deliberately a path whose parent does not exist. Both traffic
+# control-plane actions must create it before atomically publishing state.
+cutover_state="$artifact_dir/ci-artifacts/issue341/cutover-state.json"
+fresh_rollback_state="$artifact_dir/fresh-rollback/issue341/rollback-state.json"
 mysql_host=127.0.0.1
 mysql_port=
 admin_password="oj341_admin_${run_id}"
@@ -88,13 +91,14 @@ migrate() {
   local action="$1"
   local source="$2"
   local evidence="$3"
+  local control_state="${4:-$cutover_state}"
   local -a arguments=(
     --action "$action" --admin-user root --source-schema "$source"
     --host "$mysql_host" --port "$mysql_port" --source-read-only-ack
     --evidence "$evidence"
   )
   if [[ "$action" == cutover || "$action" == rollback ]]; then
-    arguments+=(--cutover-state "$cutover_state")
+    arguments+=(--cutover-state "$control_state")
   fi
   env OJ_MYSQL_ADMIN_PASSWORD="$admin_password" \
     OJ341_RUNTIME_PASSWORD_IDENTITY='oj341_identity_runtime' \
@@ -138,16 +142,24 @@ if [[ "$scenario" == all || "$scenario" == empty-cutover ]]; then
     fail 'rollback without all runtime passwords wrote PASS evidence'
   fi
   migrate rollback oj341_empty "$artifact_dir/empty-rollback.json"
-  node - "$artifact_dir/empty-rollback.json" <<'NODE' >>"$raw_log" 2>&1
+  # This second rollback does not reuse the cutover directory.  It proves the
+  # recovery entry point independently creates a fresh nested control path.
+  migrate rollback oj341_empty "$artifact_dir/empty-rollback-fresh-state.json" "$fresh_rollback_state"
+  node - "$artifact_dir/empty-rollback.json" "$artifact_dir/empty-rollback-fresh-state.json" <<'NODE' >>"$raw_log" 2>&1
 const fs = require('node:fs');
-const evidence = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
-if (evidence.result !== 'PASS' || !Array.isArray(evidence.verification?.permissions)
-    || evidence.verification.permissions.length !== 45
-    || evidence.verification.permissions.some((probe) => !probe.passed)) {
-  process.exitCode = 1;
+for (const path of process.argv.slice(2)) {
+  const evidence = JSON.parse(fs.readFileSync(path, 'utf8'));
+  if (evidence.result !== 'PASS' || !Array.isArray(evidence.verification?.permissions)
+      || evidence.verification.permissions.length !== 45
+      || evidence.verification.permissions.some((probe) => !probe.passed)) {
+    process.exitCode = 1;
+  }
 }
 NODE
+  test -f "$cutover_state" || fail 'fresh nested cutover state path was not created'
+  test -f "$fresh_rollback_state" || fail 'fresh nested rollback state path was not created'
   grep -Fq 'LEGACY_MONOLITH' "$cutover_state" || fail 'rollback did not restore the explicit legacy cutover state'
+  grep -Fq 'LEGACY_MONOLITH' "$fresh_rollback_state" || fail 'fresh rollback did not publish the explicit legacy state'
 fi
 
 if [[ "$scenario" == all || "$scenario" == empty-recovery ]]; then

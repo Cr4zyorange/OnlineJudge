@@ -1,13 +1,15 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { join, resolve } from 'node:path';
+import { tmpdir } from 'node:os';
 import test from 'node:test';
 
 import {
   buildCopyStatement,
   loadFiveDomainPlan,
   parseTabRows,
+  writeControlState,
 } from '../../database/mysql/migrate-five-domain-schemas.mjs';
 
 const migrationScript = resolve('database/mysql/migrate-five-domain-schemas.mjs');
@@ -81,6 +83,9 @@ test('migration implementation creates nested evidence parents and validates all
   const source = readFileSync(migrationScript, 'utf8');
 
   assert.match(source, /mkdirSync\(dirname\(absolute\), \{ recursive: true \}\)/);
+  assert.match(source, /export function writeControlState\(path, state\)/);
+  assert.match(source, /renameSync\(temporary, absolute\)/);
+  assert.equal((source.match(/writeControlState\(options\.cutoverState, state\)/g) ?? []).length, 2);
   assert.match(source, /CREATE TABLE IF NOT EXISTS .* LIKE .*entry\.table/);
   assert.match(source, /assessment_event_outbox/);
   assert.match(source, /course\.membership\.snapshot\.v2/);
@@ -88,6 +93,18 @@ test('migration implementation creates nested evidence parents and validates all
   assert.match(source, /migration_checkpoints \(migration_id, phase, source_schema, source_fingerprint\)/);
   assert.match(source, /permissions\.length !== requiredOwners\.length \* 9/);
   assert.match(source, /permission evidence must contain 45 complete allow\/deny probes/);
+});
+
+test('cutover control state creates a fresh nested parent before an atomic write', () => {
+  const root = mkdtempSync(join(tmpdir(), 'oj341-control-state-'));
+  const statePath = join(root, 'ci-artifacts', 'issue341', 'cutover-state.json');
+  try {
+    assert.equal(existsSync(statePath), false);
+    writeControlState(statePath, { topology: 'FIVE_DOMAIN' });
+    assert.deepEqual(JSON.parse(readFileSync(statePath, 'utf8')), { topology: 'FIVE_DOMAIN' });
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });
 
 test('rollback cannot bypass the shared runtime-password and 45-probe PASS gate', () => {
@@ -137,6 +154,9 @@ test('disposable MySQL acceptance keeps bypass, missing-password, rollback, nest
   assert.match(source, /oj_assessment\.assessment_event_outbox/);
   assert.match(source, /oj_course\.course_event_outbox/);
   assert.match(source, /nested\/evidence\/verify\.json/);
+  assert.match(source, /ci-artifacts\/issue341\/cutover-state\.json/);
+  assert.match(source, /fresh-rollback\/issue341\/rollback-state\.json/);
+  assert.match(source, /fresh nested cutover state path was not created/);
   assert.match(source, /ddl-misconfigured-first\.json/);
   assert.match(source, /ddl-misconfigured-second\.json/);
   assert.match(source, /negative\/invalid-v2-replay\.json/);

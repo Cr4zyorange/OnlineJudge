@@ -70,6 +70,8 @@ node database/mysql/migrate-five-domain-schemas.mjs \
 
 这保证旧系统恢复是可逆流量操作，不把删 schema/volume 当作回滚。回滚后可再次执行 `migrate`、`replay`、`verify`；所有结果都必须以新的 source fingerprint 和 evidence 为准。
 
+`--cutover-state` 可以是尚不存在的嵌套部署目录（例如上面的 `ci-artifacts/issue341/`）。控制器会先创建父目录，再以同目录临时文件加 rename 原子发布 JSON；因此首次切换和传入另一 fresh rollback-state 路径的恢复都不会因 CI workspace 的 `ENOENT` 失败，也不会向读取方暴露半写入的流量状态。
+
 ## 4. 必须归档的 evidence
 
 `--evidence` JSON 包含源 schema migration 计数/版本、`baseSha`、`testedSha`、迁移 SHA-256、46 表的源/目标行数、CRC、checksum、主键集合差异、59 条可物理检查的 logical-reference orphan 结果、33 条 owner 内 FK 结果、13 张具体可靠运行时表的 owner 计数、Grade/Learning 投影与已应用 replay 计数，以及五账号的 45 项矩阵（20 项本域 DML allow、25 项 foreign/DDL deny）的原始错误。每个 `PASS`（包括 `rollback`）都含完整 45 条 `verification.permissions`；没有五个 runtime password 的操作在写入 PASS evidence 前失败。Secret、DSN 和 JWT 不写入结果。
