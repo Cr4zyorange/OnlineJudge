@@ -1,0 +1,13 @@
+sequenceDiagram
+  participant API as Assessment API
+  participant DB as oj_assessment task store
+  participant W1 as Worker A
+  participant W2 as Worker B
+  API->>DB: transaction creates PENDING task and outbox
+  W1->>DB: conditional claim at generation n for leaseOwner A
+  Note over W1,DB: lease expires or Worker A crashes
+  W2->>DB: conditional re-claim at next generation for leaseOwner B
+  W1->>DB: conditional final write checks task, generation, owner, live lease
+  DB-->>W1: zero rows, stale sandbox output is fenced and discarded
+  W2->>DB: fenced final write for current generation
+  DB-->>W2: one terminal result and versioned outbox event

@@ -20,6 +20,8 @@ const requiredFiles = [
   'database/ownership/cross-domain-references.csv',
   'database/ownership/schema-account-matrix.csv',
   'database/ownership/service-local-tables.csv',
+  'database/migrations/identity/DB-IDENTITY-01-identity-user-session.sql',
+  'database/migrations/identity/DB-IDENTITY-02-service-token-idempotency.sql',
   'docs/开发/D6-DATA-五域数据所有权契约.md'
 ];
 const ownershipFields = [
@@ -264,6 +266,8 @@ function errorsFor(rootPath) {
   const references = parseCsv(requireFile(rootPath, 'database/ownership/cross-domain-references.csv'), 'cross-domain-references.csv');
   const accounts = parseCsv(requireFile(rootPath, 'database/ownership/schema-account-matrix.csv'), 'schema-account-matrix.csv');
   const serviceLocalTables = parseCsv(requireFile(rootPath, 'database/ownership/service-local-tables.csv'), 'service-local-tables.csv');
+  const identitySchemaMigration = requireFile(rootPath, 'database/migrations/identity/DB-IDENTITY-01-identity-user-session.sql');
+  const identityIdempotencyMigration = requireFile(rootPath, 'database/migrations/identity/DB-IDENTITY-02-service-token-idempotency.sql');
   const document = requireFile(rootPath, 'docs/开发/D6-DATA-五域数据所有权契约.md');
   requireFields(ownership, ownershipFields, 'table-ownership.csv', errors);
   requireFields(references, referenceFields, 'cross-domain-references.csv', errors);
@@ -376,17 +380,55 @@ function errorsFor(rootPath) {
     if (localKeys.has(key)) errors.push(`duplicate service-local table ${key}`);
     localKeys.add(key);
     if (domains[entry.owner] !== entry.schema) errors.push(`service-local schema mismatch for ${key}`);
-    if (!['OUTBOX', 'INBOX', 'PROJECTION'].includes(entry.kind)) errors.push(`unknown service-local kind ${entry.kind} for ${key}`);
+    if (!['OUTBOX', 'INBOX', 'PROJECTION', 'IDEMPOTENCY'].includes(entry.kind)) errors.push(`unknown service-local kind ${entry.kind} for ${key}`);
     localKinds.set(`${entry.owner}:${entry.kind}`, entry);
   }
   for (const owner of expectedOwners) {
-    for (const kind of ['OUTBOX', 'INBOX']) {
+    const requiredKinds = owner === 'IDENTITY' ? ['OUTBOX', 'IDEMPOTENCY'] : ['OUTBOX', 'INBOX'];
+    for (const kind of requiredKinds) {
       if (!localKinds.has(`${owner}:${kind}`)) errors.push(`${owner} must own its local ${kind}`);
     }
   }
 
-  if (!document.includes('#338') || !document.includes('#341') || !document.includes('禁止跨 Schema')) {
-    errors.push('D6 ownership document must link #338, #341, and the cross-schema prohibition');
+  const identityOutbox = localKinds.get('IDENTITY:OUTBOX');
+  const identityIdempotency = localKinds.get('IDENTITY:IDEMPOTENCY');
+  if (!identityOutbox
+    || identityOutbox.table !== 't_identity_outbox_event'
+    || identityOutbox.lifecycle !== 'implemented'
+    || identityOutbox.implementation_issue !== '#311') {
+    errors.push('Identity must record the delivered t_identity_outbox_event from #311');
+  }
+  if (!identityIdempotency
+    || identityIdempotency.table !== 't_identity_service_token_idempotency'
+    || identityIdempotency.lifecycle !== 'implemented'
+    || identityIdempotency.implementation_issue !== '#311') {
+    errors.push('Identity must record its delivered idempotency table instead of a planned event inbox');
+  }
+  if (localKinds.has('IDENTITY:INBOX')) {
+    errors.push('Identity must not declare an event inbox until it actually consumes a v2 event');
+  }
+  if (!/CREATE TABLE IF NOT EXISTS t_identity_outbox_event\s*\(/i.test(identitySchemaMigration)) {
+    errors.push('#311 Identity schema migration must create t_identity_outbox_event');
+  }
+  if (!/CREATE TABLE IF NOT EXISTS t_identity_service_token_idempotency\s*\(/i.test(identityIdempotencyMigration)) {
+    errors.push('#311 Identity idempotency migration must create t_identity_service_token_idempotency');
+  }
+  try {
+    const asyncApi = JSON.parse(requireFile(rootPath, 'contracts/v2/asyncapi/events.asyncapi.json'));
+    const identityEvent = asyncApi.components?.messages?.['identity.security-version.changed.v2'];
+    if (identityEvent?.['x-onlinejudge-producer'] !== 'identity') {
+      errors.push('identity.security-version.changed.v2 must be produced by Identity');
+    }
+    if (!Array.isArray(identityEvent?.['x-onlinejudge-consumers'])
+      || identityEvent['x-onlinejudge-consumers'].includes('identity')) {
+      errors.push('Identity must not consume its own security-version event without an implemented inbox');
+    }
+  } catch (error) {
+    errors.push(`cannot read Identity v2 event contract: ${error.message}`);
+  }
+
+  if (!document.includes('#338') || !document.includes('#341') || !document.includes('#311') || !document.includes('禁止跨 Schema')) {
+    errors.push('D6 ownership document must link #311, #338, #341, and the cross-schema prohibition');
   }
   return { errors, expectedReferenceCount: expectedReferences.size };
 }
@@ -406,7 +448,11 @@ export function verifyDataOwnershipContract({ rootPath = defaultRoot } = {}) {
     accountCount: accounts.length,
     crossDomainReferenceCount: references.length,
     expectedReferenceCount,
-    serviceLocalTableCount: serviceLocalTables.length
+    serviceLocalTableCount: serviceLocalTables.length,
+    identityRuntimeTables: {
+      outbox: serviceLocalTables.find((entry) => entry.owner === 'IDENTITY' && entry.kind === 'OUTBOX')?.table,
+      idempotency: serviceLocalTables.find((entry) => entry.owner === 'IDENTITY' && entry.kind === 'IDEMPOTENCY')?.table
+    }
   };
 }
 

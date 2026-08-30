@@ -41,6 +41,29 @@ test('Issue #309 contract assigns every current business table to exactly one of
   assert.equal(summary.crossDomainReferenceCount, 59);
   assert.equal(summary.expectedReferenceCount, 59);
   assert.equal(summary.serviceLocalTableCount, 14);
+  assert.deepEqual(summary.identityRuntimeTables, {
+    outbox: 't_identity_outbox_event',
+    idempotency: 't_identity_service_token_idempotency'
+  });
+});
+
+test('the ledger rejects a fictional Identity event inbox in place of its delivered idempotency state', () => {
+  const root = fixtureRoot();
+  try {
+    const serviceLocalPath = join(root, 'database', 'ownership', 'service-local-tables.csv');
+    const serviceLocal = readFileSync(serviceLocalPath, 'utf8').replace(
+      'IDENTITY,oj_identity,t_identity_service_token_idempotency,IDEMPOTENCY,implemented,#311',
+      'IDENTITY,oj_identity,event_inbox,INBOX,planned,#337'
+    );
+    writeFileSync(serviceLocalPath, serviceLocal, 'utf8');
+
+    assert.throws(
+      () => verifyDataOwnershipContract({ rootPath: root }),
+      /Identity must record its delivered idempotency table instead of a planned event inbox/
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });
 
 test('the executable matrix rejects an account that can access another domain schema', () => {

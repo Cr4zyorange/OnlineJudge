@@ -1,13 +1,16 @@
 # D6-DATA 五域数据所有权与账号隔离契约
 
 > 决策 Issue：#309。实现输入：#338 的五服务 v2 正本
-> `docs/开发/D6-D7-五服务共享契约-v2.md` 与 ADR-006。实际迁移、回滚、校验和切换：#341。
+> `docs/开发/D6-D7-五服务共享契约-v2.md` 与 ADR-006。五服务最终架构冻结：#305 的
+> [D6-D7-五服务架构冻结-305.md](D6-D7-五服务架构冻结-305.md)。实际迁移、回滚、校验和切换：#341。
 
 ## 1. 范围与正本
 
 本文件冻结 Identity、Course、Assessment、Grade、Learning 五域的数据库边界；它不创建 Schema、账号、迁移脚本、回滚脚本或生产 Repository 改造。当前模块化单体仍使用一个物理 MySQL；`database/ownership/*.csv` 描述目标 Schema 的契约，#341 才能实施并验证数据库变更。
 
-`table-ownership.csv` 是当前 59 张业务与 service-local 可靠性表的唯一 owner 正本。它保留真实主键、外部 ID、owner 内约束、现有 owner 内索引的保留策略和 #341 的迁移策略。源表集合来自 `database/mysql/compose-schema.sql`，不得凭业务名称新增、遗漏或重复登记表。`service-local-tables.csv` 则冻结每个 Schema 的本地 inbox/outbox；#337 已实现 Assessment/Course/Grade outbox、Assessment/Grade/Learning inbox、Course 的 `course_membership_reconciliation_checkpoint`，以及 Learning 的 `learning_course_member_projection` 和课程级 `learning_course_membership_watermark`。该水位只由 `course.membership.snapshot.v2` 的完整 roster 推进，不能由任意一个成员事件推断。Grade 的 `t_grade_record` 仍为来源成绩投影；其余服务本地表的物理 Schema 切换属于 #341。
+`table-ownership.csv` 是 #341 当前 59 张 legacy 数据迁移输入的唯一 owner 正本。迁移控制器按 **46 张 legacy 业务表 + 13 张可靠消息运行时表**解释这 59 条：前者复制并逐表核验，后者在目标 owner schema 重建，不复制 lease、retry、dead-letter 或已消费状态。它保留真实主键、外部 ID、owner 内约束、现有 owner 内索引的保留策略和 #341 的迁移策略。源表集合来自 `database/mysql/compose-schema.sql`，不得凭业务名称新增、遗漏或重复登记表。`service-local-tables.csv` 则冻结每个 Schema 的 14 条本地状态记录；它另列既有 `t_grade_record` 来源成绩投影。#337 已实现 Assessment/Course/Grade outbox、Assessment/Grade/Learning inbox、Course 的 `course_membership_reconciliation_checkpoint`，以及 Learning 的 `learning_course_member_projection` 和课程级 `learning_course_membership_watermark`。该水位只由 `course.membership.snapshot.v2` 的完整 roster 推进，不能由任意一个成员事件推断。
+
+#311 已在 `database/migrations/identity/` 实际创建 Identity 自有的 `t_identity_outbox_event` 与 `t_identity_service_token_idempotency`：前者与安全版本变化同事务写入、后者持久化短时 service-token 的幂等结果。它们替换旧的抽象 `event_outbox`/planned `event_inbox` 条目；Identity 当前只生产 `identity.security-version.changed.v2` 事实而不消费业务事件，故不得虚构 Identity inbox。二者由 `identity-migrations` 幂等创建，没有 legacy 源行可复制，不改变 #341 的 **46 + 13 = 59** 迁移控制面计数，也不成为第六 owner 或跨 Schema 权限的理由。
 
 ## 2. 五域、Schema 与运行时账号
 
@@ -48,4 +51,4 @@ node scripts/ci/verify-data-ownership-contract.mjs
 git diff --check
 ```
 
-门禁从当前 `compose-schema.sql` 读取表、主键和源列，要求 58 张业务表恰有一个五域 owner，五个 Schema/账号一一对应，四个外域均被拒绝，owner 外 FK 被拒绝。它会从 59 条有效 `external_ids` 推导精确 ledger；历史账本中的 `lab_evaluation.student_id` 声明已因源列不存在而移除。门禁拒绝数量不变的列替换、删除真实映射、伪源列和不存在的 v2 契约路径，并以受控 mutation 证明账号越权和 owner 漂移会失败。
+门禁从当前 `compose-schema.sql`、ownership 和 service-local 输入读取表、主键和源列，要求 59 条 owner 恰有一个五域 owner（46 张 legacy 业务表与 13 张可靠消息运行时表），五个 Schema/账号一一对应，四个外域均被拒绝，owner 外 FK 被拒绝。`service-local-tables.csv` 的 14 条记录还包含既有 `t_grade_record` 来源成绩投影；它不能被误当成第 60 个 owner 表。门禁还要求 #311 的两张实际 Identity 状态表与其 migration DDL 对应，并拒绝把未消费任何事件的 Identity 虚构为 inbox 消费者。门禁会从 59 条有效 `external_ids` 推导精确 ledger；历史账本中的 `lab_evaluation.student_id` 声明已因源列不存在而移除。门禁拒绝数量不变的列替换、删除真实映射、伪源列和不存在的 v2 契约路径，并以受控 mutation 证明账号越权和 owner 漂移会失败。
