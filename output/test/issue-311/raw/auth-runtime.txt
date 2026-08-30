@@ -1,0 +1,30 @@
+compose status:
+NAME                              IMAGE                                                               COMMAND                  SERVICE        CREATED         STATUS                        PORTS
+onlinejudge-auth-auth-db-1        mysql:8.4                                                           "docker-entrypoint.s…"   auth-db        2 minutes ago   Up 2 minutes (healthy)        3306/tcp, 33060/tcp
+onlinejudge-auth-auth-service-1   onlinejudge/auth-service:7bba68e0580ac4fd648ebfe9fbba48f186e4003d   "java -jar /opt/onli…"   auth-service   2 minutes ago   Up About a minute (healthy)   0.0.0.0:8081->8081/tcp, [::]:8081->8081/tcp
+auth-service tail:
+auth-service-1  |
+auth-service-1  |   .   ____          _            __ _ _
+auth-service-1  |  /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+auth-service-1  | ( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+auth-service-1  |  \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+auth-service-1  |   '  |____| .__|_| |_|_| |_\__, | / / / /
+auth-service-1  |  =========|_|==============|___/=/_/_/_/
+auth-service-1  |
+auth-service-1  |  :: Spring Boot ::                (v3.4.5)
+auth-service-1  |
+auth-service-1  | 2026-08-28T08:52:05.736Z  INFO 1 --- [           main] c.o.authservice.AuthServiceApplication   : Starting AuthServiceApplication v0.1.0-SNAPSHOT using Java 21.0.12 with PID 1 (/opt/onlinejudge-auth/app.jar started by onlinejudge in /opt/onlinejudge-auth)
+auth-service-1  | 2026-08-28T08:52:05.741Z  INFO 1 --- [           main] c.o.authservice.AuthServiceApplication   : No active profile set, falling back to 1 default profile: "default"
+auth-service-1  | 2026-08-28T08:52:07.551Z  INFO 1 --- [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port 8081 (http)
+auth-service-1  | 2026-08-28T08:52:07.574Z  INFO 1 --- [           main] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+auth-service-1  | 2026-08-28T08:52:07.575Z  INFO 1 --- [           main] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/10.1.40]
+auth-service-1  | 2026-08-28T08:52:07.624Z  INFO 1 --- [           main] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring embedded WebApplicationContext
+auth-service-1  | 2026-08-28T08:52:07.627Z  INFO 1 --- [           main] w.s.c.ServletWebServerApplicationContext : Root WebApplicationContext: initialization completed in 1776 ms
+auth-service-1  | 2026-08-28T08:52:08.584Z  INFO 1 --- [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat started on port 8081 (http) with context path '/'
+auth-service-1  | 2026-08-28T08:52:08.618Z  INFO 1 --- [           main] c.o.authservice.AuthServiceApplication   : Started AuthServiceApplication in 3.893 seconds (process running for 5.281)
+auth-service-1  | 2026-08-28T08:52:13.750Z  INFO 1 --- [nio-8081-exec-1] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring DispatcherServlet 'dispatcherServlet'
+auth-service-1  | 2026-08-28T08:52:13.750Z  INFO 1 --- [nio-8081-exec-1] o.s.web.servlet.DispatcherServlet        : Initializing Servlet 'dispatcherServlet'
+auth-service-1  | 2026-08-28T08:52:13.753Z  INFO 1 --- [nio-8081-exec-1] o.s.web.servlet.DispatcherServlet        : Completed initialization in 2 ms
+auth-service-1  | 2026-08-28T08:52:13.823Z  INFO 1 --- [nio-8081-exec-1] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
+auth-service-1  | 2026-08-28T08:52:14.258Z  INFO 1 --- [nio-8081-exec-1] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Added connection com.mysql.cj.jdbc.ConnectionImpl@1331433a
+auth-service-1  | 2026-08-28T08:52:14.265Z  INFO 1 --- [nio-8081-exec-1] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.

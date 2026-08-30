@@ -16,7 +16,8 @@
           { "name": "X-Request-Id", "in": "header", "required": true, "schema": { "type": "string", "minLength": 1 } }
         ],
         "responses": {
-          "200": { "description": "JWKS; responses carry Cache-Control and must overlap key rotation longer than the maximum accepted token lifetime", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Jwks" } } } },
+          "200": { "description": "JWKS; responses carry Cache-Control and must overlap key rotation longer than the maximum accepted token lifetime", "headers": { "Cache-Control": { "required": true, "schema": { "type": "string", "pattern": "max-age" } } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Jwks" } } } },
+          "400": { "description": "X-Request-Id is missing or blank", "x-onlinejudge-error-codes": ["REQUEST_ID_REQUIRED"], "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
           "503": { "description": "Identity is temporarily unavailable; existing, unexpired tokens remain locally verifiable", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
         }
       }

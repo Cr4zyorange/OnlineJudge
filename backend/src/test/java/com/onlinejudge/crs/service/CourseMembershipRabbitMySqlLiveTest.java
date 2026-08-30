@@ -57,6 +57,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 @TestPropertySource(properties = {
         "onlinejudge.reliability.rabbitmq.enabled=true",
         "onlinejudge.reliability.publisher.enabled=false",
+        // This deliberately narrow producer/consumer context has no legacy
+        // SessionTokenService. Header compatibility is irrelevant to the
+        // real MySQL/Rabbit reliability proof and must not be auto-installed.
+        "onlinejudge.test.legacy-header-auth=false",
         "spring.rabbitmq.listener.simple.auto-startup=false",
         "onlinejudge.course.schema-initializer.enabled=false",
         "onlinejudge.demo-data.enabled=false",
