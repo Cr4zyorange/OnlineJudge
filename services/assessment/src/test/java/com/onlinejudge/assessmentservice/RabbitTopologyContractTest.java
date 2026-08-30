@@ -25,4 +25,17 @@ class RabbitTopologyContractTest {
             assertThat(Files.readString(owner)).as(owner.toString()).contains("onlinejudge.events.v2");
         }
     }
+
+    @Test
+    void controlledDeadLetterReplaysOnlyMarkAuditRowsAfterAConfirmWithoutBasicReturn() throws Exception {
+        Path root = Path.of("..", "..").toAbsolutePath().normalize();
+        for (Path replay : List.of(
+                root.resolve("services/assessment/src/main/java/com/onlinejudge/assessmentservice/messaging/CourseMembershipDeadLetterReplayCommand.java"),
+                root.resolve("services/assessment/src/main/java/com/onlinejudge/assessmentservice/messaging/IdentitySecurityVersionDeadLetterReplayCommand.java"))) {
+            String source = Files.readString(replay);
+            assertThat(source).as(replay.toString()).contains("MandatoryRabbitPublisher.publish");
+        }
+        String publisher = Files.readString(root.resolve("services/assessment/src/main/java/com/onlinejudge/assessmentservice/messaging/MandatoryRabbitPublisher.java"));
+        assertThat(publisher).contains("addReturnListener", "waitForConfirms", "unroutable");
+    }
 }

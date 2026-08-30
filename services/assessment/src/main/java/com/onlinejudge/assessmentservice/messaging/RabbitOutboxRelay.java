@@ -11,8 +11,6 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.nio.charset.StandardCharsets;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 
 /** At-least-once outbox relay: a DB record changes state only after Rabbit publisher confirm. */
 @Component
@@ -39,19 +37,13 @@ public class RabbitOutboxRelay {
         factory.setConnectionTimeout(1_000); factory.setHandshakeTimeout(1_000);
         try (Connection connection = factory.newConnection("assessment-outbox-relay"); Channel channel = connection.createChannel()) {
             channel.exchangeDeclare(exchange, "topic", true);
-            channel.confirmSelect();
-            Set<String> returnedEventIds = ConcurrentHashMap.newKeySet();
-            channel.addReturnListener(returned -> {
-                if (returned.getProperties().getMessageId() != null) returnedEventIds.add(returned.getProperties().getMessageId());
-            });
             for (var event : outbox.pending(100)) {
                 try {
                     var properties = new AMQP.BasicProperties.Builder().deliveryMode(PERSISTENT_DELIVERY_MODE)
                             .contentType("application/json").messageId(event.eventId()).type(event.eventType()).build();
-                    channel.basicPublish(exchange, "onlinejudge." + event.eventType(), true, properties, event.payloadJson().getBytes(StandardCharsets.UTF_8));
-                    boolean confirmed = channel.waitForConfirms(5_000);
-                    if (confirmed && !returnedEventIds.remove(event.eventId())) outbox.markDelivered(event.eventId());
-                    else outbox.recordDeliveryFailure(event.eventId(), confirmed ? "broker returned unroutable message" : "broker did not confirm message");
+                    MandatoryRabbitPublisher.publish(channel, exchange, "onlinejudge." + event.eventType(), properties,
+                            event.payloadJson().getBytes(StandardCharsets.UTF_8), "outbox event " + event.eventId());
+                    outbox.markDelivered(event.eventId());
                 } catch (Exception deliveryFailure) {
                     outbox.recordDeliveryFailure(event.eventId(), deliveryFailure.getMessage());
                 }

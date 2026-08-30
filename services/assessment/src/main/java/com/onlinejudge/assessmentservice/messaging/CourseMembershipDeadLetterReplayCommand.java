@@ -28,10 +28,10 @@ public class CourseMembershipDeadLetterReplayCommand implements ApplicationRunne
         var event = deadLetters.find(eventId).orElseThrow(() -> new IllegalArgumentException("course member DLQ event not found"));
         var factory = new ConnectionFactory(); factory.setHost(host); factory.setPort(port); factory.setUsername(username); factory.setPassword(password);
         try (var connection = factory.newConnection("assessment-course-member-dlq-replay"); var channel = connection.createChannel()) {
-            channel.exchangeDeclare(exchange, "topic", true); channel.confirmSelect();
+            channel.exchangeDeclare(exchange, "topic", true);
             var properties = new AMQP.BasicProperties.Builder().deliveryMode(2).contentType("application/json").messageId(event.eventId()).type("course.member.changed.v2").build();
-            channel.basicPublish(exchange, "onlinejudge.course.member.changed.v2", true, properties, event.payloadJson().getBytes(StandardCharsets.UTF_8));
-            if (!channel.waitForConfirms(5_000)) throw new IllegalStateException("course member replay was not broker-confirmed");
+            MandatoryRabbitPublisher.publish(channel, exchange, "onlinejudge.course.member.changed.v2", properties,
+                    event.payloadJson().getBytes(StandardCharsets.UTF_8), "course member replay");
         }
         deadLetters.markReplayed(event.eventId(), Instant.now());
     }

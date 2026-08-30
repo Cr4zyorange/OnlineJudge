@@ -1,0 +1,81 @@
+#!/usr/bin/env bash
+
+# Disposable MySQL 8.4 acceptance for the generic service migration runner.
+# It proves a legacy Assessment schema can be checkpointed through 01/02/03,
+# an identical rerun is a no-op, and the application account remains DML-only.
+set -Eeuo pipefail
+
+repository_root="$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"
+run_id="${OJ_ASSESSMENT_MIGRATION_RUN_ID:-$(date +%s)-$$}"
+container_name="oj313-service-migration-${run_id}"
+admin_password="oj313_migration_${run_id}"
+runtime_password="oj313_runtime_${run_id}"
+raw_log="${TMPDIR:-/tmp}/oj313-service-migration-${run_id}.log"
+
+fail() {
+  printf 'verify-assessment-migration-runner: FAIL: %s\n' "$*" >&2
+  exit 1
+}
+
+cleanup() {
+  docker rm -f "$container_name" >>"$raw_log" 2>&1 || true
+}
+trap cleanup EXIT INT TERM
+
+command -v docker >/dev/null 2>&1 || fail 'Docker client is unavailable'
+command -v mysql >/dev/null 2>&1 || fail 'mysql client is unavailable'
+docker info >/dev/null 2>&1 || fail 'Docker daemon is unavailable'
+[[ -x "$repository_root/database/mysql/migrate-service.sh" ]] || fail 'checked-in service migration runner is not executable'
+
+docker run --detach --rm --name "$container_name" --publish 127.0.0.1::3306 \
+  --env "MYSQL_ROOT_PASSWORD=$admin_password" mysql:8.4 >>"$raw_log"
+address="$(docker port "$container_name" 3306/tcp)"
+mysql_port="${address##*:}"
+[[ "$mysql_port" =~ ^[0-9]+$ ]] || fail "cannot determine disposable MySQL port from: $address"
+
+admin_mysql() {
+  MYSQL_PWD="$admin_password" mysql --protocol=TCP --host=127.0.0.1 --port="$mysql_port" --user=root "$@"
+}
+
+for _ in $(seq 1 60); do
+  if admin_mysql -e 'SELECT 1' >>"$raw_log" 2>&1; then break; fi
+  sleep 1
+done
+admin_mysql -e 'SELECT 1' >>"$raw_log" 2>&1 || fail 'disposable MySQL did not become ready'
+
+admin_mysql -e 'CREATE DATABASE oj_assessment CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;' >>"$raw_log" 2>&1
+# The old deployment has 01's table shape but no version checkpoint.  The
+# runner must record 01/02/03 without relying on runtime boot DDL.
+admin_mysql oj_assessment < "$repository_root/database/migrations/assessment/20260831_01_create_assessment_service_tables.sql" >>"$raw_log" 2>&1
+
+run_runner() {
+  MYSQL_HOST=127.0.0.1 MYSQL_PORT="$mysql_port" \
+    MIGRATION_DATABASE_NAME=oj_assessment MIGRATION_DATABASE_USER=root \
+    MIGRATION_DATABASE_PASSWORD="$admin_password" \
+    "$repository_root/database/mysql/migrate-service.sh" --schema assessment
+}
+
+first_output="$(run_runner 2>&1)" || {
+  printf '%s\n' "$first_output" >>"$raw_log"
+  fail 'first controlled migration run failed'
+}
+printf '%s\n' "$first_output" >>"$raw_log"
+grep -Fq 'PASS schema=assessment applied=3' <<<"$first_output" || fail 'first run did not apply 01/02/03'
+
+repeat_output="$(run_runner 2>&1)" || {
+  printf '%s\n' "$repeat_output" >>"$raw_log"
+  fail 'repeat controlled migration run failed'
+}
+printf '%s\n' "$repeat_output" >>"$raw_log"
+grep -Fq 'PASS schema=assessment applied=0' <<<"$repeat_output" || fail 'repeat run was not idempotent'
+
+history_count="$(admin_mysql -N -Doj_assessment -e 'SELECT COUNT(*) FROM schema_migrations;')"
+[[ "$history_count" == 3 ]] || fail "expected three migration checkpoints, found $history_count"
+admin_mysql -e "CREATE USER 'oj_assessment_rw'@'%' IDENTIFIED BY '$runtime_password'; GRANT SELECT, INSERT, UPDATE, DELETE ON oj_assessment.* TO 'oj_assessment_rw'@'%'; FLUSH PRIVILEGES;" >>"$raw_log" 2>&1
+MYSQL_PWD="$runtime_password" mysql --protocol=TCP --host=127.0.0.1 --port="$mysql_port" --user=oj_assessment_rw oj_assessment -e 'SELECT COUNT(*) FROM assessment_submission;' >>"$raw_log" 2>&1
+if MYSQL_PWD="$runtime_password" mysql --protocol=TCP --host=127.0.0.1 --port="$mysql_port" --user=oj_assessment_rw oj_assessment -e 'CREATE TABLE forbidden_runtime_ddl (id INT);' >>"$raw_log" 2>&1; then
+  fail 'DML-only runtime account unexpectedly created a table'
+fi
+grep -Fq 'ERROR 1142' "$raw_log" || fail 'runtime DDL denial did not retain MySQL ERROR 1142 evidence'
+
+printf 'verify-assessment-migration-runner: PASS checkpoints=%s runtime-ddl=DENY raw=%s\n' "$history_count" "$raw_log"

@@ -33,12 +33,11 @@ public class IdentitySecurityVersionDeadLetterReplayCommand implements Applicati
         var event = deadLetters.find(eventId).orElseThrow(() -> new IllegalArgumentException("Identity security-version DLQ event not found"));
         var factory = new ConnectionFactory(); factory.setHost(host); factory.setPort(port); factory.setUsername(username); factory.setPassword(password);
         try (var connection = factory.newConnection("assessment-identity-security-version-dlq-replay"); var channel = connection.createChannel()) {
-            channel.exchangeDeclare(exchange, "topic", true); channel.confirmSelect();
+            channel.exchangeDeclare(exchange, "topic", true);
             var properties = new AMQP.BasicProperties.Builder().deliveryMode(2).contentType("application/json")
                     .messageId(event.eventId()).correlationId(event.correlationId()).type("identity.security-version.changed.v2").build();
-            channel.basicPublish(exchange, "onlinejudge.identity.security-version.changed.v2", true, properties,
-                    event.payloadJson().getBytes(StandardCharsets.UTF_8));
-            if (!channel.waitForConfirms(5_000)) throw new IllegalStateException("Identity security-version replay was not broker-confirmed");
+            MandatoryRabbitPublisher.publish(channel, exchange, "onlinejudge.identity.security-version.changed.v2", properties,
+                    event.payloadJson().getBytes(StandardCharsets.UTF_8), "Identity security-version replay");
         }
         deadLetters.markReplayed(event.eventId(), Instant.now());
     }

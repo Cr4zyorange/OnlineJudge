@@ -40,6 +40,7 @@ blocked() {
 command -v docker >/dev/null 2>&1 || blocked 'Docker client is unavailable; real MySQL migration is unverified'
 command -v mysql >/dev/null 2>&1 || blocked 'mysql client is unavailable; real MySQL migration is unverified'
 docker info >/dev/null 2>&1 || blocked 'Docker daemon is unavailable; real MySQL migration is unverified'
+[[ -x "$repository_root/database/mysql/migrate-service.sh" ]] || blocked 'D7 checked-in service migration runner is unavailable or not executable'
 case "$scenario" in
   all|empty-cutover|empty-recovery|permissions|seed|bad) ;;
   *) fail "unknown scenario: $scenario (expected all|empty-cutover|empty-recovery|permissions|seed|bad)" ;;

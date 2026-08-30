@@ -9,6 +9,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.time.Instant;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Map;
 import java.util.UUID;
 
@@ -25,6 +27,13 @@ class RabbitOutboxRelayTest {
     @Test
     void relayExposesConfirmBeforeMarkingAnOutboxRecordDelivered() {
         assertThat(RabbitOutboxRelay.PERSISTENT_DELIVERY_MODE).isEqualTo(2);
+    }
+
+    @Test
+    void relayAndBothControlledReplaysShareTheReturnedMandatoryPublishGuard() throws Exception {
+        Path root = Path.of("..", "..").toAbsolutePath().normalize();
+        assertThat(Files.readString(root.resolve("services/assessment/src/main/java/com/onlinejudge/assessmentservice/messaging/RabbitOutboxRelay.java")))
+                .contains("MandatoryRabbitPublisher.publish");
     }
 
     @Test

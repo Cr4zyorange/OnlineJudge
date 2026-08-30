@@ -172,7 +172,7 @@
       "additionalProperties": false,
       "properties": {
         "key": {"type": "string", "pattern": "^[A-Z][A-Z0-9_]*$"},
-        "injectedAs": {"enum": ["runtime-secret", "workload-identity"]},
+        "injectedAs": {"enum": ["runtime-secret", "workload-identity", "migration-secret"]},
         "redact": {"const": true},
         "imageBuild": {"const": "forbidden"}
       }
@@ -212,6 +212,8 @@
         "forWorkload",
         "sourcePaths",
         "command",
+        "configuration",
+        "secrets",
         "dependsOnWorkloads",
         "dependsOnMigrationJobs",
         "runOnce",
@@ -227,6 +229,14 @@
         "forWorkload": {"type": "string", "pattern": "^[a-z][a-z0-9-]*$"},
         "sourcePaths": {"type": "array", "minItems": 1, "items": {"type": "string"}},
         "command": {"type": "string", "minLength": 1},
+        "configuration": {
+          "type": "array",
+          "items": {"type": "string", "pattern": "^[A-Z][A-Z0-9_]*$"}
+        },
+        "secrets": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/secret"}
+        },
         "dependsOnWorkloads": {"type": "array", "items": {"type": "string"}},
         "dependsOnMigrationJobs": {"type": "array", "items": {"type": "string"}},
         "runOnce": {"const": true},

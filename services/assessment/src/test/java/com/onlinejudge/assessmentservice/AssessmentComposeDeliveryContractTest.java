@@ -18,6 +18,7 @@ class AssessmentComposeDeliveryContractTest {
         String cachedDockerfile = Files.readString(repository.resolve("services/assessment/Dockerfile.cached-runtime"));
         String migration = Files.readString(repository.resolve("database/migrations/assessment/20260831_01_create_assessment_service_tables.sql"));
         String dlqUpgradeMigration = Files.readString(repository.resolve("database/migrations/assessment/20260831_03_identity_security_version_dead_letter.sql"));
+        String runtimeProperties = Files.readString(repository.resolve("services/assessment/src/main/resources/application-compose.properties"));
 
         assertThat(compose).contains("ASSESSMENT_STORAGE_ROOT: /var/lib/onlinejudge-assessment");
         assertThat(compose).contains("ASSESSMENT_SANDBOX_COMMAND: ${ASSESSMENT_SANDBOX_COMMAND:?ASSESSMENT_SANDBOX_COMMAND is required}");
@@ -27,6 +28,7 @@ class AssessmentComposeDeliveryContractTest {
         String worker = compose.substring(compose.indexOf("  assessment-worker:"), compose.indexOf("\nvolumes:"));
         assertThat(api).contains("ASSESSMENT_RABBIT_ENABLED: \"false\"", "ASSESSMENT_RABBIT_RELAY_ENABLED: \"false\"", "healthcheck:")
                 .doesNotContain("rabbitmq: {condition: service_healthy}");
+        assertThat(api).contains("assessment-migrations: {condition: service_completed_successfully}");
         assertThat(api).contains("ASSESSMENT_RABBIT_EXCHANGE: onlinejudge.events.v2");
         assertThat(worker).contains("ASSESSMENT_RABBIT_ENABLED: \"true\"", "ASSESSMENT_RABBIT_RELAY_ENABLED: \"true\"", "ASSESSMENT_RABBIT_EXCHANGE: onlinejudge.events.v2", "healthcheck:", "test -f /tmp/assessment-worker-ready", "retries: 3");
         assertThat(Files.readString(repository.resolve("services/assessment/src/main/java/com/onlinejudge/assessmentservice/worker/AssessmentWorkerReadiness.java")))
@@ -38,6 +40,9 @@ class AssessmentComposeDeliveryContractTest {
         assertThat(compose).contains("ASSESSMENT_WORKER_LEASE: ${ASSESSMENT_WORKER_LEASE:-PT30S}", "ASSESSMENT_WORKER_HEARTBEAT_INTERVAL: ${ASSESSMENT_WORKER_HEARTBEAT_INTERVAL:-PT5S}");
         assertThat(compose).contains("ASSESSMENT_WORKER_MAX_ATTEMPTS: ${ASSESSMENT_WORKER_MAX_ATTEMPTS:-3}", "ASSESSMENT_WORKER_RETRY_BACKOFF: ${ASSESSMENT_WORKER_RETRY_BACKOFF:-PT5S}");
         assertThat(worker).contains("rabbitmq: {condition: service_healthy}");
+        assertThat(worker).contains("assessment-migrations: {condition: service_completed_successfully}");
+        assertThat(compose).contains("assessment-runtime-account-init:", "export MYSQL_PWD=\"$$MYSQL_ROOT_PASSWORD\"", "REVOKE ALL PRIVILEGES, GRANT OPTION", "GRANT SELECT, INSERT, UPDATE, DELETE ON oj_assessment.*", "assessment-migrations:", "MIGRATION_DATABASE_USER: root", "migrate-service.sh", "MIGRATION_ROOT: /workspace/migrations");
+        assertThat(runtimeProperties).contains("spring.sql.init.mode=never");
         assertThat(compose).contains("assessment-storage-init: {condition: service_completed_successfully}", "user: \"0:0\"", "chown -R 10003:10003 /var/lib/onlinejudge-assessment");
         assertThat(count(compose, "assessment-files:/var/lib/onlinejudge-assessment")).isEqualTo(3);
         assertThat(compose).contains("volumes:\n  assessment-files:");
