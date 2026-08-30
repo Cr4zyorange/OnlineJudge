@@ -257,10 +257,16 @@ public class CourseService {
     }
 
     @Transactional
-    public AnnouncementView createAnnouncement(long courseId, String title, String content, Boolean top, CurrentUser actor) {
+    public AnnouncementView createAnnouncement(long courseId, String title, String content, Boolean top, CurrentUser actor,
+                                               String correlationId) {
         requireContentManager(courseId, actor);
-        courses.createAnnouncement(courseId, announcementTitle(title), announcementContent(content), Boolean.TRUE.equals(top), actor.id());
-        return announcementView(courses.announcements(courseId).getFirst());
+        Instant publishedAt = Instant.now();
+        CourseRepository.Announcement announcement = courses.createAnnouncement(courseId, announcementTitle(title), announcementContent(content),
+                Boolean.TRUE.equals(top), actor.id());
+        outbox.append("course.announcement.published.v2", "course-announcement", String.valueOf(announcement.id()), 1, correlationId,
+                Map.of("courseId", String.valueOf(courseId), "announcementId", String.valueOf(announcement.id()),
+                        "publishedAt", publishedAt.toString()));
+        return announcementView(announcement);
     }
 
     @Transactional

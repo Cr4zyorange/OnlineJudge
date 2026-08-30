@@ -1,10 +1,14 @@
 package com.onlinejudge.courseservice.persistence;
 
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.support.GeneratedKeyHolder;
+import org.springframework.jdbc.support.KeyHolder;
 import org.springframework.stereotype.Repository;
 
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -205,9 +209,21 @@ public class CourseRepository {
         jdbcTemplate.update("UPDATE crs_resource SET download_count = download_count + 1 WHERE course_id = ? AND id = ? AND is_deleted = FALSE", courseId, resourceId);
     }
 
-    public void createAnnouncement(long courseId, String title, String content, boolean top, long publisherId) {
-        jdbcTemplate.update("INSERT INTO crs_announcement (course_id, title, content, is_top, publisher_id, is_deleted) VALUES (?, ?, ?, ?, ?, FALSE)",
-                courseId, title, content, top, publisherId);
+    public Announcement createAnnouncement(long courseId, String title, String content, boolean top, long publisherId) {
+        KeyHolder keyHolder = new GeneratedKeyHolder();
+        jdbcTemplate.update(connection -> {
+            PreparedStatement statement = connection.prepareStatement("""
+                    INSERT INTO crs_announcement (course_id, title, content, is_top, publisher_id, is_deleted)
+                    VALUES (?, ?, ?, ?, ?, FALSE)
+                    """, Statement.RETURN_GENERATED_KEYS);
+            statement.setLong(1, courseId);
+            statement.setString(2, title);
+            statement.setString(3, content);
+            statement.setBoolean(4, top);
+            statement.setLong(5, publisherId);
+            return statement;
+        }, keyHolder);
+        return announcement(courseId, generatedId(keyHolder)).orElseThrow();
     }
 
     public List<Announcement> announcements(long courseId) {
@@ -239,6 +255,12 @@ public class CourseRepository {
     private Chapter chapter(ResultSet rs) throws SQLException { return new Chapter(rs.getLong("id"), rs.getLong("course_id"), rs.getString("chapter_name"), nullableLong(rs, "parent_id"), rs.getInt("sort_order"), rs.getString("objective"), rs.getBoolean("visible_status"), rs.getInt("chapter_type")); }
     private Resource resource(ResultSet rs) throws SQLException { return new Resource(rs.getLong("id"), rs.getLong("course_id"), nullableLong(rs, "chapter_id"), rs.getString("resource_name"), rs.getString("resource_type"), rs.getString("visibility"), rs.getObject("publish_at", LocalDateTime.class), rs.getString("storage_key"), rs.getString("external_url"), rs.getString("original_filename"), rs.getString("content_type"), rs.getLong("file_size"), rs.getInt("version"), rs.getLong("download_count"), rs.getLong("upload_user_id")); }
     private Long nullableLong(ResultSet rs, String name) throws SQLException { long value = rs.getLong(name); return rs.wasNull() ? null : value; }
+    private long generatedId(KeyHolder keyHolder) {
+        if (keyHolder.getKeyList().isEmpty()) throw new IllegalStateException("no announcement generated key returned");
+        Object value = keyHolder.getKeyList().getFirst().get("id");
+        if (value == null) value = keyHolder.getKeyList().getFirst().values().iterator().next();
+        return ((Number) value).longValue();
+    }
 
     public record Course(long id, String name, String description, long teacherId, String enrollmentMode, String inviteCode, Integer maxStudents, String status, long rosterVersion) { }
     public record Member(long id, long courseId, long userId, String role, String status, long memberVersion, String joinMethod) { }

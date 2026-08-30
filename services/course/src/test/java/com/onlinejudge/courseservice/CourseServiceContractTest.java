@@ -250,12 +250,27 @@ class CourseServiceContractTest {
                         .header("Authorization", teacher).header("X-Request-Id", requestId()))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.data.total").value(1));
 
+        String announcementRequestId = "9dbbca57-4a53-4557-bb47-293f438fb3ec";
         String announcement = mockMvc.perform(post("/api/v1/courses/{courseId}/announcements", courseId)
-                        .header("Authorization", teacher).header("X-Request-Id", requestId())
+                        .header("Authorization", teacher).header("X-Request-Id", announcementRequestId)
                         .contentType(MediaType.APPLICATION_JSON).content("{\"title\":\"welcome\",\"content\":\"course starts now\",\"top\":true}"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.data.top").value(true))
                 .andReturn().getResponse().getContentAsString();
         String announcementId = objectMapper.readTree(announcement).at("/data/id").asText();
+        var announcementFact = jdbcTemplate.queryForMap("""
+                SELECT aggregate_type, aggregate_id, aggregate_version, correlation_id, routing_key, payload_json
+                  FROM course_event_outbox WHERE event_type = 'course.announcement.published.v2'
+                """);
+        assertThat(announcementFact).containsEntry("aggregate_type", "course-announcement")
+                .containsEntry("aggregate_id", announcementId)
+                .containsEntry("aggregate_version", 1L)
+                .containsEntry("correlation_id", announcementRequestId)
+                .containsEntry("routing_key", "onlinejudge.course.announcement.published.v2");
+        JsonNode announcementPayload = objectMapper.readTree((String) announcementFact.get("payload_json"));
+        assertThat(announcementPayload.path("courseId").asText()).isEqualTo(courseId);
+        assertThat(announcementPayload.path("announcementId").asText()).isEqualTo(announcementId);
+        assertThat(announcementPayload.path("publishedAt").asText()).isNotBlank();
+        assertThat(java.time.Instant.parse(announcementPayload.path("publishedAt").asText())).isNotNull();
         mockMvc.perform(get("/api/v1/courses/{courseId}/announcements", courseId)
                         .header("Authorization", student).header("X-Request-Id", requestId()))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.data[0].title").value("welcome"));

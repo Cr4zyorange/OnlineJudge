@@ -90,6 +90,16 @@ created="$("${compose[@]}" exec -T course-service wget -qO- \
 course_id="$(printf '%s' "$created" | jq -r '.data.id')"
 [[ "$course_id" =~ ^[1-9][0-9]*$ ]] || fail "authenticated Course create did not return an id"
 
+announcement_request_id='445d8522-7118-4ed7-a6dc-a2f384fe1beb'
+announcement="$("${compose[@]}" exec -T course-service wget -qO- \
+  --header="Authorization: Bearer $token" \
+  --header="X-Request-Id: $announcement_request_id" \
+  --header='Content-Type: application/json' \
+  --post-data='{"title":"Compose announcement","content":"canonical v2 producer proof","top":true}' \
+  "http://127.0.0.1:8082/api/v1/courses/$course_id/announcements")"
+announcement_id="$(printf '%s' "$announcement" | jq -r '.data.id')"
+[[ "$announcement_id" =~ ^[1-9][0-9]*$ ]] || fail "Course announcement create did not return an id"
+
 listed="$("${compose[@]}" exec -T course-service wget -qO- \
   --header="Authorization: Bearer $token" \
   --header='X-Request-Id: 8cdec2f4-2531-4f9c-ad78-d33a8618445f' \
@@ -108,8 +118,17 @@ fi
 IFS=$'\t' read -r outbox_count event_count correlation_count <<<"$("${compose[@]}" exec -T -e "MYSQL_PWD=$COURSE_DATABASE_PASSWORD" mysql \
   mysql --protocol=TCP -h 127.0.0.1 -u oj_course_rw -D oj_course -N -e \
   "SELECT COUNT(*), COUNT(DISTINCT event_id), COUNT(DISTINCT correlation_id) FROM course_event_outbox WHERE aggregate_id = '$course_id' OR aggregate_id LIKE '$course_id:%'")"
-[[ "$outbox_count" == '2' && "$event_count" == '2' && "$correlation_count" == '1' ]] || \
-  fail "Course create did not persist the canonical member and roster outbox facts"
+[[ "$outbox_count" == '3' && "$event_count" == '3' && "$correlation_count" == '2' ]] || \
+  fail "Course create and announcement did not persist all canonical outbox facts"
+IFS=$'\t' read -r announcement_aggregate announcement_id_fact announcement_version announcement_correlation announcement_routing announcement_course announcement_payload_id announcement_published_at <<<"$("${compose[@]}" exec -T -e "MYSQL_PWD=$COURSE_DATABASE_PASSWORD" mysql \
+  mysql --protocol=TCP -h 127.0.0.1 -u oj_course_rw -D oj_course -N -e \
+  "SELECT aggregate_type, aggregate_id, aggregate_version, correlation_id, routing_key, JSON_UNQUOTE(JSON_EXTRACT(payload_json, '$.courseId')), JSON_UNQUOTE(JSON_EXTRACT(payload_json, '$.announcementId')), JSON_UNQUOTE(JSON_EXTRACT(payload_json, '$.publishedAt')) FROM course_event_outbox WHERE event_type = 'course.announcement.published.v2'")"
+[[ "$announcement_aggregate" == 'course-announcement' && "$announcement_id_fact" == "$announcement_id" && "$announcement_version" == '1' \
+   && "$announcement_correlation" == "$announcement_request_id" && "$announcement_routing" == 'onlinejudge.course.announcement.published.v2' \
+   && "$announcement_course" == "$course_id" && "$announcement_payload_id" == "$announcement_id" ]] || \
+  fail "Course announcement outbox fact did not match the canonical v2 envelope"
+node -e 'const value = process.argv[1]; if (!Number.isFinite(Date.parse(value))) process.exit(1)' "$announcement_published_at" || \
+  fail "Course announcement outbox publishedAt was not RFC3339"
 
 image_revision="$(docker image inspect --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' "$(course_image_ref)")"
 image_user="$(docker image inspect --format '{{.Config.User}}' "$(course_image_ref)")"
@@ -119,6 +138,6 @@ host_jar_sha="$(sha256sum "$repo_root/services/course/target/onlinejudge-course-
 container_jar_sha="$("${compose[@]}" exec -T course-service sha256sum /opt/onlinejudge-course/app.jar | awk '{print $1}')"
 [[ "$host_jar_sha" == "$container_jar_sha" ]] || fail "Course image does not contain the packaged Course jar"
 
-printf 'course-compose-live: PASS course-id=%s list-total=%s course-account-rows=%s cross-schema=DENIED outbox-events=%s unique-event-ids=%s correlations=%s image-revision=%s user=%s jar-sha256=%s\n' \
-  "$course_id" "$list_total" "$course_rows" "$outbox_count" "$event_count" "$correlation_count" \
+printf 'course-compose-live: PASS course-id=%s announcement-id=%s list-total=%s course-account-rows=%s cross-schema=DENIED outbox-events=%s unique-event-ids=%s correlations=%s image-revision=%s user=%s jar-sha256=%s\n' \
+  "$course_id" "$announcement_id" "$list_total" "$course_rows" "$outbox_count" "$event_count" "$correlation_count" \
   "$image_revision" "$image_user" "$host_jar_sha"

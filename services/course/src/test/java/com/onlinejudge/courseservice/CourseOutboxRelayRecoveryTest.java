@@ -44,31 +44,35 @@ class CourseOutboxRelayRecoveryTest {
         outbox.append("course.member.changed.v2", "course-member", "42:99", 1,
                 "be087a98-88e6-4dac-9486-5c50b4231b4d",
                 Map.of("courseId", "42", "userId", "99", "membershipStatus", "ACTIVE", "memberVersion", 1));
+        outbox.append("course.announcement.published.v2", "course-announcement", "91", 1,
+                "b3501574-e50c-4e20-9ee7-7ae7efde5c85",
+                Map.of("courseId", "42", "announcementId", "91", "publishedAt", "2026-08-31T00:00:00Z"));
         rabbit.setEnabled(true);
         rabbit.setHost("127.0.0.1");
         rabbit.setPort(1);
         relay.relay();
 
-        assertThat(jdbcTemplate.queryForObject("SELECT delivery_status FROM course_event_outbox", String.class)).isEqualTo("PENDING");
-        assertThat(jdbcTemplate.queryForObject("SELECT attempt_count FROM course_event_outbox", Integer.class)).isEqualTo(1);
+        assertThat(jdbcTemplate.queryForList("SELECT delivery_status FROM course_event_outbox", String.class)).containsOnly("PENDING");
+        assertThat(jdbcTemplate.queryForList("SELECT attempt_count FROM course_event_outbox", Integer.class)).containsOnly(1);
 
         jdbcTemplate.update("UPDATE course_event_outbox SET next_attempt_at = CURRENT_TIMESTAMP");
         rabbit.setPort(Integer.getInteger("course.test.rabbit.port", 33327));
         relay.relay();
 
-        assertThat(jdbcTemplate.queryForObject("SELECT delivery_status FROM course_event_outbox", String.class)).isEqualTo("PENDING");
-        assertThat(jdbcTemplate.queryForObject("SELECT attempt_count FROM course_event_outbox", Integer.class)).isEqualTo(2);
+        assertThat(jdbcTemplate.queryForList("SELECT delivery_status FROM course_event_outbox", String.class)).containsOnly("PENDING");
+        assertThat(jdbcTemplate.queryForList("SELECT attempt_count FROM course_event_outbox", Integer.class)).containsOnly(2);
 
         try (Connection connection = connection(); Channel channel = connection.createChannel()) {
             channel.exchangeDeclare(rabbit.getExchange(), "topic", true);
             channel.queueDeclare("course-outbox-recovery", true, false, false, null);
             channel.queueBind("course-outbox-recovery", rabbit.getExchange(), "onlinejudge.course.member.changed.v2");
+            channel.queueBind("course-outbox-recovery", rabbit.getExchange(), "onlinejudge.course.announcement.published.v2");
         }
         jdbcTemplate.update("UPDATE course_event_outbox SET next_attempt_at = CURRENT_TIMESTAMP");
         relay.relay();
 
-        assertThat(jdbcTemplate.queryForObject("SELECT delivery_status FROM course_event_outbox", String.class)).isEqualTo("PUBLISHED");
-        assertThat(jdbcTemplate.queryForObject("SELECT attempt_count FROM course_event_outbox", Integer.class)).isEqualTo(2);
+        assertThat(jdbcTemplate.queryForList("SELECT delivery_status FROM course_event_outbox", String.class)).containsOnly("PUBLISHED");
+        assertThat(jdbcTemplate.queryForList("SELECT attempt_count FROM course_event_outbox", Integer.class)).containsOnly(2);
     }
 
     private Connection connection() throws Exception {

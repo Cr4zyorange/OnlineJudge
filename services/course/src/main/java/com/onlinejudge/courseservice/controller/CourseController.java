@@ -175,8 +175,9 @@ public class CourseController {
 
     @PostMapping("/{courseId}/announcements")
     public ApiResponse<CourseService.AnnouncementView> createAnnouncement(@PathVariable long courseId, @Valid @RequestBody AnnouncementRequest request,
-                                                                            @RequestAttribute("course.currentUser") CurrentUser user) {
-        return ApiResponse.ok(service.createAnnouncement(courseId, request.title(), request.content(), request.top(), user));
+                                                                            @RequestAttribute("course.currentUser") CurrentUser user,
+                                                                            HttpServletRequest servletRequest) {
+        return ApiResponse.ok(service.createAnnouncement(courseId, request.title(), request.content(), request.top(), user, requestId(servletRequest)));
     }
 
     @GetMapping("/{courseId}/announcements")
