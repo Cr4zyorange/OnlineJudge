@@ -14,16 +14,25 @@ services:
       retries: 24
   rabbitmq:
     image: rabbitmq:4.1-management
+    healthcheck:
+      test: ["CMD-SHELL", "rabbitmq-diagnostics -q ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 24
   assessment-api:
     build:
       context: ../..
       dockerfile: services/assessment/Dockerfile
     depends_on:
       assessment-db: {condition: service_healthy}
+      rabbitmq: {condition: service_healthy}
     environment:
       ASSESSMENT_DATABASE_HOST: assessment-db
       ASSESSMENT_DATABASE_PASSWORD: assessment-password
-      IDENTITY_JWKS_TRUST_BUNDLE: ${IDENTITY_JWKS_TRUST_BUNDLE:-}
+      ASSESSMENT_IDENTITY_JWKS_TRUST_BUNDLE: ${ASSESSMENT_IDENTITY_JWKS_TRUST_BUNDLE:?ASSESSMENT_IDENTITY_JWKS_TRUST_BUNDLE is required}
+      ASSESSMENT_IDENTITY_JWKS_URI: ${ASSESSMENT_IDENTITY_JWKS_URI:?ASSESSMENT_IDENTITY_JWKS_URI is required}
+      ASSESSMENT_RABBIT_ENABLED: "true"
+      ASSESSMENT_RABBIT_HOST: rabbitmq
       ASSESSMENT_STORAGE_ROOT: /var/lib/onlinejudge-assessment
     volumes:
       - assessment-files:/var/lib/onlinejudge-assessment
@@ -34,15 +43,20 @@ services:
       dockerfile: services/assessment/Dockerfile
     depends_on:
       assessment-db: {condition: service_healthy}
-      rabbitmq: {condition: service_started}
+      rabbitmq: {condition: service_healthy}
     environment:
       ASSESSMENT_DATABASE_HOST: assessment-db
       ASSESSMENT_DATABASE_PASSWORD: assessment-password
       ASSESSMENT_WORKER_ENABLED: "true"
-      RABBITMQ_HOST: rabbitmq
+      ASSESSMENT_RABBIT_ENABLED: "true"
+      ASSESSMENT_RABBIT_HOST: rabbitmq
+      ASSESSMENT_IDENTITY_JWKS_TRUST_BUNDLE: ${ASSESSMENT_IDENTITY_JWKS_TRUST_BUNDLE:?ASSESSMENT_IDENTITY_JWKS_TRUST_BUNDLE is required}
+      ASSESSMENT_IDENTITY_JWKS_URI: ${ASSESSMENT_IDENTITY_JWKS_URI:?ASSESSMENT_IDENTITY_JWKS_URI is required}
       ASSESSMENT_STORAGE_ROOT: /var/lib/onlinejudge-assessment
       ASSESSMENT_SANDBOX_COMMAND: ${ASSESSMENT_SANDBOX_COMMAND:?ASSESSMENT_SANDBOX_COMMAND is required}
       ASSESSMENT_SANDBOX_PRE_EXECUTION_DELAY: ${ASSESSMENT_SANDBOX_PRE_EXECUTION_DELAY:-PT0S}
+      ASSESSMENT_WORKER_LEASE: ${ASSESSMENT_WORKER_LEASE:-PT30S}
+      ASSESSMENT_WORKER_HEARTBEAT_INTERVAL: ${ASSESSMENT_WORKER_HEARTBEAT_INTERVAL:-PT5S}
     volumes:
       - assessment-files:/var/lib/onlinejudge-assessment
     command: ["--spring.main.web-application-type=none", "--assessment.worker.enabled=true"]

@@ -11,7 +11,7 @@ services:
         RUNTIME_BASE: ${ASSESSMENT_RUNTIME_BASE:?ASSESSMENT_RUNTIME_BASE is required}
         GIT_SHA: ${GIT_SHA:?GIT_SHA is required}
   assessment-worker:
-    image: onlinejudge/assessment-api:${GIT_SHA:?GIT_SHA is required}
+    image: onlinejudge/assessment-worker:${GIT_SHA:?GIT_SHA is required}
     build:
       context: ../..
       dockerfile: services/assessment/Dockerfile.cached-runtime
