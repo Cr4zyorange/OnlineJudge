@@ -33,14 +33,17 @@ public class CourseMembershipRabbitConsumer implements SmartLifecycle {
             channel.queueBind(queue, exchange, "onlinejudge.course.member.changed.v2"); channel.basicQos(1);
             channel.basicConsume(queue, false, (tag, message) -> {
                 try {
-                    JsonNode root = json.readTree(message.getBody()); JsonNode payload = root.has("payload") ? root.get("payload") : root;
-                    String eventId = root.path("eventId").asText(message.getProperties().getMessageId());
-                    var decision = projection.apply(new CourseMembershipProjectionService.MemberChanged(eventId, payload.path("courseId").asText(),
-                            payload.path("userId").asText(), payload.path("membershipStatus").asText(), payload.path("memberVersion").asLong()));
+                    CourseMembershipEventEnvelope event = CourseMembershipEventEnvelope.parse(json.readTree(message.getBody()));
+                    var decision = projection.apply(new CourseMembershipProjectionService.MemberChanged(event.eventId(), event.courseId(),
+                            event.userId(), event.membershipStatus(), event.memberVersion()));
                     // GAP is durable in the Assessment schema; acknowledging prevents a
                     // requeue loop from starving the missing lower aggregate version.
                     channel.basicAck(message.getEnvelope().getDeliveryTag(), false);
-                } catch (Exception rejected) { channel.basicNack(message.getEnvelope().getDeliveryTag(), false, true); }
+                } catch (IllegalArgumentException invalidEnvelope) {
+                    // Untrusted wire data is terminal: never requeue an invalid v1/malformed envelope.
+                    // A broker DLX policy may retain it; without one Rabbit discards it after this NACK.
+                    channel.basicNack(message.getEnvelope().getDeliveryTag(), false, false);
+                } catch (Exception unavailable) { channel.basicNack(message.getEnvelope().getDeliveryTag(), false, true); }
             }, tag -> { });
             running = true;
         } catch (Exception unavailable) { stop(); }

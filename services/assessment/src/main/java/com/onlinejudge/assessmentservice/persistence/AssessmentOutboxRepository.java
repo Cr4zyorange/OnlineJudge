@@ -54,9 +54,15 @@ public class AssessmentOutboxRepository {
                 """, (rs, ignored) -> new PendingEvent(rs.getString("event_id"), rs.getString("event_type"), rs.getString("payload_json")), limit);
     }
 
-    /** Called only after broker publisher confirms the exact persistent message. */
+    /** Called only after broker publisher confirms the exact persistent, routable message. */
     public boolean markDelivered(String eventId) {
-        return jdbc.update("UPDATE assessment_event_outbox SET state = 'DELIVERED' WHERE event_id = ? AND state = 'PENDING'", eventId) == 1;
+        return jdbc.update("UPDATE assessment_event_outbox SET state = 'DELIVERED', last_error = NULL WHERE event_id = ? AND state = 'PENDING'", eventId) == 1;
+    }
+
+    /** A returned or unconfirmed message remains a durable retry candidate with inspectable delivery history. */
+    public boolean recordDeliveryFailure(String eventId, String error) {
+        return jdbc.update("UPDATE assessment_event_outbox SET delivery_attempt = delivery_attempt + 1, last_error = ? WHERE event_id = ? AND state = 'PENDING'",
+                error == null ? "broker delivery failed" : error.substring(0, Math.min(error.length(), 1024)), eventId) == 1;
     }
 
     public record PendingEvent(String eventId, String eventType, String payloadJson) { }

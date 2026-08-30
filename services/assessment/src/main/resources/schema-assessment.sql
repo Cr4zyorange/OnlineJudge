@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS assessment_event_outbox (
   event_id VARCHAR(36) PRIMARY KEY, event_type VARCHAR(120) NOT NULL, payload_version INTEGER NOT NULL,
   aggregate_type VARCHAR(80) NOT NULL, aggregate_id VARCHAR(160) NOT NULL, aggregate_version BIGINT NOT NULL,
   occurred_at TIMESTAMP NOT NULL, correlation_id VARCHAR(80) NOT NULL, payload_json LONGTEXT NOT NULL,
-  state VARCHAR(16) NOT NULL, created_at TIMESTAMP NOT NULL
+  state VARCHAR(16) NOT NULL, delivery_attempt INTEGER NOT NULL DEFAULT 0, last_error VARCHAR(1024), created_at TIMESTAMP NOT NULL
 );
 CREATE TABLE IF NOT EXISTS assessment_course_member_projection (
   course_id VARCHAR(80) NOT NULL, user_id VARCHAR(80) NOT NULL, membership_status VARCHAR(16) NOT NULL,
