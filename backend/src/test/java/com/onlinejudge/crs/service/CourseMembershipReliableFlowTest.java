@@ -155,6 +155,36 @@ class CourseMembershipReliableFlowTest {
                 String.class, course.id(), student.id())).isEqualTo(CourseMemberStatus.REMOVED.name());
     }
 
+    @Test
+    void sourceOwnedBootstrapCheckpointsARecoveredLegacyCourseOnceAndReleasesItsDeferredHomework() throws Exception {
+        CurrentUser teacher = user(701L, "TEACHER");
+        CurrentUser student = user(801L, "STUDENT");
+        CourseResponse course = courses.create(new CourseCreateRequest(
+                "Recovered legacy Course roster", "", "2026-F", "SE", null,
+                EnrollmentMode.PUBLIC, null, null, null, null, CourseStatus.ACTIVE
+        ), teacher);
+        courses.join(course.id(), new CourseJoinRequest(null, ""), student);
+        jdbc.update("DELETE FROM course_event_outbox WHERE aggregate_id = ? OR aggregate_id LIKE ?",
+                String.valueOf(course.id()), course.id() + ":%");
+
+        ReliableEventEnvelope homework = homework(course.id(), "homework-before-source-bootstrap");
+        assertThat(learning.consume(homework)).isEqualTo(EventProcessingDecision.ACK);
+        assertThat(count("learning_deferred_event")).isEqualTo(1);
+
+        CourseMembershipBootstrapper bootstrapper = new CourseMembershipBootstrapper(outbox, 10);
+        assertThat(bootstrapper.bootstrapMissingRosters()).isEqualTo(1);
+        assertThat(bootstrapper.bootstrapMissingRosters()).isZero();
+        assertThat(count("course_event_outbox WHERE event_type = 'course.membership.snapshot.v2'"))
+                .isEqualTo(1);
+
+        deliverCourseOutbox();
+        assertThat(reconciliation.reconcileDue(Instant.parse("2030-01-01T00:00:00Z"))).isEqualTo(1);
+        assertThat(count("lrn_notification WHERE user_id = 801")).isEqualTo(1);
+        assertThat(jdbc.queryForObject(
+                "SELECT snapshot_version FROM learning_course_membership_watermark WHERE course_id = ?",
+                Long.class, course.id())).isEqualTo(1L);
+    }
+
     private void deliverCourseOutbox() {
         CourseOutboxPublisher productionPublisher = new CourseOutboxPublisher(
                 outbox, publisher, 50, 3, 30, 1, 16);

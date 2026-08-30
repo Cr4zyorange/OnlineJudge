@@ -24,6 +24,7 @@ import com.onlinejudge.lrn.service.LearningCourseMembershipSnapshotHandler;
 import com.onlinejudge.lrn.service.LearningHomeworkPublishedHandler;
 import com.onlinejudge.lrn.service.LearningReconciliationWorker;
 import com.onlinejudge.lrn.service.LearningReliableEventConsumer;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.amqp.core.Message;
@@ -128,6 +129,22 @@ class CourseMembershipRabbitMySqlLiveTest {
     @Qualifier("reliableRabbitTemplate")
     private RabbitTemplate rabbit;
 
+    @BeforeEach
+    void resetDisposableState() {
+        jdbc.update("DELETE FROM lrn_notification_status_log");
+        jdbc.update("DELETE FROM lrn_notification");
+        jdbc.update("DELETE FROM learning_event_inbox");
+        jdbc.update("DELETE FROM learning_event_delivery_attempt");
+        jdbc.update("DELETE FROM learning_event_dead_letter");
+        jdbc.update("DELETE FROM learning_event_reconciliation_request");
+        jdbc.update("DELETE FROM learning_deferred_event");
+        jdbc.update("DELETE FROM learning_course_member_projection");
+        jdbc.update("DELETE FROM learning_course_membership_watermark");
+        jdbc.update("DELETE FROM course_event_outbox");
+        jdbc.update("DELETE FROM crs_course_member");
+        jdbc.update("DELETE FROM crs_course");
+    }
+
     @Test
     void courseOutboxRoutesAnAtomicRosterThroughRabbitAndReleasesTheOriginalDeferredHomeworkOnce() throws Exception {
         long suffix = Math.abs(System.nanoTime());
@@ -178,6 +195,54 @@ class CourseMembershipRabbitMySqlLiveTest {
         System.out.printf("course-roster-live courseId=%d homeworkEventId=%s homeworkCorrelationId=%s "
                         + "published=%d delivered=%d removalDelivered=%d watermark=3 notificationsForStudent=1%n",
                 course.id(), homework.eventId(), homework.correlationId(), 5, delivered.size(), removal.size());
+    }
+
+    @Test
+    void preexistingCourseWithoutHistoricalOutboxMustBootstrapItsRosterWithoutLearningCallingBack() throws Exception {
+        long suffix = Math.abs(System.nanoTime());
+        CurrentUser teacher = user(8_300_000L + suffix % 100_000L, "TEACHER");
+        CurrentUser student = user(8_400_000L + suffix % 100_000L, "STUDENT");
+        CourseResponse course = courses.create(new CourseCreateRequest(
+                "preexisting-course-roster-" + suffix, "", "2026-F", "SE", null,
+                EnrollmentMode.PUBLIC, null, null, null, null, CourseStatus.ACTIVE
+        ), teacher);
+        courses.join(course.id(), new CourseJoinRequest(null, ""), student);
+        // Simulate a course and members committed before #337 was deployed:
+        // business facts exist, but Course has never emitted a roster event.
+        jdbc.update("DELETE FROM course_event_outbox WHERE aggregate_id = ? OR aggregate_id LIKE ?",
+                String.valueOf(course.id()), course.id() + ":%");
+
+        ReliableEventEnvelope homework = homework(course.id(), "preexisting-homework-" + suffix);
+        assertThat(learning.consume(homework)).isEqualTo(EventProcessingDecision.ACK);
+        assertThat(count("learning_deferred_event WHERE event_id = '" + homework.eventId() + "'"))
+                .isEqualTo(1);
+        assertThat(count("lrn_notification WHERE user_id = " + student.id())).isZero();
+
+        // The source-owned scheduler scans Course state; no Learning callback
+        // is involved. Its outbox row is the durable per-course checkpoint.
+        CourseMembershipBootstrapper bootstrapper = new CourseMembershipBootstrapper(outbox, 10);
+        assertThat(bootstrapper.bootstrapMissingRosters()).isEqualTo(1);
+        assertThat(bootstrapper.bootstrapMissingRosters()).isZero();
+        assertThat(count("course_event_outbox WHERE aggregate_type = 'course-membership-roster' "
+                + "AND aggregate_id = '" + course.id() + "'"))
+                .as("preexisting Course must create its durable bootstrap snapshot")
+                .isEqualTo(1);
+
+        List<ReliableEventEnvelope> delivered = publishAndReceive(1);
+        assertThat(delivered).singleElement().satisfies(envelope -> {
+            assertThat(envelope.eventType()).isEqualTo(CourseEventOutboxRepository.MEMBERSHIP_SNAPSHOT);
+            assertThat(envelope.aggregateId()).isEqualTo(String.valueOf(course.id()));
+        });
+        assertThat(learning.consume(delivered.getFirst())).isEqualTo(EventProcessingDecision.ACK);
+        assertThat(reconciliation.reconcileDue(Instant.parse("2030-01-01T00:00:00Z"))).isEqualTo(1);
+        assertThat(count("lrn_notification WHERE user_id = " + student.id())).isEqualTo(1);
+        assertThat(jdbc.queryForObject(
+                "SELECT snapshot_version FROM learning_course_membership_watermark WHERE course_id = ?",
+                Long.class, course.id())).isEqualTo(1L);
+
+        System.out.printf("course-roster-bootstrap-live courseId=%d eventId=%s correlationId=%s "
+                        + "bootstrapped=1 repeated=0 delivered=1 watermark=1 notificationsForStudent=1%n",
+                course.id(), delivered.getFirst().eventId(), delivered.getFirst().correlationId());
     }
 
     private List<ReliableEventEnvelope> publishAndReceive(int expected) {

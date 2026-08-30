@@ -9,6 +9,7 @@ import com.onlinejudge.crs.domain.CourseMemberRole;
 import com.onlinejudge.crs.domain.CourseMemberStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -40,6 +41,61 @@ public class CourseEventOutboxRepository {
     public void appendBootstrapRoster(long courseId) {
         Instant occurredAt = Instant.now();
         appendRosterSnapshot(courseId, UUID.randomUUID().toString(), occurredAt, null, 0L);
+    }
+
+    /**
+     * Finds legacy Course aggregates that predate the reliable producer.  The
+     * absence of a roster aggregate is the durable recovery trigger; once the
+     * snapshot outbox row is committed it is also the per-course checkpoint.
+     */
+    public List<Long> coursesMissingBootstrapRosters(int limit) {
+        return jdbcTemplate.queryForList("""
+                        SELECT c.id
+                        FROM crs_course c
+                        WHERE c.is_deleted = FALSE
+                          AND NOT EXISTS (
+                              SELECT 1
+                              FROM course_event_outbox o
+                              WHERE o.aggregate_type = 'course-membership-roster'
+                                -- Compare the closed numeric course id rather
+                                -- than coercing two independently created
+                                -- schema collations to a string.
+                                AND CAST(o.aggregate_id AS DECIMAL(20, 0)) = c.id
+                          )
+                        ORDER BY c.id
+                        LIMIT ?
+                        """, Long.class, Math.max(1, limit));
+    }
+
+    /**
+     * Atomically claims the missing-bootstrap condition by locking the Course
+     * aggregate, rechecking the durable checkpoint and writing the snapshot.
+     * A crash after the insert is safe: the committed outbox fact will retry;
+     * a second scheduler/instance observes the checkpoint and performs no
+     * duplicate bootstrap side effect.
+     */
+    @Transactional
+    public boolean appendBootstrapRosterIfAbsent(long courseId) {
+        List<Long> courses = jdbcTemplate.queryForList("""
+                        SELECT id
+                        FROM crs_course
+                        WHERE id = ? AND is_deleted = FALSE
+                        FOR UPDATE
+                        """, Long.class, courseId);
+        if (courses.isEmpty()) {
+            return false;
+        }
+        Integer existing = jdbcTemplate.queryForObject("""
+                        SELECT COUNT(*)
+                        FROM course_event_outbox
+                        WHERE aggregate_type = 'course-membership-roster'
+                          AND aggregate_id = ?
+                        """, Integer.class, String.valueOf(courseId));
+        if (existing != null && existing > 0) {
+            return false;
+        }
+        appendBootstrapRoster(courseId);
+        return true;
     }
 
     /**
