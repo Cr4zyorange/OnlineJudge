@@ -19,6 +19,13 @@ services:
       interval: 5s
       timeout: 3s
       retries: 24
+  assessment-storage-init:
+    image: mysql:8.4
+    user: "0:0"
+    entrypoint: ["sh", "-c"]
+    command: ["mkdir -p /var/lib/onlinejudge-assessment && chown -R 10003:10003 /var/lib/onlinejudge-assessment && test -w /var/lib/onlinejudge-assessment"]
+    volumes:
+      - assessment-files:/var/lib/onlinejudge-assessment
   assessment-api:
     build:
       context: ../..
@@ -26,6 +33,7 @@ services:
     depends_on:
       assessment-db: {condition: service_healthy}
       rabbitmq: {condition: service_healthy}
+      assessment-storage-init: {condition: service_completed_successfully}
     environment:
       ASSESSMENT_DATABASE_HOST: assessment-db
       ASSESSMENT_DATABASE_PASSWORD: assessment-password
@@ -45,6 +53,7 @@ services:
     depends_on:
       assessment-db: {condition: service_healthy}
       rabbitmq: {condition: service_healthy}
+      assessment-storage-init: {condition: service_completed_successfully}
     environment:
       ASSESSMENT_DATABASE_HOST: assessment-db
       ASSESSMENT_DATABASE_PASSWORD: assessment-password
@@ -59,6 +68,8 @@ services:
       ASSESSMENT_SANDBOX_PRE_EXECUTION_DELAY: ${ASSESSMENT_SANDBOX_PRE_EXECUTION_DELAY:-PT0S}
       ASSESSMENT_WORKER_LEASE: ${ASSESSMENT_WORKER_LEASE:-PT30S}
       ASSESSMENT_WORKER_HEARTBEAT_INTERVAL: ${ASSESSMENT_WORKER_HEARTBEAT_INTERVAL:-PT5S}
+      ASSESSMENT_WORKER_MAX_ATTEMPTS: ${ASSESSMENT_WORKER_MAX_ATTEMPTS:-3}
+      ASSESSMENT_WORKER_RETRY_BACKOFF: ${ASSESSMENT_WORKER_RETRY_BACKOFF:-PT5S}
     volumes:
       - assessment-files:/var/lib/onlinejudge-assessment
     command: ["--spring.main.web-application-type=none", "--assessment.worker.enabled=true"]

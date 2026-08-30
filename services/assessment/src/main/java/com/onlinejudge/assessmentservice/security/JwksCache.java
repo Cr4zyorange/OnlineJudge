@@ -17,7 +17,8 @@ public class JwksCache {
     private volatile Map<String, PublicKey> keys = Map.of();
     public JwksCache(ObjectMapper mapper, AssessmentIdentityProperties properties) { this.mapper = mapper; this.properties = properties; this.http = HttpClient.newBuilder().connectTimeout(properties.getRequestTimeout()).build(); }
     @PostConstruct void bootstrap() { if (!properties.getJwksTrustBundle().isBlank()) keys = JwtVerifier.parseJwks(mapper, properties.getJwksTrustBundle()); }
-    public JwtVerifier.Claims verifyUser(String header) { try { return JwtVerifier.verify(mapper, keys, header, properties.getIssuer(), properties.getAudience()); } catch (JwtVerifier.UnknownKid e) { refreshOnce(); return JwtVerifier.verify(mapper, keys, header, properties.getIssuer(), properties.getAudience()); } }
+    public JwtVerifier.Claims verifyUser(String header) { return verify(header, properties.getAudience()); }
+    public JwtVerifier.Claims verify(String header, String audience) { try { return JwtVerifier.verify(mapper, keys, header, properties.getIssuer(), audience); } catch (JwtVerifier.UnknownKid e) { refreshOnce(); return JwtVerifier.verify(mapper, keys, header, properties.getIssuer(), audience); } }
     @Scheduled(fixedDelayString = "${assessment.identity.refresh-interval:300000}") public void scheduledRefresh() { if (properties.isRefreshEnabled()) refreshOnce(); }
     public synchronized boolean refreshOnce() { if (properties.getJwksUri().isBlank()) return false; try { var request = HttpRequest.newBuilder(URI.create(properties.getJwksUri())).timeout(properties.getRequestTimeout()).GET().build(); var response = http.send(request, HttpResponse.BodyHandlers.ofString()); if (response.statusCode() != 200) return false; keys = JwtVerifier.parseJwks(mapper, response.body()); return true; } catch (Exception ignored) { return false; } }
 }

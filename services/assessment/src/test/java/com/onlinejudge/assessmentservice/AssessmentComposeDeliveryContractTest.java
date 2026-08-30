@@ -26,8 +26,10 @@ class AssessmentComposeDeliveryContractTest {
         assertThat(compose).contains("ASSESSMENT_IDENTITY_JWKS_TRUST_BUNDLE: ${ASSESSMENT_IDENTITY_JWKS_TRUST_BUNDLE:?ASSESSMENT_IDENTITY_JWKS_TRUST_BUNDLE is required}");
         assertThat(compose).contains("ASSESSMENT_IDENTITY_JWKS_URI: ${ASSESSMENT_IDENTITY_JWKS_URI:?ASSESSMENT_IDENTITY_JWKS_URI is required}");
         assertThat(compose).contains("ASSESSMENT_WORKER_LEASE: ${ASSESSMENT_WORKER_LEASE:-PT30S}", "ASSESSMENT_WORKER_HEARTBEAT_INTERVAL: ${ASSESSMENT_WORKER_HEARTBEAT_INTERVAL:-PT5S}");
+        assertThat(compose).contains("ASSESSMENT_WORKER_MAX_ATTEMPTS: ${ASSESSMENT_WORKER_MAX_ATTEMPTS:-3}", "ASSESSMENT_WORKER_RETRY_BACKOFF: ${ASSESSMENT_WORKER_RETRY_BACKOFF:-PT5S}");
         assertThat(compose).contains("rabbitmq: {condition: service_healthy}");
-        assertThat(count(compose, "assessment-files:/var/lib/onlinejudge-assessment")).isEqualTo(2);
+        assertThat(compose).contains("assessment-storage-init: {condition: service_completed_successfully}", "user: \"0:0\"", "chown -R 10003:10003 /var/lib/onlinejudge-assessment");
+        assertThat(count(compose, "assessment-files:/var/lib/onlinejudge-assessment")).isEqualTo(3);
         assertThat(compose).contains("volumes:\n  assessment-files:");
         assertThat(primaryDockerfile).contains("/var/lib/onlinejudge-assessment");
         assertThat(cachedDockerfile).contains("/var/lib/onlinejudge-assessment", "USER 10003:10003");

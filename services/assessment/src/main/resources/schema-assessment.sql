@@ -7,7 +7,9 @@ CREATE TABLE IF NOT EXISTS evaluation_task (
   id VARCHAR(36) PRIMARY KEY, submission_id VARCHAR(36) NOT NULL UNIQUE, source_type VARCHAR(8) NOT NULL,
   source_id VARCHAR(80) NOT NULL, course_id VARCHAR(80) NOT NULL, student_id VARCHAR(80) NOT NULL,
   state VARCHAR(16) NOT NULL, lease_owner VARCHAR(120), lease_until TIMESTAMP, heartbeat_at TIMESTAMP,
-  attempt INTEGER NOT NULL, generation BIGINT NOT NULL, result_status VARCHAR(32), finished_at TIMESTAMP,
+  attempt INTEGER NOT NULL, generation BIGINT NOT NULL, result_status VARCHAR(32), next_attempt_at TIMESTAMP,
+  manual_replay_count INTEGER NOT NULL DEFAULT 0, manual_replayed_by VARCHAR(80), manual_replayed_at TIMESTAMP,
+  finished_at TIMESTAMP,
   created_at TIMESTAMP NOT NULL, updated_at TIMESTAMP NOT NULL,
   INDEX idx_evaluation_task_claim (state, lease_until, created_at)
 );
@@ -31,9 +33,33 @@ CREATE TABLE IF NOT EXISTS assessment_deferred_course_member_event (
   membership_status VARCHAR(16) NOT NULL, member_version BIGINT NOT NULL,
   UNIQUE KEY uq_assessment_deferred_member_version (course_id, user_id, member_version)
 );
+CREATE TABLE IF NOT EXISTS assessment_course_member_dead_letter (
+  event_id VARCHAR(80) PRIMARY KEY, payload_json LONGTEXT NOT NULL, failure_reason VARCHAR(256) NOT NULL,
+  replay_count INTEGER NOT NULL DEFAULT 0, received_at TIMESTAMP NOT NULL, replayed_at TIMESTAMP NULL
+);
+CREATE TABLE IF NOT EXISTS assessment_identity_security_version (
+  user_id VARCHAR(80) PRIMARY KEY, minimum_security_version BIGINT NOT NULL,
+  aggregate_version BIGINT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS assessment_identity_security_version_event_inbox (
+  event_id VARCHAR(36) PRIMARY KEY, user_id VARCHAR(80) NOT NULL, aggregate_version BIGINT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS assessment_identity_security_version_gap (
+  user_id VARCHAR(80) PRIMARY KEY, expected_version BIGINT NOT NULL, observed_version BIGINT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS assessment_deferred_identity_security_version_event (
+  event_id VARCHAR(36) PRIMARY KEY, user_id VARCHAR(80) NOT NULL, security_version BIGINT NOT NULL,
+  change_reason VARCHAR(32) NOT NULL, aggregate_version BIGINT NOT NULL,
+  UNIQUE KEY uq_assessment_deferred_security_version (user_id, aggregate_version)
+);
 CREATE TABLE IF NOT EXISTS assessment_source_grade (
   source_type VARCHAR(8) NOT NULL, source_id VARCHAR(80) NOT NULL, course_id VARCHAR(80) NOT NULL,
   student_id VARCHAR(80) NOT NULL, score DECIMAL(10,2), full_score DECIMAL(10,2) NOT NULL,
   status VARCHAR(16) NOT NULL, source_version BIGINT NOT NULL, updated_at TIMESTAMP NOT NULL,
   PRIMARY KEY (source_type, source_id, student_id)
+);
+CREATE TABLE IF NOT EXISTS assessment_source_grade_snapshot (
+  source_type VARCHAR(8) NOT NULL, source_id VARCHAR(80) NOT NULL, course_id VARCHAR(80) NOT NULL,
+  snapshot_version BIGINT NOT NULL,
+  PRIMARY KEY (source_type, source_id)
 );
