@@ -1,0 +1,16 @@
+# Registry-constrained verification path: the service jar is built locally and
+# copied into an immutable, already-cached Java 21 runtime. It deliberately
+# keeps the OCI metadata, non-root UID and compose entrypoint equal to the
+# primary Dockerfile.
+ARG RUNTIME_BASE=eclipse-temurin:21-jre@sha256:7a65df4b22d2de92d4e04056e884f3b9122d70b21e2847fd66084278bd0ce037
+FROM ${RUNTIME_BASE}
+
+WORKDIR /opt/onlinejudge-assessment
+ARG GIT_SHA
+ARG IMAGE_SOURCE=https://github.com/Cr4zyorange/OnlineJudge
+LABEL org.opencontainers.image.revision="$GIT_SHA" org.opencontainers.image.version="$GIT_SHA" org.opencontainers.image.source="$IMAGE_SOURCE"
+
+COPY --chown=10001:10001 services/assessment/target/onlinejudge-assessment-service-0.1.0-SNAPSHOT.jar app.jar
+EXPOSE 8083
+USER 10001:10001
+ENTRYPOINT ["java", "-jar", "/opt/onlinejudge-assessment/app.jar", "--spring.config.additional-location=classpath:/application-compose.properties"]
