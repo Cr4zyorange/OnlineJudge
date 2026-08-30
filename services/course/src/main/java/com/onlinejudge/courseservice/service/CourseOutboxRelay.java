@@ -14,14 +14,23 @@ import org.springframework.stereotype.Component;
 import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /** Broker failure only leaves durable PENDING facts for retry; it cannot roll a committed Course command back. */
 @Component
 public class CourseOutboxRelay {
+    private static final int BATCH_SIZE = 50;
+    private static final int MAX_ATTEMPTS = 8;
+    private static final Duration LEASE_DURATION = Duration.ofSeconds(30);
+    private static final Duration RETRY_BASE = Duration.ofSeconds(5);
+    private static final Duration RETRY_MAXIMUM = Duration.ofMinutes(5);
     private final CourseOutboxRepository outbox;
     private final CourseRabbitProperties rabbit;
     private final ObjectMapper objectMapper;
+    private final String leaseOwner = "course-outbox-relay-" + UUID.randomUUID();
 
     public CourseOutboxRelay(CourseOutboxRepository outbox, CourseRabbitProperties rabbit, ObjectMapper objectMapper) {
         this.outbox = outbox;
@@ -31,15 +40,24 @@ public class CourseOutboxRelay {
 
     @Scheduled(fixedDelay = 1000)
     public void relay() {
-        if (!rabbit.isEnabled()) return;
-        for (CourseOutboxRepository.OutboxRecord record : outbox.due(50)) {
+        relayOnce();
+    }
+
+    /** Visible for disposable two-relay acceptance: each invocation owns only the leases it won. */
+    public int relayOnce() {
+        if (!rabbit.isEnabled()) return 0;
+        Instant now = Instant.now();
+        var claimed = outbox.claimDue(leaseOwner, now, LEASE_DURATION, BATCH_SIZE);
+        for (CourseOutboxRepository.OutboxRecord record : claimed) {
             try {
                 publish(record);
-                outbox.published(record.id());
+                outbox.markPublished(record, Instant.now());
             } catch (Exception exception) {
-                outbox.retry(record.id(), exception.getClass().getSimpleName());
+                outbox.markFailedAttempt(record, Instant.now(), exception.getClass().getSimpleName() + ": " + exception.getMessage(),
+                        MAX_ATTEMPTS, RETRY_BASE, RETRY_MAXIMUM);
             }
         }
+        return claimed.size();
     }
 
     private void publish(CourseOutboxRepository.OutboxRecord record) throws Exception {

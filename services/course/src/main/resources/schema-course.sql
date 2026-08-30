@@ -110,6 +110,7 @@ CREATE TABLE IF NOT EXISTS course_event_outbox (
     next_attempt_at TIMESTAMP NOT NULL,
     lease_owner VARCHAR(128),
     lease_until TIMESTAMP,
+    lease_generation BIGINT NOT NULL DEFAULT 0,
     last_error VARCHAR(1024),
     published_at TIMESTAMP,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,

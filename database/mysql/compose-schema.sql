@@ -1095,6 +1095,7 @@ CREATE TABLE IF NOT EXISTS assessment_event_outbox (
     next_attempt_at TIMESTAMP NOT NULL,
     lease_owner VARCHAR(128) NULL,
     lease_until TIMESTAMP NULL,
+    lease_generation BIGINT NOT NULL DEFAULT 0,
     last_error VARCHAR(1024) NULL,
     published_at TIMESTAMP NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,

@@ -16,6 +16,10 @@ import com.rabbitmq.client.Connection;
 import com.rabbitmq.client.ConnectionFactory;
 
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -52,14 +56,14 @@ class CourseOutboxRelayRecoveryTest {
         rabbit.setPort(1);
         relay.relay();
 
-        assertThat(jdbcTemplate.queryForList("SELECT delivery_status FROM course_event_outbox", String.class)).containsOnly("PENDING");
+        assertThat(jdbcTemplate.queryForList("SELECT delivery_status FROM course_event_outbox", String.class)).containsOnly("RETRY");
         assertThat(jdbcTemplate.queryForList("SELECT attempt_count FROM course_event_outbox", Integer.class)).containsOnly(1);
 
         jdbcTemplate.update("UPDATE course_event_outbox SET next_attempt_at = CURRENT_TIMESTAMP");
         rabbit.setPort(Integer.getInteger("course.test.rabbit.port", 33327));
         relay.relay();
 
-        assertThat(jdbcTemplate.queryForList("SELECT delivery_status FROM course_event_outbox", String.class)).containsOnly("PENDING");
+        assertThat(jdbcTemplate.queryForList("SELECT delivery_status FROM course_event_outbox", String.class)).containsOnly("RETRY");
         assertThat(jdbcTemplate.queryForList("SELECT attempt_count FROM course_event_outbox", Integer.class)).containsOnly(2);
 
         try (Connection connection = connection(); Channel channel = connection.createChannel()) {
@@ -73,6 +77,45 @@ class CourseOutboxRelayRecoveryTest {
 
         assertThat(jdbcTemplate.queryForList("SELECT delivery_status FROM course_event_outbox", String.class)).containsOnly("PUBLISHED");
         assertThat(jdbcTemplate.queryForList("SELECT attempt_count FROM course_event_outbox", Integer.class)).containsOnly(2);
+    }
+
+    @Test
+    void twoConcurrentRelayInstancesClaimAndPublishTheDurableEventExactlyOnce() throws Exception {
+        outbox.append("course.member.changed.v2", "course-member", "43:100", 1,
+                "915f53ed-8752-4b11-aed9-dc4dd8ca032d",
+                Map.of("courseId", "43", "userId", "100", "membershipStatus", "ACTIVE", "memberVersion", 1));
+        rabbit.setEnabled(true);
+        rabbit.setHost("127.0.0.1");
+        rabbit.setPort(Integer.getInteger("course.test.rabbit.port", 33327));
+        try (Connection connection = connection(); Channel channel = connection.createChannel()) {
+            channel.exchangeDeclare(rabbit.getExchange(), "topic", true);
+            channel.queueDeclare("course-outbox-two-relay", true, false, false, null);
+            channel.queueBind("course-outbox-two-relay", rabbit.getExchange(), "onlinejudge.course.member.changed.v2");
+        }
+
+        CourseOutboxRelay first = new CourseOutboxRelay(outbox, rabbit, new com.fasterxml.jackson.databind.ObjectMapper());
+        CourseOutboxRelay second = new CourseOutboxRelay(outbox, rabbit, new com.fasterxml.jackson.databind.ObjectMapper());
+        CountDownLatch ready = new CountDownLatch(2);
+        CountDownLatch start = new CountDownLatch(1);
+        try (ExecutorService pool = Executors.newFixedThreadPool(2)) {
+            Future<Integer> firstResult = pool.submit(() -> relayAfterStart(first, ready, start));
+            Future<Integer> secondResult = pool.submit(() -> relayAfterStart(second, ready, start));
+            ready.await();
+            start.countDown();
+            assertThat(firstResult.get() + secondResult.get()).isEqualTo(1);
+        }
+
+        try (Connection connection = connection(); Channel channel = connection.createChannel()) {
+            assertThat(channel.queueDeclarePassive("course-outbox-two-relay").getMessageCount()).isEqualTo(1);
+        }
+        assertThat(jdbcTemplate.queryForMap("SELECT delivery_status, attempt_count, lease_owner FROM course_event_outbox"))
+                .containsEntry("delivery_status", "PUBLISHED").containsEntry("attempt_count", 0).containsEntry("lease_owner", null);
+    }
+
+    private int relayAfterStart(CourseOutboxRelay relay, CountDownLatch ready, CountDownLatch start) throws Exception {
+        ready.countDown();
+        start.await();
+        return relay.relayOnce();
     }
 
     private Connection connection() throws Exception {
