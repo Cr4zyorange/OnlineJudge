@@ -1070,6 +1070,228 @@ CREATE TABLE IF NOT EXISTS t_hwk_submission_attachment (
 );
 
 
+-- Source: database/migrations/20260830_01_create_reliable_event_storage.sql
+-- Every table is owned by one service; this monolith-era snapshot is a
+-- bootstrap artifact and does not grant cross-service runtime access.
+CREATE TABLE IF NOT EXISTS assessment_event_outbox (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    event_id VARCHAR(64) NOT NULL,
+    event_type VARCHAR(128) NOT NULL,
+    payload_version INT NOT NULL,
+    aggregate_type VARCHAR(64) NOT NULL,
+    aggregate_id VARCHAR(128) NOT NULL,
+    aggregate_version BIGINT NOT NULL,
+    correlation_id VARCHAR(64) NOT NULL,
+    payload_json TEXT NOT NULL,
+    routing_key VARCHAR(192) NOT NULL,
+    delivery_status VARCHAR(32) NOT NULL,
+    attempt_count INT NOT NULL DEFAULT 0,
+    next_attempt_at TIMESTAMP NOT NULL,
+    lease_owner VARCHAR(128) NULL,
+    lease_until TIMESTAMP NULL,
+    last_error VARCHAR(1024) NULL,
+    published_at TIMESTAMP NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uq_assessment_event_outbox_event UNIQUE (event_id),
+    KEY idx_assessment_event_outbox_due (delivery_status, next_attempt_at, lease_until),
+    KEY idx_assessment_event_outbox_correlation (correlation_id)
+);
+
+CREATE TABLE IF NOT EXISTS course_event_outbox (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    event_id VARCHAR(64) NOT NULL,
+    event_type VARCHAR(128) NOT NULL,
+    payload_version INT NOT NULL,
+    aggregate_type VARCHAR(64) NOT NULL,
+    aggregate_id VARCHAR(128) NOT NULL,
+    aggregate_version BIGINT NOT NULL,
+    correlation_id VARCHAR(64) NOT NULL,
+    payload_json TEXT NOT NULL,
+    routing_key VARCHAR(192) NOT NULL,
+    delivery_status VARCHAR(32) NOT NULL,
+    attempt_count INT NOT NULL DEFAULT 0,
+    next_attempt_at TIMESTAMP NOT NULL,
+    lease_owner VARCHAR(128) NULL,
+    lease_until TIMESTAMP NULL,
+    last_error VARCHAR(1024) NULL,
+    published_at TIMESTAMP NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uq_course_event_outbox_event UNIQUE (event_id),
+    KEY idx_course_event_outbox_due (delivery_status, next_attempt_at, lease_until),
+    KEY idx_course_event_outbox_correlation (correlation_id)
+);
+
+-- Source: database/migrations/20260831_03_create_course_membership_reconciliation_checkpoint.sql
+CREATE TABLE IF NOT EXISTS course_membership_reconciliation_checkpoint (
+    course_id BIGINT NOT NULL PRIMARY KEY,
+    snapshot_event_id VARCHAR(64) NOT NULL,
+    snapshot_version BIGINT NOT NULL,
+    next_reconcile_at TIMESTAMP NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    KEY idx_course_membership_reconciliation_due (next_reconcile_at)
+);
+
+CREATE TABLE IF NOT EXISTS grade_event_outbox (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    event_id VARCHAR(64) NOT NULL,
+    event_type VARCHAR(128) NOT NULL,
+    payload_version INT NOT NULL,
+    aggregate_type VARCHAR(64) NOT NULL,
+    aggregate_id VARCHAR(128) NOT NULL,
+    aggregate_version BIGINT NOT NULL,
+    correlation_id VARCHAR(64) NOT NULL,
+    payload_json TEXT NOT NULL,
+    routing_key VARCHAR(192) NOT NULL,
+    delivery_status VARCHAR(32) NOT NULL,
+    attempt_count INT NOT NULL DEFAULT 0,
+    next_attempt_at TIMESTAMP NOT NULL,
+    lease_owner VARCHAR(128) NULL,
+    lease_until TIMESTAMP NULL,
+    last_error VARCHAR(1024) NULL,
+    published_at TIMESTAMP NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uq_grade_event_outbox_event UNIQUE (event_id),
+    KEY idx_grade_event_outbox_due (delivery_status, next_attempt_at, lease_until),
+    KEY idx_grade_event_outbox_correlation (correlation_id)
+);
+
+CREATE TABLE IF NOT EXISTS assessment_event_inbox (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    consumer_name VARCHAR(64) NOT NULL,
+    event_id VARCHAR(64) NOT NULL,
+    event_type VARCHAR(128) NOT NULL,
+    aggregate_type VARCHAR(64) NOT NULL,
+    aggregate_id VARCHAR(128) NOT NULL,
+    aggregate_version BIGINT NOT NULL,
+    correlation_id VARCHAR(64) NOT NULL,
+    processing_status VARCHAR(32) NOT NULL,
+    processed_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uq_assessment_event_inbox_consumer_event UNIQUE (consumer_name, event_id),
+    KEY idx_assessment_event_inbox_aggregate (consumer_name, aggregate_type, aggregate_id, aggregate_version)
+);
+
+CREATE TABLE IF NOT EXISTS grade_event_inbox (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    consumer_name VARCHAR(64) NOT NULL,
+    event_id VARCHAR(64) NOT NULL,
+    event_type VARCHAR(128) NOT NULL,
+    aggregate_type VARCHAR(64) NOT NULL,
+    aggregate_id VARCHAR(128) NOT NULL,
+    aggregate_version BIGINT NOT NULL,
+    correlation_id VARCHAR(64) NOT NULL,
+    processing_status VARCHAR(32) NOT NULL,
+    processed_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uq_grade_event_inbox_consumer_event UNIQUE (consumer_name, event_id),
+    KEY idx_grade_event_inbox_aggregate (consumer_name, aggregate_type, aggregate_id, aggregate_version)
+);
+
+CREATE TABLE IF NOT EXISTS learning_event_inbox (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    consumer_name VARCHAR(64) NOT NULL,
+    event_id VARCHAR(64) NOT NULL,
+    event_type VARCHAR(128) NOT NULL,
+    aggregate_type VARCHAR(64) NOT NULL,
+    aggregate_id VARCHAR(128) NOT NULL,
+    aggregate_version BIGINT NOT NULL,
+    correlation_id VARCHAR(64) NOT NULL,
+    processing_status VARCHAR(32) NOT NULL,
+    processed_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uq_learning_event_inbox_consumer_event UNIQUE (consumer_name, event_id),
+    KEY idx_learning_event_inbox_aggregate (consumer_name, aggregate_type, aggregate_id, aggregate_version)
+);
+
+CREATE TABLE IF NOT EXISTS learning_event_delivery_attempt (
+    consumer_name VARCHAR(64) NOT NULL,
+    event_id VARCHAR(64) NOT NULL,
+    attempt_count INT NOT NULL,
+    last_error VARCHAR(1024) NULL,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (consumer_name, event_id)
+);
+
+CREATE TABLE IF NOT EXISTS learning_event_dead_letter (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    consumer_name VARCHAR(64) NOT NULL,
+    event_id VARCHAR(64) NOT NULL,
+    event_type VARCHAR(128) NOT NULL,
+    correlation_id VARCHAR(64) NOT NULL,
+    envelope_json TEXT NOT NULL,
+    failure_classification VARCHAR(64) NOT NULL,
+    failure_message VARCHAR(1024) NOT NULL,
+    attempt_count INT NOT NULL,
+    replayed_at TIMESTAMP NULL,
+    replayed_by VARCHAR(128) NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uq_learning_dead_letter_consumer_event UNIQUE (consumer_name, event_id),
+    KEY idx_learning_dead_letter_created (created_at),
+    KEY idx_learning_dead_letter_correlation (correlation_id)
+);
+
+CREATE TABLE IF NOT EXISTS learning_event_reconciliation_request (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    consumer_name VARCHAR(64) NOT NULL,
+    aggregate_type VARCHAR(64) NOT NULL,
+    aggregate_id VARCHAR(128) NOT NULL,
+    observed_version BIGINT NOT NULL,
+    last_applied_version BIGINT NOT NULL,
+    triggering_event_id VARCHAR(64) NOT NULL,
+    correlation_id VARCHAR(64) NOT NULL,
+    request_status VARCHAR(32) NOT NULL DEFAULT 'OPEN',
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    resolved_at TIMESTAMP NULL,
+    CONSTRAINT uq_learning_reconciliation_gap UNIQUE (consumer_name, aggregate_type, aggregate_id, observed_version),
+    KEY idx_learning_reconciliation_open (request_status, created_at)
+);
+
+CREATE TABLE IF NOT EXISTS learning_deferred_event (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    consumer_name VARCHAR(64) NOT NULL,
+    event_id VARCHAR(64) NOT NULL,
+    event_type VARCHAR(128) NOT NULL,
+    aggregate_type VARCHAR(64) NOT NULL,
+    aggregate_id VARCHAR(128) NOT NULL,
+    aggregate_version BIGINT NOT NULL,
+    correlation_id VARCHAR(64) NOT NULL,
+    envelope_json TEXT NOT NULL,
+    deferral_reason VARCHAR(64) NOT NULL,
+    delivery_status VARCHAR(32) NOT NULL,
+    attempt_count INT NOT NULL DEFAULT 0,
+    next_attempt_at TIMESTAMP NOT NULL,
+    lease_owner VARCHAR(128) NULL,
+    lease_until TIMESTAMP NULL,
+    last_error VARCHAR(1024) NULL,
+    resolved_at TIMESTAMP NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uq_learning_deferred_consumer_event UNIQUE (consumer_name, event_id),
+    KEY idx_learning_deferred_due (delivery_status, next_attempt_at, lease_until),
+    KEY idx_learning_deferred_correlation (correlation_id)
+);
+
+CREATE TABLE IF NOT EXISTS learning_course_member_projection (
+    course_id BIGINT NOT NULL,
+    user_id BIGINT NOT NULL,
+    membership_status VARCHAR(32) NOT NULL,
+    member_version BIGINT NOT NULL,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (course_id, user_id),
+    KEY idx_learning_course_member_active (course_id, membership_status)
+);
+
+-- Source: database/migrations/20260831_02_create_learning_membership_watermark.sql
+CREATE TABLE IF NOT EXISTS learning_course_membership_watermark (
+    course_id BIGINT NOT NULL PRIMARY KEY,
+    snapshot_version BIGINT NOT NULL,
+    completed_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    KEY idx_learning_roster_watermark_version (snapshot_version)
+);
+
 -- The clean snapshot already contains every migration below. Checksums are
 -- validated by database/mysql/migrate.sh before a retained database is reused.
 INSERT INTO schema_migrations
@@ -1101,4 +1323,7 @@ VALUES
     ('20260822_02_create_lab_submission_source_file.sql', 'f545c92f7b14291930dbf45dfcf48db121128b62b466ef699201e1f1de0fdb78', 'COMPOSE_BASELINE', 0, 1),
     ('20260822_03_create_hwk_submission_attachment.sql', 'c45eeca539e8a56522826833cc533789cfad169e7c6712420de1208e6b014979', 'COMPOSE_BASELINE', 0, 1),
     ('20260825_01_add_grd_analysis_source_fingerprint.sql', 'f650506d22e00f48f23da6f6dd76ca11d3f1e1083a59f805be20cf7b98315b59', 'COMPOSE_BASELINE', 0, 1),
-    ('20260825_02_add_grd_analysis_source_version.sql', 'd40f5b9a41a0a836960f9b3d445e0d1f6fc6cbcc4f2b48b210387fcfc9f21b2c', 'COMPOSE_BASELINE', 0, 1);
+    ('20260825_02_add_grd_analysis_source_version.sql', 'd40f5b9a41a0a836960f9b3d445e0d1f6fc6cbcc4f2b48b210387fcfc9f21b2c', 'COMPOSE_BASELINE', 0, 1),
+    ('20260830_01_create_reliable_event_storage.sql', '9c20588263045d59dd55730741aa46c2f973828ba3270fc8c3717505e5c2ee45', 'COMPOSE_BASELINE', 0, 1),
+    ('20260831_02_create_learning_membership_watermark.sql', '9a60d1a32ce5b3305cfa7663aabf5dc5e19b6831376d2374c9c158b2435d35b4', 'COMPOSE_BASELINE', 0, 1),
+    ('20260831_03_create_course_membership_reconciliation_checkpoint.sql', '2e3698cbf45df00da05275fd5d7f54073c3a57aa9369856f5ff8beb82d087d3f', 'COMPOSE_BASELINE', 0, 1);
