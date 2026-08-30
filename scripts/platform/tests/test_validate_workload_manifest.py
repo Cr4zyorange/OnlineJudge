@@ -16,6 +16,34 @@ VALIDATOR = REPOSITORY_ROOT / "scripts/platform/validate_workload_manifest.py"
 SCHEMA = REPOSITORY_ROOT / "deploy/platform/workload-manifest.schema.json"
 MANIFEST = REPOSITORY_ROOT / "deploy/platform/workloads.json"
 CONTRACT_GATE = REPOSITORY_ROOT / "scripts/ci/contract-verify.sh"
+BACKEND_APPLICATION_WORKLOADS = [
+    "identity-service",
+    "course-service",
+    "assessment-api",
+    "assessment-worker",
+    "grade-service",
+    "learning-service",
+]
+CURRENT_MONOLITH_MODULE_PATHS = {
+    "identity-service": ["backend/src/main/java/com/onlinejudge/auth/**"],
+    "course-service": ["backend/src/main/java/com/onlinejudge/crs/**"],
+    "assessment-api": [
+        "backend/src/main/java/com/onlinejudge/lab/**",
+        "backend/src/main/java/com/onlinejudge/hwk/**",
+    ],
+    "assessment-worker": [
+        "backend/src/main/java/com/onlinejudge/lab/**",
+        "backend/src/main/java/com/onlinejudge/hwk/**",
+    ],
+    "grade-service": ["backend/src/main/java/com/onlinejudge/grd/**"],
+    "learning-service": ["backend/src/main/java/com/onlinejudge/lrn/**"],
+}
+SHARED_BACKEND_INPUTS = [
+    "backend/src/main/java/com/onlinejudge/common/**",
+    "backend/src/main/java/com/onlinejudge/integration/**",
+    "backend/src/main/resources/**",
+    "backend/pom.xml",
+]
 
 
 class WorkloadManifestValidationTest(unittest.TestCase):
@@ -212,6 +240,101 @@ class WorkloadManifestValidationTest(unittest.TestCase):
 
         self.assertIn("scripts/platform/validate_workload_manifest.py", contract_gate)
         self.assertIn("scripts.platform.tests.test_validate_workload_manifest", contract_gate)
+
+    def test_current_monolith_module_paths_select_their_workloads(self) -> None:
+        expected_workloads_by_path = {
+            "backend/src/main/java/com/onlinejudge/auth/domain/AuthUser.java": ["identity-service"],
+            "backend/src/main/java/com/onlinejudge/crs/domain/Course.java": ["course-service"],
+            "backend/src/main/java/com/onlinejudge/lab/domain/LabExperiment.java": [
+                "assessment-api",
+                "assessment-worker",
+            ],
+            "backend/src/main/java/com/onlinejudge/hwk/domain/HomeworkSubmissionAttachment.java": [
+                "assessment-api",
+                "assessment-worker",
+            ],
+            "backend/src/main/java/com/onlinejudge/grd/domain/GradeItem.java": ["grade-service"],
+            "backend/src/main/java/com/onlinejudge/lrn/domain/LearningTask.java": ["learning-service"],
+        }
+
+        for changed_path, expected_workloads in expected_workloads_by_path.items():
+            with self.subTest(changed_path=changed_path):
+                result = self.run_validator(MANIFEST, "--changed-path", changed_path)
+
+                self.assertEqual(result.returncode, 0, result.stderr)
+                resolved = json.loads(result.stdout)
+                self.assertEqual(resolved["affectedWorkloads"], expected_workloads)
+
+    def test_shared_backend_inputs_select_all_backend_application_workloads(self) -> None:
+        changed_paths = [
+            "backend/src/main/java/com/onlinejudge/common/event/NotificationEvent.java",
+            "backend/src/main/java/com/onlinejudge/integration/course/CoursePermissionClient.java",
+            "backend/src/main/resources/application.yml",
+            "backend/pom.xml",
+        ]
+
+        for changed_path in changed_paths:
+            with self.subTest(changed_path=changed_path):
+                result = self.run_validator(MANIFEST, "--changed-path", changed_path)
+
+                self.assertEqual(result.returncode, 0, result.stderr)
+                resolved = json.loads(result.stdout)
+                self.assertEqual(resolved["affectedWorkloads"], BACKEND_APPLICATION_WORKLOADS)
+
+    def test_removing_a_required_current_backend_input_is_rejected(self) -> None:
+        def apply_current_backend_inputs(manifest: dict) -> None:
+            for workload in manifest["workloads"]:
+                required_paths = CURRENT_MONOLITH_MODULE_PATHS.get(workload["name"], [])
+                if workload["name"] in BACKEND_APPLICATION_WORKLOADS:
+                    required_paths = [*required_paths, *SHARED_BACKEND_INPUTS]
+                for required_path in required_paths:
+                    if required_path not in workload["sourcePaths"]:
+                        workload["sourcePaths"].append(required_path)
+                    if required_path not in workload["pathTriggers"]:
+                        workload["pathTriggers"].append(required_path)
+
+        mutations = [
+            ("identity-service", "backend/src/main/java/com/onlinejudge/auth/**"),
+            ("course-service", "backend/src/main/java/com/onlinejudge/crs/**"),
+            ("assessment-api", "backend/src/main/java/com/onlinejudge/hwk/**"),
+            ("assessment-worker", "backend/src/main/java/com/onlinejudge/lab/**"),
+            ("grade-service", "backend/src/main/java/com/onlinejudge/grd/**"),
+            ("learning-service", "backend/src/main/java/com/onlinejudge/lrn/**"),
+            ("identity-service", "backend/src/main/java/com/onlinejudge/common/**"),
+            ("identity-service", "backend/src/main/java/com/onlinejudge/integration/**"),
+            ("identity-service", "backend/src/main/resources/**"),
+            ("identity-service", "backend/pom.xml"),
+        ]
+        for workload_name, required_path in mutations:
+            with self.subTest(workload=workload_name, missing=required_path):
+                def mutate(manifest: dict) -> None:
+                    apply_current_backend_inputs(manifest)
+                    workload = next(
+                        item for item in manifest["workloads"] if item["name"] == workload_name
+                    )
+                    workload["sourcePaths"].remove(required_path)
+                    workload["pathTriggers"].remove(required_path)
+
+                temporary_directory = self.write_variant(mutate)
+                self.addCleanup(temporary_directory.cleanup)
+
+                result = self.run_validator(Path(temporary_directory.name) / "workloads.json")
+
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("current repository source path", result.stderr)
+                self.assertIn(workload_name, result.stderr)
+
+    def test_sbom_is_required_for_every_workload_image(self) -> None:
+        def mutate(manifest: dict) -> None:
+            manifest["workloads"][0]["image"]["sbomRequired"] = False
+
+        temporary_directory = self.write_variant(mutate)
+        self.addCleanup(temporary_directory.cleanup)
+
+        result = self.run_validator(Path(temporary_directory.name) / "workloads.json")
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("sbomRequired", result.stderr)
 
 
 if __name__ == "__main__":

@@ -48,7 +48,7 @@
     {
       "name": "identity-service",
       "type": "service",
-      "sourcePaths": ["services/identity/**", "backend/src/main/java/com/onlinejudge/auth/**"],
+      "sourcePaths": ["services/identity/**", "backend/src/main/java/com/onlinejudge/auth/**", "backend/src/main/java/com/onlinejudge/common/**", "backend/src/main/java/com/onlinejudge/integration/**", "backend/src/main/resources/**", "backend/pom.xml"],
       "dockerfile": "services/identity/Dockerfile",
       "image": {
         "repository": "onlinejudge/identity-service",
@@ -70,13 +70,13 @@
         {"key": "IDENTITY_JWT_SIGNING_KEY", "injectedAs": "runtime-secret", "redact": true, "imageBuild": "forbidden"}
       ],
       "resources": {"requests": {"cpu": "200m", "memory": "256Mi"}, "limits": {"cpu": "1000m", "memory": "1Gi"}},
-      "pathTriggers": ["services/identity/**", "backend/src/main/java/com/onlinejudge/auth/**", "database/migrations/identity/**"],
+      "pathTriggers": ["services/identity/**", "backend/src/main/java/com/onlinejudge/auth/**", "backend/src/main/java/com/onlinejudge/common/**", "backend/src/main/java/com/onlinejudge/integration/**", "backend/src/main/resources/**", "backend/pom.xml", "database/migrations/identity/**"],
       "traffic": {"exposed": false, "routePrefixes": ["/api/v1/auth", "/.well-known/jwks.json"], "browserEntry": null}
     },
     {
       "name": "course-service",
       "type": "service",
-      "sourcePaths": ["services/course/**", "backend/src/main/java/com/onlinejudge/course/**"],
+      "sourcePaths": ["services/course/**", "backend/src/main/java/com/onlinejudge/crs/**", "backend/src/main/java/com/onlinejudge/common/**", "backend/src/main/java/com/onlinejudge/integration/**", "backend/src/main/resources/**", "backend/pom.xml"],
       "dockerfile": "services/course/Dockerfile",
       "image": {
         "repository": "onlinejudge/course-service",
@@ -98,13 +98,13 @@
         {"key": "COURSE_SERVICE_IDENTITY", "injectedAs": "workload-identity", "redact": true, "imageBuild": "forbidden"}
       ],
       "resources": {"requests": {"cpu": "200m", "memory": "256Mi"}, "limits": {"cpu": "1000m", "memory": "1Gi"}},
-      "pathTriggers": ["services/course/**", "backend/src/main/java/com/onlinejudge/course/**", "database/migrations/course/**"],
+      "pathTriggers": ["services/course/**", "backend/src/main/java/com/onlinejudge/crs/**", "backend/src/main/java/com/onlinejudge/common/**", "backend/src/main/java/com/onlinejudge/integration/**", "backend/src/main/resources/**", "backend/pom.xml", "database/migrations/course/**"],
       "traffic": {"exposed": false, "routePrefixes": ["/api/v1/courses"], "browserEntry": null}
     },
     {
       "name": "assessment-api",
       "type": "service",
-      "sourcePaths": ["services/assessment/**", "backend/src/main/java/com/onlinejudge/lab/**", "backend/src/main/java/com/onlinejudge/homework/**"],
+      "sourcePaths": ["services/assessment/**", "backend/src/main/java/com/onlinejudge/lab/**", "backend/src/main/java/com/onlinejudge/hwk/**", "backend/src/main/java/com/onlinejudge/common/**", "backend/src/main/java/com/onlinejudge/integration/**", "backend/src/main/resources/**", "backend/pom.xml"],
       "dockerfile": "services/assessment/Dockerfile",
       "image": {
         "repository": "onlinejudge/assessment-api",
@@ -127,13 +127,13 @@
         {"key": "RABBITMQ_PASSWORD", "injectedAs": "runtime-secret", "redact": true, "imageBuild": "forbidden"}
       ],
       "resources": {"requests": {"cpu": "300m", "memory": "512Mi"}, "limits": {"cpu": "1500m", "memory": "2Gi"}},
-      "pathTriggers": ["services/assessment/**", "backend/src/main/java/com/onlinejudge/lab/**", "backend/src/main/java/com/onlinejudge/homework/**", "database/migrations/assessment/**"],
+      "pathTriggers": ["services/assessment/**", "backend/src/main/java/com/onlinejudge/lab/**", "backend/src/main/java/com/onlinejudge/hwk/**", "backend/src/main/java/com/onlinejudge/common/**", "backend/src/main/java/com/onlinejudge/integration/**", "backend/src/main/resources/**", "backend/pom.xml", "database/migrations/assessment/**"],
       "traffic": {"exposed": false, "routePrefixes": ["/api/v1/labs", "/api/v1/homeworks", "/api/v1/submissions", "/api/v1/evaluations"], "browserEntry": null}
     },
     {
       "name": "assessment-worker",
       "type": "worker",
-      "sourcePaths": ["services/assessment/**", "backend/src/main/java/com/onlinejudge/evaluation/**"],
+      "sourcePaths": ["services/assessment/**", "backend/src/main/java/com/onlinejudge/lab/**", "backend/src/main/java/com/onlinejudge/hwk/**", "backend/src/main/java/com/onlinejudge/common/**", "backend/src/main/java/com/onlinejudge/integration/**", "backend/src/main/resources/**", "backend/pom.xml"],
       "dockerfile": "services/assessment/Dockerfile",
       "image": {
         "repository": "onlinejudge/assessment-worker",
@@ -156,13 +156,13 @@
         {"key": "RABBITMQ_PASSWORD", "injectedAs": "runtime-secret", "redact": true, "imageBuild": "forbidden"}
       ],
       "resources": {"requests": {"cpu": "500m", "memory": "1Gi"}, "limits": {"cpu": "2000m", "memory": "4Gi"}},
-      "pathTriggers": ["services/assessment/**", "backend/src/main/java/com/onlinejudge/evaluation/**"],
+      "pathTriggers": ["services/assessment/**", "backend/src/main/java/com/onlinejudge/lab/**", "backend/src/main/java/com/onlinejudge/hwk/**", "backend/src/main/java/com/onlinejudge/common/**", "backend/src/main/java/com/onlinejudge/integration/**", "backend/src/main/resources/**", "backend/pom.xml"],
       "traffic": {"exposed": false, "routePrefixes": [], "browserEntry": null}
     },
     {
       "name": "grade-service",
       "type": "service",
-      "sourcePaths": ["services/grade/**", "backend/src/main/java/com/onlinejudge/grade/**"],
+      "sourcePaths": ["services/grade/**", "backend/src/main/java/com/onlinejudge/grd/**", "backend/src/main/java/com/onlinejudge/common/**", "backend/src/main/java/com/onlinejudge/integration/**", "backend/src/main/resources/**", "backend/pom.xml"],
       "dockerfile": "services/grade/Dockerfile",
       "image": {
         "repository": "onlinejudge/grade-service",
@@ -185,13 +185,13 @@
         {"key": "RABBITMQ_PASSWORD", "injectedAs": "runtime-secret", "redact": true, "imageBuild": "forbidden"}
       ],
       "resources": {"requests": {"cpu": "200m", "memory": "256Mi"}, "limits": {"cpu": "1000m", "memory": "1Gi"}},
-      "pathTriggers": ["services/grade/**", "backend/src/main/java/com/onlinejudge/grade/**", "database/migrations/grade/**"],
+      "pathTriggers": ["services/grade/**", "backend/src/main/java/com/onlinejudge/grd/**", "backend/src/main/java/com/onlinejudge/common/**", "backend/src/main/java/com/onlinejudge/integration/**", "backend/src/main/resources/**", "backend/pom.xml", "database/migrations/grade/**"],
       "traffic": {"exposed": false, "routePrefixes": ["/api/v1/grades"], "browserEntry": null}
     },
     {
       "name": "learning-service",
       "type": "service",
-      "sourcePaths": ["services/learning/**", "backend/src/main/java/com/onlinejudge/learning/**"],
+      "sourcePaths": ["services/learning/**", "backend/src/main/java/com/onlinejudge/lrn/**", "backend/src/main/java/com/onlinejudge/common/**", "backend/src/main/java/com/onlinejudge/integration/**", "backend/src/main/resources/**", "backend/pom.xml"],
       "dockerfile": "services/learning/Dockerfile",
       "image": {
         "repository": "onlinejudge/learning-service",
@@ -214,7 +214,7 @@
         {"key": "RABBITMQ_PASSWORD", "injectedAs": "runtime-secret", "redact": true, "imageBuild": "forbidden"}
       ],
       "resources": {"requests": {"cpu": "200m", "memory": "256Mi"}, "limits": {"cpu": "1000m", "memory": "1Gi"}},
-      "pathTriggers": ["services/learning/**", "backend/src/main/java/com/onlinejudge/learning/**", "database/migrations/learning/**"],
+      "pathTriggers": ["services/learning/**", "backend/src/main/java/com/onlinejudge/lrn/**", "backend/src/main/java/com/onlinejudge/common/**", "backend/src/main/java/com/onlinejudge/integration/**", "backend/src/main/resources/**", "backend/pom.xml", "database/migrations/learning/**"],
       "traffic": {"exposed": false, "routePrefixes": ["/api/v1/learning", "/api/v1/notifications"], "browserEntry": null}
     },
     {

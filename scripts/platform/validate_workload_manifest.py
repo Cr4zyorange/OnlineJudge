@@ -34,6 +34,34 @@ CORE_WORKLOADS = {
     "mysql",
 }
 ORDERED_SCHEMAS = ["identity", "course", "assessment", "grade", "learning"]
+BACKEND_APPLICATION_WORKLOADS = (
+    "identity-service",
+    "course-service",
+    "assessment-api",
+    "assessment-worker",
+    "grade-service",
+    "learning-service",
+)
+CURRENT_MONOLITH_MODULE_PATHS = {
+    "identity-service": ("backend/src/main/java/com/onlinejudge/auth/**",),
+    "course-service": ("backend/src/main/java/com/onlinejudge/crs/**",),
+    "assessment-api": (
+        "backend/src/main/java/com/onlinejudge/lab/**",
+        "backend/src/main/java/com/onlinejudge/hwk/**",
+    ),
+    "assessment-worker": (
+        "backend/src/main/java/com/onlinejudge/lab/**",
+        "backend/src/main/java/com/onlinejudge/hwk/**",
+    ),
+    "grade-service": ("backend/src/main/java/com/onlinejudge/grd/**",),
+    "learning-service": ("backend/src/main/java/com/onlinejudge/lrn/**",),
+}
+SHARED_BACKEND_INPUTS = (
+    "backend/src/main/java/com/onlinejudge/common/**",
+    "backend/src/main/java/com/onlinejudge/integration/**",
+    "backend/src/main/resources/**",
+    "backend/pom.xml",
+)
 
 
 class ManifestValidationError(ValueError):
@@ -237,6 +265,10 @@ def validate_workloads(workloads: list[dict[str, Any]]) -> dict[str, dict[str, A
         required_fields(image, ("repository", "tagTemplate", "build", "sbomRequired"), f"{location}.image")
         if not isinstance(image["build"], bool) or not isinstance(image["sbomRequired"], bool):
             raise ManifestValidationError(f"{location}.image build and sbomRequired must be booleans")
+        if image["sbomRequired"] is not True:
+            raise ManifestValidationError(
+                f"{location}.image.sbomRequired must be true for every workload image"
+            )
         if image["build"] and "${GIT_SHA}" not in image["tagTemplate"]:
             raise ManifestValidationError(f"{location}.image.tagTemplate must contain ${{GIT_SHA}} for a built workload")
         if image["build"] and workload["dockerfile"] is None:
@@ -299,6 +331,28 @@ def validate_workload_source_path_triggers(workload_by_name: dict[str, dict[str,
             ):
                 raise ManifestValidationError(
                     f"workload '{name}' source path '{source_path}' is not covered by pathTriggers"
+                )
+
+
+def validate_current_repository_source_mappings(
+    workload_by_name: dict[str, dict[str, Any]]
+) -> None:
+    """Keep v2 delivery selection bound to the source tree that exists today."""
+    for name, module_paths in CURRENT_MONOLITH_MODULE_PATHS.items():
+        required_paths = module_paths
+        if name in BACKEND_APPLICATION_WORKLOADS:
+            required_paths = (*required_paths, *SHARED_BACKEND_INPUTS)
+        workload = workload_by_name[name]
+        for required_path in required_paths:
+            if required_path not in workload["sourcePaths"]:
+                raise ManifestValidationError(
+                    f"workload '{name}' must declare current repository source path "
+                    f"'{required_path}' in sourcePaths"
+                )
+            if required_path not in workload["pathTriggers"]:
+                raise ManifestValidationError(
+                    f"workload '{name}' must trigger current repository source path "
+                    f"'{required_path}' in pathTriggers"
                 )
 
 
@@ -440,6 +494,7 @@ def validate(manifest: dict[str, Any], schema: dict[str, Any]) -> dict[str, dict
     workloads = validate_manifest_shape(manifest)
     workload_by_name = validate_workloads(workloads)
     validate_workload_source_path_triggers(workload_by_name)
+    validate_current_repository_source_mappings(workload_by_name)
     validate_dependency_graph(workload_by_name)
     validate_migration_jobs(manifest, workload_by_name)
     validate_promotion_and_retirement(manifest)
