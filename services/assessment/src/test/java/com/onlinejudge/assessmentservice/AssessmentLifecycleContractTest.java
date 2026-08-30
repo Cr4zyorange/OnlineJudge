@@ -59,6 +59,19 @@ class AssessmentLifecycleContractTest {
     }
 
     @Test
+    void resultReadAllowsTheSubmitterOrAnActiveCourseTeacherButRejectsOtherStudents() throws Exception {
+        var submitted = submissions.submit(new AssessmentSubmissionService.SubmissionCommand(
+                "LAB", "lab-result", "course-7", "student-42", "stored://submission-result"));
+        jdbc.update("INSERT INTO assessment_course_member_projection (course_id, user_id, membership_status, member_version) VALUES ('course-7', 'teacher-7', 'ACTIVE', 1)");
+        jdbc.update("INSERT INTO assessment_course_member_projection (course_id, user_id, membership_status, member_version) VALUES ('course-7', 'student-99', 'ACTIVE', 1)");
+
+        mockMvc.perform(get("/api/v1/evaluations/{taskId}", submitted.taskId()).header("Authorization", "Bearer " + TestJwtFactory.userToken(KEY, "lifecycle-kid", "student-99", List.of("STUDENT"))))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(get("/api/v1/evaluations/{taskId}", submitted.taskId()).header("Authorization", "Bearer " + TestJwtFactory.userToken(KEY, "lifecycle-kid", "teacher-7", List.of("TEACHER"))))
+                .andExpect(status().isOk());
+    }
+
+    @Test
     void expiredClaimCanBeTakenOverButStaleGenerationCannotWriteTerminalResult() {
         var submitted = submissions.submit(new AssessmentSubmissionService.SubmissionCommand(
                 "LAB", "lab-1", "course-7", "student-42", "stored://submission-2"));
