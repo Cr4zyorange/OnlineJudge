@@ -42,7 +42,7 @@ iss=onlinejudge.identity.v2, aud=onlinejudge.api
 | 鉴权 | `POST /api/v1/auth/check-permission` | 校验当前主体权限码 |
 | 资料、管理、审计 | 既有 `/api/v1/users/**`、`/api/v1/admin/**` | 保持 AUTH 兼容行为并提升安全版本 |
 
-`contracts/v2/openapi/identity.openapi.json` 中的 `POST /internal/v2/service-tokens` 是服务工作负载 mTLS 令牌契约；在完整 mTLS 运行时配置落地前，不得用共享静态密钥或伪造 Header 代替它。
+`POST /internal/v2/service-tokens` 已按 `contracts/v2/openapi/identity.openapi.json` 实现。Identity 只读取 TLS 终结器写入 servlet request 的客户端证书属性，按证书 subject 的显式工作负载策略限制 `audience` 与 `scopes`，再签发最长 5 分钟、单一受众的 RS256 JWT；不会接受共享静态密钥、`X-Internal-Token` 或伪造身份 Header。请求携带 `X-Request-Id` 和 16–128 位 `Idempotency-Key`；同一工作负载以不同请求重用该 key 返回 `409 IDEMPOTENCY_KEY_REUSED`。mTLS 身份缺失或无效返回 `401 SERVICE_IDENTITY_INVALID`，已认证但策略不足返回 `403 SERVICE_IDENTITY_FORBIDDEN`，格式错误返回 `400 SERVICE_TOKEN_INVALID`，均使用 v2 的 `{code,message,requestId,retryable}` 错误体而不使用兼容 API 包络。
 
 ## 5. 数据库、配置与镜像
 
@@ -64,9 +64,13 @@ Compose 仅在初始化空 `onlinejudge_identity` 数据库时只读挂载此文
 | `IDENTITY_JWT_KID` | 无 | 必填可轮换 key id |
 | `IDENTITY_JWT_PREVIOUS_PUBLIC_KEYS` | 空 | `kid:base64-x509` 逗号列表 |
 | `IDENTITY_JWT_ISSUER` / `AUDIENCE` | v2 默认值 | 消费端精确匹配 |
+| `IDENTITY_SERVICE_TOKEN_WORKLOADS` | `{}` | JSON 的客户端证书 subject -> audiences/scopes 最小授权映射；仅由部署 Secret/配置注入 |
+| `IDENTITY_SERVICE_TOKEN_TTL` | `PT5M` | 不超过 5 分钟的 service JWT 生命周期 |
 | `IDENTITY_SEED_DATA_ENABLED` | `false` | 仅 DEV/CI 可启用 |
 
 Dockerfile 位于 `services/identity/Dockerfile`，镜像为 `onlinejudge/identity-service`，使用固定摘要基础镜像和 non-root `10001:10001`。Compose 文件为 `deploy/docker/compose.identity.yml`，只引用当前完整 SHA 标签。
+
+受外部 registry/BuildKit frontend 不可达影响的验收环境，可以先运行 Maven 打包后使用 `services/identity/Dockerfile.cached-runtime` 与本机已缓存、固定标签的 Java 21 基础镜像执行同一运行阶段验收。该 fallback 仍创建真实 non-root 镜像、保留 OCI revision、运行 Compose 的 MySQL 迁移和 readiness；它只替代不可拉取的构建基础层，不能作为跳过镜像或 Compose 验收的理由。
 
 ## 6. 构建、探针和验收
 
@@ -80,8 +84,15 @@ docker build --build-arg "GIT_SHA=$env:GIT_SHA" -f services/identity/Dockerfile 
 docker compose -f deploy/docker/compose.identity.yml up -d --wait
 ```
 
+```powershell
+# registry 受限的可重复 fallback；RUNTIME_BASE 必须是本机已缓存且固定的 Java 21 镜像。
+mvn -f services/identity/pom.xml package -DskipTests
+docker build --build-arg "RUNTIME_BASE=onlinejudge/backend:<known-immutable-sha>" --build-arg "GIT_SHA=$env:GIT_SHA" -f services/identity/Dockerfile.cached-runtime -t "onlinejudge/identity-service:$env:GIT_SHA" .
+docker compose -f deploy/docker/compose.identity.yml up -d --wait
+```
+
 默认端口为 `8081`。`/health` 只检查进程，`/readiness` 执行最小数据库查询且依赖故障返回 503，`/version` 返回 `service=identity-service`、版本和 revision。验收覆盖 JWT 声明、JWKS 格式、轮换重叠、离线验签、issuer/audience/alg/kid/exp/securityVersion 拒绝、禁用/登出失效、迁移、非 root 镜像与 readiness。
 
 ## 7. 合并和集成门槛
 
-#338 已确定五服务与 v2 契约，#311 可独立实现和评审。#309 服务分库迁移仍是最终非草稿/合并门槛：在其合并及使用方完成契约消费前，不切换生产流量，也不声称业务服务已接入在线 JWKS 刷新或 outbox 投递。
+#338 已确定五服务与 v2 契约，#309 已合入 `dev`，因此它不再阻止 #311 结束 Draft。#337 的 outbox 投递和各业务服务的在线 JWKS 刷新仍是独立后续工作：本交付只声明已缓存 JWKS 的本地验证与 securityVersion 投影，不宣称这些异步消费链路已经投产。

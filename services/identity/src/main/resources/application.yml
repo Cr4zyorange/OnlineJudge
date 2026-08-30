@@ -21,6 +21,9 @@ onlinejudge:
       current-private-key: ${IDENTITY_JWT_SIGNING_KEY:}
       previous-public-keys: ${IDENTITY_JWT_PREVIOUS_PUBLIC_KEYS:}
       allow-ephemeral-keys: ${IDENTITY_JWT_ALLOW_EPHEMERAL_KEYS:true}
+    service-tokens:
+      ttl: ${IDENTITY_SERVICE_TOKEN_TTL:PT5M}
+      workloads: '${IDENTITY_SERVICE_TOKEN_WORKLOADS:{}}'
   build:
     version: ${IDENTITY_SERVICE_VERSION:0.1.0-SNAPSHOT}
     revision: ${IDENTITY_SERVICE_REVISION:unknown}

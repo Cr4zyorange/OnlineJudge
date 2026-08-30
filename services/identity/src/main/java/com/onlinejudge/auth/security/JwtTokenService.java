@@ -20,6 +20,7 @@ import java.security.Signature;
 import java.security.interfaces.RSAPublicKey;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -130,6 +131,25 @@ public class JwtTokenService {
         } catch (RuntimeException exception) {
             return Optional.empty();
         }
+    }
+
+    /** Service credentials are distinct from user sessions and bind one workload to one audience. */
+    public IssuedServiceToken issueServiceToken(String workloadSubject, String audience, List<String> scopes, Duration ttl) {
+        if (workloadSubject == null || workloadSubject.isBlank() || audience == null || audience.isBlank()
+                || scopes == null || scopes.isEmpty() || ttl == null || ttl.isNegative() || ttl.isZero()) {
+            throw new IllegalArgumentException("service token claims are invalid");
+        }
+        Instant issuedAt = clock.instant();
+        Instant expiresAt = issuedAt.plus(ttl);
+        Map<String, Object> claims = new LinkedHashMap<>();
+        claims.put("sub", workloadSubject);
+        claims.put("scopes", List.copyOf(scopes));
+        claims.put("jti", UUID.randomUUID().toString());
+        claims.put("iat", issuedAt.getEpochSecond());
+        claims.put("exp", expiresAt.getEpochSecond());
+        claims.put("iss", issuer);
+        claims.put("aud", audience);
+        return new IssuedServiceToken(sign(claims), expiresAt);
     }
 
     public Map<String, Object> jwks() {
@@ -333,6 +353,9 @@ public class JwtTokenService {
     }
 
     public record IssuedUserToken(String token, LocalDateTime expiresAt) {
+    }
+
+    public record IssuedServiceToken(String token, Instant expiresAt) {
     }
 
     public record ValidatedUserToken(

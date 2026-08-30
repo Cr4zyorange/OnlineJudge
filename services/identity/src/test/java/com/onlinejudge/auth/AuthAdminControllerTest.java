@@ -2,6 +2,8 @@ package com.onlinejudge.auth;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.onlinejudge.auth.controller.RegisterRequest;
+import com.onlinejudge.auth.security.JwtTokenService;
+import com.onlinejudge.auth.security.OfflineJwtVerifier;
 import com.onlinejudge.auth.service.AuthService;
 import com.onlinejudge.identityservice.IdentityServiceApplication;
 import org.junit.jupiter.api.Test;
@@ -56,6 +58,9 @@ class AuthAdminControllerTest {
 
     @Autowired
     private AuthService authService;
+
+    @Autowired
+    private JwtTokenService jwtTokenService;
 
     @Test
     void adminAssignsUserRolesAndRolePermissionsWithAuditLogs() throws Exception {
@@ -312,6 +317,44 @@ class AuthAdminControllerTest {
                 .andExpect(jsonPath("$.data.roleName").value("授课教师"));
     }
 
+    @Test
+    void disablingRoleAdvancesEveryAffectedSecurityVersionAndInvalidatesOldJwtOffline() throws Exception {
+        long adminId = seedUser("disable-admin", "DisableAdmin01@pass", "ADMIN");
+        long targetId = seedUser("disable-target", "DisableTarget01@pass", "ADMIN");
+        String adminToken = loginToken("disable-admin", "DisableAdmin01@pass");
+        String targetToken = loginToken("disable-target", "DisableTarget01@pass");
+        long adminRoleId = roleId("ADMIN");
+
+        mockMvc.perform(put("/api/v1/admin/roles")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "roleId", adminRoleId,
+                                "roleCode", "ADMIN",
+                                "roleName", "管理员",
+                                "enabled", false
+                        ))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.enabled").value(false));
+
+        assertThat(securityVersion(adminId)).isEqualTo(2L);
+        assertThat(securityVersion(targetId)).isEqualTo(2L);
+        OfflineJwtVerifier verifier = OfflineJwtVerifier.fromJwks(
+                objectMapper,
+                java.time.Clock.systemUTC(),
+                JwtTokenService.ISSUER,
+                JwtTokenService.USER_AUDIENCE,
+                jwtTokenService.jwks()
+        );
+        assertThat(verifier.verify(targetToken, ignored -> securityVersion(targetId)).accepted()).isFalse();
+        assertThat(verifier.verify(targetToken, ignored -> securityVersion(targetId)).rejection())
+                .isEqualTo(OfflineJwtVerifier.Rejection.SECURITY_VERSION_STALE);
+
+        mockMvc.perform(get("/api/v1/auth/me")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(targetToken)))
+                .andExpect(status().isUnauthorized());
+    }
+
     private long seedUser(String username, String password, String userType) {
         return authService.registerTrusted(new RegisterRequest(
                 username,
@@ -372,6 +415,15 @@ class AuthAdminControllerTest {
                 username
         );
         return count == null ? 0 : count;
+    }
+
+    private long securityVersion(long userId) {
+        Long value = jdbcTemplate.queryForObject(
+                "SELECT security_version FROM t_auth_user WHERE user_id = ?",
+                Long.class,
+                userId
+        );
+        return value == null ? -1 : value;
     }
 
     private String bearer(String token) {

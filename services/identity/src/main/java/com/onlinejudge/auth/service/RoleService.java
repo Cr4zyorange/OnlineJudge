@@ -121,13 +121,24 @@ public class RoleService {
         if (!authRepository.roleExists(roleId)) {
             throw AuthApiException.notFound("角色不存在");
         }
+        RoleView existing = authRepository.roleView(roleId);
+        String roleCode = normalizeCode(requireText(request.roleCode(), "角色编码不能为空"));
+        boolean enabled = request.enabled() == null || request.enabled();
         authRepository.updateRole(
                 roleId,
-                normalizeCode(requireText(request.roleCode(), "角色编码不能为空")),
+                roleCode,
                 requireText(request.roleName(), "角色名称不能为空"),
                 blankToNull(request.description()),
-                request.enabled() == null || request.enabled()
+                enabled
         );
+        // Role code or enabled-state changes alter the claims authorized by every assigned user.
+        // Advance and outbox each user inside this transaction before any stale JWT can be accepted
+        // by an offline consumer that has consumed the corresponding v2 projection event.
+        if (!existing.roleCode().equals(roleCode) || existing.enabled() != enabled) {
+            for (Long userId : authRepository.userIdsForRole(roleId)) {
+                securityVersionService.advance(userId, SecurityVersionService.ChangeReason.ROLE_CHANGED);
+            }
+        }
         return authRepository.roleView(roleId);
     }
 

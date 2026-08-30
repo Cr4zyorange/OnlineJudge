@@ -1,6 +1,8 @@
 package com.onlinejudge.authservice.exception;
 
 import com.fasterxml.jackson.databind.JsonMappingException;
+import com.onlinejudge.auth.controller.ServiceTokenError;
+import com.onlinejudge.auth.exception.ServiceTokenException;
 import com.onlinejudge.common.exception.ApiException;
 import com.onlinejudge.common.web.ApiResponse;
 import jakarta.servlet.http.HttpServletRequest;
@@ -30,8 +32,22 @@ public class AuthServiceExceptionHandler {
                 .body(ApiResponse.error(exception.code(), exception.getMessage()));
     }
 
+    @ExceptionHandler(ServiceTokenException.class)
+    public ResponseEntity<ServiceTokenError> serviceToken(ServiceTokenException exception, HttpServletRequest request) {
+        String requestId = request.getHeader("X-Request-Id");
+        return ResponseEntity.status(exception.status()).body(new ServiceTokenError(
+                exception.code(),
+                exception.getMessage(),
+                requestId == null || requestId.isBlank() ? "unknown" : requestId,
+                exception.status() == HttpStatus.SERVICE_UNAVAILABLE
+        ));
+    }
+
     @ExceptionHandler(HttpMessageNotReadableException.class)
-    public ResponseEntity<ApiResponse<Void>> unreadable(HttpMessageNotReadableException exception) {
+    public ResponseEntity<?> unreadable(HttpMessageNotReadableException exception, HttpServletRequest request) {
+        if (isServiceTokenRequest(request)) {
+            return malformedServiceTokenRequest(request);
+        }
         String field = firstJsonFieldName(exception);
         String message = field == null ? "请求参数不合法" : "参数错误：" + field + " 不合法";
         return ResponseEntity.badRequest().body(ApiResponse.error("AUTH_400", message));
@@ -44,7 +60,10 @@ public class AuthServiceExceptionHandler {
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<ApiResponse<Void>> invalid(MethodArgumentNotValidException exception) {
+    public ResponseEntity<?> invalid(MethodArgumentNotValidException exception, HttpServletRequest request) {
+        if (isServiceTokenRequest(request)) {
+            return malformedServiceTokenRequest(request);
+        }
         String message = exception.getBindingResult().getFieldErrors().stream()
                 .map(error -> error.getDefaultMessage() == null
                         ? error.getField() + " 不合法"
@@ -56,7 +75,10 @@ public class AuthServiceExceptionHandler {
     }
 
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
-    public ResponseEntity<ApiResponse<Void>> mismatch(MethodArgumentTypeMismatchException exception) {
+    public ResponseEntity<?> mismatch(MethodArgumentTypeMismatchException exception, HttpServletRequest request) {
+        if (isServiceTokenRequest(request)) {
+            return malformedServiceTokenRequest(request);
+        }
         return ResponseEntity.badRequest()
                 .body(ApiResponse.error("AUTH_400", "参数错误：" + exception.getName() + " 不合法"));
     }
@@ -84,5 +106,19 @@ public class AuthServiceExceptionHandler {
             }
         }
         return null;
+    }
+
+    private static boolean isServiceTokenRequest(HttpServletRequest request) {
+        return "/internal/v2/service-tokens".equals(request.getRequestURI());
+    }
+
+    private static ResponseEntity<ServiceTokenError> malformedServiceTokenRequest(HttpServletRequest request) {
+        String requestId = request.getHeader("X-Request-Id");
+        return ResponseEntity.badRequest().body(new ServiceTokenError(
+                "SERVICE_TOKEN_INVALID",
+                "request body is malformed",
+                requestId == null || requestId.isBlank() ? "unknown" : requestId,
+                false
+        ));
     }
 }

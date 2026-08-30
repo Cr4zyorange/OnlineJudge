@@ -59,7 +59,9 @@ public class TokenCurrentUserProvider implements CurrentUserProvider {
     }
 
     private CurrentUser toCurrentUser(AuthUserView user) {
-        String primaryRole = user.roles().isEmpty() ? user.userType() : user.roles().get(0);
+        // userType is profile metadata, not an authorization grant. A disabled role must never
+        // regain authority through this fallback.
+        String primaryRole = user.roles().isEmpty() ? "" : user.roles().get(0);
         return new CurrentUser(user.id(), user.username(), primaryRole, new TreeSet<>(user.permissions()));
     }
 
