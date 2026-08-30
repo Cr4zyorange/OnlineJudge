@@ -91,6 +91,8 @@ uploads/
 storage/
 !backend/src/main/java/com/onlinejudge/common/storage/
 !backend/src/main/java/com/onlinejudge/common/storage/*.java
+!services/assessment/src/main/java/com/onlinejudge/assessmentservice/storage/
+!services/assessment/src/main/java/com/onlinejudge/assessmentservice/storage/*.java
 data/
 *.db
 *.sqlite
