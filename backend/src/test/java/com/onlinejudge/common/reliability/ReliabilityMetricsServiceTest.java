@@ -76,5 +76,6 @@ class ReliabilityMetricsServiceTest {
         assertThat(snapshot.learningDeadLetters()).isEqualTo(1);
         assertThat(snapshot.oldestLearningDeadLetterEventId()).isEqualTo("dlq-event");
         assertThat(snapshot.oldestLearningDeadLetterCorrelationId()).isEqualTo("dlq-correlation");
+        assertThat(snapshot.learningDeferredEvents()).isZero();
     }
 }

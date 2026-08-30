@@ -29,6 +29,7 @@ public class LearningReliableEventConsumer {
     private final LearningEventInboxRepository inbox;
     private final LearningReliabilityRepository reliability;
     private final LearningHomeworkPublishedHandler homeworkHandler;
+    private final LearningCourseMemberChangedHandler courseMemberHandler;
     private final ObjectMapper objectMapper;
     private final TransactionTemplate localTransaction;
     private final TransactionTemplate recoveryTransaction;
@@ -38,6 +39,7 @@ public class LearningReliableEventConsumer {
             LearningEventInboxRepository inbox,
             LearningReliabilityRepository reliability,
             LearningHomeworkPublishedHandler homeworkHandler,
+            LearningCourseMemberChangedHandler courseMemberHandler,
             ObjectMapper objectMapper,
             PlatformTransactionManager transactionManager,
             @Value("${onlinejudge.reliability.consumer.max-attempts:3}") int maxAttempts
@@ -45,6 +47,7 @@ public class LearningReliableEventConsumer {
         this.inbox = inbox;
         this.reliability = reliability;
         this.homeworkHandler = homeworkHandler;
+        this.courseMemberHandler = courseMemberHandler;
         this.objectMapper = objectMapper;
         this.localTransaction = new TransactionTemplate(transactionManager);
         this.recoveryTransaction = new TransactionTemplate(transactionManager);
@@ -56,6 +59,9 @@ public class LearningReliableEventConsumer {
         try {
             envelope.requireV2();
             return localTransaction.execute(status -> consumeInLocalTransaction(envelope));
+        } catch (CourseProjectionUnavailableException exception) {
+            persistDeferred(envelope, "MEMBERSHIP_PROJECTION_PENDING");
+            return EventProcessingDecision.ACK;
         } catch (NonRetryableEventException exception) {
             persistDeadLetter(envelope, "NON_RETRYABLE", exception.getMessage(), 0);
             return EventProcessingDecision.DEAD_LETTER;
@@ -81,15 +87,27 @@ public class LearningReliableEventConsumer {
             return EventProcessingDecision.ACK;
         }
         if (envelope.aggregateVersion() > current + 1) {
-            inbox.record(CONSUMER, envelope, "GAP", Instant.now());
+            persistDeferred(envelope, "PROJECTION_GAP");
             reliability.recordGap(
                     CONSUMER, envelope.aggregateType(), envelope.aggregateId(), envelope.aggregateVersion(), current,
                     envelope.eventId(), envelope.correlationId(), Instant.now());
             return EventProcessingDecision.ACK;
         }
-        homeworkHandler.apply(envelope);
+        apply(envelope);
         inbox.record(CONSUMER, envelope, "APPLIED", Instant.now());
         return EventProcessingDecision.ACK;
+    }
+
+    private void apply(ReliableEventEnvelope envelope) {
+        if ("assessment.homework.published.v2".equals(envelope.eventType())) {
+            homeworkHandler.apply(envelope);
+            return;
+        }
+        if ("course.member.changed.v2".equals(envelope.eventType())) {
+            courseMemberHandler.apply(envelope);
+            return;
+        }
+        throw new NonRetryableEventException("Learning does not consume eventType " + envelope.eventType());
     }
 
     public ReliableEventEnvelope deserialize(String json) {
@@ -133,6 +151,10 @@ public class LearningReliableEventConsumer {
         recoveryTransaction.executeWithoutResult(status -> reliability.deadLetter(
                 CONSUMER, envelope.eventId(), envelope.eventType(), envelope.correlationId(), serialize(envelope),
                 classification, safeMessage(message), attempts, Instant.now()));
+    }
+
+    private void persistDeferred(ReliableEventEnvelope envelope, String reason) {
+        reliability.defer(CONSUMER, envelope, serialize(envelope), reason, Instant.now());
     }
 
     private String required(com.fasterxml.jackson.databind.JsonNode root, String field) {

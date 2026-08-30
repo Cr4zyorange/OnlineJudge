@@ -34,7 +34,9 @@ import static org.assertj.core.api.Assertions.assertThat;
         LearningEventInboxRepository.class,
         LearningReliabilityRepository.class,
         LearningHomeworkPublishedHandler.class,
+        LearningCourseMemberChangedHandler.class,
         LearningReliableEventConsumer.class,
+        LearningReconciliationWorker.class,
         LearningDeadLetterReplayService.class,
         LearningReliableEventConsumerTest.TestConfig.class
 })
@@ -68,6 +70,9 @@ class LearningReliableEventConsumerTest {
     private LearningDeadLetterReplayService replayService;
 
     @org.springframework.beans.factory.annotation.Autowired
+    private LearningReconciliationWorker reconciliationWorker;
+
+    @org.springframework.beans.factory.annotation.Autowired
     private RecordingPublisher publisher;
 
     @BeforeEach
@@ -78,6 +83,7 @@ class LearningReliableEventConsumerTest {
         jdbcTemplate.update("DELETE FROM learning_event_delivery_attempt");
         jdbcTemplate.update("DELETE FROM learning_event_dead_letter");
         jdbcTemplate.update("DELETE FROM learning_event_reconciliation_request");
+        jdbcTemplate.update("DELETE FROM learning_deferred_event");
         jdbcTemplate.update("DELETE FROM learning_course_member_projection");
         courseMembers.upsert(88L, 42L, "ACTIVE", 1L, Instant.parse("2026-08-30T09:00:00Z"));
         publisher.publishedEventIds.clear();
@@ -99,15 +105,58 @@ class LearningReliableEventConsumerTest {
     }
 
     @Test
-    void aggregateVersionGapCreatesAuditableReconciliationAndDoesNotApplySpeculativeState() {
+    void aggregateVersionGapIsDurablyDeferredAndCreatesAuditableReconciliation() {
         assertThat(consumer.consume(homeworkEvent("event-gap", 2, "Java collections homework")))
                 .isEqualTo(EventProcessingDecision.ACK);
 
         assertThat(count("lrn_notification")).isZero();
-        assertThat(jdbcTemplate.queryForObject(
-                "SELECT processing_status FROM learning_event_inbox", String.class
-        )).isEqualTo("GAP");
+        assertThat(count("learning_event_inbox")).isZero();
+        assertThat(count("learning_deferred_event")).isEqualTo(1);
         assertThat(count("learning_event_reconciliation_request")).isEqualTo(1);
+    }
+
+    @Test
+    void reconciliationEventuallyAppliesDeferredV2AfterTheMissingVersionArrives() {
+        assertThat(consumer.consume(homeworkEvent("event-v2", 2, "Java collections homework")))
+                .isEqualTo(EventProcessingDecision.ACK);
+        assertThat(count("learning_event_inbox")).isZero();
+
+        assertThat(consumer.consume(homeworkEvent("event-v1", 1, "Java collections homework")))
+                .isEqualTo(EventProcessingDecision.ACK);
+        assertThat(reconciliationWorker.reconcileDue(Instant.now().plusSeconds(10))).isEqualTo(1);
+
+        assertThat(count("learning_event_inbox")).isEqualTo(2);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT processing_status FROM learning_event_inbox WHERE event_id = 'event-v2'", String.class
+        )).isEqualTo("APPLIED");
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT request_status FROM learning_event_reconciliation_request WHERE triggering_event_id = 'event-v2'", String.class
+        )).isEqualTo("RESOLVED");
+    }
+
+    @Test
+    void courseMemberEventBuildsTheProjectionAndUnblocksADeferredHomeworkNotification() {
+        jdbcTemplate.update("DELETE FROM learning_course_member_projection");
+
+        assertThat(consumer.consume(homeworkEvent("homework-before-members", 1, "Java collections homework")))
+                .isEqualTo(EventProcessingDecision.ACK);
+        assertThat(count("lrn_notification")).isZero();
+        assertThat(count("learning_event_inbox")).isZero();
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT deferral_reason FROM learning_deferred_event", String.class
+        )).isEqualTo("MEMBERSHIP_PROJECTION_PENDING");
+
+        assertThat(consumer.consume(courseMemberEvent("course-member-42", "ACTIVE", 1)))
+                .isEqualTo(EventProcessingDecision.ACK);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT member_version FROM learning_course_member_projection WHERE course_id = 88 AND user_id = 42", Long.class
+        )).isEqualTo(1L);
+
+        assertThat(reconciliationWorker.reconcileDue(Instant.now().plusSeconds(10))).isEqualTo(1);
+        assertThat(count("lrn_notification")).isEqualTo(1);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT processing_status FROM learning_event_inbox WHERE event_id = 'homework-before-members'", String.class
+        )).isEqualTo("APPLIED");
     }
 
     @Test
@@ -149,6 +198,27 @@ class LearningReliableEventConsumerTest {
                     mapper.readTree("""
                             {"courseId":"88","homeworkId":"91","title":"%s","deadline":"2026-09-06T16:00:00Z","receiverScope":"COURSE_ACTIVE_STUDENTS","publishedAt":"2026-08-30T09:15:30Z"}
                             """.formatted(title))
+            );
+        } catch (Exception exception) {
+            throw new AssertionError(exception);
+        }
+    }
+
+    private ReliableEventEnvelope courseMemberEvent(String eventId, String membershipStatus, long memberVersion) {
+        try {
+            ObjectMapper mapper = new ObjectMapper();
+            return new ReliableEventEnvelope(
+                    eventId,
+                    "course.member.changed.v2",
+                    2,
+                    "course-member",
+                    "88:42",
+                    memberVersion,
+                    Instant.parse("2026-08-30T09:15:30Z"),
+                    "34c3bdce-e3ff-45b0-8c75-3e46d0e57f5b",
+                    mapper.readTree("""
+                            {"courseId":"88","userId":"42","membershipStatus":"%s","memberVersion":%d}
+                            """.formatted(membershipStatus, memberVersion))
             );
         } catch (Exception exception) {
             throw new AssertionError(exception);

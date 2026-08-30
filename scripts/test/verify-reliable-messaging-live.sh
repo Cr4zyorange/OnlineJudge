@@ -21,7 +21,10 @@ docker run --detach --name "$container_name" \
     rabbitmq:4.1-management >/dev/null
 
 attempt=0
-until docker exec "$container_name" rabbitmq-diagnostics -q ping >/dev/null 2>&1; do
+# The official 4.1 image creates its Erlang cookie mode 0400 for the
+# `rabbitmq` user.  `docker exec` defaults to root, which cannot read that
+# cookie and therefore makes a healthy broker look unavailable.
+until docker exec --user rabbitmq "$container_name" rabbitmq-diagnostics -q ping >/dev/null 2>&1; do
     attempt=$((attempt + 1))
     if [ "$attempt" -ge 60 ]; then
         docker logs "$container_name" >&2 || true

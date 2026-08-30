@@ -61,7 +61,7 @@ public class AssessmentOutboxPublisher {
         for (OutboxRecord record : claimed) {
             try {
                 publisher.publish(record.envelope(), record.routingKey());
-                repository.markPublished(record.id(), leaseOwner, Instant.now());
+                repository.markPublished(record.id(), leaseOwner, now);
             } catch (RuntimeException exception) {
                 int nextAttempt = record.attemptCount() + 1;
                 boolean terminal = nextAttempt >= maxAttempts;
@@ -69,10 +69,10 @@ public class AssessmentOutboxPublisher {
                         record.id(),
                         leaseOwner,
                         nextAttempt,
-                        terminal ? Instant.now() : now.plus(backoff(nextAttempt)),
+                        terminal ? now : now.plus(backoff(nextAttempt)),
                         terminal,
                         safeError(exception),
-                        Instant.now()
+                        now
                 );
                 log.warn("Assessment outbox publish failed eventId={} correlationId={} attempt={} terminal={} error={}",
                         record.envelope().eventId(), record.envelope().correlationId(), nextAttempt, terminal,

@@ -45,6 +45,10 @@ public class LearningHomeworkPublishedHandler {
         requiredRfc3339(payload, "publishedAt");
 
         List<Long> recipients = courseMembers.activeStudentIds(courseId);
+        if (recipients.isEmpty() && !courseMembers.hasObservedCourse(courseId)) {
+            throw new CourseProjectionUnavailableException(
+                    "Learning has not yet received course.member.changed.v2 for course " + courseId);
+        }
         for (Long recipient : recipients) {
             NotificationCreateCommand command = new NotificationCreateCommand(
                     "homework:" + homeworkId + ":" + recipient,

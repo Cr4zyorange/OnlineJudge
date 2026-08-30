@@ -10,6 +10,9 @@ public record ReliabilityMetricsSnapshot(
         Long oldestAssessmentAgeSeconds,
         long learningDeadLetters,
         String oldestLearningDeadLetterEventId,
-        String oldestLearningDeadLetterCorrelationId
+        String oldestLearningDeadLetterCorrelationId,
+        long learningDeferredEvents,
+        String oldestLearningDeferredEventId,
+        String oldestLearningDeferredCorrelationId
 ) {
 }

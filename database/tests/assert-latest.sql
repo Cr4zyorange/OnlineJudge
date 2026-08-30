@@ -74,9 +74,10 @@ BEGIN
            'assessment_event_outbox', 'course_event_outbox', 'grade_event_outbox',
            'assessment_event_inbox', 'grade_event_inbox', 'learning_event_inbox',
            'learning_event_dead_letter', 'learning_event_reconciliation_request',
+           'learning_deferred_event',
            'learning_course_member_projection'
        );
-    IF actual_count <> 9 THEN
+    IF actual_count <> 10 THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'reliable messaging ownership tables are incomplete';
     END IF;
 

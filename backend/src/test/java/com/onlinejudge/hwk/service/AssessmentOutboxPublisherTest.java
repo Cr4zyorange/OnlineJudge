@@ -81,6 +81,24 @@ class AssessmentOutboxPublisherTest {
         assertThat(broker.eventIds).hasSize(1);
     }
 
+    @Test
+    void secondPublisherTakesOverAnExpiredLeaseAfterTheFirstPublisherCrashes() {
+        repository.appendHomeworkPublished(publishedHomework());
+        Instant claimedAt = Instant.parse("2026-08-30T10:00:00Z");
+        long eventRowId = repository.claimDue("publisher-that-crashed", claimedAt, java.time.Duration.ofSeconds(30), 1)
+                .getFirst().id();
+
+        // The first process resumes only after its lease is no longer valid. It
+        // must not be able to acknowledge a row that a second process may take.
+        repository.markPublished(eventRowId, "publisher-that-crashed", claimedAt.plusSeconds(31));
+        assertThat(status()).isEqualTo("IN_FLIGHT");
+
+        AssessmentOutboxPublisher survivingPublisher = publisher();
+        assertThat(survivingPublisher.drain(claimedAt.plusSeconds(31))).isEqualTo(1);
+        assertThat(status()).isEqualTo("PUBLISHED");
+        assertThat(broker.eventIds).hasSize(1);
+    }
+
     private AssessmentOutboxPublisher publisher() {
         return new AssessmentOutboxPublisher(repository, broker, 10, 3, 30, 1, 16);
     }

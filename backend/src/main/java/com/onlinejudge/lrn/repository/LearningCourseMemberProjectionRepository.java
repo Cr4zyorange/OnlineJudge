@@ -42,4 +42,10 @@ public class LearningCourseMemberProjectionRepository {
                         ORDER BY user_id
                         """, Long.class, courseId);
     }
+
+    public boolean hasObservedCourse(long courseId) {
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM learning_course_member_projection WHERE course_id = ?", Integer.class, courseId);
+        return count != null && count > 0;
+    }
 }

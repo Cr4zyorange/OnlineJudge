@@ -26,6 +26,7 @@ public class ReliabilityMetricsService {
         long retrying = assessmentOutbox.countByStatus("RETRY");
         var oldestAssessment = assessmentOutbox.oldestAutomaticallyDeliverable();
         var oldestDeadLetter = learningReliability.oldestUnreplayedDeadLetter();
+        var oldestDeferred = learningReliability.oldestUnresolvedDeferred();
         return new ReliabilityMetricsSnapshot(
                 pending + retrying,
                 pending,
@@ -37,7 +38,10 @@ public class ReliabilityMetricsService {
                         .orElse(null),
                 learningReliability.deadLetterCount(),
                 oldestDeadLetter.map(LearningReliabilityRepository.DeadLetterObservation::eventId).orElse(null),
-                oldestDeadLetter.map(LearningReliabilityRepository.DeadLetterObservation::correlationId).orElse(null)
+                oldestDeadLetter.map(LearningReliabilityRepository.DeadLetterObservation::correlationId).orElse(null),
+                learningReliability.deferredCount(),
+                oldestDeferred.map(LearningReliabilityRepository.DeferredObservation::eventId).orElse(null),
+                oldestDeferred.map(LearningReliabilityRepository.DeferredObservation::correlationId).orElse(null)
         );
     }
 }

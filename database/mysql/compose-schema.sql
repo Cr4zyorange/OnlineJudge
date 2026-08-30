@@ -1237,6 +1237,31 @@ CREATE TABLE IF NOT EXISTS learning_event_reconciliation_request (
     KEY idx_learning_reconciliation_open (request_status, created_at)
 );
 
+CREATE TABLE IF NOT EXISTS learning_deferred_event (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    consumer_name VARCHAR(64) NOT NULL,
+    event_id VARCHAR(64) NOT NULL,
+    event_type VARCHAR(128) NOT NULL,
+    aggregate_type VARCHAR(64) NOT NULL,
+    aggregate_id VARCHAR(128) NOT NULL,
+    aggregate_version BIGINT NOT NULL,
+    correlation_id VARCHAR(64) NOT NULL,
+    envelope_json TEXT NOT NULL,
+    deferral_reason VARCHAR(64) NOT NULL,
+    delivery_status VARCHAR(32) NOT NULL,
+    attempt_count INT NOT NULL DEFAULT 0,
+    next_attempt_at TIMESTAMP NOT NULL,
+    lease_owner VARCHAR(128) NULL,
+    lease_until TIMESTAMP NULL,
+    last_error VARCHAR(1024) NULL,
+    resolved_at TIMESTAMP NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uq_learning_deferred_consumer_event UNIQUE (consumer_name, event_id),
+    KEY idx_learning_deferred_due (delivery_status, next_attempt_at, lease_until),
+    KEY idx_learning_deferred_correlation (correlation_id)
+);
+
 CREATE TABLE IF NOT EXISTS learning_course_member_projection (
     course_id BIGINT NOT NULL,
     user_id BIGINT NOT NULL,
@@ -1279,4 +1304,4 @@ VALUES
     ('20260822_03_create_hwk_submission_attachment.sql', 'c45eeca539e8a56522826833cc533789cfad169e7c6712420de1208e6b014979', 'COMPOSE_BASELINE', 0, 1),
     ('20260825_01_add_grd_analysis_source_fingerprint.sql', 'f650506d22e00f48f23da6f6dd76ca11d3f1e1083a59f805be20cf7b98315b59', 'COMPOSE_BASELINE', 0, 1),
     ('20260825_02_add_grd_analysis_source_version.sql', 'd40f5b9a41a0a836960f9b3d445e0d1f6fc6cbcc4f2b48b210387fcfc9f21b2c', 'COMPOSE_BASELINE', 0, 1),
-    ('20260830_01_create_reliable_event_storage.sql', '3ea06ca2b3e370b4de3f068bb130117b2aff9c015d75815495d5364cabfada2d', 'COMPOSE_BASELINE', 0, 1);
+    ('20260830_01_create_reliable_event_storage.sql', '9c20588263045d59dd55730741aa46c2f973828ba3270fc8c3717505e5c2ee45', 'COMPOSE_BASELINE', 0, 1);

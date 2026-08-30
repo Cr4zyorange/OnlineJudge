@@ -89,22 +89,24 @@ public class AssessmentEventOutboxRepository {
         List<Long> candidateIds = jdbcTemplate.queryForList("""
                         SELECT id
                         FROM assessment_event_outbox
-                        WHERE delivery_status IN ('PENDING', 'RETRY')
-                          AND next_attempt_at <= ?
-                          AND (lease_until IS NULL OR lease_until < ?)
+                        WHERE (delivery_status IN ('PENDING', 'RETRY')
+                               AND next_attempt_at <= ?
+                               AND (lease_until IS NULL OR lease_until < ?))
+                           OR (delivery_status = 'IN_FLIGHT' AND lease_until < ?)
                         ORDER BY next_attempt_at, id
                         LIMIT ?
-                        """, Long.class, now, now, Math.max(1, limit));
+                        """, Long.class, now, now, now, Math.max(1, limit));
         Instant leaseUntil = now.plus(leaseDuration);
         for (Long id : candidateIds) {
             jdbcTemplate.update("""
                             UPDATE assessment_event_outbox
                             SET delivery_status = 'IN_FLIGHT', lease_owner = ?, lease_until = ?, updated_at = ?
                             WHERE id = ?
-                              AND delivery_status IN ('PENDING', 'RETRY')
-                              AND next_attempt_at <= ?
-                              AND (lease_until IS NULL OR lease_until < ?)
-                            """, leaseOwner, leaseUntil, now, id, now, now);
+                              AND ((delivery_status IN ('PENDING', 'RETRY')
+                                    AND next_attempt_at <= ?
+                                    AND (lease_until IS NULL OR lease_until < ?))
+                                   OR (delivery_status = 'IN_FLIGHT' AND lease_until < ?))
+                            """, leaseOwner, leaseUntil, now, id, now, now, now);
         }
         return jdbcTemplate.query("""
                         SELECT id, event_id, event_type, payload_version, aggregate_type, aggregate_id,
@@ -135,8 +137,8 @@ public class AssessmentEventOutboxRepository {
                         UPDATE assessment_event_outbox
                         SET delivery_status = 'PUBLISHED', published_at = ?, lease_owner = NULL, lease_until = NULL,
                             updated_at = ?
-                        WHERE id = ? AND delivery_status = 'IN_FLIGHT' AND lease_owner = ?
-                        """, publishedAt, publishedAt, id, leaseOwner);
+                        WHERE id = ? AND delivery_status = 'IN_FLIGHT' AND lease_owner = ? AND lease_until >= ?
+                        """, publishedAt, publishedAt, id, leaseOwner, publishedAt);
     }
 
     public void markFailedAttempt(
@@ -152,8 +154,8 @@ public class AssessmentEventOutboxRepository {
                         UPDATE assessment_event_outbox
                         SET delivery_status = ?, attempt_count = ?, next_attempt_at = ?, last_error = ?,
                             lease_owner = NULL, lease_until = NULL, updated_at = ?
-                        WHERE id = ? AND delivery_status = 'IN_FLIGHT' AND lease_owner = ?
-                        """, terminal ? "FAILED" : "RETRY", attemptCount, nextAttemptAt, error, updatedAt, id, leaseOwner);
+                        WHERE id = ? AND delivery_status = 'IN_FLIGHT' AND lease_owner = ? AND lease_until >= ?
+                        """, terminal ? "FAILED" : "RETRY", attemptCount, nextAttemptAt, error, updatedAt, id, leaseOwner, updatedAt);
     }
 
     public long countByStatus(String status) {

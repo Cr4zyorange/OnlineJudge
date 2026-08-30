@@ -2,6 +2,7 @@ package com.onlinejudge.common.reliability;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.amqp.core.Queue;
+import org.springframework.amqp.core.Binding;
 import org.springframework.amqp.rabbit.connection.CachingConnectionFactory;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 
@@ -28,6 +29,8 @@ class RabbitMqReliabilityConfigurationTest {
                             .containsEntry("x-dead-letter-exchange", "onlinejudge.events.v2")
                             .containsEntry("x-dead-letter-routing-key", "onlinejudge.assessment.homework.published.v2");
                     assertThat(deadLetter.isDurable()).isTrue();
+                    assertThat(context.getBean("courseMemberChangedToLearning", Binding.class).getRoutingKey())
+                            .isEqualTo("onlinejudge.course.member.changed.v2");
                 });
     }
 }

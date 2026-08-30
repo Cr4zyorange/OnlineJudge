@@ -164,6 +164,31 @@ CREATE TABLE IF NOT EXISTS learning_event_reconciliation_request (
     KEY idx_learning_reconciliation_open (request_status, created_at)
 );
 
+CREATE TABLE IF NOT EXISTS learning_deferred_event (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    consumer_name VARCHAR(64) NOT NULL,
+    event_id VARCHAR(64) NOT NULL,
+    event_type VARCHAR(128) NOT NULL,
+    aggregate_type VARCHAR(64) NOT NULL,
+    aggregate_id VARCHAR(128) NOT NULL,
+    aggregate_version BIGINT NOT NULL,
+    correlation_id VARCHAR(64) NOT NULL,
+    envelope_json TEXT NOT NULL,
+    deferral_reason VARCHAR(64) NOT NULL,
+    delivery_status VARCHAR(32) NOT NULL,
+    attempt_count INT NOT NULL DEFAULT 0,
+    next_attempt_at TIMESTAMP NOT NULL,
+    lease_owner VARCHAR(128) NULL,
+    lease_until TIMESTAMP NULL,
+    last_error VARCHAR(1024) NULL,
+    resolved_at TIMESTAMP NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uq_learning_deferred_consumer_event UNIQUE (consumer_name, event_id),
+    KEY idx_learning_deferred_due (delivery_status, next_attempt_at, lease_until),
+    KEY idx_learning_deferred_correlation (correlation_id)
+);
+
 CREATE TABLE IF NOT EXISTS learning_course_member_projection (
     course_id BIGINT NOT NULL,
     user_id BIGINT NOT NULL,

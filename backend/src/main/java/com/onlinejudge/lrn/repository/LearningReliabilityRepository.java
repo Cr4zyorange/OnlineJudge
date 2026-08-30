@@ -1,10 +1,13 @@
 package com.onlinejudge.lrn.repository;
 
+import com.onlinejudge.common.reliability.ReliableEventEnvelope;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
+import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 
 @Repository
@@ -66,6 +69,109 @@ public class LearningReliabilityRepository {
         }
     }
 
+    public void defer(
+            String consumerName,
+            ReliableEventEnvelope envelope,
+            String envelopeJson,
+            String reason,
+            Instant now
+    ) {
+        try {
+            jdbcTemplate.update("""
+                            INSERT INTO learning_deferred_event
+                            (consumer_name, event_id, event_type, aggregate_type, aggregate_id, aggregate_version,
+                             correlation_id, envelope_json, deferral_reason, delivery_status, attempt_count,
+                             next_attempt_at, lease_owner, lease_until, last_error, resolved_at, created_at, updated_at)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', 0, ?, NULL, NULL, NULL, NULL, ?, ?)
+                            """, consumerName, envelope.eventId(), envelope.eventType(), envelope.aggregateType(),
+                    envelope.aggregateId(), envelope.aggregateVersion(), envelope.correlationId(), envelopeJson,
+                    reason, now, now, now);
+        } catch (DuplicateKeyException ignored) {
+            // The original broker delivery may be redelivered while the durable
+            // reconciliation worker owns it. Keep the original envelope/state.
+        }
+    }
+
+    public List<DeferredEvent> claimDeferred(String leaseOwner, Instant now, Duration leaseDuration, int limit) {
+        List<Long> candidates = jdbcTemplate.queryForList("""
+                        SELECT id FROM learning_deferred_event
+                        WHERE (delivery_status = 'PENDING' AND next_attempt_at <= ?)
+                           OR (delivery_status = 'IN_FLIGHT' AND lease_until < ?)
+                        ORDER BY next_attempt_at, id
+                        LIMIT ?
+                        """, Long.class, now, now, Math.max(1, limit));
+        Instant leaseUntil = now.plus(leaseDuration);
+        for (Long id : candidates) {
+            jdbcTemplate.update("""
+                            UPDATE learning_deferred_event
+                            SET delivery_status = 'IN_FLIGHT', lease_owner = ?, lease_until = ?, updated_at = ?
+                            WHERE id = ? AND ((delivery_status = 'PENDING' AND next_attempt_at <= ?)
+                                               OR (delivery_status = 'IN_FLIGHT' AND lease_until < ?))
+                            """, leaseOwner, leaseUntil, now, id, now, now);
+        }
+        return jdbcTemplate.query("""
+                        SELECT id, event_id, envelope_json
+                        FROM learning_deferred_event
+                        WHERE delivery_status = 'IN_FLIGHT' AND lease_owner = ? AND lease_until = ?
+                        ORDER BY id
+                        """, (rs, rowNum) -> new DeferredEvent(
+                rs.getLong("id"), rs.getString("event_id"), rs.getString("envelope_json")
+        ), leaseOwner, leaseUntil);
+    }
+
+    public void markDeferredResolved(long id, String leaseOwner, Instant now) {
+        jdbcTemplate.update("""
+                        UPDATE learning_deferred_event
+                        SET delivery_status = 'RESOLVED', resolved_at = ?, lease_owner = NULL, lease_until = NULL,
+                            updated_at = ?
+                        WHERE id = ? AND delivery_status = 'IN_FLIGHT' AND lease_owner = ? AND lease_until >= ?
+                        """, now, now, id, leaseOwner, now);
+    }
+
+    public void releaseDeferred(long id, String leaseOwner, Instant nextAttemptAt, String error, Instant now) {
+        jdbcTemplate.update("""
+                        UPDATE learning_deferred_event
+                        SET delivery_status = 'PENDING', attempt_count = attempt_count + 1, next_attempt_at = ?,
+                            lease_owner = NULL, lease_until = NULL, last_error = ?, updated_at = ?
+                        WHERE id = ? AND delivery_status = 'IN_FLIGHT' AND lease_owner = ? AND lease_until >= ?
+                        """, nextAttemptAt, error, now, id, leaseOwner, now);
+    }
+
+    public void markDeferredFailed(long id, String leaseOwner, String error, Instant now) {
+        jdbcTemplate.update("""
+                        UPDATE learning_deferred_event
+                        SET delivery_status = 'FAILED', lease_owner = NULL, lease_until = NULL,
+                            last_error = ?, updated_at = ?
+                        WHERE id = ? AND delivery_status = 'IN_FLIGHT' AND lease_owner = ? AND lease_until >= ?
+                        """, error, now, id, leaseOwner, now);
+    }
+
+    public long deferredCount() {
+        Long count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM learning_deferred_event WHERE delivery_status <> 'RESOLVED'", Long.class);
+        return count == null ? 0 : count;
+    }
+
+    public Optional<DeferredObservation> oldestUnresolvedDeferred() {
+        return jdbcTemplate.query("""
+                        SELECT event_id, correlation_id, created_at
+                        FROM learning_deferred_event
+                        WHERE delivery_status <> 'RESOLVED'
+                        ORDER BY created_at, id
+                        LIMIT 1
+                        """, (rs, rowNum) -> new DeferredObservation(
+                rs.getString("event_id"), rs.getString("correlation_id"), rs.getTimestamp("created_at").toInstant()
+        )).stream().findFirst();
+    }
+
+    public void resolveReconciliationForEvent(String eventId, Instant now) {
+        jdbcTemplate.update("""
+                        UPDATE learning_event_reconciliation_request
+                        SET request_status = 'RESOLVED', resolved_at = ?
+                        WHERE triggering_event_id = ? AND request_status = 'OPEN'
+                        """, now, eventId);
+    }
+
     public Optional<DeadLetter> findForReplay(String consumerName, String eventId) {
         return jdbcTemplate.query("""
                         SELECT event_type, correlation_id, envelope_json, attempt_count
@@ -106,5 +212,11 @@ public class LearningReliabilityRepository {
     }
 
     public record DeadLetterObservation(String eventId, String correlationId, Instant createdAt) {
+    }
+
+    public record DeferredEvent(long id, String eventId, String envelopeJson) {
+    }
+
+    public record DeferredObservation(String eventId, String correlationId, Instant createdAt) {
     }
 }

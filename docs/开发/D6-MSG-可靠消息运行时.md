@@ -6,8 +6,8 @@
 
 - 只承诺 **at-least-once**：confirmed publish 之后 broker 仍可能在 consumer ack 前重投。
 - 生产者在本地事务内写入业务事实和其拥有的 outbox；RabbitMQ/Learning 不可用不会回滚成功的本地业务事实。
-- publisher 用短租约领取 `PENDING`/`RETRY` 行；失败按有限指数退避写回 `RETRY`，到达上限写 `FAILED`，绝不无限静默重试。
-- consumer 在同一事务中写 inbox 和本地副作用。重复 `eventId` ACK 为 no-op；旧 aggregateVersion 记录为 `IGNORED_OLD`；版本缺口记录 `GAP` 和 reconciliation 请求，不能猜测投影。
+- publisher 用短租约领取 `PENDING`/`RETRY` 行或原 owner 已失效的 `IN_FLIGHT` 行；失败按有限指数退避写回 `RETRY`，到达上限写 `FAILED`，绝不无限静默重试。过期 owner 不可回写。
+- consumer 在同一事务中写 inbox 和本地副作用。重复 `eventId` ACK 为 no-op；旧 aggregateVersion 记录为 `IGNORED_OLD`；版本缺口或尚未就绪的成员投影会持久化原 envelope 到 deferred state machine，再由 reconciliation worker 收敛，不能 ACK 后永久遗忘。
 - schema/契约错误为不可重试，直接留下审计 DLQ；可重试错误计数达到上限后也进入 DLQ。受控 replay 按原始 `eventId` 重发，只有 broker confirm 后才标为 `replayed`。
 
 ## 当前运行时接口与边界
@@ -19,7 +19,7 @@
 | Grade | `grade_event_outbox` | 同一 outbox 状态模型的预置 owner table | Grade 服务事件接入由对应服务 Issue 消费；#337 不从 Assessment/Learning 跨表代写。 |
 | Assessment | `assessment_event_inbox` | 预置 owner table | 消费者接入由 Assessment 服务 Issue 消费。 |
 | Grade | `grade_event_inbox` | 预置 owner table | 消费者接入由 Grade 服务 Issue 消费。 |
-| Learning | `learning_event_inbox`、`learning_event_dead_letter`、`learning_event_reconciliation_request`、`learning_course_member_projection` | `LearningReliableEventConsumer`、`LearningDeadLetterReplayService` | 当前接入 Homework 发布事件；成员投影解析 `COURSE_ACTIVE_STUDENTS`，消息没有学生 roster。 |
+| Learning | `learning_event_inbox`、`learning_event_dead_letter`、`learning_event_reconciliation_request`、`learning_deferred_event`、`learning_course_member_projection` | `LearningReliableEventConsumer`、`LearningCourseMemberChangedHandler`、`LearningReconciliationWorker`、`LearningDeadLetterReplayService` | 消费 `course.member.changed.v2` 建本地成员投影；Homework 在投影尚未观察到时延迟，缺口/成员事件到达后 worker 按原 eventId 收敛，消息没有学生 roster。 |
 
 迁移文件是 `database/migrations/20260830_01_create_reliable_event_storage.sql`，并同步进 `database/mysql/compose-schema.sql` 与基线历史。真正的五 schema、每服务 runtime account 和数据库授权只能在 #309/#341 的合并设计与迁移完成后启用；在此之前测试环境的单一账号不是隔离证据。
 
@@ -29,14 +29,14 @@
 
 - `onlinejudge.events.v2` 是 durable topic exchange；routing key 是 `onlinejudge.<eventType>`。
 - `onlinejudge.learning.events.v2` 是 durable main queue，消费端使用 manual ack。
-- 可重试消息投给 durable `onlinejudge.learning.retry.v2`，TTL 1 秒后回到 homework routing key；这是延迟重投，不是 busy loop。
+- 可重试消息投给 durable `onlinejudge.learning.retry.v2`，TTL 1 秒后回到 homework routing key；retry copy 获 publisher confirm 前绝不 ACK 原消息。这是延迟重投，不是 busy loop。
 - 拒绝或不可重试消息由 `onlinejudge.events.dlx.v2` 路由到 durable `onlinejudge.learning.dlq.v2`。数据库 DLQ 还保存 envelope、attempt、失败分类、`eventId` 与 `correlationId`，供审计和重放。
 
 生产发布使用 Rabbit publisher confirms 并标记 persistent delivery；拒绝、超时、网络错误都会抛出 `BrokerUnavailableException`，outbox 不会错误地改成 `PUBLISHED`。
 
 ## 观测与故障证据
 
-`ReliabilityMetricsService` 返回 Assessment backlog/PENDING/RETRY/FAILED、最老自动投递消息的 `eventId`/`correlationId`/年龄，以及 Learning 未重放 DLQ 总数和最老 DLQ 的关联 ID。它是供受保护的运行平台接出的结构化指标源，不公开未鉴权的重放 HTTP 入口。
+`ReliabilityMetricsService` 返回 Assessment backlog/PENDING/RETRY/FAILED、最老自动投递消息的 `eventId`/`correlationId`/年龄，以及 Learning 未重放 DLQ 和未收敛 deferred 事件的总数、最老关联 ID。它是供受保护的运行平台接出的结构化指标源，不公开未鉴权的重放 HTTP 入口。
 
 自动化证据包括：
 

@@ -83,7 +83,7 @@ class RabbitMqConfirmedPublisherLiveTest {
         assertThat(message).isNotNull();
         assertThat((String) message.getMessageProperties().getHeader("eventId")).isEqualTo(envelope.eventId());
         assertThat((String) message.getMessageProperties().getHeader("correlationId")).isEqualTo(envelope.correlationId());
-        assertThat(message.getMessageProperties().getDeliveryMode())
+        assertThat(message.getMessageProperties().getReceivedDeliveryMode())
                 .isEqualTo(org.springframework.amqp.core.MessageDeliveryMode.PERSISTENT);
         assertThat(new ObjectMapper().readTree(message.getBody()).path("eventId").asText()).isEqualTo(envelope.eventId());
         System.out.printf("rabbit-live-confirmed eventId=%s correlationId=%s route=%s%n",
