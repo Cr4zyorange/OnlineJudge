@@ -6,7 +6,9 @@ set -euo pipefail
 # accepting platform-manifest metadata as a deployment implementation.
 repo_root="$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"
 checkout="${1:-$repo_root}"
+fixture_mode="${2:-}"
 compose="$checkout/deploy/docker/compose.yml"
+platform="$checkout/deploy/platform/workloads.json"
 config="$checkout/services/course/src/main/resources/application-compose.properties"
 migrator="$checkout/database/mysql/migrate-course-service.sh"
 cached_runtime="$checkout/services/course/Dockerfile.cached-runtime"
@@ -20,12 +22,25 @@ fail() {
 }
 
 [[ -f "$compose" ]] || fail "missing supported Compose manifest"
+[[ -f "$platform" ]] || fail "missing platform workload manifest"
 [[ -f "$config" ]] || fail "missing Course Compose configuration"
 [[ -x "$migrator" ]] || fail "missing executable Course migration entrypoint"
 [[ -f "$cached_runtime" ]] || fail "missing Course cached-runtime Dockerfile"
 [[ -x "$live_smoke" ]] || fail "missing executable Course Compose live smoke"
 [[ -x "$live_learning" ]] || fail "missing executable Course-to-Learning live proof"
 [[ -f "$learning_overlay" ]] || fail "missing Course-to-Learning disposable Compose overlay"
+command -v node >/dev/null 2>&1 || fail "node is required to validate the Course migration manifest command"
+
+course_migration_command="$(node -e '
+  const manifest = require(process.argv[1]);
+  const job = manifest.migrationJobs.find((item) => item.name === "course-migrations");
+  if (!job || typeof job.command !== "string") process.exit(2);
+  process.stdout.write(job.command);
+' "$platform")" || fail "Course migration manifest command could not be read"
+[[ "$course_migration_command" == './database/mysql/migrate-course-service.sh' ]] || \
+  fail "Course migration manifest command must target database/mysql/migrate-course-service.sh"
+[[ -x "$checkout/${course_migration_command#./}" ]] || \
+  fail "Course migration manifest command must resolve to an executable runner"
 
 require() {
   local file="$1" text="$2" label="$3"
@@ -54,19 +69,26 @@ require "$cached_runtime" 'org.opencontainers.image.revision' 'cached Course run
 require "$cached_runtime" 'COPY --chown=10002:10002 services/course/target/onlinejudge-course-service-0.1.0-SNAPSHOT.jar app.jar' 'cached Course runtime does not run the same Course jar'
 require "$cached_runtime" 'USER 10002:10002' 'cached Course runtime is not non-root'
 require "$live_smoke" 'cross-schema=DENIED' 'Course Compose live smoke does not prove schema isolation'
+require "$live_smoke" 'runtime-ddl=DENIED' 'Course Compose live smoke does not prove runtime DDL denial'
 require "$live_smoke" 'course-id=' 'Course Compose live smoke does not prove an authenticated Course API'
 require "$live_learning" 'pending-before-binding=4' 'Course-to-Learning proof does not retain unbound durable facts'
 require "$live_learning" 'watermark=2 notifications=1' 'Course-to-Learning proof does not verify Learning convergence'
 require "$learning_overlay" 'OJ312_MYSQL_PORT' 'Course-to-Learning overlay does not isolate the disposable MySQL port'
+
+if [[ "$fixture_mode" == '--fixture' ]]; then
+  printf 'course-compose-contract: fixture validation PASS\n'
+  exit 0
+fi
 
 # Mutation: a superficial workload entry must not be enough; removing the
 # actual Compose Course service must make the formal contract fail.
 fixture="$(mktemp -d "${TMPDIR:-/tmp}/onlinejudge-course-compose-contract.XXXXXX")"
 cleanup() { rm -rf -- "$fixture"; }
 trap cleanup EXIT INT TERM
-mkdir -p "$fixture/deploy/docker" "$fixture/services/course/src/main/resources" "$fixture/database/mysql"
+mkdir -p "$fixture/deploy/docker" "$fixture/deploy/platform" "$fixture/services/course/src/main/resources" "$fixture/database/mysql"
 mkdir -p "$fixture/scripts/test"
 cp "$compose" "$fixture/deploy/docker/compose.yml"
+cp "$repo_root/deploy/platform/workloads.json" "$fixture/deploy/platform/workloads.json"
 cp "$learning_overlay" "$fixture/deploy/docker/compose.course-learning-live.yml"
 cp "$config" "$fixture/services/course/src/main/resources/application-compose.properties"
 cp "$cached_runtime" "$fixture/services/course/Dockerfile.cached-runtime"
@@ -76,6 +98,18 @@ cp "$live_learning" "$fixture/scripts/test/verify-course-to-learning-live.sh"
 chmod +x "$fixture/scripts/test/verify-course-to-learning-live.sh"
 cp "$migrator" "$fixture/database/mysql/migrate-course-service.sh"
 chmod +x "$fixture/database/mysql/migrate-course-service.sh"
+
+# Mutation: the platform contract must not merely name a Course migration job;
+# its command must resolve to the checked-in, executable runner.
+sed -i.bak 's#migrate-course-service\.sh#migrator-that-does-not-exist.sh#' "$fixture/deploy/platform/workloads.json"
+rm -f "$fixture/deploy/platform/workloads.json.bak"
+if bash "$0" "$fixture" --fixture >"$fixture/migration-command.out" 2>"$fixture/migration-command.err"; then
+  fail "unresolvable Course migration command mutation unexpectedly passed"
+fi
+grep -Fq 'Course migration manifest command' "$fixture/migration-command.err" || \
+  fail "unresolvable Course migration command mutation was not detected"
+cp "$repo_root/deploy/platform/workloads.json" "$fixture/deploy/platform/workloads.json"
+
 awk '
   /^  course-service:$/ { skip = 1; next }
   skip && /^  [^[:space:]]/ { skip = 0 }

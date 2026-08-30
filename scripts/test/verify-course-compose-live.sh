@@ -114,6 +114,13 @@ if "${compose[@]}" exec -T -e "MYSQL_PWD=$COURSE_DATABASE_PASSWORD" mysql \
   mysql --protocol=TCP -h 127.0.0.1 -u oj_course_rw -D onlinejudge -N -e 'SELECT COUNT(*) FROM crs_course' >/dev/null 2>&1; then
   fail "Course account unexpectedly read the legacy schema"
 fi
+ddl_probe="__course_runtime_ddl_probe_${run_id}"
+if ddl_error="$("${compose[@]}" exec -T -e "MYSQL_PWD=$COURSE_DATABASE_PASSWORD" mysql \
+  mysql --protocol=TCP -h 127.0.0.1 -u oj_course_rw -D oj_course -N -e "CREATE TABLE \`$ddl_probe\` (id BIGINT)" 2>&1)"; then
+  fail "Course runtime account unexpectedly received DDL authority"
+fi
+printf '%s' "$ddl_error" | grep -Eq 'ERROR 1142|command denied' || \
+  fail "Course runtime DDL denial did not return a MySQL authorization error"
 
 IFS=$'\t' read -r outbox_count event_count correlation_count <<<"$("${compose[@]}" exec -T -e "MYSQL_PWD=$COURSE_DATABASE_PASSWORD" mysql \
   mysql --protocol=TCP -h 127.0.0.1 -u oj_course_rw -D oj_course -N -e \
@@ -138,6 +145,6 @@ host_jar_sha="$(sha256sum "$repo_root/services/course/target/onlinejudge-course-
 container_jar_sha="$("${compose[@]}" exec -T course-service sha256sum /opt/onlinejudge-course/app.jar | awk '{print $1}')"
 [[ "$host_jar_sha" == "$container_jar_sha" ]] || fail "Course image does not contain the packaged Course jar"
 
-printf 'course-compose-live: PASS course-id=%s announcement-id=%s list-total=%s course-account-rows=%s cross-schema=DENIED outbox-events=%s unique-event-ids=%s correlations=%s image-revision=%s user=%s jar-sha256=%s\n' \
+printf 'course-compose-live: PASS course-id=%s announcement-id=%s list-total=%s course-account-rows=%s cross-schema=DENIED runtime-ddl=DENIED outbox-events=%s unique-event-ids=%s correlations=%s image-revision=%s user=%s jar-sha256=%s\n' \
   "$course_id" "$announcement_id" "$list_total" "$course_rows" "$outbox_count" "$event_count" "$correlation_count" \
   "$image_revision" "$image_user" "$host_jar_sha"
