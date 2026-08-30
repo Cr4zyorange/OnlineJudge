@@ -205,10 +205,6 @@ public class CourseRepository {
         jdbcTemplate.update("UPDATE crs_resource SET is_deleted = TRUE, updated_at = CURRENT_TIMESTAMP WHERE course_id = ? AND id = ? AND is_deleted = FALSE", courseId, resourceId);
     }
 
-    public void incrementDownloadCount(long courseId, long resourceId) {
-        jdbcTemplate.update("UPDATE crs_resource SET download_count = download_count + 1 WHERE course_id = ? AND id = ? AND is_deleted = FALSE", courseId, resourceId);
-    }
-
     public Announcement createAnnouncement(long courseId, String title, String content, boolean top, long publisherId) {
         KeyHolder keyHolder = new GeneratedKeyHolder();
         jdbcTemplate.update(connection -> {

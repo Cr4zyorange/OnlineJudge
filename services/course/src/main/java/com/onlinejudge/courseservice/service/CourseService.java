@@ -242,18 +242,16 @@ public class CourseService {
         return courses.resources(courseId, canManageContent(courseId, actor)).stream().map(this::resourceView).toList();
     }
 
-    @Transactional
+    /** HTTP GET must remain safe for browser prefetches and retries. */
     public ResourceDownload downloadResource(long courseId, long resourceId, CurrentUser actor) {
         requireMember(courseId, actor);
         CourseRepository.Resource resource = resource(courseId, resourceId);
         if (!canManageContent(courseId, actor) && (!"STUDENT".equals(resource.visibility())
                 || (resource.publishAt() != null && resource.publishAt().isAfter(LocalDateTime.now())))) throw forbidden();
-        courses.incrementDownloadCount(courseId, resourceId);
-        CourseRepository.Resource updated = resource(courseId, resourceId);
-        if (updated.externalUrl() != null && !updated.externalUrl().isBlank()) {
-            return new ResourceDownload(null, null, null, updated.externalUrl());
+        if (resource.externalUrl() != null && !resource.externalUrl().isBlank()) {
+            return new ResourceDownload(null, null, null, resource.externalUrl());
         }
-        return new ResourceDownload(fileStorage.load(updated.storageKey()), updated.contentType(), updated.originalFilename(), null);
+        return new ResourceDownload(fileStorage.load(resource.storageKey()), resource.contentType(), resource.originalFilename(), null);
     }
 
     @Transactional

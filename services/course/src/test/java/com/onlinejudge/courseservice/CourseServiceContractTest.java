@@ -399,6 +399,36 @@ class CourseServiceContractTest {
                 .andExpect(status().isOk()).andExpect(jsonPath("$.data").isEmpty());
     }
 
+    @Test
+    void resourceDownloadGetIsReadOnlyAcrossBrowserPrefetchRetries() throws Exception {
+        String teacher = userToken("971", List.of("TEACHER"));
+        String student = userToken("972", List.of("STUDENT"));
+        String courseId = createdCourse(teacher, "read only resource download");
+        mockMvc.perform(post("/api/v1/courses/{courseId}/join", courseId)
+                        .header("Authorization", student).header("X-Request-Id", requestId()))
+                .andExpect(status().isOk());
+        String resourceResponse = mockMvc.perform(post("/api/v1/courses/{courseId}/resources", courseId)
+                        .header("Authorization", teacher).header("X-Request-Id", requestId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"browser prefetch target\",\"url\":\"https://example.test/prefetch.pdf\"}"))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        long resourceId = objectMapper.readTree(resourceResponse).at("/data/id").asLong();
+        var resourceBefore = jdbcTemplate.queryForMap("SELECT download_count, version, updated_at FROM crs_resource WHERE id = ?", resourceId);
+        int outboxBefore = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM course_event_outbox", Integer.class);
+        int memberBefore = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM crs_course_member", Integer.class);
+
+        for (int retry = 0; retry < 2; retry++) {
+            mockMvc.perform(get("/api/v1/courses/{courseId}/resources/{resourceId}/download", courseId, resourceId)
+                            .header("Authorization", student).header("X-Request-Id", requestId()))
+                    .andExpect(status().is3xxRedirection());
+        }
+
+        assertThat(jdbcTemplate.queryForMap("SELECT download_count, version, updated_at FROM crs_resource WHERE id = ?", resourceId))
+                .isEqualTo(resourceBefore);
+        assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM course_event_outbox", Integer.class)).isEqualTo(outboxBefore);
+        assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM crs_course_member", Integer.class)).isEqualTo(memberBefore);
+    }
+
     private String createdCourse(String teacherToken, String name) throws Exception {
         String response = mockMvc.perform(post("/api/v1/courses")
                         .header("Authorization", teacherToken)
