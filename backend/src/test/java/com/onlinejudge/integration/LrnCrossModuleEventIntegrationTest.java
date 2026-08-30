@@ -1,7 +1,8 @@
 package com.onlinejudge.integration;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.onlinejudge.lrn.service.NotificationCreateCommand;
+import com.onlinejudge.lrn.service.NotificationService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,9 +27,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * LRN closure for real cross-module entry points. GRADE_PUBLISHED is exercised by
- * {@link GrdLrnIntegrationTest}; this class adds the missing LAB_EXPERIMENT_PUBLISHED
- * and HOMEWORK_PUBLISHED paths and verifies the resulting LRN state transitions.
+ * LRN closure for the retained notification API and Homework publication's v2
+ * asynchronous hand-off. Homework notification persistence is intentionally
+ * covered by the Learning inbox test, not by the retired in-process callback.
  */
 @SpringBootTest(properties = {
         "spring.datasource.url=jdbc:h2:mem:lrn_cross_module_integration;MODE=MySQL;DATABASE_TO_LOWER=TRUE;CASE_INSENSITIVE_IDENTIFIERS=TRUE;DB_CLOSE_DELAY=-1"
@@ -49,6 +50,9 @@ class LrnCrossModuleEventIntegrationTest {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private NotificationService notificationService;
 
     @BeforeEach
     void setUp() {
@@ -91,13 +95,7 @@ class LrnCrossModuleEventIntegrationTest {
     }
 
     @Test
-    void realLabAndHomeworkPublishCreateMemberScopedUnreadLrnNotifications() throws Exception {
-        long labId = createLab();
-        mockMvc.perform(post("/api/v1/labs/{labId}/publish", labId)
-                        .headers(teacherHeaders()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.status").value("PUBLISHED"));
-
+    void homeworkPublishCommitsAnAssessmentOutboxWithoutAnInProcessLearningSideEffect() throws Exception {
         long homeworkId = createHomework();
         mockMvc.perform(put("/api/v1/homeworks/{homeworkId}/publish", homeworkId)
                         .headers(teacherHeaders()))
@@ -105,37 +103,51 @@ class LrnCrossModuleEventIntegrationTest {
                 .andExpect(jsonPath("$.data.status").value("PUBLISHED"));
 
         mockMvc.perform(get("/api/v1/notifications")
-                        .headers(studentHeaders(STUDENT_ID))
-                        .param("type", "TASK")
-                        .param("isRead", "false"))
+                .headers(studentHeaders(STUDENT_ID))
+                .param("type", "TASK")
+                .param("isRead", "false"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.total").value(2))
-                .andExpect(jsonPath("$.data.unreadCount").value(2))
-                .andExpect(jsonPath("$.data.records", hasSize(2)))
-                .andExpect(jsonPath("$.data.records[0].sourceModule").value("HWK"))
-                .andExpect(jsonPath("$.data.records[0].sourceId").value(homeworkId))
-                .andExpect(jsonPath("$.data.records[1].sourceModule").value("LAB"))
-                .andExpect(jsonPath("$.data.records[1].sourceId").value(labId));
+                .andExpect(jsonPath("$.data.total").value(0))
+                .andExpect(jsonPath("$.data.unreadCount").value(0))
+                .andExpect(jsonPath("$.data.records", hasSize(0)));
 
         mockMvc.perform(get("/api/v1/notifications")
-                        .headers(studentHeaders(SECOND_STUDENT_ID)))
+                .headers(studentHeaders(SECOND_STUDENT_ID)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.total").value(2));
+                .andExpect(jsonPath("$.data.total").value(0));
 
         mockMvc.perform(get("/api/v1/notifications")
                         .headers(studentHeaders(OUTSIDER_ID)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.total").value(0));
+
+        Integer outboxCount = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM assessment_event_outbox
+                WHERE aggregate_id = ?
+                  AND event_type = 'assessment.homework.published.v2'
+                  AND delivery_status = 'PENDING'
+                """, Integer.class, String.valueOf(homeworkId));
+        org.assertj.core.api.Assertions.assertThat(outboxCount).isEqualTo(1);
     }
 
     @Test
     void crossModuleNotificationReadDeleteAndOwnershipRemainAuditable() throws Exception {
-        long homeworkId = createHomework();
-        mockMvc.perform(put("/api/v1/homeworks/{homeworkId}/publish", homeworkId)
-                        .headers(teacherHeaders()))
-                .andExpect(status().isOk());
+        long labId = createLab();
+        notificationService.createNotifications(new NotificationCreateCommand(
+                "issue-262-notification-" + labId,
+                "LAB_EXPERIMENT_PUBLISHED",
+                "TASK",
+                COURSE_ID,
+                "LAB",
+                labId,
+                List.of(STUDENT_ID, SECOND_STUDENT_ID),
+                "实验已发布",
+                "验证通知读取、删除与归属审计",
+                1,
+                "/courses/" + COURSE_ID + "/labs/" + labId
+        ));
 
-        long notificationId = notificationId(STUDENT_ID, "HWK", homeworkId);
+        long notificationId = notificationId(STUDENT_ID, "LAB", labId);
         mockMvc.perform(put("/api/v1/notifications/read")
                         .headers(studentHeaders(STUDENT_ID))
                         .contentType(MediaType.APPLICATION_JSON)

@@ -22,6 +22,7 @@ spring:
         - file:../database/migrations/20260530_01_create_hwk_homework.sql
         - file:../database/migrations/20260601_01_create_hwk_submission.sql
         - file:../database/migrations/20260822_03_create_hwk_submission_attachment.sql
+        - file:../database/migrations/20260830_01_create_reliable_event_storage.sql
         - classpath:h2-hwk-statistics-attention-indexes.sql
         - file:../database/migrations/20260530_01_create_lrn_learning_task.sql
         - file:../database/migrations/20260531_01_create_lrn_learning_progress.sql
@@ -38,3 +39,14 @@ onlinejudge:
       upload-ttl: PT24H
       zip-max-entries: 128
       cleanup-enabled: true
+  reliability:
+    rabbitmq:
+      enabled: false
+    publisher:
+      enabled: false
+      fixed-delay-ms: 5000
+      batch-size: 50
+      max-attempts: 8
+      lease-seconds: 30
+      retry-base-seconds: 1
+      retry-max-seconds: 300
