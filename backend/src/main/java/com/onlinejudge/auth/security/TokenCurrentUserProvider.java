@@ -44,7 +44,13 @@ public class TokenCurrentUserProvider implements CurrentUserProvider {
 
     private CurrentUser toCurrentUser(AuthUserView user) {
         String primaryRole = user.roles().isEmpty() ? user.userType() : user.roles().get(0);
-        return new CurrentUser(user.id(), user.username(), primaryRole, new TreeSet<>(user.permissions()));
+        return new CurrentUser(
+                user.id(),
+                user.username(),
+                primaryRole,
+                new TreeSet<>(user.roles()),
+                new TreeSet<>(user.permissions())
+        );
     }
 
     private Optional<CurrentUser> toCurrentUser(OfflineJwtVerifier.Principal principal) {
@@ -57,6 +63,7 @@ public class TokenCurrentUserProvider implements CurrentUserProvider {
                     userId,
                     "",
                     principal.roles().get(0),
+                    new TreeSet<>(principal.roles()),
                     new TreeSet<>(principal.permissions())
             ));
         } catch (NumberFormatException exception) {

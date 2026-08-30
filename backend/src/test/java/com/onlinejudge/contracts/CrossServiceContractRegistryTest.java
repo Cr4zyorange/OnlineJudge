@@ -127,7 +127,7 @@ class CrossServiceContractRegistryTest {
         Set<String> fields = Arrays.stream(currentUser.getRecordComponents())
                 .map(java.lang.reflect.RecordComponent::getName)
                 .collect(java.util.stream.Collectors.toSet());
-        assertThat(fields).containsExactlyInAnyOrder("id", "username", "role", "permissions");
+        assertThat(fields).containsExactlyInAnyOrder("id", "username", "role", "roles", "permissions");
         assertThat(Class.forName("com.onlinejudge.common.security.CurrentUserProvider").isInterface()).isTrue();
     }
 

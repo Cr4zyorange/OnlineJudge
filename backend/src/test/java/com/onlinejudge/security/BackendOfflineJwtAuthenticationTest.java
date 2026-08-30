@@ -68,6 +68,41 @@ class BackendOfflineJwtAuthenticationTest {
     }
 
     @Test
+    void allClaimedRolesAuthorizeTeachingRegardlessOfJwtRoleOrder() throws Exception {
+        for (List<String> roles : List.of(List.of("STUDENT", "TEACHER"), List.of("TEACHER", "STUDENT"))) {
+            String token = userToken("90904", roles, List.of("course:manage"), 1,
+                    "onlinejudge.identity.v2", "onlinejudge.api", "RS256", KID,
+                    Instant.now().plusSeconds(300));
+
+            mockMvc.perform(post("/api/v1/courses")
+                            .header("Authorization", "Bearer " + token)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"name\":\"multi-role-course\"}"))
+                    .andExpect(status().isOk());
+        }
+    }
+
+    @Test
+    void duplicateOrUnknownRolesWithoutTeacherRemainForbidden() throws Exception {
+        for (List<String> roles : List.of(
+                List.of("STUDENT"),
+                List.of("STUDENT", "STUDENT"),
+                List.of("UNKNOWN", "STUDENT"),
+                List.of("UNKNOWN", "UNKNOWN")
+        )) {
+            String token = userToken("90905", roles, List.of("course:manage"), 1,
+                    "onlinejudge.identity.v2", "onlinejudge.api", "RS256", KID,
+                    Instant.now().plusSeconds(300));
+
+            mockMvc.perform(post("/api/v1/courses")
+                            .header("Authorization", "Bearer " + token)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"name\":\"non-teacher-course\"}"))
+                    .andExpect(status().isForbidden());
+        }
+    }
+
+    @Test
     void rejectsWrongIssuerAudienceAlgorithmKidExpiryAndStaleSecurityVersion() throws Exception {
         securityVersions.apply("90903", 2);
         for (String token : List.of(

@@ -20,7 +20,7 @@ iss=onlinejudge.identity.v2, aud=onlinejudge.api
 
 `GET /.well-known/jwks.json` 返回当前与轮换重叠窗口内的 RSA 公钥，键均含 `kty=RSA`、`use=sig`、`alg=RS256`、`kid`、`n`、`e`。此 v2 操作必须携带非空 `X-Request-Id`；缺失时返回 `400 REQUEST_ID_REQUIRED` 及标准错误体。成功响应是 `Cache-Control: public, max-age=<IDENTITY_JWKS_CACHE_MAX_AGE>, must-revalidate`，消费端以该有界缓存窗口安排刷新。旧公钥必须保留至少一个最大 Token 生命周期加消费端缓存窗口。私钥只由 `IDENTITY_JWT_SIGNING_KEY` 注入；Compose/生产显式关闭临时开发密钥。
 
-`OfflineJwtVerifier` 是业务服务应复用的纯协议实现，没有 Identity HTTP 客户端或 Identity 数据库依赖。它在请求路径拒绝未知 `kid`、非 RS256、签名错误、错误 issuer/audience、未来签发、过期和低于本地最小 `securityVersion` 的令牌。每个业务服务在启动时从运行时 Secret `IDENTITY_JWKS_TRUST_BUNDLE` 载入公开 JWKS，随后在请求路径之外按 `IDENTITY_JWKS_URI`、刷新间隔和超时定时刷新；刷新失败保留最后一个有效快照。因此 Identity 停机时，已启动或从 bundle 重启的服务仍可离线验证未过期会话，新登录和无初始 bundle 的实例失败关闭。不得用网关 Header 代替验证。
+`OfflineJwtVerifier` 是业务服务应复用的纯协议实现，没有 Identity HTTP 客户端或 Identity 数据库依赖。它在请求路径拒绝未知 `kid`、非 RS256、签名错误、错误 issuer/audience、未来签发、过期和低于本地最小 `securityVersion` 的令牌。已验证 JWT 的 `roles[]` 被完整地规范化为角色集合，`hasRole` 按集合成员判断而不依赖 claim 顺序；重复角色去重，未知角色不会因此取得任一已知角色权限。每个业务服务在启动时从运行时 Secret `IDENTITY_JWKS_TRUST_BUNDLE` 载入公开 JWKS，随后在请求路径之外按 `IDENTITY_JWKS_URI`、刷新间隔和超时定时刷新；刷新失败保留最后一个有效快照。因此 Identity 停机时，已启动或从 bundle 重启的服务仍可离线验证未过期会话，新登录和无初始 bundle 的实例失败关闭。不得用网关 Header 代替验证。
 
 ## 3. 会话失效和安全版本
 
