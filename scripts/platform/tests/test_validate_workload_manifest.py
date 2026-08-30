@@ -15,6 +15,7 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 VALIDATOR = REPOSITORY_ROOT / "scripts/platform/validate_workload_manifest.py"
 SCHEMA = REPOSITORY_ROOT / "deploy/platform/workload-manifest.schema.json"
 MANIFEST = REPOSITORY_ROOT / "deploy/platform/workloads.json"
+CONTRACT_GATE = REPOSITORY_ROOT / "scripts/ci/contract-verify.sh"
 
 
 class WorkloadManifestValidationTest(unittest.TestCase):
@@ -89,7 +90,10 @@ class WorkloadManifestValidationTest(unittest.TestCase):
 
     def test_cyclic_dependency_is_rejected(self) -> None:
         def mutate(manifest: dict) -> None:
-            manifest["workloads"][0]["dependsOn"].append("frontend")
+            frontend = next(
+                workload for workload in manifest["workloads"] if workload["name"] == "frontend"
+            )
+            frontend["dependsOn"].append("gateway")
 
         temporary_directory = self.write_variant(mutate)
         self.addCleanup(temporary_directory.cleanup)
@@ -118,6 +122,96 @@ class WorkloadManifestValidationTest(unittest.TestCase):
             "learning-service",
             "frontend",
         ])
+
+    def test_auth_source_change_selects_identity_service(self) -> None:
+        result = self.run_validator(
+            MANIFEST,
+            "--changed-path",
+            "backend/src/main/java/com/onlinejudge/auth/AuthApplication.java",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        resolved = json.loads(result.stdout)
+        self.assertEqual(resolved["affectedWorkloads"], ["identity-service"])
+
+    def test_source_path_without_trigger_is_rejected(self) -> None:
+        def mutate(manifest: dict) -> None:
+            identity = next(
+                workload
+                for workload in manifest["workloads"]
+                if workload["name"] == "identity-service"
+            )
+            identity["pathTriggers"] = ["services/identity/**"]
+
+        temporary_directory = self.write_variant(mutate)
+        self.addCleanup(temporary_directory.cleanup)
+
+        result = self.run_validator(Path(temporary_directory.name) / "workloads.json")
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("source path", result.stderr)
+        self.assertIn("identity-service", result.stderr)
+
+    def test_migration_path_without_owning_workload_trigger_is_rejected(self) -> None:
+        def mutate(manifest: dict) -> None:
+            manifest["migrationJobs"][0]["sourcePaths"] = ["database/migrations/uncovered/**"]
+
+        temporary_directory = self.write_variant(mutate)
+        self.addCleanup(temporary_directory.cleanup)
+
+        result = self.run_validator(Path(temporary_directory.name) / "workloads.json")
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("migration source path", result.stderr)
+        self.assertIn("identity-migrations", result.stderr)
+
+    def test_gateway_models_the_browser_entry_for_frontend(self) -> None:
+        manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
+        gateway = next(workload for workload in manifest["workloads"] if workload["name"] == "gateway")
+
+        self.assertEqual(gateway["traffic"]["browserEntry"], {
+            "path": "/",
+            "targetWorkload": "frontend",
+        })
+        self.assertTrue(gateway["traffic"]["exposed"])
+        self.assertIn("frontend", gateway["dependsOn"])
+
+    def test_gateway_without_frontend_dependency_is_rejected(self) -> None:
+        def mutate(manifest: dict) -> None:
+            gateway = next(workload for workload in manifest["workloads"] if workload["name"] == "gateway")
+            gateway["dependsOn"] = [
+                dependency for dependency in gateway["dependsOn"] if dependency != "frontend"
+            ]
+
+        temporary_directory = self.write_variant(mutate)
+        self.addCleanup(temporary_directory.cleanup)
+
+        result = self.run_validator(Path(temporary_directory.name) / "workloads.json")
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("browser entry", result.stderr)
+        self.assertIn("frontend", result.stderr)
+
+    def test_direct_frontend_exposure_is_rejected(self) -> None:
+        def mutate(manifest: dict) -> None:
+            frontend = next(
+                workload for workload in manifest["workloads"] if workload["name"] == "frontend"
+            )
+            frontend["traffic"]["exposed"] = True
+
+        temporary_directory = self.write_variant(mutate)
+        self.addCleanup(temporary_directory.cleanup)
+
+        result = self.run_validator(Path(temporary_directory.name) / "workloads.json")
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("served through gateway", result.stderr)
+
+    def test_contract_gate_runs_platform_validation_and_regression_suite(self) -> None:
+        contract_gate = CONTRACT_GATE.read_text(encoding="utf-8")
+
+        self.assertIn("scripts/platform/validate_workload_manifest.py", contract_gate)
+        self.assertIn("scripts.platform.tests.test_validate_workload_manifest", contract_gate)
 
 
 if __name__ == "__main__":

@@ -39,7 +39,7 @@ validate-workflows（无前置，静态校验 + dry-run 链路模拟）
         │
         ├── backend-gate    compile + 单元测试 + 集成测试
         ├── frontend-gate   npm ci + typecheck + 单元测试 + build + 运行器契约
-        ├── contracts-gate  shell 契约 + 公共基础设施契约
+        ├── contracts-gate  shell 契约 + 公共基础设施契约 + D7 workload manifest
         │
         ▼
       delivery（needs 全部四个门禁；后续镜像/Kind 部署 job 以 needs: [delivery] 挂接）
@@ -68,7 +68,7 @@ validate-workflows（无前置，静态校验 + dry-run 链路模拟）
 每个门禁 job 在 `ci-artifacts/<job>/` 下保留：
 
 - `environment.json`：event、repository、workflow、run id、ref、base_ref、精确 head SHA、runner OS/arch、Java/Maven/Node/npm 版本、UTC 时间戳。
-- `gate.log`：正本脚本完整输出（含每个命令回显）。
+- `gate.log`：正本脚本完整输出（含每个命令回显）；`contracts-gate/consumer/gate.log` 同时保留 D7 workload manifest 的 schema/语义校验和 Python mutation regression 原始输出。
 - surefire/vitest XML 报告（按单元/集成/契约分目录）与 `test-summary.txt`（tests/failures/errors/skipped 计数）。
 - `check-result.txt`（validate-workflows）与 `checkpoint.txt`（delivery）。
 

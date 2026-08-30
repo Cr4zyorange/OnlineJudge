@@ -270,6 +270,38 @@ def validate_workloads(workloads: list[dict[str, Any]]) -> dict[str, dict[str, A
     return workload_by_name
 
 
+def path_pattern_covers(source_path: str, trigger_pattern: str) -> bool:
+    """Return whether every path selected by source_path is selected by trigger_pattern.
+
+    The manifest intentionally uses repository-relative directory patterns.  A
+    narrower trigger must never be accepted for a workload source path: doing
+    so would make the build matrix silently omit source changes.  We support
+    exact paths and the directory ``/**`` form used by this contract; arbitrary
+    glob-to-glob containment is deliberately rejected unless the patterns are
+    equal because it cannot be proved safely with the standard library matcher.
+    """
+    source = source_path.lstrip("./")
+    trigger = trigger_pattern.lstrip("./")
+    if source == trigger:
+        return True
+    if trigger.endswith("/**"):
+        trigger_prefix = trigger[:-3]
+        return source == trigger_prefix or source.startswith(trigger_prefix + "/")
+    return False
+
+
+def validate_workload_source_path_triggers(workload_by_name: dict[str, dict[str, Any]]) -> None:
+    for name, workload in workload_by_name.items():
+        for source_path in workload["sourcePaths"]:
+            if not any(
+                path_pattern_covers(source_path, trigger_pattern)
+                for trigger_pattern in workload["pathTriggers"]
+            ):
+                raise ManifestValidationError(
+                    f"workload '{name}' source path '{source_path}' is not covered by pathTriggers"
+                )
+
+
 def validate_dependency_graph(workload_by_name: dict[str, dict[str, Any]]) -> None:
     for name, workload in workload_by_name.items():
         for dependency in workload["dependsOn"]:
@@ -325,6 +357,16 @@ def validate_migration_jobs(manifest: dict[str, Any], workload_by_name: dict[str
             raise ManifestValidationError(f"{location} references unknown workload '{job['forWorkload']}'")
         if workload_by_name[job["forWorkload"]]["migrationJob"] != job["name"]:
             raise ManifestValidationError(f"{location} is not linked by workload '{job['forWorkload']}'")
+        owning_workload = workload_by_name[job["forWorkload"]]
+        for source_path in job["sourcePaths"]:
+            if not any(
+                path_pattern_covers(source_path, trigger_pattern)
+                for trigger_pattern in owning_workload["pathTriggers"]
+            ):
+                raise ManifestValidationError(
+                    f"migration source path '{source_path}' for job '{job['name']}' is not covered "
+                    f"by owning workload '{job['forWorkload']}' pathTriggers"
+                )
         if job["dependsOnWorkloads"] != ["mysql"]:
             raise ManifestValidationError(f"{location} must depend on the physical mysql workload")
         expected_dependencies = [] if expected_previous is None else [expected_previous]
@@ -365,14 +407,43 @@ def validate_promotion_and_retirement(manifest: dict[str, Any]) -> None:
         raise ManifestValidationError("d3Retirement must retain the explicit compatibility-window policy")
 
 
+def validate_browser_entry(workload_by_name: dict[str, dict[str, Any]]) -> None:
+    """Require a browser-reachable SPA through the public gateway route."""
+    gateway = workload_by_name["gateway"]
+    frontend = workload_by_name["frontend"]
+    gateway_traffic = gateway["traffic"]
+    frontend_traffic = frontend["traffic"]
+    browser_entry = gateway_traffic["browserEntry"]
+
+    if gateway_traffic["exposed"] is not True:
+        raise ManifestValidationError("gateway browser entry must be externally exposed")
+    if browser_entry != {"path": "/", "targetWorkload": "frontend"}:
+        raise ManifestValidationError(
+            "gateway browser entry must route path '/' to workload 'frontend'"
+        )
+    if frontend["type"] != "frontend":
+        raise ManifestValidationError("gateway browser entry target 'frontend' must be a frontend workload")
+    if frontend_traffic["exposed"] is not False:
+        raise ManifestValidationError("frontend browser entry must be served through gateway, not exposed directly")
+    if "frontend" not in gateway["dependsOn"]:
+        raise ManifestValidationError(
+            "gateway browser entry must declare frontend as a deployment dependency"
+        )
+    for name, workload in workload_by_name.items():
+        if name != "gateway" and workload["traffic"]["browserEntry"] is not None:
+            raise ManifestValidationError(f"only gateway may declare a browser entry (found on '{name}')")
+
+
 def validate(manifest: dict[str, Any], schema: dict[str, Any]) -> dict[str, dict[str, Any]]:
     validate_schema_shape(schema)
     validate_against_schema(manifest, schema, schema, "manifest")
     workloads = validate_manifest_shape(manifest)
     workload_by_name = validate_workloads(workloads)
+    validate_workload_source_path_triggers(workload_by_name)
     validate_dependency_graph(workload_by_name)
     validate_migration_jobs(manifest, workload_by_name)
     validate_promotion_and_retirement(manifest)
+    validate_browser_entry(workload_by_name)
     return workload_by_name
 
 

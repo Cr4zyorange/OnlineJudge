@@ -30,7 +30,7 @@
         "liveness": {"kind": "http", "target": "/health/live", "requiredDependencies": []},
         "readiness": {"kind": "http", "target": "/health/ready", "requiredDependencies": []}
       },
-      "dependsOn": ["identity-service", "course-service", "assessment-api", "grade-service", "learning-service"],
+      "dependsOn": ["identity-service", "course-service", "assessment-api", "grade-service", "learning-service", "frontend"],
       "migrationJob": null,
       "configuration": ["GATEWAY_HTTP_PORT", "REQUEST_ID_HEADER"],
       "secrets": [
@@ -39,7 +39,11 @@
       ],
       "resources": {"requests": {"cpu": "100m", "memory": "128Mi"}, "limits": {"cpu": "500m", "memory": "512Mi"}},
       "pathTriggers": ["services/gateway/**", "deploy/gateway/**"],
-      "traffic": {"exposed": true, "routePrefixes": ["/"]}
+      "traffic": {
+        "exposed": true,
+        "routePrefixes": ["/api"],
+        "browserEntry": {"path": "/", "targetWorkload": "frontend"}
+      }
     },
     {
       "name": "identity-service",
@@ -67,7 +71,7 @@
       ],
       "resources": {"requests": {"cpu": "200m", "memory": "256Mi"}, "limits": {"cpu": "1000m", "memory": "1Gi"}},
       "pathTriggers": ["services/identity/**", "backend/src/main/java/com/onlinejudge/auth/**", "database/migrations/identity/**"],
-      "traffic": {"exposed": false, "routePrefixes": ["/api/v1/auth", "/.well-known/jwks.json"]}
+      "traffic": {"exposed": false, "routePrefixes": ["/api/v1/auth", "/.well-known/jwks.json"], "browserEntry": null}
     },
     {
       "name": "course-service",
@@ -95,7 +99,7 @@
       ],
       "resources": {"requests": {"cpu": "200m", "memory": "256Mi"}, "limits": {"cpu": "1000m", "memory": "1Gi"}},
       "pathTriggers": ["services/course/**", "backend/src/main/java/com/onlinejudge/course/**", "database/migrations/course/**"],
-      "traffic": {"exposed": false, "routePrefixes": ["/api/v1/courses"]}
+      "traffic": {"exposed": false, "routePrefixes": ["/api/v1/courses"], "browserEntry": null}
     },
     {
       "name": "assessment-api",
@@ -124,7 +128,7 @@
       ],
       "resources": {"requests": {"cpu": "300m", "memory": "512Mi"}, "limits": {"cpu": "1500m", "memory": "2Gi"}},
       "pathTriggers": ["services/assessment/**", "backend/src/main/java/com/onlinejudge/lab/**", "backend/src/main/java/com/onlinejudge/homework/**", "database/migrations/assessment/**"],
-      "traffic": {"exposed": false, "routePrefixes": ["/api/v1/labs", "/api/v1/homeworks", "/api/v1/submissions", "/api/v1/evaluations"]}
+      "traffic": {"exposed": false, "routePrefixes": ["/api/v1/labs", "/api/v1/homeworks", "/api/v1/submissions", "/api/v1/evaluations"], "browserEntry": null}
     },
     {
       "name": "assessment-worker",
@@ -153,7 +157,7 @@
       ],
       "resources": {"requests": {"cpu": "500m", "memory": "1Gi"}, "limits": {"cpu": "2000m", "memory": "4Gi"}},
       "pathTriggers": ["services/assessment/**", "backend/src/main/java/com/onlinejudge/evaluation/**"],
-      "traffic": {"exposed": false, "routePrefixes": []}
+      "traffic": {"exposed": false, "routePrefixes": [], "browserEntry": null}
     },
     {
       "name": "grade-service",
@@ -182,7 +186,7 @@
       ],
       "resources": {"requests": {"cpu": "200m", "memory": "256Mi"}, "limits": {"cpu": "1000m", "memory": "1Gi"}},
       "pathTriggers": ["services/grade/**", "backend/src/main/java/com/onlinejudge/grade/**", "database/migrations/grade/**"],
-      "traffic": {"exposed": false, "routePrefixes": ["/api/v1/grades"]}
+      "traffic": {"exposed": false, "routePrefixes": ["/api/v1/grades"], "browserEntry": null}
     },
     {
       "name": "learning-service",
@@ -211,7 +215,7 @@
       ],
       "resources": {"requests": {"cpu": "200m", "memory": "256Mi"}, "limits": {"cpu": "1000m", "memory": "1Gi"}},
       "pathTriggers": ["services/learning/**", "backend/src/main/java/com/onlinejudge/learning/**", "database/migrations/learning/**"],
-      "traffic": {"exposed": false, "routePrefixes": ["/api/v1/learning", "/api/v1/notifications"]}
+      "traffic": {"exposed": false, "routePrefixes": ["/api/v1/learning", "/api/v1/notifications"], "browserEntry": null}
     },
     {
       "name": "frontend",
@@ -230,13 +234,13 @@
         "liveness": {"kind": "http", "target": "/", "requiredDependencies": []},
         "readiness": {"kind": "http", "target": "/", "requiredDependencies": []}
       },
-      "dependsOn": ["gateway"],
+      "dependsOn": [],
       "migrationJob": null,
       "configuration": ["PUBLIC_API_BASE_URL"],
       "secrets": [],
       "resources": {"requests": {"cpu": "100m", "memory": "128Mi"}, "limits": {"cpu": "500m", "memory": "512Mi"}},
       "pathTriggers": ["frontend/**"],
-      "traffic": {"exposed": false, "routePrefixes": []}
+      "traffic": {"exposed": false, "routePrefixes": [], "browserEntry": null}
     },
     {
       "name": "rabbitmq",
@@ -264,7 +268,7 @@
       "secrets": [{"key": "RABBITMQ_PASSWORD", "injectedAs": "runtime-secret", "redact": true, "imageBuild": "forbidden"}],
       "resources": {"requests": {"cpu": "200m", "memory": "256Mi"}, "limits": {"cpu": "1000m", "memory": "1Gi"}},
       "pathTriggers": ["deploy/rabbitmq/**"],
-      "traffic": {"exposed": false, "routePrefixes": []}
+      "traffic": {"exposed": false, "routePrefixes": [], "browserEntry": null}
     },
     {
       "name": "mysql",
@@ -296,7 +300,7 @@
       ],
       "resources": {"requests": {"cpu": "500m", "memory": "1Gi"}, "limits": {"cpu": "2000m", "memory": "4Gi"}},
       "pathTriggers": ["database/**", "deploy/mysql/**"],
-      "traffic": {"exposed": false, "routePrefixes": []}
+      "traffic": {"exposed": false, "routePrefixes": [], "browserEntry": null}
     }
   ],
   "migrationJobs": [
@@ -386,7 +390,7 @@
     "legacyContract": "docs/开发/D3-CICD-共享契约.md",
     "compatibilityWindow": "v2-parallel-until-gates-pass",
     "retirementGates": [
-      "#305, #309 and #338 are merged and their service, schema and identity names match this manifest",
+      "the recorded #305/#309/#338 cross-contract comparison has no service, schema, identity or failure-semantics mismatch; OPEN or merged status is not a gate",
       "#318 proves a disposable environment with all five services, assessment-worker, gateway, frontend, RabbitMQ and MySQL",
       "all five migration jobs are rerunnable, failure-blocking and have a recorded rollback drill",
       "the v2 pipeline publishes digest, SBOM and checksum evidence for every workload",

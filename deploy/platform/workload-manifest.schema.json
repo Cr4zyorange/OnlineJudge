@@ -113,14 +113,15 @@
         },
         "traffic": {
           "type": "object",
-          "required": ["exposed", "routePrefixes"],
+          "required": ["exposed", "routePrefixes", "browserEntry"],
           "additionalProperties": false,
           "properties": {
             "exposed": {"type": "boolean"},
             "routePrefixes": {
               "type": "array",
               "items": {"type": "string"}
-            }
+            },
+            "browserEntry": {"$ref": "#/$defs/browserEntry"}
           }
         }
       }
@@ -186,6 +187,15 @@
       "properties": {
         "cpu": {"type": "string", "pattern": "^[0-9]+m?$"},
         "memory": {"type": "string", "pattern": "^[0-9]+(Mi|Gi)$"}
+      }
+    },
+    "browserEntry": {
+      "type": ["object", "null"],
+      "required": ["path", "targetWorkload"],
+      "additionalProperties": false,
+      "properties": {
+        "path": {"type": "string", "minLength": 1},
+        "targetWorkload": {"type": "string", "pattern": "^[a-z][a-z0-9-]*$"}
       }
     },
     "migrationJob": {
