@@ -23,7 +23,7 @@
 
 ## 3. 禁止跨 Schema 与替代路径
 
-禁止跨 Schema 外键、join、跨服务 Repository、任意 `schema.table` SQL、共享 ORM Entity/Mapper、数据库 view 和以管理员账号规避运行时权限。owner 内的主外键、唯一约束和索引可保留；对 owner 外的关联只保存不带物理 FK 的 ID，并遵循 `cross-domain-references.csv`。
+禁止跨 Schema 外键、join、跨服务 Repository、任意 `schema.table` SQL、共享 ORM Entity/Mapper、数据库 view 和以管理员账号规避运行时权限。owner 内的主外键、唯一约束和索引可保留；对 owner 外的关联只保存不带物理 FK 的 ID，并遵循 `cross-domain-references.csv`。账本必须从 `table-ownership.csv` 的每个 `external_ids` 声明推导出完整的 `(consumer, table, column, target)` 集合，逐项一对一匹配；表目标必须存在于 owner 的 schema，契约目标与替代路径必须是 `contracts/v2/` 下可解析的 OpenAPI/AsyncAPI JSON Pointer。
 
 | 消费需求 | 唯一替代路径 | 一致性与失败语义 |
 | --- | --- | --- |
@@ -48,4 +48,4 @@ node scripts/ci/verify-data-ownership-contract.mjs
 git diff --check
 ```
 
-门禁从当前 `compose-schema.sql` 读取表和主键，要求 46 张业务表恰有一个五域 owner，五个 Schema/账号一一对应，四个外域均被拒绝，owner 外 FK 被拒绝，cross-domain ledger 必须指向 `contracts/v2/` 替代路径，并以受控 mutation 证明账号越权和 owner 漂移会失败。
+门禁从当前 `compose-schema.sql` 读取表、主键和源列，要求 46 张业务表恰有一个五域 owner，五个 Schema/账号一一对应，四个外域均被拒绝，owner 外 FK 被拒绝。它会从 56 条有效 `external_ids` 推导精确 ledger；历史账本中的 `lab_evaluation.student_id` 声明已因源列不存在而移除。门禁拒绝数量不变的列替换、删除真实映射、伪源列和不存在的 v2 契约路径，并以受控 mutation 证明账号越权和 owner 漂移会失败。
