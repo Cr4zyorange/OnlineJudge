@@ -93,7 +93,7 @@ migrate() {
     --host "$mysql_host" --port "$mysql_port" --source-read-only-ack
     --evidence "$evidence"
   )
-  if [[ "$action" == cutover ]]; then
+  if [[ "$action" == cutover || "$action" == rollback ]]; then
     arguments+=(--cutover-state "$cutover_state")
   fi
   env OJ_MYSQL_ADMIN_PASSWORD="$admin_password" \
@@ -127,9 +127,26 @@ if [[ "$scenario" == all || "$scenario" == empty-cutover ]]; then
   reset_targets
   migrate migrate oj341_empty "$artifact_dir/empty-migrate.json"
   migrate cutover oj341_empty "$artifact_dir/empty-cutover.json"
-  OJ_MYSQL_ADMIN_PASSWORD="$admin_password" node "$repository_root/database/mysql/migrate-five-domain-schemas.mjs" \
+  if env -u OJ341_RUNTIME_PASSWORD_IDENTITY -u OJ341_RUNTIME_PASSWORD_COURSE \
+    -u OJ341_RUNTIME_PASSWORD_ASSESSMENT -u OJ341_RUNTIME_PASSWORD_GRADE -u OJ341_RUNTIME_PASSWORD_LEARNING \
+    OJ_MYSQL_ADMIN_PASSWORD="$admin_password" node "$repository_root/database/mysql/migrate-five-domain-schemas.mjs" \
     --action rollback --admin-user root --source-schema oj341_empty --host "$mysql_host" --port "$mysql_port" \
-    --cutover-state "$cutover_state" --evidence "$artifact_dir/empty-rollback.json" >>"$raw_log" 2>&1
+    --cutover-state "$cutover_state" --evidence "$artifact_dir/negative/rollback-no-runtime-passwords.json" >>"$raw_log" 2>&1; then
+    fail 'rollback without all runtime passwords unexpectedly produced PASS'
+  fi
+  if [[ -f "$artifact_dir/negative/rollback-no-runtime-passwords.json" ]] && grep -Fq '"result": "PASS"' "$artifact_dir/negative/rollback-no-runtime-passwords.json"; then
+    fail 'rollback without all runtime passwords wrote PASS evidence'
+  fi
+  migrate rollback oj341_empty "$artifact_dir/empty-rollback.json"
+  node - "$artifact_dir/empty-rollback.json" <<'NODE' >>"$raw_log" 2>&1
+const fs = require('node:fs');
+const evidence = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+if (evidence.result !== 'PASS' || !Array.isArray(evidence.verification?.permissions)
+    || evidence.verification.permissions.length !== 45
+    || evidence.verification.permissions.some((probe) => !probe.passed)) {
+  process.exitCode = 1;
+}
+NODE
   grep -Fq 'LEGACY_MONOLITH' "$cutover_state" || fail 'rollback did not restore the explicit legacy cutover state'
 fi
 

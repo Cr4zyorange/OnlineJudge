@@ -65,6 +65,16 @@ test('migration implementation creates nested evidence parents and validates all
   assert.match(source, /permission evidence must contain 45 complete allow\/deny probes/);
 });
 
+test('rollback cannot bypass the shared runtime-password and 45-probe PASS gate', () => {
+  const source = readFileSync(migrationScript, 'utf8');
+  const passwordGate = source.indexOf('const passwords = requiredRuntimePasswords(plan, options);');
+  const rollbackPath = source.indexOf("if (options.action === 'rollback')");
+
+  assert.ok(passwordGate >= 0 && passwordGate < rollbackPath);
+  assert.match(source, /if \(!verification\.passed\) \{\n\s+writeEvidence\(options\.evidence, \{\n\s+\.\.\.base, result: 'FAIL', verification/);
+  assert.match(source, /result: 'PASS', verification, rollback: state/);
+});
+
 test('migration replay serializes source-grade and member facts as valid v2 payloads', () => {
   const source = readFileSync(migrationScript, 'utf8');
 
@@ -92,11 +102,13 @@ test('DDL denial probes are repeat-safe and only accept a MySQL authorization de
   assert.match(source, /ERROR 1142|command denied/);
 });
 
-test('disposable MySQL acceptance keeps bypass, missing-password, nested-evidence, and repeat-DDL negatives', () => {
+test('disposable MySQL acceptance keeps bypass, missing-password, rollback, nested-evidence, and repeat-DDL negatives', () => {
   const source = readFileSync(liveAcceptanceScript, 'utf8');
 
   assert.match(source, /skip-permissions-bypass\.json/);
   assert.match(source, /no-runtime-passwords\.json/);
+  assert.match(source, /rollback-no-runtime-passwords\.json/);
+  assert.match(source, /verification\.permissions\.length !== 45/);
   assert.match(source, /nested\/evidence\/verify\.json/);
   assert.match(source, /ddl-misconfigured-first\.json/);
   assert.match(source, /ddl-misconfigured-second\.json/);

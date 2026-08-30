@@ -755,6 +755,11 @@ export async function main(argv = process.argv.slice(2)) {
     fail(`set ${options.adminPasswordEnv} for the disposable MySQL administrator`);
   }
   const plan = loadFiveDomainPlan();
+  // Every action that could claim migration success, including a rollback
+  // recovery, must prove the same five-account ownership boundary.  Keeping
+  // this gate ahead of action dispatch prevents a rollback/no-op shortcut
+  // from writing a convincing-looking PASS with zero runtime probes.
+  const passwords = requiredRuntimePasswords(plan, options);
   const admin = createMysql(options, options.adminUser, adminPassword);
   const base = {
     issue: 341,
@@ -771,6 +776,13 @@ export async function main(argv = process.argv.slice(2)) {
 
   if (options.action === 'rollback') {
     if (!options.cutoverState) fail('--cutover-state is required for rollback evidence');
+    const verification = verifyAll(admin, plan, options, options.sourceSchema, passwords);
+    if (!verification.passed) {
+      writeEvidence(options.evidence, {
+        ...base, result: 'FAIL', verification, finishedAt: new Date().toISOString(),
+      });
+      fail(verification.failures.join('; '));
+    }
     const prior = existsSync(options.cutoverState) ? JSON.parse(readFileSync(options.cutoverState, 'utf8')) : null;
     const recovery = sourceRecoveryProbe(admin, options.sourceSchema);
     const state = {
@@ -782,7 +794,7 @@ export async function main(argv = process.argv.slice(2)) {
       recovery,
     };
     writeFileSync(resolve(options.cutoverState), `${JSON.stringify(state, null, 2)}\n`, 'utf8');
-    const evidence = { ...base, result: 'PASS', rollback: state, finishedAt: new Date().toISOString() };
+    const evidence = { ...base, result: 'PASS', verification, rollback: state, finishedAt: new Date().toISOString() };
     writeEvidence(options.evidence, evidence);
     process.stdout.write(`${JSON.stringify(evidence)}\n`);
     return evidence;
@@ -791,7 +803,6 @@ export async function main(argv = process.argv.slice(2)) {
   if ((options.action === 'migrate' || options.action === 'replay') && !options.sourceReadOnlyAck) {
     fail(`${options.action} requires --source-read-only-ack; do not copy a live writable legacy schema`);
   }
-  const passwords = requiredRuntimePasswords(plan, options);
   const beforeFingerprint = sourceFingerprint(admin, plan, options.sourceSchema);
 
   if (options.action === 'migrate') {
