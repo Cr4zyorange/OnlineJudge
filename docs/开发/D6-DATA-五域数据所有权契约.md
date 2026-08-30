@@ -23,7 +23,7 @@
 
 ## 3. 禁止跨 Schema 与替代路径
 
-禁止跨 Schema 外键、join、跨服务 Repository、任意 `schema.table` SQL、共享 ORM Entity/Mapper、数据库 view 和以管理员账号规避运行时权限。owner 内的主外键、唯一约束和索引可保留；对 owner 外的关联只保存不带物理 FK 的 ID，并遵循 `cross-domain-references.csv`。账本必须从 `table-ownership.csv` 的每个 `external_ids` 声明推导出完整的 `(consumer, table, column, target)` 集合，逐项一对一匹配；表目标必须存在于 owner 的 schema，契约目标与替代路径必须是 `contracts/v2/` 下可解析的 OpenAPI/AsyncAPI JSON Pointer。`contracts/v2` 是解析后的真实路径边界：不接受绝对路径或任何 `..` 段，且制品 realpath（含符号链接）必须仍位于该目录下。
+禁止跨 Schema 外键、join、跨服务 Repository、任意 `schema.table` SQL、共享 ORM Entity/Mapper、数据库 view 和以管理员账号规避运行时权限。owner 内的主外键、唯一约束和索引可保留；对 owner 外的关联只保存不带物理 FK 的 ID，并遵循 `cross-domain-references.csv`。账本必须从 `table-ownership.csv` 的每个 `external_ids` 声明推导出完整的 `(consumer, table, column, target)` 集合，逐项一对一匹配；表目标必须存在于 owner 的 schema，契约目标与替代路径必须是 `contracts/v2/` 下可解析的 OpenAPI/AsyncAPI JSON Pointer。`contracts/v2` 是解析后的真实路径边界：不接受绝对路径或任何 `..` 段，且制品 realpath（含符号链接）必须仍位于该目录下；仓库内的 `contracts` 祖先及 `v2` 根目录本身都必须是物理目录，且 `v2` realpath 必须精确等于从仓库 realpath 推导的物理目录，不能由 symlink 重定义边界。
 
 | 消费需求 | 唯一替代路径 | 一致性与失败语义 |
 | --- | --- | --- |

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { existsSync, readFileSync, realpathSync } from 'node:fs';
+import { existsSync, lstatSync, readFileSync, realpathSync } from 'node:fs';
 import { isAbsolute, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -121,6 +121,46 @@ function isContainedBy(directory, candidate) {
     && !isAbsolute(relativeCandidate);
 }
 
+function canonicalContractDirectory(rootPath, errors) {
+  const repositoryRoot = resolve(rootPath);
+  let repositoryRootReal;
+  try {
+    repositoryRootReal = realpathSync(repositoryRoot);
+  } catch (error) {
+    errors.push(`repository root cannot be resolved: ${error.message}`);
+    return undefined;
+  }
+
+  const contractsDirectory = resolve(repositoryRoot, 'contracts');
+  const canonicalDirectory = resolve(contractsDirectory, 'v2');
+  const expectedCanonicalDirectory = resolve(repositoryRootReal, 'contracts', 'v2');
+  for (const [kind, directory] of [['ancestor', contractsDirectory], ['root', canonicalDirectory]]) {
+    try {
+      if (lstatSync(directory).isSymbolicLink()) {
+        const displayPath = relative(repositoryRoot, directory).split(sep).join('/');
+        errors.push(`canonical contracts/v2 ${kind} must not be a symlink: ${displayPath}`);
+        return undefined;
+      }
+    } catch (error) {
+      errors.push(`canonical contracts/v2 directory is unavailable: ${error.message}`);
+      return undefined;
+    }
+  }
+
+  let canonicalDirectoryReal;
+  try {
+    canonicalDirectoryReal = realpathSync(canonicalDirectory);
+  } catch (error) {
+    errors.push(`canonical contracts/v2 directory is unavailable: ${error.message}`);
+    return undefined;
+  }
+  if (canonicalDirectoryReal !== expectedCanonicalDirectory) {
+    errors.push('canonical contracts/v2 root must resolve to the repository physical directory');
+    return undefined;
+  }
+  return { canonicalDirectory, canonicalDirectoryReal };
+}
+
 function canonicalContractArtifact(rootPath, artifact, errors) {
   if (isAbsolute(artifact) || /^[A-Za-z]:[\\/]/.test(artifact)) {
     errors.push(`contract artifact must be relative: ${artifact}`);
@@ -131,17 +171,11 @@ function canonicalContractArtifact(rootPath, artifact, errors) {
     return undefined;
   }
 
-  const canonicalDirectory = resolve(rootPath, 'contracts', 'v2');
-  let canonicalDirectoryReal;
-  try {
-    canonicalDirectoryReal = realpathSync(canonicalDirectory);
-  } catch (error) {
-    errors.push(`canonical contracts/v2 directory is unavailable: ${error.message}`);
-    return undefined;
-  }
+  const canonicalRoot = canonicalContractDirectory(rootPath, errors);
+  if (!canonicalRoot) return undefined;
 
   const absoluteArtifact = resolve(rootPath, artifact);
-  if (!isContainedBy(canonicalDirectory, absoluteArtifact)) {
+  if (!isContainedBy(canonicalRoot.canonicalDirectory, absoluteArtifact)) {
     errors.push(`contract artifact escapes canonical contracts/v2: ${artifact}`);
     return undefined;
   }
@@ -157,7 +191,7 @@ function canonicalContractArtifact(rootPath, artifact, errors) {
     errors.push(`contract artifact cannot be resolved: ${artifact} (${error.message})`);
     return undefined;
   }
-  if (!isContainedBy(canonicalDirectoryReal, realArtifact)) {
+  if (!isContainedBy(canonicalRoot.canonicalDirectoryReal, realArtifact)) {
     errors.push(`contract artifact escapes canonical contracts/v2: ${artifact}`);
     return undefined;
   }

@@ -18,6 +18,19 @@ function fixtureRoot() {
   return root;
 }
 
+function createSymlinkOrSkip(t, target, linkPath) {
+  try {
+    symlinkSync(target, linkPath, 'dir');
+    return true;
+  } catch (error) {
+    if (['EPERM', 'EACCES', 'ENOTSUP', 'EINVAL'].includes(error.code)) {
+      t.skip(`symbolic links are unavailable on this platform (${error.code})`);
+      return false;
+    }
+    throw error;
+  }
+}
+
 test('Issue #309 contract assigns every current business table to exactly one of five schemas', () => {
   const summary = verifyDataOwnershipContract({ rootPath: repoRoot });
 
@@ -242,6 +255,42 @@ test('the ledger rejects a canonical v2 symlink that resolves outside the bounda
     assert.throws(
       () => verifyDataOwnershipContract({ rootPath: root }),
       /contract artifact escapes canonical contracts\/v2: contracts\/v2\/asyncapi\/identity-escape\.json/
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('the ledger rejects a contracts/v2 root directory symlink to external content', (t) => {
+  const root = fixtureRoot();
+  try {
+    const canonicalV2 = join(root, 'contracts', 'v2');
+    const externalV2 = join(root, 'external-v2');
+    cpSync(canonicalV2, externalV2, { recursive: true });
+    rmSync(canonicalV2, { recursive: true, force: true });
+    if (!createSymlinkOrSkip(t, externalV2, canonicalV2)) return;
+
+    assert.throws(
+      () => verifyDataOwnershipContract({ rootPath: root }),
+      /canonical contracts\/v2 root must not be a symlink: contracts\/v2/
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('the ledger rejects a symlinked contracts ancestor of the canonical root', (t) => {
+  const root = fixtureRoot();
+  try {
+    const canonicalContracts = join(root, 'contracts');
+    const externalContracts = join(root, 'external-contracts');
+    cpSync(canonicalContracts, externalContracts, { recursive: true });
+    rmSync(canonicalContracts, { recursive: true, force: true });
+    if (!createSymlinkOrSkip(t, externalContracts, canonicalContracts)) return;
+
+    assert.throws(
+      () => verifyDataOwnershipContract({ rootPath: root }),
+      /canonical contracts\/v2 ancestor must not be a symlink: contracts/
     );
   } finally {
     rmSync(root, { recursive: true, force: true });
