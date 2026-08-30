@@ -28,6 +28,7 @@ assessment:
     password: ${RABBITMQ_PASSWORD:guest}
     exchange: ${ASSESSMENT_RABBIT_EXCHANGE:onlinejudge.events}
     course-member-queue: ${ASSESSMENT_COURSE_MEMBER_QUEUE:assessment.course-members.v2}
+    relay-enabled: ${ASSESSMENT_RABBIT_RELAY_ENABLED:true}
     relay-interval: ${ASSESSMENT_RABBIT_RELAY_INTERVAL:1000}
   identity:
     issuer: ${IDENTITY_JWT_ISSUER:onlinejudge.identity.v2}

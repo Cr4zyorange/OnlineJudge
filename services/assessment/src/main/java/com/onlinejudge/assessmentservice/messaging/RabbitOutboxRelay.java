@@ -16,7 +16,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /** At-least-once outbox relay: a DB record changes state only after Rabbit publisher confirm. */
 @Component
-@ConditionalOnProperty(name = "assessment.rabbit.enabled", havingValue = "true")
+@ConditionalOnProperty(name = {"assessment.rabbit.enabled", "assessment.rabbit.relay-enabled"}, havingValue = "true")
 public class RabbitOutboxRelay {
     public static final int PERSISTENT_DELIVERY_MODE = 2;
     private final AssessmentOutboxRepository outbox;
