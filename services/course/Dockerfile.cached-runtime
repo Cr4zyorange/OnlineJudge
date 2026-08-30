@@ -1,0 +1,26 @@
+# A runtime-only fallback for registry-constrained verification runners.
+# Build services/course/target first, then provide a locally cached immutable
+# Java 21 image that was verified to contain java and wget.  The normal
+# Dockerfile remains the primary reproducible build path.
+ARG RUNTIME_BASE
+FROM ${RUNTIME_BASE}
+
+USER root
+WORKDIR /opt/onlinejudge-course
+
+ARG GIT_SHA
+ARG IMAGE_SOURCE=https://github.com/Cr4zyorange/OnlineJudge
+LABEL org.opencontainers.image.revision="$GIT_SHA" \
+      org.opencontainers.image.version="$GIT_SHA" \
+      org.opencontainers.image.source="$IMAGE_SOURCE"
+
+RUN command -v java >/dev/null \
+    && command -v wget >/dev/null \
+    && groupadd --system --gid 10002 onlinejudge-course \
+    && useradd --system --uid 10002 --gid 10002 --home-dir /opt/onlinejudge-course --shell /usr/sbin/nologin onlinejudge-course
+
+COPY --chown=10002:10002 services/course/target/onlinejudge-course-service-0.1.0-SNAPSHOT.jar app.jar
+
+EXPOSE 8082
+USER 10002:10002
+ENTRYPOINT ["java", "-jar", "/opt/onlinejudge-course/app.jar", "--spring.config.additional-location=classpath:/application-compose.properties"]

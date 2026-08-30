@@ -140,3 +140,31 @@ CRS 完成后需要交付：
 - 课程、成员、章节、资源、公告测试数据
 
 完成标准是 LAB、HWK、GRD、LRN 可以基于 CRS 判断课程归属和课程内权限，不再自己维护一套课程成员逻辑。
+
+## 11. 独立服务部署验收
+
+Course 服务使用 `services/course/Dockerfile` 构建为
+`onlinejudge/course-service:${GIT_SHA}`，并由 `deploy/docker/compose.yml` 中的
+`course-migrations` 先为独立 `oj_course` schema 和最小权限
+`oj_course_rw` 账号执行版本化迁移；Course 仅在迁移 job 成功、MySQL 和 RabbitMQ
+健康后启动。运行期禁止以 `spring.sql.init` 创建测试 schema，readiness 为
+`/actuator/health/readiness`，进程用户固定为非 root 的 `10002:10002`。
+
+受外部 registry 或 BuildKit frontend 超时影响时，不能跳过镜像或 Compose 验收。
+应先运行 `mvn -f services/course/pom.xml -DskipTests package`，再使用
+`services/course/Dockerfile.cached-runtime` 和已在本机检查过的、不可变 Java 21
+运行时镜像构建同一个 jar，例如：
+
+```bash
+GIT_SHA="$(git rev-parse HEAD)"
+docker build \
+  --build-arg "RUNTIME_BASE=onlinejudge/backend:<known-immutable-sha>" \
+  --build-arg "GIT_SHA=$GIT_SHA" \
+  -f services/course/Dockerfile.cached-runtime \
+  -t "onlinejudge/course-service:$GIT_SHA" .
+```
+
+该 fallback 仍必须保留精确 SHA 的 OCI revision、`10002:10002` 非 root 用户和
+主 Dockerfile 相同的 Course jar；之后必须运行真实 MySQL 8.4、RabbitMQ 4.1 的
+Compose migrations、readiness 和 API 验收，并保留 primary Dockerfile 的原始失败
+日志。它只替代不可取得的构建基础层，不替代生产路径。

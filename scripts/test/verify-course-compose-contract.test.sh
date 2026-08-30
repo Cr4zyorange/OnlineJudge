@@ -9,6 +9,7 @@ checkout="${1:-$repo_root}"
 compose="$checkout/deploy/docker/compose.yml"
 config="$checkout/services/course/src/main/resources/application-compose.properties"
 migrator="$checkout/database/mysql/migrate-course-service.sh"
+cached_runtime="$checkout/services/course/Dockerfile.cached-runtime"
 
 fail() {
   printf 'course-compose-contract: FAIL: %s\n' "$*" >&2
@@ -18,6 +19,7 @@ fail() {
 [[ -f "$compose" ]] || fail "missing supported Compose manifest"
 [[ -f "$config" ]] || fail "missing Course Compose configuration"
 [[ -x "$migrator" ]] || fail "missing executable Course migration entrypoint"
+[[ -f "$cached_runtime" ]] || fail "missing Course cached-runtime Dockerfile"
 
 require() {
   local file="$1" text="$2" label="$3"
@@ -37,6 +39,11 @@ require "$config" 'spring.sql.init.mode=never' 'Course Compose runtime still cre
 require "$config" 'COURSE_DATABASE_USER' 'Course Compose username does not use the canonical variable'
 require "$migrator" 'oj_course_rw' 'migration entrypoint does not provision the canonical Course account'
 require "$migrator" 'schema_migrations' 'migration entrypoint has no durable version checkpoint'
+require "$cached_runtime" 'ARG RUNTIME_BASE' 'cached Course runtime does not require a pinned local base'
+require "$cached_runtime" 'FROM ${RUNTIME_BASE}' 'cached Course runtime does not use the supplied local base'
+require "$cached_runtime" 'org.opencontainers.image.revision' 'cached Course runtime does not retain OCI revision'
+require "$cached_runtime" 'COPY --chown=10002:10002 services/course/target/onlinejudge-course-service-0.1.0-SNAPSHOT.jar app.jar' 'cached Course runtime does not run the same Course jar'
+require "$cached_runtime" 'USER 10002:10002' 'cached Course runtime is not non-root'
 
 # Mutation: a superficial workload entry must not be enough; removing the
 # actual Compose Course service must make the formal contract fail.
@@ -46,6 +53,7 @@ trap cleanup EXIT INT TERM
 mkdir -p "$fixture/deploy/docker" "$fixture/services/course/src/main/resources" "$fixture/database/mysql"
 cp "$compose" "$fixture/deploy/docker/compose.yml"
 cp "$config" "$fixture/services/course/src/main/resources/application-compose.properties"
+cp "$cached_runtime" "$fixture/services/course/Dockerfile.cached-runtime"
 cp "$migrator" "$fixture/database/mysql/migrate-course-service.sh"
 chmod +x "$fixture/database/mysql/migrate-course-service.sh"
 awk '
