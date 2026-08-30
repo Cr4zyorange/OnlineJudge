@@ -1,5 +1,12 @@
-import { config, flushPromises, mount, RouterLinkStub, type VueWrapper } from '@vue/test-utils';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  config,
+  enableAutoUnmount,
+  flushPromises,
+  mount,
+  RouterLinkStub,
+  type VueWrapper
+} from '@vue/test-utils';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import HomeworkStudentView from '../../../src/views/hwk/HomeworkStudentView.vue';
 import * as homeworkApi from '../../../src/api/hwk/homeworks';
 import * as learningProgressApi from '../../../src/api/lrn/learningProgress';
@@ -36,6 +43,7 @@ config.global.stubs = {
   ...config.global.stubs,
   RouterLink: RouterLinkStub
 };
+enableAutoUnmount(afterEach);
 
 describe('HomeworkStudentView', () => {
   beforeEach(() => {
@@ -856,7 +864,6 @@ describe('HomeworkStudentView', () => {
 
     expect(event.defaultPrevented).toBe(true);
     expect(window.sessionStorage.getItem('oj:hwk-file-upload:v1:601:101:11')).toContain('000000000011');
-    wrapper.unmount();
   });
 
   it('retains the selected File after upload failure and retries the same file', async () => {
@@ -1237,7 +1244,6 @@ describe('HomeworkStudentView', () => {
     await flushPromises();
 
     expect(removeListener).toHaveBeenCalledWith('beforeunload', expect.any(Function));
-    wrapper.unmount();
   });
 
   it('reloads the homework when a reused route changes its homework id', async () => {
