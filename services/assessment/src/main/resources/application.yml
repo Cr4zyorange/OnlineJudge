@@ -26,7 +26,7 @@ assessment:
     port: ${RABBITMQ_PORT:5672}
     username: ${RABBITMQ_USERNAME:guest}
     password: ${RABBITMQ_PASSWORD:guest}
-    exchange: ${ASSESSMENT_RABBIT_EXCHANGE:assessment.events.v2}
+    exchange: ${ASSESSMENT_RABBIT_EXCHANGE:onlinejudge.events}
     course-member-queue: ${ASSESSMENT_COURSE_MEMBER_QUEUE:assessment.course-members.v2}
     relay-interval: ${ASSESSMENT_RABBIT_RELAY_INTERVAL:1000}
   identity:

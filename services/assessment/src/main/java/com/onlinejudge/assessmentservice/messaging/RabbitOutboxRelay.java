@@ -23,7 +23,7 @@ public class RabbitOutboxRelay {
 
     public RabbitOutboxRelay(AssessmentOutboxRepository outbox, @Value("${assessment.rabbit.host:127.0.0.1}") String host,
             @Value("${assessment.rabbit.port:5672}") int port, @Value("${assessment.rabbit.username:guest}") String username,
-            @Value("${assessment.rabbit.password:guest}") String password, @Value("${assessment.rabbit.exchange:assessment.events.v2}") String exchange) {
+            @Value("${assessment.rabbit.password:guest}") String password, @Value("${assessment.rabbit.exchange:onlinejudge.events}") String exchange) {
         this.outbox = outbox; this.host = host; this.port = port; this.username = username; this.password = password; this.exchange = exchange;
     }
 
@@ -37,7 +37,7 @@ public class RabbitOutboxRelay {
             for (var event : outbox.pending(100)) {
                 var properties = new AMQP.BasicProperties.Builder().deliveryMode(PERSISTENT_DELIVERY_MODE)
                         .contentType("application/json").messageId(event.eventId()).type(event.eventType()).build();
-                channel.basicPublish(exchange, event.eventType(), true, properties, event.payloadJson().getBytes(StandardCharsets.UTF_8));
+                channel.basicPublish(exchange, "onlinejudge." + event.eventType(), true, properties, event.payloadJson().getBytes(StandardCharsets.UTF_8));
                 if (channel.waitForConfirms(5_000)) outbox.markDelivered(event.eventId());
             }
         } catch (Exception ignored) {

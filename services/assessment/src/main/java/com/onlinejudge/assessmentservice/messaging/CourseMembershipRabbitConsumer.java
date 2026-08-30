@@ -21,7 +21,7 @@ public class CourseMembershipRabbitConsumer implements SmartLifecycle {
     public CourseMembershipRabbitConsumer(CourseMembershipProjectionService projection, ObjectMapper json,
             @Value("${assessment.rabbit.host:127.0.0.1}") String host, @Value("${assessment.rabbit.port:5672}") int port,
             @Value("${assessment.rabbit.username:guest}") String username, @Value("${assessment.rabbit.password:guest}") String password,
-            @Value("${assessment.rabbit.exchange:assessment.events.v2}") String exchange,
+            @Value("${assessment.rabbit.exchange:onlinejudge.events}") String exchange,
             @Value("${assessment.rabbit.course-member-queue:assessment.course-members.v2}") String queue) {
         this.projection = projection; this.json = json; this.host = host; this.port = port; this.username = username; this.password = password; this.exchange = exchange; this.queue = queue;
     }
@@ -30,7 +30,7 @@ public class CourseMembershipRabbitConsumer implements SmartLifecycle {
             var factory = new ConnectionFactory(); factory.setHost(host); factory.setPort(port); factory.setUsername(username); factory.setPassword(password);
             connection = factory.newConnection("assessment-course-member-consumer"); channel = connection.createChannel();
             channel.exchangeDeclare(exchange, "topic", true); channel.queueDeclare(queue, true, false, false, null);
-            channel.queueBind(queue, exchange, "course.member.changed.v2"); channel.basicQos(1);
+            channel.queueBind(queue, exchange, "onlinejudge.course.member.changed.v2"); channel.basicQos(1);
             channel.basicConsume(queue, false, (tag, message) -> {
                 try {
                     JsonNode root = json.readTree(message.getBody()); JsonNode payload = root.has("payload") ? root.get("payload") : root;

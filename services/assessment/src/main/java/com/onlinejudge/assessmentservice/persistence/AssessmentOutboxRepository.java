@@ -9,6 +9,7 @@ import java.time.Instant;
 import java.util.Map;
 import java.util.UUID;
 import java.util.List;
+import java.util.LinkedHashMap;
 
 /** Local producer facts; RabbitMQ delivery belongs to the relay and never the submission transaction. */
 @Repository
@@ -20,12 +21,23 @@ public class AssessmentOutboxRepository {
     public void append(String eventType, String aggregateType, String aggregateId, long aggregateVersion,
                        String correlationId, Map<String, Object> payload, Instant now) {
         try {
+            String eventId = UUID.randomUUID().toString();
+            Map<String, Object> envelope = new LinkedHashMap<>();
+            envelope.put("eventId", eventId);
+            envelope.put("eventType", eventType);
+            envelope.put("payloadVersion", 2);
+            envelope.put("aggregateType", aggregateType);
+            envelope.put("aggregateId", aggregateId);
+            envelope.put("aggregateVersion", aggregateVersion);
+            envelope.put("occurredAt", now.toString());
+            envelope.put("correlationId", correlationId);
+            envelope.put("payload", payload);
             jdbc.update("""
                     INSERT INTO assessment_event_outbox (event_id, event_type, payload_version, aggregate_type,
                      aggregate_id, aggregate_version, occurred_at, correlation_id, payload_json, state, created_at)
                     VALUES (?, ?, 2, ?, ?, ?, ?, ?, ?, 'PENDING', ?)
-                    """, UUID.randomUUID().toString(), eventType, aggregateType, aggregateId, aggregateVersion,
-                    Timestamp.from(now), correlationId, mapper.writeValueAsString(payload), Timestamp.from(now));
+                    """, eventId, eventType, aggregateType, aggregateId, aggregateVersion,
+                    Timestamp.from(now), correlationId, mapper.writeValueAsString(envelope), Timestamp.from(now));
         } catch (Exception exception) {
             throw new IllegalStateException("assessment outbox serialization failed", exception);
         }

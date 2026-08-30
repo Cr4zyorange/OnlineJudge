@@ -11,6 +11,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 /** v2 producer and consumer ordering facts, all persisted in the Assessment schema. */
 @SpringBootTest
@@ -41,6 +42,17 @@ class WorkerAndProjectionReliabilityTest {
         assertThat(jdbc.queryForObject("SELECT source_version FROM assessment_source_grade WHERE source_type = 'HWK' AND source_id = 'homework-1' AND student_id = 'student-1'", Long.class)).isEqualTo(1L);
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM assessment_event_outbox WHERE event_type = 'assessment.evaluation.completed.v2'", Integer.class)).isEqualTo(1);
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM assessment_event_outbox WHERE event_type = 'assessment.source-grade.changed.v2'", Integer.class)).isEqualTo(1);
+    }
+
+    @Test
+    void outboxPersistsTheCanonicalV2EnvelopeRatherThanAnUnaddressablePayloadFragment() throws Exception {
+        var submitted = submissions.submit(new AssessmentSubmissionService.SubmissionCommand("HWK", "homework-envelope", "course-1", "student-1", "persistent://one"));
+        worker.runOne("worker-envelope", task -> AssessmentWorker.EvaluationOutcome.successful("ACCEPTED"));
+        String json = jdbc.queryForObject("SELECT payload_json FROM assessment_event_outbox WHERE correlation_id = ? AND event_type = 'assessment.source-grade.changed.v2'", String.class, submitted.taskId());
+        var root = new ObjectMapper().readTree(json);
+        assertThat(root.path("eventType").asText()).isEqualTo("assessment.source-grade.changed.v2");
+        assertThat(root.path("eventId").asText()).isNotBlank();
+        assertThat(root.path("payload").path("sourceId").asText()).isEqualTo("homework-envelope");
     }
 
     @Test
