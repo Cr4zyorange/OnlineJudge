@@ -31,7 +31,7 @@ class IdentityJwksRefresherTest {
         String initialJwks = jwks(initial, "initial-kid");
         String rotatedJwks = jwks(rotated, "rotated-kid");
         IdentityJwksCache cache = new IdentityJwksCache(JSON, "onlinejudge.identity.v2", "onlinejudge.api", initialJwks);
-        ServiceJwtVerifier serviceVerifier = new ServiceJwtVerifier(JSON, "onlinejudge.identity.v2", "learning", initialJwks);
+        ServiceJwtVerifier serviceVerifier = new ServiceJwtVerifier(JSON, "onlinejudge.identity.v2", "course", initialJwks);
         AtomicReference<String> requestId = new AtomicReference<>();
         HttpServer identity = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         identity.createContext("/.well-known/jwks.json", exchange -> {
@@ -105,7 +105,7 @@ class IdentityJwksRefresherTest {
         String header = encode(Map.of("alg", "RS256", "typ", "JWT", "kid", kid));
         Instant now = Instant.now();
         String payload = encode(Map.of(
-                "sub", "course-service", "aud", "learning", "scopes", List.of("learning.tasks.read"),
+                "sub", "course-service", "aud", "course", "scopes", List.of("learning.tasks.read"),
                 "iat", now.getEpochSecond(), "exp", now.plusSeconds(300).getEpochSecond(),
                 "iss", "onlinejudge.identity.v2"
         ));

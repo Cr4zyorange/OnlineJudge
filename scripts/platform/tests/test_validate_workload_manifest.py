@@ -22,11 +22,10 @@ BACKEND_APPLICATION_WORKLOADS = [
     "assessment-api",
     "assessment-worker",
     "grade-service",
-    "learning-service",
-]
+    ]
 CURRENT_MONOLITH_MODULE_PATHS = {
     "identity-service": ["backend/src/main/java/com/onlinejudge/auth/**"],
-    "course-service": ["backend/src/main/java/com/onlinejudge/crs/**"],
+    "course-service": ["backend/src/main/java/com/onlinejudge/crs/**", "backend/src/main/java/com/onlinejudge/lrn/**"],
     "assessment-api": [
         "backend/src/main/java/com/onlinejudge/lab/**",
         "backend/src/main/java/com/onlinejudge/hwk/**",
@@ -36,7 +35,6 @@ CURRENT_MONOLITH_MODULE_PATHS = {
         "backend/src/main/java/com/onlinejudge/hwk/**",
     ],
     "grade-service": ["backend/src/main/java/com/onlinejudge/grd/**"],
-    "learning-service": ["backend/src/main/java/com/onlinejudge/lrn/**"],
 }
 SHARED_BACKEND_INPUTS = [
     "backend/src/main/java/com/onlinejudge/common/**",
@@ -46,12 +44,12 @@ SHARED_BACKEND_INPUTS = [
 ]
 MICROSERVICE_V2_CONTRACT_INPUTS = [
     "contracts/v2/**",
-    "docs/adr/ADR-006-五业务服务与可靠消息契约.md",
-    "docs/开发/D6-D7-五服务共享契约-v2.md",
-    "docs/开发/D6-D7-五服务架构冻结-305.md",
-    "docs/diagrams/arch/issue305-*.mmd",
+    "docs/adr/ADR-006-三业务服务与可靠消息契约.md",
+    "docs/开发/D6-三服务共享契约-306.md",
+    "docs/开发/D6-三服务架构冻结-306.md",
+    "docs/diagrams/arch/issue306-*.mmd",
     "scripts/ci/contract-verify.sh",
-    "scripts/ci/verify-final-architecture-305.mjs",
+    "scripts/ci/verify-three-service-baseline-306.mjs",
     "scripts/ci/verify-microservice-contract-v2.mjs",
     "scripts/ci/verify-workflow-gates.test.sh",
 ]
@@ -89,8 +87,8 @@ class WorkloadManifestValidationTest(unittest.TestCase):
         result = self.run_validator(MANIFEST)
 
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("PASS: 10 workloads", result.stdout)
-        self.assertIn("5 ordered migration jobs", result.stdout)
+        self.assertIn("PASS: 9 workloads", result.stdout)
+        self.assertIn("4 ordered migration jobs", result.stdout)
 
     def test_missing_required_field_is_rejected(self) -> None:
         temporary_directory = self.write_variant(
@@ -158,8 +156,7 @@ class WorkloadManifestValidationTest(unittest.TestCase):
             "assessment-api",
             "assessment-worker",
             "grade-service",
-            "learning-service",
-            "frontend",
+                        "frontend",
         ])
 
     def test_auth_source_change_selects_identity_service(self) -> None:
@@ -280,7 +277,7 @@ class WorkloadManifestValidationTest(unittest.TestCase):
                 "assessment-worker",
             ],
             "backend/src/main/java/com/onlinejudge/grd/domain/GradeItem.java": ["grade-service"],
-            "backend/src/main/java/com/onlinejudge/lrn/domain/LearningTask.java": ["learning-service"],
+            "backend/src/main/java/com/onlinejudge/lrn/domain/LearningTask.java": ["course-service"],
         }
 
         for changed_path, expected_workloads in expected_workloads_by_path.items():
@@ -312,12 +309,12 @@ class WorkloadManifestValidationTest(unittest.TestCase):
             "contracts/v2/openapi/course.openapi.json",
             "contracts/v2/asyncapi/events.asyncapi.json",
             "contracts/v2/examples/event-envelope.valid.json",
-            "docs/adr/ADR-006-五业务服务与可靠消息契约.md",
-            "docs/开发/D6-D7-五服务共享契约-v2.md",
-            "docs/开发/D6-D7-五服务架构冻结-305.md",
-            "docs/diagrams/arch/issue305-five-service-context.mmd",
+            "docs/adr/ADR-006-三业务服务与可靠消息契约.md",
+            "docs/开发/D6-三服务共享契约-306.md",
+            "docs/开发/D6-三服务架构冻结-306.md",
+            "docs/diagrams/arch/issue306-three-service-context.mmd",
             "scripts/ci/contract-verify.sh",
-            "scripts/ci/verify-final-architecture-305.mjs",
+            "scripts/ci/verify-three-service-baseline-306.mjs",
             "scripts/ci/verify-microservice-contract-v2.mjs",
             "scripts/ci/verify-workflow-gates.test.sh",
         ]
@@ -380,7 +377,7 @@ class WorkloadManifestValidationTest(unittest.TestCase):
             ("assessment-api", "backend/src/main/java/com/onlinejudge/hwk/**"),
             ("assessment-worker", "backend/src/main/java/com/onlinejudge/lab/**"),
             ("grade-service", "backend/src/main/java/com/onlinejudge/grd/**"),
-            ("learning-service", "backend/src/main/java/com/onlinejudge/lrn/**"),
+            ("course-service", "backend/src/main/java/com/onlinejudge/lrn/**"),
             ("identity-service", "backend/src/main/java/com/onlinejudge/common/**"),
             ("identity-service", "backend/src/main/java/com/onlinejudge/integration/**"),
             ("identity-service", "backend/src/main/resources/**"),

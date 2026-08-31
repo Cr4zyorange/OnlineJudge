@@ -24,7 +24,7 @@ import java.util.Map;
  */
 @Component
 public class LearningReliableEventConsumer {
-    public static final String CONSUMER = "learning";
+    public static final String CONSUMER = "course";
 
     private final LearningEventInboxRepository inbox;
     private final LearningReliabilityRepository reliability;

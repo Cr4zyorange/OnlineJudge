@@ -14,9 +14,9 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.UUID;
 
 /**
- * Internal v2 endpoint for the bounded Course -> LRN recent-task summary
- * contract (learning.openapi.json).  Course has already verified active
- * membership for the requested userId before calling this endpoint; Learning
+ * Internal v2 endpoint for the bounded Course LRN recent-task summary
+ * contract (course.openapi.json).  Course has already verified active
+ * membership for the requested userId before calling this endpoint; its LRN role
  * only returns deadline-ordered task facts for that member, capped at five.
  */
 @RestController
@@ -49,13 +49,13 @@ public class LearningTaskInternalController {
                 userId,
                 new LearningTaskQuery(null, null, courseId, "deadline", "asc", 1, boundedLimit)
         );
-        // v2 internal lists are 0-based; the Learning service pagination is
+        // v2 internal lists are 0-based; the LRN pagination is
         // 1-based, so the bounded summary page exposes page 0.
         return new LearningTaskSummaryPage(page.records(), page.total(), page.page() - 1, page.size());
     }
 
     /**
-     * learning.openapi.json marks X-Request-Id required and UUID-formatted at
+     * course.openapi.json marks X-Request-Id required and UUID-formatted at
      * this receiving boundary; the caller already sends it, so the server-side
      * contract must not silently accept its absence or a malformed value.
      */

@@ -1,6 +1,5 @@
 owner,schema,account,allow,deny,ddl
-IDENTITY,oj_identity,oj_identity_rw,SELECT|INSERT|UPDATE|DELETE,oj_assessment|oj_course|oj_grade|oj_learning,DENY
-COURSE,oj_course,oj_course_rw,SELECT|INSERT|UPDATE|DELETE,oj_assessment|oj_grade|oj_identity|oj_learning,DENY
-ASSESSMENT,oj_assessment,oj_assessment_rw,SELECT|INSERT|UPDATE|DELETE,oj_course|oj_grade|oj_identity|oj_learning,DENY
-GRADE,oj_grade,oj_grade_rw,SELECT|INSERT|UPDATE|DELETE,oj_assessment|oj_course|oj_identity|oj_learning,DENY
-LEARNING,oj_learning,oj_learning_rw,SELECT|INSERT|UPDATE|DELETE,oj_assessment|oj_course|oj_grade|oj_identity,DENY
+IDENTITY,oj_identity,oj_identity_rw,SELECT|INSERT|UPDATE|DELETE,oj_assessment|oj_course|oj_grade,DENY
+COURSE,oj_course,oj_course_rw,SELECT|INSERT|UPDATE|DELETE,oj_assessment|oj_grade|oj_identity,DENY
+ASSESSMENT,oj_assessment,oj_assessment_rw,SELECT|INSERT|UPDATE|DELETE,oj_course|oj_grade|oj_identity,DENY
+GRADE,oj_grade,oj_grade_rw,SELECT|INSERT|UPDATE|DELETE,oj_assessment|oj_course|oj_identity,DENY

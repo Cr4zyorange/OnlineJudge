@@ -8,8 +8,8 @@ ASSESSMENT,oj_assessment,assessment_event_outbox,OUTBOX,implemented,#337
 ASSESSMENT,oj_assessment,assessment_event_inbox,INBOX,implemented,#337
 GRADE,oj_grade,grade_event_outbox,OUTBOX,implemented,#337
 GRADE,oj_grade,grade_event_inbox,INBOX,implemented,#337
-LEARNING,oj_learning,event_outbox,OUTBOX,planned,#337
-LEARNING,oj_learning,learning_event_inbox,INBOX,implemented,#337
-GRADE,oj_grade,t_grade_record,PROJECTION,existing,#341
-LEARNING,oj_learning,learning_course_member_projection,PROJECTION,implemented,#337
-LEARNING,oj_learning,learning_course_membership_watermark,PROJECTION,implemented,#337
+COURSE,oj_course,event_outbox,OUTBOX,planned,#337
+COURSE,oj_course,learning_event_inbox,INBOX,implemented,#337
+GRADE,oj_grade,t_grade_record,PROJECTION,existing,#306
+COURSE,oj_course,learning_course_member_projection,PROJECTION,implemented,#337
+COURSE,oj_course,learning_course_membership_watermark,PROJECTION,implemented,#337

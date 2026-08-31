@@ -41,7 +41,7 @@ public class RabbitMqReliabilityConfiguration {
     Queue learningEventsQueue() {
         return QueueBuilder.durable(LEARNING_QUEUE)
                 .deadLetterExchange(DLX_EXCHANGE)
-                .deadLetterRoutingKey("learning")
+                .deadLetterRoutingKey("course")
                 .build();
     }
 
@@ -100,7 +100,7 @@ public class RabbitMqReliabilityConfiguration {
 
     @Bean
     Binding learningDeadLetterBinding(TopicExchange onlinejudgeDeadLetterExchange, Queue learningDeadLetterQueue) {
-        return BindingBuilder.bind(learningDeadLetterQueue).to(onlinejudgeDeadLetterExchange).with("learning");
+        return BindingBuilder.bind(learningDeadLetterQueue).to(onlinejudgeDeadLetterExchange).with("course");
     }
 
     @Bean
