@@ -60,6 +60,11 @@ class LabWorkflowContractTest {
     void activeTeacherMembership() {
         jdbc.update("DELETE FROM assessment_event_outbox");
         jdbc.update("DELETE FROM assessment_source_grade");
+        jdbc.update("DELETE FROM assessment_homework_review_log");
+        jdbc.update("DELETE FROM assessment_homework_evaluation");
+        jdbc.update("DELETE FROM assessment_homework_submission");
+        jdbc.update("DELETE FROM assessment_homework_testcase");
+        jdbc.update("DELETE FROM assessment_homework");
         jdbc.update("DELETE FROM assessment_lab_score_change_log");
         jdbc.update("DELETE FROM assessment_lab_score");
         jdbc.update("DELETE FROM assessment_lab_evaluation_result");
@@ -483,13 +488,28 @@ class LabWorkflowContractTest {
     @Test
     @EnabledIfSystemProperty(named = "assessment.docker-sandbox.test", matches = "true")
     void workerKeepsHomeworkEvaluationOnTheSharedDockerSandboxPath() throws Exception {
+        String teacherToken = TestJwtFactory.userToken(KEY, "lab-workflow-kid", "teacher-314", List.of("TEACHER"));
         String studentToken = TestJwtFactory.userToken(KEY, "lab-workflow-kid", "student-homework-sandbox-314", List.of("STUDENT"));
         jdbc.update("INSERT INTO assessment_course_member_projection (course_id, user_id, membership_status, member_version) VALUES ('course-314', 'student-homework-sandbox-314', 'ACTIVE', 1)");
 
-        mockMvc.perform(multipart("/api/v1/homeworks/homework-sandbox-314/submissions")
-                        .file(new org.springframework.mock.web.MockMultipartFile("file", "answer.py", "text/x-python", "print('homework sandbox')\n".getBytes()))
-                        .param("courseId", "course-314")
-                        .header("Authorization", "Bearer " + studentToken).header("X-Request-Id", "homework-sandbox-submit-314"))
+        String created = mockMvc.perform(post("/api/v1/homeworks")
+                        .header("Authorization", "Bearer " + teacherToken).header("X-Request-Id", java.util.UUID.randomUUID().toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"courseId":"course-314","title":"homework-sandbox-314","description":"shared Docker path",
+                                 "type":"CODE","deadline":"2030-01-01T12:00:00Z","totalScore":100,"allowResubmit":true,
+                                 "allowLateSubmit":false,"languages":["python"],
+                                 "testCases":[{"input":"","expectedOutput":"homework sandbox\\n","scoreWeight":100,"hidden":true,"sortOrder":1}]}
+                                """))
+                .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+        long homeworkId = new com.fasterxml.jackson.databind.ObjectMapper().readTree(created).path("id").asLong();
+        mockMvc.perform(put("/api/v1/homeworks/{homeworkId}/publish", homeworkId)
+                        .header("Authorization", "Bearer " + teacherToken).header("X-Request-Id", java.util.UUID.randomUUID().toString()))
+                .andExpect(status().isOk());
+        mockMvc.perform(post("/api/v1/homeworks/{homeworkId}/submissions", homeworkId)
+                        .header("Authorization", "Bearer " + studentToken).header("X-Request-Id", java.util.UUID.randomUUID().toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"codeText\":\"print('homework sandbox')\\n\",\"language\":\"python\"}"))
                 .andExpect(status().isCreated());
         String submissionId = jdbc.queryForObject("SELECT id FROM assessment_submission WHERE source_type = 'HWK'", String.class);
 

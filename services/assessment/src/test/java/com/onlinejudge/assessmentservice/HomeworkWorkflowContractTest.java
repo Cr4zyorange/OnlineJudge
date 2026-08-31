@@ -17,6 +17,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import com.onlinejudge.assessmentservice.service.CoursePermissionClient;
 import com.onlinejudge.assessmentservice.service.CourseAuthorizationUnavailableException;
+import com.onlinejudge.assessmentservice.persistence.EvaluationTaskRepository;
 import com.onlinejudge.assessmentservice.worker.AssessmentWorker;
 
 import java.security.KeyPair;
@@ -45,6 +46,7 @@ class HomeworkWorkflowContractTest {
     @Autowired ObjectMapper mapper;
     @MockBean CoursePermissionClient coursePermissions;
     @Autowired AssessmentWorker worker;
+    @Autowired EvaluationTaskRepository tasks;
 
     @DynamicPropertySource
     static void identity(DynamicPropertyRegistry registry) {
@@ -636,14 +638,15 @@ class HomeworkWorkflowContractTest {
         when(coursePermissions.canManageCourse("course-315", teacherId)).thenReturn(true);
         String studentToken = TestJwtFactory.userToken(KEY, "homework-workflow-kid", studentId, List.of("STUDENT"));
         String teacherToken = TestJwtFactory.userToken(KEY, "homework-workflow-kid", teacherId, List.of("TEACHER"));
-        String submitted = mockMvc.perform(post("/api/v1/submissions")
-                        .header("Authorization", "Bearer " + studentToken)
-                        .header("X-Request-Id", UUID.randomUUID().toString())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"sourceType\":\"LAB\",\"sourceId\":\"lab-315\",\"courseId\":\"course-315\"}"))
-                .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
-        String submissionId = mapper.readTree(submitted).path("submissionId").asText();
-        String taskId = mapper.readTree(submitted).path("taskId").asText();
+        String submissionId = UUID.randomUUID().toString();
+        String taskId = UUID.randomUUID().toString();
+        Instant createdAt = Instant.now();
+        jdbc.update("""
+                INSERT INTO assessment_submission
+                    (id, source_type, source_id, course_id, student_id, content_ref, evaluation_status, created_at)
+                VALUES (?, 'LAB', 'lab-315', 'course-315', ?, 'fixture://lab-315', 'PENDING', ?)
+                """, submissionId, studentId, java.sql.Timestamp.from(createdAt));
+        tasks.insert(taskId, submissionId, "LAB", "lab-315", "course-315", studentId, "lab-fixture-315", createdAt);
         worker.runOne("lab-worker-failure", task -> AssessmentWorker.EvaluationOutcome.failed("SANDBOX_UNCONFIGURED"));
 
         mockMvc.perform(post("/api/v1/submissions/{submissionId}/reevaluate", submissionId)

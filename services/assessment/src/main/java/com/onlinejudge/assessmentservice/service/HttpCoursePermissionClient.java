@@ -72,7 +72,7 @@ public class HttpCoursePermissionClient implements CoursePermissionClient {
                     || !userId.equals(decision.path("userId").asText())
                     || !"MANAGE".equals(decision.path("action").asText())
                     || decision.path("memberVersion").asLong(0) < 1) {
-                throw new CourseAuthorizationUnavailableException("CRS authorization response does not match the request");
+                return false;
             }
             return decision.path("allowed").asBoolean(false);
         } catch (CourseAuthorizationUnavailableException unavailable) {
