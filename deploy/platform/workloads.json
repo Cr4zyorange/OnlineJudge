@@ -14,7 +14,6 @@
   "sharedServiceContractPaths": [
     "contracts/v2/**",
     "docs/adr/ADR-006-五业务服务与可靠消息契约.md",
-    "docs/开发/D4-CROSS-SERVICE-共享契约.md",
     "docs/开发/D6-D7-五服务共享契约-v2.md",
     "docs/开发/D6-D7-五服务架构冻结-305.md",
     "docs/diagrams/arch/issue305-*.mmd",
@@ -59,7 +58,7 @@
     {
       "name": "identity-service",
       "type": "service",
-      "sourcePaths": ["services/identity/**", "backend/src/main/java/com/onlinejudge/auth/**", "backend/src/main/java/com/onlinejudge/common/**", "backend/src/main/java/com/onlinejudge/integration/**", "backend/src/main/resources/**", "backend/pom.xml", "contracts/v2/**", "docs/adr/ADR-006-五业务服务与可靠消息契约.md", "docs/开发/D4-CROSS-SERVICE-共享契约.md", "docs/开发/D6-D7-五服务共享契约-v2.md", "docs/开发/D6-D7-五服务架构冻结-305.md", "docs/diagrams/arch/issue305-*.mmd", "scripts/ci/contract-verify.sh", "scripts/ci/verify-final-architecture-305.mjs", "scripts/ci/verify-microservice-contract-v2.mjs", "scripts/ci/verify-workflow-gates.test.sh"],
+      "sourcePaths": ["services/identity/**", "backend/src/main/java/com/onlinejudge/auth/**", "backend/src/main/java/com/onlinejudge/common/**", "backend/src/main/java/com/onlinejudge/integration/**", "backend/src/main/resources/**", "backend/pom.xml", "contracts/v2/**", "docs/adr/ADR-006-五业务服务与可靠消息契约.md", "docs/开发/D6-D7-五服务共享契约-v2.md", "docs/开发/D6-D7-五服务架构冻结-305.md", "docs/diagrams/arch/issue305-*.mmd", "scripts/ci/contract-verify.sh", "scripts/ci/verify-final-architecture-305.mjs", "scripts/ci/verify-microservice-contract-v2.mjs", "scripts/ci/verify-workflow-gates.test.sh"],
       "dockerfile": "services/identity/Dockerfile",
       "image": {
         "repository": "onlinejudge/identity-service",
@@ -81,13 +80,13 @@
         {"key": "IDENTITY_JWT_SIGNING_KEY", "injectedAs": "runtime-secret", "redact": true, "imageBuild": "forbidden"}
       ],
       "resources": {"requests": {"cpu": "200m", "memory": "256Mi"}, "limits": {"cpu": "1000m", "memory": "1Gi"}},
-      "pathTriggers": ["services/identity/**", "backend/src/main/java/com/onlinejudge/auth/**", "backend/src/main/java/com/onlinejudge/common/**", "backend/src/main/java/com/onlinejudge/integration/**", "backend/src/main/resources/**", "backend/pom.xml", "contracts/v2/**", "docs/adr/ADR-006-五业务服务与可靠消息契约.md", "docs/开发/D4-CROSS-SERVICE-共享契约.md", "docs/开发/D6-D7-五服务共享契约-v2.md", "docs/开发/D6-D7-五服务架构冻结-305.md", "docs/diagrams/arch/issue305-*.mmd", "scripts/ci/contract-verify.sh", "scripts/ci/verify-final-architecture-305.mjs", "scripts/ci/verify-microservice-contract-v2.mjs", "scripts/ci/verify-workflow-gates.test.sh", "database/migrations/identity/**"],
+      "pathTriggers": ["services/identity/**", "backend/src/main/java/com/onlinejudge/auth/**", "backend/src/main/java/com/onlinejudge/common/**", "backend/src/main/java/com/onlinejudge/integration/**", "backend/src/main/resources/**", "backend/pom.xml", "contracts/v2/**", "docs/adr/ADR-006-五业务服务与可靠消息契约.md", "docs/开发/D6-D7-五服务共享契约-v2.md", "docs/开发/D6-D7-五服务架构冻结-305.md", "docs/diagrams/arch/issue305-*.mmd", "scripts/ci/contract-verify.sh", "scripts/ci/verify-final-architecture-305.mjs", "scripts/ci/verify-microservice-contract-v2.mjs", "scripts/ci/verify-workflow-gates.test.sh", "database/migrations/identity/**"],
       "traffic": {"exposed": false, "routePrefixes": ["/api/v1/auth", "/.well-known/jwks.json"], "browserEntry": null}
     },
     {
       "name": "course-service",
       "type": "service",
-      "sourcePaths": ["services/course/**", "backend/src/main/java/com/onlinejudge/crs/**", "backend/src/main/java/com/onlinejudge/common/**", "backend/src/main/java/com/onlinejudge/integration/**", "backend/src/main/resources/**", "backend/pom.xml", "contracts/v2/**", "docs/adr/ADR-006-五业务服务与可靠消息契约.md", "docs/开发/D4-CROSS-SERVICE-共享契约.md", "docs/开发/D6-D7-五服务共享契约-v2.md", "docs/开发/D6-D7-五服务架构冻结-305.md", "docs/diagrams/arch/issue305-*.mmd", "scripts/ci/contract-verify.sh", "scripts/ci/verify-final-architecture-305.mjs", "scripts/ci/verify-microservice-contract-v2.mjs", "scripts/ci/verify-workflow-gates.test.sh"],
+      "sourcePaths": ["services/course/**", "backend/src/main/java/com/onlinejudge/crs/**", "backend/src/main/java/com/onlinejudge/common/**", "backend/src/main/java/com/onlinejudge/integration/**", "backend/src/main/resources/**", "backend/pom.xml", "contracts/v2/**", "docs/adr/ADR-006-五业务服务与可靠消息契约.md", "docs/开发/D6-D7-五服务共享契约-v2.md", "docs/开发/D6-D7-五服务架构冻结-305.md", "docs/diagrams/arch/issue305-*.mmd", "scripts/ci/contract-verify.sh", "scripts/ci/verify-final-architecture-305.mjs", "scripts/ci/verify-microservice-contract-v2.mjs", "scripts/ci/verify-workflow-gates.test.sh"],
       "dockerfile": "services/course/Dockerfile",
       "image": {
         "repository": "onlinejudge/course-service",
@@ -110,13 +109,13 @@
         {"key": "COURSE_SERVICE_IDENTITY", "injectedAs": "workload-identity", "redact": true, "imageBuild": "forbidden"}
       ],
       "resources": {"requests": {"cpu": "200m", "memory": "256Mi"}, "limits": {"cpu": "1000m", "memory": "1Gi"}},
-      "pathTriggers": ["services/course/**", "backend/src/main/java/com/onlinejudge/crs/**", "backend/src/main/java/com/onlinejudge/common/**", "backend/src/main/java/com/onlinejudge/integration/**", "backend/src/main/resources/**", "backend/pom.xml", "contracts/v2/**", "docs/adr/ADR-006-五业务服务与可靠消息契约.md", "docs/开发/D4-CROSS-SERVICE-共享契约.md", "docs/开发/D6-D7-五服务共享契约-v2.md", "docs/开发/D6-D7-五服务架构冻结-305.md", "docs/diagrams/arch/issue305-*.mmd", "scripts/ci/contract-verify.sh", "scripts/ci/verify-final-architecture-305.mjs", "scripts/ci/verify-microservice-contract-v2.mjs", "scripts/ci/verify-workflow-gates.test.sh", "database/migrations/course/**"],
+      "pathTriggers": ["services/course/**", "backend/src/main/java/com/onlinejudge/crs/**", "backend/src/main/java/com/onlinejudge/common/**", "backend/src/main/java/com/onlinejudge/integration/**", "backend/src/main/resources/**", "backend/pom.xml", "contracts/v2/**", "docs/adr/ADR-006-五业务服务与可靠消息契约.md", "docs/开发/D6-D7-五服务共享契约-v2.md", "docs/开发/D6-D7-五服务架构冻结-305.md", "docs/diagrams/arch/issue305-*.mmd", "scripts/ci/contract-verify.sh", "scripts/ci/verify-final-architecture-305.mjs", "scripts/ci/verify-microservice-contract-v2.mjs", "scripts/ci/verify-workflow-gates.test.sh", "database/migrations/course/**"],
       "traffic": {"exposed": false, "routePrefixes": ["/api/v1/courses"], "browserEntry": null}
     },
     {
       "name": "assessment-api",
       "type": "service",
-      "sourcePaths": ["services/assessment/**", "backend/src/main/java/com/onlinejudge/lab/**", "backend/src/main/java/com/onlinejudge/hwk/**", "backend/src/main/java/com/onlinejudge/common/**", "backend/src/main/java/com/onlinejudge/integration/**", "backend/src/main/resources/**", "backend/pom.xml", "contracts/v2/**", "docs/adr/ADR-006-五业务服务与可靠消息契约.md", "docs/开发/D4-CROSS-SERVICE-共享契约.md", "docs/开发/D6-D7-五服务共享契约-v2.md", "docs/开发/D6-D7-五服务架构冻结-305.md", "docs/diagrams/arch/issue305-*.mmd", "scripts/ci/contract-verify.sh", "scripts/ci/verify-final-architecture-305.mjs", "scripts/ci/verify-microservice-contract-v2.mjs", "scripts/ci/verify-workflow-gates.test.sh"],
+      "sourcePaths": ["services/assessment/**", "backend/src/main/java/com/onlinejudge/lab/**", "backend/src/main/java/com/onlinejudge/hwk/**", "backend/src/main/java/com/onlinejudge/common/**", "backend/src/main/java/com/onlinejudge/integration/**", "backend/src/main/resources/**", "backend/pom.xml", "contracts/v2/**", "docs/adr/ADR-006-五业务服务与可靠消息契约.md", "docs/开发/D6-D7-五服务共享契约-v2.md", "docs/开发/D6-D7-五服务架构冻结-305.md", "docs/diagrams/arch/issue305-*.mmd", "scripts/ci/contract-verify.sh", "scripts/ci/verify-final-architecture-305.mjs", "scripts/ci/verify-microservice-contract-v2.mjs", "scripts/ci/verify-workflow-gates.test.sh"],
       "dockerfile": "services/assessment/Dockerfile",
       "image": {
         "repository": "onlinejudge/assessment-api",
@@ -140,13 +139,13 @@
         {"key": "RABBITMQ_PASSWORD", "injectedAs": "runtime-secret", "redact": true, "imageBuild": "forbidden"}
       ],
       "resources": {"requests": {"cpu": "300m", "memory": "512Mi"}, "limits": {"cpu": "1500m", "memory": "2Gi"}},
-      "pathTriggers": ["services/assessment/**", "backend/src/main/java/com/onlinejudge/lab/**", "backend/src/main/java/com/onlinejudge/hwk/**", "backend/src/main/java/com/onlinejudge/common/**", "backend/src/main/java/com/onlinejudge/integration/**", "backend/src/main/resources/**", "backend/pom.xml", "contracts/v2/**", "docs/adr/ADR-006-五业务服务与可靠消息契约.md", "docs/开发/D4-CROSS-SERVICE-共享契约.md", "docs/开发/D6-D7-五服务共享契约-v2.md", "docs/开发/D6-D7-五服务架构冻结-305.md", "docs/diagrams/arch/issue305-*.mmd", "scripts/ci/contract-verify.sh", "scripts/ci/verify-final-architecture-305.mjs", "scripts/ci/verify-microservice-contract-v2.mjs", "scripts/ci/verify-workflow-gates.test.sh", "database/migrations/assessment/**"],
+      "pathTriggers": ["services/assessment/**", "backend/src/main/java/com/onlinejudge/lab/**", "backend/src/main/java/com/onlinejudge/hwk/**", "backend/src/main/java/com/onlinejudge/common/**", "backend/src/main/java/com/onlinejudge/integration/**", "backend/src/main/resources/**", "backend/pom.xml", "contracts/v2/**", "docs/adr/ADR-006-五业务服务与可靠消息契约.md", "docs/开发/D6-D7-五服务共享契约-v2.md", "docs/开发/D6-D7-五服务架构冻结-305.md", "docs/diagrams/arch/issue305-*.mmd", "scripts/ci/contract-verify.sh", "scripts/ci/verify-final-architecture-305.mjs", "scripts/ci/verify-microservice-contract-v2.mjs", "scripts/ci/verify-workflow-gates.test.sh", "database/migrations/assessment/**"],
       "traffic": {"exposed": false, "routePrefixes": ["/api/v1/labs", "/api/v1/homeworks", "/api/v1/submissions", "/api/v1/evaluations"], "browserEntry": null}
     },
     {
       "name": "assessment-worker",
       "type": "worker",
-      "sourcePaths": ["services/assessment/**", "backend/src/main/java/com/onlinejudge/lab/**", "backend/src/main/java/com/onlinejudge/hwk/**", "backend/src/main/java/com/onlinejudge/common/**", "backend/src/main/java/com/onlinejudge/integration/**", "backend/src/main/resources/**", "backend/pom.xml", "contracts/v2/**", "docs/adr/ADR-006-五业务服务与可靠消息契约.md", "docs/开发/D4-CROSS-SERVICE-共享契约.md", "docs/开发/D6-D7-五服务共享契约-v2.md", "docs/开发/D6-D7-五服务架构冻结-305.md", "docs/diagrams/arch/issue305-*.mmd", "scripts/ci/contract-verify.sh", "scripts/ci/verify-final-architecture-305.mjs", "scripts/ci/verify-microservice-contract-v2.mjs", "scripts/ci/verify-workflow-gates.test.sh"],
+      "sourcePaths": ["services/assessment/**", "backend/src/main/java/com/onlinejudge/lab/**", "backend/src/main/java/com/onlinejudge/hwk/**", "backend/src/main/java/com/onlinejudge/common/**", "backend/src/main/java/com/onlinejudge/integration/**", "backend/src/main/resources/**", "backend/pom.xml", "contracts/v2/**", "docs/adr/ADR-006-五业务服务与可靠消息契约.md", "docs/开发/D6-D7-五服务共享契约-v2.md", "docs/开发/D6-D7-五服务架构冻结-305.md", "docs/diagrams/arch/issue305-*.mmd", "scripts/ci/contract-verify.sh", "scripts/ci/verify-final-architecture-305.mjs", "scripts/ci/verify-microservice-contract-v2.mjs", "scripts/ci/verify-workflow-gates.test.sh"],
       "dockerfile": "services/assessment/Dockerfile",
       "image": {
         "repository": "onlinejudge/assessment-worker",
@@ -169,13 +168,13 @@
         {"key": "RABBITMQ_PASSWORD", "injectedAs": "runtime-secret", "redact": true, "imageBuild": "forbidden"}
       ],
       "resources": {"requests": {"cpu": "500m", "memory": "1Gi"}, "limits": {"cpu": "2000m", "memory": "4Gi"}},
-      "pathTriggers": ["services/assessment/**", "backend/src/main/java/com/onlinejudge/lab/**", "backend/src/main/java/com/onlinejudge/hwk/**", "backend/src/main/java/com/onlinejudge/common/**", "backend/src/main/java/com/onlinejudge/integration/**", "backend/src/main/resources/**", "backend/pom.xml", "contracts/v2/**", "docs/adr/ADR-006-五业务服务与可靠消息契约.md", "docs/开发/D4-CROSS-SERVICE-共享契约.md", "docs/开发/D6-D7-五服务共享契约-v2.md", "docs/开发/D6-D7-五服务架构冻结-305.md", "docs/diagrams/arch/issue305-*.mmd", "scripts/ci/contract-verify.sh", "scripts/ci/verify-final-architecture-305.mjs", "scripts/ci/verify-microservice-contract-v2.mjs", "scripts/ci/verify-workflow-gates.test.sh"],
+      "pathTriggers": ["services/assessment/**", "backend/src/main/java/com/onlinejudge/lab/**", "backend/src/main/java/com/onlinejudge/hwk/**", "backend/src/main/java/com/onlinejudge/common/**", "backend/src/main/java/com/onlinejudge/integration/**", "backend/src/main/resources/**", "backend/pom.xml", "contracts/v2/**", "docs/adr/ADR-006-五业务服务与可靠消息契约.md", "docs/开发/D6-D7-五服务共享契约-v2.md", "docs/开发/D6-D7-五服务架构冻结-305.md", "docs/diagrams/arch/issue305-*.mmd", "scripts/ci/contract-verify.sh", "scripts/ci/verify-final-architecture-305.mjs", "scripts/ci/verify-microservice-contract-v2.mjs", "scripts/ci/verify-workflow-gates.test.sh"],
       "traffic": {"exposed": false, "routePrefixes": [], "browserEntry": null}
     },
     {
       "name": "grade-service",
       "type": "service",
-      "sourcePaths": ["services/grade/**", "backend/src/main/java/com/onlinejudge/grd/**", "backend/src/main/java/com/onlinejudge/common/**", "backend/src/main/java/com/onlinejudge/integration/**", "backend/src/main/resources/**", "backend/pom.xml", "contracts/v2/**", "docs/adr/ADR-006-五业务服务与可靠消息契约.md", "docs/开发/D4-CROSS-SERVICE-共享契约.md", "docs/开发/D6-D7-五服务共享契约-v2.md", "docs/开发/D6-D7-五服务架构冻结-305.md", "docs/diagrams/arch/issue305-*.mmd", "scripts/ci/contract-verify.sh", "scripts/ci/verify-final-architecture-305.mjs", "scripts/ci/verify-microservice-contract-v2.mjs", "scripts/ci/verify-workflow-gates.test.sh"],
+      "sourcePaths": ["services/grade/**", "backend/src/main/java/com/onlinejudge/grd/**", "backend/src/main/java/com/onlinejudge/common/**", "backend/src/main/java/com/onlinejudge/integration/**", "backend/src/main/resources/**", "backend/pom.xml", "contracts/v2/**", "docs/adr/ADR-006-五业务服务与可靠消息契约.md", "docs/开发/D6-D7-五服务共享契约-v2.md", "docs/开发/D6-D7-五服务架构冻结-305.md", "docs/diagrams/arch/issue305-*.mmd", "scripts/ci/contract-verify.sh", "scripts/ci/verify-final-architecture-305.mjs", "scripts/ci/verify-microservice-contract-v2.mjs", "scripts/ci/verify-workflow-gates.test.sh"],
       "dockerfile": "services/grade/Dockerfile",
       "image": {
         "repository": "onlinejudge/grade-service",
@@ -199,13 +198,13 @@
         {"key": "RABBITMQ_PASSWORD", "injectedAs": "runtime-secret", "redact": true, "imageBuild": "forbidden"}
       ],
       "resources": {"requests": {"cpu": "200m", "memory": "256Mi"}, "limits": {"cpu": "1000m", "memory": "1Gi"}},
-      "pathTriggers": ["services/grade/**", "backend/src/main/java/com/onlinejudge/grd/**", "backend/src/main/java/com/onlinejudge/common/**", "backend/src/main/java/com/onlinejudge/integration/**", "backend/src/main/resources/**", "backend/pom.xml", "contracts/v2/**", "docs/adr/ADR-006-五业务服务与可靠消息契约.md", "docs/开发/D4-CROSS-SERVICE-共享契约.md", "docs/开发/D6-D7-五服务共享契约-v2.md", "docs/开发/D6-D7-五服务架构冻结-305.md", "docs/diagrams/arch/issue305-*.mmd", "scripts/ci/contract-verify.sh", "scripts/ci/verify-final-architecture-305.mjs", "scripts/ci/verify-microservice-contract-v2.mjs", "scripts/ci/verify-workflow-gates.test.sh", "database/migrations/grade/**"],
+      "pathTriggers": ["services/grade/**", "backend/src/main/java/com/onlinejudge/grd/**", "backend/src/main/java/com/onlinejudge/common/**", "backend/src/main/java/com/onlinejudge/integration/**", "backend/src/main/resources/**", "backend/pom.xml", "contracts/v2/**", "docs/adr/ADR-006-五业务服务与可靠消息契约.md", "docs/开发/D6-D7-五服务共享契约-v2.md", "docs/开发/D6-D7-五服务架构冻结-305.md", "docs/diagrams/arch/issue305-*.mmd", "scripts/ci/contract-verify.sh", "scripts/ci/verify-final-architecture-305.mjs", "scripts/ci/verify-microservice-contract-v2.mjs", "scripts/ci/verify-workflow-gates.test.sh", "database/migrations/grade/**"],
       "traffic": {"exposed": false, "routePrefixes": ["/api/v1/grades"], "browserEntry": null}
     },
     {
       "name": "learning-service",
       "type": "service",
-      "sourcePaths": ["services/learning/**", "backend/src/main/java/com/onlinejudge/lrn/**", "backend/src/main/java/com/onlinejudge/common/**", "backend/src/main/java/com/onlinejudge/integration/**", "backend/src/main/resources/**", "backend/pom.xml", "contracts/v2/**", "docs/adr/ADR-006-五业务服务与可靠消息契约.md", "docs/开发/D4-CROSS-SERVICE-共享契约.md", "docs/开发/D6-D7-五服务共享契约-v2.md", "docs/开发/D6-D7-五服务架构冻结-305.md", "docs/diagrams/arch/issue305-*.mmd", "scripts/ci/contract-verify.sh", "scripts/ci/verify-final-architecture-305.mjs", "scripts/ci/verify-microservice-contract-v2.mjs", "scripts/ci/verify-workflow-gates.test.sh"],
+      "sourcePaths": ["services/learning/**", "backend/src/main/java/com/onlinejudge/lrn/**", "backend/src/main/java/com/onlinejudge/common/**", "backend/src/main/java/com/onlinejudge/integration/**", "backend/src/main/resources/**", "backend/pom.xml", "contracts/v2/**", "docs/adr/ADR-006-五业务服务与可靠消息契约.md", "docs/开发/D6-D7-五服务共享契约-v2.md", "docs/开发/D6-D7-五服务架构冻结-305.md", "docs/diagrams/arch/issue305-*.mmd", "scripts/ci/contract-verify.sh", "scripts/ci/verify-final-architecture-305.mjs", "scripts/ci/verify-microservice-contract-v2.mjs", "scripts/ci/verify-workflow-gates.test.sh"],
       "dockerfile": "services/learning/Dockerfile",
       "image": {
         "repository": "onlinejudge/learning-service",
@@ -229,7 +228,7 @@
         {"key": "RABBITMQ_PASSWORD", "injectedAs": "runtime-secret", "redact": true, "imageBuild": "forbidden"}
       ],
       "resources": {"requests": {"cpu": "200m", "memory": "256Mi"}, "limits": {"cpu": "1000m", "memory": "1Gi"}},
-      "pathTriggers": ["services/learning/**", "backend/src/main/java/com/onlinejudge/lrn/**", "backend/src/main/java/com/onlinejudge/common/**", "backend/src/main/java/com/onlinejudge/integration/**", "backend/src/main/resources/**", "backend/pom.xml", "contracts/v2/**", "docs/adr/ADR-006-五业务服务与可靠消息契约.md", "docs/开发/D4-CROSS-SERVICE-共享契约.md", "docs/开发/D6-D7-五服务共享契约-v2.md", "docs/开发/D6-D7-五服务架构冻结-305.md", "docs/diagrams/arch/issue305-*.mmd", "scripts/ci/contract-verify.sh", "scripts/ci/verify-final-architecture-305.mjs", "scripts/ci/verify-microservice-contract-v2.mjs", "scripts/ci/verify-workflow-gates.test.sh", "database/migrations/learning/**"],
+      "pathTriggers": ["services/learning/**", "backend/src/main/java/com/onlinejudge/lrn/**", "backend/src/main/java/com/onlinejudge/common/**", "backend/src/main/java/com/onlinejudge/integration/**", "backend/src/main/resources/**", "backend/pom.xml", "contracts/v2/**", "docs/adr/ADR-006-五业务服务与可靠消息契约.md", "docs/开发/D6-D7-五服务共享契约-v2.md", "docs/开发/D6-D7-五服务架构冻结-305.md", "docs/diagrams/arch/issue305-*.mmd", "scripts/ci/contract-verify.sh", "scripts/ci/verify-final-architecture-305.mjs", "scripts/ci/verify-microservice-contract-v2.mjs", "scripts/ci/verify-workflow-gates.test.sh", "database/migrations/learning/**"],
       "traffic": {"exposed": false, "routePrefixes": ["/api/v1/learning", "/api/v1/notifications"], "browserEntry": null}
     },
     {

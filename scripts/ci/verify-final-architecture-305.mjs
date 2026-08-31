@@ -23,7 +23,17 @@ const requiredArchitectureMarkers = [
   'course.membership.snapshot.v2',
   'assessment.homework.published.v2',
   'at-least-once',
-  '不共享 Repository、不跨 Schema SQL、不使用全局内部 Token'
+  '不共享 Repository、不跨 Schema SQL、不使用全局内部 Token',
+  'Grade 正常计算只使用本地来源成绩投影',
+  'Course 不可用时失败关闭',
+  'onlinejudge_identity'
+];
+
+const rejectedArchitectureDocuments = [
+  'docs/开发/D4-CROSS-SERVICE-共享契约.md',
+  'docs/过程/概要/评测服务拆分设计与迁移边界.md',
+  'docs/diagrams/fig_2_6_assessment_service_boundary.mmd',
+  'docs/最终提交/assets/fig_2_6_assessment_service_boundary.svg'
 ];
 
 function read(rootPath, relativePath, problems) {
@@ -65,8 +75,11 @@ export function verifyFinalArchitecture305({ rootPath = defaultRoot } = {}) {
   const ownershipDocument = read(rootPath, 'docs/开发/D6-DATA-五域数据所有权契约.md', problems);
   const workloadDocument = read(rootPath, 'docs/开发/D7-平台工作负载清单契约.md', problems);
   const identityDeliveryDocument = read(rootPath, 'docs/开发/D6-AUTH-独立身份服务交付.md', problems);
-  const v1Document = read(rootPath, 'docs/开发/D4-CROSS-SERVICE-共享契约.md', problems);
-  const assessmentMigrationDocument = read(rootPath, 'docs/过程/概要/评测服务拆分设计与迁移边界.md', problems);
+  for (const rejectedDocument of rejectedArchitectureDocuments) {
+    if (existsSync(resolve(rootPath, rejectedDocument))) {
+      problems.push(`rejected architecture document must be deleted: ${rejectedDocument}`);
+    }
+  }
 
   for (const marker of requiredArchitectureMarkers) {
     const error = marker === 'taskId + generation + leaseOwner + leaseUntil'
@@ -74,16 +87,11 @@ export function verifyFinalArchitecture305({ rootPath = defaultRoot } = {}) {
       : `final architecture document missing required decision: ${marker}`;
     requireText(architecture, marker, error, problems);
   }
-  for (const [issue, sha] of Object.entries(mergeShas)) {
-    requireText(architecture, sha, `final architecture document must identify ${issue} merge SHA ${sha}`, problems);
+  for (const rejectedText of ['D4-CROSS-SERVICE', '#279', '学习与成绩服务', 'source-grade event/API']) {
+    if (architecture.includes(rejectedText)) {
+      problems.push(`final architecture document retains rejected text: ${rejectedText}`);
+    }
   }
-  requireText(architecture, identityDeliverySha, `final architecture document must identify #311 merge SHA ${identityDeliverySha}`, problems);
-  requireText(architecture, 'IDENTITY_DATABASE_NAME`/`IDENTITY_DATABASE_USERNAME` 分别设为 `oj_identity`/`oj_identity_rw`',
-    'final architecture document must map the delivered Identity workload to the #309 schema/account', problems);
-  requireText(architecture, 't_identity_outbox_event` 和 `t_identity_service_token_idempotency`',
-    'final architecture document must name the delivered Identity runtime tables', problems);
-  requireText(architecture, '46 legacy + 13 reliable runtime = 59',
-    'final architecture document must keep the #341 migration control-plane count stable', problems);
   requireText(identityDeliveryDocument, 'services/identity', '#311 Identity delivery document must identify the standalone service root', problems);
   requireText(identityDeliveryDocument, 'IDENTITY_JWKS_TRUST_BUNDLE', '#311 Identity delivery document must require JWKS bootstrap for offline verification', problems);
   requireText(identityDeliveryDocument, 'POST /internal/v2/service-tokens', '#311 Identity delivery document must define the v2 service-token operation', problems);
@@ -105,24 +113,12 @@ export function verifyFinalArchitecture305({ rootPath = defaultRoot } = {}) {
   requireText(workloadDocument, mergeShas.issue336, `D7 must identify #336 merge SHA ${mergeShas.issue336}`, problems);
   requireText(workloadDocument, identityDeliverySha, `D7 must identify #311 merge SHA ${identityDeliverySha}`, problems);
   requireLocalMarkdownLink(
-    rootPath, v1Document, 'docs/开发/D4-CROSS-SERVICE-共享契约.md', 'D6-D7-五服务架构冻结-305.md',
-    'D4 history document must link to the #305 freeze', problems
-  );
-  requireLocalMarkdownLink(
-    rootPath, assessmentMigrationDocument, 'docs/过程/概要/评测服务拆分设计与迁移边界.md', '../../开发/D6-D7-五服务架构冻结-305.md',
-    '#279 migration document must link to the #305 freeze', problems
-  );
-  requireLocalMarkdownLink(
     rootPath, workloadDocument, 'docs/开发/D7-平台工作负载清单契约.md', 'D6-D7-五服务架构冻结-305.md',
     'D7 workload document must link to the #305 freeze', problems
   );
   requireLocalMarkdownLink(
     rootPath, ownershipDocument, 'docs/开发/D6-DATA-五域数据所有权契约.md', 'D6-D7-五服务架构冻结-305.md',
     'D6 ownership document must link to the #305 freeze', problems
-  );
-  requireLocalMarkdownLink(
-    rootPath, architecture, 'docs/开发/D6-D7-五服务架构冻结-305.md', 'D6-AUTH-独立身份服务交付.md',
-    'final architecture document must link to the #311 Identity delivery', problems
   );
   for (const diagram of [
     'docs/diagrams/arch/issue305-five-service-context.mmd',
