@@ -261,6 +261,11 @@ public class LabEvaluationController {
         return (user.hasRole("TEACHER") || user.hasRole("ADMIN")) && coursePermissions.canManageCourse(lab.courseId(), user.id());
     }
 
+    private boolean canManage(LabExperimentService.LabSummary lab, CurrentUser user, String requestId) {
+        return (user.hasRole("TEACHER") || user.hasRole("ADMIN"))
+                && coursePermissions.canManageCourse(lab.courseId(), user.id(), requestId);
+    }
+
     private boolean scoresPublished(LabExperimentService.LabSummary lab) {
         return "SCORE_PUBLISHED".equals(lab.status()) || "ARCHIVED".equals(lab.status());
     }
@@ -273,7 +278,10 @@ public class LabEvaluationController {
             jakarta.servlet.http.HttpServletRequest http) {
         String requestId = requireRequestId(http);
         LabExperimentService.LabSummary lab = findLab(labId);
-        if (!canManage(lab, user)) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "course management permission is required");
+        if (!canManage(lab, user, requestId)) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "course management permission is required");
+        if ("ARCHIVED".equals(lab.status()) || lab.deleted()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "an archived LAB is immutable");
+        }
         Map<String, Object> submission = jdbc.query("SELECT student_id, auto_score FROM assessment_lab_submission WHERE lab_id = ? AND submission_id = ? FOR UPDATE",
                 (rs, ignored) -> {
                     Map<String, Object> value = new LinkedHashMap<>();
@@ -345,14 +353,30 @@ public class LabEvaluationController {
         if (!canManage(lab, user)) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "course management permission is required");
         String creator = jdbc.queryForObject("SELECT created_by FROM assessment_lab_experiment WHERE id = ?", String.class, labId);
         int total = jdbc.queryForObject("SELECT COUNT(*) FROM assessment_course_member_projection WHERE course_id = ? AND membership_status = 'ACTIVE' AND user_id <> ?", Integer.class, lab.courseId(), creator);
-        int submitted = jdbc.queryForObject("SELECT COUNT(DISTINCT student_id) FROM assessment_lab_submission WHERE lab_id = ?", Integer.class, labId);
-        int evaluated = jdbc.queryForObject("SELECT COUNT(DISTINCT lab.student_id) FROM assessment_lab_submission lab JOIN assessment_submission submission ON submission.id = lab.submission_id WHERE lab.lab_id = ? AND submission.evaluation_status IN ('ACCEPTED','WRONG_ANSWER','COMPILE_ERROR','RUNTIME_ERROR','TIME_LIMIT_EXCEEDED','SYSTEM_ERROR')", Integer.class, labId);
-        List<BigDecimal> effectiveScores = jdbc.query(effectiveSubmissionsSql("COALESCE(s.final_score, s.auto_score) AS score"),
-                (rs, ignored) -> rs.getBigDecimal("score"), labId);
+        int submitted = jdbc.queryForObject("""
+                SELECT COUNT(DISTINCT submission.student_id) FROM assessment_lab_submission submission
+                 JOIN assessment_course_member_projection member ON member.course_id = ? AND member.user_id = submission.student_id
+                    AND member.membership_status = 'ACTIVE' AND member.user_id <> ?
+                 WHERE submission.lab_id = ?
+                """, Integer.class, lab.courseId(), creator, labId);
+        int evaluated = jdbc.queryForObject("""
+                SELECT COUNT(*) FROM (
+                %s
+                ) effective
+                 JOIN assessment_submission submission ON submission.id = effective.submission_id
+                 WHERE submission.evaluation_status IN ('ACCEPTED','WRONG_ANSWER','COMPILE_ERROR','RUNTIME_ERROR','TIME_LIMIT_EXCEEDED','SYSTEM_ERROR')
+                """.formatted(effectiveSubmissionsSql("s.submission_id", true)), Integer.class, lab.courseId(), creator, labId);
+        List<BigDecimal> effectiveScores = jdbc.query(effectiveSubmissionsSql("COALESCE(s.final_score, s.auto_score) AS score", true),
+                (rs, ignored) -> rs.getBigDecimal("score"), lab.courseId(), creator, labId);
         List<BigDecimal> scored = effectiveScores.stream().filter(java.util.Objects::nonNull).toList();
         BigDecimal average = scored.isEmpty() ? null : scored.stream().reduce(BigDecimal.ZERO, BigDecimal::add)
                 .divide(BigDecimal.valueOf(scored.size()), 2, RoundingMode.HALF_UP);
-        int late = jdbc.queryForObject("SELECT COUNT(*) FROM assessment_lab_submission WHERE lab_id = ? AND submit_status = 'LATE'", Integer.class, labId);
+        int late = jdbc.queryForObject("""
+                SELECT COUNT(*) FROM assessment_lab_submission submission
+                 JOIN assessment_course_member_projection member ON member.course_id = ? AND member.user_id = submission.student_id
+                    AND member.membership_status = 'ACTIVE' AND member.user_id <> ?
+                 WHERE submission.lab_id = ? AND submission.submit_status = 'LATE'
+                """, Integer.class, lab.courseId(), creator, labId);
         List<String> unsubmitted = jdbc.queryForList("""
                 SELECT member.user_id FROM assessment_course_member_projection member
                  WHERE member.course_id = ? AND member.membership_status = 'ACTIVE' AND member.user_id <> ?
@@ -384,7 +408,8 @@ public class LabEvaluationController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "X-Request-Id is required");
         }
         LabExperimentService.LabSummary lab = findLab(labId);
-        if (!canManage(lab, user)) {
+        String requestId = requireRequestId(request);
+        if (!canManage(lab, user, requestId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "course management permission is required");
         }
         EvaluationTask task = tasks.findBySubmission(submissionId)
@@ -396,12 +421,12 @@ public class LabEvaluationController {
                     .stream().findFirst().orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "LAB submission does not exist"));
             String taskId = java.util.UUID.randomUUID().toString();
             Instant now = Instant.now();
-            tasks.insert(taskId, submissionId, "LAB", Long.toString(labId), lab.courseId(), (String) submission.get("studentId"), request.getHeader("X-Request-Id"), now);
+            tasks.insert(taskId, submissionId, "LAB", Long.toString(labId), lab.courseId(), (String) submission.get("studentId"), requestId, now);
             jdbc.update("UPDATE assessment_submission SET evaluation_status = 'PENDING' WHERE id = ?", submissionId);
             EvaluationTask created = tasks.find(taskId).orElseThrow();
             return Map.of("taskId", created.id(), "submissionId", submissionId, "state", created.state().name(), "generation", created.generation());
         }
-        if (!tasks.manualReplay(task.id(), user.id(), request.getHeader("X-Request-Id"), Instant.now())) {
+        if (!tasks.manualReplay(task.id(), user.id(), requestId, Instant.now())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "only a terminal failed evaluation can be replayed");
         }
         EvaluationTask replayed = tasks.find(task.id()).orElseThrow();
@@ -442,10 +467,14 @@ public class LabEvaluationController {
         return requestId;
     }
 
-    private static String effectiveSubmissionsSql(String projection) {
+    private static String effectiveSubmissionsSql(String projection, boolean activeRosterOnly) {
         return """
                 SELECT %s
                   FROM assessment_lab_submission s
+                """.formatted(projection) + (activeRosterOnly ? """
+                  JOIN assessment_course_member_projection member ON member.course_id = ? AND member.user_id = s.student_id
+                     AND member.membership_status = 'ACTIVE' AND member.user_id <> ?
+                """ : "") + """
                  WHERE s.lab_id = ?
                    AND ((s.final_score IS NOT NULL AND s.submission_version = (SELECT MAX(finalized.submission_version)
                           FROM assessment_lab_submission finalized
@@ -457,7 +486,7 @@ public class LabEvaluationController {
                          AND s.submission_version = (SELECT MAX(latest.submission_version)
                               FROM assessment_lab_submission latest
                              WHERE latest.lab_id = s.lab_id AND latest.student_id = s.student_id)))
-                """.formatted(projection);
+                """;
     }
 
     private static Map<String, Integer> scoreDistribution(List<BigDecimal> scores) {

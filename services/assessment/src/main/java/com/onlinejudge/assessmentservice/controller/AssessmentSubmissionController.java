@@ -52,9 +52,11 @@ public class AssessmentSubmissionController {
         try { lab = labs.find(sourceId); }
         catch (java.util.NoSuchElementException missing) { throw new ResponseStatusException(HttpStatus.NOT_FOUND, "LAB does not exist", missing); }
         if (!user.hasRole("STUDENT") || !courseMembers.isActive(lab.courseId(), user.id())) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "active course student membership is required");
-        if ((file == null || file.isEmpty()) && (code == null || code.isBlank())) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "submission code or file is required");
+        boolean hasFile = file != null && !file.isEmpty();
+        boolean hasCode = code != null && !code.isBlank();
+        if (!hasFile && !hasCode) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "submission code or file is required");
+        if (hasFile && hasCode) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "submission must provide either code or file, not both");
         try {
-            boolean hasFile = file != null && !file.isEmpty();
             byte[] content = hasFile ? file.getBytes() : code.getBytes(java.nio.charset.StandardCharsets.UTF_8);
             String filename = hasFile ? file.getOriginalFilename() : "Main." + language;
             return labSubmissions.submit(new LabSubmissionService.SubmitLabCommand(sourceId, courseId, user.id(), language,

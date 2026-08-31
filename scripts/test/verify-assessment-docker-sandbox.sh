@@ -8,6 +8,8 @@ cleanup() {
 trap cleanup EXIT
 
 docker pull python:3.12-alpine >/dev/null
+docker pull eclipse-temurin:21-jdk-alpine >/dev/null
+docker pull gcc:14.2.0 >/dev/null
 docker pull tecnativa/docker-socket-proxy:0.1.2 >/dev/null
 docker run -d --rm --name "$proxy_name" \
   -e CONTAINERS=1 -e IMAGES=1 -e POST=1 -e ALLOW_START=1 -e ALLOW_RESTARTS=1 \
@@ -24,6 +26,6 @@ done
 curl --fail --silent "http://127.0.0.1:${proxy_port}/_ping" >/dev/null
 
 mvn -B -ntp -f services/assessment/pom.xml \
-  -Dtest=DockerSandboxClientIntegrationTest,LabWorkflowContractTest#workerExecutesPersistedLabCodeAgainstTestcasesAndStoresCaseResults,LabWorkflowContractTest#sandboxUsesEachLabTimeLimitInsteadOfGlobalTimeout \
+  -Dtest=DockerSandboxClientIntegrationTest,LabWorkflowContractTest#workerExecutesPersistedLabCodeAgainstTestcasesAndStoresCaseResults,LabWorkflowContractTest#workerKeepsHomeworkEvaluationOnTheSharedDockerSandboxPath,LabWorkflowContractTest#automaticLabEvaluationExecutesJavaAndCppSubmissions,LabWorkflowContractTest#sandboxUsesEachLabTimeLimitInsteadOfGlobalTimeout \
   -Dassessment.docker-sandbox.test=true \
   -Dassessment.docker-sandbox.api="http://127.0.0.1:${proxy_port}" test

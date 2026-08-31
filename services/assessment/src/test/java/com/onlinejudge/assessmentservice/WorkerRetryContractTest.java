@@ -45,6 +45,9 @@ class WorkerRetryContractTest {
         var terminal = worker.runOne("worker-second", task -> AssessmentWorker.EvaluationOutcome.failed("SANDBOX_TIMEOUT")).orElseThrow();
         assertThat(terminal.state()).isEqualTo(TaskState.FAILED);
         assertThat(terminal.attempt()).isEqualTo(2);
+        assertThat(terminal.resultStatus()).isEqualTo("TIME_LIMIT_EXCEEDED");
+        assertThat(jdbc.queryForObject("SELECT evaluation_status FROM assessment_submission WHERE id = ?", String.class, submitted.submissionId()))
+                .isEqualTo("TIME_LIMIT_EXCEEDED");
 
         assertThat(tasks.manualReplay(submitted.taskId(), "teacher-retry", java.time.Instant.now())).isTrue();
         var replayed = tasks.find(submitted.taskId()).orElseThrow();

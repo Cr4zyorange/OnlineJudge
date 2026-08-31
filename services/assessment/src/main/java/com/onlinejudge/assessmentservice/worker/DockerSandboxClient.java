@@ -13,6 +13,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 
@@ -22,16 +23,28 @@ import java.util.UUID;
  */
 final class DockerSandboxClient {
     private static final int CONNECT_TIMEOUT_MS = 2_000;
+    private static final int COMPILE_FAILURE_EXIT_CODE = 66;
     private static final int MAX_OUTPUT_BYTES = 64 * 1024;
     private static final int MAX_SOURCE_BYTES = 512 * 1024;
     private static final int MAX_INPUT_BYTES = 128 * 1024;
     private final URI baseUri;
-    private final String image;
+    private final RuntimeImage python;
+    private final RuntimeImage java;
+    private final RuntimeImage cpp;
     private final ObjectMapper json = new ObjectMapper();
 
     DockerSandboxClient(String apiUri, String image) {
+        this(apiUri, image, "eclipse-temurin:21-jdk-alpine", "gcc:14.2.0");
+    }
+
+    DockerSandboxClient(String apiUri, String pythonImage, String javaImage, String cppImage) {
         this.baseUri = apiUri == null || apiUri.isBlank() ? null : URI.create(apiUri.endsWith("/") ? apiUri : apiUri + "/");
-        this.image = image == null || image.isBlank() ? "python:3.12-alpine" : image;
+        this.python = new RuntimeImage(pythonImage == null || pythonImage.isBlank() ? "python:3.12-alpine" : pythonImage,
+                "printf %s \"$OJ_SOURCE_B64\" | base64 -d > /workspace/Main.py; printf %s \"$OJ_INPUT_B64\" | base64 -d > /workspace/input.txt; python3 -m py_compile /workspace/Main.py || exit " + COMPILE_FAILURE_EXIT_CODE + "; exec python3 /workspace/Main.py < /workspace/input.txt");
+        this.java = new RuntimeImage(javaImage == null || javaImage.isBlank() ? "eclipse-temurin:21-jdk-alpine" : javaImage,
+                "printf %s \"$OJ_SOURCE_B64\" | base64 -d > /workspace/Main.java; printf %s \"$OJ_INPUT_B64\" | base64 -d > /workspace/input.txt; mkdir -p /workspace/classes; javac -d /workspace/classes /workspace/Main.java || exit " + COMPILE_FAILURE_EXIT_CODE + "; exec java -cp /workspace/classes Main < /workspace/input.txt");
+        this.cpp = new RuntimeImage(cppImage == null || cppImage.isBlank() ? "gcc:14.2.0" : cppImage,
+                "printf %s \"$OJ_SOURCE_B64\" | base64 -d > /workspace/Main.cpp; printf %s \"$OJ_INPUT_B64\" | base64 -d > /workspace/input.txt; g++ -O2 -std=c++20 /workspace/Main.cpp -o /workspace/Main || exit " + COMPILE_FAILURE_EXIT_CODE + "; exec /workspace/Main < /workspace/input.txt");
     }
 
     boolean configured() {
@@ -39,34 +52,36 @@ final class DockerSandboxClient {
     }
 
     Result evaluate(String language, byte[] source, String input, int timeLimitMs, int memoryLimitKb) {
-        if (!configured()) return new Result(null, "SANDBOX_UNCONFIGURED");
-        if (!"python".equalsIgnoreCase(language) && !"python3".equalsIgnoreCase(language)) {
+        RuntimeImage runtime = runtime(language);
+        if (!configured()) return new Result(null, "SYSTEM_ERROR");
+        if (runtime == null) {
             return new Result(null, "COMPILE_ERROR");
         }
         if (source.length > MAX_SOURCE_BYTES || (input != null && input.getBytes(StandardCharsets.UTF_8).length > MAX_INPUT_BYTES)) {
-            return new Result(null, "SANDBOX_INPUT_TOO_LARGE");
+            return new Result(null, "SYSTEM_ERROR");
         }
         String containerId = null;
         int timeoutMs = Math.max(1, timeLimitMs);
         try {
-            containerId = createContainer(source, input, timeoutMs, memoryLimitKb);
+            containerId = createContainer(runtime, source, input, timeoutMs, memoryLimitKb);
             require(request("POST", "/containers/" + containerId + "/start", new byte[0], null, CONNECT_TIMEOUT_MS), 204);
             Response waited = request("POST", "/containers/" + containerId + "/wait", new byte[0], null, timeoutMs);
             require(waited, 200);
             int exitCode = json.readTree(waited.body()).path("StatusCode").asInt(Integer.MIN_VALUE);
             String output = readLogs(containerId, timeoutMs);
-            return exitCode == 0 ? new Result(output, null) : new Result(output, "RUNTIME_ERROR");
+            return exitCode == 0 ? new Result(output, null)
+                    : new Result(output, exitCode == COMPILE_FAILURE_EXIT_CODE ? "COMPILE_ERROR" : "RUNTIME_ERROR");
         } catch (SocketTimeoutException timedOut) {
             kill(containerId);
-            return new Result(null, "SANDBOX_TIMEOUT");
+            return new Result(null, "TIME_LIMIT_EXCEEDED");
         } catch (Exception rejected) {
-            return new Result(null, "SANDBOX_ERROR");
+            return new Result(null, "SYSTEM_ERROR");
         } finally {
             remove(containerId);
         }
     }
 
-    private String createContainer(byte[] source, String input, int timeLimitMs, int memoryLimitKb) throws IOException {
+    private String createContainer(RuntimeImage runtime, byte[] source, String input, int timeLimitMs, int memoryLimitKb) throws IOException {
         Map<String, Object> hostConfig = new LinkedHashMap<>();
         hostConfig.put("NetworkMode", "none");
         hostConfig.put("ReadonlyRootfs", true);
@@ -76,10 +91,10 @@ final class DockerSandboxClient {
         hostConfig.put("CapDrop", List.of("ALL"));
         hostConfig.put("SecurityOpt", List.of("no-new-privileges:true"));
         hostConfig.put("Tmpfs", Map.of(
-                "/workspace", "rw,nosuid,nodev,noexec,size=8m,mode=1777",
+                "/workspace", "rw,nosuid,nodev,exec,size=8m,mode=1777",
                 "/tmp", "rw,nosuid,nodev,noexec,size=16m,mode=1777"));
         Map<String, Object> definition = new LinkedHashMap<>();
-        definition.put("Image", image);
+        definition.put("Image", runtime.image());
         definition.put("User", "65534:65534");
         definition.put("WorkingDir", "/workspace");
         definition.put("Env", List.of(
@@ -87,7 +102,7 @@ final class DockerSandboxClient {
                 "OJ_MEMORY_LIMIT_KB=" + memoryLimitKb,
                 "OJ_SOURCE_B64=" + Base64.getEncoder().encodeToString(source),
                 "OJ_INPUT_B64=" + Base64.getEncoder().encodeToString(input == null ? new byte[0] : input.getBytes(StandardCharsets.UTF_8))));
-        definition.put("Cmd", List.of("sh", "-ec", "printf %s \"$OJ_SOURCE_B64\" | base64 -d > /workspace/Main.py; printf %s \"$OJ_INPUT_B64\" | base64 -d > /workspace/input.txt; exec python3 /workspace/Main.py < /workspace/input.txt"));
+        definition.put("Cmd", List.of("sh", "-ec", runtime.command()));
         definition.put("HostConfig", hostConfig);
         Response created = request("POST", "/containers/create?name=oj-lab-" + UUID.randomUUID(),
                 json.writeValueAsBytes(definition), "application/json", CONNECT_TIMEOUT_MS);
@@ -176,4 +191,15 @@ final class DockerSandboxClient {
 
     record Result(String output, String status) { }
     private record Response(int status, byte[] body) { }
+    private record RuntimeImage(String image, String command) { }
+
+    private RuntimeImage runtime(String language) {
+        if (language == null) return null;
+        return switch (language.trim().toLowerCase(Locale.ROOT)) {
+            case "python", "python3" -> python;
+            case "java" -> java;
+            case "cpp", "c++", "cc", "cxx" -> cpp;
+            default -> null;
+        };
+    }
 }

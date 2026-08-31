@@ -47,8 +47,8 @@ public class LabExperimentController {
     @ResponseStatus(HttpStatus.CREATED)
     public LabExperimentService.LabSummary create(@PathVariable String courseId, @Valid @RequestBody CreateLabRequest request,
             @RequestAttribute("assessment.currentUser") CurrentUser user, HttpServletRequest http) {
-        requireRequestId(http);
-        if (!canManage(courseId, user)) {
+        String requestId = requireRequestId(http);
+        if (!canManage(courseId, user, requestId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "course management permission is required");
         }
         try {
@@ -122,11 +122,11 @@ public class LabExperimentController {
     @PutMapping("/labs/{labId}")
     public LabExperimentService.LabSummary update(@PathVariable long labId, @Valid @RequestBody UpdateLabRequest request,
             @RequestAttribute("assessment.currentUser") CurrentUser user, HttpServletRequest http) {
-        requireRequestId(http);
+        String requestId = requireRequestId(http);
         LabExperimentService.LabSummary current;
         try { current = labs.find(labId); }
         catch (NoSuchElementException missing) { throw new ResponseStatusException(HttpStatus.NOT_FOUND, "LAB does not exist", missing); }
-        if (!canManage(current.courseId(), user)) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "course management permission is required");
+        if (!canManage(current.courseId(), user, requestId)) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "course management permission is required");
         try { return labs.update(labId, request.toCommand()); }
         catch (IllegalArgumentException invalid) { throw new ResponseStatusException(HttpStatus.BAD_REQUEST, invalid.getMessage(), invalid); }
         catch (IllegalStateException invalidState) { throw new ResponseStatusException(HttpStatus.CONFLICT, invalidState.getMessage(), invalidState); }
@@ -134,11 +134,12 @@ public class LabExperimentController {
 
     @DeleteMapping("/labs/{labId}")
     public LabExperimentService.LabSummary delete(@PathVariable long labId,
-            @RequestAttribute("assessment.currentUser") CurrentUser user) {
+            @RequestAttribute("assessment.currentUser") CurrentUser user, HttpServletRequest http) {
+        String requestId = requireRequestId(http);
         LabExperimentService.LabSummary current;
         try { current = labs.find(labId); }
         catch (NoSuchElementException missing) { throw new ResponseStatusException(HttpStatus.NOT_FOUND, "LAB does not exist", missing); }
-        if (!canManage(current.courseId(), user)) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "course management permission is required");
+        if (!canManage(current.courseId(), user, requestId)) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "course management permission is required");
         try { return labs.delete(labId); }
         catch (IllegalStateException invalidState) { throw new ResponseStatusException(HttpStatus.CONFLICT, invalidState.getMessage(), invalidState); }
     }
@@ -146,18 +147,18 @@ public class LabExperimentController {
     @PostMapping("/labs/{labId}/publish")
     public LabExperimentService.LabSummary publish(@PathVariable long labId,
             @RequestAttribute("assessment.currentUser") CurrentUser user, HttpServletRequest http) {
-        requireRequestId(http);
+        String requestId = requireRequestId(http);
         LabExperimentService.LabSummary lab;
         try {
             lab = labs.find(labId);
         } catch (NoSuchElementException missing) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "LAB does not exist", missing);
         }
-        if (!canManage(lab.courseId(), user)) {
+        if (!canManage(lab.courseId(), user, requestId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "course management permission is required");
         }
         try {
-            return labs.publish(labId);
+            return labs.publish(labId, requestId);
         } catch (IllegalStateException invalidState) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, invalidState.getMessage(), invalidState);
         }
@@ -166,30 +167,29 @@ public class LabExperimentController {
     @PostMapping("/labs/{labId}/close")
     public LabExperimentService.LabSummary close(@PathVariable long labId,
             @RequestAttribute("assessment.currentUser") CurrentUser user, HttpServletRequest http) {
-        requireRequestId(http);
-        return lifecycleMutation(labId, user, true);
+        return lifecycleMutation(labId, user, true, requireRequestId(http));
     }
 
     @PutMapping("/labs/{labId}/release-scores")
     public LabExperimentService.LabSummary releaseScores(@PathVariable long labId,
             @RequestAttribute("assessment.currentUser") CurrentUser user, HttpServletRequest http) {
-        requireRequestId(http);
-        LabExperimentService.LabSummary current = findAndAuthorize(labId, user);
+        String requestId = requireRequestId(http);
+        LabExperimentService.LabSummary current = findAndAuthorize(labId, user, requestId);
         try { return labs.releaseScores(current.labId(), http.getHeader("X-Request-Id")); }
         catch (IllegalStateException invalidState) { throw new ResponseStatusException(HttpStatus.CONFLICT, invalidState.getMessage(), invalidState); }
     }
 
-    private LabExperimentService.LabSummary lifecycleMutation(long labId, CurrentUser user, boolean close) {
-        LabExperimentService.LabSummary current = findAndAuthorize(labId, user);
-        try { return close ? labs.close(current.labId()) : labs.publish(current.labId()); }
+    private LabExperimentService.LabSummary lifecycleMutation(long labId, CurrentUser user, boolean close, String requestId) {
+        LabExperimentService.LabSummary current = findAndAuthorize(labId, user, requestId);
+        try { return close ? labs.close(current.labId()) : labs.publish(current.labId(), requestId); }
         catch (IllegalStateException invalidState) { throw new ResponseStatusException(HttpStatus.CONFLICT, invalidState.getMessage(), invalidState); }
     }
 
-    private LabExperimentService.LabSummary findAndAuthorize(long labId, CurrentUser user) {
+    private LabExperimentService.LabSummary findAndAuthorize(long labId, CurrentUser user, String requestId) {
         LabExperimentService.LabSummary current;
         try { current = labs.find(labId); }
         catch (NoSuchElementException missing) { throw new ResponseStatusException(HttpStatus.NOT_FOUND, "LAB does not exist", missing); }
-        if (!canManage(current.courseId(), user)) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "course management permission is required");
+        if (!canManage(current.courseId(), user, requestId)) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "course management permission is required");
         return current;
     }
 
@@ -198,15 +198,22 @@ public class LabExperimentController {
         return java.util.Arrays.stream(value.split(",")).map(String::trim).filter(item -> !item.isBlank()).map(Long::valueOf).toList();
     }
 
-    private static void requireRequestId(HttpServletRequest request) {
-        if (request.getHeader("X-Request-Id") == null || request.getHeader("X-Request-Id").isBlank()) {
+    private static String requireRequestId(HttpServletRequest request) {
+        String requestId = request.getHeader("X-Request-Id");
+        if (requestId == null || requestId.isBlank() || requestId.length() > 80) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "X-Request-Id is required");
         }
+        return requestId;
     }
 
     private boolean canManage(String courseId, CurrentUser user) {
         return (user.hasRole("TEACHER") || user.hasRole("ADMIN"))
                 && coursePermissions.canManageCourse(courseId, user.id());
+    }
+
+    private boolean canManage(String courseId, CurrentUser user, String requestId) {
+        return (user.hasRole("TEACHER") || user.hasRole("ADMIN"))
+                && coursePermissions.canManageCourse(courseId, user.id(), requestId);
     }
 
     public record CreateLabRequest(@NotBlank String title, @NotBlank String description, Instant deadline,
@@ -219,7 +226,7 @@ public class LabExperimentController {
         public boolean reportRequiredOrDefault() { return Boolean.TRUE.equals(reportRequired); }
         public int timeLimitMsOrDefault() { return timeLimitMs == null ? 60000 : timeLimitMs; }
         public int memoryLimitKbOrDefault() { return memoryLimitKb == null ? 262144 : memoryLimitKb; }
-        public String evaluationModeOrDefault() { return evaluationMode == null || evaluationMode.isBlank() ? "DOCKER_IO" : evaluationMode; }
+        public String evaluationModeOrDefault() { return evaluationMode == null || evaluationMode.isBlank() ? "DOCKER_IO" : evaluationMode.trim().toUpperCase(java.util.Locale.ROOT); }
         public String toAttachmentIds() { return attachmentIds == null ? "" : attachmentIds.stream().map(String::valueOf).collect(java.util.stream.Collectors.joining(",")); }
         public List<LabExperimentService.LabTestcase> toTestcases() {
             if (testcaseRequests == null) return List.of();
@@ -244,7 +251,7 @@ public class LabExperimentController {
                     autoEvaluateOrDefault(), testcases, chapterId, toAttachmentIds(), evaluationModeOrDefault(), reportRequiredOrDefault(),
                     timeLimitMsOrDefault(), memoryLimitKbOrDefault());
         }
-        public String evaluationModeOrDefault() { return evaluationMode == null || evaluationMode.isBlank() ? "DOCKER_IO" : evaluationMode; }
+        public String evaluationModeOrDefault() { return evaluationMode == null || evaluationMode.isBlank() ? "DOCKER_IO" : evaluationMode.trim().toUpperCase(java.util.Locale.ROOT); }
     }
     public record TestcaseRequest(String input, String expectedOutput, @DecimalMin(value = "0") BigDecimal scoreWeight,
                                   @JsonProperty("public") boolean isPublic, int orderNum) { }

@@ -19,6 +19,6 @@ class SandboxEvaluatorTest {
         var evaluator = new SandboxEvaluator(files);
 
         assertThat(evaluator.evaluate(stored.storageKey()).successful()).isFalse();
-        assertThat(evaluator.evaluate(stored.storageKey()).status()).isEqualTo("SANDBOX_UNCONFIGURED");
+        assertThat(evaluator.evaluate(stored.storageKey()).status()).isEqualTo("SYSTEM_ERROR");
     }
 }

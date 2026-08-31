@@ -21,8 +21,9 @@ class AssessmentComposeDeliveryContractTest {
         String runtimeProperties = Files.readString(repository.resolve("services/assessment/src/main/resources/application-compose.properties"));
 
         assertThat(compose).contains("ASSESSMENT_STORAGE_ROOT: /var/lib/onlinejudge-assessment");
-        assertThat(compose).contains("assessment-sandbox-docker-proxy:", "assessment-sandbox-image-init:");
-        assertThat(compose).contains("ASSESSMENT_SANDBOX_DOCKER_API_URI: http://assessment-sandbox-docker-proxy:2375", "ASSESSMENT_SANDBOX_IMAGE: python:3.12-alpine");
+        assertThat(compose).contains("assessment-sandbox-docker-proxy:", "assessment-sandbox-python-image-init:", "assessment-sandbox-java-image-init:", "assessment-sandbox-cpp-image-init:");
+        assertThat(compose).contains("ASSESSMENT_SANDBOX_DOCKER_API_URI: http://assessment-sandbox-docker-proxy:2375", "ASSESSMENT_SANDBOX_IMAGE: python:3.12-alpine",
+                "ASSESSMENT_SANDBOX_JAVA_IMAGE: eclipse-temurin:21-jdk-alpine", "ASSESSMENT_SANDBOX_CPP_IMAGE: gcc:14.2.0");
         assertThat(compose).contains("ASSESSMENT_RABBIT_ENABLED: \"true\"", "ASSESSMENT_RABBIT_HOST: rabbitmq");
         String api = compose.substring(compose.indexOf("  assessment-api:"), compose.indexOf("  assessment-worker:"));
         String worker = compose.substring(compose.indexOf("  assessment-worker:"), compose.indexOf("\nvolumes:"));
@@ -31,7 +32,8 @@ class AssessmentComposeDeliveryContractTest {
         assertThat(api).contains("assessment-migrations: {condition: service_completed_successfully}");
         assertThat(api).contains("ASSESSMENT_RABBIT_EXCHANGE: onlinejudge.events.v2");
         assertThat(worker).contains("ASSESSMENT_RABBIT_ENABLED: \"true\"", "ASSESSMENT_RABBIT_RELAY_ENABLED: \"true\"", "ASSESSMENT_RABBIT_EXCHANGE: onlinejudge.events.v2", "healthcheck:", "test -f /tmp/assessment-worker-ready", "retries: 3");
-        assertThat(worker).contains("assessment-sandbox-docker-proxy: {condition: service_started}", "assessment-sandbox-image-init: {condition: service_completed_successfully}")
+        assertThat(worker).contains("assessment-sandbox-docker-proxy: {condition: service_started}", "assessment-sandbox-python-image-init: {condition: service_completed_successfully}",
+                "assessment-sandbox-java-image-init: {condition: service_completed_successfully}", "assessment-sandbox-cpp-image-init: {condition: service_completed_successfully}")
                 .doesNotContain("ASSESSMENT_SANDBOX_COMMAND", "/var/run/docker.sock");
         String sandboxProxy = compose.substring(compose.indexOf("  assessment-sandbox-docker-proxy:"), compose.indexOf("  assessment-storage-init:"));
         assertThat(sandboxProxy).contains("/var/run/docker.sock:/var/run/docker.sock:ro", "CONTAINERS: \"1\"", "POST: \"1\"", "ALLOW_START: \"1\"", "ALLOW_RESTARTS: \"1\"", "NETWORKS: \"0\"")

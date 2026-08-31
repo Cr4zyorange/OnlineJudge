@@ -21,10 +21,14 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
+import java.util.Locale;
+import java.util.Set;
 
 /** LAB's lifecycle aggregate; generic Assessment tasks are created only for an accepted LAB submission. */
 @Service
 public class LabExperimentService {
+    private static final Set<String> SUPPORTED_LANGUAGES = Set.of("python", "java", "cpp");
+    private static final Set<String> EVALUATION_MODES = Set.of("DOCKER_IO", "MANUAL", "MIXED");
     private final JdbcTemplate jdbc;
     private final AssessmentOutboxRepository outbox;
     private final SourceGradeRepository grades;
@@ -231,6 +235,12 @@ public class LabExperimentService {
 
     @Transactional
     public LabSummary publish(long labId) {
+        return publish(labId, UUID.randomUUID().toString());
+    }
+
+    @Transactional
+    public LabSummary publish(long labId, String requestId) {
+        requireRequestId(requestId);
         LabSummary current = find(labId);
         if (!"DRAFT".equals(current.status())) throw new IllegalStateException("only a draft LAB can be published");
         Instant now = clock.instant();
@@ -239,7 +249,7 @@ public class LabExperimentService {
             throw new IllegalStateException("LAB lifecycle changed concurrently");
         }
         outbox.append("assessment.lab.published.v2", "assessment-lab", Long.toString(labId), 2,
-                java.util.UUID.randomUUID().toString(), java.util.Map.of(
+                requestId, java.util.Map.of(
                         "courseId", current.courseId(), "labId", Long.toString(labId), "title", current.title(),
                         "deadline", current.deadline().toString(), "receiverScope", "COURSE_ACTIVE_STUDENTS", "publishedAt", now.toString()), now);
         return new LabSummary(current.labId(), current.courseId(), current.title(), "PUBLISHED", current.deadline(),
@@ -253,7 +263,8 @@ public class LabExperimentService {
         if (command.description() == null || command.description().isBlank()) throw new IllegalArgumentException("description is required");
         if (command.deadline() == null || !command.deadline().isAfter(clock.instant())) throw new IllegalArgumentException("deadline must be in the future");
         if (command.maxScore() == null || command.maxScore().signum() <= 0) throw new IllegalArgumentException("maxScore must be positive");
-        if (command.allowedLanguages() == null || command.allowedLanguages().isEmpty() || command.allowedLanguages().stream().anyMatch(value -> value == null || value.isBlank() || value.contains(","))) throw new IllegalArgumentException("at least one valid language is required");
+        validateLanguages(command.allowedLanguages());
+        validateEvaluationConfiguration(command.evaluationMode(), command.autoEvaluate());
         if (command.testcases() == null) throw new IllegalArgumentException("testcases are required");
         validateAutomaticTestcases(command.autoEvaluate(), command.maxScore(), command.testcases());
         long orders = command.testcases().stream().map(LabTestcase::orderNum).distinct().count();
@@ -267,7 +278,8 @@ public class LabExperimentService {
         if (command.description() == null || command.description().isBlank()) throw new IllegalArgumentException("description is required");
         if (command.deadline() == null || !command.deadline().isAfter(clock.instant())) throw new IllegalArgumentException("deadline must be in the future");
         if (command.maxScore() == null || command.maxScore().signum() <= 0) throw new IllegalArgumentException("maxScore must be positive");
-        if (command.allowedLanguages() == null || command.allowedLanguages().isEmpty() || command.allowedLanguages().stream().anyMatch(value -> value == null || value.isBlank() || value.contains(","))) throw new IllegalArgumentException("at least one valid language is required");
+        validateLanguages(command.allowedLanguages());
+        validateEvaluationConfiguration(command.evaluationMode(), command.autoEvaluate());
         if (command.testcases() == null) throw new IllegalArgumentException("testcases are required");
         validateAutomaticTestcases(command.autoEvaluate(), command.maxScore(), command.testcases());
         if (command.testcases().stream().map(LabTestcase::orderNum).distinct().count() != command.testcases().size()) throw new IllegalArgumentException("testcase orderNum values must be unique");
@@ -286,6 +298,27 @@ public class LabExperimentService {
         }
         if (totalWeight.compareTo(maxScore) != 0) {
             throw new IllegalArgumentException("automatic LAB testcase weights must equal maxScore");
+        }
+    }
+
+    private static void validateLanguages(List<String> allowedLanguages) {
+        if (allowedLanguages == null || allowedLanguages.isEmpty() || allowedLanguages.stream().anyMatch(value -> value == null || value.isBlank() || value.contains(","))) {
+            throw new IllegalArgumentException("at least one valid language is required");
+        }
+        if (allowedLanguages.stream().map(value -> value.trim().toLowerCase(Locale.ROOT)).anyMatch(value -> !SUPPORTED_LANGUAGES.contains(value))) {
+            throw new IllegalArgumentException("allowedLanguages only supports python, java, and cpp");
+        }
+    }
+
+    private static void validateEvaluationConfiguration(String evaluationMode, boolean autoEvaluate) {
+        if (evaluationMode == null || !EVALUATION_MODES.contains(evaluationMode)) {
+            throw new IllegalArgumentException("evaluationMode must be one of DOCKER_IO, MANUAL, MIXED");
+        }
+        if ("MANUAL".equals(evaluationMode) && autoEvaluate) {
+            throw new IllegalArgumentException("MANUAL LAB cannot enable autoEvaluate");
+        }
+        if ("DOCKER_IO".equals(evaluationMode) && !autoEvaluate) {
+            throw new IllegalArgumentException("DOCKER_IO LAB must enable autoEvaluate");
         }
     }
 

@@ -36,8 +36,16 @@ public class HttpCoursePermissionClient implements CoursePermissionClient {
 
     @Override
     public boolean canManageCourse(String courseId, String userId) {
+        return canManageCourse(courseId, userId, UUID.randomUUID().toString());
+    }
+
+    @Override
+    public boolean canManageCourse(String courseId, String userId, String requestId) {
         if (authorizationUri.isBlank() || serviceAuthorization.isBlank() || courseId == null || userId == null) {
             throw new CourseAuthorizationUnavailableException("CRS authorization is not configured");
+        }
+        if (requestId == null || requestId.isBlank() || requestId.length() > 80) {
+            throw new CourseAuthorizationUnavailableException("CRS authorization request id is invalid");
         }
         try {
             String path = authorizationUri.replace("{courseId}", encode(courseId)).replace("{userId}", encode(userId));
@@ -45,7 +53,7 @@ public class HttpCoursePermissionClient implements CoursePermissionClient {
             HttpRequest request = HttpRequest.newBuilder(URI.create(path + separator + "action=MANAGE"))
                     .timeout(timeout)
                     .header("Accept", "application/json")
-                    .header("X-Request-Id", UUID.randomUUID().toString())
+                    .header("X-Request-Id", requestId)
                     .header("X-OnlineJudge-Service-Authorization", serviceAuthorization)
                     .GET().build();
             HttpResponse<String> response = http.send(request, HttpResponse.BodyHandlers.ofString());

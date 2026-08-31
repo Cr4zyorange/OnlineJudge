@@ -35,16 +35,17 @@ class WorkerCompletionService {
             tasks.reschedule(task.id(), workerId, task.generation(), outcome.status(), finished.plus(retryBackoff), finished);
             return;
         }
-        if (!tasks.complete(task.id(), workerId, task.generation(), outcome.successful(), outcome.status(), finished)) return;
+        AssessmentWorker.EvaluationOutcome terminal = publicOutcome(outcome);
+        if (!tasks.complete(task.id(), workerId, task.generation(), terminal.successful(), terminal.status(), finished)) return;
         // The lightweight constructor is used by queue-only tests and has no
         // HWK projection.  Preserve its pre-existing generic-task behaviour.
         boolean homeworkProjection = false;
         if (jdbc != null) {
+            jdbc.update("UPDATE assessment_submission SET evaluation_status = ? WHERE id = ?", terminal.status(), task.submissionId());
             if ("LAB".equals(task.sourceType())) {
-                jdbc.update("UPDATE assessment_submission SET evaluation_status = ? WHERE id = ?", outcome.status(), task.submissionId());
-                jdbc.update("UPDATE assessment_lab_submission SET auto_score = ? WHERE submission_id = ?", outcome.successful() ? outcome.score() : null, task.submissionId());
+                jdbc.update("UPDATE assessment_lab_submission SET auto_score = ? WHERE submission_id = ?", terminal.successful() ? terminal.score() : null, task.submissionId());
                 jdbc.update("DELETE FROM assessment_lab_evaluation_result WHERE submission_id = ?", task.submissionId());
-                for (AssessmentWorker.LabCaseResult result : outcome.caseResults()) {
+                for (AssessmentWorker.LabCaseResult result : terminal.caseResults()) {
                     jdbc.update("""
                             INSERT INTO assessment_lab_evaluation_result (submission_id, testcase_id, passed, score, actual_output, message, executed_at)
                             VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -58,22 +59,21 @@ class WorkerCompletionService {
                      WHERE submission_id = ? FOR UPDATE
                     """, (rs, ignored) -> rs.getBoolean("is_final"), task.submissionId()).isEmpty();
             if (homeworkProjection) {
-                jdbc.update("UPDATE assessment_submission SET evaluation_status = ? WHERE id = ?", outcome.status(), task.submissionId());
                 jdbc.update("""
                         UPDATE assessment_homework_submission
                            SET evaluation_status = ?, auto_score = ?, final_score = ?
                          WHERE submission_id = ?
-                        """, outcome.status(), outcome.successful() ? outcome.score() : null,
-                        outcome.successful() ? outcome.score() : null, task.submissionId());
-                appendHomeworkEvaluation(task, outcome, finished);
+                        """, terminal.status(), terminal.successful() ? terminal.score() : null,
+                        terminal.successful() ? terminal.score() : null, task.submissionId());
+                appendHomeworkEvaluation(task, terminal, finished);
             }
             }
         }
         outbox.append("assessment.evaluation.completed.v2", "assessment-submission", task.submissionId(), task.generation(), task.originRequestId(),
-                Map.of("courseId", task.courseId(), "submissionId", task.submissionId(), "evaluationStatus", outcome.successful() ? "SUCCESS" : "FAILED", "evaluationVersion", task.generation(), "completedAt", finished.toString()), finished);
-        if (outcome.successful() && (!"HWK".equals(task.sourceType()) || !homeworkProjection)
+                Map.of("courseId", task.courseId(), "submissionId", task.submissionId(), "evaluationStatus", terminal.successful() ? "SUCCESS" : "FAILED", "evaluationVersion", task.generation(), "completedAt", finished.toString()), finished);
+        if (terminal.successful() && (!"HWK".equals(task.sourceType()) || !homeworkProjection)
                 && shouldPublishSourceGrade(task)) {
-            java.math.BigDecimal publishedScore = outcome.score();
+            java.math.BigDecimal publishedScore = terminal.score();
             if ("LAB".equals(task.sourceType()) && jdbc != null) {
                 // Release selects the newest finalized submission for a student;
                 // replaying a later unfinalized submission must preserve that basis.
@@ -86,9 +86,9 @@ class WorkerCompletionService {
                         Long.parseLong(task.sourceId()), task.studentId());
                 if (finalScore != null) publishedScore = finalScore;
             }
-            long version = grades.upsertScored(task.sourceType(), task.sourceId(), task.courseId(), task.studentId(), publishedScore, outcome.fullScore(), finished);
+            long version = grades.upsertScored(task.sourceType(), task.sourceId(), task.courseId(), task.studentId(), publishedScore, terminal.fullScore(), finished);
             outbox.append("assessment.source-grade.changed.v2", "assessment-source-grade", task.sourceType() + ":" + task.sourceId() + ":" + task.studentId(), version, task.originRequestId(),
-                    Map.of("courseId", task.courseId(), "sourceType", task.sourceType(), "sourceId", task.sourceId(), "studentId", task.studentId(), "score", publishedScore, "fullScore", outcome.fullScore(), "status", "SCORED", "sourceVersion", version), finished);
+                    Map.of("courseId", task.courseId(), "sourceType", task.sourceType(), "sourceId", task.sourceId(), "studentId", task.studentId(), "score", publishedScore, "fullScore", terminal.fullScore(), "status", "SCORED", "sourceVersion", version), finished);
         }
     }
     private void appendHomeworkEvaluation(EvaluationTask task, AssessmentWorker.EvaluationOutcome outcome, Instant finished) {
@@ -110,4 +110,14 @@ class WorkerCompletionService {
         return "SCORE_PUBLISHED".equals(status) || "ARCHIVED".equals(status);
     }
     private boolean retryable(String status) { return "SANDBOX_TIMEOUT".equals(status) || "SANDBOX_ERROR".equals(status) || "SYSTEM_ERROR".equals(status); }
+
+    /** Internal sandbox diagnostics can drive retries, but terminal API/DB state is a documented status only. */
+    private static AssessmentWorker.EvaluationOutcome publicOutcome(AssessmentWorker.EvaluationOutcome outcome) {
+        String status = switch (outcome.status()) {
+            case "SANDBOX_TIMEOUT" -> "TIME_LIMIT_EXCEEDED";
+            case "SANDBOX_UNAVAILABLE", "SANDBOX_UNCONFIGURED", "SANDBOX_ERROR", "SANDBOX_INPUT_TOO_LARGE", "SUBMISSION_FILE_MISSING" -> "SYSTEM_ERROR";
+            default -> outcome.status();
+        };
+        return new AssessmentWorker.EvaluationOutcome(outcome.successful(), status, outcome.score(), outcome.fullScore(), outcome.caseResults());
+    }
 }

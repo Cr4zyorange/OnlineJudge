@@ -8,4 +8,9 @@ public interface CoursePermissionClient {
      * so callers fail closed with 503 instead of misreporting a denial.
      */
     boolean canManageCourse(String courseId, String userId) throws CourseAuthorizationUnavailableException;
+
+    /** Write commands retain the initiating API correlation across the CRS authorization hop. */
+    default boolean canManageCourse(String courseId, String userId, String requestId) {
+        return canManageCourse(courseId, userId);
+    }
 }

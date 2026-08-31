@@ -40,10 +40,18 @@ services:
       BUILD: "0"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
-  assessment-sandbox-image-init:
+  assessment-sandbox-python-image-init:
     image: python:3.12-alpine
     network_mode: none
     command: ["python3", "-c", "pass"]
+  assessment-sandbox-java-image-init:
+    image: eclipse-temurin:21-jdk-alpine
+    network_mode: none
+    command: ["java", "-version"]
+  assessment-sandbox-cpp-image-init:
+    image: gcc:14.2.0
+    network_mode: none
+    command: ["g++", "--version"]
   assessment-storage-init:
     image: mysql:8.4
     user: "0:0"
@@ -121,7 +129,9 @@ services:
       assessment-storage-init: {condition: service_completed_successfully}
       assessment-migrations: {condition: service_completed_successfully}
       assessment-sandbox-docker-proxy: {condition: service_started}
-      assessment-sandbox-image-init: {condition: service_completed_successfully}
+      assessment-sandbox-python-image-init: {condition: service_completed_successfully}
+      assessment-sandbox-java-image-init: {condition: service_completed_successfully}
+      assessment-sandbox-cpp-image-init: {condition: service_completed_successfully}
     environment:
       ASSESSMENT_DATABASE_HOST: assessment-db
       ASSESSMENT_DATABASE_USER: onlinejudge_assessment
@@ -142,6 +152,8 @@ services:
       ASSESSMENT_STORAGE_ROOT: /var/lib/onlinejudge-assessment
       ASSESSMENT_SANDBOX_DOCKER_API_URI: http://assessment-sandbox-docker-proxy:2375
       ASSESSMENT_SANDBOX_IMAGE: python:3.12-alpine
+      ASSESSMENT_SANDBOX_JAVA_IMAGE: eclipse-temurin:21-jdk-alpine
+      ASSESSMENT_SANDBOX_CPP_IMAGE: gcc:14.2.0
       ASSESSMENT_WORKER_LEASE: ${ASSESSMENT_WORKER_LEASE:-PT30S}
       ASSESSMENT_WORKER_HEARTBEAT_INTERVAL: ${ASSESSMENT_WORKER_HEARTBEAT_INTERVAL:-PT5S}
       ASSESSMENT_WORKER_MAX_ATTEMPTS: ${ASSESSMENT_WORKER_MAX_ATTEMPTS:-3}
