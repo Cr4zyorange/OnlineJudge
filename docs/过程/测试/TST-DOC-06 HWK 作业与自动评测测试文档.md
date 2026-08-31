@@ -29,7 +29,7 @@
 | V1.8 | 2026-08-27 | HWK 模块负责人 | 按 PR #276 复审纠正 CODE 评测假阳性：E2E 不再以 API-HWK-11 读取触发评测，FR-HWK-04 与 TC-HWK-10/11 如实标记 FAIL；同步三层图源、SVG 边语义校验和反向变异测试，并明确 #264 文档/测试闭环可关闭、#296 独立负责产品修复 |
 | V1.9 | 2026-08-27 | HWK 模块负责人 | 按 #296 实现提交后后台评测 Worker、PENDING 原子认领、API-HWK-11 纯读取与 SYSTEM_ERROR 兜底；E2E 仅轮询 API-HWK-10 验收终态，TC-HWK-10/11 更新为 PASS |
 | V2.0 | 2026-08-27 | HWK 模块负责人 | 按 PR #299 返工补齐持久恢复：定时重投 PENDING、启动时重置旧进程遗留 RUNNING，并以首次派发遗漏/重启自动化验证；不改变公共 API、DTO、错误码或状态枚举 |
-| V2.1 | 2026-08-30 | D6 契约负责人 | #338 明确 API-HWK-03 v2 语义变更：Homework + outbox 本地成功即 PUBLISHED；Learning/broker 不可用不回滚；仅本地事务失败为 `503/HWK_5003`/DRAFT。既有 `publishRequired` 测试标为 v1 历史证据，v2 事件 schema/反例/mutation 由契约门禁验证，运行时 outbox 验收留给 #337/服务拆分 Issue。 |
+| V2.1 | 2026-08-30 | D6 契约负责人 | #338 冻结 API-HWK-03 当前语义：Homework + outbox 本地成功即 PUBLISHED；Learning/broker 不可用不回滚；仅本地事务失败为 `503/HWK_5003`/DRAFT。事件 schema、反例和 mutation 由契约门禁验证，运行时 outbox 验收留给 #337/服务拆分 Issue。 |
 
 ### 1.2 审批记录
 
@@ -176,7 +176,7 @@
 | TC-HWK-25 | FR-HWK-03、05；NFR-HWK-03、04 | API-HWK-08/09/10；DB-HWK-08 | 多版本 FILE 提交与不可用资产 | 查询学生历史/教师详情 | 每个版本只返回精确绑定的安全附件摘要，不串版或泄露存储引用 | 自动化与 MAN-HWK-012 历史/批阅页通过 | 通过 |
 | TC-HWK-26 | FR-HWK-03、05；NFR-HWK-04 | API-HWK-24 | 提交者、课程管理者、匿名、他人提交 | 下载并核对鉴权、响应头和 SHA-256 | 每次重鉴权；仅提交者/课程管理者成功；精确版本且不泄露内部引用 | 学生/教师 SHA-256 均 `d1847d02cb36254509d0ec2df0eaf20805ce3f6aed4e25a809aea88f8d8568fa`；匿名 401，他人 403 | 通过 |
 | TC-HWK-27 | FR-HWK-02、03；NFR-HWK-05 | UI-HWK-05/06/08；API-HWK-23/24 | 上传/恢复失败、迟到响应、路由切换、sessionStorage | 选择→上传→失败保留/重试/移除→提交；刷新恢复 GET 失败后重载 | 无假 fileId/路由污染；sessionStorage 不含 File/本地路径；恢复失败保留 session/UUID | 前端 53 files / 545 tests；`fileId=d3b0f3f1-e989-4a6f-8665-ba35daa29329` 恢复 GET 500/HWK_5002 后保留，解除 mock 后 GET 200、DELETE 200 | 通过 |
-| TC-HWK-N01 | NFR-HWK-01 | API-HWK-03、07、11、13；DB-HWK-05 | 模拟本地 Homework/outbox 失败、Learning/broker 不可用、评测失败、重复提交冲突、首次派发遗漏和进程重启 | 执行发布、提交、查询和批阅；扫描 PENDING 并启动恢复 RUNNING | v2：本地失败为 `503/HWK_5003`/DRAFT；Learning/broker 失败保留 PUBLISHED 和 outbox；事件含 title/deadline/receiverScope 且无 roster | `publishRollsBackHomeworkWhenRequiredNotificationDeliveryFails` 是 v1 历史证据；#338 契约门禁已验证 schema、反例和 mutation，运行时 outbox/E2E 待 #337/服务拆分 Issue | v2 运行时待验收 |
+| TC-HWK-N01 | NFR-HWK-01 | API-HWK-03、07、11、13；DB-HWK-05 | 模拟本地 Homework/outbox 失败、Learning/broker 不可用、评测失败、重复提交冲突、首次派发遗漏和进程重启 | 执行发布、提交、查询和批阅；扫描 PENDING 并启动恢复 RUNNING | 本地失败为 `503/HWK_5003`/DRAFT；Learning/broker 失败保留 PUBLISHED 和 outbox；事件含 title/deadline/receiverScope 且无 roster | #338 契约门禁已验证当前 schema、反例和 mutation，运行时 outbox/E2E 待 #337/服务拆分 Issue | 运行时待验收 |
 | TC-HWK-N02 | NFR-HWK-02 | API-HWK-05、09、15；组合索引与增量迁移 | 数据量大于单页，包含活跃/退出学生和多版本提交 | 查询三类名单和统计，检查 Repository 查询及迁移元数据 | 1 基页码、size 1～100、稳定排序和聚合总数正确；统计为 SQL 聚合，不加载全部最终提交；组合索引存在且列顺序正确 | SQL 聚合、极大页码、fresh/H2/存量 MySQL 脚本契约 10 条通过；真实 MySQL EXPLAIN 待部署复核 | 有条件通过 |
 | TC-HWK-N03 | NFR-HWK-03 | API-HWK-10、20、21；DB-HWK-04、05、06 | 存在多次提交、评测、重评、批阅 | 查询详情、评测日志、批阅日志 | 提交和日志可追溯 | 迁移测试和控制器日志用例通过 | 通过 |
 | TC-HWK-N04 | NFR-HWK-04 | 全部 HWK 接口；重点 API-HWK-09、15 | 学生、无权限教师、姓名服务失败、缓存数据 | 越权查询统计/名单并触发姓名降级 | 返回 `HWK_4031`/403 且不泄露统计、名单或学生标识；页面不展示裸 `studentId` | 专属 403 自动化通过；390px 学生深链落到 403；姓名服务 503 时只显示安全占位 | 通过 |

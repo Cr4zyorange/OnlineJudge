@@ -47,7 +47,6 @@ SHARED_BACKEND_INPUTS = [
 MICROSERVICE_V2_CONTRACT_INPUTS = [
     "contracts/v2/**",
     "docs/adr/ADR-006-五业务服务与可靠消息契约.md",
-    "docs/开发/D4-CROSS-SERVICE-共享契约.md",
     "docs/开发/D6-D7-五服务共享契约-v2.md",
     "docs/开发/D6-D7-五服务架构冻结-305.md",
     "docs/diagrams/arch/issue305-*.mmd",
@@ -314,7 +313,6 @@ class WorkloadManifestValidationTest(unittest.TestCase):
             "contracts/v2/asyncapi/events.asyncapi.json",
             "contracts/v2/examples/event-envelope.valid.json",
             "docs/adr/ADR-006-五业务服务与可靠消息契约.md",
-            "docs/开发/D4-CROSS-SERVICE-共享契约.md",
             "docs/开发/D6-D7-五服务共享契约-v2.md",
             "docs/开发/D6-D7-五服务架构冻结-305.md",
             "docs/diagrams/arch/issue305-five-service-context.mmd",
