@@ -151,6 +151,33 @@ class LearningTaskInternalControllerTest {
                 .andExpect(jsonPath("$.code").value("SERVICE_IDENTITY_INVALID"));
     }
 
+    @Test
+    void missingRequestIdIsRejectedWithTheDocumentedContractErrorShape() throws Exception {
+        mockMvc.perform(get("/internal/v2/learning/tasks/recent")
+                        .header("X-OnlineJudge-Service-Authorization", "Bearer " + serviceToken(List.of("learning.tasks.read")))
+                        .param("courseId", "501")
+                        .param("userId", "601"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("REQUEST_ID_REQUIRED"))
+                .andExpect(jsonPath("$.message").value("X-Request-Id is required"))
+                .andExpect(jsonPath("$.requestId").value(""))
+                .andExpect(jsonPath("$.retryable").value(false));
+    }
+
+    @Test
+    void malformedRequestIdIsRejectedWithTheDocumentedContractErrorShape() throws Exception {
+        mockMvc.perform(get("/internal/v2/learning/tasks/recent")
+                        .header("X-OnlineJudge-Service-Authorization", "Bearer " + serviceToken(List.of("learning.tasks.read")))
+                        .header("X-Request-Id", "not-a-uuid")
+                        .param("courseId", "501")
+                        .param("userId", "601"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("REQUEST_ID_INVALID"))
+                .andExpect(jsonPath("$.message").value("X-Request-Id must be a UUID"))
+                .andExpect(jsonPath("$.requestId").value("not-a-uuid"))
+                .andExpect(jsonPath("$.retryable").value(false));
+    }
+
     private void insertTask(long userId, long courseId, String sourceModule, long sourceId, String taskType,
                             String title, LocalDateTime deadline, int progress, String status, String actionUrl) {
         jdbcTemplate.update("""

@@ -11,6 +11,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.UUID;
+
 /**
  * Internal v2 endpoint for the bounded Course -> LRN recent-task summary
  * contract (learning.openapi.json).  Course has already verified active
@@ -40,6 +42,7 @@ public class LearningTaskInternalController {
             @RequestParam long userId,
             @RequestParam(defaultValue = "5") int limit
     ) {
+        requireRequestId(request);
         serviceIdentity.requireTasksRead(request);
         int boundedLimit = Math.max(1, Math.min(limit, MAX_RECENT_TASKS));
         LearningTaskPage page = learningTaskService.listTasks(
@@ -49,5 +52,24 @@ public class LearningTaskInternalController {
         // v2 internal lists are 0-based; the Learning service pagination is
         // 1-based, so the bounded summary page exposes page 0.
         return new LearningTaskSummaryPage(page.records(), page.total(), page.page() - 1, page.size());
+    }
+
+    /**
+     * learning.openapi.json marks X-Request-Id required and UUID-formatted at
+     * this receiving boundary; the caller already sends it, so the server-side
+     * contract must not silently accept its absence or a malformed value.
+     */
+    private static void requireRequestId(HttpServletRequest request) {
+        String requestId = request.getHeader("X-Request-Id");
+        if (requestId == null || requestId.isBlank()) {
+            throw new InternalV2RequestException(
+                    "REQUEST_ID_REQUIRED", "X-Request-Id is required", org.springframework.http.HttpStatus.BAD_REQUEST, false);
+        }
+        try {
+            UUID.fromString(requestId);
+        } catch (IllegalArgumentException malformed) {
+            throw new InternalV2RequestException(
+                    "REQUEST_ID_INVALID", "X-Request-Id must be a UUID", org.springframework.http.HttpStatus.BAD_REQUEST, false);
+        }
     }
 }
