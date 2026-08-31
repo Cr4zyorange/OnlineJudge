@@ -40,12 +40,33 @@ export function verifyThreeServiceBaseline306({ rootPath = defaultRoot } = {}) {
   }
   if (accounts.some((line) => line.includes('oj_learning') || line.includes('oj_learning_rw'))) problems.push('schema account matrix must not retain a standalone Learning service');
   const ownershipLedger = read(rootPath, 'database/ownership/table-ownership.csv', problems);
+  const lrnTables = [];
   for (const row of ownershipLedger.trim().split(/\r?\n/).slice(1)) {
     const [table, owner, schema] = row.split(',');
+    if (table.startsWith('lrn_') || table.startsWith('learning_')) {
+      lrnTables.push(table);
+    }
     if ((table.startsWith('lrn_') || table.startsWith('learning_')) && (owner !== 'COURSE' || schema !== 'oj_course')) {
       problems.push(`Course must own LRN table ${table} in oj_course`);
     }
   }
+  const requiredLrnTables = [
+    'lrn_learning_task', 'lrn_learning_progress', 'lrn_learning_record',
+    'lrn_notification', 'lrn_notification_status_log',
+    'lrn_reminder_rule', 'lrn_notification_setting', 'lrn_reminder_scan_log',
+    'learning_event_inbox', 'learning_event_delivery_attempt', 'learning_event_dead_letter',
+    'learning_event_reconciliation_request', 'learning_deferred_event',
+    'learning_course_member_projection', 'learning_course_membership_watermark'
+  ];
+  if (JSON.stringify(lrnTables) !== JSON.stringify(requiredLrnTables)) problems.push('ownership ledger must enumerate the 15 Course-owned LRN runtime tables');
+  const courseMigration = read(rootPath, 'database/migrations/course/V20260901_07__course_lrn_owned_tables.sql', problems);
+  for (const table of requiredLrnTables) {
+    if (!courseMigration.includes(`CREATE TABLE IF NOT EXISTS ${table}`)) problems.push(`Course migration must create LRN runtime table ${table}`);
+    if (!courseMigration.includes(`course_copy_legacy_lrn_table('${table}')`)) problems.push(`Course migration must validate legacy cutover for ${table}`);
+  }
+  if (!courseMigration.includes('BIT_XOR(CRC32') || !courseMigration.includes('oj_learning')) problems.push('Course migration must validate a detected legacy LRN cutover before checkpointing');
+  const migrationRunner = read(rootPath, 'database/mysql/migrate-service.sh', problems);
+  if (migrationRunner.includes('identity|course|assessment|grade|learning') || migrationRunner.includes('--schema learning')) problems.push('migration runner must reject the retired Learning schema');
 
   let manifest;
   try { manifest = JSON.parse(read(rootPath, 'deploy/platform/workloads.json', problems)); } catch (error) { problems.push(`invalid workload manifest: ${error.message}`); }

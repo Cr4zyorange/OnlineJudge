@@ -14,6 +14,7 @@ function fixtureRoot() {
   for (const relativePath of [
     'contracts/v2',
     'database/migrations',
+    'database/mysql',
     'database/ownership',
     'deploy/platform',
     'docs/adr/ADR-006-三业务服务与可靠消息契约.md',
@@ -112,6 +113,44 @@ test('Issue #306 rejects duplicate or retired AsyncAPI consumers', () => {
     assert.throws(
       () => verifyThreeServiceBaseline306({ rootPath: root }),
       /AsyncAPI identity\.security-version\.changed\.v2 must name each three-service consumer at most once/
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('Issue #306 rejects a Course migration that omits an owned LRN runtime table', () => {
+  const root = fixtureRoot();
+  try {
+    const migrationPath = join(root, 'database/migrations/course/V20260901_07__course_lrn_owned_tables.sql');
+    const migration = readFileSync(migrationPath, 'utf8').replace(
+      'CREATE TABLE IF NOT EXISTS learning_event_dead_letter',
+      '-- missing learning_event_dead_letter'
+    );
+    writeFileSync(migrationPath, migration, 'utf8');
+
+    assert.throws(
+      () => verifyThreeServiceBaseline306({ rootPath: root }),
+      /Course migration must create LRN runtime table learning_event_dead_letter/
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('Issue #306 rejects a migration runner that accepts the retired Learning schema', () => {
+  const root = fixtureRoot();
+  try {
+    const runnerPath = join(root, 'database/mysql/migrate-service.sh');
+    const runner = readFileSync(runnerPath, 'utf8').replace(
+      'identity|course|assessment|grade)',
+      'identity|course|assessment|grade|learning)'
+    );
+    writeFileSync(runnerPath, runner, 'utf8');
+
+    assert.throws(
+      () => verifyThreeServiceBaseline306({ rootPath: root }),
+      /migration runner must reject the retired Learning schema/
     );
   } finally {
     rmSync(root, { recursive: true, force: true });

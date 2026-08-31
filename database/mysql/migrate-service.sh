@@ -7,7 +7,7 @@
 set -eu
 
 usage() {
-    echo "usage: migrate-service.sh --schema identity|course|assessment|grade|learning" >&2
+    echo "usage: migrate-service.sh --schema identity|course|assessment|grade" >&2
 }
 
 schema=
@@ -31,9 +31,9 @@ while [ "$#" -gt 0 ]; do
 done
 
 case "$schema" in
-    identity|course|assessment|grade|learning) ;;
+    identity|course|assessment|grade) ;;
     *)
-        echo "--schema must be one of identity, course, assessment, grade, learning" >&2
+        echo "--schema must be one of identity, course, assessment, grade" >&2
         exit 64
         ;;
 esac

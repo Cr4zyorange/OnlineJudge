@@ -30,3 +30,16 @@ node --test scripts/test/verify-three-service-baseline-306.test.mjs
 ## 下游通知
 
 `BASELINE_READY` 通知对象：#355、#357、#356、#339、#317、#318、#319、#320、#340、#307、#321、#304；通知载荷必须包含本文件和上述完整 SHA。
+
+## 审查返工（PR #358）
+
+审查复现的 RED：`mvn -B -ntp test -Dtest=AuthServiceExtractionContractTest` 为 `3 tests / 1 failure / 0 errors`，旧断言把退役的独立 Learning 当作第五个 JWKS consumer；扩展后的 `bash database/tests/verify-four-domain-baseline.sh` 在旧迁移上报告缺失 `lrn_learning_progress`。旧 `migrate-service.sh --schema learning` 也仍接受已退役 schema 名称。
+
+修复后的 GREEN：
+
+- `mvn -B -ntp test -DargLine=-Dnet.bytebuddy.experimental=true`：`493 tests / 0 failures / 0 errors / 14 skipped`。本机是 Java 25；该参数只兼容当前 Byte Buddy，CI 的 Java 21 无需它。
+- `node --test scripts/test/verify-three-service-baseline-306.test.mjs`：`7/7`，额外拒绝 15 表清单缺失、未验证历史切换或 migration runner 接受 `learning`。
+- `bash database/tests/verify-four-domain-baseline.sh`：4 accounts、12 local-DML allow、12 foreign-schema deny、4 DDL deny、15 Course LRN runtime tables，并以实际 `migrate-course-service.sh` 验证已填充历史 LRN 表的数据切换、迁移账本 checkpoint 与 migrate/rollback/repeat。
+- `bash database/mysql/migrate-service.sh --schema learning`：预期拒绝，退出码 `64`。
+
+12 个下游 Issue 已补发结构化通知，逐条使用：`BASELINE_READY issue=#306 sha=921af331e785551107466c8267d5f988436e1d14 contracts=contracts/v2 manifest=deploy/platform/workloads.json evidence=docs/过程/测试/Issue-306-三服务基线验收证据.md`。
