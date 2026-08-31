@@ -1,0 +1,13 @@
+spring:
+  application:
+    name: grade-service
+  datasource:
+    url: ${GRADE_DATASOURCE_URL:jdbc:h2:mem:grade_service;MODE=MySQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1}
+    username: ${GRADE_DATABASE_USER:sa}
+    password: ${GRADE_DATABASE_PASSWORD:}
+    driver-class-name: ${GRADE_DATABASE_DRIVER:org.h2.Driver}
+  sql.init:
+    mode: always
+    schema-locations: classpath:schema-grade.sql
+server:
+  port: ${GRADE_HTTP_PORT:8084}
