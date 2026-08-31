@@ -1,58 +1,144 @@
-# D7-GATEWAY 路由切流与回滚
+# D7-GATEWAY 五服务路由、切流与回滚
 
-## 目标
+## 1. 目标与边界
 
-前端仍只访问既有 `/api` 基址。Nginx 按公开路径将流量路由至 AUTH、CRS、Assessment、Learning & Grade 四个逻辑服务；每项默认保持 `backend:8080`，因此服务尚未切换时原单体链路不变。
+Gateway 是 `deploy/platform/workloads.json` 定义的独立基础设施 workload，浏览器入口为
+`http://gateway:8080`，不再把业务路由配置挂载到 frontend。它负责公开路径路由、请求
+Header 零信任边界、request ID、请求大小、限流、超时和基础错误映射；Identity、Course、
+Assessment、Grade、Learning 始终自行验证 JWT、权限和业务状态。
 
-## 路由与安全边界
+Gateway 不拥有业务事实，不执行 session introspection，不注入用户身份，不暴露
+`/internal/v2/**`、Assessment Worker、RabbitMQ、MySQL、迁移任务或内部管理入口。
+未知 `/api/**` 返回 404，不回退到单体 backend。
 
-| 服务 | 路径 |
-| --- | --- |
-| AUTH | `/api/v1/auth/**`、`/api/v1/users/me/**`、`/api/v1/admin/**` |
-| CRS | `/api/v1/courses/**`（实验、作业、成绩子路径除外）、`/api/v1/chapters/**` |
-| Assessment | `/api/v1/labs/**`、`/api/v1/homeworks/**`、`/api/v1/submissions/**`、`/api/v1/evaluations/**`，以及课程下的实验/作业路径 |
-| Learning & Grade | `/api/v1/learning/**`、`/api/v1/notifications/**`、`/api/v1/reminder-rules/**`，课程下全部成绩路径，以及 `/api/v1/grade-items/**`、`/api/v1/grade-records/**`、`/api/v1/course-grade-summaries/**`、`/api/v1/grade-review-requests/**` |
+本实现分两阶段验收：
 
-课程下的实验、作业和成绩规则优先于通用课程路由。网关仅转发浏览器携带的 `Authorization`；会在代理前清空 `X-User-*`、`X-Permissions`、`X-Course-Ids` 和 `X-Manageable-Course-Ids`，不伪造内部身份主体。未冻结的服务间主体契约仍由 #310 管理。
+1. 五服务契约、独立 Gateway workload、disposable 五 upstream、切换和回滚可以提前完成。
+2. #312 Course、#339 Grade、#342 Learning 完成后，在真实五服务环境完成登录到通知主链，
+   才能关闭 #317。
 
-精确根路径和子路径均被覆盖，例如 `/api/v1/courses` 与 `/api/v1/courses/**`、`/api/v1/homeworks` 与 `/api/v1/homeworks/**`。请求体上限保持 55MB。普通代理的连接、读取、发送超时为 5s、60s、60s；Assessment 上传/提交读取与发送超时为 300s。代理重试显式关闭，避免非幂等上传或提交被重复发送。下游 401、403、404 保持业务响应；网关连接失败返回 `GATEWAY_502`，超时返回 `GATEWAY_504`，不暴露内部地址、堆栈或凭据。
+## 2. 路由矩阵
 
-## 切流与回滚
+| 服务 | 默认地址 | 公开路径 |
+| --- | --- | --- |
+| Identity | `identity-service:8081` | `/api/v1/auth/**`、`/api/v1/users/me/**`、`/api/v1/admin/**` |
+| Course | `course-service:8082` | `/api/v1/courses/**`、`/api/v1/chapters/**`，排除下列 Assessment/Grade 课程子资源 |
+| Assessment | `assessment-api:8083` | `/api/v1/labs/**`、`/api/v1/homeworks/**`、`/api/v1/submissions/**`、`/api/v1/evaluations/**`、课程下实验和作业 |
+| Grade | `grade-service:8084` | `/api/v1/grades/**`、成绩项、成绩记录、汇总、发布、分析与复核公开路径，以及课程下成绩子资源 |
+| Learning | `learning-service:8085` | `/api/v1/learning/**`、`/api/v1/notifications/**`、`/api/v1/reminder-rules/**` |
 
-运行目录默认是 `tmp/gateway-runtime`，其中 `targets.env` 是当前已选择的四个上游，`targets.previous.env` 是本次切换前快照。每次只允许改变一个服务：
+课程下的实验、作业与成绩正则路由先于通用 Course 路由匹配。Gateway 保留原始 URI、查询
+参数和请求体，不将公开路径改写为 `/internal/v2/**`。
 
-```powershell
-./scripts/gateway/switch-gateway-target.sh --mode compose --service auth --target auth-service:8081
-./scripts/gateway/switch-gateway-target.sh --mode compose --service auth --target backend:8080
+## 3. Header 与 request ID
+
+每个代理 location 都引用 `deploy/gateway/proxy-request-headers.conf`。该文件先执行
+`proxy_pass_request_headers off`，再只重建以下公开契约所需 Header：
+
+- `Host`、`X-Real-IP`、`X-Forwarded-For`、`X-Forwarded-Proto`；
+- `X-Request-Id`、`Authorization`；
+- `Accept`、`Accept-Language`、`User-Agent`；
+- `Content-Type`、`Content-Length`、`Content-Encoding`；
+- `Range`、`If-Range`、`If-None-Match`、`If-Modified-Since`；
+- `Idempotency-Key`。
+
+因此任意大小写形式和未来新增的 `X-User-*`、
+`X-OnlineJudge-Service-Authorization`、`X-Internal-Token`、标准 hop-by-hop Header，
+以及客户端通过 `Connection` 声明的扩展 Header 都不会进入上游。Bearer 原样透传，
+Gateway 不读取其 claims，也不把 claims 转成 Header。
+
+`X-Request-Id` 只接受 1–128 个 ASCII 字母、数字、点、下划线、冒号或连字符，首字符
+必须是字母或数字。合法值原样透传；缺失或非法值替换为 Nginx `$request_id`。最终值同时
+发送给下游并通过响应 `X-Request-Id` 返回。
+
+## 4. 限制、超时与错误
+
+- 普通请求体上限 10 MB；Assessment 上传与提交为 55 MB。
+- 连接超时 5 秒，普通读写超时 60 秒，Assessment 上传与提交读写超时 300 秒。
+- Identity、普通查询、写入/上传分别使用独立限流 zone，超限返回 429。
+- `proxy_next_upstream off` 全局生效；POST、PUT、PATCH、DELETE、multipart 和评测提交
+  不会由 Gateway 自动重放。
+- 下游 401、403、404、409、422 保持业务响应；连接失败、受控不可用和超时分别映射为
+  502、503、504。
+- Gateway 自有 404、413、429、502、503、504 使用统一 JSON，包含 `code`、`message`、
+  `requestId` 和 `retryable`，不包含上游地址、Bearer、内部身份、文件路径或异常栈。
+
+## 5. 镜像与启动
+
+独立镜像入口为 `services/gateway/Dockerfile`。容器启动时：
+
+1. 要求五个 `*_UPSTREAM` 环境变量全部存在且符合小写 `host:port`；
+2. 从 `deploy/gateway/gateway.conf.template` 渲染到临时文件；
+3. 拒绝未解析 token，原子替换运行配置；
+4. 执行 `nginx -t`；
+5. 验证成功后才启动 Nginx。
+
+没有 `backend:8080` 默认值，也没有 Learning/Grade 共用目标。
+`deploy/docker/compose.gateway.yml` 提供独立 Gateway overlay，并移除 frontend 的公开端口；
+#318 负责将五个真实服务、Worker、RabbitMQ、MySQL、frontend 与 Gateway 编排成最终
+disposable 环境。Kind 的 D3 frontend 已解除 Gateway ConfigMap 挂载，#318 提供独立
+`deployment/gateway` 后，本文切换脚本即可对该 workload 执行 reload。
+
+## 6. 单服务切换与回滚
+
+状态目录默认是 `tmp/gateway-runtime`。`targets.env` 必须恰好包含五个键：
+
+```dotenv
+IDENTITY_UPSTREAM=identity-service:8081
+COURSE_UPSTREAM=course-service:8082
+ASSESSMENT_UPSTREAM=assessment-api:8083
+GRADE_UPSTREAM=grade-service:8084
+LEARNING_UPSTREAM=learning-service:8085
 ```
 
-可用服务名为 `auth`、`crs`、`assessment`、`learning-grade`，目标必须为小写 `host:port`。脚本会渲染 Nginx 配置、仅重建 Compose 的 `frontend` 或滚动重启 Kind 的 `frontend`、执行探针与受保护冒烟请求。任一后置检查失败时，脚本恢复本次前快照并再次验证；验证成功退出码为 1，恢复也无法验证时退出码为 2。
-
-真实冒烟验证需要显式提供会话，且不会把 Bearer 输出到日志：
+旧 `AUTH_UPSTREAM`、`CRS_UPSTREAM` 或 `LEARNING_GRADE_UPSTREAM` 状态文件会被明确拒绝，
+不会被静默解释。示例：
 
 ```powershell
-$env:GATEWAY_BASE = 'http://127.0.0.1:8088'
-$env:GATEWAY_BEARER_TOKEN = '<temporary-session-token>'
-$env:GATEWAY_SMOKE_PATH = '/api/v1/auth/me'
-./scripts/gateway/verify-gateway.sh
+bash scripts/gateway/switch-gateway-target.sh --mode compose --service grade --target grade-canary:9084
+bash scripts/gateway/switch-gateway-target.sh --mode compose --service learning --target learning-canary:9085
 ```
 
-## Compose 与 Kind
+可用服务名为 `identity`、`course`、`assessment`、`grade`、`learning`。脚本只修改一个
+目标，验证完整五键文件，渲染并重载 Compose `gateway` 或 Kind `deployment/gateway`，再执行
+健康和受保护 smoke。后置检查失败时恢复完整前一快照并重复验证；回滚验证成功时原操作
+退出 1，回滚也无法验证时退出 2。
 
-`deploy/docker/compose.gateway.yml` 将生成的 `default.conf` 只读挂载到现有 frontend。Kind 在 `k8s-deploy.sh` 中从同一模板生成 `gateway-config` ConfigMap，并以 `subPath` 挂载到 frontend。默认配置也随 frontend 镜像交付，因此未启用覆盖文件时继续代理到单体后端。
+## 7. 验证入口
 
-## 验证
-
-先执行可重复的静态与脚本验证：
+不需要 Docker 的契约：
 
 ```powershell
+node scripts/gateway/tests/request-boundary.test.mjs
+node scripts/gateway/tests/gateway-routing-contract.test.mjs
+node scripts/gateway/tests/gateway-workload-contract.test.mjs
+node scripts/gateway/tests/identity-assessment-runtime-contract.test.mjs
 bash scripts/gateway/tests/render-gateway-config.test.sh
 bash scripts/gateway/tests/gateway-default-config.test.sh
-bash scripts/gateway/tests/gateway-routing-contract.test.sh
 bash scripts/gateway/tests/switch-gateway-target.test.sh
 bash scripts/gateway/tests/verify-gateway.test.sh
 bash scripts/gateway/tests/kind-gateway-config.test.sh
+```
+
+Docker Linux 引擎可用后执行五 disposable upstream：
+
+```powershell
 bash scripts/gateway/tests/gateway-runtime.test.sh
 ```
 
-随后在 Docker 引擎可用且各独立服务镜像/服务已交付时运行 Compose、Kind 和真实四服务切流冒烟。每次验证须在 `output/test/issue-317/README.md` 记录环境、基线 SHA、被测 SHA、命令、通过/失败/跳过计数、退出码与原始日志位置。
+引擎不可用时脚本打印单行阻塞原因并退出 69，不产生容器或伪造通过。真实 Identity 与
+Assessment 验证需要预先启动服务，并提供安全密码文件：
+
+```powershell
+$env:IDENTITY_BASE = 'http://127.0.0.1:8081'
+$env:ASSESSMENT_BASE = 'http://127.0.0.1:18083'
+$env:GATEWAY_BASE = 'http://127.0.0.1:8088'
+$env:TEST_USERNAME = 'gateway-probe-user'
+$env:TEST_PASSWORD_FILE = '/secure/path/gateway-probe.password'
+$env:IDENTITY_CONTAINER = 'onlinejudge-auth-identity-service-1'
+bash scripts/gateway/tests/identity-assessment-runtime.test.sh
+```
+
+脚本经 Gateway 登录，访问 Assessment 的缺失评测资源并得到鉴权后的 404，停止 Identity
+后使用同一未过期 JWT 再次得到 404，从而证明 Assessment 本地验签；退出路径始终恢复
+Identity。密码、Bearer 和登录响应只保存在权限受限的临时目录，日志不输出凭据。
