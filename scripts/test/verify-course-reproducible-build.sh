@@ -18,6 +18,8 @@ fail() {
 command -v mvn >/dev/null 2>&1 || fail "mvn is required"
 command -v sha256sum >/dev/null 2>&1 || fail "sha256sum is required"
 [[ -f "$course_dir/pom.xml" ]] || fail "missing Course pom.xml"
+java_major="$(java -version 2>&1 | sed -n '1s/.*version "\([0-9][0-9]*\).*/\1/p')"
+[[ "$java_major" == '21' ]] || fail "Course reproducible build requires Java 21, got ${java_major:-unknown}"
 
 build_and_hash() {
   (cd "$course_dir" && mvn -B -ntp clean package -DskipTests >/dev/null)

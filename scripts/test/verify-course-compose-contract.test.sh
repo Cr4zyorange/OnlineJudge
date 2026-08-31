@@ -73,6 +73,10 @@ require "$cached_runtime" 'USER 10002:10002' 'cached Course runtime is not non-r
 require "$live_smoke" 'cross-schema=DENIED' 'Course Compose live smoke does not prove schema isolation'
 require "$live_smoke" 'runtime-ddl=DENIED' 'Course Compose live smoke does not prove runtime DDL denial'
 require "$live_smoke" 'course-id=' 'Course Compose live smoke does not prove an authenticated Course API'
+require "$live_smoke" 'require_clean_source_tree "$repo_root"' 'Course Compose live smoke does not require an exact clean source tree'
+require "$live_smoke" 'mvn -B -ntp clean package -DskipTests' 'Course Compose live smoke does not package the exact Course source'
+require "$live_smoke" 'docker build --pull=false --no-cache' 'Course Compose live smoke can reuse a stale Course image layer'
+require "$live_smoke" 'Course source image provenance did not match its clean package' 'Course Compose live smoke does not verify clean-package image provenance before startup'
 require "$live_learning" 'pending-before-binding=4' 'Course-to-Learning proof does not retain unbound durable facts'
 require "$live_learning" 'watermark=2 notifications=1' 'Course-to-Learning proof does not verify Learning convergence'
 require "$learning_overlay" 'OJ312_MYSQL_PORT' 'Course-to-Learning overlay does not isolate the disposable MySQL port'
@@ -122,6 +126,19 @@ fi
 grep -Fq 'dedicated Course event user' "$fixture/rabbit-user.err" || \
   fail "guest Rabbit credential mutation was not detected"
 cp "$compose" "$fixture/deploy/docker/compose.yml"
+
+# Mutation: a same-SHA tag may already exist locally.  The supported live
+# path must build from the current clean Course package rather than silently
+# accepting an old Docker cache layer.
+sed -i.bak 's/--no-cache/--cache-from stale-course-image/g' "$fixture/scripts/test/verify-course-compose-live.sh"
+rm -f "$fixture/scripts/test/verify-course-compose-live.sh.bak"
+if bash "$0" "$fixture" --fixture >"$fixture/image-cache.out" 2>"$fixture/image-cache.err"; then
+  fail "stale Course image cache mutation unexpectedly passed"
+fi
+grep -Fq 'stale Course image layer' "$fixture/image-cache.err" || \
+  fail "stale Course image cache mutation was not detected"
+cp "$live_smoke" "$fixture/scripts/test/verify-course-compose-live.sh"
+chmod +x "$fixture/scripts/test/verify-course-compose-live.sh"
 
 awk '
   /^  course-service:$/ { skip = 1; next }

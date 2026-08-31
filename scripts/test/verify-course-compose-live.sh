@@ -15,11 +15,24 @@ require_command docker
 require_command node
 require_command jq
 require_command sha256sum
+require_command mvn
+require_clean_source_tree "$repo_root"
 
-[[ -f "$repo_root/services/course/target/onlinejudge-course-service-0.1.0-SNAPSHOT.jar" ]] || \
-  fail "Course jar is missing; run mvn -f services/course/pom.xml -DskipTests package first"
-docker image inspect "$(course_image_ref)" >/dev/null 2>&1 || \
-  fail "Course image $(course_image_ref) is missing; build the primary Dockerfile or documented cached runtime first"
+java_major="$(java -version 2>&1 | sed -n '1s/.*version "\([0-9][0-9]*\).*/\1/p')"
+[[ "$java_major" == '21' ]] || fail "Course Compose provenance requires Java 21, got ${java_major:-unknown}"
+
+# Build the exact clean source in this supported acceptance path.  The tag is
+# source-SHA-addressed, so accepting a caller-provided image would otherwise
+# permit a stale JAR from an earlier local build to masquerade as this commit.
+course_jar="$repo_root/services/course/target/onlinejudge-course-service-0.1.0-SNAPSHOT.jar"
+(cd "$repo_root/services/course" && mvn -B -ntp clean package -DskipTests)
+[[ -f "$course_jar" ]] || fail "Course clean package did not produce its executable JAR"
+host_jar_sha="$(sha256sum "$course_jar" | awk '{print $1}')"
+docker build --pull=false --no-cache --build-arg "GIT_SHA=$GIT_SHA" \
+  -f "$repo_root/services/course/Dockerfile.cached-runtime" -t "$(course_image_ref)" "$repo_root"
+image_jar_sha="$(docker run --rm --entrypoint sha256sum "$(course_image_ref)" /opt/onlinejudge-course/app.jar | awk '{print $1}')"
+[[ "$host_jar_sha" == "$image_jar_sha" ]] || \
+  fail "Course source image provenance did not match its clean package"
 
 run_id="${COURSE_COMPOSE_LIVE_RUN_ID:-$$}"
 [[ "$run_id" =~ ^[a-z0-9][a-z0-9_-]*$ ]] || fail "COURSE_COMPOSE_LIVE_RUN_ID contains unsupported characters"
@@ -149,7 +162,6 @@ image_revision="$(docker image inspect --format '{{ index .Config.Labels "org.op
 image_user="$(docker image inspect --format '{{.Config.User}}' "$(course_image_ref)")"
 [[ "$image_revision" == "$GIT_SHA" ]] || fail "Course image OCI revision did not match GIT_SHA"
 [[ "$image_user" == '10002:10002' ]] || fail "Course image must run as 10002:10002"
-host_jar_sha="$(sha256sum "$repo_root/services/course/target/onlinejudge-course-service-0.1.0-SNAPSHOT.jar" | awk '{print $1}')"
 container_jar_sha="$("${compose[@]}" exec -T course-service sha256sum /opt/onlinejudge-course/app.jar | awk '{print $1}')"
 [[ "$host_jar_sha" == "$container_jar_sha" ]] || fail "Course image does not contain the packaged Course jar"
 
