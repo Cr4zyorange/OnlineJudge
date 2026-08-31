@@ -9,6 +9,7 @@ import com.sun.net.httpserver.HttpsConfigurator;
 import com.sun.net.httpserver.HttpsParameters;
 import com.sun.net.httpserver.HttpsServer;
 import javax.net.ssl.KeyManagerFactory;
+import javax.net.ssl.SSLParameters;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManagerFactory;
 import javax.security.auth.x500.X500Principal;
@@ -98,11 +99,22 @@ class CourseServiceContractTest {
                 public void configure(HttpsParameters parameters) {
                     // The proof is the renewable mTLS path: the Course client
                     // must present its workload certificate on every call.
-                    parameters.setNeedClientAuth(true);
+                    // setNeedClientAuth alone is not reliably propagated to the
+                    // SSLEngine by jdk.httpserver on every JDK; installing the
+                    // full SSLParameters is the documented, portable form.
+                    SSLParameters sslParameters = serverSslContext(TLS_DIR).getDefaultSSLParameters();
+                    sslParameters.setNeedClientAuth(true);
+                    parameters.setSSLParameters(sslParameters);
                 }
             });
             learningServer.createContext("/internal/v2/learning/tasks/recent", exchange -> {
-                if (!"CN=course-service".equals(peerSubject((com.sun.net.httpserver.HttpsExchange) exchange))) {
+                String peerSubject;
+                try {
+                    peerSubject = peerSubject((com.sun.net.httpserver.HttpsExchange) exchange);
+                } catch (Exception unverified) {
+                    peerSubject = null;
+                }
+                if (!"CN=course-service".equals(peerSubject)) {
                     byte[] body = "{\"code\":\"SERVICE_IDENTITY_INVALID\",\"message\":\"mTLS workload identity is invalid\",\"requestId\":\"\",\"retryable\":false}"
                             .getBytes(StandardCharsets.UTF_8);
                     exchange.sendResponseHeaders(401, body.length);
