@@ -182,7 +182,10 @@ class CourseServiceToLearningRabbitMySqlLiveTest {
     }
 
     private void eventuallyCount(String description, String clause, long expected) throws InterruptedException {
-        Instant deadline = Instant.now().plus(Duration.ofSeconds(25));
+        // The Course relay's bounded backoff can schedule a recovery attempt
+        // tens of seconds after the last broker failure, so the acceptance
+        // window must absorb a cold listener startup plus that backoff.
+        Instant deadline = Instant.now().plus(Duration.ofSeconds(60));
         while (Instant.now().isBefore(deadline)) {
             if (count(clause) == expected) return;
             Thread.sleep(200);

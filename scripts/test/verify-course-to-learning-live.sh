@@ -123,6 +123,7 @@ done
 
 java_home="${OJ312_JAVA_HOME:-/Users/xigma/Library/Java/JavaVirtualMachines/ms-21.0.9/Contents/Home}"
 [[ -x "$java_home/bin/java" ]] || fail "OJ312_JAVA_HOME must point to a Java 21 runtime"
+listener_log="$(mktemp "${TMPDIR:-/tmp}/oj312-course-learning-listener.XXXXXX")"
 set +e
 ONLINEJUDGE_LIVE_COURSE_TO_LEARNING=true JAVA_HOME="$java_home" PATH="$java_home/bin:$PATH" \
   mvn -B -ntp -f "$repo_root/backend/pom.xml" \
@@ -131,9 +132,41 @@ ONLINEJUDGE_LIVE_COURSE_TO_LEARNING=true JAVA_HOME="$java_home" PATH="$java_home
   -Doj.mysql.username=onlinejudge -Doj.mysql.password="$MYSQL_PASSWORD" \
   -Doj.rabbit.host=127.0.0.1 -Doj.rabbit.port="$OJ312_RABBITMQ_PORT" \
   -Doj.rabbit.username="${RABBITMQ_USER:-oj_course_events}" -Doj.rabbit.password="$RABBITMQ_PASSWORD" \
-  -Doj.course.id="$course_id" -Doj.course.student-id=7412 test
+  -Doj.course.id="$course_id" -Doj.course.student-id=7412 test >"$listener_log" 2>&1 &
+listener_pid=$!
+set -e
+
+# The bounded relay backoff may have pushed the next attempt past the
+# listener acceptance window.  Wait for the Learning queue declaration, then
+# reset only the retry clock, never the durable facts or their attempt audit,
+# so the next relay poll republishes the same source events to a bound queue.
+queue_ready=0
+for _ in $(seq 1 60); do
+  if "${compose[@]}" exec -T rabbitmq rabbitmqctl list_queues name 2>/dev/null \
+      | grep -Fq 'onlinejudge.learning.events.v2'; then
+    queue_ready=1
+    break
+  fi
+  kill -0 "$listener_pid" 2>/dev/null || break
+  sleep 1
+done
+[[ "$queue_ready" -eq 1 ]] || {
+  set +e
+  wait "$listener_pid" 2>/dev/null
+  set -e
+  cat "$listener_log" >&2
+  rm -f "$listener_log"
+  fail "Learning queue was not declared before the listener exited"
+}
+"${compose[@]}" exec -T -e "MYSQL_PWD=$COURSE_DATABASE_PASSWORD" mysql \
+  mysql --protocol=TCP -h 127.0.0.1 -u oj_course_rw -D oj_course -N -e \
+  "UPDATE course_event_outbox SET next_attempt_at = CURRENT_TIMESTAMP WHERE delivery_status IN ('PENDING', 'RETRY') AND (aggregate_id = '$course_id' OR aggregate_id LIKE '$course_id:%')"
+
+set +e
+wait "$listener_pid"
 listener_status="$?"
 set -e
+rm -f "$listener_log"
 
 IFS=$'\t' read -r published event_ids correlations <<<"$("${compose[@]}" exec -T -e "MYSQL_PWD=$COURSE_DATABASE_PASSWORD" mysql \
   mysql --protocol=TCP -h 127.0.0.1 -u oj_course_rw -D oj_course -N -e \
