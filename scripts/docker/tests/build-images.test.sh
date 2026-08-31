@@ -109,11 +109,12 @@ CONTAINER_TEST_DOCKER_LOG="$docker_log" \
   }
 
 build_count="$(grep -c '^build ' "$docker_log")"
-[[ "$build_count" -eq 2 ]] || fail "expected two Docker builds, got $build_count"
+[[ "$build_count" -eq 3 ]] || fail "expected three Docker builds, got $build_count"
 grep -Fq -- "-t onlinejudge/backend:$head_sha" "$docker_log" || fail "backend full-SHA image missing"
 grep -Fq -- "-t onlinejudge/frontend:$head_sha" "$docker_log" || fail "frontend full-SHA image missing"
-[[ "$(grep -Fc -- "--build-arg GIT_SHA=$head_sha" "$docker_log")" -eq 2 ]] || \
-  fail "both builds must receive the full GIT_SHA"
+grep -Fq -- "-t onlinejudge/course-service:$head_sha" "$docker_log" || fail "Course full-SHA image missing"
+[[ "$(grep -Fc -- "--build-arg GIT_SHA=$head_sha" "$docker_log")" -eq 3 ]] || \
+  fail "all three builds must receive the full GIT_SHA"
 
 if grep -Eq '(^|[[:space:]:])latest($|[[:space:]])|^tag ' "$docker_log"; then
   fail "build flow created a latest or alias tag"

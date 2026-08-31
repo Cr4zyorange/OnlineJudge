@@ -102,11 +102,12 @@
       },
       "dependsOn": ["mysql"],
       "migrationJob": "course-migrations",
-      "configuration": ["COURSE_HTTP_PORT", "MYSQL_HOST", "MYSQL_PORT", "COURSE_DATABASE_NAME", "COURSE_DATABASE_USER", "IDENTITY_JWT_ISSUER", "IDENTITY_JWT_AUDIENCE", "IDENTITY_JWKS_URI", "IDENTITY_JWKS_REFRESH_INTERVAL", "IDENTITY_JWKS_REFRESH_INITIAL_DELAY", "IDENTITY_JWKS_REQUEST_TIMEOUT"],
+      "configuration": ["COURSE_HTTP_PORT", "MYSQL_HOST", "MYSQL_PORT", "COURSE_DATABASE_NAME", "COURSE_DATABASE_USER", "IDENTITY_JWT_ISSUER", "IDENTITY_JWT_AUDIENCE", "IDENTITY_JWKS_URI", "IDENTITY_JWKS_REFRESH_INTERVAL", "IDENTITY_JWKS_REFRESH_INITIAL_DELAY", "IDENTITY_JWKS_REQUEST_TIMEOUT", "RABBITMQ_HOST", "RABBITMQ_PORT"],
       "secrets": [
         {"key": "COURSE_DATABASE_PASSWORD", "injectedAs": "runtime-secret", "redact": true, "imageBuild": "forbidden"},
+        {"key": "COURSE_SERVICE_IDENTITY", "injectedAs": "workload-identity", "redact": true, "imageBuild": "forbidden"},
         {"key": "IDENTITY_JWKS_TRUST_BUNDLE", "injectedAs": "runtime-secret", "redact": true, "imageBuild": "forbidden"},
-        {"key": "COURSE_SERVICE_IDENTITY", "injectedAs": "workload-identity", "redact": true, "imageBuild": "forbidden"}
+        {"key": "RABBITMQ_PASSWORD", "injectedAs": "runtime-secret", "redact": true, "imageBuild": "forbidden"}
       ],
       "resources": {"requests": {"cpu": "200m", "memory": "256Mi"}, "limits": {"cpu": "1000m", "memory": "1Gi"}},
       "pathTriggers": ["services/course/**", "backend/src/main/java/com/onlinejudge/crs/**", "backend/src/main/java/com/onlinejudge/common/**", "backend/src/main/java/com/onlinejudge/integration/**", "backend/src/main/resources/**", "backend/pom.xml", "contracts/v2/**", "docs/adr/ADR-006-五业务服务与可靠消息契约.md", "docs/开发/D6-D7-五服务共享契约-v2.md", "docs/开发/D6-D7-五服务架构冻结-305.md", "docs/diagrams/arch/issue305-*.mmd", "scripts/ci/contract-verify.sh", "scripts/ci/verify-final-architecture-305.mjs", "scripts/ci/verify-microservice-contract-v2.mjs", "scripts/ci/verify-workflow-gates.test.sh", "database/migrations/course/**"],

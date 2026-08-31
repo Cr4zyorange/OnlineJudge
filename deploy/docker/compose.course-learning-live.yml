@@ -1,0 +1,11 @@
+# Disposable acceptance overlay only.  It exposes the two internal dependencies
+# on loopback so the host-side production Learning listener test can consume
+# events emitted by the independently deployed Course container.  Base Compose
+# remains non-public and this file is never used for normal deployment.
+services:
+  mysql:
+    ports:
+      - "127.0.0.1:${OJ312_MYSQL_PORT:?OJ312_MYSQL_PORT is required}:3306"
+  rabbitmq:
+    ports:
+      - "127.0.0.1:${OJ312_RABBITMQ_PORT:?OJ312_RABBITMQ_PORT is required}:5672"

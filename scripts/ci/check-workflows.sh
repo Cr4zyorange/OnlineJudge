@@ -160,6 +160,15 @@ done
 run_check "backend verifier compiles and tests Assessment service" \
   grep -Fq 'services/assessment/pom.xml' "$checkout/scripts/ci/backend-verify.sh"
 
+# #312 Course 服务独立 Maven 工程。workflow 只调用 canonical backend
+# script，故这里锁定该脚本必须把 Course 的 compile/test 作为正式门禁。
+run_check "backend gate compiles Course service" grep -Fq 'Course service' "$checkout/scripts/ci/backend-verify.sh"
+run_check "backend gate runs Course Maven project" grep -Fq 'course_dir' "$checkout/scripts/ci/backend-verify.sh"
+run_check "backend gate has Course pipeline mutation" grep -Fq 'verify-course-service-ci-gate.test.sh' "$checkout/scripts/ci/backend-verify.sh"
+run_check "backend gate checks supported Course Compose path" grep -Fq 'verify-course-compose-contract.test.sh' "$checkout/scripts/ci/backend-verify.sh"
+run_check "backend gate verifies Course package reproducibility" grep -Fq 'verify-course-reproducible-build.sh' "$checkout/scripts/ci/backend-verify.sh"
+run_check "Course reproducible-build gate exists" test -x "$checkout/scripts/test/verify-course-reproducible-build.sh"
+
 # 7. 硬门禁不得被 continue-on-error 吞掉。
 run_check "no continue-on-error" bash -c '! grep -Eq "continue-on-error" "$1"' _ "$workflow_file"
 

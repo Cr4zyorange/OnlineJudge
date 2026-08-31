@@ -7,5 +7,13 @@ services:
       - app-data:/opt/onlinejudge/data
       - /var/run/docker.sock:/var/run/docker.sock
 
+  # The evaluation overlay keeps Course on the same real Rabbit/MySQL route
+  # as the base profile; this explicit declaration prevents an eval run from
+  # silently omitting the independently deployable Course workload.
+  course-service:
+    environment:
+      COURSE_RABBIT_ENABLED: "true"
+
 volumes:
   app-data:
+  course-data:

@@ -1,0 +1,8 @@
+# Disposable acceptance overlay only: exposes Course's TLS listener on
+# loopback so the host-side proof can present a real workload client
+# certificate through the actual mTLS handshake.  Base Compose remains
+# non-public and this file is never used for normal deployment.
+services:
+  course-service:
+    ports:
+      - "127.0.0.1:${OJ312_COURSE_PORT:?OJ312_COURSE_PORT is required}:8082"

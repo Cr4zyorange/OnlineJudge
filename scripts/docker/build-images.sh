@@ -25,4 +25,11 @@ docker build \
   -t "$(frontend_image_ref)" \
   "$repo_root"
 
-printf 'Built 2 application images for %s\n' "$GIT_SHA"
+printf 'Building %s\n' "$(course_image_ref)"
+docker build \
+  --file "$repo_root/services/course/Dockerfile" \
+  --build-arg "GIT_SHA=$GIT_SHA" \
+  -t "$(course_image_ref)" \
+  "$repo_root"
+
+printf 'Built 3 application images for %s\n' "$GIT_SHA"

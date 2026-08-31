@@ -71,6 +71,7 @@ jobs:
           cache-dependency-path: |
             backend/pom.xml
             services/assessment/pom.xml
+            services/course/pom.xml
       - name: Collect environment manifest
         run: bash scripts/ci/collect-environment.sh "$GITHUB_WORKSPACE" ci-artifacts/backend-gate/environment.json
       - name: Backend quality gates
@@ -88,6 +89,7 @@ jobs:
             backend/target/surefire-reports/unit/**
             backend/target/surefire-reports/integration/**
             services/assessment/target/surefire-reports/**
+            services/course/target/surefire-reports/**
           if-no-files-found: warn
           retention-days: 14
 

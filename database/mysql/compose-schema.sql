@@ -2,6 +2,12 @@
 -- Generated from database/migrations in Compose startup order; run once by the MySQL container on an empty mysql-data volume.
 SET NAMES utf8mb4;
 
+-- #312: Compose always reserves Course's independently owned target schema.
+-- `course-migrations` then provisions oj_course_rw and applies the versioned
+-- Course migrations; this source-baseline file deliberately does not copy
+-- legacy Course facts into the target (that quiescent cutover is #341).
+CREATE DATABASE IF NOT EXISTS oj_course CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+
 CREATE TABLE schema_migrations (
     installed_rank BIGINT NOT NULL AUTO_INCREMENT,
     version VARCHAR(255) NOT NULL,
@@ -1089,6 +1095,7 @@ CREATE TABLE IF NOT EXISTS assessment_event_outbox (
     next_attempt_at TIMESTAMP NOT NULL,
     lease_owner VARCHAR(128) NULL,
     lease_until TIMESTAMP NULL,
+    lease_generation BIGINT NOT NULL DEFAULT 0,
     last_error VARCHAR(1024) NULL,
     published_at TIMESTAMP NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,

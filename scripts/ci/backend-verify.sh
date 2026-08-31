@@ -7,12 +7,13 @@ checkout="${1:-$repo_root}"
 checkout="$(CDPATH= cd -- "$checkout" && pwd)"
 backend_dir="$checkout/backend"
 assessment_dir="$checkout/services/assessment"
+course_dir="$checkout/services/course"
 artifact_dir="$checkout/ci-artifacts/backend-gate"
 log="$artifact_dir/gate.log"
 expected_java_major="${OJ_CI_JAVA_MAJOR:-21}"
 expected_maven_min_version="${OJ_CI_MAVEN_MIN_VERSION:-3.9.0}"
 
-mkdir -p "$artifact_dir/unit" "$artifact_dir/integration"
+mkdir -p "$artifact_dir/unit" "$artifact_dir/integration" "$artifact_dir/course"
 : > "$log"
 
 fail() {
@@ -78,6 +79,7 @@ printf 'backend-verify: java=%s maven=%s\n' "$java_major" "$maven_version" | tee
 
 [[ -f "$backend_dir/pom.xml" ]] || fail "missing $backend_dir/pom.xml"
 [[ -f "$assessment_dir/pom.xml" ]] || fail "missing $assessment_dir/pom.xml"
+[[ -f "$course_dir/pom.xml" ]] || fail "missing $course_dir/pom.xml"
 
 preserve_reports() {
   local phase="$1"
@@ -86,6 +88,32 @@ preserve_reports() {
   rm -f "$dest"/*.xml
   (cd "$backend_dir" && cp target/surefire-reports/*.xml "$dest"/)
 }
+
+preserve_course_reports() {
+  local dest="$artifact_dir/course/surefire-reports"
+  mkdir -p "$dest"
+  rm -f "$dest"/*.xml
+  (cd "$course_dir" && cp target/surefire-reports/*.xml "$dest"/)
+}
+
+# #312 is independently deployable and owns Course facts.  The formal backend
+# gate must compile and test this Maven project before it can be delivered; a
+# green legacy backend build is not a substitute.
+printf '\n$ mvn -B -ntp -q -DskipTests compile (Course service)\n' | tee -a "$log"
+(cd "$course_dir" && run_mvn_retry mvn -B -ntp -q -DskipTests compile)
+printf '\n$ mvn -B -ntp test (Course service)\n' | tee -a "$log"
+(cd "$course_dir" && rm -f target/surefire-reports/*.xml && run_mvn_retry mvn -B -ntp test)
+preserve_course_reports
+
+# This mutation runs the copied formal entry point with a Course-only Maven
+# failure.  If Course compilation is removed from the gate, the mutation is
+# incorrectly green.  Nested invocation disables itself to avoid recursion.
+if [[ "${OJ312_COURSE_GATE_MUTATION:-0}" != "1" ]]; then
+  log_run bash "$checkout/scripts/test/verify-course-service-ci-gate.test.sh" "$checkout"
+fi
+log_run bash "$checkout/scripts/test/verify-course-service-live-summary.test.sh" "$checkout"
+log_run bash "$checkout/scripts/test/verify-course-compose-contract.test.sh" "$checkout"
+log_run bash "$checkout/scripts/test/verify-course-reproducible-build.sh" "$checkout"
 
 # 编译门禁：主代码必须可编译。
 printf '\n$ mvn -B -ntp -q -DskipTests compile\n' | tee -a "$log"
@@ -114,4 +142,4 @@ printf '\n$ mvn -B -ntp -f services/assessment/pom.xml test\n' | tee -a "$log"
 (cd "$checkout" && rm -f services/assessment/target/surefire-reports/*.xml \
   && run_mvn_retry mvn -B -ntp -f services/assessment/pom.xml test)
 
-printf 'backend-verify: PASS (backend compile + unit + integration; assessment compile + test)\n' | tee -a "$log"
+printf 'backend-verify: PASS (Course compile/test/Compose contract; Assessment compile/test; legacy backend compile + unit + integration)\n' | tee -a "$log"
