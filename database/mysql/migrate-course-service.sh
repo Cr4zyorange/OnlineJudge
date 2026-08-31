@@ -68,7 +68,9 @@ for migration in \
   V20260831_01__course_service_schema.sql \
   V20260831_02__course_security_version_inbox.sql \
   V20260831_03__course_runtime_version_columns.sql \
-  V20260831_04__course_outbox_fencing.sql; do
+  V20260831_04__course_outbox_fencing.sql \
+  V20260831_05__course_file_delete_journal.sql \
+  V20260831_06__course_chapter_active_order_uniqueness.sql; do
   path="$migration_dir/$migration"
   [[ -f "$path" ]] || fail "missing migration $path"
   expected_checksum="$(checksum "$path")"
@@ -84,4 +86,4 @@ for migration in \
   printf 'course-migrations: applied %s checksum=%s\n' "$migration" "$expected_checksum"
 done
 
-printf 'course-migrations: PASS schema=%s account=%s migrations=4\n' "$database" "$account"
+printf 'course-migrations: PASS schema=%s account=%s migrations=6\n' "$database" "$account"

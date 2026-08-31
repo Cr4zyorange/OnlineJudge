@@ -5,7 +5,13 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.onlinejudge.courseservice.config.CourseRabbitProperties;
 import com.onlinejudge.courseservice.security.TestJwtFactory;
 import com.onlinejudge.courseservice.service.CourseService;
-import com.sun.net.httpserver.HttpServer;
+import com.sun.net.httpserver.HttpsConfigurator;
+import com.sun.net.httpserver.HttpsParameters;
+import com.sun.net.httpserver.HttpsServer;
+import javax.net.ssl.KeyManagerFactory;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.TrustManagerFactory;
+import javax.security.auth.x500.X500Principal;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -20,11 +26,18 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.mock.web.MockMultipartFile;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.security.GeneralSecurityException;
 import java.security.KeyPair;
+import java.security.KeyStore;
+import java.security.cert.X509Certificate;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -50,7 +63,9 @@ class CourseServiceContractTest {
     private static final String EMPTY_TASK_PAGE = """
             {"items":[],"page":0,"size":5,"total":0}
             """;
-    private static HttpServer learningServer;
+    private static final Path TLS_DIR;
+    private static final Path STORAGE_ROOT;
+    private static HttpsServer learningServer;
     private static final AtomicReference<LearningStubResponse> LEARNING_RESPONSE =
             new AtomicReference<>(new LearningStubResponse(200, EMPTY_TASK_PAGE));
 
@@ -71,8 +86,28 @@ class CourseServiceContractTest {
 
     static {
         try {
-            learningServer = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
+            TLS_DIR = Files.createTempDirectory("course-mtls-test");
+            STORAGE_ROOT = Files.createTempDirectory("course-storage-test");
+            generateMtlsKeystores(TLS_DIR);
+            learningServer = HttpsServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
+            learningServer.setHttpsConfigurator(new HttpsConfigurator(serverSslContext(TLS_DIR)) {
+                @Override
+                public void configure(HttpsParameters parameters) {
+                    // The proof is the renewable mTLS path: the Course client
+                    // must present its workload certificate on every call.
+                    parameters.setNeedClientAuth(true);
+                }
+            });
             learningServer.createContext("/internal/v2/learning/tasks/recent", exchange -> {
+                if (!"CN=course-service".equals(peerSubject((com.sun.net.httpserver.HttpsExchange) exchange))) {
+                    byte[] body = "{\"code\":\"SERVICE_IDENTITY_INVALID\",\"message\":\"mTLS workload identity is invalid\",\"requestId\":\"\",\"retryable\":false}"
+                            .getBytes(StandardCharsets.UTF_8);
+                    exchange.sendResponseHeaders(401, body.length);
+                    try (OutputStream stream = exchange.getResponseBody()) {
+                        stream.write(body);
+                    }
+                    return;
+                }
                 LearningStubResponse response = LEARNING_RESPONSE.get();
                 byte[] body = response.body().getBytes(StandardCharsets.UTF_8);
                 exchange.getResponseHeaders().set("Content-Type", "application/json");
@@ -82,7 +117,7 @@ class CourseServiceContractTest {
                 }
             });
             learningServer.start();
-        } catch (IOException failure) {
+        } catch (Exception failure) {
             throw new ExceptionInInitializerError(failure);
         }
     }
@@ -92,9 +127,18 @@ class CourseServiceContractTest {
         registry.add("course.identity.jwks-trust-bundle", () -> BOOTSTRAP_JWKS);
         registry.add("course.identity.jwks-uri", () -> "http://127.0.0.1:1/identity/jwks.json");
         registry.add("course.identity.refresh-enabled", () -> false);
-        registry.add("course.learning.base-url", () -> "http://127.0.0.1:" + learningServer.getAddress().getPort());
+        registry.add("course.identity.mtls-service-subjects", () -> "CN=course-service");
+        registry.add("course.learning.base-url", () -> "https://127.0.0.1:" + learningServer.getAddress().getPort());
         registry.add("course.learning.timeout-ms", () -> 2000L);
-        registry.add("course.learning.service-token", () -> "test-learning-service-token");
+        registry.add("course.learning.service-token", () -> "");
+        registry.add("course.learning.mtls-enabled", () -> true);
+        registry.add("course.learning.mtls-keystore-path", () -> TLS_DIR.resolve("client.p12").toString());
+        registry.add("course.learning.mtls-keystore-password", () -> "changeit");
+        registry.add("course.learning.mtls-keystore-type", () -> "PKCS12");
+        registry.add("course.learning.mtls-truststore-path", () -> TLS_DIR.resolve("client-trust.p12").toString());
+        registry.add("course.learning.mtls-truststore-password", () -> "changeit");
+        registry.add("course.learning.mtls-truststore-type", () -> "PKCS12");
+        registry.add("course.storage.root", () -> STORAGE_ROOT.toString());
     }
 
     @AfterAll
@@ -105,6 +149,7 @@ class CourseServiceContractTest {
     @BeforeEach
     void clearCourseFacts() {
         LEARNING_RESPONSE.set(new LearningStubResponse(200, EMPTY_TASK_PAGE));
+        jdbcTemplate.update("DELETE FROM course_file_delete_journal");
         jdbcTemplate.update("DELETE FROM course_event_outbox");
         jdbcTemplate.update("DELETE FROM course_membership_reconciliation_checkpoint");
         jdbcTemplate.update("DELETE FROM crs_course_member");
@@ -835,6 +880,277 @@ class CourseServiceContractTest {
                 .andExpect(status().isOk()).andExpect(jsonPath("$.data.title").value("slides.pdf"));
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM crs_resource WHERE course_id = ?", Integer.class, Long.parseLong(courseId))).isEqualTo(1);
+    }
+
+    @Test
+    void siblingChapterOrderConflictIsRejectedWith409ForCreateUpdateAndDifferentParents() throws Exception {
+        String teacher = userToken("601", List.of("TEACHER"));
+        String courseId = createdCourse(teacher, "chapter order conflict");
+
+        String first = mockMvc.perform(post("/api/v1/courses/{courseId}/chapters", courseId)
+                        .header("Authorization", teacher).header("X-Request-Id", requestId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"first root\",\"sortOrder\":5}"))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        String firstId = objectMapper.readTree(first).at("/data/id").asText();
+
+        mockMvc.perform(post("/api/v1/courses/{courseId}/chapters", courseId)
+                        .header("Authorization", teacher).header("X-Request-Id", requestId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"duplicate root order\",\"sortOrder\":5}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("CHAPTER_ORDER_CONFLICT"));
+
+        String second = mockMvc.perform(post("/api/v1/courses/{courseId}/chapters", courseId)
+                        .header("Authorization", teacher).header("X-Request-Id", requestId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"second root\",\"sortOrder\":6}"))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        String secondId = objectMapper.readTree(second).at("/data/id").asText();
+
+        // A different parent is a different ordering group, so the order may repeat.
+        mockMvc.perform(post("/api/v1/courses/{courseId}/chapters", courseId)
+                        .header("Authorization", teacher).header("X-Request-Id", requestId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"child of first\",\"parentId\":\"" + firstId + "\",\"sortOrder\":5}"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(put("/api/v1/courses/{courseId}/chapters/{chapterId}", courseId, secondId)
+                        .header("Authorization", teacher).header("X-Request-Id", requestId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"sortOrder\":5}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("CHAPTER_ORDER_CONFLICT"));
+
+        // Keeping an existing order on update stays valid (self is excluded).
+        mockMvc.perform(put("/api/v1/courses/{courseId}/chapters/{chapterId}", courseId, firstId)
+                        .header("Authorization", teacher).header("X-Request-Id", requestId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"sortOrder\":5}"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void loweringCourseCapacityBelowActiveRosterIsRejectedWhileTheCourseRowLockGuardsIt() throws Exception {
+        String teacher = userToken("611", List.of("TEACHER"));
+        String create = mockMvc.perform(post("/api/v1/courses")
+                        .header("Authorization", teacher).header("X-Request-Id", requestId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"capacity guard\",\"maxStudents\":2}"))
+                .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+        String courseId = objectMapper.readTree(create).at("/data/id").asText();
+
+        mockMvc.perform(post("/api/v1/courses/{courseId}/join", courseId)
+                        .header("Authorization", userToken("612", List.of("STUDENT"))).header("X-Request-Id", requestId()))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(put("/api/v1/courses/{courseId}", courseId)
+                        .header("Authorization", teacher).header("X-Request-Id", requestId())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"maxStudents\":1}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("COURSE_CAPACITY_BELOW_ROSTER"));
+
+        mockMvc.perform(put("/api/v1/courses/{courseId}", courseId)
+                        .header("Authorization", teacher).header("X-Request-Id", requestId())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"maxStudents\":2}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.maxStudents").value(2));
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT max_students FROM crs_course WHERE id = ?", Integer.class, Long.parseLong(courseId))).isEqualTo(2);
+    }
+
+    @Test
+    void rejoiningRemovedAssistantResetsToStudentAndNeverRestoresManagement() throws Exception {
+        String teacher = userToken("621", List.of("TEACHER"));
+        String assistant = userToken("622", List.of("TEACHER"));
+        String courseId = createdCourse(teacher, "rejoin resets role");
+        mockMvc.perform(post("/api/v1/courses/{courseId}/join", courseId)
+                        .header("Authorization", assistant).header("X-Request-Id", requestId()))
+                .andExpect(status().isOk());
+        mockMvc.perform(put("/api/v1/courses/{courseId}/members/{userId}", courseId, "622")
+                        .header("Authorization", teacher).header("X-Request-Id", requestId())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"role\":\"ASSISTANT\",\"status\":\"ACTIVE\"}"))
+                .andExpect(status().isOk());
+        mockMvc.perform(put("/api/v1/courses/{courseId}/members/{userId}", courseId, "622")
+                        .header("Authorization", teacher).header("X-Request-Id", requestId())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"role\":\"ASSISTANT\",\"status\":\"REMOVED\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.status").value("REMOVED"));
+
+        mockMvc.perform(post("/api/v1/courses/{courseId}/join", courseId)
+                        .header("Authorization", assistant).header("X-Request-Id", requestId()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.role").value("STUDENT"))
+                .andExpect(jsonPath("$.data.status").value("ACTIVE"));
+
+        mockMvc.perform(post("/api/v1/courses/{courseId}/chapters", courseId)
+                        .header("Authorization", assistant).header("X-Request-Id", requestId())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"title\":\"not allowed\"}"))
+                .andExpect(status().isForbidden());
+
+        assertThat(jdbcTemplate.queryForMap(
+                "SELECT role, join_status FROM crs_course_member WHERE course_id = ? AND user_id = ?",
+                Long.parseLong(courseId), 622L))
+                .containsEntry("role", "STUDENT").containsEntry("join_status", "ACTIVE");
+    }
+
+    @Test
+    void deletingUploadedResourceRemovesItsPhysicalObjectAndCompletesTheJournal() throws Exception {
+        String teacher = userToken("631", List.of("TEACHER"));
+        String courseId = createdCourse(teacher, "physical file delete");
+        String response = mockMvc.perform(multipart("/api/v1/courses/{courseId}/resources", courseId)
+                        .file(new MockMultipartFile("file", "notes.txt", "text/plain", "delete me".getBytes(StandardCharsets.UTF_8)))
+                        .param("name", "notes.txt").param("resourceType", "DOCUMENT").param("visibility", "STUDENT")
+                        .header("Authorization", teacher).header("X-Request-Id", requestId()))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        String resourceId = objectMapper.readTree(response).at("/data/id").asText();
+        String storageKey = jdbcTemplate.queryForObject(
+                "SELECT storage_key FROM crs_resource WHERE id = ?", String.class, Long.parseLong(resourceId));
+        Path stored = STORAGE_ROOT.resolve(storageKey);
+        assertThat(stored).exists();
+
+        mockMvc.perform(delete("/api/v1/courses/{courseId}/resources/{resourceId}", courseId, resourceId)
+                        .header("Authorization", teacher).header("X-Request-Id", requestId()))
+                .andExpect(status().isOk());
+
+        assertThat(stored).doesNotExist();
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT status FROM course_file_delete_journal WHERE resource_id = ?", String.class, Long.parseLong(resourceId)))
+                .isEqualTo("COMPLETED");
+    }
+
+    @Test
+    void pendingFileDeleteJournalEntriesAreRecoveredByTheSweep() throws Exception {
+        Path orphan = STORAGE_ROOT.resolve("orphan-recovery.txt");
+        Files.writeString(orphan, "orphan");
+        jdbcTemplate.update("""
+                INSERT INTO course_file_delete_journal (course_id, resource_id, storage_key, status)
+                VALUES (1, 424242, ?, 'PENDING')
+                """, "orphan-recovery.txt");
+
+        assertThat(courseService.recoverPendingFileDeletions()).isEqualTo(1);
+        assertThat(orphan).doesNotExist();
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT status FROM course_file_delete_journal WHERE resource_id = 424242", String.class))
+                .isEqualTo("COMPLETED");
+    }
+
+    @Test
+    void internalV2EndpointsAcceptTrustedMtlsWorkloadCertificateWithoutServiceJwt() throws Exception {
+        String courseResponse = mockMvc.perform(post("/api/v1/courses")
+                        .header("Authorization", userToken("641", List.of("TEACHER")))
+                        .header("X-Request-Id", requestId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"mtls internal contract\"}"))
+                .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+        String courseId = objectMapper.readTree(courseResponse).at("/data/id").asText();
+
+        mockMvc.perform(get("/internal/v2/courses/{courseId}/members?page=0&size=20", courseId)
+                        .header("X-Request-Id", requestId())
+                        .requestAttr("jakarta.servlet.request.X509Certificate",
+                                new X509Certificate[]{certificateWithSubject("CN=course-service")}))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].userId").value("641"));
+
+        mockMvc.perform(get("/internal/v2/courses/{courseId}/members?page=0&size=20", courseId)
+                        .header("X-Request-Id", requestId())
+                        .requestAttr("jakarta.servlet.request.X509Certificate",
+                                new X509Certificate[]{certificateWithSubject("CN=unknown-workload")}))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("SERVICE_IDENTITY_FORBIDDEN"));
+    }
+
+    private static void generateMtlsKeystores(Path dir) throws Exception {
+        keytool("-genkeypair", "-alias", "server", "-keyalg", "RSA", "-keysize", "2048",
+                "-dname", "CN=backend", "-ext", "SAN=ip:127.0.0.1", "-validity", "3650",
+                "-storetype", "PKCS12", "-keystore", dir.resolve("server.p12").toString(),
+                "-storepass", "changeit", "-keypass", "changeit");
+        keytool("-genkeypair", "-alias", "client", "-keyalg", "RSA", "-keysize", "2048",
+                "-dname", "CN=course-service", "-validity", "3650",
+                "-storetype", "PKCS12", "-keystore", dir.resolve("client.p12").toString(),
+                "-storepass", "changeit", "-keypass", "changeit");
+        keytool("-exportcert", "-alias", "server", "-file", dir.resolve("server.cer").toString(),
+                "-keystore", dir.resolve("server.p12").toString(), "-storepass", "changeit");
+        keytool("-exportcert", "-alias", "client", "-file", dir.resolve("client.cer").toString(),
+                "-keystore", dir.resolve("client.p12").toString(), "-storepass", "changeit");
+        keytool("-importcert", "-noprompt", "-alias", "server", "-file", dir.resolve("server.cer").toString(),
+                "-storetype", "PKCS12", "-keystore", dir.resolve("client-trust.p12").toString(), "-storepass", "changeit");
+        keytool("-importcert", "-noprompt", "-alias", "client", "-file", dir.resolve("client.cer").toString(),
+                "-storetype", "PKCS12", "-keystore", dir.resolve("server-trust.p12").toString(), "-storepass", "changeit");
+    }
+
+    private static void keytool(String... args) throws Exception {
+        List<String> command = new ArrayList<>();
+        command.add(Path.of(System.getProperty("java.home"), "bin", "keytool").toString());
+        command.addAll(List.of(args));
+        Process process = new ProcessBuilder(command).redirectErrorStream(true).start();
+        String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+        if (process.waitFor() != 0) {
+            throw new IllegalStateException("keytool failed: " + output);
+        }
+    }
+
+    private static SSLContext serverSslContext(Path dir) throws GeneralSecurityException, IOException {
+        KeyStore keyStore = KeyStore.getInstance("PKCS12");
+        try (InputStream in = Files.newInputStream(dir.resolve("server.p12"))) {
+            keyStore.load(in, "changeit".toCharArray());
+        }
+        KeyManagerFactory keyManagers = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
+        keyManagers.init(keyStore, "changeit".toCharArray());
+        KeyStore trustStore = KeyStore.getInstance("PKCS12");
+        try (InputStream in = Files.newInputStream(dir.resolve("server-trust.p12"))) {
+            trustStore.load(in, "changeit".toCharArray());
+        }
+        TrustManagerFactory trustManagers = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+        trustManagers.init(trustStore);
+        SSLContext context = SSLContext.getInstance("TLS");
+        context.init(keyManagers.getKeyManagers(), trustManagers.getTrustManagers(), null);
+        return context;
+    }
+
+    private static String peerSubject(com.sun.net.httpserver.HttpsExchange exchange) throws IOException {
+        try {
+            X509Certificate peer = (X509Certificate) exchange.getSSLSession().getPeerCertificates()[0];
+            return peer.getSubjectX500Principal().getName();
+        } catch (Exception failure) {
+            throw new IOException(failure);
+        }
+    }
+
+    private static X509Certificate certificateWithSubject(String subject) {
+        return new X509Certificate() {
+            @Override
+            public X500Principal getSubjectX500Principal() {
+                return new X500Principal(subject);
+            }
+            @Override public java.security.Principal getIssuerDN() { throw new UnsupportedOperationException(); }
+            @Override public java.security.Principal getSubjectDN() { throw new UnsupportedOperationException(); }
+            @Override public java.util.Date getNotAfter() { throw new UnsupportedOperationException(); }
+            @Override public java.util.Date getNotBefore() { throw new UnsupportedOperationException(); }
+            @Override public java.math.BigInteger getSerialNumber() { throw new UnsupportedOperationException(); }
+            @Override public String getSigAlgName() { throw new UnsupportedOperationException(); }
+            @Override public String getSigAlgOID() { throw new UnsupportedOperationException(); }
+            @Override public byte[] getSigAlgParams() { throw new UnsupportedOperationException(); }
+            @Override public int getVersion() { throw new UnsupportedOperationException(); }
+            @Override public byte[] getTBSCertificate() { throw new UnsupportedOperationException(); }
+            @Override public byte[] getSignature() { throw new UnsupportedOperationException(); }
+            @Override public boolean[] getSubjectUniqueID() { throw new UnsupportedOperationException(); }
+            @Override public boolean[] getIssuerUniqueID() { throw new UnsupportedOperationException(); }
+            @Override public boolean[] getKeyUsage() { throw new UnsupportedOperationException(); }
+            @Override public List<String> getExtendedKeyUsage() { throw new UnsupportedOperationException(); }
+            @Override public int getBasicConstraints() { throw new UnsupportedOperationException(); }
+            @Override public java.util.Collection<List<?>> getSubjectAlternativeNames() { throw new UnsupportedOperationException(); }
+            @Override public java.util.Collection<List<?>> getIssuerAlternativeNames() { throw new UnsupportedOperationException(); }
+            @Override public void checkValidity() { throw new UnsupportedOperationException(); }
+            @Override public void checkValidity(java.util.Date date) { throw new UnsupportedOperationException(); }
+            @Override public void verify(java.security.PublicKey key) { throw new UnsupportedOperationException(); }
+            @Override public void verify(java.security.PublicKey key, String sigProvider) { throw new UnsupportedOperationException(); }
+            @Override public byte[] getEncoded() { throw new UnsupportedOperationException(); }
+            @Override public java.security.PublicKey getPublicKey() { throw new UnsupportedOperationException(); }
+            @Override public String toString() { throw new UnsupportedOperationException(); }
+            @Override public boolean hasUnsupportedCriticalExtension() { throw new UnsupportedOperationException(); }
+            @Override public java.util.Set<String> getCriticalExtensionOIDs() { throw new UnsupportedOperationException(); }
+            @Override public java.util.Set<String> getNonCriticalExtensionOIDs() { throw new UnsupportedOperationException(); }
+            @Override public byte[] getExtensionValue(String oid) { throw new UnsupportedOperationException(); }
+        };
     }
 
     private String createdCourse(String teacherToken, String name) throws Exception {

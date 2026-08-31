@@ -168,6 +168,20 @@ public class CourseRepository {
         return chapter(courseId, generatedId(keyHolder)).orElseThrow();
     }
 
+    /**
+     * CRS-SC-02 sibling-order conflict check.  Two active chapters under the
+     * same parent may not share a sort order; a different parent (including a
+     * different subtree) is a separate ordering group.
+     */
+    public boolean chapterExistsAtOrder(long courseId, Long parentId, int sortOrder, long excludeChapterId) {
+        Integer count = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM crs_chapter
+                 WHERE course_id = ? AND ordering_parent = ? AND sort_order = ?
+                   AND is_deleted = FALSE AND id <> ?
+                """, Integer.class, courseId, parentId == null ? -1L : parentId, sortOrder, excludeChapterId);
+        return count != null && count > 0;
+    }
+
     public List<Chapter> chapters(long courseId, boolean includeHidden) {
         String sql = "SELECT id, course_id, chapter_name, parent_id, sort_order, objective, visible_status, chapter_type FROM crs_chapter WHERE course_id = ? AND is_deleted = FALSE" +
                 (includeHidden ? "" : " AND visible_status = TRUE") + " ORDER BY parent_id, sort_order, id";
@@ -292,6 +306,37 @@ public class CourseRepository {
         jdbcTemplate.update("UPDATE crs_announcement SET is_deleted = TRUE, updated_at = CURRENT_TIMESTAMP WHERE course_id = ? AND id = ? AND is_deleted = FALSE", courseId, announcementId);
     }
 
+    public void enqueueFileDeletion(long courseId, long resourceId, String storageKey) {
+        jdbcTemplate.update("""
+                INSERT INTO course_file_delete_journal (course_id, resource_id, storage_key, status)
+                VALUES (?, ?, ?, 'PENDING')
+                """, courseId, resourceId, storageKey);
+    }
+
+    public void completeFileDeletion(long resourceId) {
+        jdbcTemplate.update("""
+                UPDATE course_file_delete_journal
+                   SET status = 'COMPLETED', last_error = NULL, updated_at = CURRENT_TIMESTAMP
+                 WHERE resource_id = ? AND status <> 'COMPLETED'
+                """, resourceId);
+    }
+
+    public void failFileDeletion(long resourceId, String error) {
+        jdbcTemplate.update("""
+                UPDATE course_file_delete_journal
+                   SET attempt_count = attempt_count + 1, last_error = ?, status = 'PENDING', updated_at = CURRENT_TIMESTAMP
+                 WHERE resource_id = ?
+                """, error, resourceId);
+    }
+
+    public List<FileDeletion> pendingFileDeletions() {
+        return jdbcTemplate.query("""
+                SELECT id, course_id, resource_id, storage_key, attempt_count
+                  FROM course_file_delete_journal WHERE status = 'PENDING' ORDER BY id
+                """, (rs, row) -> new FileDeletion(rs.getLong("id"), rs.getLong("course_id"), rs.getLong("resource_id"),
+                rs.getString("storage_key"), rs.getInt("attempt_count")));
+    }
+
     private Optional<Course> oneCourse(ResultSet rs) throws SQLException { return rs.next() ? Optional.of(course(rs)) : Optional.empty(); }
     private Optional<Member> oneMember(ResultSet rs) throws SQLException { return rs.next() ? Optional.of(member(rs)) : Optional.empty(); }
     private Course course(ResultSet rs) throws SQLException { return new Course(rs.getLong("id"), rs.getString("course_name"), rs.getString("description"), rs.getLong("teacher_id"), rs.getString("enrollment_mode"), rs.getString("invite_code"), (Integer) rs.getObject("max_students"), rs.getString("status"), rs.getLong("roster_version")); }
@@ -312,4 +357,5 @@ public class CourseRepository {
     public record Resource(long id, long courseId, Long chapterId, String name, String type, String visibility, LocalDateTime publishAt,
                            String storageKey, String externalUrl, String originalFilename, String contentType, long fileSize, int version, long downloadCount, long uploadUserId) { }
     public record Announcement(long id, long courseId, String title, String content, boolean top, long publisherId) { }
+    public record FileDeletion(long id, long courseId, long resourceId, String storageKey, int attemptCount) { }
 }

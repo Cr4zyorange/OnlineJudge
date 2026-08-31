@@ -48,6 +48,8 @@ CREATE TABLE IF NOT EXISTS crs_chapter (
     parent_id BIGINT,
     chapter_name VARCHAR(255) NOT NULL,
     sort_order INT NOT NULL DEFAULT 0,
+    ordering_parent BIGINT GENERATED ALWAYS AS (COALESCE(parent_id, -1)),
+    active_order BIGINT GENERATED ALWAYS AS (CASE WHEN is_deleted = FALSE THEN sort_order ELSE NULL END),
     objective VARCHAR(4000),
     visible_status BOOLEAN NOT NULL DEFAULT TRUE,
     chapter_type INT NOT NULL DEFAULT 1,
@@ -57,6 +59,7 @@ CREATE TABLE IF NOT EXISTS crs_chapter (
     CONSTRAINT fk_course_chapter_course FOREIGN KEY(course_id) REFERENCES crs_course(id),
     CONSTRAINT fk_course_chapter_parent FOREIGN KEY(parent_id) REFERENCES crs_chapter(id)
 );
+CREATE UNIQUE INDEX IF NOT EXISTS uq_crs_chapter_active_order ON crs_chapter(course_id, ordering_parent, active_order);
 
 CREATE TABLE IF NOT EXISTS crs_resource (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
@@ -126,3 +129,17 @@ CREATE TABLE IF NOT EXISTS course_membership_reconciliation_checkpoint (
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     KEY idx_course_membership_reconciliation_due (next_reconcile_at)
 );
+
+CREATE TABLE IF NOT EXISTS course_file_delete_journal (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    course_id BIGINT NOT NULL,
+    resource_id BIGINT NOT NULL,
+    storage_key VARCHAR(500) NOT NULL,
+    status VARCHAR(32) NOT NULL DEFAULT 'PENDING',
+    attempt_count INT NOT NULL DEFAULT 0,
+    last_error VARCHAR(1024),
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uq_course_file_delete_journal_resource UNIQUE(resource_id)
+);
+CREATE INDEX IF NOT EXISTS idx_course_file_delete_journal_pending ON course_file_delete_journal(status, attempt_count);

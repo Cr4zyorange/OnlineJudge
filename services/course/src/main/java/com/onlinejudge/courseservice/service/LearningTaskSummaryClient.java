@@ -5,10 +5,17 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.onlinejudge.courseservice.config.CourseLearningProperties;
 import org.springframework.stereotype.Component;
 
+import javax.net.ssl.KeyManagerFactory;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.TrustManagerFactory;
+import java.io.InputStream;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.security.KeyStore;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -18,7 +25,8 @@ import java.util.List;
  * ({@code GET /internal/v2/learning/tasks/recent}).  One request with one
  * timeout budget; any non-200, malformed, or failed response surfaces as
  * {@link LearningTasksUnavailableException} so the caller never turns a
- * downstream outage into an empty "no tasks" state.
+ * downstream outage into an empty "no tasks" state.  The workload presents
+ * either a renewable mTLS client certificate or a short-lived service JWT.
  */
 @Component
 public class LearningTaskSummaryClient {
@@ -32,7 +40,11 @@ public class LearningTaskSummaryClient {
     public LearningTaskSummaryClient(ObjectMapper objectMapper, CourseLearningProperties properties) {
         this.objectMapper = objectMapper;
         this.properties = properties;
-        this.http = HttpClient.newBuilder().connectTimeout(properties.getTimeout()).build();
+        HttpClient.Builder builder = HttpClient.newBuilder().connectTimeout(properties.getTimeout());
+        if (properties.isMtlsEnabled()) {
+            builder.sslContext(mtlsContext());
+        }
+        this.http = builder.build();
     }
 
     public List<RecentTask> recentTasks(long courseId, long userId, String requestId) {
@@ -85,6 +97,36 @@ public class LearningTaskSummaryClient {
     private static String textOrNull(JsonNode item, String field) {
         JsonNode value = item.get(field);
         return value == null || value.isNull() ? null : value.asText();
+    }
+
+    private SSLContext mtlsContext() {
+        try {
+            char[] keyPassword = password(properties.getMtlsKeystorePassword());
+            KeyStore keyStore = KeyStore.getInstance(properties.getMtlsKeystoreType());
+            try (InputStream in = Files.newInputStream(Path.of(properties.getMtlsKeystorePath()))) {
+                keyStore.load(in, keyPassword);
+            }
+            KeyManagerFactory keyManagers = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
+            keyManagers.init(keyStore, keyPassword);
+
+            char[] trustPassword = password(properties.getMtlsTruststorePassword());
+            KeyStore trustStore = KeyStore.getInstance(properties.getMtlsTruststoreType());
+            try (InputStream in = Files.newInputStream(Path.of(properties.getMtlsTruststorePath()))) {
+                trustStore.load(in, trustPassword);
+            }
+            TrustManagerFactory trustManagers = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+            trustManagers.init(trustStore);
+
+            SSLContext context = SSLContext.getInstance("TLS");
+            context.init(keyManagers.getKeyManagers(), trustManagers.getTrustManagers(), null);
+            return context;
+        } catch (Exception failure) {
+            throw new IllegalStateException("course learning mTLS is misconfigured", failure);
+        }
+    }
+
+    private static char[] password(String value) {
+        return value == null ? new char[0] : value.toCharArray();
     }
 
     public record RecentTask(long taskId, String taskType, String title, long courseId, String courseName,

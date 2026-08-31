@@ -5,9 +5,12 @@ import com.onlinejudge.courseservice.persistence.CourseRosterReconciliationRepos
 import com.onlinejudge.courseservice.persistence.CourseRepository;
 import com.onlinejudge.courseservice.security.CurrentUser;
 import com.onlinejudge.courseservice.web.CourseException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.net.URI;
@@ -58,12 +61,20 @@ public class CourseService {
                              Integer maxStudents, String status, CurrentUser actor) {
         requireOwner(courseId, actor);
         requireMutableCourse(courseId);
-        CourseRepository.Course current = course(courseId);
+        // The course-row lock keeps the roster comparison and the persisted
+        // capacity one guarded decision: join() reserves seats under the same
+        // lock, so lowering the limit can never strand active members.
+        CourseRepository.Course current = courses.lockCourse(courseId)
+                .orElseThrow(() -> new CourseException(HttpStatus.NOT_FOUND, "COURSE_NOT_FOUND", "course does not exist", false));
         String nextName = name == null ? current.name() : courseName(name);
         String nextDescription = description == null ? current.description() : description(description);
         String nextMode = enrollmentMode == null ? current.enrollmentMode() : enrollmentMode(enrollmentMode, current.enrollmentMode());
         String nextStatus = status == null || status.isBlank() ? current.status() : courseStatus(status);
         Integer nextCapacity = maxStudents == null ? current.maxStudents() : capacity(maxStudents);
+        if (nextCapacity != null && courses.activeMemberCount(courseId, null) > nextCapacity) {
+            throw new CourseException(HttpStatus.CONFLICT, "COURSE_CAPACITY_BELOW_ROSTER",
+                    "course capacity cannot be lower than the current active roster", false);
+        }
         String nextInvite = inviteCode(nextMode, inviteCode, current.inviteCode());
         return view(courses.updateCourse(courseId, nextName, nextDescription, nextMode, nextInvite, nextCapacity, nextStatus), actor);
     }
@@ -96,9 +107,11 @@ public class CourseService {
             throw new CourseException(HttpStatus.CONFLICT, "COURSE_CAPACITY_REACHED", "course has reached its member capacity", false);
         }
         String nextStatus = "REVIEW".equals(course.enrollmentMode()) ? "PENDING" : "ACTIVE";
+        // A removed manager must not regain their elevated role through a plain
+        // self-join; rejoining always re-enters as a STUDENT.
         CourseRepository.Member member = existing == null
                 ? courses.insertMember(courseId, actor.id(), "STUDENT", nextStatus, joinMethod(course.enrollmentMode()), null)
-                : courses.updateMember(courseId, actor.id(), existing.role(), nextStatus, null);
+                : courses.updateMember(courseId, actor.id(), "STUDENT", nextStatus, null);
         writeMemberFacts(member, correlationId);
         writeRosterSnapshot(courseId, correlationId);
         return memberView(member);
@@ -167,7 +180,12 @@ public class CourseService {
         int order = order(sortOrder);
         int type = chapterType == null ? 1 : chapterType;
         if (type < 1 || type > 9) throw new CourseException(HttpStatus.BAD_REQUEST, "CHAPTER_TYPE_INVALID", "chapter type is invalid", false);
-        return chapterView(courses.createChapter(courseId, chapterTitle(title), parent, order, objective(objective), visible == null || visible, type));
+        if (courses.chapterExistsAtOrder(courseId, parent, order, -1)) throw chapterOrderConflict();
+        try {
+            return chapterView(courses.createChapter(courseId, chapterTitle(title), parent, order, objective(objective), visible == null || visible, type));
+        } catch (DataIntegrityViolationException concurrentConflict) {
+            throw chapterOrderConflict();
+        }
     }
 
     @Transactional
@@ -178,11 +196,17 @@ public class CourseService {
         CourseRepository.Chapter current = courses.chapter(courseId, chapterId)
                 .orElseThrow(() -> new CourseException(HttpStatus.NOT_FOUND, "CHAPTER_NOT_FOUND", "chapter does not exist", false));
         Long parent = parentId == null ? current.parentId() : validateParent(courseId, chapterId, parentId);
+        int nextOrder = sortOrder == null ? current.sortOrder() : order(sortOrder);
         int type = chapterType == null ? current.chapterType() : chapterType;
         if (type < 1 || type > 9) throw new CourseException(HttpStatus.BAD_REQUEST, "CHAPTER_TYPE_INVALID", "chapter type is invalid", false);
-        courses.updateChapter(courseId, chapterId, title == null ? current.title() : chapterTitle(title), parent,
-                sortOrder == null ? current.sortOrder() : order(sortOrder), objective == null ? current.objective() : objective(objective),
-                visible == null ? current.visible() : visible, type);
+        if (courses.chapterExistsAtOrder(courseId, parent, nextOrder, chapterId)) throw chapterOrderConflict();
+        try {
+            courses.updateChapter(courseId, chapterId, title == null ? current.title() : chapterTitle(title), parent,
+                    nextOrder, objective == null ? current.objective() : objective(objective),
+                    visible == null ? current.visible() : visible, type);
+        } catch (DataIntegrityViolationException concurrentConflict) {
+            throw chapterOrderConflict();
+        }
         return chapterView(courses.chapter(courseId, chapterId).orElseThrow());
     }
 
@@ -252,8 +276,16 @@ public class CourseService {
     public void deleteResource(long courseId, long resourceId, CurrentUser actor) {
         requireContentManager(courseId, actor);
         requireMutableCourse(courseId);
-        resource(courseId, resourceId);
+        CourseRepository.Resource resource = resource(courseId, resourceId);
         courses.deleteResource(courseId, resourceId);
+        String storageKey = resource.storageKey();
+        if (storageKey != null && !storageKey.isBlank()) {
+            // Hiding the DB row is not storage cleanup: journal the pending
+            // physical delete in the same transaction, then remove the object
+            // after commit so a crash leaves a recoverable PENDING entry.
+            courses.enqueueFileDeletion(courseId, resourceId, storageKey);
+            deleteStoredFileAfterCommit(resourceId, storageKey);
+        }
     }
 
     public List<ResourceView> resources(long courseId, CurrentUser actor) {
@@ -404,6 +436,38 @@ public class CourseService {
         return reconciled;
     }
 
+    /** Durable compensation for {@link #deleteResource}: retries every journaled physical delete. */
+    public int recoverPendingFileDeletions() {
+        int recovered = 0;
+        for (CourseRepository.FileDeletion pending : courses.pendingFileDeletions()) {
+            deleteStoredFile(pending.resourceId(), pending.storageKey());
+            recovered++;
+        }
+        return recovered;
+    }
+
+    private void deleteStoredFileAfterCommit(long resourceId, String storageKey) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            deleteStoredFile(resourceId, storageKey);
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                deleteStoredFile(resourceId, storageKey);
+            }
+        });
+    }
+
+    private void deleteStoredFile(long resourceId, String storageKey) {
+        try {
+            fileStorage.deleteQuietly(storageKey);
+            courses.completeFileDeletion(resourceId);
+        } catch (RuntimeException failure) {
+            courses.failFileDeletion(resourceId, failure.getMessage());
+        }
+    }
+
     private void writeMemberFacts(CourseRepository.Member member, String correlationId) {
         outbox.append("course.member.changed.v2", "course-member", member.courseId() + ":" + member.userId(), member.memberVersion(), correlationId,
                 Map.of("courseId", String.valueOf(member.courseId()), "userId", String.valueOf(member.userId()),
@@ -498,6 +562,9 @@ public class CourseService {
         int result = value == null ? 0 : value;
         if (result < 0 || result > 100000) throw new CourseException(HttpStatus.BAD_REQUEST, "CHAPTER_ORDER_INVALID", "chapter sort order is invalid", false);
         return result;
+    }
+    private CourseException chapterOrderConflict() {
+        return new CourseException(HttpStatus.CONFLICT, "CHAPTER_ORDER_CONFLICT", "章节排序冲突，请调整顺序", false);
     }
     private Long validateParent(long courseId, Long chapterId, String parentId) {
         if (parentId == null || parentId.isBlank()) return null;

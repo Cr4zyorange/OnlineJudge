@@ -14,6 +14,13 @@ public class CourseLearningProperties {
     private String baseUrl = "";
     private Duration timeout = Duration.ofMillis(800);
     private String serviceToken = "";
+    private boolean mtlsEnabled = false;
+    private String mtlsKeystorePath = "";
+    private String mtlsKeystorePassword = "";
+    private String mtlsKeystoreType = "PKCS12";
+    private String mtlsTruststorePath = "";
+    private String mtlsTruststorePassword = "";
+    private String mtlsTruststoreType = "PKCS12";
 
     public String getBaseUrl() {
         return baseUrl;
@@ -38,4 +45,19 @@ public class CourseLearningProperties {
     public void setServiceToken(String serviceToken) {
         this.serviceToken = serviceToken;
     }
+
+    public boolean isMtlsEnabled() { return mtlsEnabled; }
+    public void setMtlsEnabled(boolean mtlsEnabled) { this.mtlsEnabled = mtlsEnabled; }
+    public String getMtlsKeystorePath() { return mtlsKeystorePath; }
+    public void setMtlsKeystorePath(String mtlsKeystorePath) { this.mtlsKeystorePath = mtlsKeystorePath; }
+    public String getMtlsKeystorePassword() { return mtlsKeystorePassword; }
+    public void setMtlsKeystorePassword(String mtlsKeystorePassword) { this.mtlsKeystorePassword = mtlsKeystorePassword; }
+    public String getMtlsKeystoreType() { return mtlsKeystoreType; }
+    public void setMtlsKeystoreType(String mtlsKeystoreType) { this.mtlsKeystoreType = mtlsKeystoreType; }
+    public String getMtlsTruststorePath() { return mtlsTruststorePath; }
+    public void setMtlsTruststorePath(String mtlsTruststorePath) { this.mtlsTruststorePath = mtlsTruststorePath; }
+    public String getMtlsTruststorePassword() { return mtlsTruststorePassword; }
+    public void setMtlsTruststorePassword(String mtlsTruststorePassword) { this.mtlsTruststorePassword = mtlsTruststorePassword; }
+    public String getMtlsTruststoreType() { return mtlsTruststoreType; }
+    public void setMtlsTruststoreType(String mtlsTruststoreType) { this.mtlsTruststoreType = mtlsTruststoreType; }
 }

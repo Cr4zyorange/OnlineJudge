@@ -38,6 +38,7 @@ course:
     refresh-enabled: ${IDENTITY_JWKS_REFRESH_ENABLED:true}
     refresh-initial-delay: ${IDENTITY_JWKS_REFRESH_INITIAL_DELAY:PT30S}
     refresh-interval: ${IDENTITY_JWKS_REFRESH_INTERVAL:PT5M}
+    mtls-service-subjects: ${COURSE_INTERNAL_MTLS_SERVICE_SUBJECTS:}
   rabbit:
     enabled: ${COURSE_RABBIT_ENABLED:false}
     host: ${RABBITMQ_HOST:localhost}
@@ -50,5 +51,12 @@ course:
     base-url: ${COURSE_LEARNING_BASE_URL:}
     timeout-ms: ${COURSE_LEARNING_TIMEOUT_MS:800}
     service-token: ${COURSE_LEARNING_SERVICE_TOKEN:}
+    mtls-enabled: ${COURSE_LEARNING_MTLS_ENABLED:false}
+    mtls-keystore-path: ${COURSE_LEARNING_MTLS_KEYSTORE_PATH:}
+    mtls-keystore-password: ${COURSE_LEARNING_MTLS_KEYSTORE_PASSWORD:}
+    mtls-keystore-type: ${COURSE_LEARNING_MTLS_KEYSTORE_TYPE:PKCS12}
+    mtls-truststore-path: ${COURSE_LEARNING_MTLS_TRUSTSTORE_PATH:}
+    mtls-truststore-password: ${COURSE_LEARNING_MTLS_TRUSTSTORE_PASSWORD:}
+    mtls-truststore-type: ${COURSE_LEARNING_MTLS_TRUSTSTORE_TYPE:PKCS12}
   storage:
     root: ${COURSE_STORAGE_ROOT:${java.io.tmpdir}/onlinejudge-course}

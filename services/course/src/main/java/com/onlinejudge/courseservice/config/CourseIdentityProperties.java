@@ -14,6 +14,7 @@ public class CourseIdentityProperties {
     private boolean refreshEnabled = true;
     private Duration refreshInitialDelay = Duration.ofSeconds(30);
     private Duration refreshInterval = Duration.ofMinutes(5);
+    private String mtlsServiceSubjects = "";
 
     public String getIssuer() { return issuer; }
     public void setIssuer(String issuer) { this.issuer = issuer; }
@@ -31,4 +32,6 @@ public class CourseIdentityProperties {
     public void setRefreshInitialDelay(Duration refreshInitialDelay) { this.refreshInitialDelay = refreshInitialDelay; }
     public Duration getRefreshInterval() { return refreshInterval; }
     public void setRefreshInterval(Duration refreshInterval) { this.refreshInterval = refreshInterval; }
+    public String getMtlsServiceSubjects() { return mtlsServiceSubjects; }
+    public void setMtlsServiceSubjects(String mtlsServiceSubjects) { this.mtlsServiceSubjects = mtlsServiceSubjects; }
 }
