@@ -232,6 +232,7 @@ public class LabExperimentService {
         if (command.maxScore() == null || command.maxScore().signum() <= 0) throw new IllegalArgumentException("maxScore must be positive");
         if (command.allowedLanguages() == null || command.allowedLanguages().isEmpty() || command.allowedLanguages().stream().anyMatch(value -> value == null || value.isBlank() || value.contains(","))) throw new IllegalArgumentException("at least one valid language is required");
         if (command.testcases() == null) throw new IllegalArgumentException("testcases are required");
+        validateAutomaticTestcases(command.autoEvaluate(), command.maxScore(), command.testcases());
         long orders = command.testcases().stream().map(LabTestcase::orderNum).distinct().count();
         if (orders != command.testcases().size()) throw new IllegalArgumentException("testcase orderNum values must be unique");
         command.testcases().forEach(LabTestcase::validate);
@@ -245,8 +246,24 @@ public class LabExperimentService {
         if (command.maxScore() == null || command.maxScore().signum() <= 0) throw new IllegalArgumentException("maxScore must be positive");
         if (command.allowedLanguages() == null || command.allowedLanguages().isEmpty() || command.allowedLanguages().stream().anyMatch(value -> value == null || value.isBlank() || value.contains(","))) throw new IllegalArgumentException("at least one valid language is required");
         if (command.testcases() == null) throw new IllegalArgumentException("testcases are required");
+        validateAutomaticTestcases(command.autoEvaluate(), command.maxScore(), command.testcases());
         if (command.testcases().stream().map(LabTestcase::orderNum).distinct().count() != command.testcases().size()) throw new IllegalArgumentException("testcase orderNum values must be unique");
         command.testcases().forEach(LabTestcase::validate);
+    }
+
+    private void validateAutomaticTestcases(boolean autoEvaluate, BigDecimal maxScore, List<LabTestcase> testcases) {
+        if (!autoEvaluate) return;
+        if (testcases.isEmpty()) throw new IllegalArgumentException("automatic LAB requires at least one testcase");
+        BigDecimal totalWeight = BigDecimal.ZERO;
+        for (LabTestcase testcase : testcases) {
+            if (testcase == null || testcase.scoreWeight() == null || testcase.scoreWeight().signum() <= 0) {
+                throw new IllegalArgumentException("automatic LAB testcase weights must be positive");
+            }
+            totalWeight = totalWeight.add(testcase.scoreWeight());
+        }
+        if (totalWeight.compareTo(maxScore) != 0) {
+            throw new IllegalArgumentException("automatic LAB testcase weights must equal maxScore");
+        }
     }
 
     public record CreateLabCommand(String courseId, String title, String description, Instant deadline,

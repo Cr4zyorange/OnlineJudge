@@ -4,6 +4,7 @@ import com.onlinejudge.assessmentservice.security.TestJwtFactory;
 import com.onlinejudge.assessmentservice.worker.AssessmentWorker;
 import com.onlinejudge.assessmentservice.worker.SandboxEvaluator;
 import com.onlinejudge.assessmentservice.service.CoursePermissionClient;
+import com.onlinejudge.assessmentservice.service.CourseAuthorizationUnavailableException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -63,6 +64,8 @@ class LabWorkflowContractTest {
     void activeTeacherMembership() {
         jdbc.update("DELETE FROM assessment_event_outbox");
         jdbc.update("DELETE FROM assessment_source_grade");
+        jdbc.update("DELETE FROM assessment_lab_score_change_log");
+        jdbc.update("DELETE FROM assessment_lab_score");
         jdbc.update("DELETE FROM assessment_lab_evaluation_result");
         jdbc.update("DELETE FROM assessment_lab_testcase");
         jdbc.update("DELETE FROM assessment_lab_submission");
@@ -85,7 +88,8 @@ class LabWorkflowContractTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"title":"fresh-lab-314","description":"created by issue 314","deadline":"%s",
-                                 "maxScore":100,"allowedLanguages":["python"],"autoEvaluate":true}
+                                 "maxScore":100,"allowedLanguages":["python"],"autoEvaluate":true,
+                                 "testcases":[{"input":"x","expectedOutput":"x","scoreWeight":100,"public":true,"orderNum":1}]}
                                 """.formatted(deadline)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.status").value("DRAFT"))
@@ -149,7 +153,8 @@ class LabWorkflowContractTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"title":"submit-lab-314","description":"submission boundary","deadline":"2030-01-01T12:00:00Z",
-                                 "maxScore":100,"allowedLanguages":["python"],"autoEvaluate":true}
+                                 "maxScore":100,"allowedLanguages":["python"],"autoEvaluate":true,
+                                 "testcases":[{"input":"x","expectedOutput":"x","scoreWeight":100,"public":true,"orderNum":1}]}
                                 """))
                 .andExpect(status().isCreated());
         Long labId = jdbc.queryForObject("SELECT id FROM assessment_lab_experiment WHERE title = 'submit-lab-314'", Long.class);
@@ -193,6 +198,20 @@ class LabWorkflowContractTest {
         org.assertj.core.api.Assertions.assertThat(jdbc.queryForObject("SELECT evaluation_status FROM assessment_submission", String.class)).isEqualTo("NONE");
         org.assertj.core.api.Assertions.assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM evaluation_task", Integer.class)).isZero();
         String submissionId = jdbc.queryForObject("SELECT submission_id FROM assessment_lab_submission WHERE lab_id = ?", String.class, labId);
+        mockMvc.perform(post("/api/v1/labs/{labId}/submissions/{submissionId}/score", labId, submissionId)
+                        .header("Authorization", "Bearer " + teacherToken).header("X-Request-Id", "manual-score-314")
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"finalScore\":80}"))
+                .andExpect(status().isOk());
+        mockMvc.perform(put("/api/v1/labs/{labId}/release-scores", labId)
+                        .header("Authorization", "Bearer " + teacherToken).header("X-Request-Id", "manual-release-314"))
+                .andExpect(status().isOk());
+        mockMvc.perform(get("/api/v1/labs/{labId}/results/{studentId}", labId, "student-manual-314")
+                        .header("Authorization", "Bearer " + studentToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.submission.finalScore").value(80))
+                .andExpect(jsonPath("$.evaluationResult.evaluationStatus").value("NONE"))
+                .andExpect(jsonPath("$.evaluationResult.state").value("NONE"))
+                .andExpect(jsonPath("$.latestScore.finalScore").value(80));
         mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/v1/labs/{labId}/submissions/{submissionId}/evaluate", labId, submissionId)
                         .header("Authorization", "Bearer " + teacherToken).header("X-Request-Id", "manual-evaluate-314"))
                 .andExpect(status().isOk())
@@ -230,7 +249,8 @@ class LabWorkflowContractTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"title":"grade-lab-314","description":"source grade event","deadline":"2030-01-01T12:00:00Z",
-                                 "maxScore":100,"allowedLanguages":["python"],"autoEvaluate":true}
+                                "maxScore":100,"allowedLanguages":["python"],"autoEvaluate":true,
+                                 "testcases":[{"input":"x","expectedOutput":"x","scoreWeight":100,"public":true,"orderNum":1}]}
                                 """))
                 .andExpect(status().isCreated());
         Long labId = jdbc.queryForObject("SELECT id FROM assessment_lab_experiment WHERE title = 'grade-lab-314'", Long.class);
@@ -277,7 +297,7 @@ class LabWorkflowContractTest {
         mockMvc.perform(post("/api/v1/courses/{courseId}/labs", "course-314")
                         .header("Authorization", "Bearer " + teacherToken).header("X-Request-Id", "redaction-create-314")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"title\":\"redaction-lab-314\",\"description\":\"score visibility\",\"deadline\":\"2030-01-01T12:00:00Z\",\"maxScore\":100,\"allowedLanguages\":[\"python\"],\"autoEvaluate\":true}"))
+                        .content("{\"title\":\"redaction-lab-314\",\"description\":\"score visibility\",\"deadline\":\"2030-01-01T12:00:00Z\",\"maxScore\":100,\"allowedLanguages\":[\"python\"],\"autoEvaluate\":true,\"testcases\":[{\"input\":\"x\",\"expectedOutput\":\"x\",\"scoreWeight\":100,\"public\":true,\"orderNum\":1}]}"))
                 .andExpect(status().isCreated());
         Long labId = jdbc.queryForObject("SELECT id FROM assessment_lab_experiment WHERE title = 'redaction-lab-314'", Long.class);
         mockMvc.perform(post("/api/v1/labs/{labId}/publish", labId)
@@ -294,13 +314,77 @@ class LabWorkflowContractTest {
 
         mockMvc.perform(get("/api/v1/labs/{labId}/results/{studentId}", labId, "student-redaction-314").header("Authorization", "Bearer " + studentToken))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.submission").value(org.hamcrest.Matchers.nullValue()))
-                .andExpect(jsonPath("$.evaluationResult").value(org.hamcrest.Matchers.nullValue()))
+                .andExpect(jsonPath("$.submission").exists())
+                .andExpect(jsonPath("$.submission.autoScore").value(org.hamcrest.Matchers.nullValue()))
+                .andExpect(jsonPath("$.evaluationResult").exists())
+                .andExpect(jsonPath("$.evaluationResult.score").value(org.hamcrest.Matchers.nullValue()))
                 .andExpect(jsonPath("$.latestScore").value(org.hamcrest.Matchers.nullValue()));
 
         jdbc.update("UPDATE assessment_course_member_projection SET membership_status = 'REMOVED' WHERE course_id = 'course-314' AND user_id = 'student-redaction-314'");
         mockMvc.perform(get("/api/v1/labs/{labId}/results/{studentId}", labId, "student-redaction-314").header("Authorization", "Bearer " + studentToken))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void courseAuthorizationOutageReturnsRetryableServiceUnavailable() throws Exception {
+        when(coursePermissions.canManageCourse("course-314", "teacher-314"))
+                .thenThrow(new CourseAuthorizationUnavailableException("CRS unavailable"));
+        String teacherToken = TestJwtFactory.userToken(KEY, "lab-workflow-kid", "teacher-314", List.of("TEACHER"));
+        mockMvc.perform(post("/api/v1/courses/{courseId}/labs", "course-314")
+                        .header("Authorization", "Bearer " + teacherToken)
+                        .header("X-Request-Id", "authorization-outage-314")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"authorization-outage-314\",\"description\":\"outage\",\"deadline\":\"2030-01-01T12:00:00Z\",\"maxScore\":100,\"allowedLanguages\":[\"python\"],\"autoEvaluate\":false}"))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.code").value("COURSE_AUTHORIZATION_UNAVAILABLE"))
+                .andExpect(jsonPath("$.retryable").value(true));
+    }
+
+    @Test
+    void automaticLabRequiresPositiveTestcasesWhoseWeightsMatchMaximum() throws Exception {
+        String teacherToken = TestJwtFactory.userToken(KEY, "lab-workflow-kid", "teacher-314", List.of("TEACHER"));
+        mockMvc.perform(post("/api/v1/courses/{courseId}/labs", "course-314")
+                        .header("Authorization", "Bearer " + teacherToken).header("X-Request-Id", "auto-validation-empty-314")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"auto-validation-empty-314\",\"description\":\"validation\",\"deadline\":\"2030-01-01T12:00:00Z\",\"maxScore\":100,\"allowedLanguages\":[\"python\"],\"autoEvaluate\":true}"))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(post("/api/v1/courses/{courseId}/labs", "course-314")
+                        .header("Authorization", "Bearer " + teacherToken).header("X-Request-Id", "auto-validation-weight-314")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"auto-validation-weight-314\",\"description\":\"validation\",\"deadline\":\"2030-01-01T12:00:00Z\",\"maxScore\":100,\"allowedLanguages\":[\"python\"],\"autoEvaluate\":true,\"testcases\":[{\"input\":\"x\",\"expectedOutput\":\"x\",\"scoreWeight\":101,\"public\":true,\"orderNum\":1}]}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void studentResultRetainsPublicFeedbackBeforeScoreRelease() throws Exception {
+        String teacherToken = TestJwtFactory.userToken(KEY, "lab-workflow-kid", "teacher-314", List.of("TEACHER"));
+        String studentToken = TestJwtFactory.userToken(KEY, "lab-workflow-kid", "student-feedback-314", List.of("STUDENT"));
+        jdbc.update("INSERT INTO assessment_course_member_projection (course_id, user_id, membership_status, member_version) VALUES ('course-314', 'student-feedback-314', 'ACTIVE', 1)");
+        mockMvc.perform(post("/api/v1/courses/{courseId}/labs", "course-314")
+                        .header("Authorization", "Bearer " + teacherToken).header("X-Request-Id", "feedback-create-314")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"feedback-lab-314\",\"description\":\"public feedback\",\"deadline\":\"2030-01-01T12:00:00Z\",\"maxScore\":100,\"allowedLanguages\":[\"python\"],\"autoEvaluate\":true,\"testcases\":[{\"input\":\"public-input\",\"expectedOutput\":\"public-output\",\"scoreWeight\":50,\"public\":true,\"orderNum\":1},{\"input\":\"secret-input\",\"expectedOutput\":\"secret-output\",\"scoreWeight\":50,\"public\":false,\"orderNum\":2}]}"))
+                .andExpect(status().isCreated());
+        Long labId = jdbc.queryForObject("SELECT id FROM assessment_lab_experiment WHERE title = 'feedback-lab-314'", Long.class);
+        mockMvc.perform(post("/api/v1/labs/{labId}/publish", labId).header("Authorization", "Bearer " + teacherToken).header("X-Request-Id", "feedback-publish-314"))
+                .andExpect(status().isOk());
+        mockMvc.perform(multipart("/api/v1/labs/{labId}/submissions", labId).file("file", "print(1)".getBytes()).param("language", "python")
+                        .header("Authorization", "Bearer " + studentToken).header("X-Request-Id", "feedback-submit-314"))
+                .andExpect(status().isCreated());
+        String submissionId = jdbc.queryForObject("SELECT submission_id FROM assessment_lab_submission WHERE lab_id = ?", String.class, labId);
+        List<Long> testcaseIds = jdbc.queryForList("SELECT id FROM assessment_lab_testcase WHERE lab_id = ? ORDER BY order_num", Long.class, labId);
+        worker.runOne("feedback-worker-314", task -> new AssessmentWorker.EvaluationOutcome(true, "ACCEPTED", new BigDecimal("100"), new BigDecimal("100"), List.of(
+                new AssessmentWorker.LabCaseResult(testcaseIds.get(0), true, new BigDecimal("50"), "public-output", null),
+                new AssessmentWorker.LabCaseResult(testcaseIds.get(1), true, new BigDecimal("50"), "secret-output", null))));
+        mockMvc.perform(get("/api/v1/labs/{labId}/results/{studentId}", labId, "student-feedback-314").header("Authorization", "Bearer " + studentToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.submission").exists())
+                .andExpect(jsonPath("$.submission.autoScore").value(org.hamcrest.Matchers.nullValue()))
+                .andExpect(jsonPath("$.evaluationResult.evaluationStatus").value("ACCEPTED"))
+                .andExpect(jsonPath("$.evaluationResult.caseResults").isArray())
+                .andExpect(jsonPath("$.evaluationResult.caseResults.length()").value(1))
+                .andExpect(jsonPath("$.evaluationResult.caseResults[0].input").value("public-input"))
+                .andExpect(jsonPath("$.evaluationResult.caseResults[0].score").value(org.hamcrest.Matchers.nullValue()));
     }
 
     @Test
@@ -440,7 +524,7 @@ class LabWorkflowContractTest {
         mockMvc.perform(post("/api/v1/courses/{courseId}/labs", "course-314")
                         .header("Authorization", "Bearer " + teacherToken).header("X-Request-Id", "delete-create-314")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"title\":\"delete-lab-314\",\"description\":\"draft\",\"deadline\":\"2030-01-01T12:00:00Z\",\"maxScore\":100,\"allowedLanguages\":[\"python\"],\"autoEvaluate\":true}"))
+                        .content("{\"title\":\"delete-lab-314\",\"description\":\"draft\",\"deadline\":\"2030-01-01T12:00:00Z\",\"maxScore\":100,\"allowedLanguages\":[\"python\"],\"autoEvaluate\":true,\"testcases\":[{\"input\":\"x\",\"expectedOutput\":\"x\",\"scoreWeight\":100,\"public\":true,\"orderNum\":1}]}"))
                 .andExpect(status().isCreated());
         Long labId = jdbc.queryForObject("SELECT id FROM assessment_lab_experiment WHERE title = 'delete-lab-314'", Long.class);
         mockMvc.perform(delete("/api/v1/labs/{labId}", labId)
@@ -460,7 +544,7 @@ class LabWorkflowContractTest {
         mockMvc.perform(post("/api/v1/courses/{courseId}/labs", "course-314")
                         .header("Authorization", "Bearer " + teacherToken).header("X-Request-Id", "query-create-314")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"title\":\"query-lab-314\",\"description\":\"query\",\"deadline\":\"2030-01-01T12:00:00Z\",\"maxScore\":100,\"allowedLanguages\":[\"python\"],\"autoEvaluate\":true}"))
+                        .content("{\"title\":\"query-lab-314\",\"description\":\"query\",\"deadline\":\"2030-01-01T12:00:00Z\",\"maxScore\":100,\"allowedLanguages\":[\"python\"],\"autoEvaluate\":true,\"testcases\":[{\"input\":\"x\",\"expectedOutput\":\"x\",\"scoreWeight\":100,\"public\":true,\"orderNum\":1}]}"))
                 .andExpect(status().isCreated());
         Long labId = jdbc.queryForObject("SELECT id FROM assessment_lab_experiment WHERE title = 'query-lab-314'", Long.class);
         mockMvc.perform(post("/api/v1/labs/{labId}/publish", labId)
@@ -505,7 +589,7 @@ class LabWorkflowContractTest {
         mockMvc.perform(post("/api/v1/courses/{courseId}/labs", "course-314")
                         .header("Authorization", "Bearer " + teacherToken).header("X-Request-Id", "code-create-314")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"title\":\"code-lab-314\",\"description\":\"code\",\"deadline\":\"2030-01-01T12:00:00Z\",\"maxScore\":100,\"allowedLanguages\":[\"python\"],\"autoEvaluate\":true}"))
+                        .content("{\"title\":\"code-lab-314\",\"description\":\"code\",\"deadline\":\"2030-01-01T12:00:00Z\",\"maxScore\":100,\"allowedLanguages\":[\"python\"],\"autoEvaluate\":true,\"testcases\":[{\"input\":\"x\",\"expectedOutput\":\"x\",\"scoreWeight\":100,\"public\":true,\"orderNum\":1}]}"))
                 .andExpect(status().isCreated());
         Long labId = jdbc.queryForObject("SELECT id FROM assessment_lab_experiment WHERE title = 'code-lab-314'", Long.class);
         mockMvc.perform(post("/api/v1/labs/{labId}/publish", labId)
@@ -527,7 +611,7 @@ class LabWorkflowContractTest {
         mockMvc.perform(post("/api/v1/courses/{courseId}/labs", "course-314")
                         .header("Authorization", "Bearer " + teacherToken).header("X-Request-Id", "score-create-314")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"title\":\"score-lab-314\",\"description\":\"score\",\"deadline\":\"2030-01-01T12:00:00Z\",\"maxScore\":100,\"allowedLanguages\":[\"python\"],\"autoEvaluate\":true}"))
+                        .content("{\"title\":\"score-lab-314\",\"description\":\"score\",\"deadline\":\"2030-01-01T12:00:00Z\",\"maxScore\":100,\"allowedLanguages\":[\"python\"],\"autoEvaluate\":true,\"testcases\":[{\"input\":\"x\",\"expectedOutput\":\"x\",\"scoreWeight\":100,\"public\":true,\"orderNum\":1}]}"))
                 .andExpect(status().isCreated());
         Long labId = jdbc.queryForObject("SELECT id FROM assessment_lab_experiment WHERE title = 'score-lab-314'", Long.class);
         mockMvc.perform(post("/api/v1/labs/{labId}/publish", labId)
@@ -542,15 +626,30 @@ class LabWorkflowContractTest {
                         .header("Authorization", "Bearer " + teacherToken).header("X-Request-Id", "score-write-314")
                         .contentType(MediaType.APPLICATION_JSON).content("{\"manualScore\":80,\"finalScore\":80,\"comment\":\"checked\"}"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.finalScore").value(80));
-        org.assertj.core.api.Assertions.assertThat(jdbc.queryForObject("SELECT final_score FROM assessment_lab_submission WHERE submission_id = ?", BigDecimal.class, submissionId)).isEqualByComparingTo("80");
+                .andExpect(jsonPath("$.finalScore").value(80))
+                .andExpect(jsonPath("$.hasChangeLogs").value(false));
+        mockMvc.perform(post("/api/v1/labs/{labId}/submissions/{submissionId}/score", labId, submissionId)
+                        .header("Authorization", "Bearer " + teacherToken).header("X-Request-Id", "score-change-without-reason-314")
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"finalScore\":90}"))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(post("/api/v1/labs/{labId}/submissions/{submissionId}/score", labId, submissionId)
+                        .header("Authorization", "Bearer " + teacherToken).header("X-Request-Id", "score-change-with-reason-314")
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"finalScore\":90,\"changeReason\":\"rubric correction\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.finalScore").value(90))
+                .andExpect(jsonPath("$.hasChangeLogs").value(true));
+        org.assertj.core.api.Assertions.assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM assessment_lab_score_change_log WHERE submission_id = ?", Integer.class, submissionId)).isEqualTo(1);
+        org.assertj.core.api.Assertions.assertThat(jdbc.queryForObject("SELECT old_final_score FROM assessment_lab_score_change_log WHERE submission_id = ?", BigDecimal.class, submissionId)).isEqualByComparingTo("80");
+        org.assertj.core.api.Assertions.assertThat(jdbc.queryForObject("SELECT new_final_score FROM assessment_lab_score_change_log WHERE submission_id = ?", BigDecimal.class, submissionId)).isEqualByComparingTo("90");
+        org.assertj.core.api.Assertions.assertThat(jdbc.queryForObject("SELECT reason FROM assessment_lab_score_change_log WHERE submission_id = ?", String.class, submissionId)).isEqualTo("rubric correction");
+        org.assertj.core.api.Assertions.assertThat(jdbc.queryForObject("SELECT final_score FROM assessment_lab_submission WHERE submission_id = ?", BigDecimal.class, submissionId)).isEqualByComparingTo("90");
         org.assertj.core.api.Assertions.assertThat(jdbc.queryForObject("SELECT submit_status FROM assessment_lab_submission WHERE submission_id = ?", String.class, submissionId)).isEqualTo("SCORED");
         org.assertj.core.api.Assertions.assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM assessment_source_grade WHERE source_type = 'LAB' AND source_id = ? AND student_id = ?", Integer.class, Long.toString(labId), "student-score-314")).isZero();
         org.assertj.core.api.Assertions.assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM assessment_event_outbox WHERE event_type = 'assessment.source-grade.changed.v2' AND aggregate_id = ?", Integer.class, "LAB:" + labId + ":student-score-314")).isZero();
         mockMvc.perform(put("/api/v1/labs/{labId}/release-scores", labId)
                         .header("Authorization", "Bearer " + teacherToken).header("X-Request-Id", "score-release-314"))
                 .andExpect(status().isOk());
-        org.assertj.core.api.Assertions.assertThat(jdbc.queryForObject("SELECT score FROM assessment_source_grade WHERE source_type = 'LAB' AND source_id = ? AND student_id = ?", BigDecimal.class, Long.toString(labId), "student-score-314")).isEqualByComparingTo("80");
+        org.assertj.core.api.Assertions.assertThat(jdbc.queryForObject("SELECT score FROM assessment_source_grade WHERE source_type = 'LAB' AND source_id = ? AND student_id = ?", BigDecimal.class, Long.toString(labId), "student-score-314")).isEqualByComparingTo("90");
         org.assertj.core.api.Assertions.assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM assessment_event_outbox WHERE event_type = 'assessment.source-grade.changed.v2' AND aggregate_id = ?", Integer.class, "LAB:" + labId + ":student-score-314")).isEqualTo(1);
         mockMvc.perform(get("/api/v1/labs/{labId}/statistics", labId)
                         .header("Authorization", "Bearer " + teacherToken))
@@ -562,7 +661,8 @@ class LabWorkflowContractTest {
                         .header("Authorization", "Bearer " + studentToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.labId").value(labId))
-                .andExpect(jsonPath("$.studentId").value("student-score-314"));
+                .andExpect(jsonPath("$.studentId").value("student-score-314"))
+                .andExpect(jsonPath("$.latestScore.finalScore").value(90));
     }
 
     @Test
@@ -573,7 +673,7 @@ class LabWorkflowContractTest {
         mockMvc.perform(post("/api/v1/courses/{courseId}/labs", "course-314")
                         .header("Authorization", "Bearer " + teacherToken).header("X-Request-Id", "final-priority-create-314")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"title\":\"final-priority-lab-314\",\"description\":\"final score wins\",\"deadline\":\"2030-01-01T12:00:00Z\",\"maxScore\":100,\"allowedLanguages\":[\"python\"],\"autoEvaluate\":true}"))
+                        .content("{\"title\":\"final-priority-lab-314\",\"description\":\"final score wins\",\"deadline\":\"2030-01-01T12:00:00Z\",\"maxScore\":100,\"allowedLanguages\":[\"python\"],\"autoEvaluate\":true,\"testcases\":[{\"input\":\"x\",\"expectedOutput\":\"x\",\"scoreWeight\":100,\"public\":true,\"orderNum\":1}]}"))
                 .andExpect(status().isCreated());
         Long labId = jdbc.queryForObject("SELECT id FROM assessment_lab_experiment WHERE title = 'final-priority-lab-314'", Long.class);
         mockMvc.perform(post("/api/v1/labs/{labId}/publish", labId)
@@ -608,7 +708,7 @@ class LabWorkflowContractTest {
         mockMvc.perform(post("/api/v1/courses/{courseId}/labs", "course-314")
                         .header("Authorization", "Bearer " + teacherToken).header("X-Request-Id", "replay-final-create-314")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"title\":\"replay-final-lab-314\",\"description\":\"final score survives replay\",\"deadline\":\"2030-01-01T12:00:00Z\",\"maxScore\":100,\"allowedLanguages\":[\"python\"],\"autoEvaluate\":true}"))
+                        .content("{\"title\":\"replay-final-lab-314\",\"description\":\"final score survives replay\",\"deadline\":\"2030-01-01T12:00:00Z\",\"maxScore\":100,\"allowedLanguages\":[\"python\"],\"autoEvaluate\":true,\"testcases\":[{\"input\":\"x\",\"expectedOutput\":\"x\",\"scoreWeight\":100,\"public\":true,\"orderNum\":1}]}"))
                 .andExpect(status().isCreated());
         Long labId = jdbc.queryForObject("SELECT id FROM assessment_lab_experiment WHERE title = 'replay-final-lab-314'", Long.class);
         mockMvc.perform(post("/api/v1/labs/{labId}/publish", labId)
@@ -648,7 +748,7 @@ class LabWorkflowContractTest {
         mockMvc.perform(post("/api/v1/courses/{courseId}/labs", "course-314")
                         .header("Authorization", "Bearer " + teacherToken).header("X-Request-Id", "replay-create-314")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"title\":\"replay-lab-314\",\"description\":\"replay\",\"deadline\":\"2030-01-01T12:00:00Z\",\"maxScore\":100,\"allowedLanguages\":\"python\",\"autoEvaluate\":true}"))
+                        .content("{\"title\":\"replay-lab-314\",\"description\":\"replay\",\"deadline\":\"2030-01-01T12:00:00Z\",\"maxScore\":100,\"allowedLanguages\":\"python\",\"autoEvaluate\":true,\"testcases\":[{\"input\":\"x\",\"expectedOutput\":\"x\",\"scoreWeight\":100,\"public\":true,\"orderNum\":1}]}"))
                 .andExpect(status().isCreated());
         Long labId = jdbc.queryForObject("SELECT id FROM assessment_lab_experiment WHERE title = 'replay-lab-314'", Long.class);
         mockMvc.perform(post("/api/v1/labs/{labId}/publish", labId)

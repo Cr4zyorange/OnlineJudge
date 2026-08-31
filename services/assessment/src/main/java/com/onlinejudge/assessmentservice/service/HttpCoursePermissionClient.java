@@ -14,7 +14,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.UUID;
 
-/** Calls the canonical Course v2 authorization endpoint and fails closed. */
+/** Calls the canonical CRS authorization endpoint and distinguishes denial from dependency outage. */
 @Component
 public class HttpCoursePermissionClient implements CoursePermissionClient {
     private final ObjectMapper mapper;
@@ -36,9 +36,8 @@ public class HttpCoursePermissionClient implements CoursePermissionClient {
 
     @Override
     public boolean canManageCourse(String courseId, String userId) {
-        if (courseId == null || userId == null) return false;
-        if (authorizationUri.isBlank() || serviceAuthorization.isBlank()) {
-            throw new CourseAuthorizationUnavailableException("course authorization endpoint is not configured");
+        if (authorizationUri.isBlank() || serviceAuthorization.isBlank() || courseId == null || userId == null) {
+            throw new CourseAuthorizationUnavailableException("CRS authorization is not configured");
         }
         try {
             String path = authorizationUri.replace("{courseId}", encode(courseId)).replace("{userId}", encode(userId));
@@ -50,20 +49,31 @@ public class HttpCoursePermissionClient implements CoursePermissionClient {
                     .header("X-OnlineJudge-Service-Authorization", serviceAuthorization)
                     .GET().build();
             HttpResponse<String> response = http.send(request, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() == 401 || response.statusCode() == 403) {
+                return false;
+            }
             if (response.statusCode() != 200) {
-                throw new CourseAuthorizationUnavailableException(
-                        "course authorization responded with HTTP " + response.statusCode());
+                throw new CourseAuthorizationUnavailableException("CRS authorization returned HTTP " + response.statusCode());
             }
             JsonNode decision = mapper.readTree(response.body());
-            return decision.path("allowed").asBoolean(false)
-                    && courseId.equals(decision.path("courseId").asText())
-                    && userId.equals(decision.path("userId").asText())
-                    && "MANAGE".equals(decision.path("action").asText())
-                    && decision.path("memberVersion").asLong(0) >= 1;
+            if (decision == null || !decision.has("allowed") || !decision.has("courseId")
+                    || !decision.has("userId") || !decision.has("action") || !decision.has("memberVersion")
+                    || !decision.path("allowed").isBoolean() || !decision.path("courseId").isTextual()
+                    || !decision.path("userId").isTextual() || !decision.path("action").isTextual()
+                    || !decision.path("memberVersion").isIntegralNumber()) {
+                throw new CourseAuthorizationUnavailableException("CRS authorization response is malformed");
+            }
+            if (!courseId.equals(decision.path("courseId").asText())
+                    || !userId.equals(decision.path("userId").asText())
+                    || !"MANAGE".equals(decision.path("action").asText())
+                    || decision.path("memberVersion").asLong(0) < 1) {
+                throw new CourseAuthorizationUnavailableException("CRS authorization response does not match the request");
+            }
+            return decision.path("allowed").asBoolean(false);
         } catch (CourseAuthorizationUnavailableException unavailable) {
             throw unavailable;
         } catch (Exception unavailable) {
-            throw new CourseAuthorizationUnavailableException("course authorization is unavailable", unavailable);
+            throw new CourseAuthorizationUnavailableException("CRS authorization is unavailable", unavailable);
         }
     }
 

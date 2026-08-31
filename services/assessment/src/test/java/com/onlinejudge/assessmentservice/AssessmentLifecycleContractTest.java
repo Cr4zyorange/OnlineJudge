@@ -50,6 +50,8 @@ class AssessmentLifecycleContractTest {
         jdbc.update("DELETE FROM assessment_homework_submission");
         jdbc.update("DELETE FROM assessment_lab_evaluation_result");
         jdbc.update("DELETE FROM assessment_lab_testcase");
+        jdbc.update("DELETE FROM assessment_lab_score_change_log");
+        jdbc.update("DELETE FROM assessment_lab_score");
         jdbc.update("DELETE FROM assessment_lab_submission");
         jdbc.update("DELETE FROM assessment_submission");
         jdbc.update("DELETE FROM assessment_lab_experiment");

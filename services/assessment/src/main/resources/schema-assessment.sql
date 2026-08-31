@@ -157,3 +157,11 @@ CREATE TABLE IF NOT EXISTS assessment_lab_score (
   scored_at TIMESTAMP NOT NULL, updated_at TIMESTAMP NOT NULL,
   INDEX idx_assessment_lab_score_lab (lab_id)
 );
+CREATE TABLE IF NOT EXISTS assessment_lab_score_change_log (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY, submission_id VARCHAR(36) NOT NULL,
+  old_final_score DECIMAL(10,2) NOT NULL, new_final_score DECIMAL(10,2) NOT NULL,
+  reason VARCHAR(500) NOT NULL, operator_id VARCHAR(80) NOT NULL, created_at TIMESTAMP NOT NULL,
+  INDEX idx_assessment_lab_score_change_log_submission (submission_id),
+  CONSTRAINT fk_assessment_lab_score_change_log_score FOREIGN KEY (submission_id)
+    REFERENCES assessment_lab_score(submission_id) ON DELETE CASCADE
+);

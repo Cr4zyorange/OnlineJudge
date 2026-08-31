@@ -57,6 +57,15 @@ public class LabEvaluationController {
     @GetMapping("/{labId}/submissions/{submissionId}/result")
     public Map<String, Object> result(@PathVariable long labId, @PathVariable String submissionId,
             @RequestAttribute("assessment.currentUser") CurrentUser user) {
+        return evaluationResult(labId, submissionId, user, false);
+    }
+
+    /**
+     * Builds the passive evaluation projection. Aggregated student results allow
+     * manual LABs to have no task, while the dedicated result endpoint keeps its
+     * historical not-found contract for an uncreated evaluation task.
+     */
+    private Map<String, Object> evaluationResult(long labId, String submissionId, CurrentUser user, boolean allowMissingTask) {
         LabExperimentService.LabSummary lab;
         try { lab = labs.find(labId); }
         catch (java.util.NoSuchElementException missing) { throw new ResponseStatusException(HttpStatus.NOT_FOUND, "LAB does not exist", missing); }
@@ -69,17 +78,22 @@ public class LabEvaluationController {
         boolean manager = (user.hasRole("TEACHER") || user.hasRole("ADMIN")) && coursePermissions.canManageCourse(lab.courseId(), user.id());
         if (!owner && !manager) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "LAB result access is restricted");
         if (!manager && !courseMembers.isActive(lab.courseId(), user.id())) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "active course membership is required");
-        EvaluationTask task = tasks.findBySubmission(submissionId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "evaluation task does not exist"));
+        EvaluationTask task = tasks.findBySubmission(submissionId).orElse(null);
+        if (task == null && !allowMissingTask) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "evaluation task does not exist");
+        }
+        String persistedStatus = jdbc.query("SELECT evaluation_status FROM assessment_submission WHERE id = ?",
+                rows -> rows.next() ? rows.getString(1) : "NONE", submissionId);
         Map<String, Object> response = new LinkedHashMap<>();
-        response.put("taskId", task.id());
+        response.put("taskId", task == null ? null : task.id());
         response.put("submissionId", submissionId);
-        response.put("evaluationStatus", task.resultStatus() == null ? "PENDING" : task.resultStatus());
-        response.put("state", task.state().name());
+        response.put("evaluationStatus", task == null ? (persistedStatus == null ? "NONE" : persistedStatus)
+                : task.resultStatus() == null ? "PENDING" : task.resultStatus());
+        response.put("state", task == null ? "NONE" : task.state().name());
         boolean scoresVisible = manager || scoresPublished(lab);
         response.put("score", scoresVisible ? submission.autoScore() : null);
         response.put("fullScore", scoresVisible ? lab.maxScore() : null);
-        response.put("evaluationVersion", task.generation());
+        response.put("evaluationVersion", task == null ? null : task.generation());
         List<Map<String, Object>> caseResults = jdbc.query("""
                 SELECT result.testcase_id, result.passed, result.score, result.actual_output, result.message,
                        testcase.input_text, testcase.expected_output, testcase.order_num, testcase.is_public
@@ -212,8 +226,10 @@ public class LabEvaluationController {
         response.put("status", lab.status());
         response.put("publishedAt", lab.publishedAt());
         boolean scoresVisible = manager || scoresPublished(lab);
-        response.put("submission", scoresVisible ? submissionDetail(labId, submissionId, user) : null);
-        response.put("evaluationResult", scoresVisible ? result(labId, submissionId, user) : null);
+        // The aggregate always exposes the submission and public testcase feedback;
+        // only score-bearing fields are gated until the teacher releases them.
+        response.put("submission", submissionDetail(labId, submissionId, user));
+        response.put("evaluationResult", evaluationResult(labId, submissionId, user, true));
         response.put("latestScore", scoresVisible ? jdbc.query("""
                 SELECT report_id, auto_score, report_score, manual_score, final_score, comment, scored_at, updated_at
                   FROM assessment_lab_score
@@ -265,6 +281,16 @@ public class LabEvaluationController {
         if (request == null || request.finalScore() == null || request.finalScore().signum() < 0 || request.finalScore().compareTo(lab.maxScore()) > 0) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "finalScore must be within the LAB score range");
         }
+        BigDecimal previousFinalScore = jdbc.query("SELECT final_score FROM assessment_lab_score WHERE submission_id = ?",
+                rows -> rows.next() ? rows.getBigDecimal(1) : null, submissionId);
+        String changeReason = request.changeReason() == null ? null : request.changeReason().trim();
+        if (changeReason != null && changeReason.length() > 500) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "changeReason must be at most 500 characters");
+        }
+        boolean scoreChanged = previousFinalScore != null && previousFinalScore.compareTo(request.finalScore()) != 0;
+        if (scoreChanged && (changeReason == null || changeReason.isBlank())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "changeReason is required when changing an existing score");
+        }
         Instant now = Instant.now();
         jdbc.update("""
                 INSERT INTO assessment_lab_score (submission_id, lab_id, report_id, auto_score, report_score, manual_score, final_score, comment, scored_at, updated_at)
@@ -273,6 +299,13 @@ public class LabEvaluationController {
                     final_score = VALUES(final_score), comment = VALUES(comment), updated_at = VALUES(updated_at)
                 """, submissionId, labId, submission.get("autoScore"), request.reportScore(), request.manualScore(), request.finalScore(), request.comment(), java.sql.Timestamp.from(now), java.sql.Timestamp.from(now));
         jdbc.update("UPDATE assessment_lab_submission SET final_score = ?, submit_status = 'SCORED' WHERE submission_id = ? AND lab_id = ?", request.finalScore(), submissionId, labId);
+        if (scoreChanged) {
+            jdbc.update("""
+                    INSERT INTO assessment_lab_score_change_log
+                        (submission_id, old_final_score, new_final_score, reason, operator_id, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    """, submissionId, previousFinalScore, request.finalScore(), changeReason, user.id(), java.sql.Timestamp.from(now));
+        }
         if (grades != null && outbox != null && scoresPublished(lab)) {
             long version = grades.upsertScored("LAB", Long.toString(labId), lab.courseId(), (String) submission.get("studentId"), request.finalScore(), lab.maxScore(), now);
             outbox.append("assessment.source-grade.changed.v2", "assessment-source-grade", "LAB:" + labId + ":" + submission.get("studentId"), version, submissionId,
@@ -289,7 +322,7 @@ public class LabEvaluationController {
                     response.put("manualScore", rs.getBigDecimal("manual_score"));
                     response.put("finalScore", rs.getBigDecimal("final_score"));
                     response.put("comment", rs.getString("comment"));
-                    response.put("hasChangeLogs", false);
+                    response.put("hasChangeLogs", jdbc.queryForObject("SELECT COUNT(*) FROM assessment_lab_score_change_log WHERE submission_id = ?", Integer.class, submissionId) > 0);
                     response.put("scoredAt", rs.getTimestamp("scored_at").toInstant());
                     response.put("updatedAt", rs.getTimestamp("updated_at").toInstant());
                     return response;
