@@ -338,9 +338,13 @@ class HomeworkWorkflowContractTest {
                 .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
         String submissionId = mapper.readTree(submitted).path("submissionId").asText();
         String taskId = mapper.readTree(submitted).path("taskId").asText();
-        worker.runOne("homework-worker-success-" + evaluationStatus, task -> new AssessmentWorker.EvaluationOutcome(
+        assertThat(worker.runOne("homework-worker-success-" + evaluationStatus, task -> new AssessmentWorker.EvaluationOutcome(
                 true, evaluationStatus, "ACCEPTED".equals(evaluationStatus) ? new BigDecimal("100") : BigDecimal.ZERO,
-                new BigDecimal("100")));
+                new BigDecimal("100"))))
+                .hasValueSatisfying(completed -> {
+                    assertThat(completed.state().name()).isEqualTo("SUCCEEDED");
+                    assertThat(completed.resultStatus()).isEqualTo(evaluationStatus);
+                });
 
         mockMvc.perform(post("/api/v1/submissions/{submissionId}/reevaluate", submissionId)
                         .header("Authorization", "Bearer " + teacherToken)
