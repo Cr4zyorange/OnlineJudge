@@ -92,6 +92,17 @@ public class EvaluationTaskRepository {
                 """, Timestamp.from(now), requestedBy, Timestamp.from(now), Timestamp.from(now), id) == 1;
     }
 
+    /** API-HWK-12 accepts failed work and the successful ACCEPTED/WRONG_ANSWER terminal states. */
+    public boolean manualReplayHomework(String id, String requestedBy, Instant now) {
+        return jdbc.update("""
+                UPDATE evaluation_task SET state = 'PENDING', result_status = NULL, next_attempt_at = ?, lease_owner = NULL,
+                    lease_until = NULL, generation = generation + 1, manual_replay_count = manual_replay_count + 1,
+                    manual_replayed_by = ?, manual_replayed_at = ?, updated_at = ?
+                 WHERE id = ? AND source_type = 'HWK'
+                   AND (state = 'FAILED' OR (state = 'SUCCEEDED' AND result_status IN ('ACCEPTED', 'WRONG_ANSWER')))
+                """, Timestamp.from(now), requestedBy, Timestamp.from(now), Timestamp.from(now), id) == 1;
+    }
+
     public Optional<EvaluationTask> find(String id) {
         List<EvaluationTask> rows = jdbc.query("""
                 SELECT id, submission_id, source_type, source_id, course_id, student_id, state, generation,

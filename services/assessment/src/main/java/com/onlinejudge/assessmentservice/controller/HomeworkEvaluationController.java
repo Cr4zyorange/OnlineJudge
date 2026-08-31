@@ -75,12 +75,20 @@ public class HomeworkEvaluationController {
         }
         EvaluationTask task = tasks.findBySubmission(submissionId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "evaluation not found"));
+        boolean canonicalHomeworkTask = "HWK".equals(task.sourceType()) && jdbc.queryForObject("""
+                SELECT COUNT(*) FROM assessment_homework_submission hs
+                  JOIN assessment_homework h ON h.id = hs.homework_id
+                 WHERE hs.submission_id = ? AND h.type = 'CODE'
+                """, Integer.class, submissionId) == 1;
+        if (!canonicalHomeworkTask) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "homework evaluation not found");
+        }
         boolean managerRole = user.hasRole("TEACHER") || user.hasRole("ASSISTANT");
         if (!managerRole || !coursePermissions.canManageCourse(task.courseId(), user.id())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "course management permission is required");
         }
-        if (!tasks.manualReplay(task.id(), user.id(), java.time.Instant.now())) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "only a terminal failed evaluation can be replayed");
+        if (!tasks.manualReplayHomework(task.id(), user.id(), java.time.Instant.now())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "only a terminal homework evaluation can be replayed");
         }
         EvaluationTask replayed = tasks.find(task.id()).orElseThrow();
         return Map.of("submissionId", submissionId, "taskId", replayed.id(), "taskState", replayed.state().name(),
