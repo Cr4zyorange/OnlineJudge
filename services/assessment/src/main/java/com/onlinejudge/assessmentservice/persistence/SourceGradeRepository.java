@@ -51,11 +51,25 @@ public class SourceGradeRepository {
     }
     /** A snapshot older than this cannot be reconstructed after retention or a schema upgrade. */
     public OptionalLong firstRetainedSnapshotVersion(String courseId, String sourceType, String sourceId) {
+        Long sourceFloor = jdbc.query("""
+                SELECT first_reconstructable_version
+                  FROM assessment_source_grade_snapshot
+                 WHERE course_id=? AND source_type=? AND source_id=?
+                """, (rs, ignored) -> rs.getLong(1), courseId, sourceType, sourceId)
+                .stream().findFirst().orElse(null);
         List<Long> versions = jdbc.query("""
                 SELECT MIN(snapshot_version) FROM assessment_source_grade_revision
                  WHERE course_id=? AND source_type=? AND source_id=?
                 """, (rs, ignored) -> rs.getObject(1, Long.class), courseId, sourceType, sourceId);
-        return versions.isEmpty() || versions.getFirst() == null ? OptionalLong.empty() : OptionalLong.of(versions.getFirst());
+        Long firstRevision = versions.isEmpty() ? null : versions.getFirst();
+        if (firstRevision == null) {
+            // A restart while the upgrade backfill is unavailable must fail closed:
+            // accepting an earlier token would turn a non-empty Grade projection into
+            // an apparently valid empty page.
+            long current = snapshotVersion(courseId, sourceType, sourceId);
+            return sourceFloor == null ? OptionalLong.of(current) : OptionalLong.of(Math.max(sourceFloor, current));
+        }
+        return OptionalLong.of(sourceFloor == null ? firstRevision : Math.max(sourceFloor, firstRevision));
     }
     public long count(String courseId, String sourceType, String sourceId, long snapshotVersion) {
         return jdbc.queryForObject("""

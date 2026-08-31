@@ -1,5 +1,6 @@
 package com.onlinejudge.assessmentservice.controller;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import com.onlinejudge.assessmentservice.security.CurrentUser;
 import com.onlinejudge.assessmentservice.service.CoursePermissionClient;
 import com.onlinejudge.assessmentservice.service.HomeworkService;
@@ -28,6 +29,8 @@ import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.UUID;
 import java.io.UncheckedIOException;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1")
@@ -47,10 +50,10 @@ public class HomeworkController {
 
     @PostMapping(path = "/homeworks/{homeworkId}/submissions", consumes = "application/json")
     @ResponseStatus(HttpStatus.CREATED)
-    public HomeworkSubmissionService.SubmittedHomework submit(@PathVariable long homeworkId,
+    public Map<String, Object> submit(@PathVariable long homeworkId,
             @Valid @RequestBody SubmitHomeworkRequest request,
             @RequestAttribute("assessment.currentUser") CurrentUser user, HttpServletRequest http) {
-        requireRequestId(http);
+        requestId(http);
         if (!user.hasRole("STUDENT")) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "student role is required");
         HomeworkService.HomeworkSummary homework;
         try {
@@ -62,7 +65,24 @@ public class HomeworkController {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "active course student membership is required");
         }
         try {
-            return submissions.submit(homeworkId, user.id(), request.code(), request.language());
+            HomeworkSubmissionService.SubmittedHomework submitted = submissions.submit(homeworkId, user.id(),
+                    request.codeText(), request.language());
+            Map<String, Object> data = new LinkedHashMap<>();
+            data.put("submissionId", submitted.publicSubmissionId());
+            data.put("homeworkId", submitted.homeworkId());
+            data.put("studentId", user.id());
+            data.put("submitType", "CODE");
+            data.put("language", request.language());
+            data.put("submitStatus", submitted.submitStatus());
+            data.put("evaluationStatus", submitted.evaluationStatus());
+            data.put("reviewStatus", "UNREVIEWED");
+            data.put("autoScore", null);
+            data.put("manualScore", null);
+            data.put("finalScore", null);
+            data.put("version", submitted.version());
+            data.put("final", true);
+            data.put("submittedAt", submitted.submittedAt());
+            return success(data);
         } catch (NoSuchElementException missing) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "homework not found", missing);
         } catch (IllegalArgumentException invalid) {
@@ -143,6 +163,25 @@ public class HomeworkController {
         return requestId;
     }
 
+    private static String requestId(HttpServletRequest request) {
+        String requestId = request.getHeader("X-Request-Id");
+        if (requestId == null || requestId.isBlank()) return UUID.randomUUID().toString();
+        try {
+            UUID.fromString(requestId);
+            return requestId;
+        } catch (IllegalArgumentException invalid) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "X-Request-Id must be a UUID", invalid);
+        }
+    }
+
+    private static Map<String, Object> success(Map<String, Object> data) {
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("code", 0);
+        response.put("message", "success");
+        response.put("data", data);
+        return response;
+    }
+
     public record CreateHomeworkRequest(@NotBlank String courseId, @NotBlank String title, String description,
                                         @NotBlank String type, @NotNull Instant deadline,
                                         @NotNull @DecimalMin(value = "0", inclusive = false) BigDecimal totalScore,
@@ -164,5 +203,6 @@ public class HomeworkController {
         }
     }
 
-    public record SubmitHomeworkRequest(@NotBlank String code, @NotBlank String language) { }
+    public record SubmitHomeworkRequest(@JsonAlias({"code", "codeText"}) @NotBlank String codeText,
+                                        @NotBlank String language) { }
 }

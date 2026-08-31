@@ -42,6 +42,8 @@ class IdentitySecurityVersionProjectionTest {
         jdbc.update("DELETE FROM assessment_identity_security_version_gap");
         jdbc.update("DELETE FROM assessment_identity_security_version");
         jdbc.update("DELETE FROM assessment_course_member_projection");
+        jdbc.update("DELETE FROM assessment_homework_review_log");
+        jdbc.update("DELETE FROM assessment_homework_evaluation");
         jdbc.update("DELETE FROM evaluation_task");
         jdbc.update("DELETE FROM assessment_homework_submission");
         jdbc.update("DELETE FROM assessment_submission");

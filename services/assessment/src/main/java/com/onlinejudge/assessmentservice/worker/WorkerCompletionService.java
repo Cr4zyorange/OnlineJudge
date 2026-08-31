@@ -52,6 +52,7 @@ class WorkerCompletionService {
                          WHERE submission_id = ?
                         """, outcome.status(), outcome.successful() ? outcome.score() : null,
                         outcome.successful() ? outcome.score() : null, task.submissionId());
+                appendHomeworkEvaluation(task, outcome, finished);
             }
         }
         outbox.append("assessment.evaluation.completed.v2", "assessment-submission", task.submissionId(), task.generation(), task.id(),
@@ -61,6 +62,16 @@ class WorkerCompletionService {
             outbox.append("assessment.source-grade.changed.v2", "assessment-source-grade", task.sourceType() + ":" + task.sourceId() + ":" + task.studentId(), version, task.id(),
                     Map.of("courseId", task.courseId(), "sourceType", task.sourceType(), "sourceId", task.sourceId(), "studentId", task.studentId(), "score", outcome.score(), "fullScore", outcome.fullScore(), "status", "SCORED", "sourceVersion", version), finished);
         }
+    }
+    private void appendHomeworkEvaluation(EvaluationTask task, AssessmentWorker.EvaluationOutcome outcome, Instant finished) {
+        jdbc.update("""
+                INSERT INTO assessment_homework_evaluation
+                    (task_id, task_generation, submission_id, homework_id, student_id, evaluation_type, status,
+                     score, full_score, started_at, finished_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, task.id(), task.generation(), task.submissionId(), Long.parseLong(task.sourceId()), task.studentId(),
+                task.generation() > 1 ? "REJUDGE" : "CODE_JUDGE", outcome.status(),
+                outcome.successful() ? outcome.score() : null, outcome.fullScore(), finished, finished);
     }
     private boolean retryable(String status) { return "SANDBOX_TIMEOUT".equals(status) || "SANDBOX_ERROR".equals(status) || "SYSTEM_ERROR".equals(status); }
 }

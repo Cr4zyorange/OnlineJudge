@@ -55,6 +55,8 @@ class HomeworkWorkflowContractTest {
     @BeforeEach
     void clean() {
         jdbc.update("DELETE FROM assessment_event_outbox");
+        jdbc.update("DELETE FROM assessment_homework_review_log");
+        jdbc.update("DELETE FROM assessment_homework_evaluation");
         jdbc.update("DELETE FROM assessment_source_grade_snapshot");
         jdbc.update("DELETE FROM assessment_source_grade");
         jdbc.update("DELETE FROM evaluation_task");
@@ -123,14 +125,42 @@ class HomeworkWorkflowContractTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"code\":\"print(input().upper())\",\"language\":\"python\"}"))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.evaluationStatus").value("PENDING"))
-                .andExpect(jsonPath("$.version").value(1))
+                .andExpect(jsonPath("$.data.evaluationStatus").value("PENDING"))
+                .andExpect(jsonPath("$.data.version").value(1))
                 .andReturn().getResponse().getContentAsString();
 
-        String submissionId = mapper.readTree(submitted).path("submissionId").asText();
+        String submissionId = privateSubmissionId(submitted);
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM assessment_submission WHERE id = ? AND source_type = 'HWK'", Integer.class, submissionId)).isEqualTo(1);
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM evaluation_task WHERE submission_id = ? AND state = 'PENDING'", Integer.class, submissionId)).isEqualTo(1);
         assertThat(jdbc.queryForObject("SELECT is_final FROM assessment_homework_submission WHERE submission_id = ?", Boolean.class, submissionId)).isTrue();
+    }
+
+    @Test
+    void frontendCodeTextSubmissionNeedsNoRequestIdAndReceivesTheStandardSuccessEnvelope() throws Exception {
+        String teacherId = "teacher-315-" + UUID.randomUUID();
+        String studentId = "student-315-" + UUID.randomUUID();
+        long homeworkId = createAndPublishCodeHomework(teacherId, "frontend-submit-315-" + UUID.randomUUID(), true,
+                false, Instant.parse("2030-01-01T12:00:00Z"));
+        jdbc.update("INSERT INTO assessment_course_member_projection (course_id, user_id, membership_status, member_version) VALUES ('course-315', ?, 'ACTIVE', 1)", studentId);
+        String studentToken = TestJwtFactory.userToken(KEY, "homework-workflow-kid", studentId, List.of("STUDENT"));
+
+        String submitted = mockMvc.perform(post("/api/v1/homeworks/{homeworkId}/submissions", homeworkId)
+                        .header("Authorization", "Bearer " + studentToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"codeText\":\"print('frontend')\",\"language\":\"python\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.code").value(0))
+                .andExpect(jsonPath("$.data.homeworkId").value(homeworkId))
+                .andExpect(jsonPath("$.data.submissionId").isNumber())
+                .andExpect(jsonPath("$.data.evaluationStatus").value("PENDING"))
+                .andReturn().getResponse().getContentAsString();
+        long publicSubmissionId = publicSubmissionId(submitted);
+        mockMvc.perform(get("/api/v1/submissions/{submissionId}/evaluation", publicSubmissionId)
+                        .header("Authorization", "Bearer " + studentToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(0))
+                .andExpect(jsonPath("$.data.submissionId").value(publicSubmissionId))
+                .andExpect(jsonPath("$.data.taskState").value("PENDING"));
     }
 
     @Test
@@ -148,8 +178,8 @@ class HomeworkWorkflowContractTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"code\":\"print(input().upper())\",\"language\":\"python\"}"))
                 .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
-        String submissionId = mapper.readTree(submitted).path("submissionId").asText();
-        String taskId = mapper.readTree(submitted).path("taskId").asText();
+        String submissionId = privateSubmissionId(submitted);
+        String taskId = taskIdForSubmission(submissionId);
 
         worker.runOne("homework-worker-315", task -> new AssessmentWorker.EvaluationOutcome(
                 true, "ACCEPTED", new BigDecimal("80"), new BigDecimal("100")));
@@ -158,9 +188,9 @@ class HomeworkWorkflowContractTest {
                         .get("/api/v1/submissions/{submissionId}/evaluation", submissionId)
                         .header("Authorization", "Bearer " + studentToken))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.taskId").value(taskId))
-                .andExpect(jsonPath("$.evaluationStatus").value("ACCEPTED"))
-                .andExpect(jsonPath("$.score").value(80));
+                .andExpect(jsonPath("$.data.taskId").value(taskId))
+                .andExpect(jsonPath("$.data.evaluationStatus").value("ACCEPTED"))
+                .andExpect(jsonPath("$.data.score").value(80));
         assertThat(jdbc.queryForObject("SELECT evaluation_status FROM assessment_homework_submission WHERE submission_id = ?", String.class, submissionId)).isEqualTo("ACCEPTED");
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM assessment_source_grade WHERE source_type = 'HWK' AND source_id = ? AND student_id = ?", Integer.class, Long.toString(homeworkId), studentId)).isZero();
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM assessment_event_outbox WHERE event_type = 'assessment.source-grade.changed.v2' AND aggregate_id = ?", Integer.class, "HWK:" + homeworkId + ":" + studentId)).isZero();
@@ -259,7 +289,7 @@ class HomeworkWorkflowContractTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"code\":\"print('result')\",\"language\":\"python\"}"))
                 .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
-        String submissionId = mapper.readTree(submitted).path("submissionId").asText();
+        String submissionId = privateSubmissionId(submitted);
         worker.runOne("homework-worker-owner-read", task -> new AssessmentWorker.EvaluationOutcome(
                 true, "ACCEPTED", new BigDecimal("80"), new BigDecimal("100")));
         when(coursePermissions.canManageCourse("course-315", studentId))
@@ -268,8 +298,8 @@ class HomeworkWorkflowContractTest {
         mockMvc.perform(get("/api/v1/submissions/{submissionId}/evaluation", submissionId)
                         .header("Authorization", "Bearer " + studentToken))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.evaluationStatus").value("ACCEPTED"))
-                .andExpect(jsonPath("$.score").value(80));
+                .andExpect(jsonPath("$.data.evaluationStatus").value("ACCEPTED"))
+                .andExpect(jsonPath("$.data.score").value(80));
     }
 
     @Test
@@ -314,16 +344,16 @@ class HomeworkWorkflowContractTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"code\":\"print('failure')\",\"language\":\"python\"}"))
                 .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
-        String submissionId = mapper.readTree(submitted).path("submissionId").asText();
-        String taskId = mapper.readTree(submitted).path("taskId").asText();
+        String submissionId = privateSubmissionId(submitted);
+        String taskId = taskIdForSubmission(submissionId);
         worker.runOne("homework-worker-failure", task -> AssessmentWorker.EvaluationOutcome.failed("SANDBOX_UNCONFIGURED"));
 
         mockMvc.perform(post("/api/v1/submissions/{submissionId}/reevaluate", submissionId)
                         .header("Authorization", "Bearer " + teacherToken)
                         .header("X-Request-Id", UUID.randomUUID().toString()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.taskId").value(taskId))
-                .andExpect(jsonPath("$.taskState").value("PENDING"));
+                .andExpect(jsonPath("$.data.taskId").value(taskId))
+                .andExpect(jsonPath("$.data.taskState").value("PENDING"));
 
         assertThat(jdbc.queryForObject("SELECT manual_replay_count FROM evaluation_task WHERE id = ?", Integer.class, taskId)).isEqualTo(1);
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM assessment_source_grade WHERE source_id = ?", Integer.class,
@@ -345,8 +375,8 @@ class HomeworkWorkflowContractTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"code\":\"print('result')\",\"language\":\"python\"}"))
                 .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
-        String submissionId = mapper.readTree(submitted).path("submissionId").asText();
-        String taskId = mapper.readTree(submitted).path("taskId").asText();
+        String submissionId = privateSubmissionId(submitted);
+        String taskId = taskIdForSubmission(submissionId);
         assertThat(worker.runOne("homework-worker-success-" + evaluationStatus, task -> new AssessmentWorker.EvaluationOutcome(
                 true, evaluationStatus, "ACCEPTED".equals(evaluationStatus) ? new BigDecimal("100") : BigDecimal.ZERO,
                 new BigDecimal("100"))))
@@ -359,16 +389,16 @@ class HomeworkWorkflowContractTest {
                         .header("Authorization", "Bearer " + teacherToken)
                         .header("X-Request-Id", UUID.randomUUID().toString()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.taskId").value(taskId))
-                .andExpect(jsonPath("$.taskState").value("PENDING"));
+                .andExpect(jsonPath("$.data.taskId").value(taskId))
+                .andExpect(jsonPath("$.data.taskState").value("PENDING"));
 
         mockMvc.perform(get("/api/v1/submissions/{submissionId}/evaluation", submissionId)
                         .header("Authorization", "Bearer " + teacherToken))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.taskState").value("PENDING"))
-                .andExpect(jsonPath("$.evaluationStatus").value("PENDING"))
-                .andExpect(jsonPath("$.score").value(org.hamcrest.Matchers.nullValue()))
-                .andExpect(jsonPath("$.finalScore").value(org.hamcrest.Matchers.nullValue()));
+                .andExpect(jsonPath("$.data.taskState").value("PENDING"))
+                .andExpect(jsonPath("$.data.evaluationStatus").value("PENDING"))
+                .andExpect(jsonPath("$.data.score").value(org.hamcrest.Matchers.nullValue()))
+                .andExpect(jsonPath("$.data.finalScore").value(org.hamcrest.Matchers.nullValue()));
 
         assertThat(jdbc.queryForObject("SELECT manual_replay_count FROM evaluation_task WHERE id = ?", Integer.class, taskId))
                 .isEqualTo(1);
@@ -376,6 +406,37 @@ class HomeworkWorkflowContractTest {
                 submissionId)).isEqualTo("PENDING");
         assertThat(jdbc.queryForObject("SELECT evaluation_status FROM assessment_homework_submission WHERE submission_id = ?",
                 String.class, submissionId)).isEqualTo("PENDING");
+    }
+
+    @Test
+    void reevaluationAppendsAnImmutableEvaluationRecordAndARejudgeAuditEntry() throws Exception {
+        String teacherId = "teacher-315-" + UUID.randomUUID();
+        String studentId = "student-315-" + UUID.randomUUID();
+        long homeworkId = createAndPublishCodeHomework(teacherId, "evaluation-history-315-" + UUID.randomUUID(), true,
+                false, Instant.parse("2030-01-01T12:00:00Z"));
+        jdbc.update("INSERT INTO assessment_course_member_projection (course_id, user_id, membership_status, member_version) VALUES ('course-315', ?, 'ACTIVE', 1)", studentId);
+        String studentToken = TestJwtFactory.userToken(KEY, "homework-workflow-kid", studentId, List.of("STUDENT"));
+        String teacherToken = TestJwtFactory.userToken(KEY, "homework-workflow-kid", teacherId, List.of("TEACHER"));
+        String submitted = mockMvc.perform(post("/api/v1/homeworks/{homeworkId}/submissions", homeworkId)
+                        .header("Authorization", "Bearer " + studentToken).header("X-Request-Id", UUID.randomUUID().toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"code\":\"print('history')\",\"language\":\"python\"}"))
+                .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+        String submissionId = privateSubmissionId(submitted);
+        worker.runOne("homework-worker-evaluation-history", task -> new AssessmentWorker.EvaluationOutcome(
+                true, "ACCEPTED", new BigDecimal("95"), new BigDecimal("100")));
+
+        mockMvc.perform(post("/api/v1/submissions/{submissionId}/reevaluate", submissionId)
+                        .header("Authorization", "Bearer " + teacherToken)
+                        .header("X-Request-Id", UUID.randomUUID().toString()))
+                .andExpect(status().isOk());
+
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM assessment_homework_evaluation WHERE submission_id = ? AND status = 'ACCEPTED'", Integer.class, submissionId)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM assessment_homework_review_log WHERE submission_id = ? AND operation_type = 'REJUDGE'", Integer.class, submissionId)).isEqualTo(1);
+        mockMvc.perform(get("/api/v1/submissions/{submissionId}/evaluation", submissionId)
+                        .header("Authorization", "Bearer " + teacherToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.evaluationHistory[0].status").value("ACCEPTED"));
     }
 
     @Test
@@ -392,7 +453,7 @@ class HomeworkWorkflowContractTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"code\":\"print('result')\",\"language\":\"python\"}"))
                 .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
-        String submissionId = mapper.readTree(submitted).path("submissionId").asText();
+        String submissionId = privateSubmissionId(submitted);
         worker.runOne("homework-worker-first-success", task -> new AssessmentWorker.EvaluationOutcome(
                 true, "ACCEPTED", new BigDecimal("88"), new BigDecimal("100")));
 
@@ -401,7 +462,7 @@ class HomeworkWorkflowContractTest {
                         .header("Authorization", "Bearer " + teacherToken)
                         .header("X-Request-Id", requestId))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.taskState").value("PENDING"));
+                .andExpect(jsonPath("$.data.taskState").value("PENDING"));
 
         assertNoSourceGrade(homeworkId, studentId);
 
@@ -410,10 +471,10 @@ class HomeworkWorkflowContractTest {
         mockMvc.perform(get("/api/v1/submissions/{submissionId}/evaluation", submissionId)
                         .header("Authorization", "Bearer " + teacherToken))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.taskState").value("FAILED"))
-                .andExpect(jsonPath("$.evaluationStatus").value("COMPILE_ERROR"))
-                .andExpect(jsonPath("$.score").value(org.hamcrest.Matchers.nullValue()))
-                .andExpect(jsonPath("$.finalScore").value(org.hamcrest.Matchers.nullValue()));
+                .andExpect(jsonPath("$.data.taskState").value("FAILED"))
+                .andExpect(jsonPath("$.data.evaluationStatus").value("COMPILE_ERROR"))
+                .andExpect(jsonPath("$.data.score").value(org.hamcrest.Matchers.nullValue()))
+                .andExpect(jsonPath("$.data.finalScore").value(org.hamcrest.Matchers.nullValue()));
         assertNoSourceGrade(homeworkId, studentId);
         assertThat(jdbc.queryForObject("""
                 SELECT COUNT(*) FROM assessment_event_outbox
@@ -449,7 +510,7 @@ class HomeworkWorkflowContractTest {
                         .header("Authorization", "Bearer " + teacherToken)
                         .header("X-Request-Id", UUID.randomUUID().toString()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.taskState").value("PENDING"));
+                .andExpect(jsonPath("$.data.taskState").value("PENDING"));
 
         assertCurrentSourceGrade(homeworkId, studentId, "SCORED", new BigDecimal("90"), 1);
         assertThat(jdbc.queryForObject("""
@@ -519,7 +580,21 @@ class HomeworkWorkflowContractTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"code\":\"" + code + "\",\"language\":\"python\"}"))
                 .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
-        return mapper.readTree(submitted).path("submissionId").asText();
+        return privateSubmissionId(submitted);
+    }
+
+    private String privateSubmissionId(String response) throws Exception {
+        long publicSubmissionId = publicSubmissionId(response);
+        return jdbc.queryForObject("SELECT submission_id FROM assessment_homework_submission WHERE public_id = ?",
+                String.class, publicSubmissionId);
+    }
+
+    private long publicSubmissionId(String response) throws Exception {
+        return mapper.readTree(response).path("data").path("submissionId").asLong();
+    }
+
+    private String taskIdForSubmission(String submissionId) {
+        return jdbc.queryForObject("SELECT id FROM evaluation_task WHERE submission_id = ?", String.class, submissionId);
     }
 
     private void assertCurrentSourceGrade(long homeworkId, String studentId, String expectedStatus,

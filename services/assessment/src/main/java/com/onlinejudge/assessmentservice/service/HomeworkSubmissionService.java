@@ -82,9 +82,12 @@ public class HomeworkSubmissionService {
                          evaluation_status, is_final, submitted_at)
                     VALUES (?, ?, ?, ?, ?, ?, 'PENDING', TRUE, ?)
                 """, generic.submissionId(), homeworkId, studentId, version, language, submitStatus, Timestamp.from(now));
+        long publicSubmissionId = jdbc.queryForObject(
+                "SELECT public_id FROM assessment_homework_submission WHERE submission_id = ?", Long.class,
+                generic.submissionId());
         grades.markUngradedIfPresent("HWK", Long.toString(homeworkId), studentId, now)
                 .ifPresent(grade -> appendUngradedEvent(grade, generic.taskId(), now));
-        return new SubmittedHomework(generic.submissionId(), generic.taskId(), homeworkId, version,
+        return new SubmittedHomework(generic.submissionId(), generic.taskId(), publicSubmissionId, homeworkId, version,
                 submitStatus, "PENDING", now);
     }
 
@@ -128,6 +131,6 @@ public class HomeworkSubmissionService {
     private record HomeworkRule(long id, String courseId, String status, Instant deadline, boolean allowResubmit,
                                 boolean allowLateSubmit, String allowedLanguages) { }
 
-    public record SubmittedHomework(String submissionId, String taskId, long homeworkId, int version,
+    public record SubmittedHomework(String submissionId, String taskId, long publicSubmissionId, long homeworkId, int version,
                                     String submitStatus, String evaluationStatus, Instant submittedAt) { }
 }

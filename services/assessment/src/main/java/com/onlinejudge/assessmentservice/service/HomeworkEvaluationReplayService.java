@@ -30,10 +30,13 @@ public class HomeworkEvaluationReplayService {
 
     @Transactional
     public boolean replay(EvaluationTask task, String requestedBy, String requestId, Instant now) {
-        boolean currentHomeworkSubmission = jdbc.queryForObject("""
-                SELECT is_final FROM assessment_homework_submission
+        ReplayTarget target = jdbc.query("""
+                SELECT homework_id, student_id, is_final, evaluation_status, auto_score
+                  FROM assessment_homework_submission
                  WHERE submission_id = ? FOR UPDATE
-                """, Boolean.class, task.submissionId());
+                """, (rs, ignored) -> new ReplayTarget(rs.getLong("homework_id"), rs.getString("student_id"),
+                rs.getBoolean("is_final"), rs.getString("evaluation_status"), rs.getBigDecimal("auto_score")),
+                task.submissionId()).stream().findFirst().orElseThrow();
         if (!tasks.manualReplayHomework(task.id(), requestedBy, now)) {
             return false;
         }
@@ -48,12 +51,21 @@ public class HomeworkEvaluationReplayService {
         if (submissions != 1 || homeworkSubmissions != 1) {
             throw new IllegalStateException("homework replay must update both submission projections");
         }
-        if (currentHomeworkSubmission) {
+        jdbc.update("""
+                INSERT INTO assessment_homework_review_log
+                    (submission_id, homework_id, student_id, operation_type, old_score, new_score, operator_id, reason, created_at)
+                VALUES (?, ?, ?, 'REJUDGE', ?, NULL, ?, ?, ?)
+                """, task.submissionId(), target.homeworkId(), target.studentId(), target.autoScore(), requestedBy,
+                "replayed from " + target.evaluationStatus(), java.sql.Timestamp.from(now));
+        if (target.current()) {
             grades.markUngradedIfPresent(task.sourceType(), task.sourceId(), task.studentId(), now)
                     .ifPresent(grade -> appendUngradedEvent(grade, requestId, now));
         }
         return true;
     }
+
+    private record ReplayTarget(long homeworkId, String studentId, boolean current, String evaluationStatus,
+                                java.math.BigDecimal autoScore) { }
 
     private void appendUngradedEvent(SourceGradeRepository.SourceGrade grade, String requestId, Instant now) {
         Map<String, Object> payload = new LinkedHashMap<>();

@@ -48,6 +48,16 @@ admin_mysql -e 'CREATE DATABASE oj_assessment CHARACTER SET utf8mb4 COLLATE utf8
 # The old deployment has 01's table shape but no version checkpoint.  The
 # runner must record every migration without relying on runtime boot DDL.
 admin_mysql oj_assessment < "$repository_root/database/migrations/assessment/20260831_01_create_assessment_service_tables.sql" >>"$raw_log" 2>&1
+# Simulate a Grade rebuild token issued by the old current-row-only projection.
+# Later migrations must retain a precise reconstruction floor rather than making
+# such a token look like a valid empty source page.
+admin_mysql -Doj_assessment -e "
+  INSERT INTO assessment_source_grade_snapshot (source_type, source_id, course_id, snapshot_version)
+  VALUES ('HWK', 'upgrade-source', 'upgrade-course', 5);
+  INSERT INTO assessment_source_grade
+    (source_type, source_id, course_id, student_id, score, full_score, status, source_version, updated_at)
+  VALUES ('HWK', 'upgrade-source', 'upgrade-course', 'upgrade-student', 90, 100, 'SCORED', 3, UTC_TIMESTAMP());
+" >>"$raw_log" 2>&1
 
 run_runner() {
   MYSQL_HOST=127.0.0.1 MYSQL_PORT="$mysql_port" \
@@ -72,6 +82,10 @@ grep -Fq 'PASS schema=assessment applied=0' <<<"$repeat_output" || fail 'repeat 
 
 history_count="$(admin_mysql -N -Doj_assessment -e 'SELECT COUNT(*) FROM schema_migrations;')"
 [[ "$history_count" == "$expected_migrations" ]] || fail "expected $expected_migrations migration checkpoints, found $history_count"
+snapshot_floor="$(admin_mysql -N -Doj_assessment -e "SELECT first_reconstructable_version FROM assessment_source_grade_snapshot WHERE source_type='HWK' AND source_id='upgrade-source';")"
+[[ "$snapshot_floor" == "5" ]] || fail "expected upgraded source snapshot floor 5, found $snapshot_floor"
+revision_count="$(admin_mysql -N -Doj_assessment -e "SELECT COUNT(*) FROM assessment_source_grade_revision WHERE source_type='HWK' AND source_id='upgrade-source' AND snapshot_version=5;")"
+[[ "$revision_count" == "1" ]] || fail "expected one upgraded source-grade revision at snapshot 5, found $revision_count"
 admin_mysql -e "CREATE USER 'oj_assessment_rw'@'%' IDENTIFIED BY '$runtime_password'; GRANT SELECT, INSERT, UPDATE, DELETE ON oj_assessment.* TO 'oj_assessment_rw'@'%'; FLUSH PRIVILEGES;" >>"$raw_log" 2>&1
 MYSQL_PWD="$runtime_password" mysql --protocol=TCP --host=127.0.0.1 --port="$mysql_port" --user=oj_assessment_rw oj_assessment -e 'SELECT COUNT(*) FROM assessment_submission;' >>"$raw_log" 2>&1
 if MYSQL_PWD="$runtime_password" mysql --protocol=TCP --host=127.0.0.1 --port="$mysql_port" --user=oj_assessment_rw oj_assessment -e 'CREATE TABLE forbidden_runtime_ddl (id INT);' >>"$raw_log" 2>&1; then
