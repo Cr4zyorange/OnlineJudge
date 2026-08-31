@@ -82,12 +82,15 @@ CREATE TABLE IF NOT EXISTS assessment_homework (
 CREATE TABLE IF NOT EXISTS assessment_homework_testcase (
   id BIGINT AUTO_INCREMENT PRIMARY KEY, homework_id BIGINT NOT NULL, input_text TEXT NOT NULL,
   expected_output TEXT NOT NULL, score_weight DECIMAL(10,2) NOT NULL, is_hidden BOOLEAN NOT NULL, sort_order INT NOT NULL,
-  UNIQUE KEY uq_assessment_homework_testcase_order (homework_id, sort_order)
+  UNIQUE KEY uq_assessment_homework_testcase_order (homework_id, sort_order),
+  CONSTRAINT fk_assessment_homework_testcase_homework FOREIGN KEY (homework_id) REFERENCES assessment_homework(id)
 );
 CREATE TABLE IF NOT EXISTS assessment_homework_submission (
   submission_id VARCHAR(36) PRIMARY KEY, homework_id BIGINT NOT NULL, student_id VARCHAR(80) NOT NULL,
   submission_version INTEGER NOT NULL, language VARCHAR(40) NOT NULL, submit_status VARCHAR(20) NOT NULL,
   evaluation_status VARCHAR(32) NOT NULL, auto_score DECIMAL(10,2), final_score DECIMAL(10,2), is_final BOOLEAN NOT NULL,
   submitted_at TIMESTAMP NOT NULL, UNIQUE KEY uq_assessment_homework_submission_version (homework_id, student_id, submission_version),
-  INDEX idx_assessment_homework_submission_student (homework_id, student_id, is_final, submitted_at)
+  INDEX idx_assessment_homework_submission_student (homework_id, student_id, is_final, submitted_at),
+  CONSTRAINT fk_assessment_homework_submission_homework FOREIGN KEY (homework_id) REFERENCES assessment_homework(id),
+  CONSTRAINT fk_assessment_homework_submission_submission FOREIGN KEY (submission_id) REFERENCES assessment_submission(id)
 );
