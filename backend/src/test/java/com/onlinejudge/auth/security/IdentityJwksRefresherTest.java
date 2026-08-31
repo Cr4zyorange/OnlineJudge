@@ -1,6 +1,7 @@
 package com.onlinejudge.auth.security;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.onlinejudge.lrn.security.ServiceJwtVerifier;
 import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.Test;
 
@@ -30,6 +31,7 @@ class IdentityJwksRefresherTest {
         String initialJwks = jwks(initial, "initial-kid");
         String rotatedJwks = jwks(rotated, "rotated-kid");
         IdentityJwksCache cache = new IdentityJwksCache(JSON, "onlinejudge.identity.v2", "onlinejudge.api", initialJwks);
+        ServiceJwtVerifier serviceVerifier = new ServiceJwtVerifier(JSON, "onlinejudge.identity.v2", "learning", initialJwks);
         AtomicReference<String> requestId = new AtomicReference<>();
         HttpServer identity = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         identity.createContext("/.well-known/jwks.json", exchange -> {
@@ -43,6 +45,7 @@ class IdentityJwksRefresherTest {
         try {
             IdentityJwksRefresher refresher = new IdentityJwksRefresher(
                     cache,
+                    serviceVerifier,
                     "http://127.0.0.1:" + identity.getAddress().getPort() + "/.well-known/jwks.json",
                     "refresh-test-request",
                     Duration.ofSeconds(1),
@@ -53,6 +56,8 @@ class IdentityJwksRefresherTest {
             String existingToken = token(rotated, "rotated-kid");
             assertThat(requestId.get()).isEqualTo("refresh-test-request");
             assertThat(cache.verify(existingToken, userId -> 1)).isPresent();
+            assertThat(serviceVerifier.verify("Bearer " + serviceToken(rotated, "rotated-kid")).scopes())
+                    .contains("learning.tasks.read");
 
             identity.stop(0);
             refresher.refresh();
@@ -89,6 +94,20 @@ class IdentityJwksRefresherTest {
                 "sessionId", "cache-test-session", "securityVersion", 1,
                 "iat", now.getEpochSecond(), "exp", now.plusSeconds(300).getEpochSecond(),
                 "iss", "onlinejudge.identity.v2", "aud", "onlinejudge.api"
+        ));
+        Signature signature = Signature.getInstance("SHA256withRSA");
+        signature.initSign(pair.getPrivate());
+        signature.update((header + "." + payload).getBytes(StandardCharsets.US_ASCII));
+        return header + "." + payload + "." + Base64.getUrlEncoder().withoutPadding().encodeToString(signature.sign());
+    }
+
+    private static String serviceToken(KeyPair pair, String kid) throws Exception {
+        String header = encode(Map.of("alg", "RS256", "typ", "JWT", "kid", kid));
+        Instant now = Instant.now();
+        String payload = encode(Map.of(
+                "sub", "course-service", "aud", "learning", "scopes", List.of("learning.tasks.read"),
+                "iat", now.getEpochSecond(), "exp", now.plusSeconds(300).getEpochSecond(),
+                "iss", "onlinejudge.identity.v2"
         ));
         Signature signature = Signature.getInstance("SHA256withRSA");
         signature.initSign(pair.getPrivate());

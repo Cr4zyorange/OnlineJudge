@@ -27,13 +27,15 @@ public class CourseService {
     private final CourseOutboxRepository outbox;
     private final CourseRosterReconciliationRepository reconciliation;
     private final CourseFileStorage fileStorage;
+    private final LearningTaskSummaryClient learningTasks;
 
     public CourseService(CourseRepository courses, CourseOutboxRepository outbox, CourseRosterReconciliationRepository reconciliation,
-                         CourseFileStorage fileStorage) {
+                         CourseFileStorage fileStorage, LearningTaskSummaryClient learningTasks) {
         this.courses = courses;
         this.outbox = outbox;
         this.reconciliation = reconciliation;
         this.fileStorage = fileStorage;
+        this.learningTasks = learningTasks;
     }
 
     @Transactional
@@ -299,15 +301,32 @@ public class CourseService {
     /**
      * API-CRS-22 / CRS-SC-09: course home summary for an authenticated member.
      * Course owns the course and announcement facts; LRN owns recent-task
-     * facts, so the task section intentionally stays at the designed empty
-     * state until a stable internal task-summary contract is added.
+     * facts, so the task section comes from the bounded Course -> LRN internal
+     * contract.  A Learning outage is a 503 LEARNING_TASKS_UNAVAILABLE, never
+     * a fabricated empty task list.
      */
-    public HomeSummaryView homeSummary(long courseId, CurrentUser actor) {
+    public HomeSummaryView homeSummary(long courseId, CurrentUser actor, String requestId) {
         CourseRepository.Course course = course(courseId);
         requireMember(courseId, actor);
+        List<RecentTaskView> tasks;
+        try {
+            tasks = learningTasks.recentTasks(courseId, actor.id(), requestId).stream()
+                    .map(this::recentTaskView)
+                    .toList();
+        } catch (LearningTaskSummaryClient.LearningTasksUnavailableException unavailable) {
+            throw new CourseException(HttpStatus.SERVICE_UNAVAILABLE, "LEARNING_TASKS_UNAVAILABLE",
+                    "recent tasks are temporarily unavailable", true);
+        }
         return new HomeSummaryView(view(course, actor),
                 courses.announcements(courseId).stream().limit(5).map(this::announcementView).toList(),
-                List.of());
+                tasks);
+    }
+
+    private RecentTaskView recentTaskView(LearningTaskSummaryClient.RecentTask task) {
+        return new RecentTaskView(
+                task.taskId(), task.taskType(), task.title(), task.courseId(), task.courseName(),
+                task.deadline(), task.progress(), task.status(), task.actionUrl()
+        );
     }
 
     public List<AnnouncementView> announcements(long courseId, CurrentUser actor) {

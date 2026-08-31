@@ -3,6 +3,25 @@
   "info": { "title": "OnlineJudge Learning Service internal contract", "version": "2.0.0" },
   "x-onlinejudge-service": "learning",
   "paths": {
+    "/internal/v2/learning/tasks/recent": {
+      "get": {
+        "operationId": "getRecentLearningTasks", "x-onlinejudge-timeout-ms": 800,
+        "description": "Bounded recent task summaries for one member in one course, ordered by deadline. The caller must already have verified that userId is an active member of courseId; Learning never trusts a caller-supplied membership claim. A bounded limit of at most 5 is always enforced server-side, and an outage must not be reported as an empty task list.",
+        "security": [{ "serviceJwt": [] }, { "mTLS": [] }],
+        "parameters": [
+          { "name": "X-Request-Id", "in": "header", "required": true, "schema": { "type": "string", "format": "uuid" } },
+          { "name": "courseId", "in": "query", "required": true, "schema": { "type": "integer", "minimum": 1 } },
+          { "name": "userId", "in": "query", "required": true, "schema": { "type": "integer", "minimum": 1 } },
+          { "name": "limit", "in": "query", "required": false, "schema": { "type": "integer", "minimum": 1, "maximum": 5, "default": 5 } }
+        ],
+        "responses": {
+          "200": { "description": "Recent task page", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RecentTaskPage" } } } },
+          "401": { "description": "Missing, invalid, expired, or wrong-audience service JWT; or invalid workload mTLS service identity", "x-onlinejudge-error-codes": ["SERVICE_IDENTITY_INVALID"], "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "403": { "description": "Authenticated service principal lacks the learning.tasks.read scope", "x-onlinejudge-error-codes": ["SERVICE_IDENTITY_FORBIDDEN"], "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "503": { "description": "Learning cannot answer; the caller rejects the user operation without a local task fallback", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      }
+    },
     "/internal/v2/notifications/reconciliation-requests": {
       "post": {
         "operationId": "requestNotificationReconciliation", "x-onlinejudge-timeout-ms": 1000,
@@ -23,7 +42,24 @@
       "Error": { "type": "object", "required": ["code", "message", "requestId", "retryable"], "properties": { "code": { "type": "string" }, "message": { "type": "string" }, "requestId": { "type": "string" }, "retryable": { "type": "boolean" } } },
       "Page": { "type": "object", "required": ["items", "page", "size", "total"], "properties": { "items": { "type": "array", "items": {} }, "page": { "type": "integer" }, "size": { "type": "integer" }, "total": { "type": "integer" } } },
       "ReconciliationRequest": { "type": "object", "required": ["sourceService", "eventId", "reason"], "properties": { "sourceService": { "enum": ["course", "assessment", "grade"] }, "eventId": { "type": "string", "format": "uuid" }, "reason": { "enum": ["DLQ", "PROJECTION_GAP", "OPERATOR_REPLAY"] } } },
-      "ReconciliationAccepted": { "type": "object", "required": ["requestId", "status"], "properties": { "requestId": { "type": "string", "format": "uuid" }, "status": { "const": "ACCEPTED" } } }
+      "ReconciliationAccepted": { "type": "object", "required": ["requestId", "status"], "properties": { "requestId": { "type": "string", "format": "uuid" }, "status": { "const": "ACCEPTED" } } },
+      "RecentTask": { "type": "object", "required": ["taskId", "taskType", "title", "courseId", "courseName", "progress", "status"], "properties": {
+        "taskId": { "type": "integer" },
+        "taskType": { "enum": ["RESOURCE", "EXPERIMENT", "HOMEWORK"] },
+        "title": { "type": "string" },
+        "courseId": { "type": "integer", "minimum": 1 },
+        "courseName": { "type": "string" },
+        "deadline": { "type": ["string", "null"] },
+        "progress": { "type": "integer", "minimum": 0, "maximum": 100 },
+        "status": { "enum": ["NOT_STARTED", "IN_PROGRESS", "COMPLETED", "OVERDUE"] },
+        "actionUrl": { "type": ["string", "null"] }
+      } },
+      "RecentTaskPage": { "type": "object", "required": ["items", "page", "size", "total"], "properties": {
+        "items": { "type": "array", "items": { "$ref": "#/components/schemas/RecentTask" } },
+        "page": { "type": "integer" },
+        "size": { "type": "integer" },
+        "total": { "type": "integer" }
+      } }
     }
   }
 }

@@ -20,7 +20,7 @@ const serviceContracts = {
   ],
   assessment: ['/internal/v2/source-grades'],
   grade: ['/internal/v2/courses/{courseId}/grade-publications'],
-  learning: ['/internal/v2/notifications/reconciliation-requests']
+  learning: ['/internal/v2/learning/tasks/recent', '/internal/v2/notifications/reconciliation-requests']
 };
 
 const expectedEventTypes = [

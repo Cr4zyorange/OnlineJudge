@@ -5,6 +5,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.onlinejudge.courseservice.config.CourseRabbitProperties;
 import com.onlinejudge.courseservice.security.TestJwtFactory;
 import com.onlinejudge.courseservice.service.CourseService;
+import com.sun.net.httpserver.HttpServer;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,8 +19,14 @@ import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.mock.web.MockMultipartFile;
 
+import java.io.IOException;
+import java.io.OutputStream;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.nio.charset.StandardCharsets;
 import java.security.KeyPair;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -39,6 +47,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class CourseServiceContractTest {
     private static final KeyPair KEY_PAIR = TestJwtFactory.rsaKeyPair();
     private static final String BOOTSTRAP_JWKS = TestJwtFactory.jwks("course-test-kid", KEY_PAIR);
+    private static final String EMPTY_TASK_PAGE = """
+            {"items":[],"page":0,"size":5,"total":0}
+            """;
+    private static HttpServer learningServer;
+    private static final AtomicReference<LearningStubResponse> LEARNING_RESPONSE =
+            new AtomicReference<>(new LearningStubResponse(200, EMPTY_TASK_PAGE));
 
     @Autowired
     private MockMvc mockMvc;
@@ -55,15 +69,42 @@ class CourseServiceContractTest {
     @Autowired
     private CourseRabbitProperties rabbit;
 
+    static {
+        try {
+            learningServer = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
+            learningServer.createContext("/internal/v2/learning/tasks/recent", exchange -> {
+                LearningStubResponse response = LEARNING_RESPONSE.get();
+                byte[] body = response.body().getBytes(StandardCharsets.UTF_8);
+                exchange.getResponseHeaders().set("Content-Type", "application/json");
+                exchange.sendResponseHeaders(response.status(), body.length);
+                try (OutputStream stream = exchange.getResponseBody()) {
+                    stream.write(body);
+                }
+            });
+            learningServer.start();
+        } catch (IOException failure) {
+            throw new ExceptionInInitializerError(failure);
+        }
+    }
+
     @DynamicPropertySource
     static void properties(DynamicPropertyRegistry registry) {
         registry.add("course.identity.jwks-trust-bundle", () -> BOOTSTRAP_JWKS);
         registry.add("course.identity.jwks-uri", () -> "http://127.0.0.1:1/identity/jwks.json");
         registry.add("course.identity.refresh-enabled", () -> false);
+        registry.add("course.learning.base-url", () -> "http://127.0.0.1:" + learningServer.getAddress().getPort());
+        registry.add("course.learning.timeout-ms", () -> 2000L);
+        registry.add("course.learning.service-token", () -> "test-learning-service-token");
+    }
+
+    @AfterAll
+    static void stopLearningStub() {
+        learningServer.stop(0);
     }
 
     @BeforeEach
     void clearCourseFacts() {
+        LEARNING_RESPONSE.set(new LearningStubResponse(200, EMPTY_TASK_PAGE));
         jdbcTemplate.update("DELETE FROM course_event_outbox");
         jdbcTemplate.update("DELETE FROM course_membership_reconciliation_checkpoint");
         jdbcTemplate.update("DELETE FROM crs_course_member");
@@ -472,7 +513,7 @@ class CourseServiceContractTest {
     }
 
     @Test
-    void memberHomeSummaryReturnsCourseAnnouncementsAndTaskSummarySection() throws Exception {
+    void memberHomeSummaryReturnsCourseAnnouncementsAndRealRecentTasksFromLearning() throws Exception {
         String teacher = userToken("921", List.of("TEACHER"));
         String student = userToken("922", List.of("STUDENT"));
         String courseId = createdCourse(teacher, "home summary course");
@@ -490,6 +531,13 @@ class CourseServiceContractTest {
                         .header("Authorization", student).header("X-Request-Id", requestId()))
                 .andExpect(status().isOk());
 
+        LEARNING_RESPONSE.set(new LearningStubResponse(200, """
+                {"items":[
+                  {"taskId":77,"taskType":"HOMEWORK","title":"Submit homework 1","courseId":%s,"courseName":"home summary course","deadline":"2026-09-03 10:00:00","progress":20,"status":"IN_PROGRESS","actionUrl":"/courses/%s/homeworks/77"},
+                  {"taskId":88,"taskType":"EXPERIMENT","title":"Lab 1","courseId":%s,"courseName":"home summary course","deadline":"2026-09-05 10:00:00","progress":0,"status":"NOT_STARTED","actionUrl":"/courses/%s/labs/88"}
+                ],"page":0,"size":5,"total":2}
+                """.formatted(courseId, courseId, courseId, courseId)));
+
         mockMvc.perform(get("/api/v1/courses/{courseId}/home-summary", courseId)
                         .header("Authorization", student).header("X-Request-Id", requestId()))
                 .andExpect(status().isOk())
@@ -497,7 +545,47 @@ class CourseServiceContractTest {
                 .andExpect(jsonPath("$.data.announcements.length()").value(2))
                 .andExpect(jsonPath("$.data.announcements[0].title").value("pinned welcome"))
                 .andExpect(jsonPath("$.data.announcements[0].top").value(true))
+                .andExpect(jsonPath("$.data.recentTasks.length()").value(2))
+                .andExpect(jsonPath("$.data.recentTasks[0].title").value("Submit homework 1"))
+                .andExpect(jsonPath("$.data.recentTasks[0].taskType").value("HOMEWORK"))
+                .andExpect(jsonPath("$.data.recentTasks[0].status").value("IN_PROGRESS"))
+                .andExpect(jsonPath("$.data.recentTasks[0].deadline").value("2026-09-03 10:00:00"))
+                .andExpect(jsonPath("$.data.recentTasks[1].title").value("Lab 1"));
+    }
+
+    @Test
+    void memberHomeSummaryShowsEmptyTaskSectionWhenLearningReturnsNoTasks() throws Exception {
+        String teacher = userToken("925", List.of("TEACHER"));
+        String student = userToken("926", List.of("STUDENT"));
+        String courseId = createdCourse(teacher, "no task home summary");
+        mockMvc.perform(post("/api/v1/courses/{courseId}/join", courseId)
+                        .header("Authorization", student).header("X-Request-Id", requestId()))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/v1/courses/{courseId}/home-summary", courseId)
+                        .header("Authorization", student).header("X-Request-Id", requestId()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.course.name").value("no task home summary"))
                 .andExpect(jsonPath("$.data.recentTasks").isEmpty());
+    }
+
+    @Test
+    void memberHomeSummaryFailsClosedWhenLearningTaskSummaryIsUnavailable() throws Exception {
+        String teacher = userToken("927", List.of("TEACHER"));
+        String student = userToken("928", List.of("STUDENT"));
+        String courseId = createdCourse(teacher, "unavailable task home summary");
+        mockMvc.perform(post("/api/v1/courses/{courseId}/join", courseId)
+                        .header("Authorization", student).header("X-Request-Id", requestId()))
+                .andExpect(status().isOk());
+
+        LEARNING_RESPONSE.set(new LearningStubResponse(503,
+                "{\"code\":\"LEARNING_TASKS_UNAVAILABLE\",\"message\":\"learning unavailable\",\"requestId\":\"00000000-0000-0000-0000-000000000000\",\"retryable\":true}"));
+
+        mockMvc.perform(get("/api/v1/courses/{courseId}/home-summary", courseId)
+                        .header("Authorization", student).header("X-Request-Id", requestId()))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.code").value("LEARNING_TASKS_UNAVAILABLE"))
+                .andExpect(jsonPath("$.retryable").value(true));
     }
 
     @Test
@@ -578,4 +666,7 @@ class CourseServiceContractTest {
     }
 
     private String requestId() { return java.util.UUID.randomUUID().toString(); }
+
+    private record LearningStubResponse(int status, String body) {
+    }
 }

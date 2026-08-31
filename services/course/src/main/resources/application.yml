@@ -46,5 +46,9 @@ course:
     password: ${RABBITMQ_PASSWORD:}
     exchange: ${RABBITMQ_EXCHANGE:onlinejudge.events.v2}
     identity-security-version-queue: ${COURSE_IDENTITY_SECURITY_VERSION_QUEUE:course.identity-security-version.v2}
+  learning:
+    base-url: ${COURSE_LEARNING_BASE_URL:}
+    timeout-ms: ${COURSE_LEARNING_TIMEOUT_MS:800}
+    service-token: ${COURSE_LEARNING_SERVICE_TOKEN:}
   storage:
     root: ${COURSE_STORAGE_ROOT:${java.io.tmpdir}/onlinejudge-course}

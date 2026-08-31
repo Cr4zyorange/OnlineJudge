@@ -60,8 +60,9 @@ public class CourseController {
 
     @GetMapping("/{courseId}/home-summary")
     public ApiResponse<CourseService.HomeSummaryView> homeSummary(@PathVariable long courseId,
-                                                                  @RequestAttribute("course.currentUser") CurrentUser user) {
-        return ApiResponse.ok(service.homeSummary(courseId, user));
+                                                                  @RequestAttribute("course.currentUser") CurrentUser user,
+                                                                  HttpServletRequest servletRequest) {
+        return ApiResponse.ok(service.homeSummary(courseId, user, requestId(servletRequest)));
     }
 
     @PutMapping("/{courseId}")
