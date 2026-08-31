@@ -82,20 +82,6 @@ chmod 600 "$secret_file"
 kindlib_note "applying namespace $K8S_NAMESPACE"
 kindlib_kubectl apply -f "$render_dir/00-namespace.yaml"
 
-gateway_config="$render_dir/gateway-default.conf"
-set -a
-# shellcheck disable=SC1091
-source "$repo_root/deploy/nginx/gateway-defaults.env"
-set +a
-"$repo_root/scripts/gateway/render-gateway-config.sh" \
-  --template "$repo_root/deploy/nginx/gateway.conf.template" \
-  --output "$gateway_config"
-kindlib_note "applying generated gateway configuration"
-kindlib_kubectl create configmap gateway-config \
-  --from-file=default.conf="$gateway_config" \
-  --namespace "$K8S_NAMESPACE" \
-  --dry-run=client -o yaml | kindlib_kubectl apply -f -
-
 kindlib_note "applying shared non-sensitive config"
 kindlib_kubectl apply -f "$render_dir/01-configmap.yaml"
 

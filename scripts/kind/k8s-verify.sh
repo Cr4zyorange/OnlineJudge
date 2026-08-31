@@ -113,8 +113,8 @@ kindlib_note "port-forwarding frontend service to 127.0.0.1:$frontend_pf_port"
 kindlib_kubectl --namespace "$K8S_NAMESPACE" port-forward "svc/frontend" "${frontend_pf_port}:80" >/dev/null 2>&1 &
 port_forward_pids+=("$!")
 kindlib_kubectl --namespace "$K8S_NAMESPACE" exec deployment/frontend -- nginx -t \
-  || kindlib_fail "mounted gateway configuration failed nginx -t"
-kindlib_note "PASS: mounted gateway configuration passed nginx -t"
+  || kindlib_fail "frontend nginx configuration failed nginx -t"
+kindlib_note "PASS: frontend nginx configuration passed nginx -t"
 assert_http_index "frontend static entry" "http://127.0.0.1:${frontend_pf_port}/"
 assert_http_index "frontend SPA deep link" "http://127.0.0.1:${frontend_pf_port}/student/courses/1"
 assert_http_up "frontend-to-backend readiness proxy" "http://127.0.0.1:${frontend_pf_port}/api/v1/system/readiness"

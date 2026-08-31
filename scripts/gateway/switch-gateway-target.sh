@@ -24,11 +24,12 @@ done
 [[ "$target" =~ ^[a-z0-9][a-z0-9.-]*:[0-9]{2,5}$ ]] || { printf 'target must be a lowercase host:port value\n' >&2; exit 64; }
 
 case "$service" in
-  auth) variable=AUTH_UPSTREAM ;;
-  crs) variable=CRS_UPSTREAM ;;
+  identity) variable=IDENTITY_UPSTREAM ;;
+  course) variable=COURSE_UPSTREAM ;;
   assessment) variable=ASSESSMENT_UPSTREAM ;;
-  learning-grade) variable=LEARNING_GRADE_UPSTREAM ;;
-  *) printf 'service must be auth, crs, assessment, or learning-grade\n' >&2; exit 64 ;;
+  grade) variable=GRADE_UPSTREAM ;;
+  learning) variable=LEARNING_UPSTREAM ;;
+  *) printf 'service must be identity, course, assessment, grade, or learning\n' >&2; exit 64 ;;
 esac
 
 mkdir -p "$runtime_dir"
@@ -37,8 +38,39 @@ previous_file="$runtime_dir/targets.previous.env"
 config_file="$runtime_dir/default.conf"
 
 if [[ ! -f "$targets_file" ]]; then
-  cp "$repo_root/deploy/nginx/gateway-defaults.env" "$targets_file"
+  cp "$repo_root/deploy/gateway/upstreams.env" "$targets_file"
 fi
+
+validate_targets_file() {
+  local source_file="$1"
+  local key value
+  local count=0
+  declare -A seen=()
+
+  if grep -Eq '^(AUTH|CRS|LEARNING_GRADE)_UPSTREAM=' "$source_file"; then
+    printf 'legacy four-service target file is not supported\n' >&2
+    return 64
+  fi
+
+  while IFS='=' read -r key value; do
+    case "$key" in
+      IDENTITY_UPSTREAM|COURSE_UPSTREAM|ASSESSMENT_UPSTREAM|GRADE_UPSTREAM|LEARNING_UPSTREAM) ;;
+      *) printf 'invalid gateway target key: %s\n' "$key" >&2; return 64 ;;
+    esac
+    [[ -z "${seen[$key]:-}" ]] || { printf 'duplicate gateway target key: %s\n' "$key" >&2; return 64; }
+    [[ "$value" =~ ^[a-z0-9][a-z0-9.-]*:[0-9]{2,5}$ ]] \
+      || { printf 'invalid gateway target value for %s\n' "$key" >&2; return 64; }
+    seen[$key]=1
+    count=$((count + 1))
+  done < "$source_file"
+
+  [[ "$count" -eq 5 ]] || { printf 'gateway target file must contain exactly five services\n' >&2; return 64; }
+  for key in IDENTITY_UPSTREAM COURSE_UPSTREAM ASSESSMENT_UPSTREAM GRADE_UPSTREAM LEARNING_UPSTREAM; do
+    [[ -n "${seen[$key]:-}" ]] || { printf 'missing gateway target key: %s\n' "$key" >&2; return 64; }
+  done
+}
+
+validate_targets_file "$targets_file"
 cp "$targets_file" "$previous_file"
 
 replace_target() {
@@ -47,6 +79,7 @@ replace_target() {
   local temporary_file="${source_file}.tmp.$$"
   sed -E "s|^${variable}=.*$|${variable}=${replacement}|" "$source_file" > "$temporary_file"
   mv -- "$temporary_file" "$source_file"
+  validate_targets_file "$source_file"
 }
 
 render_config() {
@@ -55,7 +88,7 @@ render_config() {
   source "$targets_file"
   set +a
   "$repo_root/scripts/gateway/render-gateway-config.sh" \
-    --template "$repo_root/deploy/nginx/gateway.conf.template" \
+    --template "$repo_root/deploy/gateway/gateway.conf.template" \
     --output "$config_file"
 }
 
@@ -65,14 +98,14 @@ reload_gateway() {
       docker compose \
         --file "$repo_root/deploy/docker/compose.yml" \
         --file "$repo_root/deploy/docker/compose.gateway.yml" \
-        up -d --no-deps --force-recreate frontend
+        up -d --no-deps --force-recreate gateway
       ;;
     kind)
       kubectl --namespace onlinejudge-ci create configmap gateway-config \
-        --from-file=default.conf="$config_file" \
+        --from-file=gateway.conf="$config_file" \
         --dry-run=client -o yaml | kubectl --namespace onlinejudge-ci apply -f -
-      kubectl --namespace onlinejudge-ci rollout restart deployment/frontend
-      kubectl --namespace onlinejudge-ci rollout status deployment/frontend --timeout=120s
+      kubectl --namespace onlinejudge-ci rollout restart deployment/gateway
+      kubectl --namespace onlinejudge-ci rollout status deployment/gateway --timeout=120s
       ;;
   esac
 }

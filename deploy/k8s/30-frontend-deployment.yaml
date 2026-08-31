@@ -1,5 +1,7 @@
-# Frontend Deployment (Nginx serving the Vue build and proxying /api/ to
-# backend:8080). The image tag is the __GIT_SHA__ placeholder rendered by
+# Frontend Deployment (Nginx serving the Vue build). During the D3 compatibility
+# window its packaged default config still proxies /api/ to backend:8080. The
+# independent five-service Gateway is a separate workload owned by #317/#318.
+# The image tag is the __GIT_SHA__ placeholder rendered by
 # scripts/kind/k8s-deploy.sh (D3 contract #293 section 3; latest is forbidden).
 apiVersion: apps/v1
 kind: Deployment
@@ -25,24 +27,12 @@ spec:
         app: frontend
         app.kubernetes.io/part-of: onlinejudge
     spec:
-      volumes:
-        - name: gateway-config
-          configMap:
-            name: gateway-config
-            items:
-              - key: default.conf
-                path: default.conf
       containers:
         - name: frontend
           image: onlinejudge/frontend:__GIT_SHA__
           ports:
             - containerPort: 80
               name: http
-          volumeMounts:
-            - name: gateway-config
-              mountPath: /etc/nginx/conf.d/default.conf
-              subPath: default.conf
-              readOnly: true
           startupProbe:
             httpGet:
               path: /
