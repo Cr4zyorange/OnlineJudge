@@ -86,6 +86,7 @@ if [[ "$side" == "consumer" || "$side" == "all" ]]; then
   # disposable MySQL 8.4, and a service migration cannot pass by falling back
   # to application boot DDL.
   log_run bash "$checkout/database/tests/verify-assessment-migration-runner.sh"
+  log_run bash "$checkout/database/tests/verify-course-migration-runner.sh"
 fi
 
 # 仓库脚本契约：所有跟踪的 *.sh 必须 LF + bash 语法合法。

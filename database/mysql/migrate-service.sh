@@ -91,6 +91,19 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
 );
 SQL
 
+# #341's copied legacy schemas retain the older migration ledger shape, where
+# installed_type is mandatory.  A D7 service Job must be able to checkpoint a
+# Course upgrade from that live shape as well as a freshly-created service
+# schema; application boot DDL is not an acceptable fallback.
+legacy_ledger=$(run_mysql <<'SQL'
+SELECT COUNT(*)
+  FROM information_schema.columns
+ WHERE table_schema = DATABASE()
+   AND table_name = 'schema_migrations'
+   AND column_name = 'installed_type';
+SQL
+)
+
 set -- "$migration_dir"/*.sql
 if [ ! -f "$1" ]; then
     echo "migrate-service: schema=$schema no migration files"
@@ -121,10 +134,18 @@ SQL
         echo "migration failed: $version" >&2
         exit 1
     fi
-    run_mysql <<SQL
+    if [ "$legacy_ledger" = "1" ]; then
+        run_mysql <<SQL
+INSERT INTO schema_migrations
+    (version, checksum_sha256, installed_type, execution_ms, success)
+VALUES ('$escaped_version', '$checksum', 'SERVICE', 0, 1);
+SQL
+    else
+        run_mysql <<SQL
 INSERT INTO schema_migrations (version, checksum_sha256)
 VALUES ('$escaped_version', '$checksum');
 SQL
+    fi
     applied=$((applied + 1))
     echo "migrate-service: schema=$schema version=$version applied"
 done
