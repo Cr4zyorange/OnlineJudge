@@ -245,6 +245,24 @@ class HomeworkWorkflowContractTest {
     }
 
     @Test
+    void courseManagerWhoOwnsTheSubmissionCanSeeItsUnpublishedEvaluation() throws Exception {
+        String managerId = "manager-student-315-" + UUID.randomUUID();
+        long homeworkId = createAndPublishCodeHomework(managerId, "manager-result-315-" + UUID.randomUUID(), true,
+                false, Instant.parse("2030-01-01T12:00:00Z"));
+        String managerToken = TestJwtFactory.userToken(KEY, "homework-workflow-kid", managerId,
+                List.of("TEACHER", "STUDENT"));
+        String submissionId = submitCodeHomework(homeworkId, managerToken, "print('manager result')");
+        worker.runOne("homework-worker-manager-result-315", task -> new AssessmentWorker.EvaluationOutcome(
+                true, "ACCEPTED", new BigDecimal("80"), new BigDecimal("100")));
+
+        mockMvc.perform(get("/api/v1/submissions/{submissionId}/evaluation", submissionId)
+                        .header("Authorization", "Bearer " + managerToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.score").value(80))
+                .andExpect(jsonPath("$.data.finalScore").value(80));
+    }
+
+    @Test
     void localOutboxWriteFailureRollsPublicationBackAndReturnsHwk5003() throws Exception {
         String teacherId = "teacher-315-" + UUID.randomUUID();
         String teacherToken = TestJwtFactory.userToken(KEY, "homework-workflow-kid", teacherId, List.of("TEACHER"));
