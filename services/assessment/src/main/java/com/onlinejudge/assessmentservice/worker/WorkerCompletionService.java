@@ -73,9 +73,15 @@ class WorkerCompletionService {
                 Map.of("courseId", task.courseId(), "submissionId", task.submissionId(), "evaluationStatus", outcome.successful() ? "SUCCESS" : "FAILED", "evaluationVersion", task.generation(), "completedAt", finished.toString()), finished);
         if (outcome.successful() && (!"HWK".equals(task.sourceType()) || !homeworkProjection)
                 && shouldPublishSourceGrade(task)) {
-            long version = grades.upsertScored(task.sourceType(), task.sourceId(), task.courseId(), task.studentId(), outcome.score(), outcome.fullScore(), finished);
+            java.math.BigDecimal publishedScore = outcome.score();
+            if ("LAB".equals(task.sourceType()) && jdbc != null) {
+                java.math.BigDecimal finalScore = jdbc.query("SELECT final_score FROM assessment_lab_submission WHERE submission_id = ?",
+                        rows -> rows.next() ? rows.getBigDecimal(1) : null, task.submissionId());
+                if (finalScore != null) publishedScore = finalScore;
+            }
+            long version = grades.upsertScored(task.sourceType(), task.sourceId(), task.courseId(), task.studentId(), publishedScore, outcome.fullScore(), finished);
             outbox.append("assessment.source-grade.changed.v2", "assessment-source-grade", task.sourceType() + ":" + task.sourceId() + ":" + task.studentId(), version, task.id(),
-                    Map.of("courseId", task.courseId(), "sourceType", task.sourceType(), "sourceId", task.sourceId(), "studentId", task.studentId(), "score", outcome.score(), "fullScore", outcome.fullScore(), "status", "SCORED", "sourceVersion", version), finished);
+                    Map.of("courseId", task.courseId(), "sourceType", task.sourceType(), "sourceId", task.sourceId(), "studentId", task.studentId(), "score", publishedScore, "fullScore", outcome.fullScore(), "status", "SCORED", "sourceVersion", version), finished);
         }
     }
     private void appendHomeworkEvaluation(EvaluationTask task, AssessmentWorker.EvaluationOutcome outcome, Instant finished) {

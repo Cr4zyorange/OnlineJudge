@@ -191,7 +191,9 @@ public class LabExperimentService {
                 SELECT s.submission_id, s.student_id, COALESCE(s.final_score, s.auto_score) AS score
                   FROM assessment_lab_submission s
                  WHERE s.lab_id = ? AND COALESCE(s.final_score, s.auto_score) IS NOT NULL
-                   AND s.submission_version = (SELECT MAX(s2.submission_version) FROM assessment_lab_submission s2 WHERE s2.lab_id = s.lab_id AND s2.student_id = s.student_id)
+                   AND ((s.final_score IS NOT NULL AND s.submission_version = (SELECT MAX(s2.submission_version) FROM assessment_lab_submission s2 WHERE s2.lab_id = s.lab_id AND s2.student_id = s.student_id AND s2.final_score IS NOT NULL))
+                     OR (s.final_score IS NULL AND NOT EXISTS (SELECT 1 FROM assessment_lab_submission sf WHERE sf.lab_id = s.lab_id AND sf.student_id = s.student_id AND sf.final_score IS NOT NULL)
+                         AND s.submission_version = (SELECT MAX(s3.submission_version) FROM assessment_lab_submission s3 WHERE s3.lab_id = s.lab_id AND s3.student_id = s.student_id)))
                 """, (rs, ignored) -> {
             String studentId = rs.getString("student_id");
             BigDecimal score = rs.getBigDecimal("score");

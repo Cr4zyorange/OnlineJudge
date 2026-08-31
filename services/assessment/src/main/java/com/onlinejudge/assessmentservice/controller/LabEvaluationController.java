@@ -129,8 +129,9 @@ public class LabEvaluationController {
             item.put("submitStatus", rs.getString("submit_status"));
             String status = jdbc.query("SELECT evaluation_status FROM assessment_submission WHERE id = ?", rows -> rows.next() ? rows.getString(1) : "NONE", rs.getString("submission_id"));
             item.put("evaluationStatus", status == null ? "NONE" : status);
-            item.put("autoScore", rs.getBigDecimal("auto_score"));
-            item.put("finalScore", rs.getBigDecimal("final_score"));
+            boolean scoresVisible = manager || scoresPublished(lab);
+            item.put("autoScore", scoresVisible ? rs.getBigDecimal("auto_score") : null);
+            item.put("finalScore", scoresVisible ? rs.getBigDecimal("final_score") : null);
             item.put("version", rs.getInt("submission_version"));
             item.put("submittedAt", rs.getTimestamp("submitted_at").toInstant());
             int newer = jdbc.queryForObject("SELECT COUNT(*) FROM assessment_lab_submission WHERE lab_id = ? AND student_id = ? AND submission_version > ?", Integer.class, labId, rs.getString("student_id"), rs.getInt("submission_version"));
@@ -174,6 +175,13 @@ public class LabEvaluationController {
         boolean manager = canManage(lab, user);
         if (!manager && !item.get("studentId").equals(user.id())) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "LAB submission access is restricted");
         if (!manager && !courseMembers.isActive(lab.courseId(), user.id())) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "active course membership is required");
+        boolean scoresVisible = manager || scoresPublished(lab);
+        if (!scoresVisible) {
+            item.put("autoScore", null);
+            item.put("finalScore", null);
+            item.put("isFinal", false);
+            item.put("isScoringBasis", false);
+        }
         return item;
     }
 
@@ -264,7 +272,7 @@ public class LabEvaluationController {
                 ON DUPLICATE KEY UPDATE report_score = VALUES(report_score), manual_score = VALUES(manual_score),
                     final_score = VALUES(final_score), comment = VALUES(comment), updated_at = VALUES(updated_at)
                 """, submissionId, labId, submission.get("autoScore"), request.reportScore(), request.manualScore(), request.finalScore(), request.comment(), java.sql.Timestamp.from(now), java.sql.Timestamp.from(now));
-        jdbc.update("UPDATE assessment_lab_submission SET final_score = ? WHERE submission_id = ? AND lab_id = ?", request.finalScore(), submissionId, labId);
+        jdbc.update("UPDATE assessment_lab_submission SET final_score = ?, submit_status = 'SCORED' WHERE submission_id = ? AND lab_id = ?", request.finalScore(), submissionId, labId);
         if (grades != null && outbox != null && scoresPublished(lab)) {
             long version = grades.upsertScored("LAB", Long.toString(labId), lab.courseId(), (String) submission.get("studentId"), request.finalScore(), lab.maxScore(), now);
             outbox.append("assessment.source-grade.changed.v2", "assessment-source-grade", "LAB:" + labId + ":" + submission.get("studentId"), version, submissionId,
