@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.onlinejudge.assessmentservice.security.TestJwtFactory;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -246,6 +248,67 @@ class HomeworkWorkflowContractTest {
         assertThat(jdbc.queryForObject("SELECT manual_replay_count FROM evaluation_task WHERE id = ?", Integer.class, taskId)).isEqualTo(1);
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM assessment_source_grade WHERE source_id = ?", Integer.class,
                 Long.toString(homeworkId))).isZero();
+    }
+
+    @ParameterizedTest(name = "teacher can replay successful homework result {0}")
+    @ValueSource(strings = {"ACCEPTED", "WRONG_ANSWER"})
+    void authorizedTeacherCanReplaySuccessfulHomeworkEvaluation(String evaluationStatus) throws Exception {
+        String teacherId = "teacher-315-" + UUID.randomUUID();
+        String studentId = "student-315-" + UUID.randomUUID();
+        long homeworkId = createAndPublishCodeHomework(teacherId, "successful-replay-315-" + UUID.randomUUID(), true,
+                false, Instant.parse("2030-01-01T12:00:00Z"));
+        jdbc.update("INSERT INTO assessment_course_member_projection (course_id, user_id, membership_status, member_version) VALUES ('course-315', ?, 'ACTIVE', 1)", studentId);
+        String studentToken = TestJwtFactory.userToken(KEY, "homework-workflow-kid", studentId, List.of("STUDENT"));
+        String teacherToken = TestJwtFactory.userToken(KEY, "homework-workflow-kid", teacherId, List.of("TEACHER"));
+        String submitted = mockMvc.perform(post("/api/v1/homeworks/{homeworkId}/submissions", homeworkId)
+                        .header("Authorization", "Bearer " + studentToken).header("X-Request-Id", UUID.randomUUID().toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"code\":\"print('result')\",\"language\":\"python\"}"))
+                .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+        String submissionId = mapper.readTree(submitted).path("submissionId").asText();
+        String taskId = mapper.readTree(submitted).path("taskId").asText();
+        worker.runOne("homework-worker-success-" + evaluationStatus, task -> new AssessmentWorker.EvaluationOutcome(
+                true, evaluationStatus, "ACCEPTED".equals(evaluationStatus) ? new BigDecimal("100") : BigDecimal.ZERO,
+                new BigDecimal("100")));
+
+        mockMvc.perform(post("/api/v1/submissions/{submissionId}/reevaluate", submissionId)
+                        .header("Authorization", "Bearer " + teacherToken)
+                        .header("X-Request-Id", UUID.randomUUID().toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.taskId").value(taskId))
+                .andExpect(jsonPath("$.taskState").value("PENDING"));
+
+        assertThat(jdbc.queryForObject("SELECT manual_replay_count FROM evaluation_task WHERE id = ?", Integer.class, taskId))
+                .isEqualTo(1);
+    }
+
+    @Test
+    void homeworkReevaluationEndpointRejectsLabTask() throws Exception {
+        String teacherId = "teacher-315-" + UUID.randomUUID();
+        String studentId = "student-315-" + UUID.randomUUID();
+        jdbc.update("INSERT INTO assessment_course_member_projection (course_id, user_id, membership_status, member_version) VALUES ('course-315', ?, 'ACTIVE', 1)", studentId);
+        when(coursePermissions.canManageCourse("course-315", teacherId)).thenReturn(true);
+        String studentToken = TestJwtFactory.userToken(KEY, "homework-workflow-kid", studentId, List.of("STUDENT"));
+        String teacherToken = TestJwtFactory.userToken(KEY, "homework-workflow-kid", teacherId, List.of("TEACHER"));
+        String submitted = mockMvc.perform(post("/api/v1/submissions")
+                        .header("Authorization", "Bearer " + studentToken)
+                        .header("X-Request-Id", UUID.randomUUID().toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"sourceType\":\"LAB\",\"sourceId\":\"lab-315\",\"courseId\":\"course-315\"}"))
+                .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+        String submissionId = mapper.readTree(submitted).path("submissionId").asText();
+        String taskId = mapper.readTree(submitted).path("taskId").asText();
+        worker.runOne("lab-worker-failure", task -> AssessmentWorker.EvaluationOutcome.failed("SANDBOX_UNCONFIGURED"));
+
+        mockMvc.perform(post("/api/v1/submissions/{submissionId}/reevaluate", submissionId)
+                        .header("Authorization", "Bearer " + teacherToken)
+                        .header("X-Request-Id", UUID.randomUUID().toString()))
+                .andExpect(status().isNotFound());
+
+        assertThat(jdbc.queryForObject("SELECT state FROM evaluation_task WHERE id = ?", String.class, taskId))
+                .isEqualTo("FAILED");
+        assertThat(jdbc.queryForObject("SELECT manual_replay_count FROM evaluation_task WHERE id = ?", Integer.class, taskId))
+                .isZero();
     }
 
     @Test
