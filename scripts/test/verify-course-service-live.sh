@@ -156,4 +156,4 @@ mvn -B -ntp -f "$repo_root/services/course/pom.xml" \
   -Dtest=CourseServiceContractTest,CourseSecurityVersionProjectionTest,CourseOutboxRelayRecoveryTest,IdentitySecurityVersionRabbitConsumerTest,CourseOutboxLeaseTest,CourseGeneratedKeyMySqlConcurrencyTest,JwksCacheTest \
   test | tee "$evidence_dir/course-service-live.log"
 
-printf 'issue312-course-live: PASS mysql=8.4 rabbit=4.1 upgrade=RED-GREEN-rollback-remigrate tables=8 tests=22 evidence=%s\n' "$evidence_dir"
+printf 'issue312-course-live: PASS mysql=8.4 rabbit=4.1 upgrade=RED-GREEN-rollback-remigrate tables=8 tests=24 evidence=%s\n' "$evidence_dir"

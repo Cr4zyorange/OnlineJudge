@@ -119,6 +119,24 @@ class CourseServiceContractTest {
     }
 
     @Test
+    void expiredBearerTokenFailsClosedAsSessionExpired() throws Exception {
+        mockMvc.perform(get("/api/v1/courses")
+                        .header("Authorization", TestJwtFactory.expiredUserToken(KEY_PAIR, "course-test-kid", "9011", List.of("TEACHER")))
+                        .header("X-Request-Id", "a99f25d6-5ec1-4b2a-91c2-26e0d6a763c1"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("AUTHENTICATION_REQUIRED"));
+    }
+
+    @Test
+    void unknownCourseDetailReturnsCourseNotFoundForAuthenticatedUser() throws Exception {
+        mockMvc.perform(get("/api/v1/courses/424242")
+                        .header("Authorization", userToken("9012", List.of("STUDENT")))
+                        .header("X-Request-Id", "0de25f9e-6d8c-493a-a538-109cdc0b18c2"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("COURSE_NOT_FOUND"));
+    }
+
+    @Test
     void internalV2AuthorizationUsesAudienceBoundServiceJwtAndReturnsCanonicalPage() throws Exception {
         String courseResponse = mockMvc.perform(post("/api/v1/courses")
                         .header("Authorization", userToken("501", List.of("TEACHER")))

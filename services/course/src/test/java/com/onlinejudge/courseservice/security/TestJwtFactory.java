@@ -46,6 +46,17 @@ public final class TestJwtFactory {
         return signed(pair, kid, claims);
     }
 
+    /** A structurally valid token whose session already expired, for the session-expiry branch. */
+    public static String expiredUserToken(KeyPair pair, String kid, String userId, List<String> roles) {
+        Map<String, Object> claims = baseClaims();
+        long now = Instant.now().getEpochSecond();
+        claims.put("iat", now - 600);
+        claims.put("exp", now - 300);
+        claims.put("userId", userId); claims.put("sessionId", "expired-session"); claims.put("securityVersion", 1);
+        claims.put("roles", roles); claims.put("permissions", List.of()); claims.put("aud", "onlinejudge.api");
+        return signed(pair, kid, claims);
+    }
+
     public static String serviceToken(KeyPair pair, String kid, String subject, String audience, List<String> scopes) {
         Map<String, Object> claims = baseClaims();
         claims.put("sub", subject); claims.put("scopes", scopes); claims.put("aud", audience);
