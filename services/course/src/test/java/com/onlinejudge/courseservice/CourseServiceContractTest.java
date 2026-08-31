@@ -66,6 +66,7 @@ class CourseServiceContractTest {
             """;
     private static final Path TLS_DIR;
     private static final Path STORAGE_ROOT;
+    private static SSLContext SERVER_SSL_CONTEXT;
     private static HttpsServer learningServer;
     private static final AtomicReference<LearningStubResponse> LEARNING_RESPONSE =
             new AtomicReference<>(new LearningStubResponse(200, EMPTY_TASK_PAGE));
@@ -90,19 +91,23 @@ class CourseServiceContractTest {
             TLS_DIR = Files.createTempDirectory("course-mtls-test");
             STORAGE_ROOT = Files.createTempDirectory("course-storage-test");
             generateMtlsKeystores(TLS_DIR);
+            SERVER_SSL_CONTEXT = serverSslContext(TLS_DIR);
             // Bind explicitly to the IPv4 loopback: the mTLS client connects to
             // https://127.0.0.1:port, so an OS-preferring IPv6 loopback address
             // would make the same suite fail only on some runners (CI).
             learningServer = HttpsServer.create(new InetSocketAddress(InetAddress.getByName("127.0.0.1"), 0), 0);
-            learningServer.setHttpsConfigurator(new HttpsConfigurator(serverSslContext(TLS_DIR)) {
+            learningServer.setHttpsConfigurator(new HttpsConfigurator(SERVER_SSL_CONTEXT) {
                 @Override
                 public void configure(HttpsParameters parameters) {
                     // The proof is the renewable mTLS path: the Course client
                     // must present its workload certificate on every call.
-                    // setNeedClientAuth alone is not reliably propagated to the
-                    // SSLEngine by jdk.httpserver on every JDK; installing the
-                    // full SSLParameters is the documented, portable form.
-                    SSLParameters sslParameters = serverSslContext(TLS_DIR).getDefaultSSLParameters();
+                    // The full SSLParameters must be installed (setNeedClientAuth
+                    // alone is not reliably propagated), and TLS 1.3 client-auth
+                    // handshakes stall on jdk.httpserver on some JDKs after the
+                    // server flight; TLS 1.2 completes deterministically on every
+                    // runner (CI JDK 21 included).
+                    SSLParameters sslParameters = SERVER_SSL_CONTEXT.getDefaultSSLParameters();
+                    sslParameters.setProtocols(new String[]{"TLSv1.2"});
                     sslParameters.setNeedClientAuth(true);
                     parameters.setSSLParameters(sslParameters);
                 }
