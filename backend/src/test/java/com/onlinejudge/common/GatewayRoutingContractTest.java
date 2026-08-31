@@ -9,7 +9,8 @@ import java.nio.file.Path;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class GatewayRoutingContractTest {
-    private static final Path TEMPLATE = Path.of("..", "deploy", "nginx", "gateway.conf.template");
+    private static final Path TEMPLATE = Path.of("..", "deploy", "gateway", "gateway.conf.template");
+    private static final Path REQUEST_HEADERS = Path.of("..", "deploy", "gateway", "proxy-request-headers.conf");
 
     @Test
     void gatewayRoutesEveryFrozenPublicApiFamilyWithoutCoursePrefixConflicts() throws IOException {
@@ -23,6 +24,7 @@ class GatewayRoutingContractTest {
                 "location = /api/v1/notifications",
                 "location ^~ /api/v1/notifications/",
                 "location = /api/v1/reminder-rules",
+                "location = /api/v1/grades",
                 "location ^~ /api/v1/grade-items/",
                 "location ^~ /api/v1/grade-records/",
                 "location ^~ /api/v1/course-grade-summaries/",
@@ -37,17 +39,21 @@ class GatewayRoutingContractTest {
 
     @Test
     void gatewayForwardsBearerButClearsAllBrowserSuppliedIdentityHeaders() throws IOException {
-        String template = Files.readString(TEMPLATE);
+        String requestHeaders = Files.readString(REQUEST_HEADERS);
 
-        assertThat(template).contains(
+        assertThat(requestHeaders).contains(
+                "proxy_pass_request_headers off;",
                 "proxy_set_header Authorization $http_authorization;",
-                "proxy_set_header X-User-Id \"\";",
-                "proxy_set_header X-Username \"\";",
-                "proxy_set_header X-User-Role \"\";",
-                "proxy_set_header X-Permissions \"\";",
-                "proxy_set_header X-Course-Ids \"\";",
-                "proxy_set_header X-Manageable-Course-Ids \"\";");
-        assertThat(template).doesNotContain("proxy_set_header X-User-Id $http_");
+                "proxy_set_header X-Request-Id $gateway_request_id;");
+        assertThat(requestHeaders).doesNotContain(
+                "X-User-Id",
+                "X-Username",
+                "X-User-Role",
+                "X-Permissions",
+                "X-Course-Ids",
+                "X-Manageable-Course-Ids",
+                "X-OnlineJudge-Service-Authorization",
+                "X-Internal-Token");
     }
 
     @Test
@@ -55,6 +61,7 @@ class GatewayRoutingContractTest {
         String template = Files.readString(TEMPLATE);
 
         assertThat(template).contains(
+                "client_max_body_size 10m;",
                 "client_max_body_size 55m;",
                 "proxy_connect_timeout 5s;",
                 "proxy_read_timeout 60s;",
@@ -62,11 +69,19 @@ class GatewayRoutingContractTest {
                 "proxy_read_timeout 300s;",
                 "proxy_send_timeout 300s;",
                 "proxy_next_upstream off;",
+                "error_page 413 = @gateway_payload_too_large;",
+                "error_page 429 = @gateway_rate_limited;",
                 "error_page 502 = @gateway_bad_gateway;",
-                "error_page 504 = @gateway_gateway_timeout;",
+                "error_page 503 = @gateway_unavailable;",
+                "error_page 504 = @gateway_timeout;",
+                "\"code\":\"GATEWAY_413\"",
+                "\"code\":\"GATEWAY_429\"",
                 "\"code\":\"GATEWAY_502\"",
+                "\"code\":\"GATEWAY_503\"",
                 "\"code\":\"GATEWAY_504\"",
-                "location /api/ { proxy_pass http://backend:8080; }",
-                "try_files $uri /index.html;");
+                "location ^~ /internal/v2/",
+                "location ^~ /api/",
+                "proxy_pass http://frontend:80;");
+        assertThat(template).doesNotContain("backend:8080", "try_files $uri /index.html;");
     }
 }
