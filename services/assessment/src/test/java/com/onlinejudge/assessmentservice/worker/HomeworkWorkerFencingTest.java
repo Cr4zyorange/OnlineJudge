@@ -70,10 +70,10 @@ class HomeworkWorkerFencingTest {
         completion.complete(replacement, "worker-b", outcome, started.plusSeconds(12));
 
         assertThat(jdbc.queryForObject("SELECT evaluation_status FROM assessment_homework_submission WHERE submission_id = ?", String.class, submissionId)).isEqualTo("ACCEPTED");
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM assessment_source_grade", Integer.class)).isEqualTo(1);
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM assessment_event_outbox", Integer.class)).isEqualTo(2);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM assessment_source_grade", Integer.class)).isZero();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM assessment_event_outbox", Integer.class)).isEqualTo(1);
         completion.complete(expired, "worker-a", outcome, started.plusSeconds(13));
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM assessment_source_grade", Integer.class)).isEqualTo(1);
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM assessment_event_outbox", Integer.class)).isEqualTo(2);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM assessment_source_grade", Integer.class)).isZero();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM assessment_event_outbox", Integer.class)).isEqualTo(1);
     }
 }

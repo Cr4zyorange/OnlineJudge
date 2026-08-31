@@ -38,24 +38,25 @@ class WorkerCompletionService {
         if (!tasks.complete(task.id(), workerId, task.generation(), outcome.successful(), outcome.status(), finished)) return;
         // The lightweight constructor is used by queue-only tests and has no
         // HWK projection.  Preserve its pre-existing generic-task behaviour.
-        boolean currentHomeworkSubmission = true;
+        boolean homeworkProjection = false;
         if (jdbc != null && "HWK".equals(task.sourceType())) {
-            currentHomeworkSubmission = jdbc.query("""
+            homeworkProjection = !jdbc.query("""
                     SELECT is_final FROM assessment_homework_submission
                      WHERE submission_id = ? FOR UPDATE
-                    """, (rs, ignored) -> rs.getBoolean("is_final"), task.submissionId())
-                    .stream().findFirst().orElse(true);
-            jdbc.update("UPDATE assessment_submission SET evaluation_status = ? WHERE id = ?", outcome.status(), task.submissionId());
-            jdbc.update("""
-                    UPDATE assessment_homework_submission
-                       SET evaluation_status = ?, auto_score = ?, final_score = ?
-                     WHERE submission_id = ?
-                    """, outcome.status(), outcome.successful() ? outcome.score() : null,
-                    outcome.successful() ? outcome.score() : null, task.submissionId());
+                    """, (rs, ignored) -> rs.getBoolean("is_final"), task.submissionId()).isEmpty();
+            if (homeworkProjection) {
+                jdbc.update("UPDATE assessment_submission SET evaluation_status = ? WHERE id = ?", outcome.status(), task.submissionId());
+                jdbc.update("""
+                        UPDATE assessment_homework_submission
+                           SET evaluation_status = ?, auto_score = ?, final_score = ?
+                         WHERE submission_id = ?
+                        """, outcome.status(), outcome.successful() ? outcome.score() : null,
+                        outcome.successful() ? outcome.score() : null, task.submissionId());
+            }
         }
         outbox.append("assessment.evaluation.completed.v2", "assessment-submission", task.submissionId(), task.generation(), task.id(),
                 Map.of("courseId", task.courseId(), "submissionId", task.submissionId(), "evaluationStatus", outcome.successful() ? "SUCCESS" : "FAILED", "evaluationVersion", task.generation(), "completedAt", finished.toString()), finished);
-        if (outcome.successful() && (!"HWK".equals(task.sourceType()) || currentHomeworkSubmission)) {
+        if (outcome.successful() && (!"HWK".equals(task.sourceType()) || !homeworkProjection)) {
             long version = grades.upsertScored(task.sourceType(), task.sourceId(), task.courseId(), task.studentId(), outcome.score(), outcome.fullScore(), finished);
             outbox.append("assessment.source-grade.changed.v2", "assessment-source-grade", task.sourceType() + ":" + task.sourceId() + ":" + task.studentId(), version, task.id(),
                     Map.of("courseId", task.courseId(), "sourceType", task.sourceType(), "sourceId", task.sourceId(), "studentId", task.studentId(), "score", outcome.score(), "fullScore", outcome.fullScore(), "status", "SCORED", "sourceVersion", version), finished);

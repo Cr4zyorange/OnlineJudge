@@ -1,6 +1,7 @@
 package com.onlinejudge.assessmentservice.service;
 
 import com.onlinejudge.assessmentservice.persistence.AssessmentOutboxRepository;
+import com.onlinejudge.assessmentservice.persistence.SourceGradeRepository;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.PreparedStatementCreator;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
@@ -19,16 +20,18 @@ import java.util.NoSuchElementException;
 public class HomeworkService {
     private final JdbcTemplate jdbc;
     private final AssessmentOutboxRepository outbox;
+    private final SourceGradeRepository grades;
     private final Clock clock;
 
     @org.springframework.beans.factory.annotation.Autowired
-    public HomeworkService(JdbcTemplate jdbc, AssessmentOutboxRepository outbox) {
-        this(jdbc, outbox, Clock.systemUTC());
+    public HomeworkService(JdbcTemplate jdbc, AssessmentOutboxRepository outbox, SourceGradeRepository grades) {
+        this(jdbc, outbox, grades, Clock.systemUTC());
     }
 
-    HomeworkService(JdbcTemplate jdbc, AssessmentOutboxRepository outbox, Clock clock) {
+    HomeworkService(JdbcTemplate jdbc, AssessmentOutboxRepository outbox, SourceGradeRepository grades, Clock clock) {
         this.jdbc = jdbc;
         this.outbox = outbox;
+        this.grades = grades;
         this.clock = clock;
     }
 
@@ -102,6 +105,39 @@ public class HomeworkService {
         return published;
     }
 
+    /** Grades become available to GRD only once a course manager explicitly publishes them. */
+    @Transactional
+    public HomeworkSummary publishScores(long homeworkId, String correlationId) {
+        HomeworkSummary homework = findForUpdate(homeworkId);
+        if (!"PUBLISHED".equals(homework.status())) {
+            throw new IllegalStateException("only a published homework can have its scores published");
+        }
+        Instant publishedAt = clock.instant();
+        List<PublishedScore> scores = jdbc.query("""
+                SELECT hs.student_id, hs.final_score
+                  FROM assessment_homework_submission hs
+                  JOIN evaluation_task task ON task.submission_id = hs.submission_id
+                 WHERE hs.homework_id = ? AND hs.is_final = TRUE
+                   AND task.state = 'SUCCEEDED' AND hs.final_score IS NOT NULL
+                """, (rs, ignored) -> new PublishedScore(rs.getString("student_id"), rs.getBigDecimal("final_score")), homeworkId);
+        int updated = jdbc.update("""
+                UPDATE assessment_homework
+                   SET status = 'SCORE_PUBLISHED', aggregate_version = aggregate_version + 1, updated_at = ?
+                 WHERE id = ? AND status = 'PUBLISHED'
+                """, Timestamp.from(publishedAt), homeworkId);
+        if (updated != 1) throw new IllegalStateException("homework score publication conflicted");
+        for (PublishedScore score : scores) {
+            long version = grades.upsertScored("HWK", Long.toString(homeworkId), homework.courseId(), score.studentId(),
+                    score.score(), homework.totalScore(), publishedAt);
+            outbox.append("assessment.source-grade.changed.v2", "assessment-source-grade",
+                    "HWK:" + homeworkId + ":" + score.studentId(), version, correlationId,
+                    Map.of("courseId", homework.courseId(), "sourceType", "HWK", "sourceId", Long.toString(homeworkId),
+                            "studentId", score.studentId(), "score", score.score(), "fullScore", homework.totalScore(),
+                            "status", "SCORED", "sourceVersion", version), publishedAt);
+        }
+        return find(homeworkId);
+    }
+
     public HomeworkSummary find(long homeworkId) {
         return query(homeworkId, false);
     }
@@ -158,4 +194,6 @@ public class HomeworkService {
     public record HomeworkSummary(long id, String courseId, String title, String description, String type, String status,
                                   Instant deadline, BigDecimal totalScore, boolean allowResubmit, boolean allowLateSubmit,
                                   List<String> languages, long aggregateVersion, Instant publishedAt) { }
+
+    private record PublishedScore(String studentId, BigDecimal score) { }
 }

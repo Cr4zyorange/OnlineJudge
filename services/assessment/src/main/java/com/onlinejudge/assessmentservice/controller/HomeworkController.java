@@ -107,6 +107,24 @@ public class HomeworkController {
         }
     }
 
+    @PutMapping("/homeworks/{homeworkId}/scores/publish")
+    public HomeworkService.HomeworkSummary publishScores(@PathVariable long homeworkId,
+            @RequestAttribute("assessment.currentUser") CurrentUser user, HttpServletRequest http) {
+        String requestId = requireRequestId(http);
+        HomeworkService.HomeworkSummary homework;
+        try {
+            homework = homeworks.find(homeworkId);
+        } catch (NoSuchElementException missing) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "homework not found", missing);
+        }
+        requireManager(homework.courseId(), user);
+        try {
+            return homeworks.publishScores(homeworkId, requestId);
+        } catch (IllegalStateException conflict) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, conflict.getMessage(), conflict);
+        }
+    }
+
     private void requireManager(String courseId, CurrentUser user) {
         boolean managerRole = user.hasRole("TEACHER") || user.hasRole("ASSISTANT");
         if (!managerRole || !coursePermissions.canManageCourse(courseId, user.id())) {
