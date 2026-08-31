@@ -38,13 +38,6 @@ public class AssessmentSubmissionController {
         return submitUploaded("LAB", sourceId, courseId, file, user, http);
     }
 
-    @PostMapping(path = "/homeworks/{sourceId}/submissions", consumes = "multipart/form-data")
-    @org.springframework.web.bind.annotation.ResponseStatus(HttpStatus.CREATED)
-    public AssessmentSubmissionService.SubmittedSubmission submitHomework(@PathVariable String sourceId, @RequestParam String courseId,
-            @RequestParam MultipartFile file, @RequestAttribute("assessment.currentUser") CurrentUser user, HttpServletRequest http) {
-        return submitUploaded("HWK", sourceId, courseId, file, user, http);
-    }
-
     private AssessmentSubmissionService.SubmittedSubmission submitUploaded(String sourceType, String sourceId, String courseId, MultipartFile file,
             CurrentUser user, HttpServletRequest http) {
         if (http.getHeader("X-Request-Id") == null || http.getHeader("X-Request-Id").isBlank()) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "X-Request-Id is required");

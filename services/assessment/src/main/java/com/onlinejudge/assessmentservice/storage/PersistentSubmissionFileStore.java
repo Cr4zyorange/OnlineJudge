@@ -20,5 +20,11 @@ public class PersistentSubmissionFileStore {
         Files.write(target, bytes, StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE);
         return new StoredFile(key, safeName, bytes.length);
     }
+    public void delete(String storageKey) throws IOException {
+        if (storageKey == null || storageKey.isBlank()) return;
+        Path target = root.resolve(storageKey).normalize();
+        if (!target.startsWith(root)) throw new IllegalArgumentException("storage key escapes root");
+        Files.deleteIfExists(target);
+    }
     public record StoredFile(String storageKey, String originalFilename, long size) { }
 }

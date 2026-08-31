@@ -105,6 +105,11 @@ public class EvaluationTaskRepository {
         return rows.stream().findFirst();
     }
 
+    public Optional<EvaluationTask> findBySubmission(String submissionId) {
+        return jdbc.queryForList("SELECT id FROM evaluation_task WHERE submission_id = ?", String.class, submissionId)
+                .stream().findFirst().flatMap(this::find);
+    }
+
     public int count() { return jdbc.queryForObject("SELECT COUNT(*) FROM evaluation_task", Integer.class); }
     private static Instant toInstant(Timestamp value) { return value == null ? null : value.toInstant(); }
 }

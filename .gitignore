@@ -94,6 +94,7 @@ storage/
 !services/assessment/src/main/java/com/onlinejudge/assessmentservice/storage/
 !services/assessment/src/main/java/com/onlinejudge/assessmentservice/storage/*.java
 data/
+/services/assessment/var/
 *.db
 *.sqlite
 *.sqlite3
