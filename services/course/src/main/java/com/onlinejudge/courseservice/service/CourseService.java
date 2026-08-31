@@ -55,6 +55,7 @@ public class CourseService {
     public CourseView update(long courseId, String name, String description, String enrollmentMode, String inviteCode,
                              Integer maxStudents, String status, CurrentUser actor) {
         requireOwner(courseId, actor);
+        requireMutableCourse(courseId);
         CourseRepository.Course current = course(courseId);
         String nextName = name == null ? current.name() : courseName(name);
         String nextDescription = description == null ? current.description() : description(description);
@@ -68,12 +69,17 @@ public class CourseService {
     @Transactional
     public CourseView archive(long courseId, CurrentUser actor) {
         requireOwner(courseId, actor);
+        requireMutableCourse(courseId);
         return view(courses.archiveCourse(courseId), actor);
     }
 
     @Transactional
     public MemberView join(long courseId, String inviteCode, CurrentUser actor, String correlationId) {
-        CourseRepository.Course course = course(courseId);
+        // The course-row lock makes the capacity count and the member insert one
+        // atomic guarded reservation; without it two concurrent joins can both
+        // observe a free seat and over-enroll the course.
+        CourseRepository.Course course = courses.lockCourse(courseId)
+                .orElseThrow(() -> new CourseException(HttpStatus.NOT_FOUND, "COURSE_NOT_FOUND", "course does not exist", false));
         if (!"ACTIVE".equals(course.status())) {
             throw new CourseException(HttpStatus.CONFLICT, "COURSE_CLOSED", "course is not open for enrollment", false);
         }
@@ -147,6 +153,7 @@ public class CourseService {
     public ChapterView createChapter(long courseId, String title, String parentId, Integer sortOrder, String objective,
                                      Boolean visible, Integer chapterType, CurrentUser actor) {
         requireContentManager(courseId, actor);
+        requireMutableCourse(courseId);
         Long parent = validateParent(courseId, null, parentId);
         int order = order(sortOrder);
         int type = chapterType == null ? 1 : chapterType;
@@ -158,6 +165,7 @@ public class CourseService {
     public ChapterView updateChapter(long courseId, long chapterId, String title, String parentId, Integer sortOrder,
                                      String objective, Boolean visible, Integer chapterType, CurrentUser actor) {
         requireContentManager(courseId, actor);
+        requireMutableCourse(courseId);
         CourseRepository.Chapter current = courses.chapter(courseId, chapterId)
                 .orElseThrow(() -> new CourseException(HttpStatus.NOT_FOUND, "CHAPTER_NOT_FOUND", "chapter does not exist", false));
         Long parent = parentId == null ? current.parentId() : validateParent(courseId, chapterId, parentId);
@@ -172,6 +180,7 @@ public class CourseService {
     @Transactional
     public void deleteChapter(long courseId, long chapterId, CurrentUser actor) {
         requireContentManager(courseId, actor);
+        requireMutableCourse(courseId);
         courses.chapter(courseId, chapterId).orElseThrow(() -> new CourseException(HttpStatus.NOT_FOUND, "CHAPTER_NOT_FOUND", "chapter does not exist", false));
         if (courses.chapterHasChildren(courseId, chapterId)) {
             throw new CourseException(HttpStatus.CONFLICT, "CHAPTER_HAS_CHILDREN", "remove child chapters before deleting this chapter", false);
@@ -188,6 +197,7 @@ public class CourseService {
     public ResourceView createResource(long courseId, String title, String url, String chapterId, String resourceType,
                                        String visibility, LocalDateTime publishAt, CurrentUser actor) {
         requireContentManager(courseId, actor);
+        requireMutableCourse(courseId);
         Long chapter = validateResourceChapter(courseId, chapterId);
         String normalizedUrl = resourceUrl(url);
         String normalizedTitle = resourceTitle(title);
@@ -201,6 +211,7 @@ public class CourseService {
     public ResourceView uploadResource(long courseId, MultipartFile file, String title, String chapterId, String resourceType,
                                        String visibility, LocalDateTime publishAt, CurrentUser actor) {
         requireContentManager(courseId, actor);
+        requireMutableCourse(courseId);
         Long chapter = validateResourceChapter(courseId, chapterId);
         CourseFileStorage.StoredFile stored = fileStorage.store(file);
         try {
@@ -218,6 +229,7 @@ public class CourseService {
     public ResourceView updateResource(long courseId, long resourceId, String title, String url, String chapterId,
                                        String resourceType, String visibility, LocalDateTime publishAt, CurrentUser actor) {
         requireContentManager(courseId, actor);
+        requireMutableCourse(courseId);
         CourseRepository.Resource current = resource(courseId, resourceId);
         Long chapter = chapterId == null ? current.chapterId() : validateResourceChapter(courseId, chapterId);
         String nextUrl = url == null ? current.externalUrl() : resourceUrl(url);
@@ -230,6 +242,7 @@ public class CourseService {
     @Transactional
     public void deleteResource(long courseId, long resourceId, CurrentUser actor) {
         requireContentManager(courseId, actor);
+        requireMutableCourse(courseId);
         resource(courseId, resourceId);
         courses.deleteResource(courseId, resourceId);
     }
@@ -255,6 +268,7 @@ public class CourseService {
     public AnnouncementView createAnnouncement(long courseId, String title, String content, Boolean top, CurrentUser actor,
                                                String correlationId) {
         requireContentManager(courseId, actor);
+        requireMutableCourse(courseId);
         Instant publishedAt = Instant.now();
         CourseRepository.Announcement announcement = courses.createAnnouncement(courseId, announcementTitle(title), announcementContent(content),
                 Boolean.TRUE.equals(top), actor.id());
@@ -267,6 +281,7 @@ public class CourseService {
     @Transactional
     public AnnouncementView updateAnnouncement(long courseId, long announcementId, String title, String content, Boolean top, CurrentUser actor) {
         requireContentManager(courseId, actor);
+        requireMutableCourse(courseId);
         CourseRepository.Announcement current = announcement(courseId, announcementId);
         courses.updateAnnouncement(courseId, announcementId, title == null ? current.title() : announcementTitle(title),
                 content == null ? current.content() : announcementContent(content), top == null ? current.top() : top);
@@ -276,8 +291,23 @@ public class CourseService {
     @Transactional
     public void deleteAnnouncement(long courseId, long announcementId, CurrentUser actor) {
         requireContentManager(courseId, actor);
+        requireMutableCourse(courseId);
         announcement(courseId, announcementId);
         courses.deleteAnnouncement(courseId, announcementId);
+    }
+
+    /**
+     * API-CRS-22 / CRS-SC-09: course home summary for an authenticated member.
+     * Course owns the course and announcement facts; LRN owns recent-task
+     * facts, so the task section intentionally stays at the designed empty
+     * state until a stable internal task-summary contract is added.
+     */
+    public HomeSummaryView homeSummary(long courseId, CurrentUser actor) {
+        CourseRepository.Course course = course(courseId);
+        requireMember(courseId, actor);
+        return new HomeSummaryView(view(course, actor),
+                courses.announcements(courseId).stream().limit(5).map(this::announcementView).toList(),
+                List.of());
     }
 
     public List<AnnouncementView> announcements(long courseId, CurrentUser actor) {
@@ -383,6 +413,12 @@ public class CourseService {
         if (!("ACTIVE".equals(member.status()) && "TEACHER".equals(member.role()))) throw forbidden();
     }
     private void requireContentManager(long courseId, CurrentUser user) { if (!canManageContent(courseId, user)) throw forbidden(); }
+    private void requireMutableCourse(long courseId) {
+        String status = course(courseId).status();
+        if (!"ACTIVE".equals(status) && !"DRAFT".equals(status)) {
+            throw new CourseException(HttpStatus.CONFLICT, "COURSE_READ_ONLY", "course is archived or closed and cannot be modified", false);
+        }
+    }
     private boolean canManageContent(long courseId, CurrentUser user) {
         if (user.hasRole("ADMIN")) return true;
         return courses.member(courseId, user.id()).filter(member -> "ACTIVE".equals(member.status()))
@@ -511,6 +547,9 @@ public class CourseService {
 
     public record CourseView(String id, String name, String description, String teacherId, String enrollmentMode, String status,
                              boolean member, String inviteCode, Integer maxStudents) { }
+    public record HomeSummaryView(CourseView course, List<AnnouncementView> announcements, List<RecentTaskView> recentTasks) { }
+    public record RecentTaskView(long taskId, String taskType, String title, long courseId, String courseName,
+                                 String deadline, Integer progress, String status, String actionUrl) { }
     public record CoursePage(List<CourseView> items, int page, int size, int total) { }
     public record MemberView(String userId, String role, String status, long memberVersion, String joinMethod) { }
     public record ChapterView(long id, long courseId, String title, Long parentId, int sortOrder, String objective, boolean visible, int chapterType) { }

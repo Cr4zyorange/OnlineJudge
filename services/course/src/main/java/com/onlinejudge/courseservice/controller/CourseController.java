@@ -58,6 +58,12 @@ public class CourseController {
         return ApiResponse.ok(service.detail(courseId, user));
     }
 
+    @GetMapping("/{courseId}/home-summary")
+    public ApiResponse<CourseService.HomeSummaryView> homeSummary(@PathVariable long courseId,
+                                                                  @RequestAttribute("course.currentUser") CurrentUser user) {
+        return ApiResponse.ok(service.homeSummary(courseId, user));
+    }
+
     @PutMapping("/{courseId}")
     public ApiResponse<CourseService.CourseView> update(@PathVariable long courseId, @RequestBody CourseUpdateRequest request,
                                                          @RequestAttribute("course.currentUser") CurrentUser user) {

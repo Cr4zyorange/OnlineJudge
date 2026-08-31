@@ -471,6 +471,93 @@ class CourseServiceContractTest {
                 .isEqualTo("new lower sort row");
     }
 
+    @Test
+    void memberHomeSummaryReturnsCourseAnnouncementsAndTaskSummarySection() throws Exception {
+        String teacher = userToken("921", List.of("TEACHER"));
+        String student = userToken("922", List.of("STUDENT"));
+        String courseId = createdCourse(teacher, "home summary course");
+        mockMvc.perform(post("/api/v1/courses/{courseId}/announcements", courseId)
+                        .header("Authorization", teacher).header("X-Request-Id", requestId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"pinned welcome\",\"content\":\"first\",\"top\":true}"))
+                .andExpect(status().isOk());
+        mockMvc.perform(post("/api/v1/courses/{courseId}/announcements", courseId)
+                        .header("Authorization", teacher).header("X-Request-Id", requestId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"plain update\",\"content\":\"second\"}"))
+                .andExpect(status().isOk());
+        mockMvc.perform(post("/api/v1/courses/{courseId}/join", courseId)
+                        .header("Authorization", student).header("X-Request-Id", requestId()))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/v1/courses/{courseId}/home-summary", courseId)
+                        .header("Authorization", student).header("X-Request-Id", requestId()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.course.name").value("home summary course"))
+                .andExpect(jsonPath("$.data.announcements.length()").value(2))
+                .andExpect(jsonPath("$.data.announcements[0].title").value("pinned welcome"))
+                .andExpect(jsonPath("$.data.announcements[0].top").value(true))
+                .andExpect(jsonPath("$.data.recentTasks").isEmpty());
+    }
+
+    @Test
+    void nonMemberHomeSummaryIsDenied() throws Exception {
+        String teacher = userToken("931", List.of("TEACHER"));
+        String courseId = createdCourse(teacher, "member only home summary");
+        mockMvc.perform(get("/api/v1/courses/{courseId}/home-summary", courseId)
+                        .header("Authorization", userToken("932", List.of("STUDENT")))
+                        .header("X-Request-Id", requestId()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("COURSE_ACCESS_FORBIDDEN"));
+    }
+
+    @Test
+    void archivedAndClosedCoursesRejectContentMutationsWhileStayingReadable() throws Exception {
+        String teacher = userToken("941", List.of("TEACHER"));
+        String courseId = createdCourse(teacher, "read only after archive");
+        mockMvc.perform(delete("/api/v1/courses/{courseId}", courseId)
+                        .header("Authorization", teacher).header("X-Request-Id", requestId()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.status").value("ARCHIVED"));
+
+        mockMvc.perform(post("/api/v1/courses/{courseId}/chapters", courseId)
+                        .header("Authorization", teacher).header("X-Request-Id", requestId())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"title\":\"forbidden chapter\"}"))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("COURSE_READ_ONLY"));
+        mockMvc.perform(post("/api/v1/courses/{courseId}/resources", courseId)
+                        .header("Authorization", teacher).header("X-Request-Id", requestId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"forbidden resource\",\"url\":\"https://example.test/x.pdf\"}"))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("COURSE_READ_ONLY"));
+        mockMvc.perform(post("/api/v1/courses/{courseId}/announcements", courseId)
+                        .header("Authorization", teacher).header("X-Request-Id", requestId())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"title\":\"forbidden\",\"content\":\"x\"}"))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("COURSE_READ_ONLY"));
+        mockMvc.perform(put("/api/v1/courses/{courseId}", courseId)
+                        .header("Authorization", teacher).header("X-Request-Id", requestId())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"name\":\"renamed after archive\"}"))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("COURSE_READ_ONLY"));
+        mockMvc.perform(delete("/api/v1/courses/{courseId}", courseId)
+                        .header("Authorization", teacher).header("X-Request-Id", requestId()))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("COURSE_READ_ONLY"));
+
+        mockMvc.perform(get("/api/v1/courses/{courseId}/announcements", courseId)
+                        .header("Authorization", teacher).header("X-Request-Id", requestId()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data").isEmpty());
+        mockMvc.perform(get("/api/v1/courses/{courseId}/chapters", courseId)
+                        .header("Authorization", teacher).header("X-Request-Id", requestId()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data").isEmpty());
+
+        String closedId = createdCourse(teacher, "closed by status");
+        mockMvc.perform(put("/api/v1/courses/{courseId}", closedId)
+                        .header("Authorization", teacher).header("X-Request-Id", requestId())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"status\":\"CLOSED\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.status").value("CLOSED"));
+        mockMvc.perform(post("/api/v1/courses/{courseId}/announcements", closedId)
+                        .header("Authorization", teacher).header("X-Request-Id", requestId())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"title\":\"closed\",\"content\":\"x\"}"))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("COURSE_READ_ONLY"));
+    }
+
     private String createdCourse(String teacherToken, String name) throws Exception {
         String response = mockMvc.perform(post("/api/v1/courses")
                         .header("Authorization", teacherToken)

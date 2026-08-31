@@ -47,6 +47,15 @@ public class CourseRepository {
                 """, this::oneCourse, courseId);
     }
 
+    /** Serializes enrollment against the course row so capacity is decided and written atomically. */
+    public Optional<Course> lockCourse(long courseId) {
+        return jdbcTemplate.query("""
+                SELECT id, course_name, description, teacher_id, enrollment_mode, invite_code, max_students,
+                       status, is_deleted, roster_version
+                  FROM crs_course WHERE id = ? AND is_deleted = FALSE FOR UPDATE
+                """, this::oneCourse, courseId);
+    }
+
     public List<Course> allCourses() {
         return jdbcTemplate.query("""
                 SELECT id, course_name, description, teacher_id, enrollment_mode, invite_code, max_students,
