@@ -83,6 +83,79 @@ class CourseCapacityConcurrencyMySqlTest {
                 """, Integer.class, courseId)).isEqualTo(2);
     }
 
+    @Test
+    void onlyOneOfTwoPendingApplicantsCanBeApprovedForTheFinalSeat() throws Exception {
+        CourseService.CourseView created = courseService.create(
+                "issue312-approval-final-seat", "", "REVIEW", null, 2, TEACHER, UUID.randomUUID().toString());
+        long courseId = Long.parseLong(created.id());
+        CurrentUser firstApplicant = new CurrentUser(9812, Set.of("STUDENT"), Set.of(), 1);
+        CurrentUser secondApplicant = new CurrentUser(9813, Set.of("STUDENT"), Set.of(), 1);
+
+        courseService.join(courseId, null, firstApplicant, UUID.randomUUID().toString());
+        courseService.join(courseId, null, secondApplicant, UUID.randomUUID().toString());
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM crs_course_member
+                 WHERE course_id = ? AND join_status = 'PENDING' AND is_deleted = FALSE
+                """, Integer.class, courseId)).isEqualTo(2);
+
+        jdbcTemplate.execute("""
+                CREATE TRIGGER issue312_capacity_approval_delay BEFORE UPDATE ON crs_course_member
+                FOR EACH ROW DO SLEEP(IF(OLD.join_status = 'PENDING' AND NEW.join_status = 'ACTIVE', 1, 0))
+                """);
+
+        CountDownLatch ready = new CountDownLatch(2);
+        CountDownLatch start = new CountDownLatch(1);
+        AtomicReference<String> rejection = new AtomicReference<>();
+        try (ExecutorService pool = Executors.newFixedThreadPool(2)) {
+            Future<Boolean> first = pool.submit(() -> approvalOutcome(courseId, firstApplicant, ready, start, rejection));
+            Future<Boolean> second = pool.submit(() -> approvalOutcome(courseId, secondApplicant, ready, start, rejection));
+            ready.await();
+            start.countDown();
+
+            assertThat(first.get(15, TimeUnit.SECONDS) == second.get(15, TimeUnit.SECONDS)).isFalse();
+            assertThat(rejection.get()).isEqualTo("COURSE_CAPACITY_REACHED");
+        }
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM crs_course_member
+                 WHERE course_id = ? AND join_status = 'ACTIVE' AND is_deleted = FALSE
+                """, Integer.class, courseId)).isEqualTo(2);
+    }
+
+    @Test
+    void twoTeachersCannotConcurrentlyRemoveEachOther() throws Exception {
+        CourseService.CourseView created = courseService.create(
+                "issue312-last-teacher", "", "PUBLIC", null, null, TEACHER, UUID.randomUUID().toString());
+        long courseId = Long.parseLong(created.id());
+        CurrentUser secondTeacher = new CurrentUser(9822, Set.of("TEACHER"), Set.of("course:manage"), 1);
+        courseService.join(courseId, null, secondTeacher, UUID.randomUUID().toString());
+        courseService.changeMember(courseId, secondTeacher.id(), "TEACHER", "ACTIVE", TEACHER, UUID.randomUUID().toString());
+
+        jdbcTemplate.execute("""
+                CREATE TRIGGER issue312_last_teacher_delay BEFORE UPDATE ON crs_course_member
+                FOR EACH ROW DO SLEEP(IF(OLD.join_status = 'ACTIVE' AND OLD.role = 'TEACHER'
+                    AND NEW.join_status = 'REMOVED', 1, 0))
+                """);
+
+        CountDownLatch ready = new CountDownLatch(2);
+        CountDownLatch start = new CountDownLatch(1);
+        AtomicReference<String> rejection = new AtomicReference<>();
+        try (ExecutorService pool = Executors.newFixedThreadPool(2)) {
+            Future<Boolean> ownerRemovesSecond = pool.submit(() -> removalOutcome(
+                    courseId, secondTeacher.id(), TEACHER, ready, start, rejection));
+            Future<Boolean> secondRemovesOwner = pool.submit(() -> removalOutcome(
+                    courseId, TEACHER.id(), secondTeacher, ready, start, rejection));
+            ready.await();
+            start.countDown();
+
+            assertThat(ownerRemovesSecond.get(15, TimeUnit.SECONDS) == secondRemovesOwner.get(15, TimeUnit.SECONDS)).isFalse();
+            assertThat(rejection.get()).isIn("LAST_TEACHER_REQUIRED", "COURSE_ACCESS_FORBIDDEN");
+        }
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM crs_course_member
+                 WHERE course_id = ? AND role = 'TEACHER' AND join_status = 'ACTIVE' AND is_deleted = FALSE
+                """, Integer.class, courseId)).isEqualTo(1);
+    }
+
     private boolean joinOutcome(long courseId, CurrentUser user, CountDownLatch ready, CountDownLatch start,
                                 AtomicReference<String> rejection) throws Exception {
         ready.countDown();
@@ -96,7 +169,35 @@ class CourseCapacityConcurrencyMySqlTest {
         }
     }
 
+    private boolean approvalOutcome(long courseId, CurrentUser applicant, CountDownLatch ready, CountDownLatch start,
+                                    AtomicReference<String> rejection) throws Exception {
+        ready.countDown();
+        start.await();
+        try {
+            courseService.changeMember(courseId, applicant.id(), "STUDENT", "ACTIVE", TEACHER, UUID.randomUUID().toString());
+            return true;
+        } catch (CourseException rejected) {
+            rejection.compareAndSet(null, rejected.code());
+            return false;
+        }
+    }
+
+    private boolean removalOutcome(long courseId, long targetUserId, CurrentUser actor, CountDownLatch ready,
+                                   CountDownLatch start, AtomicReference<String> rejection) throws Exception {
+        ready.countDown();
+        start.await();
+        try {
+            courseService.changeMember(courseId, targetUserId, "TEACHER", "REMOVED", actor, UUID.randomUUID().toString());
+            return true;
+        } catch (CourseException rejected) {
+            rejection.compareAndSet(null, rejected.code());
+            return false;
+        }
+    }
+
     private void dropDelays() {
         jdbcTemplate.execute("DROP TRIGGER IF EXISTS issue312_capacity_join_delay");
+        jdbcTemplate.execute("DROP TRIGGER IF EXISTS issue312_capacity_approval_delay");
+        jdbcTemplate.execute("DROP TRIGGER IF EXISTS issue312_last_teacher_delay");
     }
 }

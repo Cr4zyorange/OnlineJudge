@@ -156,4 +156,5 @@ mvn -B -ntp -f "$repo_root/services/course/pom.xml" \
   -Dtest=CourseServiceContractTest,CourseSecurityVersionProjectionTest,CourseOutboxRelayRecoveryTest,IdentitySecurityVersionRabbitConsumerTest,CourseOutboxLeaseTest,CourseGeneratedKeyMySqlConcurrencyTest,CourseCapacityConcurrencyMySqlTest,JwksCacheTest \
   test | tee "$evidence_dir/course-service-live.log"
 
-printf 'issue312-course-live: PASS mysql=8.4 rabbit=4.1 upgrade=RED-GREEN-rollback-remigrate tables=8 tests=28 evidence=%s\n' "$evidence_dir"
+test_total="$(bash "$repo_root/scripts/test/course-surefire-summary.sh" "$evidence_dir/course-service-live.log")"
+printf 'issue312-course-live: PASS mysql=8.4 rabbit=4.1 upgrade=RED-GREEN-rollback-remigrate tables=8 tests=%s evidence=%s\n' "$test_total" "$evidence_dir"

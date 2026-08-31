@@ -50,6 +50,19 @@ require() {
   grep -Fq -- "$text" "$file" || fail "$label"
 }
 
+validate_compose_interpolation() {
+  command -v docker >/dev/null 2>&1 || fail "docker compose is required to validate Compose interpolation"
+  GIT_SHA='0000000000000000000000000000000000000000' \
+  MYSQL_PASSWORD='contract-mysql-password' \
+  MYSQL_ROOT_PASSWORD='contract-mysql-root-password' \
+  COURSE_DATABASE_PASSWORD='contract-course-password' \
+  RABBITMQ_PASSWORD='contract-rabbit-password' \
+  IDENTITY_JWKS_TRUST_BUNDLE='{"keys":[]}' \
+  IDENTITY_JWKS_URI='http://127.0.0.1:9/.well-known/jwks.json' \
+    docker compose --file "$compose" config --quiet >/dev/null || \
+    fail "supported Compose manifest has invalid interpolation"
+}
+
 require "$compose" 'rabbitmq:' 'RabbitMQ service is missing'
 require "$compose" 'course-migrations:' 'Course migration job is missing'
 require "$compose" 'course-service:' 'Course service is missing'
@@ -83,6 +96,7 @@ require "$live_smoke" 'Course source image provenance did not match its clean pa
 require "$live_learning" 'pending-before-binding=4' 'Course-to-Learning proof does not retain unbound durable facts'
 require "$live_learning" 'watermark=2 notifications=1' 'Course-to-Learning proof does not verify Learning convergence'
 require "$learning_overlay" 'OJ312_MYSQL_PORT' 'Course-to-Learning overlay does not isolate the disposable MySQL port'
+validate_compose_interpolation
 
 if [[ "$fixture_mode" == '--fixture' ]]; then
   printf 'course-compose-contract: fixture validation PASS\n'
@@ -144,6 +158,17 @@ grep -Fq 'stale Course image layer' "$fixture/image-cache.err" || \
   fail "stale Course image cache mutation was not detected"
 cp "$live_smoke" "$fixture/scripts/test/verify-course-compose-live.sh"
 chmod +x "$fixture/scripts/test/verify-course-compose-live.sh"
+
+# Mutation: Docker Compose must parse every defaulted environment expression;
+# `${NAME:}` is not a valid empty-default form and blocks the entire runtime.
+sed -i.bak 's/COURSE_LEARNING_SERVICE_TOKEN:-}/COURSE_LEARNING_SERVICE_TOKEN:}/' "$fixture/deploy/docker/compose.yml"
+rm -f "$fixture/deploy/docker/compose.yml.bak"
+if bash "$0" "$fixture" --fixture >"$fixture/interpolation.out" 2>"$fixture/interpolation.err"; then
+  fail "invalid Compose interpolation mutation unexpectedly passed"
+fi
+grep -Fq 'supported Compose manifest has invalid interpolation' "$fixture/interpolation.err" || \
+  fail "invalid Compose interpolation mutation was not detected"
+cp "$compose" "$fixture/deploy/docker/compose.yml"
 
 awk '
   /^  course-service:$/ { skip = 1; next }

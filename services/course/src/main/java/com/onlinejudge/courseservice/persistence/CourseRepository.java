@@ -87,6 +87,18 @@ public class CourseRepository {
                 """, (rs, row) -> member(rs), courseId);
     }
 
+    /**
+     * A current, locked roster view used after lockCourse() for membership
+     * mutations.  It avoids a repeatable-read snapshot observing stale members
+     * after another serialized course mutation has committed.
+     */
+    public List<Member> lockMembers(long courseId) {
+        return jdbcTemplate.query("""
+                SELECT id, course_id, user_id, role, join_method, join_status, member_version
+                  FROM crs_course_member WHERE course_id = ? AND is_deleted = FALSE ORDER BY user_id FOR UPDATE
+                """, (rs, row) -> member(rs), courseId);
+    }
+
     public List<Member> members(long courseId, String role, String status, int page, int size) {
         StringBuilder sql = new StringBuilder("SELECT id, course_id, user_id, role, join_method, join_status, member_version FROM crs_course_member WHERE course_id = ? AND is_deleted = FALSE");
         java.util.ArrayList<Object> values = new java.util.ArrayList<>();
