@@ -3,9 +3,8 @@
 ## 1. 结论
 
 当前阶段已完成五服务 Gateway 的契约、独立 workload、零信任请求 Header、request ID、
-路由、限制、错误、单服务切换与回滚实现。所有不依赖 Docker 的相关自动化检查通过；
-Docker Linux 引擎在当前 Windows 会话不可用，五 upstream 容器运行时和真实
-Identity/Assessment 停机验收均以明确退出码 69 保持未通过状态。
+路由、限制、错误、单服务切换与回滚实现。Docker Linux 引擎恢复后，五 upstream 容器
+运行时验收以及真实 Identity/Assessment 停机验收均已通过。
 
 本记录不关闭 #317。#312 Course、#339 Grade、#342 Learning 尚未提供最终真实服务环境，
 五服务主链也尚未运行，因此 PR 必须保持 Draft。
@@ -20,7 +19,7 @@ Identity/Assessment 停机验收均以明确退出码 69 保持未通过状态�
 | `origin/dev` 基线 | `836eb38` |
 | 静态验收代码 SHA | `d88990d` |
 | Docker Client | 29.3.1 |
-| Docker Server | 不可用；`com.docker.service` 为 `Stopped`，当前会话无权启动 |
+| Docker Server | 29.3.1（Docker Desktop Linux engine） |
 | Java / Maven | Oracle JDK 24.0.2 / Maven 3.9.16 |
 | 目标 Gateway | `nginx:1.27-alpine`，独立 `services/gateway/Dockerfile` |
 
@@ -39,7 +38,11 @@ Git Bash 在本机将 `python3` 解析到 WindowsApps 的无效占位程序，�
 | 五目标切换 | 旧脚本返回 `service must be auth, crs, assessment, or learning-grade` | Identity/Course/Assessment/Grade/Learning 独立切换与完整回滚通过 |
 | Kind 边界 | 检出 frontend 仍挂载 `gateway-config` | frontend 与 Gateway 解耦，D3 清单回归仍通过 |
 | Gateway 健康验证 | verifier 仍请求单体 `/api/v1/system/**` | 改为 `/health/live`、`/health/ready` |
-| 真实服务门 | Identity/Assessment 脚本缺失 | 结构安全契约通过；实际环境仍以 69 阻塞 |
+| Nginx request ID 正则 | 容器启动失败：`unexpected "{"` | 以 Nginx 支持的带引号正则键渲染，运行时配置校验通过 |
+| 运行时 fixture 前端 | Gateway `GET /` 为 502（fixture 固定监听 8080） | fixture 支持端口注入，前端按真实 `frontend:80` 监听 |
+| Git Bash 挂载 | 1 秒超时模板未进入容器，慢请求错误返回 200 | Windows 挂载源路径显式转换并关闭该次 Docker 参数路径重写，504 断言通过 |
+| 真实服务 JWKS | JWKS 健康探测返回 400（缺 request ID） | 验收脚本按 Identity 公共契约传递 request ID |
+| 真实服务响应头 | CRLF 正则导致连续性断言误报 | 规范化响应头换行后精确比较 request ID |
 
 每个生产行为均先出现对应失败，再补最小实现并复跑相关回归。
 
@@ -71,17 +74,17 @@ Git Bash 在本机将 `python3` 解析到 WindowsApps 的无效占位程序，�
 | `bash scripts/test/verify-kind-scripts.test.sh` | PASS |
 | `mvn -q test` | PASS：495 tests、0 failures、0 errors、13 skipped |
 | `git diff --check` | PASS |
+| `bash scripts/gateway/tests/gateway-runtime.test.sh` | PASS：五服务、Header 白名单、401/403/404/413/429/502/503/504、关闭重试 |
+| `bash scripts/gateway/tests/identity-assessment-runtime.test.sh` | PASS：经 Gateway 登录；Identity 停止时 Assessment 本地校验 JWT 仍返回 404，并保留 request ID |
 
 ## 5. 当前阻塞且未计为通过
 
 | 命令 | 当前结果 | 复测条件 |
 | --- | --- | --- |
-| `bash scripts/gateway/tests/gateway-runtime.test.sh` | `BLOCKED: Docker Linux engine is unavailable`，退出 69 | Docker Linux Server 可连接 |
-| `bash scripts/gateway/tests/identity-assessment-runtime.test.sh` | `Docker Linux engine is unavailable`，退出 69 | Docker 可用，Identity、Assessment、Gateway 已启动并提供安全测试账号 |
 | 真实五服务主链 | 未执行 | #312、#339、#342 提供 `UNBLOCKED_BY`，#318 disposable 环境可用 |
 
-尝试通过 `Start-Service com.docker.service` 恢复环境时，Windows 返回当前会话不能打开该
-服务；没有绕过权限、修改系统服务配置或伪造容器证据。
+运行时验收使用独立命名的临时 Docker network、七个临时容器和 H2 内存数据源；验收结束后
+已全部删除，未触碰现有 `opengaussdb` 容器。
 
 ## 6. 已覆盖的契约
 
@@ -99,7 +102,7 @@ Git Bash 在本机将 `python3` 解析到 WindowsApps 的无效占位程序，�
 
 ## 7. 剩余验收
 
-Docker 恢复后，先原样运行两条阻塞脚本。#312、#339、#342 完成后，再通过 #318 的真实
+#312、#339、#342 完成后，再通过 #318 的真实
 disposable 环境执行：登录 → 课程 → 作业/实验 → 提交/评测 → 成绩 → 通知，并验证每个
 下游独立 JWT/权限拒绝、request ID 连续、限流、超时、断连、超大请求和非幂等无重试。
 只有这些结果通过后，才能更新本记录、将 PR 转为非草稿并发布最终 `UNBLOCKED_BY #317`。
