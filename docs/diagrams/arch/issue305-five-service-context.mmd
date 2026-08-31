@@ -1,15 +1,16 @@
 flowchart LR
   Identity[Identity\nJWT / JWKS / security version]
-  Course[Course\ncourse + membership roster]
-  Assessment[Assessment API + Worker\nLAB/HWK + evaluations]
-  Grade[Grade\nsource-grade projection + publication]
-  Learning[Learning\ntasks + notifications]
-  Identity -. local verification .-> Course
-  Identity -. local verification .-> Assessment
-  Identity -. local verification .-> Grade
-  Identity -. local verification .-> Learning
-  Course -->|authorization API; member/roster event| Assessment
-  Course -->|roster/announcement event| Learning
-  Assessment -->|source-grade event/API| Grade
-  Assessment -->|homework/evaluation event| Learning
-  Grade -->|publication/review event| Learning
+  Course[Course\ncourse + membership]
+  Assessment[Assessment API + Worker\nLAB/HWK + evaluation]
+  Grade[Grade\nsource projection + grade]
+  Learning[Learning\ntask + progress + notification]
+  Identity -. locally verified identity .-> Course
+  Identity -. locally verified identity .-> Assessment
+  Identity -. locally verified identity .-> Grade
+  Identity -. locally verified identity .-> Learning
+  Course -->|authorization API| Assessment
+  Course -->|authorization API| Grade
+  Course -->|course/member events| Learning
+  Assessment -->|source-grade events| Grade
+  Assessment -->|homework/evaluation events| Learning
+  Grade -->|publication/review events| Learning

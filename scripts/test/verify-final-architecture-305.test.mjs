@@ -22,12 +22,10 @@ function fixtureRoot() {
     'docs/diagrams/arch/issue305-five-service-deployment.mmd',
     'docs/adr/ADR-006-五业务服务与可靠消息契约.md',
     'docs/开发/D6-AUTH-独立身份服务交付.md',
-    'docs/开发/D4-CROSS-SERVICE-共享契约.md',
     'docs/开发/D6-D7-五服务共享契约-v2.md',
     'docs/开发/D6-D7-五服务架构冻结-305.md',
     'docs/开发/D6-DATA-五域数据所有权契约.md',
-    'docs/开发/D7-平台工作负载清单契约.md',
-    'docs/过程/概要/评测服务拆分设计与迁移边界.md'
+    'docs/开发/D7-平台工作负载清单契约.md'
   ]) {
     const source = join(repoRoot, relativePath);
     const destination = join(root, relativePath);
@@ -137,19 +135,15 @@ test('the freeze rejects D7 evidence that points to the superseded #309 or draft
   }
 });
 
-test('the freeze rejects a historical document whose #305 reference no longer resolves', () => {
+test('the freeze rejects reintroducing a deleted architecture document', () => {
   const root = fixtureRoot();
   try {
     const v1Path = join(root, 'docs/开发/D4-CROSS-SERVICE-共享契约.md');
-    const v1 = readFileSync(v1Path, 'utf8').replace(
-      '](D6-D7-五服务架构冻结-305.md)',
-      '](missing-D6-D7-五服务架构冻结-305.md)'
-    );
-    writeFileSync(v1Path, v1, 'utf8');
+    writeFileSync(v1Path, '# rejected architecture\n', 'utf8');
 
     assert.throws(
       () => verifyFinalArchitecture305({ rootPath: root }),
-      /D4 history document must link to the #305 freeze at D6-D7-五服务架构冻结-305\.md/
+      /rejected architecture document must be deleted: docs\/开发\/D4-CROSS-SERVICE-共享契约\.md/
     );
   } finally {
     rmSync(root, { recursive: true, force: true });

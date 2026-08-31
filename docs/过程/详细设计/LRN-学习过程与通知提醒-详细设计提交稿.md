@@ -216,7 +216,7 @@ v2 事件使用统一 `EventEnvelope`，不得携带 `receiverUserIds` 或学生
 | SVC-LRN-04 | ReminderRuleService   | 管理用户提醒规则和通知偏好，定时扫描即将截止任务并触发提醒   | userId, ruleDTO            | 规则列表、成功/失败   |
 | SVC-LRN-05 | EventConsumerService  | 监听来自 LAB/HWK/GRD 的事件（MQ或直接调用），调用 NotificationService 创建通知 | ModuleEvent                | 通知ID列表            |
 
-v1 应用内直接调用曾由 `PersistentNotificationEventPublisher` 提供同步 `publishRequired`，作为历史实现保留。v2 不把 Learning 通知持久化加入 Assessment 发布事务：Homework `PUBLISHED` 与 `assessment.homework.published.v2` outbox 同一本地事务成功即提交；Learning 至少一次消费后，从事件的有界 `title`、RFC3339 `deadline`、`receiverScope=COURSE_ACTIVE_STUDENTS` 和自己的 Course 成员投影创建任务与通知。`receiverUserIds`/学生 roster 被禁止；消费者以 `homeworkId:recipientUserId` 幂等。Learning、broker 或网络失败进入 outbox 重试、DLQ、重放和对账，不回滚发布；只有 Homework/outbox **本地**事务失败才使 API-HWK-03 返回 `503/HWK_5003` 并保持 DRAFT。
+Learning 通知持久化不加入 Assessment 发布事务：Homework `PUBLISHED` 与 `assessment.homework.published.v2` outbox 同一本地事务成功即提交；Learning 至少一次消费后，从事件的有界 `title`、RFC3339 `deadline`、`receiverScope=COURSE_ACTIVE_STUDENTS` 和自己的 Course 成员投影创建任务与通知。`receiverUserIds`/学生 roster 被禁止；消费者以 `homeworkId:recipientUserId` 幂等。Learning、broker 或网络失败进入 outbox 重试、DLQ、重放和对账，不回滚发布；只有 Homework/outbox **本地**事务失败才使 API-HWK-03 返回 `503/HWK_5003` 并保持 DRAFT。
 
 ## 6 数据结构与数据库设计
 

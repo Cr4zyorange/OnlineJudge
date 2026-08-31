@@ -1,9 +1,9 @@
 sequenceDiagram
   participant API as Assessment API
-  participant DB as oj_assessment task store
+  participant DB as Assessment task store
   participant W1 as Worker A
   participant W2 as Worker B
-  API->>DB: transaction creates PENDING task and outbox
+  API->>DB: transaction creates Submission and PENDING job
   W1->>DB: conditional claim at generation n for leaseOwner A
   Note over W1,DB: lease expires or Worker A crashes
   W2->>DB: conditional re-claim at next generation for leaseOwner B
