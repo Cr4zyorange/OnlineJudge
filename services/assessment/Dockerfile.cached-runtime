@@ -1,0 +1,22 @@
+# Registry-constrained verification path: the service jar is built locally and
+# copied into an immutable, already-cached Java 21 runtime. It deliberately
+# keeps the OCI metadata, non-root UID and compose entrypoint equal to the
+# primary Dockerfile.
+ARG RUNTIME_BASE=eclipse-temurin:21-jre@sha256:7a65df4b22d2de92d4e04056e884f3b9122d70b21e2847fd66084278bd0ce037
+FROM ${RUNTIME_BASE}
+
+WORKDIR /opt/onlinejudge-assessment
+ARG GIT_SHA
+ARG IMAGE_SOURCE=https://github.com/Cr4zyorange/OnlineJudge
+LABEL org.opencontainers.image.revision="$GIT_SHA" org.opencontainers.image.version="$GIT_SHA" org.opencontainers.image.source="$IMAGE_SOURCE"
+
+USER root
+# A verified cached runtime can already carry the non-root uid.  Preserve that
+# uid instead of failing the constrained build path on an existing account.
+RUN getent group 10003 >/dev/null || groupadd --system --gid 10003 assessment \
+    && (id -u 10003 >/dev/null 2>&1 || useradd --system --uid 10003 --gid 10003 --home-dir /opt/onlinejudge-assessment --shell /usr/sbin/nologin assessment) \
+    && install -d -o 10003 -g 10003 /var/lib/onlinejudge-assessment
+COPY --chown=10003:10003 services/assessment/target/onlinejudge-assessment-service-0.1.0-SNAPSHOT.jar app.jar
+EXPOSE 8083
+USER 10003:10003
+ENTRYPOINT ["java", "-jar", "/opt/onlinejudge-assessment/app.jar", "--spring.config.additional-location=classpath:/application-compose.properties"]

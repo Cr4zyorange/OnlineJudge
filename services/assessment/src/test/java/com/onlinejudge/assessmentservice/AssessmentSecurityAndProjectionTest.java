@@ -1,0 +1,51 @@
+package com.onlinejudge.assessmentservice;
+
+import com.onlinejudge.assessmentservice.security.TestJwtFactory;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.web.servlet.MockMvc;
+
+import java.security.KeyPair;
+import java.util.List;
+
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+/** v2 identity and Course projection are both mandatory; gateway headers never grant submission authority. */
+@SpringBootTest
+@AutoConfigureMockMvc
+class AssessmentSecurityAndProjectionTest {
+    private static final KeyPair KEY = TestJwtFactory.rsaKeyPair();
+    @Autowired MockMvc mockMvc;
+    @Autowired JdbcTemplate jdbc;
+
+    @DynamicPropertySource
+    static void identity(DynamicPropertyRegistry registry) {
+        registry.add("assessment.identity.jwks-trust-bundle", () -> TestJwtFactory.jwks("assessment-test-kid", KEY));
+        registry.add("assessment.identity.jwks-uri", () -> "http://127.0.0.1:1/identity/jwks.json");
+    }
+
+    @BeforeEach
+    void projection() {
+        jdbc.update("DELETE FROM assessment_course_member_projection");
+        jdbc.update("INSERT INTO assessment_course_member_projection (course_id, user_id, membership_status, member_version) VALUES ('course-7', 'student-42', 'ACTIVE', 1)");
+    }
+
+    @Test
+    void forgedHeadersAreRejectedWhileCachedJwtAndCourseProjectionAuthorizeSubmission() throws Exception {
+        mockMvc.perform(post("/api/v1/submissions").header("X-User-Id", "student-42").header("X-User-Role", "STUDENT")
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"sourceType\":\"HWK\",\"sourceId\":\"h-1\",\"courseId\":\"course-7\"}"))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(post("/api/v1/submissions").header("Authorization", "Bearer " + TestJwtFactory.userToken(KEY, "assessment-test-kid", "student-42", List.of("STUDENT")))
+                        .header("X-Request-Id", "8f647722-1c27-4dcb-b388-6004a0d8929d").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"sourceType\":\"HWK\",\"sourceId\":\"h-1\",\"courseId\":\"course-7\"}"))
+                .andExpect(status().isCreated());
+    }
+}

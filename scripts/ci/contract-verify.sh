@@ -81,6 +81,11 @@ log_run node --test "$checkout/scripts/test/verify-data-ownership-contract.test.
 log_run node --test "$checkout/scripts/test/verify-five-domain-data-migration.test.mjs"
 if [[ "$side" == "consumer" || "$side" == "all" ]]; then
   log_run bash "$checkout/database/tests/verify-five-domain-migration.sh"
+  # The generic runner is the executable migration path consumed by the D7
+  # Jobs.  Keep it adjacent to #341's 45/45 runtime-account gate: both run on
+  # disposable MySQL 8.4, and a service migration cannot pass by falling back
+  # to application boot DDL.
+  log_run bash "$checkout/database/tests/verify-assessment-migration-runner.sh"
 fi
 
 # 仓库脚本契约：所有跟踪的 *.sh 必须 LF + bash 语法合法。

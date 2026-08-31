@@ -4,7 +4,9 @@ set -euo pipefail
 
 repo_root="$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"
 checkout="${1:-$repo_root}"
+checkout="$(CDPATH= cd -- "$checkout" && pwd)"
 backend_dir="$checkout/backend"
+assessment_dir="$checkout/services/assessment"
 artifact_dir="$checkout/ci-artifacts/backend-gate"
 log="$artifact_dir/gate.log"
 expected_java_major="${OJ_CI_JAVA_MAJOR:-21}"
@@ -75,6 +77,7 @@ version_ge "$maven_version" "$expected_maven_min_version" || {
 printf 'backend-verify: java=%s maven=%s\n' "$java_major" "$maven_version" | tee -a "$log"
 
 [[ -f "$backend_dir/pom.xml" ]] || fail "missing $backend_dir/pom.xml"
+[[ -f "$assessment_dir/pom.xml" ]] || fail "missing $assessment_dir/pom.xml"
 
 preserve_reports() {
   local phase="$1"
@@ -102,4 +105,13 @@ printf '\n$ mvn -B -ntp test（集成，仅 integration/** 与 CrsClosureE2EApiT
   -Dsurefire.includes='**/integration/**,**/CrsClosureE2EApiTest.java')
 preserve_reports integration
 
-printf 'backend-verify: PASS (compile + unit + integration)\n' | tee -a "$log"
+# Assessment is a separately packaged Java service.  It must be compiled and
+# tested here so an ignored or missing production class cannot pass the shared
+# backend gate merely because the monolith does not depend on it.
+printf '\n$ mvn -B -ntp -f services/assessment/pom.xml -DskipTests compile\n' | tee -a "$log"
+(cd "$checkout" && run_mvn_retry mvn -B -ntp -f services/assessment/pom.xml -DskipTests compile)
+printf '\n$ mvn -B -ntp -f services/assessment/pom.xml test\n' | tee -a "$log"
+(cd "$checkout" && rm -f services/assessment/target/surefire-reports/*.xml \
+  && run_mvn_retry mvn -B -ntp -f services/assessment/pom.xml test)
+
+printf 'backend-verify: PASS (backend compile + unit + integration; assessment compile + test)\n' | tee -a "$log"

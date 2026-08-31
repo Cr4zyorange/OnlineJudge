@@ -21,6 +21,9 @@ from pathlib import Path
 from typing import Any
 
 
+REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
+
+
 CORE_WORKLOADS = {
     "gateway",
     "identity-service",
@@ -461,7 +464,7 @@ def validate_migration_jobs(manifest: dict[str, Any], workload_by_name: dict[str
     for index, job in enumerate(manifest["migrationJobs"]):
         location = f"migrationJobs[{index}]"
         fields = {
-            "name", "schema", "forWorkload", "sourcePaths", "command", "dependsOnWorkloads",
+            "name", "schema", "forWorkload", "sourcePaths", "command", "configuration", "secrets", "dependsOnWorkloads",
             "dependsOnMigrationJobs", "runOnce", "blocksTraffic", "failurePolicy", "retryPolicy", "rollback",
         }
         required_fields(job, fields, location)
@@ -474,6 +477,35 @@ def validate_migration_jobs(manifest: dict[str, Any], workload_by_name: dict[str
         if job["schema"] in seen_schemas:
             raise ManifestValidationError(f"duplicate migration schema '{job['schema']}'")
         seen_schemas.add(job["schema"])
+        expected_command = f"./database/mysql/migrate-service.sh --schema {job['schema']}"
+        if job["command"] != expected_command:
+            raise ManifestValidationError(
+                f"{location} must use the checked-in migration runner '{expected_command}'"
+            )
+        runner = REPOSITORY_ROOT / "database/mysql/migrate-service.sh"
+        if not runner.is_file() or runner.stat().st_mode & 0o111 == 0:
+            raise ManifestValidationError(
+                f"{location} migration runner must exist and be executable: {runner.relative_to(REPOSITORY_ROOT)}"
+            )
+        if job["configuration"] != [
+            "MYSQL_HOST",
+            "MYSQL_PORT",
+            "MIGRATION_DATABASE_NAME",
+            "MIGRATION_DATABASE_USER",
+        ]:
+            raise ManifestValidationError(
+                f"{location} must inject only the migration control-plane connection configuration"
+            )
+        expected_secret = {
+            "key": "MIGRATION_DATABASE_PASSWORD",
+            "injectedAs": "migration-secret",
+            "redact": True,
+            "imageBuild": "forbidden",
+        }
+        if job["secrets"] != [expected_secret]:
+            raise ManifestValidationError(
+                f"{location} must inject exactly one redacted migration-only credential"
+            )
         if job["forWorkload"] not in workload_by_name:
             raise ManifestValidationError(f"{location} references unknown workload '{job['forWorkload']}'")
         if workload_by_name[job["forWorkload"]]["migrationJob"] != job["name"]:

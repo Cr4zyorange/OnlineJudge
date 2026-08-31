@@ -1,0 +1,55 @@
+spring:
+  application:
+    name: assessment-service
+  datasource:
+    url: ${ASSESSMENT_DATASOURCE_URL:jdbc:h2:mem:assessment_service;MODE=MySQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1}
+    username: ${ASSESSMENT_DATABASE_USER:sa}
+    password: ${ASSESSMENT_DATABASE_PASSWORD:}
+    driver-class-name: ${ASSESSMENT_DATABASE_DRIVER:org.h2.Driver}
+  sql.init:
+    mode: always
+    schema-locations: classpath:schema-assessment.sql
+server.port: ${ASSESSMENT_HTTP_PORT:8083}
+management:
+  endpoint.health.probes.enabled: true
+  endpoints.web.exposure.include: health,info
+assessment:
+  storage:
+    root: ${ASSESSMENT_STORAGE_ROOT:./var/assessment-files}
+  sandbox:
+    command: ${ASSESSMENT_SANDBOX_COMMAND:}
+    timeout: ${ASSESSMENT_SANDBOX_TIMEOUT:PT30S}
+    pre-execution-delay: ${ASSESSMENT_SANDBOX_PRE_EXECUTION_DELAY:PT0S}
+  worker:
+    lease: ${ASSESSMENT_WORKER_LEASE:PT30S}
+    heartbeat-interval: ${ASSESSMENT_WORKER_HEARTBEAT_INTERVAL:PT5S}
+    max-attempts: ${ASSESSMENT_WORKER_MAX_ATTEMPTS:3}
+    retry-backoff: ${ASSESSMENT_WORKER_RETRY_BACKOFF:PT5S}
+  rabbit:
+    enabled: ${ASSESSMENT_RABBIT_ENABLED:false}
+    host: ${ASSESSMENT_RABBIT_HOST:${RABBITMQ_HOST:127.0.0.1}}
+    port: ${ASSESSMENT_RABBIT_PORT:${RABBITMQ_PORT:5672}}
+    username: ${ASSESSMENT_RABBIT_USERNAME:${RABBITMQ_USERNAME:}}
+    password: ${ASSESSMENT_RABBIT_PASSWORD:${RABBITMQ_PASSWORD:}}
+    exchange: ${ASSESSMENT_RABBIT_EXCHANGE:onlinejudge.events.v2}
+    course-member-queue: ${ASSESSMENT_COURSE_MEMBER_QUEUE:assessment.course-members.v2}
+    course-membership-snapshot-routing-key: ${ASSESSMENT_COURSE_MEMBERSHIP_SNAPSHOT_ROUTING_KEY:onlinejudge.course.membership.snapshot.v2}
+    course-member-dead-letter-exchange: ${ASSESSMENT_COURSE_MEMBER_DEAD_LETTER_EXCHANGE:onlinejudge.events.dlx.v2}
+    course-member-dead-letter-queue: ${ASSESSMENT_COURSE_MEMBER_DEAD_LETTER_QUEUE:assessment.course-members.dlq.v2}
+    course-member-dead-letter-routing-key: ${ASSESSMENT_COURSE_MEMBER_DEAD_LETTER_ROUTING_KEY:onlinejudge.course.member.changed.invalid.v2}
+    replay-course-member-event-id: ${ASSESSMENT_REPLAY_COURSE_MEMBER_EVENT_ID:}
+    identity-security-version-queue: ${ASSESSMENT_IDENTITY_SECURITY_VERSION_QUEUE:assessment.identity-security-version.v2}
+    identity-security-version-dead-letter-exchange: ${ASSESSMENT_IDENTITY_SECURITY_VERSION_DEAD_LETTER_EXCHANGE:onlinejudge.events.dlx.v2}
+    identity-security-version-dead-letter-queue: ${ASSESSMENT_IDENTITY_SECURITY_VERSION_DEAD_LETTER_QUEUE:assessment.identity-security-version.dlq.v2}
+    identity-security-version-dead-letter-routing-key: ${ASSESSMENT_IDENTITY_SECURITY_VERSION_DEAD_LETTER_ROUTING_KEY:onlinejudge.identity.security-version.changed.invalid.v2}
+    replay-identity-security-version-event-id: ${ASSESSMENT_REPLAY_IDENTITY_SECURITY_VERSION_EVENT_ID:}
+    relay-enabled: ${ASSESSMENT_RABBIT_RELAY_ENABLED:true}
+    relay-interval: ${ASSESSMENT_RABBIT_RELAY_INTERVAL:1000}
+  identity:
+    issuer: ${IDENTITY_JWT_ISSUER:onlinejudge.identity.v2}
+    audience: ${IDENTITY_JWT_AUDIENCE:onlinejudge.api}
+    jwks-uri: ${IDENTITY_JWKS_URI:}
+    jwks-trust-bundle: ${IDENTITY_JWKS_TRUST_BUNDLE:}
+    request-timeout: ${IDENTITY_JWKS_REQUEST_TIMEOUT:PT1S}
+    refresh-enabled: ${IDENTITY_JWKS_REFRESH_ENABLED:true}
+    refresh-interval: ${IDENTITY_JWKS_REFRESH_INTERVAL:PT5M}

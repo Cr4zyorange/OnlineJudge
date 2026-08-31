@@ -157,6 +157,8 @@ for job in "${required_jobs[@]}"; do
     'grep -Fq "$1" <<< "$2"' _ "$script" "$section"
   run_check "canonical script $script exists" test -f "$checkout/$script"
 done
+run_check "backend verifier compiles and tests Assessment service" \
+  grep -Fq 'services/assessment/pom.xml' "$checkout/scripts/ci/backend-verify.sh"
 
 # 7. 硬门禁不得被 continue-on-error 吞掉。
 run_check "no continue-on-error" bash -c '! grep -Eq "continue-on-error" "$1"' _ "$workflow_file"

@@ -68,7 +68,9 @@ jobs:
           distribution: temurin
           java-version: "21"
           cache: maven
-          cache-dependency-path: backend/pom.xml
+          cache-dependency-path: |
+            backend/pom.xml
+            services/assessment/pom.xml
       - name: Collect environment manifest
         run: bash scripts/ci/collect-environment.sh "$GITHUB_WORKSPACE" ci-artifacts/backend-gate/environment.json
       - name: Backend quality gates
@@ -85,6 +87,7 @@ jobs:
             ci-artifacts/backend-gate/**
             backend/target/surefire-reports/unit/**
             backend/target/surefire-reports/integration/**
+            services/assessment/target/surefire-reports/**
           if-no-files-found: warn
           retention-days: 14
 

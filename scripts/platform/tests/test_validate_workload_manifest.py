@@ -205,6 +205,21 @@ class WorkloadManifestValidationTest(unittest.TestCase):
         self.assertIn("migration source path", result.stderr)
         self.assertIn("identity-migrations", result.stderr)
 
+    def test_migration_job_requires_the_checked_in_executable_runner(self) -> None:
+        def mutate(manifest: dict) -> None:
+            assessment = next(
+                job for job in manifest["migrationJobs"] if job["schema"] == "assessment"
+            )
+            assessment["command"] = "./database/mysql/removed-migrate-service.sh --schema assessment"
+
+        temporary_directory = self.write_variant(mutate)
+        self.addCleanup(temporary_directory.cleanup)
+
+        result = self.run_validator(Path(temporary_directory.name) / "workloads.json")
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("migration runner", result.stderr)
+
     def test_gateway_models_the_browser_entry_for_frontend(self) -> None:
         manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
         gateway = next(workload for workload in manifest["workloads"] if workload["name"] == "gateway")

@@ -43,6 +43,7 @@ count_reports() {
 count_reports "backend unit" "$checkout/backend/target/surefire-reports/unit"
 count_reports "backend integration" "$checkout/backend/target/surefire-reports/integration"
 count_reports "backend contract" "$checkout/backend/target/surefire-reports/contract"
+count_reports "assessment service" "$checkout/services/assessment/target/surefire-reports"
 count_reports "frontend unit" "$checkout/ci-artifacts/frontend-gate"
 
 # 前端共享运行器契约计数（node --test 的 spec 汇总行）。

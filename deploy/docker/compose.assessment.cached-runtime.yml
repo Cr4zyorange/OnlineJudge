@@ -1,0 +1,20 @@
+# Explicit override used only when the public Maven/Temurin image metadata is
+# unavailable. `RUNTIME_BASE` must name an already inspected immutable Java21
+# runtime; it never silently falls back to an unpinned image.
+services:
+  assessment-api:
+    image: onlinejudge/assessment-api:${GIT_SHA:?GIT_SHA is required}
+    build:
+      context: ../..
+      dockerfile: services/assessment/Dockerfile.cached-runtime
+      args:
+        RUNTIME_BASE: ${ASSESSMENT_RUNTIME_BASE:?ASSESSMENT_RUNTIME_BASE is required}
+        GIT_SHA: ${GIT_SHA:?GIT_SHA is required}
+  assessment-worker:
+    image: onlinejudge/assessment-worker:${GIT_SHA:?GIT_SHA is required}
+    build:
+      context: ../..
+      dockerfile: services/assessment/Dockerfile.cached-runtime
+      args:
+        RUNTIME_BASE: ${ASSESSMENT_RUNTIME_BASE:?ASSESSMENT_RUNTIME_BASE is required}
+        GIT_SHA: ${GIT_SHA:?GIT_SHA is required}
