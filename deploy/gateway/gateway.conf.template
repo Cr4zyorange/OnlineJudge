@@ -1,0 +1,29 @@
+upstream identity_upstream {
+    server __IDENTITY_UPSTREAM__;
+}
+
+upstream course_upstream {
+    server __COURSE_UPSTREAM__;
+}
+
+upstream assessment_upstream {
+    server __ASSESSMENT_UPSTREAM__;
+}
+
+upstream grade_upstream {
+    server __GRADE_UPSTREAM__;
+}
+
+upstream learning_upstream {
+    server __LEARNING_UPSTREAM__;
+}
+
+server {
+    listen 8080;
+    server_name _;
+
+    location /health/live {
+        default_type application/json;
+        return 200 '{"status":"UP"}';
+    }
+}

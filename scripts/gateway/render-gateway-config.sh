@@ -25,12 +25,18 @@ done
 [[ -n "$template" && -f "$template" ]] || { printf 'template is required\n' >&2; exit 64; }
 [[ -n "$output" ]] || { printf 'output is required\n' >&2; exit 64; }
 
-AUTH_UPSTREAM="${AUTH_UPSTREAM:-backend:8080}"
-CRS_UPSTREAM="${CRS_UPSTREAM:-backend:8080}"
-ASSESSMENT_UPSTREAM="${ASSESSMENT_UPSTREAM:-backend:8080}"
-LEARNING_GRADE_UPSTREAM="${LEARNING_GRADE_UPSTREAM:-backend:8080}"
+: "${IDENTITY_UPSTREAM:?IDENTITY_UPSTREAM is required}"
+: "${COURSE_UPSTREAM:?COURSE_UPSTREAM is required}"
+: "${ASSESSMENT_UPSTREAM:?ASSESSMENT_UPSTREAM is required}"
+: "${GRADE_UPSTREAM:?GRADE_UPSTREAM is required}"
+: "${LEARNING_UPSTREAM:?LEARNING_UPSTREAM is required}"
 
-for value in "$AUTH_UPSTREAM" "$CRS_UPSTREAM" "$ASSESSMENT_UPSTREAM" "$LEARNING_GRADE_UPSTREAM"; do
+for value in \
+  "$IDENTITY_UPSTREAM" \
+  "$COURSE_UPSTREAM" \
+  "$ASSESSMENT_UPSTREAM" \
+  "$GRADE_UPSTREAM" \
+  "$LEARNING_UPSTREAM"; do
   [[ "$value" =~ ^[a-z0-9][a-z0-9.-]*:[0-9]{2,5}$ ]] || {
     printf 'upstream must be a lowercase host:port value\n' >&2
     exit 64
@@ -42,10 +48,16 @@ temporary_output="${output}.tmp.$$"
 trap 'rm -f -- "$temporary_output"' EXIT INT TERM
 
 sed \
-  -e "s|__AUTH_UPSTREAM__|$AUTH_UPSTREAM|g" \
-  -e "s|__CRS_UPSTREAM__|$CRS_UPSTREAM|g" \
+  -e "s|__IDENTITY_UPSTREAM__|$IDENTITY_UPSTREAM|g" \
+  -e "s|__COURSE_UPSTREAM__|$COURSE_UPSTREAM|g" \
   -e "s|__ASSESSMENT_UPSTREAM__|$ASSESSMENT_UPSTREAM|g" \
-  -e "s|__LEARNING_GRADE_UPSTREAM__|$LEARNING_GRADE_UPSTREAM|g" \
+  -e "s|__GRADE_UPSTREAM__|$GRADE_UPSTREAM|g" \
+  -e "s|__LEARNING_UPSTREAM__|$LEARNING_UPSTREAM|g" \
   "$template" > "$temporary_output"
+
+if grep -Eq '__[A-Z_]+__' "$temporary_output"; then
+  printf 'rendered gateway configuration contains unresolved tokens\n' >&2
+  exit 64
+fi
 
 mv -- "$temporary_output" "$output"
