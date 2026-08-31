@@ -56,7 +56,7 @@ class CourseSecurityVersionProjectionTest {
         jdbcTemplate.update("DELETE FROM crs_course_member");
         deleteIfPresent("crs_announcement");
         deleteIfPresent("crs_resource");
-        deleteIfPresent("crs_chapter");
+        CourseTestDataCleanup.deleteChapters(jdbcTemplate);
         jdbcTemplate.update("DELETE FROM crs_course");
     }
 

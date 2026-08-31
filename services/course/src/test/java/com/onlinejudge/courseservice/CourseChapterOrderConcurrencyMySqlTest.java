@@ -44,7 +44,7 @@ class CourseChapterOrderConcurrencyMySqlTest {
         jdbcTemplate.update("DELETE FROM course_membership_reconciliation_checkpoint");
         jdbcTemplate.update("DELETE FROM crs_announcement");
         jdbcTemplate.update("DELETE FROM crs_resource");
-        jdbcTemplate.update("DELETE FROM crs_chapter");
+        CourseTestDataCleanup.deleteChapters(jdbcTemplate);
         jdbcTemplate.update("DELETE FROM crs_course_member");
         jdbcTemplate.update("DELETE FROM crs_course");
     }
