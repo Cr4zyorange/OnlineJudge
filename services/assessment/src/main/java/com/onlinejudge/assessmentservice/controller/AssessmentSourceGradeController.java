@@ -29,6 +29,10 @@ public class AssessmentSourceGradeController {
         serviceIdentity.requireGradesRead(request);
         long currentSnapshotVersion = grades.snapshotVersion(courseId, sourceType, sourceId);
         if (snapshotVersion != null && (snapshotVersion < 1 || snapshotVersion > currentSnapshotVersion)) throw new SourceGradeRequestException("invalid source-grade snapshot");
+        if (snapshotVersion != null && grades.firstRetainedSnapshotVersion(courseId, sourceType, sourceId)
+                .stream().anyMatch(firstRetained -> snapshotVersion < firstRetained)) {
+            throw new SourceGradeSnapshotExpiredException();
+        }
         long selectedSnapshotVersion = snapshotVersion == null ? currentSnapshotVersion : snapshotVersion;
         long total = grades.count(courseId, sourceType, sourceId, selectedSnapshotVersion);
         int offset;

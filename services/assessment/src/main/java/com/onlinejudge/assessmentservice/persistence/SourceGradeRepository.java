@@ -8,6 +8,7 @@ import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.OptionalLong;
 
 @Repository
 public class SourceGradeRepository {
@@ -47,6 +48,14 @@ public class SourceGradeRepository {
     }
     public long snapshotVersion(String courseId, String sourceType, String sourceId) {
         return jdbc.query("SELECT snapshot_version FROM assessment_source_grade_snapshot WHERE course_id=? AND source_type=? AND source_id=?", (rs, ignored) -> rs.getLong(1), courseId, sourceType, sourceId).stream().findFirst().orElse(1L);
+    }
+    /** A snapshot older than this cannot be reconstructed after retention or a schema upgrade. */
+    public OptionalLong firstRetainedSnapshotVersion(String courseId, String sourceType, String sourceId) {
+        List<Long> versions = jdbc.query("""
+                SELECT MIN(snapshot_version) FROM assessment_source_grade_revision
+                 WHERE course_id=? AND source_type=? AND source_id=?
+                """, (rs, ignored) -> rs.getObject(1, Long.class), courseId, sourceType, sourceId);
+        return versions.isEmpty() || versions.getFirst() == null ? OptionalLong.empty() : OptionalLong.of(versions.getFirst());
     }
     public long count(String courseId, String sourceType, String sourceId, long snapshotVersion) {
         return jdbc.queryForObject("""

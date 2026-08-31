@@ -95,4 +95,19 @@ class SourceGradeRebuildApiTest {
                 .andExpect(jsonPath("$.total").value(2)).andExpect(jsonPath("$.items[0].studentId").value("student-2"))
                 .andExpect(jsonPath("$.items[0].score").value(80));
     }
+
+    @Test
+    void preUpgradeSnapshotTokenIsRejectedInsteadOfReturningAnEmptyGradeSet() throws Exception {
+        Instant upgradedAt = Instant.parse("2026-08-31T00:00:00Z");
+        jdbc.update("INSERT INTO assessment_source_grade_snapshot (source_type, source_id, course_id, snapshot_version) VALUES ('HWK', 'homework-upgrade', 'course-upgrade', 5)");
+        jdbc.update("INSERT INTO assessment_source_grade (source_type, source_id, course_id, student_id, score, full_score, status, source_version, snapshot_version, updated_at) VALUES ('HWK', 'homework-upgrade', 'course-upgrade', 'student-1', 90, 100, 'SCORED', 3, 5, ?)", java.sql.Timestamp.from(upgradedAt));
+        jdbc.update("INSERT INTO assessment_source_grade_revision (source_type, source_id, course_id, student_id, snapshot_version, score, full_score, status, source_version, updated_at) VALUES ('HWK', 'homework-upgrade', 'course-upgrade', 'student-1', 5, 90, 100, 'SCORED', 3, ?)", java.sql.Timestamp.from(upgradedAt));
+
+        mockMvc.perform(get("/internal/v2/source-grades").param("courseId", "course-upgrade").param("sourceType", "HWK").param("sourceId", "homework-upgrade")
+                        .param("snapshotVersion", "4")
+                        .header("X-Request-Id", "source-grade-expired-snapshot")
+                        .header("X-OnlineJudge-Service-Authorization", "Bearer " + TestJwtFactory.serviceToken(KEY, "source-grade-kid", "assessment", List.of("grades:read"))))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("SOURCE_GRADE_SNAPSHOT_EXPIRED"));
+    }
 }

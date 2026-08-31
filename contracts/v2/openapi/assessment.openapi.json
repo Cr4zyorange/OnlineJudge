@@ -20,6 +20,7 @@
         "responses": {
           "200": { "description": "A stable page with its source snapshot version", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SourceGradePage" } } } },
           "400": { "description": "Invalid source filter", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "409": { "description": "The requested source snapshot is no longer retained; restart the rebuild from the current snapshot.", "x-onlinejudge-error-codes": ["SOURCE_GRADE_SNAPSHOT_EXPIRED"], "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
           "401": { "description": "Missing, invalid, expired, or wrong-audience service JWT; or invalid workload mTLS service identity", "x-onlinejudge-error-codes": ["SERVICE_IDENTITY_INVALID"], "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
           "403": { "description": "Authenticated service principal lacks the grades:read scope", "x-onlinejudge-error-codes": ["SERVICE_IDENTITY_FORBIDDEN"], "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
           "503": { "description": "Assessment source projection is unavailable", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
