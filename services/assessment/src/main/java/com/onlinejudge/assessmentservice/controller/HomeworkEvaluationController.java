@@ -4,6 +4,7 @@ import com.onlinejudge.assessmentservice.model.EvaluationTask;
 import com.onlinejudge.assessmentservice.persistence.EvaluationTaskRepository;
 import com.onlinejudge.assessmentservice.security.CurrentUser;
 import com.onlinejudge.assessmentservice.service.CoursePermissionClient;
+import com.onlinejudge.assessmentservice.service.HomeworkEvaluationReplayService;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -26,12 +27,14 @@ public class HomeworkEvaluationController {
     private final JdbcTemplate jdbc;
     private final EvaluationTaskRepository tasks;
     private final CoursePermissionClient coursePermissions;
+    private final HomeworkEvaluationReplayService replayService;
 
     public HomeworkEvaluationController(JdbcTemplate jdbc, EvaluationTaskRepository tasks,
-            CoursePermissionClient coursePermissions) {
+            CoursePermissionClient coursePermissions, HomeworkEvaluationReplayService replayService) {
         this.jdbc = jdbc;
         this.tasks = tasks;
         this.coursePermissions = coursePermissions;
+        this.replayService = replayService;
     }
 
     @GetMapping("/{submissionId}/evaluation")
@@ -87,7 +90,7 @@ public class HomeworkEvaluationController {
         if (!managerRole || !coursePermissions.canManageCourse(task.courseId(), user.id())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "course management permission is required");
         }
-        if (!tasks.manualReplayHomework(task.id(), user.id(), java.time.Instant.now())) {
+        if (!replayService.replay(task.id(), submissionId, user.id(), java.time.Instant.now())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "only a terminal homework evaluation can be replayed");
         }
         EvaluationTask replayed = tasks.find(task.id()).orElseThrow();
