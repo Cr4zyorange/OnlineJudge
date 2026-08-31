@@ -20,6 +20,7 @@ public class PersistentSubmissionFileStore {
         Files.write(target, bytes, StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE);
         return new StoredFile(key, safeName, bytes.length);
     }
+    /** Best-effort compensation for a database transaction that did not commit. */
     public void delete(String storageKey) throws IOException {
         if (storageKey == null || storageKey.isBlank()) return;
         Path target = root.resolve(storageKey).normalize();

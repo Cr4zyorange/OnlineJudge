@@ -36,16 +36,20 @@ public class AssessmentSubmissionService {
                     evaluation_status, created_at) VALUES (?, ?, ?, ?, ?, ?, 'PENDING', ?)
                 """, submissionId, command.sourceType(), command.sourceId(), command.courseId(), command.studentId(),
                 command.contentRef(), Timestamp.from(now));
-        tasks.insert(taskId, submissionId, command.sourceType(), command.sourceId(), command.courseId(), command.studentId(), now);
+        tasks.insert(taskId, submissionId, command.sourceType(), command.sourceId(), command.courseId(), command.studentId(), command.originRequestId(), now);
         return new SubmittedSubmission(submissionId, taskId, "PENDING");
     }
 
-    public record SubmissionCommand(String sourceType, String sourceId, String courseId, String studentId, String contentRef) {
+    public record SubmissionCommand(String sourceType, String sourceId, String courseId, String studentId, String contentRef, String originRequestId) {
+        public SubmissionCommand(String sourceType, String sourceId, String courseId, String studentId, String contentRef) {
+            this(sourceType, sourceId, courseId, studentId, contentRef, UUID.randomUUID().toString());
+        }
         public SubmissionCommand {
-            if (!("LAB".equals(sourceType) || "HWK".equals(sourceType))) throw new IllegalArgumentException("sourceType must be LAB or HWK");
+            if (!"HWK".equals(sourceType)) throw new IllegalArgumentException("generic submissions only support HWK");
             if (sourceId == null || sourceId.isBlank() || courseId == null || courseId.isBlank() || studentId == null || studentId.isBlank()) {
                 throw new IllegalArgumentException("sourceId, courseId and studentId are required");
             }
+            if (originRequestId == null || originRequestId.isBlank() || originRequestId.length() > 80) throw new IllegalArgumentException("origin request id is required");
         }
     }
     public record SubmittedSubmission(String submissionId, String taskId, String evaluationStatus) { }

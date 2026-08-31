@@ -58,7 +58,7 @@ public class HomeworkSubmissionService {
         String submitStatus = now.isAfter(homework.deadline()) ? "LATE" : "SUBMITTED";
         PersistentSubmissionFileStore.StoredFile stored;
         try {
-            stored = files.store(java.util.UUID.randomUUID().toString(), "submission-" + language + ".txt",
+            stored = files.store(java.util.UUID.randomUUID().toString(), sourceFilename(language),
                     code.getBytes(StandardCharsets.UTF_8));
         } catch (IOException storageFailure) {
             throw new UncheckedIOException("submission storage unavailable", storageFailure);
@@ -126,6 +126,16 @@ public class HomeworkSubmissionService {
                  WHERE homework_id = ? AND student_id = ? AND is_final = TRUE
                 """, Integer.class, homework.id(), studentId);
         if (existing > 0 && !homework.allowResubmit()) throw new IllegalStateException("homework does not allow resubmission");
+    }
+
+    /** The persisted name is the runtime selector for the shared Docker evaluator. */
+    private static String sourceFilename(String language) {
+        return switch (language) {
+            case "python" -> "submission.py";
+            case "java" -> "Main.java";
+            case "cpp", "c++", "cc", "cxx" -> "main.cpp";
+            default -> "submission.unknown";
+        };
     }
 
     private record HomeworkRule(long id, String courseId, String status, Instant deadline, boolean allowResubmit,

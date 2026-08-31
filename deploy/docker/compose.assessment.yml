@@ -22,6 +22,36 @@ services:
       interval: 5s
       timeout: 3s
       retries: 24
+  # The only workload with the privileged host socket is this proxy.  The
+  # assessment worker can create and remove isolated sandboxes over its private
+  # Docker network, but cannot mount the socket or reach other API sections.
+  assessment-sandbox-docker-proxy:
+    image: tecnativa/docker-socket-proxy:0.1.2
+    privileged: true
+    environment:
+      CONTAINERS: "1"
+      IMAGES: "1"
+      POST: "1"
+      ALLOW_START: "1"
+      ALLOW_RESTARTS: "1"
+      NETWORKS: "0"
+      VOLUMES: "0"
+      EXEC: "0"
+      BUILD: "0"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+  assessment-sandbox-python-image-init:
+    image: python:3.12-alpine
+    network_mode: none
+    command: ["python3", "-c", "pass"]
+  assessment-sandbox-java-image-init:
+    image: eclipse-temurin:21-jdk-alpine
+    network_mode: none
+    command: ["java", "-version"]
+  assessment-sandbox-cpp-image-init:
+    image: gcc:14.2.0
+    network_mode: none
+    command: ["g++", "--version"]
   assessment-storage-init:
     image: mysql:8.4
     user: "0:0"
@@ -98,6 +128,10 @@ services:
       rabbitmq: {condition: service_healthy}
       assessment-storage-init: {condition: service_completed_successfully}
       assessment-migrations: {condition: service_completed_successfully}
+      assessment-sandbox-docker-proxy: {condition: service_started}
+      assessment-sandbox-python-image-init: {condition: service_completed_successfully}
+      assessment-sandbox-java-image-init: {condition: service_completed_successfully}
+      assessment-sandbox-cpp-image-init: {condition: service_completed_successfully}
     environment:
       ASSESSMENT_DATABASE_HOST: assessment-db
       ASSESSMENT_DATABASE_USER: onlinejudge_assessment
@@ -113,9 +147,13 @@ services:
       ASSESSMENT_RABBIT_RELAY_ENABLED: "true"
       ASSESSMENT_IDENTITY_JWKS_TRUST_BUNDLE: ${ASSESSMENT_IDENTITY_JWKS_TRUST_BUNDLE:?ASSESSMENT_IDENTITY_JWKS_TRUST_BUNDLE is required}
       ASSESSMENT_IDENTITY_JWKS_URI: ${ASSESSMENT_IDENTITY_JWKS_URI:?ASSESSMENT_IDENTITY_JWKS_URI is required}
+      ASSESSMENT_COURSE_AUTHORIZATION_URI: ${ASSESSMENT_COURSE_AUTHORIZATION_URI:?ASSESSMENT_COURSE_AUTHORIZATION_URI is required}
+      ASSESSMENT_COURSE_SERVICE_AUTHORIZATION: ${ASSESSMENT_COURSE_SERVICE_AUTHORIZATION:?ASSESSMENT_COURSE_SERVICE_AUTHORIZATION is required}
       ASSESSMENT_STORAGE_ROOT: /var/lib/onlinejudge-assessment
-      ASSESSMENT_SANDBOX_COMMAND: ${ASSESSMENT_SANDBOX_COMMAND:?ASSESSMENT_SANDBOX_COMMAND is required}
-      ASSESSMENT_SANDBOX_PRE_EXECUTION_DELAY: ${ASSESSMENT_SANDBOX_PRE_EXECUTION_DELAY:-PT0S}
+      ASSESSMENT_SANDBOX_DOCKER_API_URI: http://assessment-sandbox-docker-proxy:2375
+      ASSESSMENT_SANDBOX_IMAGE: python:3.12-alpine
+      ASSESSMENT_SANDBOX_JAVA_IMAGE: eclipse-temurin:21-jdk-alpine
+      ASSESSMENT_SANDBOX_CPP_IMAGE: gcc:14.2.0
       ASSESSMENT_WORKER_LEASE: ${ASSESSMENT_WORKER_LEASE:-PT30S}
       ASSESSMENT_WORKER_HEARTBEAT_INTERVAL: ${ASSESSMENT_WORKER_HEARTBEAT_INTERVAL:-PT5S}
       ASSESSMENT_WORKER_MAX_ATTEMPTS: ${ASSESSMENT_WORKER_MAX_ATTEMPTS:-3}

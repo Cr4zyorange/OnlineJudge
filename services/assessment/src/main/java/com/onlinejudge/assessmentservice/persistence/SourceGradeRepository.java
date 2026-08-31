@@ -46,6 +46,14 @@ public class SourceGradeRepository {
         appendRevision(grade, snapshotVersion);
         return Optional.of(grade);
     }
+    @Transactional
+    public long upsertUngraded(String sourceType, String sourceId, String courseId, String studentId, BigDecimal fullScore, Instant now) {
+        long snapshotVersion = nextSnapshotVersion(sourceType, sourceId, courseId);
+        jdbc.update("INSERT INTO assessment_source_grade (source_type, source_id, course_id, student_id, score, full_score, status, source_version, snapshot_version, updated_at) VALUES (?, ?, ?, ?, NULL, ?, 'UNGRADED', 1, ?, ?) ON DUPLICATE KEY UPDATE course_id=VALUES(course_id), score=NULL, full_score=VALUES(full_score), status='UNGRADED', source_version=source_version+1, snapshot_version=VALUES(snapshot_version), updated_at=VALUES(updated_at)", sourceType, sourceId, courseId, studentId, fullScore, snapshotVersion, Timestamp.from(now));
+        SourceGrade grade = findCurrent(sourceType, sourceId, studentId);
+        appendRevision(grade, snapshotVersion);
+        return grade.sourceVersion();
+    }
     public long snapshotVersion(String courseId, String sourceType, String sourceId) {
         return jdbc.query("SELECT snapshot_version FROM assessment_source_grade_snapshot WHERE course_id=? AND source_type=? AND source_id=?", (rs, ignored) -> rs.getLong(1), courseId, sourceType, sourceId).stream().findFirst().orElse(1L);
     }

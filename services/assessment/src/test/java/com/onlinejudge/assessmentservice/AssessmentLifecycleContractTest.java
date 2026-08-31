@@ -29,7 +29,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * Submission and result reads deliberately use separate entrypoints: API GET is a pure query,
  * while only a worker can claim a durable task.
  */
-@SpringBootTest
+@SpringBootTest(properties = "assessment.worker.enabled=false")
 @AutoConfigureMockMvc
 class AssessmentLifecycleContractTest {
     private static final KeyPair KEY = TestJwtFactory.rsaKeyPair();
@@ -48,7 +48,13 @@ class AssessmentLifecycleContractTest {
         jdbc.update("DELETE FROM assessment_homework_evaluation");
         jdbc.update("DELETE FROM evaluation_task");
         jdbc.update("DELETE FROM assessment_homework_submission");
+        jdbc.update("DELETE FROM assessment_lab_evaluation_result");
+        jdbc.update("DELETE FROM assessment_lab_testcase");
+        jdbc.update("DELETE FROM assessment_lab_score_change_log");
+        jdbc.update("DELETE FROM assessment_lab_score");
+        jdbc.update("DELETE FROM assessment_lab_submission");
         jdbc.update("DELETE FROM assessment_submission");
+        jdbc.update("DELETE FROM assessment_lab_experiment");
         jdbc.update("DELETE FROM assessment_course_member_projection");
     }
 
@@ -66,7 +72,7 @@ class AssessmentLifecycleContractTest {
     @Test
     void resultReadAllowsTheSubmitterOrAnActiveCourseTeacherButRejectsOtherStudents() throws Exception {
         var submitted = submissions.submit(new AssessmentSubmissionService.SubmissionCommand(
-                "LAB", "lab-result", "course-7", "student-42", "stored://submission-result"));
+                "HWK", "homework-result", "course-7", "student-42", "stored://submission-result"));
         jdbc.update("INSERT INTO assessment_course_member_projection (course_id, user_id, membership_status, member_version) VALUES ('course-7', 'teacher-7', 'ACTIVE', 1)");
         jdbc.update("INSERT INTO assessment_course_member_projection (course_id, user_id, membership_status, member_version) VALUES ('course-7', 'student-99', 'ACTIVE', 1)");
 
@@ -79,7 +85,7 @@ class AssessmentLifecycleContractTest {
     @Test
     void expiredClaimCanBeTakenOverButStaleGenerationCannotWriteTerminalResult() {
         var submitted = submissions.submit(new AssessmentSubmissionService.SubmissionCommand(
-                "LAB", "lab-1", "course-7", "student-42", "stored://submission-2"));
+                "HWK", "homework-1", "course-7", "student-42", "stored://submission-2"));
         Instant started = Instant.parse("2026-08-31T00:00:00Z");
         EvaluationTask first = tasks.claimNext("worker-a", started, Duration.ofSeconds(10)).orElseThrow();
         EvaluationTask replacement = tasks.claimNext("worker-b", started.plusSeconds(11), Duration.ofSeconds(10)).orElseThrow();
@@ -93,11 +99,18 @@ class AssessmentLifecycleContractTest {
     @Test
     void labEndpointPersistsUploadedBytesAndKeepsEvaluationReadsPassive() throws Exception {
         jdbc.update("INSERT INTO assessment_course_member_projection (course_id, user_id, membership_status, member_version) VALUES ('course-7', 'student-42', 'ACTIVE', 1)");
+        jdbc.update("""
+                INSERT INTO assessment_lab_experiment (id, course_id, title, description, status, deadline, max_score,
+                    allowed_languages, auto_evaluate, created_by, created_at, updated_at)
+                VALUES (7, 'course-7', 'assessment-core-lab', 'test fixture', 'PUBLISHED', TIMESTAMP '2030-01-01 00:00:00',
+                    100, 'python', TRUE, 'teacher-7', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                """);
         String token = TestJwtFactory.userToken(KEY, "lifecycle-kid", "student-42", List.of("STUDENT"));
 
-        mockMvc.perform(multipart("/api/v1/labs/lab-7/submissions")
+        mockMvc.perform(multipart("/api/v1/labs/7/submissions")
                         .file("file", "print('lab')".getBytes())
                         .param("courseId", "course-7")
+                        .param("language", "python")
                         .header("X-Request-Id", "req-lab-7")
                         .header("Authorization", "Bearer " + token))
                 .andExpect(status().isCreated());

@@ -86,6 +86,8 @@ snapshot_floor="$(admin_mysql -N -Doj_assessment -e "SELECT first_reconstructabl
 [[ "$snapshot_floor" == "5" ]] || fail "expected upgraded source snapshot floor 5, found $snapshot_floor"
 revision_count="$(admin_mysql -N -Doj_assessment -e "SELECT COUNT(*) FROM assessment_source_grade_revision WHERE source_type='HWK' AND source_id='upgrade-source' AND snapshot_version=5;")"
 [[ "$revision_count" == "1" ]] || fail "expected one upgraded source-grade revision at snapshot 5, found $revision_count"
+admin_mysql -Doj_assessment -e 'SELECT COUNT(*) FROM assessment_lab_testcase;' >>"$raw_log" 2>&1
+admin_mysql -Doj_assessment -e 'SELECT COUNT(*) FROM assessment_lab_evaluation_result;' >>"$raw_log" 2>&1
 admin_mysql -e "CREATE USER 'oj_assessment_rw'@'%' IDENTIFIED BY '$runtime_password'; GRANT SELECT, INSERT, UPDATE, DELETE ON oj_assessment.* TO 'oj_assessment_rw'@'%'; FLUSH PRIVILEGES;" >>"$raw_log" 2>&1
 MYSQL_PWD="$runtime_password" mysql --protocol=TCP --host=127.0.0.1 --port="$mysql_port" --user=oj_assessment_rw oj_assessment -e 'SELECT COUNT(*) FROM assessment_submission;' >>"$raw_log" 2>&1
 if MYSQL_PWD="$runtime_password" mysql --protocol=TCP --host=127.0.0.1 --port="$mysql_port" --user=oj_assessment_rw oj_assessment -e 'CREATE TABLE forbidden_runtime_ddl (id INT);' >>"$raw_log" 2>&1; then

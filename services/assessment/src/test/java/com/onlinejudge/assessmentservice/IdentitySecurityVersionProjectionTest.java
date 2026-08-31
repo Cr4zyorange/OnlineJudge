@@ -69,6 +69,6 @@ class IdentitySecurityVersionProjectionTest {
         String v3 = TestJwtFactory.userToken(KEY, "security-version-kid", "student-security", List.of("STUDENT"), 3);
         mockMvc.perform(post("/api/v1/submissions").header("Authorization", "Bearer " + v3).header("X-Request-Id", "security-current-token")
                         .contentType(MediaType.APPLICATION_JSON).content("{\"sourceType\":\"LAB\",\"sourceId\":\"security-lab\",\"courseId\":\"course-security\"}"))
-                .andExpect(status().isCreated());
+                .andExpect(status().isBadRequest());
     }
 }

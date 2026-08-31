@@ -30,6 +30,7 @@ const expectedEventTypes = [
   'course.announcement.published.v2',
   'assessment.source-grade.changed.v2',
   'assessment.evaluation.completed.v2',
+  'assessment.lab.published.v2',
   'assessment.homework.published.v2',
   'grade.published.v2',
   'grade.review.processed.v2'
@@ -77,6 +78,13 @@ const eventContracts = {
     envelopeSchema: 'AssessmentEvaluationCompletedEvent',
     payloadSchema: 'AssessmentEvaluationCompletedPayload',
     requiredPayload: ['courseId', 'submissionId', 'evaluationStatus', 'evaluationVersion', 'completedAt']
+  },
+  'assessment.lab.published.v2': {
+    aggregateType: 'assessment-lab',
+    aggregateIdTemplate: '{labId}',
+    envelopeSchema: 'AssessmentLabPublishedEvent',
+    payloadSchema: 'AssessmentLabPublishedPayload',
+    requiredPayload: ['courseId', 'labId', 'title', 'deadline', 'receiverScope', 'publishedAt']
   },
   'assessment.homework.published.v2': {
     aggregateType: 'assessment-homework',
@@ -573,7 +581,7 @@ function validateAsyncApiDocument(document) {
       );
     }
 
-    if (eventType === 'assessment.homework.published.v2') {
+    if (eventType === 'assessment.homework.published.v2' || eventType === 'assessment.lab.published.v2') {
       const title = payloadSchema?.properties?.title;
       const deadline = payloadSchema?.properties?.deadline;
       const receiverScope = payloadSchema?.properties?.receiverScope;

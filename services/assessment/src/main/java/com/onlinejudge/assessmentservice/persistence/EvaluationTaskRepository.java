@@ -11,6 +11,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 @Repository
 public class EvaluationTaskRepository {
@@ -20,11 +21,18 @@ public class EvaluationTaskRepository {
 
     public void insert(String id, String submissionId, String sourceType, String sourceId,
                        String courseId, String studentId, Instant now) {
+        insert(id, submissionId, sourceType, sourceId, courseId, studentId, UUID.randomUUID().toString(), now);
+    }
+
+    /** The task retains the API command origin until a replay explicitly supersedes it. */
+    public void insert(String id, String submissionId, String sourceType, String sourceId,
+                       String courseId, String studentId, String originRequestId, Instant now) {
+        requireRequestId(originRequestId);
         jdbc.update("""
                 INSERT INTO evaluation_task (id, submission_id, source_type, source_id, course_id, student_id,
-                    state, generation, attempt, next_attempt_at, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, 'PENDING', 0, 0, ?, ?, ?)
-                """, id, submissionId, sourceType, sourceId, courseId, studentId,
+                    origin_request_id, state, generation, attempt, next_attempt_at, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, 'PENDING', 0, 0, ?, ?, ?)
+                """, id, submissionId, sourceType, sourceId, courseId, studentId, originRequestId,
                 Timestamp.from(now), Timestamp.from(now), Timestamp.from(now));
     }
 
@@ -84,12 +92,18 @@ public class EvaluationTaskRepository {
 
     /** Explicit teacher replay advances the fencing generation before returning a terminal failure to PENDING. */
     public boolean manualReplay(String id, String requestedBy, Instant now) {
+        return manualReplay(id, requestedBy, UUID.randomUUID().toString(), now);
+    }
+
+    /** A manual replay is a new write command, so its future worker events use that command's origin. */
+    public boolean manualReplay(String id, String requestedBy, String originRequestId, Instant now) {
+        requireRequestId(originRequestId);
         return jdbc.update("""
                 UPDATE evaluation_task SET state = 'PENDING', result_status = NULL, next_attempt_at = ?, lease_owner = NULL,
                     lease_until = NULL, generation = generation + 1, manual_replay_count = manual_replay_count + 1,
-                    manual_replayed_by = ?, manual_replayed_at = ?, updated_at = ?
+                    manual_replayed_by = ?, manual_replayed_at = ?, origin_request_id = ?, updated_at = ?
                  WHERE id = ? AND state = 'FAILED'
-                """, Timestamp.from(now), requestedBy, Timestamp.from(now), Timestamp.from(now), id) == 1;
+                """, Timestamp.from(now), requestedBy, Timestamp.from(now), originRequestId, Timestamp.from(now), id) == 1;
     }
 
     /** API-HWK-12 accepts every terminal HWK task; result detail must not make a completed task unreplayable. */
@@ -106,13 +120,13 @@ public class EvaluationTaskRepository {
     public Optional<EvaluationTask> find(String id) {
         List<EvaluationTask> rows = jdbc.query("""
                 SELECT id, submission_id, source_type, source_id, course_id, student_id, state, generation,
-                       lease_owner, lease_until, attempt, result_status
+                       lease_owner, lease_until, attempt, result_status, origin_request_id
                   FROM evaluation_task WHERE id = ?
                 """, (rs, ignored) -> new EvaluationTask(rs.getString("id"), rs.getString("submission_id"),
                 rs.getString("source_type"), rs.getString("source_id"), rs.getString("course_id"),
                 rs.getString("student_id"), TaskState.valueOf(rs.getString("state")), rs.getLong("generation"),
                 rs.getString("lease_owner"), toInstant(rs.getTimestamp("lease_until")), rs.getInt("attempt"),
-                rs.getString("result_status")), id);
+                rs.getString("result_status"), rs.getString("origin_request_id")), id);
         return rows.stream().findFirst();
     }
 
@@ -123,4 +137,9 @@ public class EvaluationTaskRepository {
 
     public int count() { return jdbc.queryForObject("SELECT COUNT(*) FROM evaluation_task", Integer.class); }
     private static Instant toInstant(Timestamp value) { return value == null ? null : value.toInstant(); }
+    private static void requireRequestId(String originRequestId) {
+        if (originRequestId == null || originRequestId.isBlank() || originRequestId.length() > 80) {
+            throw new IllegalArgumentException("origin request id must be 1-80 characters");
+        }
+    }
 }

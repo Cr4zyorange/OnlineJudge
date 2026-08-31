@@ -29,7 +29,7 @@ class AssessmentWorkerHeartbeatTest {
 
     private static final class RecordingTasks extends EvaluationTaskRepository {
         private final AtomicInteger heartbeats = new AtomicInteger();
-        private final EvaluationTask task = new EvaluationTask("task-1", "submission-1", "LAB", "lab-1", "course-1", "student-1", TaskState.RUNNING, 1, "worker-a", Instant.now().plusSeconds(30), 1, null);
+        private final EvaluationTask task = new EvaluationTask("task-1", "submission-1", "LAB", "lab-1", "course-1", "student-1", TaskState.RUNNING, 1, "worker-a", Instant.now().plusSeconds(30), 1, null, "request-heartbeat-1");
         private RecordingTasks() { super(null); }
         @Override public Optional<EvaluationTask> claimNext(String workerId, Instant now, Duration lease) { return Optional.of(task); }
         @Override public boolean heartbeat(String id, String workerId, long generation, Instant now, Duration lease) { heartbeats.incrementAndGet(); return true; }
