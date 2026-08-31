@@ -80,8 +80,7 @@ public class CourseService {
         // The course-row lock makes the capacity count and the member insert one
         // atomic guarded reservation; without it two concurrent joins can both
         // observe a free seat and over-enroll the course.
-        CourseRepository.Course course = courses.lockCourse(courseId)
-                .orElseThrow(() -> new CourseException(HttpStatus.NOT_FOUND, "COURSE_NOT_FOUND", "course does not exist", false));
+        CourseRepository.Course course = lockCourse(courseId);
         if (!"ACTIVE".equals(course.status())) {
             throw new CourseException(HttpStatus.CONFLICT, "COURSE_CLOSED", "course is not open for enrollment", false);
         }
@@ -106,7 +105,7 @@ public class CourseService {
 
     @Transactional
     public MemberView leave(long courseId, CurrentUser actor, String correlationId) {
-        requireMutableCourse(courseId);
+        requireMutableCourse(lockCourse(courseId));
         CourseRepository.Member current = courses.member(courseId, actor.id()).orElseThrow(this::forbidden);
         if (!"ACTIVE".equals(current.status()) || "TEACHER".equals(current.role())) throw forbidden();
         CourseRepository.Member changed = courses.updateMember(courseId, actor.id(), current.role(), "REMOVED", null);
@@ -117,20 +116,29 @@ public class CourseService {
 
     @Transactional
     public MemberView changeMember(long courseId, long userId, String role, String status, CurrentUser actor, String correlationId) {
-        requireOwner(courseId, actor);
-        requireMutableCourse(courseId);
-        CourseRepository.Member current = courses.member(courseId, userId)
+        // Membership approval/removal changes global course invariants.  Take the
+        // same course-row lock as join() and then a locked roster view.  This
+        // makes capacity, teacher count, and actor authority one current fact.
+        CourseRepository.Course course = lockCourse(courseId);
+        requireMutableCourse(course);
+        List<CourseRepository.Member> roster = courses.lockMembers(courseId);
+        requireOwner(roster, actor);
+        CourseRepository.Member current = roster.stream().filter(member -> member.userId() == userId).findFirst()
                 .orElseThrow(() -> new CourseException(HttpStatus.NOT_FOUND, "COURSE_MEMBER_NOT_FOUND", "course member does not exist", false));
         String nextRole = role == null || role.isBlank() ? current.role() : memberRole(role);
         String nextStatus = status == null || status.isBlank() ? current.status() : memberStatus(status);
         validateMemberTransition(current.status(), nextStatus);
+        if ("PENDING".equals(current.status()) && "ACTIVE".equals(nextStatus)
+                && course.maxStudents() != null && activeMemberCount(roster, null) >= course.maxStudents()) {
+            throw new CourseException(HttpStatus.CONFLICT, "COURSE_CAPACITY_REACHED", "course has reached its member capacity", false);
+        }
         if (actor.id() == userId && (!"TEACHER".equals(nextRole) || "REMOVED".equals(nextStatus))) {
             throw new CourseException(HttpStatus.CONFLICT, "CANNOT_CHANGE_SELF_TEACHER",
                     "a teacher cannot change their own course teacher identity", false);
         }
         if (current.role().equals("TEACHER") && "ACTIVE".equals(current.status())
                 && (!"TEACHER".equals(nextRole) || !"ACTIVE".equals(nextStatus))
-                && courses.activeMemberCount(courseId, "TEACHER") <= 1) {
+                && activeMemberCount(roster, "TEACHER") <= 1) {
             throw new CourseException(HttpStatus.CONFLICT, "LAST_TEACHER_REQUIRED", "a course requires one active teacher", false);
         }
         CourseRepository.Member changed = courses.updateMember(courseId, userId, nextRole, nextStatus,
@@ -426,6 +434,9 @@ public class CourseService {
     private CourseRepository.Course course(long courseId) {
         return courses.findCourse(courseId).orElseThrow(() -> new CourseException(HttpStatus.NOT_FOUND, "COURSE_NOT_FOUND", "course does not exist", false));
     }
+    private CourseRepository.Course lockCourse(long courseId) {
+        return courses.lockCourse(courseId).orElseThrow(() -> new CourseException(HttpStatus.NOT_FOUND, "COURSE_NOT_FOUND", "course does not exist", false));
+    }
     private CourseRepository.Resource resource(long courseId, long resourceId) {
         return courses.resource(courseId, resourceId).orElseThrow(() -> new CourseException(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND", "resource does not exist", false));
     }
@@ -438,9 +449,22 @@ public class CourseService {
         CourseRepository.Member member = courses.member(courseId, user.id()).orElseThrow(this::forbidden);
         if (!("ACTIVE".equals(member.status()) && "TEACHER".equals(member.role()))) throw forbidden();
     }
+    private void requireOwner(List<CourseRepository.Member> roster, CurrentUser user) {
+        if (user.hasRole("ADMIN")) return;
+        CourseRepository.Member member = roster.stream().filter(candidate -> candidate.userId() == user.id())
+                .findFirst().orElseThrow(this::forbidden);
+        if (!("ACTIVE".equals(member.status()) && "TEACHER".equals(member.role()))) throw forbidden();
+    }
+    private long activeMemberCount(List<CourseRepository.Member> roster, String role) {
+        return roster.stream().filter(member -> "ACTIVE".equals(member.status()))
+                .filter(member -> role == null || role.equals(member.role())).count();
+    }
     private void requireContentManager(long courseId, CurrentUser user) { if (!canManageContent(courseId, user)) throw forbidden(); }
     private void requireMutableCourse(long courseId) {
-        String status = course(courseId).status();
+        requireMutableCourse(course(courseId));
+    }
+    private void requireMutableCourse(CourseRepository.Course course) {
+        String status = course.status();
         if (!"ACTIVE".equals(status) && !"DRAFT".equals(status)) {
             throw new CourseException(HttpStatus.CONFLICT, "COURSE_READ_ONLY", "course is archived or closed and cannot be modified", false);
         }
