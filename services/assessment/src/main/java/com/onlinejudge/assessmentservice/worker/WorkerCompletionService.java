@@ -36,16 +36,14 @@ class WorkerCompletionService {
             return;
         }
         if (!tasks.complete(task.id(), workerId, task.generation(), outcome.successful(), outcome.status(), finished)) return;
-        if (jdbc != null) {
+        if (jdbc != null && "HWK".equals(task.sourceType())) {
             jdbc.update("UPDATE assessment_submission SET evaluation_status = ? WHERE id = ?", outcome.status(), task.submissionId());
-            if ("HWK".equals(task.sourceType())) {
-                jdbc.update("""
-                        UPDATE assessment_homework_submission
-                           SET evaluation_status = ?, auto_score = ?, final_score = ?
-                         WHERE submission_id = ?
-                        """, outcome.status(), outcome.successful() ? outcome.score() : null,
-                        outcome.successful() ? outcome.score() : null, task.submissionId());
-            }
+            jdbc.update("""
+                    UPDATE assessment_homework_submission
+                       SET evaluation_status = ?, auto_score = ?, final_score = ?
+                     WHERE submission_id = ?
+                    """, outcome.status(), outcome.successful() ? outcome.score() : null,
+                    outcome.successful() ? outcome.score() : null, task.submissionId());
         }
         outbox.append("assessment.evaluation.completed.v2", "assessment-submission", task.submissionId(), task.generation(), task.id(),
                 Map.of("courseId", task.courseId(), "submissionId", task.submissionId(), "evaluationStatus", outcome.successful() ? "SUCCESS" : "FAILED", "evaluationVersion", task.generation(), "completedAt", finished.toString()), finished);
