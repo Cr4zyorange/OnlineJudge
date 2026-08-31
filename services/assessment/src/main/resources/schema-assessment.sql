@@ -63,13 +63,21 @@ CREATE TABLE IF NOT EXISTS assessment_deferred_identity_security_version_event (
 CREATE TABLE IF NOT EXISTS assessment_source_grade (
   source_type VARCHAR(8) NOT NULL, source_id VARCHAR(80) NOT NULL, course_id VARCHAR(80) NOT NULL,
   student_id VARCHAR(80) NOT NULL, score DECIMAL(10,2), full_score DECIMAL(10,2) NOT NULL,
-  status VARCHAR(16) NOT NULL, source_version BIGINT NOT NULL, updated_at TIMESTAMP NOT NULL,
+  status VARCHAR(16) NOT NULL, source_version BIGINT NOT NULL, snapshot_version BIGINT NOT NULL, updated_at TIMESTAMP NOT NULL,
   PRIMARY KEY (source_type, source_id, student_id)
 );
 CREATE TABLE IF NOT EXISTS assessment_source_grade_snapshot (
   source_type VARCHAR(8) NOT NULL, source_id VARCHAR(80) NOT NULL, course_id VARCHAR(80) NOT NULL,
   snapshot_version BIGINT NOT NULL,
   PRIMARY KEY (source_type, source_id)
+);
+CREATE TABLE IF NOT EXISTS assessment_source_grade_revision (
+  source_type VARCHAR(8) NOT NULL, source_id VARCHAR(80) NOT NULL, course_id VARCHAR(80) NOT NULL,
+  student_id VARCHAR(80) NOT NULL, snapshot_version BIGINT NOT NULL, score DECIMAL(10,2),
+  full_score DECIMAL(10,2) NOT NULL, status VARCHAR(16) NOT NULL, source_version BIGINT NOT NULL,
+  updated_at TIMESTAMP NOT NULL,
+  PRIMARY KEY (source_type, source_id, student_id, snapshot_version),
+  INDEX idx_assessment_source_grade_revision_snapshot (course_id, source_type, source_id, snapshot_version, student_id)
 );
 CREATE TABLE IF NOT EXISTS assessment_homework (
   id BIGINT AUTO_INCREMENT PRIMARY KEY, course_id VARCHAR(80) NOT NULL, title VARCHAR(100) NOT NULL,

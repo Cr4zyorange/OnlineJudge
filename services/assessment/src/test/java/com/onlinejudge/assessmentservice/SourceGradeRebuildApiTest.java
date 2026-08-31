@@ -36,7 +36,11 @@ class SourceGradeRebuildApiTest {
     }
 
     @BeforeEach
-    void clean() { jdbc.update("DELETE FROM assessment_source_grade"); }
+    void clean() {
+        jdbc.update("DELETE FROM assessment_source_grade_revision");
+        jdbc.update("DELETE FROM assessment_source_grade_snapshot");
+        jdbc.update("DELETE FROM assessment_source_grade");
+    }
 
     @Test
     void gradeServiceCanReadStablePaginatedSourceFactsButUserBearerCannot() throws Exception {
@@ -66,5 +70,29 @@ class SourceGradeRebuildApiTest {
                         .header("X-Request-Id", "source-grade-invalid-filter")
                         .header("X-OnlineJudge-Service-Authorization", "Bearer " + TestJwtFactory.serviceToken(KEY, "source-grade-kid", "assessment", List.of("grades:read"))))
                 .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("SOURCE_GRADE_FILTER_INVALID"));
+    }
+
+    @Test
+    void laterPagesReuseTheOriginalSnapshotWhenAnotherStudentGradeChanges() throws Exception {
+        Instant start = Instant.parse("2026-08-31T00:00:00Z");
+        grades.upsertScored("HWK", "homework-9", "course-9", "student-1", new BigDecimal("70"), new BigDecimal("100"), start);
+        grades.upsertScored("HWK", "homework-9", "course-9", "student-2", new BigDecimal("80"), new BigDecimal("100"), start.plusSeconds(1));
+        grades.upsertScored("HWK", "homework-9", "course-9", "student-1", new BigDecimal("95"), new BigDecimal("100"), start.plusSeconds(2));
+
+        mockMvc.perform(get("/internal/v2/source-grades").param("courseId", "course-9").param("sourceType", "HWK").param("sourceId", "homework-9")
+                        .param("snapshotVersion", "2").param("page", "0").param("size", "1")
+                        .header("X-Request-Id", "source-grade-original-snapshot")
+                        .header("X-OnlineJudge-Service-Authorization", "Bearer " + TestJwtFactory.serviceToken(KEY, "source-grade-kid", "assessment", List.of("grades:read"))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.sourceSnapshotVersion").value(2))
+                .andExpect(jsonPath("$.total").value(2)).andExpect(jsonPath("$.items[0].studentId").value("student-1"))
+                .andExpect(jsonPath("$.items[0].score").value(70));
+
+        mockMvc.perform(get("/internal/v2/source-grades").param("courseId", "course-9").param("sourceType", "HWK").param("sourceId", "homework-9")
+                        .param("snapshotVersion", "2").param("page", "1").param("size", "1")
+                        .header("X-Request-Id", "source-grade-original-snapshot-second-page")
+                        .header("X-OnlineJudge-Service-Authorization", "Bearer " + TestJwtFactory.serviceToken(KEY, "source-grade-kid", "assessment", List.of("grades:read"))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.sourceSnapshotVersion").value(2))
+                .andExpect(jsonPath("$.total").value(2)).andExpect(jsonPath("$.items[0].studentId").value("student-2"))
+                .andExpect(jsonPath("$.items[0].score").value(80));
     }
 }

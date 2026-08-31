@@ -1,6 +1,8 @@
 package com.onlinejudge.assessmentservice.service;
 
 import com.onlinejudge.assessmentservice.storage.PersistentSubmissionFileStore;
+import com.onlinejudge.assessmentservice.persistence.AssessmentOutboxRepository;
+import com.onlinejudge.assessmentservice.persistence.SourceGradeRepository;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -15,25 +17,31 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.NoSuchElementException;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 @Service
 public class HomeworkSubmissionService {
     private final JdbcTemplate jdbc;
     private final AssessmentSubmissionService submissions;
     private final PersistentSubmissionFileStore files;
+    private final SourceGradeRepository grades;
+    private final AssessmentOutboxRepository outbox;
     private final Clock clock;
 
     @org.springframework.beans.factory.annotation.Autowired
     public HomeworkSubmissionService(JdbcTemplate jdbc, AssessmentSubmissionService submissions,
-            PersistentSubmissionFileStore files) {
-        this(jdbc, submissions, files, Clock.systemUTC());
+            PersistentSubmissionFileStore files, SourceGradeRepository grades, AssessmentOutboxRepository outbox) {
+        this(jdbc, submissions, files, grades, outbox, Clock.systemUTC());
     }
 
     HomeworkSubmissionService(JdbcTemplate jdbc, AssessmentSubmissionService submissions,
-            PersistentSubmissionFileStore files, Clock clock) {
+            PersistentSubmissionFileStore files, SourceGradeRepository grades, AssessmentOutboxRepository outbox, Clock clock) {
         this.jdbc = jdbc;
         this.submissions = submissions;
         this.files = files;
+        this.grades = grades;
+        this.outbox = outbox;
         this.clock = clock;
     }
 
@@ -74,8 +82,25 @@ public class HomeworkSubmissionService {
                          evaluation_status, is_final, submitted_at)
                     VALUES (?, ?, ?, ?, ?, ?, 'PENDING', TRUE, ?)
                 """, generic.submissionId(), homeworkId, studentId, version, language, submitStatus, Timestamp.from(now));
+        grades.markUngradedIfPresent("HWK", Long.toString(homeworkId), studentId, now)
+                .ifPresent(grade -> appendUngradedEvent(grade, generic.taskId(), now));
         return new SubmittedHomework(generic.submissionId(), generic.taskId(), homeworkId, version,
                 submitStatus, "PENDING", now);
+    }
+
+    private void appendUngradedEvent(SourceGradeRepository.SourceGrade grade, String correlationId, Instant now) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("courseId", grade.courseId());
+        payload.put("sourceType", grade.sourceType());
+        payload.put("sourceId", grade.sourceId());
+        payload.put("studentId", grade.studentId());
+        payload.put("score", null);
+        payload.put("fullScore", grade.fullScore());
+        payload.put("status", "UNGRADED");
+        payload.put("sourceVersion", grade.sourceVersion());
+        outbox.append("assessment.source-grade.changed.v2", "assessment-source-grade",
+                grade.sourceType() + ":" + grade.sourceId() + ":" + grade.studentId(), grade.sourceVersion(),
+                correlationId, payload, now);
     }
 
     private HomeworkRule lockHomework(long homeworkId) {

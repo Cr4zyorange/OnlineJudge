@@ -30,6 +30,10 @@ public class HomeworkEvaluationReplayService {
 
     @Transactional
     public boolean replay(EvaluationTask task, String requestedBy, String requestId, Instant now) {
+        boolean currentHomeworkSubmission = jdbc.queryForObject("""
+                SELECT is_final FROM assessment_homework_submission
+                 WHERE submission_id = ? FOR UPDATE
+                """, Boolean.class, task.submissionId());
         if (!tasks.manualReplayHomework(task.id(), requestedBy, now)) {
             return false;
         }
@@ -44,8 +48,10 @@ public class HomeworkEvaluationReplayService {
         if (submissions != 1 || homeworkSubmissions != 1) {
             throw new IllegalStateException("homework replay must update both submission projections");
         }
-        grades.markUngradedIfPresent(task.sourceType(), task.sourceId(), task.studentId(), now)
-                .ifPresent(grade -> appendUngradedEvent(grade, requestId, now));
+        if (currentHomeworkSubmission) {
+            grades.markUngradedIfPresent(task.sourceType(), task.sourceId(), task.studentId(), now)
+                    .ifPresent(grade -> appendUngradedEvent(grade, requestId, now));
+        }
         return true;
     }
 

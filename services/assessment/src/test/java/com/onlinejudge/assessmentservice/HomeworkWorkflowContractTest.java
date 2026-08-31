@@ -417,6 +417,48 @@ class HomeworkWorkflowContractTest {
     }
 
     @Test
+    void historicalHomeworkTasksCannotChangeTheCurrentSubmissionSourceGrade() throws Exception {
+        String teacherId = "teacher-315-" + UUID.randomUUID();
+        String studentId = "student-315-" + UUID.randomUUID();
+        long homeworkId = createAndPublishCodeHomework(teacherId, "current-submission-315-" + UUID.randomUUID(), true,
+                false, Instant.parse("2030-01-01T12:00:00Z"));
+        jdbc.update("INSERT INTO assessment_course_member_projection (course_id, user_id, membership_status, member_version) VALUES ('course-315', ?, 'ACTIVE', 1)", studentId);
+        String studentToken = TestJwtFactory.userToken(KEY, "homework-workflow-kid", studentId, List.of("STUDENT"));
+        String teacherToken = TestJwtFactory.userToken(KEY, "homework-workflow-kid", teacherId, List.of("TEACHER"));
+
+        String firstSubmissionId = submitCodeHomework(homeworkId, studentToken, "print('first')");
+        worker.runOne("homework-worker-first-current", task -> new AssessmentWorker.EvaluationOutcome(
+                true, "ACCEPTED", new BigDecimal("80"), new BigDecimal("100")));
+
+        String currentSubmissionId = submitCodeHomework(homeworkId, studentToken, "print('current')");
+        assertCurrentSourceGrade(homeworkId, studentId, "UNGRADED", null, 2);
+        String replacementEnvelope = jdbc.queryForObject("""
+                SELECT payload_json FROM assessment_event_outbox
+                 WHERE event_type = 'assessment.source-grade.changed.v2'
+                   AND aggregate_id = ? AND aggregate_version = 2
+                """, String.class, "HWK:" + homeworkId + ":" + studentId);
+        assertThat(mapper.readTree(replacementEnvelope).path("payload").path("status").asText()).isEqualTo("UNGRADED");
+        assertThat(mapper.readTree(replacementEnvelope).path("payload").path("score").isNull()).isTrue();
+        worker.runOne("homework-worker-current", task -> new AssessmentWorker.EvaluationOutcome(
+                true, "ACCEPTED", new BigDecimal("90"), new BigDecimal("100")));
+        assertCurrentSourceGrade(homeworkId, studentId, "SCORED", new BigDecimal("90"), 3);
+
+        mockMvc.perform(post("/api/v1/submissions/{submissionId}/reevaluate", firstSubmissionId)
+                        .header("Authorization", "Bearer " + teacherToken)
+                        .header("X-Request-Id", UUID.randomUUID().toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.taskState").value("PENDING"));
+
+        assertCurrentSourceGrade(homeworkId, studentId, "SCORED", new BigDecimal("90"), 3);
+        assertThat(jdbc.queryForObject("""
+                SELECT COUNT(*) FROM assessment_event_outbox
+                 WHERE event_type = 'assessment.source-grade.changed.v2' AND aggregate_id = ?
+                """, Integer.class, "HWK:" + homeworkId + ":" + studentId)).isEqualTo(3);
+        assertThat(jdbc.queryForObject("SELECT is_final FROM assessment_homework_submission WHERE submission_id = ?",
+                Boolean.class, currentSubmissionId)).isTrue();
+    }
+
+    @Test
     void homeworkReevaluationEndpointRejectsLabTask() throws Exception {
         String teacherId = "teacher-315-" + UUID.randomUUID();
         String studentId = "student-315-" + UUID.randomUUID();
@@ -459,6 +501,28 @@ class HomeworkWorkflowContractTest {
                 .andExpect(jsonPath("$.items[0].status").value("UNGRADED"))
                 .andExpect(jsonPath("$.items[0].score").value(org.hamcrest.Matchers.nullValue()))
                 .andExpect(jsonPath("$.items[0].sourceVersion").value(2));
+    }
+
+    private String submitCodeHomework(long homeworkId, String studentToken, String code) throws Exception {
+        String submitted = mockMvc.perform(post("/api/v1/homeworks/{homeworkId}/submissions", homeworkId)
+                        .header("Authorization", "Bearer " + studentToken)
+                        .header("X-Request-Id", UUID.randomUUID().toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"code\":\"" + code + "\",\"language\":\"python\"}"))
+                .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+        return mapper.readTree(submitted).path("submissionId").asText();
+    }
+
+    private void assertCurrentSourceGrade(long homeworkId, String studentId, String expectedStatus,
+                                          BigDecimal expectedScore, int expectedVersion) {
+        assertThat(jdbc.queryForObject("SELECT status FROM assessment_source_grade WHERE source_type = 'HWK' AND source_id = ? AND student_id = ?",
+                String.class, Long.toString(homeworkId), studentId)).isEqualTo(expectedStatus);
+        BigDecimal actualScore = jdbc.queryForObject("SELECT score FROM assessment_source_grade WHERE source_type = 'HWK' AND source_id = ? AND student_id = ?",
+                BigDecimal.class, Long.toString(homeworkId), studentId);
+        if (expectedScore == null) assertThat(actualScore).isNull();
+        else assertThat(actualScore).isEqualByComparingTo(expectedScore);
+        assertThat(jdbc.queryForObject("SELECT source_version FROM assessment_source_grade WHERE source_type = 'HWK' AND source_id = ? AND student_id = ?",
+                Long.class, Long.toString(homeworkId), studentId)).isEqualTo((long) expectedVersion);
     }
 
     @Test
