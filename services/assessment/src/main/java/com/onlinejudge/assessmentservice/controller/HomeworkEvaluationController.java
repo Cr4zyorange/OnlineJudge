@@ -51,7 +51,7 @@ public class HomeworkEvaluationController {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "submission not found"));
         boolean owner = result.studentId().equals(user.id());
         boolean managerRole = user.hasRole("TEACHER") || user.hasRole("ASSISTANT");
-        boolean manager = managerRole && coursePermissions.canManageCourse(result.courseId(), user.id());
+        boolean manager = !owner && managerRole && coursePermissions.canManageCourse(result.courseId(), user.id());
         if (!owner && !manager) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "submission result is not visible");
         EvaluationTask task = tasks.findBySubmission(submissionId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "evaluation not found"));

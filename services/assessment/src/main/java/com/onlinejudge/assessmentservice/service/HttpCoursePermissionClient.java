@@ -36,7 +36,10 @@ public class HttpCoursePermissionClient implements CoursePermissionClient {
 
     @Override
     public boolean canManageCourse(String courseId, String userId) {
-        if (authorizationUri.isBlank() || serviceAuthorization.isBlank() || courseId == null || userId == null) return false;
+        if (courseId == null || userId == null) return false;
+        if (authorizationUri.isBlank() || serviceAuthorization.isBlank()) {
+            throw new CourseAuthorizationUnavailableException("course authorization endpoint is not configured");
+        }
         try {
             String path = authorizationUri.replace("{courseId}", encode(courseId)).replace("{userId}", encode(userId));
             String separator = path.contains("?") ? "&" : "?";
@@ -47,15 +50,20 @@ public class HttpCoursePermissionClient implements CoursePermissionClient {
                     .header("X-OnlineJudge-Service-Authorization", serviceAuthorization)
                     .GET().build();
             HttpResponse<String> response = http.send(request, HttpResponse.BodyHandlers.ofString());
-            if (response.statusCode() != 200) return false;
+            if (response.statusCode() != 200) {
+                throw new CourseAuthorizationUnavailableException(
+                        "course authorization responded with HTTP " + response.statusCode());
+            }
             JsonNode decision = mapper.readTree(response.body());
             return decision.path("allowed").asBoolean(false)
                     && courseId.equals(decision.path("courseId").asText())
                     && userId.equals(decision.path("userId").asText())
                     && "MANAGE".equals(decision.path("action").asText())
                     && decision.path("memberVersion").asLong(0) >= 1;
+        } catch (CourseAuthorizationUnavailableException unavailable) {
+            throw unavailable;
         } catch (Exception unavailable) {
-            return false;
+            throw new CourseAuthorizationUnavailableException("course authorization is unavailable", unavailable);
         }
     }
 
