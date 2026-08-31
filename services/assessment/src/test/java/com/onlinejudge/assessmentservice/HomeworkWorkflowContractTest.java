@@ -54,6 +54,8 @@ class HomeworkWorkflowContractTest {
     @BeforeEach
     void clean() {
         jdbc.update("DELETE FROM assessment_event_outbox");
+        jdbc.update("DELETE FROM assessment_source_grade_snapshot");
+        jdbc.update("DELETE FROM assessment_source_grade");
         jdbc.update("DELETE FROM evaluation_task");
         jdbc.update("DELETE FROM assessment_homework_submission");
         jdbc.update("DELETE FROM assessment_submission");
@@ -296,6 +298,57 @@ class HomeworkWorkflowContractTest {
     }
 
     @Test
+    void failedHomeworkReevaluationCannotLeaveThePreviousSourceGradeScored() throws Exception {
+        String teacherId = "teacher-315-" + UUID.randomUUID();
+        String studentId = "student-315-" + UUID.randomUUID();
+        long homeworkId = createAndPublishCodeHomework(teacherId, "ungraded-replay-315-" + UUID.randomUUID(), true,
+                false, Instant.parse("2030-01-01T12:00:00Z"));
+        jdbc.update("INSERT INTO assessment_course_member_projection (course_id, user_id, membership_status, member_version) VALUES ('course-315', ?, 'ACTIVE', 1)", studentId);
+        String studentToken = TestJwtFactory.userToken(KEY, "homework-workflow-kid", studentId, List.of("STUDENT"));
+        String teacherToken = TestJwtFactory.userToken(KEY, "homework-workflow-kid", teacherId, List.of("TEACHER"));
+        String submitted = mockMvc.perform(post("/api/v1/homeworks/{homeworkId}/submissions", homeworkId)
+                        .header("Authorization", "Bearer " + studentToken).header("X-Request-Id", UUID.randomUUID().toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"code\":\"print('result')\",\"language\":\"python\"}"))
+                .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+        String submissionId = mapper.readTree(submitted).path("submissionId").asText();
+        worker.runOne("homework-worker-first-success", task -> new AssessmentWorker.EvaluationOutcome(
+                true, "ACCEPTED", new BigDecimal("88"), new BigDecimal("100")));
+
+        String requestId = UUID.randomUUID().toString();
+        mockMvc.perform(post("/api/v1/submissions/{submissionId}/reevaluate", submissionId)
+                        .header("Authorization", "Bearer " + teacherToken)
+                        .header("X-Request-Id", requestId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.taskState").value("PENDING"));
+
+        assertSourceGradeIsUngraded(homeworkId, studentId);
+        String ungradedEnvelope = jdbc.queryForObject("""
+                SELECT payload_json FROM assessment_event_outbox
+                 WHERE event_type = 'assessment.source-grade.changed.v2'
+                   AND aggregate_id = ? AND aggregate_version = 2
+                """, String.class, "HWK:" + homeworkId + ":" + studentId);
+        assertThat(mapper.readTree(ungradedEnvelope).path("correlationId").asText()).isEqualTo(requestId);
+        assertThat(mapper.readTree(ungradedEnvelope).path("payload").path("status").asText()).isEqualTo("UNGRADED");
+        assertThat(mapper.readTree(ungradedEnvelope).path("payload").path("score").isNull()).isTrue();
+
+        worker.runOne("homework-worker-replay-failure", task -> AssessmentWorker.EvaluationOutcome.failed("COMPILE_ERROR"));
+
+        mockMvc.perform(get("/api/v1/submissions/{submissionId}/evaluation", submissionId)
+                        .header("Authorization", "Bearer " + teacherToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.taskState").value("FAILED"))
+                .andExpect(jsonPath("$.evaluationStatus").value("COMPILE_ERROR"))
+                .andExpect(jsonPath("$.score").value(org.hamcrest.Matchers.nullValue()))
+                .andExpect(jsonPath("$.finalScore").value(org.hamcrest.Matchers.nullValue()));
+        assertSourceGradeIsUngraded(homeworkId, studentId);
+        assertThat(jdbc.queryForObject("""
+                SELECT COUNT(*) FROM assessment_event_outbox
+                 WHERE event_type = 'assessment.source-grade.changed.v2' AND aggregate_id = ?
+                """, Integer.class, "HWK:" + homeworkId + ":" + studentId)).isEqualTo(2);
+    }
+
+    @Test
     void homeworkReevaluationEndpointRejectsLabTask() throws Exception {
         String teacherId = "teacher-315-" + UUID.randomUUID();
         String studentId = "student-315-" + UUID.randomUUID();
@@ -322,6 +375,22 @@ class HomeworkWorkflowContractTest {
                 .isEqualTo("FAILED");
         assertThat(jdbc.queryForObject("SELECT manual_replay_count FROM evaluation_task WHERE id = ?", Integer.class, taskId))
                 .isZero();
+    }
+
+    private void assertSourceGradeIsUngraded(long homeworkId, String studentId) throws Exception {
+        mockMvc.perform(get("/internal/v2/source-grades")
+                        .param("courseId", "course-315")
+                        .param("sourceType", "HWK")
+                        .param("sourceId", Long.toString(homeworkId))
+                        .header("X-Request-Id", UUID.randomUUID().toString())
+                        .header("X-OnlineJudge-Service-Authorization", "Bearer "
+                                + TestJwtFactory.serviceToken(KEY, "homework-workflow-kid", "assessment",
+                                List.of("grades:read"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].studentId").value(studentId))
+                .andExpect(jsonPath("$.items[0].status").value("UNGRADED"))
+                .andExpect(jsonPath("$.items[0].score").value(org.hamcrest.Matchers.nullValue()))
+                .andExpect(jsonPath("$.items[0].sourceVersion").value(2));
     }
 
     @Test
