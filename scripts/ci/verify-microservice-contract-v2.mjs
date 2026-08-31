@@ -583,10 +583,9 @@ function serviceTokenDocumentationProblems(relativePath, text) {
 function validateDocumentation() {
   const currentContract = 'docs/开发/D6-D7-五服务共享契约-v2.md';
   const adr = 'docs/adr/ADR-006-五业务服务与可靠消息契约.md';
-  const v1Contract = 'docs/开发/D4-CROSS-SERVICE-共享契约.md';
   const finalOverview = 'docs/最终提交/软件概要设计说明书.md';
   const finalDetail = 'docs/最终提交/软件详细设计说明书.md';
-  for (const relativePath of [currentContract, adr, v1Contract, finalOverview, finalDetail]) {
+  for (const relativePath of [currentContract, adr, finalOverview, finalDetail]) {
     const absolutePath = resolve(repoRoot, relativePath);
     assert(existsSync(absolutePath), `missing ${relativePath}`);
   }
@@ -622,10 +621,12 @@ function validateDocumentation() {
     const text = readFileSync(resolve(repoRoot, adr), 'utf8');
     for (const failure of serviceTokenDocumentationProblems(adr, text)) problem(failure);
   }
-  if (existsSync(resolve(repoRoot, v1Contract))) {
-    const text = readFileSync(resolve(repoRoot, v1Contract), 'utf8');
-    assert(text.includes('历史基线') && text.includes('D6-D7-五服务共享契约-v2.md'),
-      `${v1Contract}: must identify v1 as historical and link v2`);
+  for (const rejectedDocument of [
+    'docs/开发/D4-CROSS-SERVICE-共享契约.md',
+    'docs/过程/概要/评测服务拆分设计与迁移边界.md'
+  ]) {
+    assert(!existsSync(resolve(repoRoot, rejectedDocument)),
+      `${rejectedDocument}: rejected architecture document must remain deleted`);
   }
 }
 
@@ -637,7 +638,6 @@ function validateHomeworkPublicationMigrationDocs() {
     'docs/过程/概要/作业与自动评测模块概要设计提交稿（hwk）.md',
     'docs/过程/详细设计/HWK-作业与自动评测模块-详细设计提交稿.md',
     'docs/过程/概要/学习过程与通知提醒 - 概要设计.md',
-    'docs/过程/概要/评测服务拆分设计与迁移边界.md',
     'docs/过程/需求/学习过程与通知提醒模块（前端总设计师负责）.md',
     'docs/过程/详细设计/LRN-学习过程与通知提醒-详细设计提交稿.md',
     'docs/过程/测试/D2-HWK业务场景与测试闭环.md',
@@ -672,8 +672,8 @@ function validateHomeworkPublicationMigrationDocs() {
         problems.push(`${relativePath}: retains the unqualified retired v1 rule: ${legacyRule}`);
       }
     }
-    if (text.includes('publishRequired') && !/(?:v1.{0,240}(?:历史|退役)|(?:历史|退役).{0,240}v1)/s.test(text)) {
-      problems.push(`${relativePath}: publishRequired may appear only as explicitly retired v1 historical evidence`);
+    if (text.includes('publishRequired')) {
+      problems.push(`${relativePath}: current five-service documents must not retain publishRequired`);
     }
     return problems;
   }

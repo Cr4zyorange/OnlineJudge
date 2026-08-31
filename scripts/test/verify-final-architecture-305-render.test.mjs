@@ -14,7 +14,7 @@ test('the frozen context, fencing and deployment diagrams have the required sema
     {
       source: 'docs/diagrams/arch/issue305-five-service-context.mmd',
       output: 'context.svg',
-      expected: [/Course -->\|authorization API; member\/roster event\| Assessment/, /Assessment -->\|source-grade event\/API\| Grade/, /Grade -->\|publication\/review event\| Learning/]
+      expected: [/Course -->\|authorization API\| Assessment/, /Course -->\|authorization API\| Grade/, /Assessment -->\|source-grade events\| Grade/, /Grade -->\|publication\/review events\| Learning/]
     },
     {
       source: 'docs/diagrams/arch/issue305-assessment-worker-fencing.mmd',
@@ -24,7 +24,7 @@ test('the frozen context, fencing and deployment diagrams have the required sema
     {
       source: 'docs/diagrams/arch/issue305-five-service-deployment.mmd',
       output: 'deployment.svg',
-      expected: [/AssessmentWorker\[Assessment Worker\]/, /five schemas \/ five accounts/, /AssessmentWorker\[Assessment Worker\] --> RabbitMQ/]
+      expected: [/AssessmentWorker\[Assessment Worker\]/, /five schemas \/ five accounts/, /RabbitMQ --> AssessmentWorker\[Assessment Worker\]/, /Course --> ObjectStore/]
     }
   ];
   try {
