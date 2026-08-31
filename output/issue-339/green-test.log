@@ -1,0 +1,65 @@
+[INFO] Scanning for projects...
+[INFO]
+[INFO] -------------< com.onlinejudge:onlinejudge-grade-service >--------------
+[INFO] Building onlinejudge-grade-service 0.1.0-SNAPSHOT
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO]
+[INFO] --- resources:3.3.1:resources (default-resources) @ onlinejudge-grade-service ---
+[INFO] Copying 1 resource from src\main\resources to target\classes
+[INFO] Copying 1 resource from src\main\resources to target\classes
+[INFO]
+[INFO] --- compiler:3.13.0:compile (default-compile) @ onlinejudge-grade-service ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO]
+[INFO] --- resources:3.3.1:testResources (default-testResources) @ onlinejudge-grade-service ---
+[INFO] skip non existing resourceDirectory C:\mySet\Learning_materials\short_semester\code\OnlineJudge\services\grade\src\test\resources
+[INFO]
+[INFO] --- compiler:3.13.0:testCompile (default-testCompile) @ onlinejudge-grade-service ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO]
+[INFO] --- surefire:3.5.3:test (default-test) @ onlinejudge-grade-service ---
+[INFO] Using auto detected provider org.apache.maven.surefire.junitplatform.JUnitPlatformProvider
+[INFO]
+[INFO] -------------------------------------------------------
+[INFO]  T E S T S
+[INFO] -------------------------------------------------------
+[INFO] Running com.onlinejudge.gradeservice.messaging.SourceGradeChangedEnvelopeTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.166 s -- in com.onlinejudge.gradeservice.messaging.SourceGradeChangedEnvelopeTest
+[INFO] Running com.onlinejudge.gradeservice.SourceGradeProjectionServiceTest
+14:41:19.962 [main] INFO org.springframework.test.context.support.AnnotationConfigContextLoaderUtils -- Could not detect default configuration classes for test class [com.onlinejudge.gradeservice.SourceGradeProjectionServiceTest]: SourceGradeProjectionServiceTest does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+14:41:20.055 [main] INFO org.springframework.boot.test.context.SpringBootTestContextBootstrapper -- Found @SpringBootConfiguration com.onlinejudge.gradeservice.GradeServiceApplication for test class com.onlinejudge.gradeservice.SourceGradeProjectionServiceTest
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+
+ :: Spring Boot ::                (v3.4.5)
+
+2026-08-31T14:41:20.382+08:00  INFO 19668 --- [grade-service] [           main] c.o.g.SourceGradeProjectionServiceTest   : Starting SourceGradeProjectionServiceTest using Java 21.0.11 with PID 19668 (started by lzh19 in C:\mySet\Learning_materials\short_semester\code\OnlineJudge\services\grade)
+2026-08-31T14:41:20.383+08:00  INFO 19668 --- [grade-service] [           main] c.o.g.SourceGradeProjectionServiceTest   : No active profile set, falling back to 1 default profile: "default"
+2026-08-31T14:41:20.980+08:00  INFO 19668 --- [grade-service] [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
+2026-08-31T14:41:21.146+08:00  INFO 19668 --- [grade-service] [           main] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Added connection conn0: url=jdbc:h2:mem:grade_service user=SA
+2026-08-31T14:41:21.149+08:00  INFO 19668 --- [grade-service] [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
+2026-08-31T14:41:21.704+08:00  INFO 19668 --- [grade-service] [           main] c.o.g.SourceGradeProjectionServiceTest   : Started SourceGradeProjectionServiceTest in 1.552 seconds (process running for 2.384)
+Mockito is currently self-attaching to enable the inline-mock-maker. This will no longer work in future releases of the JDK. Please add Mockito as an agent to your build what is described in Mockito's documentation: https://javadoc.io/doc/org.mockito/mockito-core/latest/org/mockito/Mockito.html#0.3
+WARNING: A Java agent has been loaded dynamically (C:\Users\lzh19\.m2\repository\net\bytebuddy\byte-buddy-agent\1.15.11\byte-buddy-agent-1.15.11.jar)
+WARNING: If a serviceability tool is in use, please run with -XX:+EnableDynamicAgentLoading to hide this warning
+WARNING: If a serviceability tool is not in use, please run with -Djdk.instrument.traceUsage for more information
+WARNING: Dynamic loading of agents will be disallowed by default in a future release
+Java HotSpot(TM) 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 2.576 s -- in com.onlinejudge.gradeservice.SourceGradeProjectionServiceTest
+[INFO]
+[INFO] Results:
+[INFO]
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0
+[INFO]
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD SUCCESS
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  4.492 s
+[INFO] Finished at: 2026-08-31T14:41:22+08:00
+[INFO] ------------------------------------------------------------------------
