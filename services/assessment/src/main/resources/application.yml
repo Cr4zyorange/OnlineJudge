@@ -21,10 +21,8 @@ assessment:
   storage:
     root: ${ASSESSMENT_STORAGE_ROOT:./var/assessment-files}
   sandbox:
-    command: ${ASSESSMENT_SANDBOX_COMMAND:}
-    timeout: ${ASSESSMENT_SANDBOX_TIMEOUT:PT30S}
-    pre-execution-delay: ${ASSESSMENT_SANDBOX_PRE_EXECUTION_DELAY:PT0S}
-    max-output-bytes: ${ASSESSMENT_SANDBOX_MAX_OUTPUT_BYTES:1048576}
+    docker-api-uri: ${ASSESSMENT_SANDBOX_DOCKER_API_URI:}
+    image: ${ASSESSMENT_SANDBOX_IMAGE:python:3.12-alpine}
   worker:
     lease: ${ASSESSMENT_WORKER_LEASE:PT30S}
     heartbeat-interval: ${ASSESSMENT_WORKER_HEARTBEAT_INTERVAL:PT5S}
