@@ -89,7 +89,10 @@ class CourseServiceContractTest {
             TLS_DIR = Files.createTempDirectory("course-mtls-test");
             STORAGE_ROOT = Files.createTempDirectory("course-storage-test");
             generateMtlsKeystores(TLS_DIR);
-            learningServer = HttpsServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
+            // Bind explicitly to the IPv4 loopback: the mTLS client connects to
+            // https://127.0.0.1:port, so an OS-preferring IPv6 loopback address
+            // would make the same suite fail only on some runners (CI).
+            learningServer = HttpsServer.create(new InetSocketAddress(InetAddress.getByName("127.0.0.1"), 0), 0);
             learningServer.setHttpsConfigurator(new HttpsConfigurator(serverSslContext(TLS_DIR)) {
                 @Override
                 public void configure(HttpsParameters parameters) {
@@ -315,7 +318,10 @@ class CourseServiceContractTest {
     void publishedRosterReconciliationEmitsExactlyOneNewSnapshotWithoutLearningCallback() throws Exception {
         String courseId = createdCourse(userToken("841", List.of("TEACHER")), "durable roster repair");
         jdbcTemplate.update("UPDATE course_event_outbox SET delivery_status = 'PUBLISHED' WHERE event_type = 'course.membership.snapshot.v2' AND aggregate_id = ?", courseId);
-        jdbcTemplate.update("UPDATE course_membership_reconciliation_checkpoint SET next_reconcile_at = CURRENT_TIMESTAMP WHERE course_id = ?", Long.parseLong(courseId));
+        // A fixed past due-gate keeps the claim deterministic: comparing a DB
+        // CURRENT_TIMESTAMP against Instant.now() is wall-clock sensitive and
+        // intermittently leaves the row not-yet-due on slower CI runners.
+        jdbcTemplate.update("UPDATE course_membership_reconciliation_checkpoint SET next_reconcile_at = '2020-01-01 00:00:00' WHERE course_id = ?", Long.parseLong(courseId));
 
         assertThat(courseService.reconcilePublishedRosters()).isEqualTo(1);
         assertThat(courseService.reconcilePublishedRosters()).isZero();
