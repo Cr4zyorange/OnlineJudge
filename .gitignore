@@ -78,6 +78,9 @@ coverage/
 test-results/
 playwright-report/
 frontend/test-results/
+
+# Assessment runtime submission storage (never a checked-in fixture source)
+services/assessment/var/assessment-files/
 frontend/playwright-report/
 .nyc_output/
 tmp/
