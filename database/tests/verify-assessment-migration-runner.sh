@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # Disposable MySQL 8.4 acceptance for the generic service migration runner.
-# It proves a legacy Assessment schema can be checkpointed through 01/02/03,
+# It proves a legacy Assessment schema can be checkpointed through every checked-in migration,
 # an identical rerun is a no-op, and the application account remains DML-only.
 set -Eeuo pipefail
 
@@ -11,6 +11,7 @@ container_name="oj313-service-migration-${run_id}"
 admin_password="oj313_migration_${run_id}"
 runtime_password="oj313_runtime_${run_id}"
 raw_log="${TMPDIR:-/tmp}/oj313-service-migration-${run_id}.log"
+expected_migrations="$(find "$repository_root/database/migrations/assessment" -maxdepth 1 -type f -name '*.sql' | wc -l | tr -d '[:space:]')"
 
 fail() {
   printf 'verify-assessment-migration-runner: FAIL: %s\n' "$*" >&2
@@ -45,7 +46,7 @@ admin_mysql -e 'SELECT 1' >>"$raw_log" 2>&1 || fail 'disposable MySQL did not be
 
 admin_mysql -e 'CREATE DATABASE oj_assessment CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;' >>"$raw_log" 2>&1
 # The old deployment has 01's table shape but no version checkpoint.  The
-# runner must record 01/02/03 without relying on runtime boot DDL.
+# runner must record every migration without relying on runtime boot DDL.
 admin_mysql oj_assessment < "$repository_root/database/migrations/assessment/20260831_01_create_assessment_service_tables.sql" >>"$raw_log" 2>&1
 
 run_runner() {
@@ -60,7 +61,7 @@ first_output="$(run_runner 2>&1)" || {
   fail 'first controlled migration run failed'
 }
 printf '%s\n' "$first_output" >>"$raw_log"
-grep -Fq 'PASS schema=assessment applied=3' <<<"$first_output" || fail 'first run did not apply 01/02/03'
+grep -Fq "PASS schema=assessment applied=$expected_migrations" <<<"$first_output" || fail 'first run did not apply every checked-in migration'
 
 repeat_output="$(run_runner 2>&1)" || {
   printf '%s\n' "$repeat_output" >>"$raw_log"
@@ -70,7 +71,7 @@ printf '%s\n' "$repeat_output" >>"$raw_log"
 grep -Fq 'PASS schema=assessment applied=0' <<<"$repeat_output" || fail 'repeat run was not idempotent'
 
 history_count="$(admin_mysql -N -Doj_assessment -e 'SELECT COUNT(*) FROM schema_migrations;')"
-[[ "$history_count" == 3 ]] || fail "expected three migration checkpoints, found $history_count"
+[[ "$history_count" == "$expected_migrations" ]] || fail "expected $expected_migrations migration checkpoints, found $history_count"
 admin_mysql -e "CREATE USER 'oj_assessment_rw'@'%' IDENTIFIED BY '$runtime_password'; GRANT SELECT, INSERT, UPDATE, DELETE ON oj_assessment.* TO 'oj_assessment_rw'@'%'; FLUSH PRIVILEGES;" >>"$raw_log" 2>&1
 MYSQL_PWD="$runtime_password" mysql --protocol=TCP --host=127.0.0.1 --port="$mysql_port" --user=oj_assessment_rw oj_assessment -e 'SELECT COUNT(*) FROM assessment_submission;' >>"$raw_log" 2>&1
 if MYSQL_PWD="$runtime_password" mysql --protocol=TCP --host=127.0.0.1 --port="$mysql_port" --user=oj_assessment_rw oj_assessment -e 'CREATE TABLE forbidden_runtime_ddl (id INT);' >>"$raw_log" 2>&1; then
