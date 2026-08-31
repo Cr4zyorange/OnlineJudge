@@ -11,6 +11,7 @@ compose="$checkout/deploy/docker/compose.yml"
 platform="$checkout/deploy/platform/workloads.json"
 config="$checkout/services/course/src/main/resources/application-compose.properties"
 migrator="$checkout/database/mysql/migrate-course-service.sh"
+manifest_migrator="$checkout/database/mysql/migrate-service.sh"
 cached_runtime="$checkout/services/course/Dockerfile.cached-runtime"
 live_smoke="$checkout/scripts/test/verify-course-compose-live.sh"
 live_learning="$checkout/scripts/test/verify-course-to-learning-live.sh"
@@ -25,6 +26,7 @@ fail() {
 [[ -f "$platform" ]] || fail "missing platform workload manifest"
 [[ -f "$config" ]] || fail "missing Course Compose configuration"
 [[ -x "$migrator" ]] || fail "missing executable Course migration entrypoint"
+[[ -x "$manifest_migrator" ]] || fail "missing executable shared Course migration runner"
 [[ -f "$cached_runtime" ]] || fail "missing Course cached-runtime Dockerfile"
 [[ -x "$live_smoke" ]] || fail "missing executable Course Compose live smoke"
 [[ -x "$live_learning" ]] || fail "missing executable Course-to-Learning live proof"
@@ -37,9 +39,10 @@ course_migration_command="$(node -e '
   if (!job || typeof job.command !== "string") process.exit(2);
   process.stdout.write(job.command);
 ' "$platform")" || fail "Course migration manifest command could not be read"
-[[ "$course_migration_command" == './database/mysql/migrate-course-service.sh' ]] || \
-  fail "Course migration manifest command must target database/mysql/migrate-course-service.sh"
-[[ -x "$checkout/${course_migration_command#./}" ]] || \
+[[ "$course_migration_command" == './database/mysql/migrate-service.sh --schema course' ]] || \
+  fail "Course migration manifest command must target database/mysql/migrate-service.sh --schema course"
+course_migration_runner="${course_migration_command%% *}"
+[[ -x "$checkout/${course_migration_runner#./}" ]] || \
   fail "Course migration manifest command must resolve to an executable runner"
 
 require() {
@@ -104,10 +107,12 @@ cp "$live_learning" "$fixture/scripts/test/verify-course-to-learning-live.sh"
 chmod +x "$fixture/scripts/test/verify-course-to-learning-live.sh"
 cp "$migrator" "$fixture/database/mysql/migrate-course-service.sh"
 chmod +x "$fixture/database/mysql/migrate-course-service.sh"
+cp "$manifest_migrator" "$fixture/database/mysql/migrate-service.sh"
+chmod +x "$fixture/database/mysql/migrate-service.sh"
 
 # Mutation: the platform contract must not merely name a Course migration job;
 # its command must resolve to the checked-in, executable runner.
-sed -i.bak 's#migrate-course-service\.sh#migrator-that-does-not-exist.sh#' "$fixture/deploy/platform/workloads.json"
+sed -i.bak 's#migrate-service\.sh#migrator-that-does-not-exist.sh#' "$fixture/deploy/platform/workloads.json"
 rm -f "$fixture/deploy/platform/workloads.json.bak"
 if bash "$0" "$fixture" --fixture >"$fixture/migration-command.out" 2>"$fixture/migration-command.err"; then
   fail "unresolvable Course migration command mutation unexpectedly passed"
