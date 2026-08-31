@@ -238,6 +238,7 @@ function homeworkPublicApiProblems(document, label) {
   };
   const publishScores = document?.paths?.['/api/v1/homeworks/{homeworkId}/scores/publish']?.put;
   const reevaluate = document?.paths?.['/api/v1/submissions/{submissionId}/reevaluate']?.post;
+  const homeworkSummaryEnvelope = document?.components?.schemas?.HomeworkSummaryEnvelope;
   const reasonRequest = document?.components?.schemas?.HomeworkReevaluationRequest;
 
   check(publishScores?.operationId === 'publishHomeworkScores' && publishScores?.['x-onlinejudge-api-id'] === 'API-HWK-14',
@@ -245,8 +246,14 @@ function homeworkPublicApiProblems(document, label) {
   check((publishScores?.security ?? []).some((requirement) => Object.hasOwn(requirement, 'userJwt')),
     'API-HWK-14 must require a user JWT');
   check(operationHasRequestId(publishScores), 'API-HWK-14 must require X-Request-Id');
-  check(publishScores?.responses?.['200']?.content?.['application/json']?.schema?.$ref === '#/components/schemas/HomeworkSummary',
-    'API-HWK-14 success response must use HomeworkSummary');
+  check(publishScores?.responses?.['200']?.content?.['application/json']?.schema?.$ref === '#/components/schemas/HomeworkSummaryEnvelope',
+    'API-HWK-14 success response must use HomeworkSummaryEnvelope');
+  check(homeworkSummaryEnvelope?.type === 'object' && homeworkSummaryEnvelope?.additionalProperties === false
+      && hasRequiredProperties(homeworkSummaryEnvelope, ['code', 'message', 'data'])
+      && homeworkSummaryEnvelope?.properties?.code?.const === 0
+      && homeworkSummaryEnvelope?.properties?.message?.type === 'string'
+      && homeworkSummaryEnvelope?.properties?.data?.$ref === '#/components/schemas/HomeworkSummary',
+  'HomeworkSummaryEnvelope must be the standard browser response wrapper');
   for (const status of ['403', '404', '409']) {
     check(responseHasErrorSchema(publishScores?.responses?.[status]), `API-HWK-14 must declare ${status} Error response`);
   }

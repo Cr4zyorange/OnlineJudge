@@ -128,7 +128,7 @@ public class HomeworkController {
     }
 
     @PutMapping("/homeworks/{homeworkId}/scores/publish")
-    public HomeworkService.HomeworkSummary publishScores(@PathVariable long homeworkId,
+    public Map<String, Object> publishScores(@PathVariable long homeworkId,
             @RequestAttribute("assessment.currentUser") CurrentUser user, HttpServletRequest http) {
         String requestId = requireRequestId(http);
         HomeworkService.HomeworkSummary homework;
@@ -139,7 +139,7 @@ public class HomeworkController {
         }
         requireManager(homework.courseId(), user);
         try {
-            return homeworks.publishScores(homeworkId, user.id(), requestId);
+            return success(homeworks.publishScores(homeworkId, user.id(), requestId));
         } catch (IllegalStateException conflict) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, conflict.getMessage(), conflict);
         }
@@ -174,7 +174,7 @@ public class HomeworkController {
         }
     }
 
-    private static Map<String, Object> success(Map<String, Object> data) {
+    private static Map<String, Object> success(Object data) {
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("code", 0);
         response.put("message", "success");

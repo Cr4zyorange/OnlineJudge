@@ -199,7 +199,10 @@ class HomeworkWorkflowContractTest {
                         .header("Authorization", "Bearer " + teacherToken)
                         .header("X-Request-Id", UUID.randomUUID().toString()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("SCORE_PUBLISHED"));
+                .andExpect(jsonPath("$.code").value(0))
+                .andExpect(jsonPath("$.message").value("success"))
+                .andExpect(jsonPath("$.data.id").value(homeworkId))
+                .andExpect(jsonPath("$.data.status").value("SCORE_PUBLISHED"));
         assertThat(jdbc.queryForObject("SELECT source_version FROM assessment_source_grade WHERE source_type = 'HWK' AND source_id = ? AND student_id = ?", Long.class, Long.toString(homeworkId), studentId)).isEqualTo(1L);
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM assessment_event_outbox WHERE event_type = 'assessment.source-grade.changed.v2' AND aggregate_id = ?", Integer.class, "HWK:" + homeworkId + ":" + studentId)).isEqualTo(1);
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM assessment_homework_review_log WHERE submission_id = ? AND operation_type = 'SCORE_PUBLISHED' AND operator_id = ? AND new_score = ?",
@@ -234,7 +237,10 @@ class HomeworkWorkflowContractTest {
                         .header("Authorization", "Bearer " + teacherToken)
                         .header("X-Request-Id", UUID.randomUUID().toString()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("SCORE_PUBLISHED"));
+                .andExpect(jsonPath("$.code").value(0))
+                .andExpect(jsonPath("$.message").value("success"))
+                .andExpect(jsonPath("$.data.id").value(homeworkId))
+                .andExpect(jsonPath("$.data.status").value("SCORE_PUBLISHED"));
         assertCurrentSourceGrade(homeworkId, studentId, "SCORED", new BigDecimal("86"), 1);
     }
 
