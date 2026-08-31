@@ -3,6 +3,8 @@ package com.onlinejudge.assessmentservice.controller;
 import com.onlinejudge.assessmentservice.persistence.CourseMemberProjectionRepository;
 import com.onlinejudge.assessmentservice.security.CurrentUser;
 import com.onlinejudge.assessmentservice.service.AssessmentSubmissionService;
+import com.onlinejudge.assessmentservice.service.LabExperimentService;
+import com.onlinejudge.assessmentservice.service.LabSubmissionService;
 import com.onlinejudge.assessmentservice.storage.PersistentSubmissionFileStore;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -22,7 +24,11 @@ import org.springframework.web.server.ResponseStatusException;
 @RequestMapping("/api/v1")
 public class AssessmentSubmissionController {
     private final AssessmentSubmissionService submissions; private final CourseMemberProjectionRepository courseMembers; private final PersistentSubmissionFileStore files;
-    public AssessmentSubmissionController(AssessmentSubmissionService submissions, CourseMemberProjectionRepository courseMembers, PersistentSubmissionFileStore files) { this.submissions = submissions; this.courseMembers = courseMembers; this.files = files; }
+    private final LabExperimentService labs; private final LabSubmissionService labSubmissions;
+    public AssessmentSubmissionController(AssessmentSubmissionService submissions, CourseMemberProjectionRepository courseMembers,
+            PersistentSubmissionFileStore files, LabExperimentService labs, LabSubmissionService labSubmissions) {
+        this.submissions = submissions; this.courseMembers = courseMembers; this.files = files; this.labs = labs; this.labSubmissions = labSubmissions;
+    }
     @PostMapping("/submissions")
     @org.springframework.web.bind.annotation.ResponseStatus(HttpStatus.CREATED)
     public AssessmentSubmissionService.SubmittedSubmission submit(@Valid @RequestBody SubmissionRequest request, @RequestAttribute("assessment.currentUser") CurrentUser user, HttpServletRequest http) {
@@ -34,9 +40,25 @@ public class AssessmentSubmissionController {
 
     @PostMapping(path = "/labs/{sourceId}/submissions", consumes = "multipart/form-data")
     @org.springframework.web.bind.annotation.ResponseStatus(HttpStatus.CREATED)
-    public AssessmentSubmissionService.SubmittedSubmission submitLab(@PathVariable String sourceId, @RequestParam String courseId,
+    public LabSubmissionService.SubmittedLabSubmission submitLab(@PathVariable long sourceId, @RequestParam(required = false) String courseId,
+            @RequestParam String language,
             @RequestParam MultipartFile file, @RequestAttribute("assessment.currentUser") CurrentUser user, HttpServletRequest http) {
-        return submitUploaded("LAB", sourceId, courseId, file, user, http);
+        if (http.getHeader("X-Request-Id") == null || http.getHeader("X-Request-Id").isBlank()) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "X-Request-Id is required");
+        LabExperimentService.LabSummary lab;
+        try { lab = labs.find(sourceId); }
+        catch (java.util.NoSuchElementException missing) { throw new ResponseStatusException(HttpStatus.NOT_FOUND, "LAB does not exist", missing); }
+        if (!user.hasRole("STUDENT") || !courseMembers.isActive(lab.courseId(), user.id())) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "active course student membership is required");
+        if (file.isEmpty()) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "submission file is required");
+        try {
+            return labSubmissions.submit(new LabSubmissionService.SubmitLabCommand(sourceId, courseId, user.id(), language,
+                    file.getOriginalFilename(), file.getBytes()));
+        } catch (IllegalArgumentException invalid) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, invalid.getMessage(), invalid);
+        } catch (IllegalStateException invalidState) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, invalidState.getMessage(), invalidState);
+        } catch (java.io.IOException failure) {
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "submission storage unavailable", failure);
+        }
     }
 
     private AssessmentSubmissionService.SubmittedSubmission submitUploaded(String sourceType, String sourceId, String courseId, MultipartFile file,

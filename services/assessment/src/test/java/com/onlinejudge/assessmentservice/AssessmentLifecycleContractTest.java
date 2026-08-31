@@ -48,7 +48,9 @@ class AssessmentLifecycleContractTest {
         jdbc.update("DELETE FROM assessment_homework_evaluation");
         jdbc.update("DELETE FROM evaluation_task");
         jdbc.update("DELETE FROM assessment_homework_submission");
+        jdbc.update("DELETE FROM assessment_lab_submission");
         jdbc.update("DELETE FROM assessment_submission");
+        jdbc.update("DELETE FROM assessment_lab_experiment");
         jdbc.update("DELETE FROM assessment_course_member_projection");
     }
 
@@ -93,11 +95,18 @@ class AssessmentLifecycleContractTest {
     @Test
     void labEndpointPersistsUploadedBytesAndKeepsEvaluationReadsPassive() throws Exception {
         jdbc.update("INSERT INTO assessment_course_member_projection (course_id, user_id, membership_status, member_version) VALUES ('course-7', 'student-42', 'ACTIVE', 1)");
+        jdbc.update("""
+                INSERT INTO assessment_lab_experiment (id, course_id, title, description, status, deadline, max_score,
+                    allowed_languages, auto_evaluate, created_by, created_at, updated_at)
+                VALUES (7, 'course-7', 'assessment-core-lab', 'test fixture', 'PUBLISHED', TIMESTAMP '2030-01-01 00:00:00',
+                    100, 'python', TRUE, 'teacher-7', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                """);
         String token = TestJwtFactory.userToken(KEY, "lifecycle-kid", "student-42", List.of("STUDENT"));
 
-        mockMvc.perform(multipart("/api/v1/labs/lab-7/submissions")
+        mockMvc.perform(multipart("/api/v1/labs/7/submissions")
                         .file("file", "print('lab')".getBytes())
                         .param("courseId", "course-7")
+                        .param("language", "python")
                         .header("X-Request-Id", "req-lab-7")
                         .header("Authorization", "Bearer " + token))
                 .andExpect(status().isCreated());

@@ -39,7 +39,12 @@ class WorkerCompletionService {
         // The lightweight constructor is used by queue-only tests and has no
         // HWK projection.  Preserve its pre-existing generic-task behaviour.
         boolean homeworkProjection = false;
-        if (jdbc != null && "HWK".equals(task.sourceType())) {
+        if (jdbc != null) {
+            if ("LAB".equals(task.sourceType())) {
+                jdbc.update("UPDATE assessment_submission SET evaluation_status = ? WHERE id = ?", outcome.status(), task.submissionId());
+                jdbc.update("UPDATE assessment_lab_submission SET auto_score = ? WHERE submission_id = ?", outcome.successful() ? outcome.score() : null, task.submissionId());
+            }
+            if ("HWK".equals(task.sourceType())) {
             homeworkProjection = !jdbc.query("""
                     SELECT is_final FROM assessment_homework_submission
                      WHERE submission_id = ? FOR UPDATE
@@ -53,6 +58,7 @@ class WorkerCompletionService {
                         """, outcome.status(), outcome.successful() ? outcome.score() : null,
                         outcome.successful() ? outcome.score() : null, task.submissionId());
                 appendHomeworkEvaluation(task, outcome, finished);
+            }
             }
         }
         outbox.append("assessment.evaluation.completed.v2", "assessment-submission", task.submissionId(), task.generation(), task.id(),
