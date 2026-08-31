@@ -92,6 +92,17 @@ public class EvaluationTaskRepository {
                 """, Timestamp.from(now), requestedBy, Timestamp.from(now), Timestamp.from(now), id) == 1;
     }
 
+    /** API-HWK-12 accepts every terminal HWK task; result detail must not make a completed task unreplayable. */
+    public boolean manualReplayHomework(String id, String requestedBy, Instant now) {
+        return jdbc.update("""
+                UPDATE evaluation_task SET state = 'PENDING', result_status = NULL, next_attempt_at = ?, lease_owner = NULL,
+                    lease_until = NULL, generation = generation + 1, manual_replay_count = manual_replay_count + 1,
+                    manual_replayed_by = ?, manual_replayed_at = ?, updated_at = ?
+                 WHERE id = ? AND source_type = 'HWK'
+                   AND state IN ('FAILED', 'SUCCEEDED')
+                """, Timestamp.from(now), requestedBy, Timestamp.from(now), Timestamp.from(now), id) == 1;
+    }
+
     public Optional<EvaluationTask> find(String id) {
         List<EvaluationTask> rows = jdbc.query("""
                 SELECT id, submission_id, source_type, source_id, course_id, student_id, state, generation,
@@ -103,6 +114,11 @@ public class EvaluationTaskRepository {
                 rs.getString("lease_owner"), toInstant(rs.getTimestamp("lease_until")), rs.getInt("attempt"),
                 rs.getString("result_status")), id);
         return rows.stream().findFirst();
+    }
+
+    public Optional<EvaluationTask> findBySubmission(String submissionId) {
+        return jdbc.queryForList("SELECT id FROM evaluation_task WHERE submission_id = ?", String.class, submissionId)
+                .stream().findFirst().flatMap(this::find);
     }
 
     public int count() { return jdbc.queryForObject("SELECT COUNT(*) FROM evaluation_task", Integer.class); }

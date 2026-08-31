@@ -101,9 +101,12 @@ export function closeHomework(homeworkId: number): Promise<HomeworkDetail> {
   });
 }
 
-export function publishHomeworkScores(homeworkId: number): Promise<HomeworkDetail> {
-  return request<HomeworkDetail>(`/api/v1/homeworks/${homeworkId}/scores/publish`, {
-    method: 'PUT'
+export function publishHomeworkScores(homeworkId: number): Promise<HomeworkSummary> {
+  return request<HomeworkSummary>(`/api/v1/homeworks/${homeworkId}/scores/publish`, {
+    method: 'PUT',
+    headers: {
+      'X-Request-Id': crypto.randomUUID()
+    }
   });
 }
 

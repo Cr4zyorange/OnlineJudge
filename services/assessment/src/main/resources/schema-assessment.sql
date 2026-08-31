@@ -63,11 +63,61 @@ CREATE TABLE IF NOT EXISTS assessment_deferred_identity_security_version_event (
 CREATE TABLE IF NOT EXISTS assessment_source_grade (
   source_type VARCHAR(8) NOT NULL, source_id VARCHAR(80) NOT NULL, course_id VARCHAR(80) NOT NULL,
   student_id VARCHAR(80) NOT NULL, score DECIMAL(10,2), full_score DECIMAL(10,2) NOT NULL,
-  status VARCHAR(16) NOT NULL, source_version BIGINT NOT NULL, updated_at TIMESTAMP NOT NULL,
+  status VARCHAR(16) NOT NULL, source_version BIGINT NOT NULL, snapshot_version BIGINT NOT NULL, updated_at TIMESTAMP NOT NULL,
   PRIMARY KEY (source_type, source_id, student_id)
 );
 CREATE TABLE IF NOT EXISTS assessment_source_grade_snapshot (
   source_type VARCHAR(8) NOT NULL, source_id VARCHAR(80) NOT NULL, course_id VARCHAR(80) NOT NULL,
-  snapshot_version BIGINT NOT NULL,
+  snapshot_version BIGINT NOT NULL, first_reconstructable_version BIGINT NOT NULL DEFAULT 1,
   PRIMARY KEY (source_type, source_id)
+);
+CREATE TABLE IF NOT EXISTS assessment_source_grade_revision (
+  source_type VARCHAR(8) NOT NULL, source_id VARCHAR(80) NOT NULL, course_id VARCHAR(80) NOT NULL,
+  student_id VARCHAR(80) NOT NULL, snapshot_version BIGINT NOT NULL, score DECIMAL(10,2),
+  full_score DECIMAL(10,2) NOT NULL, status VARCHAR(16) NOT NULL, source_version BIGINT NOT NULL,
+  updated_at TIMESTAMP NOT NULL,
+  PRIMARY KEY (source_type, source_id, student_id, snapshot_version),
+  INDEX idx_assessment_source_grade_revision_snapshot (course_id, source_type, source_id, snapshot_version, student_id)
+);
+CREATE TABLE IF NOT EXISTS assessment_homework (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY, course_id VARCHAR(80) NOT NULL, title VARCHAR(100) NOT NULL,
+  description TEXT NOT NULL, type VARCHAR(20) NOT NULL, status VARCHAR(20) NOT NULL, deadline TIMESTAMP NOT NULL,
+  total_score DECIMAL(10,2) NOT NULL, allow_resubmit BOOLEAN NOT NULL, allow_late_submit BOOLEAN NOT NULL,
+  allowed_languages VARCHAR(500) NOT NULL, created_by VARCHAR(80) NOT NULL, aggregate_version BIGINT NOT NULL,
+  published_at TIMESTAMP, created_at TIMESTAMP NOT NULL, updated_at TIMESTAMP NOT NULL,
+  INDEX idx_assessment_homework_course_status (course_id, status)
+);
+CREATE TABLE IF NOT EXISTS assessment_homework_testcase (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY, homework_id BIGINT NOT NULL, input_text TEXT NOT NULL,
+  expected_output TEXT NOT NULL, score_weight DECIMAL(10,2) NOT NULL, is_hidden BOOLEAN NOT NULL, sort_order INT NOT NULL,
+  UNIQUE KEY uq_assessment_homework_testcase_order (homework_id, sort_order),
+  CONSTRAINT fk_assessment_homework_testcase_homework FOREIGN KEY (homework_id) REFERENCES assessment_homework(id)
+);
+CREATE TABLE IF NOT EXISTS assessment_homework_submission (
+  submission_id VARCHAR(36) PRIMARY KEY, public_id BIGINT AUTO_INCREMENT UNIQUE, homework_id BIGINT NOT NULL, student_id VARCHAR(80) NOT NULL,
+  submission_version INTEGER NOT NULL, language VARCHAR(40) NOT NULL, submit_status VARCHAR(20) NOT NULL,
+  evaluation_status VARCHAR(32) NOT NULL, auto_score DECIMAL(10,2), final_score DECIMAL(10,2), is_final BOOLEAN NOT NULL,
+  submitted_at TIMESTAMP NOT NULL, UNIQUE KEY uq_assessment_homework_submission_version (homework_id, student_id, submission_version),
+  INDEX idx_assessment_homework_submission_student (homework_id, student_id, is_final, submitted_at),
+  CONSTRAINT fk_assessment_homework_submission_homework FOREIGN KEY (homework_id) REFERENCES assessment_homework(id),
+  CONSTRAINT fk_assessment_homework_submission_submission FOREIGN KEY (submission_id) REFERENCES assessment_submission(id)
+);
+CREATE TABLE IF NOT EXISTS assessment_homework_evaluation (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY, task_id VARCHAR(36) NOT NULL, task_generation BIGINT NOT NULL,
+  submission_id VARCHAR(36) NOT NULL, homework_id BIGINT NOT NULL, student_id VARCHAR(80) NOT NULL,
+  evaluation_type VARCHAR(32) NOT NULL, status VARCHAR(32) NOT NULL, score DECIMAL(10,2), full_score DECIMAL(10,2),
+  started_at TIMESTAMP NOT NULL, finished_at TIMESTAMP NOT NULL,
+  UNIQUE KEY uq_assessment_homework_evaluation_task_generation (task_id, task_generation),
+  INDEX idx_assessment_homework_evaluation_submission (submission_id, finished_at),
+  CONSTRAINT fk_assessment_homework_evaluation_task FOREIGN KEY (task_id) REFERENCES evaluation_task(id),
+  CONSTRAINT fk_assessment_homework_evaluation_submission FOREIGN KEY (submission_id) REFERENCES assessment_homework_submission(submission_id),
+  CONSTRAINT fk_assessment_homework_evaluation_homework FOREIGN KEY (homework_id) REFERENCES assessment_homework(id)
+);
+CREATE TABLE IF NOT EXISTS assessment_homework_review_log (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY, submission_id VARCHAR(36) NOT NULL, homework_id BIGINT NOT NULL,
+  student_id VARCHAR(80) NOT NULL, operation_type VARCHAR(32) NOT NULL, old_score DECIMAL(10,2),
+  new_score DECIMAL(10,2), operator_id VARCHAR(80) NOT NULL, reason VARCHAR(500), created_at TIMESTAMP NOT NULL,
+  INDEX idx_assessment_homework_review_log_submission (submission_id, created_at),
+  CONSTRAINT fk_assessment_homework_review_log_submission FOREIGN KEY (submission_id) REFERENCES assessment_homework_submission(submission_id),
+  CONSTRAINT fk_assessment_homework_review_log_homework FOREIGN KEY (homework_id) REFERENCES assessment_homework(id)
 );

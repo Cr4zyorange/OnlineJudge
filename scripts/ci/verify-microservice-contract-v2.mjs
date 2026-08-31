@@ -231,6 +231,48 @@ function serviceTokenResponseProblems(document, label) {
   return problems;
 }
 
+function homeworkPublicApiProblems(document, label) {
+  const problems = [];
+  const check = (condition, message) => {
+    if (!condition) problems.push(`${label}: ${message}`);
+  };
+  const publishScores = document?.paths?.['/api/v1/homeworks/{homeworkId}/scores/publish']?.put;
+  const reevaluate = document?.paths?.['/api/v1/submissions/{submissionId}/reevaluate']?.post;
+  const homeworkSummaryEnvelope = document?.components?.schemas?.HomeworkSummaryEnvelope;
+  const reasonRequest = document?.components?.schemas?.HomeworkReevaluationRequest;
+
+  check(publishScores?.operationId === 'publishHomeworkScores' && publishScores?.['x-onlinejudge-api-id'] === 'API-HWK-14',
+    'API-HWK-14 score publication path and operation id are required');
+  check((publishScores?.security ?? []).some((requirement) => Object.hasOwn(requirement, 'userJwt')),
+    'API-HWK-14 must require a user JWT');
+  check(operationHasRequestId(publishScores), 'API-HWK-14 must require X-Request-Id');
+  check(publishScores?.responses?.['200']?.content?.['application/json']?.schema?.$ref === '#/components/schemas/HomeworkSummaryEnvelope',
+    'API-HWK-14 success response must use HomeworkSummaryEnvelope');
+  check(homeworkSummaryEnvelope?.type === 'object' && homeworkSummaryEnvelope?.additionalProperties === false
+      && hasRequiredProperties(homeworkSummaryEnvelope, ['code', 'message', 'data'])
+      && homeworkSummaryEnvelope?.properties?.code?.const === 0
+      && homeworkSummaryEnvelope?.properties?.message?.type === 'string'
+      && homeworkSummaryEnvelope?.properties?.data?.$ref === '#/components/schemas/HomeworkSummary',
+  'HomeworkSummaryEnvelope must be the standard browser response wrapper');
+  for (const status of ['403', '404', '409']) {
+    check(responseHasErrorSchema(publishScores?.responses?.[status]), `API-HWK-14 must declare ${status} Error response`);
+  }
+
+  check(reevaluate?.['x-onlinejudge-api-id'] === 'API-HWK-12', 'API-HWK-12 identifier is required');
+  check(reevaluate?.requestBody?.required === true
+      && reevaluate?.requestBody?.content?.['application/json']?.schema?.$ref === '#/components/schemas/HomeworkReevaluationRequest',
+  'API-HWK-12 must require HomeworkReevaluationRequest');
+  check(reasonRequest?.type === 'object' && reasonRequest?.additionalProperties === false
+      && hasRequiredProperties(reasonRequest, ['reason'])
+      && reasonRequest?.properties?.reason?.type === 'string'
+      && reasonRequest.properties.reason.minLength === 1
+      && reasonRequest.properties.reason.maxLength === 500,
+  'HomeworkReevaluationRequest must require a 1-500 character reason');
+  check(responseHasErrorSchema(reevaluate?.responses?.['400']), 'API-HWK-12 must declare a validation Error response');
+  check(responseHasErrorSchema(reevaluate?.responses?.['409']), 'API-HWK-12 must declare a conflict Error response');
+  return problems;
+}
+
 function operationHasRequestId(operation) {
   return (operation?.parameters ?? []).some(
     (parameter) => parameter?.in === 'header' && parameter?.name === 'X-Request-Id' && parameter?.required === true
@@ -283,6 +325,9 @@ function validateOpenApi(service, expectedPaths) {
   }
   if (service === 'assessment') {
     for (const failure of sourceGradeConditionalProblems(document.components?.schemas?.SourceGrade, `${relativePath}: SourceGrade`)) {
+      problem(failure);
+    }
+    for (const failure of homeworkPublicApiProblems(document, `${relativePath}: HWK public API`)) {
       problem(failure);
     }
   }
@@ -758,6 +803,25 @@ function validateRejectingMutations(asyncApi) {
     );
     assert(numberOnlyFailures.length > 0, 'mutation: OpenAPI UNGRADED source grade without nullable score was accepted');
     if (numberOnlyFailures.length > 0) rejectedMutationCount += 1;
+
+    const missingPublishScoresMutation = JSON.parse(JSON.stringify(assessment));
+    delete missingPublishScoresMutation.paths['/api/v1/homeworks/{homeworkId}/scores/publish'];
+    const missingPublishScoresFailures = homeworkPublicApiProblems(
+      missingPublishScoresMutation,
+      'mutation: OpenAPI HWK public API'
+    );
+    assert(missingPublishScoresFailures.length > 0, 'mutation: missing API-HWK-14 score publication path was accepted');
+    if (missingPublishScoresFailures.length > 0) rejectedMutationCount += 1;
+
+    const missingRejudgeReasonMutation = JSON.parse(JSON.stringify(assessment));
+    delete missingRejudgeReasonMutation.components.schemas.HomeworkReevaluationRequest.properties.reason;
+    missingRejudgeReasonMutation.components.schemas.HomeworkReevaluationRequest.required = [];
+    const missingRejudgeReasonFailures = homeworkPublicApiProblems(
+      missingRejudgeReasonMutation,
+      'mutation: OpenAPI HWK public API'
+    );
+    assert(missingRejudgeReasonFailures.length > 0, 'mutation: API-HWK-12 without a required reason was accepted');
+    if (missingRejudgeReasonFailures.length > 0) rejectedMutationCount += 1;
   }
 
   const missingStatusMutation = JSON.parse(JSON.stringify(asyncApi));

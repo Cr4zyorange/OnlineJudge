@@ -42,7 +42,10 @@ class IdentitySecurityVersionProjectionTest {
         jdbc.update("DELETE FROM assessment_identity_security_version_gap");
         jdbc.update("DELETE FROM assessment_identity_security_version");
         jdbc.update("DELETE FROM assessment_course_member_projection");
+        jdbc.update("DELETE FROM assessment_homework_review_log");
+        jdbc.update("DELETE FROM assessment_homework_evaluation");
         jdbc.update("DELETE FROM evaluation_task");
+        jdbc.update("DELETE FROM assessment_homework_submission");
         jdbc.update("DELETE FROM assessment_submission");
         jdbc.update("INSERT INTO assessment_course_member_projection (course_id, user_id, membership_status, member_version) VALUES ('course-security', 'student-security', 'ACTIVE', 1)");
     }
@@ -56,7 +59,7 @@ class IdentitySecurityVersionProjectionTest {
 
         String v1 = TestJwtFactory.userToken(KEY, "security-version-kid", "student-security", List.of("STUDENT"), 1);
         mockMvc.perform(post("/api/v1/submissions").header("Authorization", "Bearer " + v1).header("X-Request-Id", "security-old-token")
-                        .contentType(MediaType.APPLICATION_JSON).content("{\"sourceType\":\"HWK\",\"sourceId\":\"security-hwk\",\"courseId\":\"course-security\"}"))
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"sourceType\":\"LAB\",\"sourceId\":\"security-lab\",\"courseId\":\"course-security\"}"))
                 .andExpect(status().isUnauthorized());
 
         assertThat(securityVersions.apply(new IdentitySecurityVersionProjectionService.SecurityVersionChanged("event-2", "student-security", 2, "LOGOUT")).decision()).isEqualTo("APPLIED");
@@ -65,7 +68,7 @@ class IdentitySecurityVersionProjectionTest {
 
         String v3 = TestJwtFactory.userToken(KEY, "security-version-kid", "student-security", List.of("STUDENT"), 3);
         mockMvc.perform(post("/api/v1/submissions").header("Authorization", "Bearer " + v3).header("X-Request-Id", "security-current-token")
-                        .contentType(MediaType.APPLICATION_JSON).content("{\"sourceType\":\"HWK\",\"sourceId\":\"security-hwk\",\"courseId\":\"course-security\"}"))
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"sourceType\":\"LAB\",\"sourceId\":\"security-lab\",\"courseId\":\"course-security\"}"))
                 .andExpect(status().isCreated());
     }
 }

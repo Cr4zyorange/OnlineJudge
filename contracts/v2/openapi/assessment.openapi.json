@@ -3,6 +3,68 @@
   "info": { "title": "OnlineJudge Assessment Service internal contract", "version": "2.0.0" },
   "x-onlinejudge-service": "assessment",
   "paths": {
+    "/api/v1/homeworks/{homeworkId}/submissions": {
+      "post": {
+        "operationId": "submitHomeworkCode",
+        "description": "Browser-facing CODE homework submission. The worker UUID remains private; the success envelope returns a numeric submissionId compatible with the HWK UI.",
+        "security": [{ "userJwt": [] }],
+        "parameters": [{ "name": "homeworkId", "in": "path", "required": true, "schema": { "type": "integer", "minimum": 1 } }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/HomeworkCodeSubmissionRequest" } } } },
+        "responses": {
+          "201": { "description": "Submission and durable PENDING task committed", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/HomeworkSubmissionEnvelope" } } } },
+          "400": { "description": "Invalid code submission", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "403": { "description": "Not an active course student", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "409": { "description": "Homework is closed or resubmission is forbidden", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      }
+    },
+    "/api/v1/homeworks/{homeworkId}/scores/publish": {
+      "put": {
+        "operationId": "publishHomeworkScores",
+        "x-onlinejudge-api-id": "API-HWK-14",
+        "description": "Publishes a settled snapshot of final HWK submissions. The service rejects the request while any final evaluation is non-terminal, so no late worker completion is omitted from Grade.",
+        "security": [{ "userJwt": [] }],
+        "parameters": [
+          { "name": "homeworkId", "in": "path", "required": true, "schema": { "type": "integer", "minimum": 1 } },
+          { "name": "X-Request-Id", "in": "header", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": {
+          "200": { "description": "Scores and their canonical Grade source facts were published", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/HomeworkSummaryEnvelope" } } } },
+          "403": { "description": "Not a course manager", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "404": { "description": "Homework not found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "409": { "description": "Homework is not PUBLISHED or a final evaluation is still non-terminal", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      }
+    },
+    "/api/v1/submissions/{submissionId}/evaluation": {
+      "get": {
+        "operationId": "getHomeworkEvaluation",
+        "security": [{ "userJwt": [] }],
+        "parameters": [{ "name": "submissionId", "in": "path", "required": true, "schema": { "type": "integer", "minimum": 1 } }],
+        "responses": {
+          "200": { "description": "Passive evaluation status and immutable execution history", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/HomeworkEvaluationEnvelope" } } } },
+          "403": { "description": "Submission is not visible", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "404": { "description": "Submission or evaluation not found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      }
+    },
+    "/api/v1/submissions/{submissionId}/reevaluate": {
+      "post": {
+        "operationId": "reevaluateHomeworkSubmission",
+        "x-onlinejudge-api-id": "API-HWK-12",
+        "description": "Queues a new fenced HWK evaluation and records a REJUDGE audit entry without deleting the completed execution record.",
+        "security": [{ "userJwt": [] }],
+        "parameters": [{ "name": "submissionId", "in": "path", "required": true, "schema": { "type": "integer", "minimum": 1 } }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/HomeworkReevaluationRequest" } } } },
+        "responses": {
+          "200": { "description": "Terminal evaluation reset to PENDING", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/HomeworkReevaluationEnvelope" } } } },
+          "400": { "description": "A nonblank re-evaluation reason is required", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "403": { "description": "Not a course manager", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "404": { "description": "Not a CODE homework evaluation", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "409": { "description": "Evaluation is not terminal or homework scores are already published", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      }
+    },
     "/internal/v2/source-grades": {
       "get": {
         "operationId": "listPublishedSourceGrades", "x-onlinejudge-timeout-ms": 1000,
@@ -14,11 +76,13 @@
           { "name": "sourceType", "in": "query", "required": true, "schema": { "enum": ["LAB", "HWK"] } },
           { "name": "sourceId", "in": "query", "required": true, "schema": { "type": "string" } },
           { "name": "page", "in": "query", "required": false, "schema": { "type": "integer", "minimum": 0, "default": 0 } },
-          { "name": "size", "in": "query", "required": false, "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 100 } }
+          { "name": "size", "in": "query", "required": false, "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 100 } },
+          { "name": "snapshotVersion", "in": "query", "required": false, "description": "Reuse the sourceSnapshotVersion returned by an earlier page to read one immutable source-grade snapshot.", "schema": { "type": "integer", "minimum": 1 } }
         ],
         "responses": {
           "200": { "description": "A stable page with its source snapshot version", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SourceGradePage" } } } },
           "400": { "description": "Invalid source filter", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "409": { "description": "The requested source snapshot is no longer retained; restart the rebuild from the current snapshot.", "x-onlinejudge-error-codes": ["SOURCE_GRADE_SNAPSHOT_EXPIRED"], "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
           "401": { "description": "Missing, invalid, expired, or wrong-audience service JWT; or invalid workload mTLS service identity", "x-onlinejudge-error-codes": ["SERVICE_IDENTITY_INVALID"], "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
           "403": { "description": "Authenticated service principal lacks the grades:read scope", "x-onlinejudge-error-codes": ["SERVICE_IDENTITY_FORBIDDEN"], "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
           "503": { "description": "Assessment source projection is unavailable", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
@@ -32,7 +96,17 @@
       "Error": { "type": "object", "required": ["code", "message", "requestId", "retryable"], "properties": { "code": { "type": "string" }, "message": { "type": "string" }, "requestId": { "type": "string" }, "retryable": { "type": "boolean" } } },
       "Page": { "type": "object", "required": ["items", "page", "size", "total"], "properties": { "items": { "type": "array", "items": {} }, "page": { "type": "integer" }, "size": { "type": "integer" }, "total": { "type": "integer" } } },
       "SourceGradePage": { "allOf": [{ "$ref": "#/components/schemas/Page" }, { "type": "object", "required": ["sourceSnapshotVersion"], "properties": { "sourceSnapshotVersion": { "type": "integer", "minimum": 1 }, "items": { "type": "array", "items": { "$ref": "#/components/schemas/SourceGrade" } } } }] },
-      "SourceGrade": { "type": "object", "additionalProperties": false, "required": ["courseId", "sourceType", "sourceId", "studentId", "score", "fullScore", "status", "updatedAt", "sourceVersion"], "properties": { "courseId": { "type": "string", "minLength": 1 }, "sourceType": { "type": "string", "enum": ["LAB", "HWK"] }, "sourceId": { "type": "string", "minLength": 1 }, "studentId": { "type": "string", "minLength": 1 }, "score": { "type": ["number", "null"], "minimum": 0, "description": "A published numeric score only when status is SCORED; null only when status is UNGRADED. Producers keep numeric scores within fullScore." }, "fullScore": { "type": "number", "exclusiveMinimum": 0 }, "status": { "type": "string", "enum": ["SCORED", "UNGRADED"], "description": "SCORED requires numeric score; UNGRADED requires score=null and must not fabricate a score." }, "updatedAt": { "type": "string", "format": "date-time" }, "sourceVersion": { "type": "integer", "minimum": 1 } }, "oneOf": [{ "type": "object", "required": ["status", "score"], "properties": { "status": { "const": "SCORED" }, "score": { "type": "number", "minimum": 0 } } }, { "type": "object", "required": ["status", "score"], "properties": { "status": { "const": "UNGRADED" }, "score": { "type": "null" } } }] }
+      "SourceGrade": { "type": "object", "additionalProperties": false, "required": ["courseId", "sourceType", "sourceId", "studentId", "score", "fullScore", "status", "updatedAt", "sourceVersion"], "properties": { "courseId": { "type": "string", "minLength": 1 }, "sourceType": { "type": "string", "enum": ["LAB", "HWK"] }, "sourceId": { "type": "string", "minLength": 1 }, "studentId": { "type": "string", "minLength": 1 }, "score": { "type": ["number", "null"], "minimum": 0, "description": "A published numeric score only when status is SCORED; null only when status is UNGRADED. Producers keep numeric scores within fullScore." }, "fullScore": { "type": "number", "exclusiveMinimum": 0 }, "status": { "type": "string", "enum": ["SCORED", "UNGRADED"], "description": "SCORED requires numeric score; UNGRADED requires score=null and must not fabricate a score." }, "updatedAt": { "type": "string", "format": "date-time" }, "sourceVersion": { "type": "integer", "minimum": 1 } }, "oneOf": [{ "type": "object", "required": ["status", "score"], "properties": { "status": { "const": "SCORED" }, "score": { "type": "number", "minimum": 0 } } }, { "type": "object", "required": ["status", "score"], "properties": { "status": { "const": "UNGRADED" }, "score": { "type": "null" } } }] },
+      "HomeworkCodeSubmissionRequest": { "type": "object", "additionalProperties": false, "required": ["codeText", "language"], "properties": { "codeText": { "type": "string", "minLength": 1 }, "language": { "type": "string", "minLength": 1 } } },
+      "HomeworkReevaluationRequest": { "type": "object", "additionalProperties": false, "required": ["reason"], "properties": { "reason": { "type": "string", "minLength": 1, "maxLength": 500 } } },
+      "HomeworkSummary": { "type": "object", "additionalProperties": false, "required": ["id", "courseId", "title", "description", "type", "status", "deadline", "totalScore", "allowResubmit", "allowLateSubmit", "languages", "aggregateVersion", "publishedAt"], "properties": { "id": { "type": "integer", "minimum": 1 }, "courseId": { "type": "string", "minLength": 1 }, "title": { "type": "string", "minLength": 1 }, "description": { "type": "string" }, "type": { "const": "CODE" }, "status": { "type": "string", "enum": ["DRAFT", "PUBLISHED", "SCORE_PUBLISHED"] }, "deadline": { "type": "string", "format": "date-time" }, "totalScore": { "type": "number", "exclusiveMinimum": 0 }, "allowResubmit": { "type": "boolean" }, "allowLateSubmit": { "type": "boolean" }, "languages": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } }, "aggregateVersion": { "type": "integer", "minimum": 1 }, "publishedAt": { "type": ["string", "null"], "format": "date-time" } } },
+      "HomeworkSummaryEnvelope": { "type": "object", "additionalProperties": false, "required": ["code", "message", "data"], "properties": { "code": { "const": 0 }, "message": { "type": "string" }, "data": { "$ref": "#/components/schemas/HomeworkSummary" } } },
+      "HomeworkSubmission": { "type": "object", "additionalProperties": false, "required": ["submissionId", "homeworkId", "submitType", "language", "submitStatus", "evaluationStatus", "reviewStatus", "version", "final", "submittedAt"], "properties": { "submissionId": { "type": "integer", "minimum": 1 }, "homeworkId": { "type": "integer", "minimum": 1 }, "studentId": { "type": "string" }, "submitType": { "const": "CODE" }, "language": { "type": "string", "minLength": 1 }, "submitStatus": { "type": "string", "enum": ["SUBMITTED", "LATE"] }, "evaluationStatus": { "const": "PENDING" }, "reviewStatus": { "const": "UNREVIEWED" }, "autoScore": { "type": "null" }, "manualScore": { "type": "null" }, "finalScore": { "type": "null" }, "version": { "type": "integer", "minimum": 1 }, "final": { "const": true }, "submittedAt": { "type": "string", "format": "date-time" } } },
+      "HomeworkSubmissionEnvelope": { "type": "object", "additionalProperties": false, "required": ["code", "message", "data"], "properties": { "code": { "const": 0 }, "message": { "type": "string" }, "data": { "$ref": "#/components/schemas/HomeworkSubmission" } } },
+      "HomeworkEvaluation": { "type": "object", "additionalProperties": false, "required": ["submissionId", "homeworkId", "taskId", "taskState", "generation", "evaluationStatus", "score", "finalScore", "evaluationHistory"], "properties": { "submissionId": { "type": "integer", "minimum": 1 }, "homeworkId": { "type": "integer", "minimum": 1 }, "taskId": { "type": "string", "minLength": 1 }, "taskState": { "type": "string", "enum": ["PENDING", "RUNNING", "RETRY_WAIT", "SUCCEEDED", "FAILED"] }, "generation": { "type": "integer", "minimum": 0 }, "evaluationStatus": { "type": "string", "minLength": 1 }, "score": { "type": ["number", "null"] }, "finalScore": { "type": ["number", "null"] }, "evaluationHistory": { "type": "array", "items": { "type": "object" } } } },
+      "HomeworkEvaluationEnvelope": { "type": "object", "additionalProperties": false, "required": ["code", "message", "data"], "properties": { "code": { "const": 0 }, "message": { "type": "string" }, "data": { "$ref": "#/components/schemas/HomeworkEvaluation" } } },
+      "HomeworkReevaluation": { "type": "object", "additionalProperties": false, "required": ["submissionId", "taskId", "taskState", "generation", "requestId"], "properties": { "submissionId": { "type": "integer", "minimum": 1 }, "taskId": { "type": "string", "minLength": 1 }, "taskState": { "const": "PENDING" }, "generation": { "type": "integer", "minimum": 1 }, "requestId": { "type": "string", "format": "uuid" } } },
+      "HomeworkReevaluationEnvelope": { "type": "object", "additionalProperties": false, "required": ["code", "message", "data"], "properties": { "code": { "const": 0 }, "message": { "type": "string" }, "data": { "$ref": "#/components/schemas/HomeworkReevaluation" } } }
     }
   }
 }

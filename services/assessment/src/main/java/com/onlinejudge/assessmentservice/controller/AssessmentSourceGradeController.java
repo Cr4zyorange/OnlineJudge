@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 /** Read-only rebuild input for Grade; it never exposes Assessment's schema directly. */
@@ -21,17 +22,38 @@ public class AssessmentSourceGradeController {
     @GetMapping
     @Transactional(readOnly = true)
     public Map<String, Object> list(@RequestParam String courseId, @RequestParam String sourceType, @RequestParam String sourceId,
-            @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "100") int size, HttpServletRequest request) {
+            @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "100") int size,
+            @RequestParam(required = false) Long snapshotVersion, HttpServletRequest request) {
         if (request.getHeader("X-Request-Id") == null || request.getHeader("X-Request-Id").isBlank()) throw new SourceGradeRequestException("X-Request-Id is required");
         if (courseId.isBlank() || sourceId.isBlank() || !("LAB".equals(sourceType) || "HWK".equals(sourceType)) || page < 0 || size < 1 || size > 100) throw new SourceGradeRequestException("invalid source-grade filter");
         serviceIdentity.requireGradesRead(request);
-        long snapshotVersion = grades.snapshotVersion(courseId, sourceType, sourceId);
-        long total = grades.count(courseId, sourceType, sourceId, snapshotVersion);
+        long currentSnapshotVersion = grades.snapshotVersion(courseId, sourceType, sourceId);
+        if (snapshotVersion != null && (snapshotVersion < 1 || snapshotVersion > currentSnapshotVersion)) throw new SourceGradeRequestException("invalid source-grade snapshot");
+        if (snapshotVersion != null && grades.firstRetainedSnapshotVersion(courseId, sourceType, sourceId)
+                .stream().anyMatch(firstRetained -> snapshotVersion < firstRetained)) {
+            throw new SourceGradeSnapshotExpiredException();
+        }
+        long selectedSnapshotVersion = snapshotVersion == null ? currentSnapshotVersion : snapshotVersion;
+        long total = grades.count(courseId, sourceType, sourceId, selectedSnapshotVersion);
         int offset;
         try { offset = Math.multiplyExact(page, size); }
         catch (ArithmeticException overflow) { throw new SourceGradeRequestException("invalid source-grade filter"); }
-        List<Map<String, Object>> items = grades.page(courseId, sourceType, sourceId, snapshotVersion, offset, size).stream().map(grade -> Map.<String, Object>of(
-                "courseId", grade.courseId(), "sourceType", grade.sourceType(), "sourceId", grade.sourceId(), "studentId", grade.studentId(), "score", grade.score(), "fullScore", grade.fullScore(), "status", grade.status(), "sourceVersion", grade.sourceVersion(), "updatedAt", grade.updatedAt().toString())).toList();
-        return Map.of("items", items, "page", page, "size", size, "total", total, "sourceSnapshotVersion", snapshotVersion);
+        List<Map<String, Object>> items = grades.page(courseId, sourceType, sourceId, selectedSnapshotVersion, offset, size)
+                .stream().map(this::response).toList();
+        return Map.of("items", items, "page", page, "size", size, "total", total, "sourceSnapshotVersion", selectedSnapshotVersion);
+    }
+
+    private Map<String, Object> response(SourceGradeRepository.SourceGrade grade) {
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("courseId", grade.courseId());
+        response.put("sourceType", grade.sourceType());
+        response.put("sourceId", grade.sourceId());
+        response.put("studentId", grade.studentId());
+        response.put("score", grade.score());
+        response.put("fullScore", grade.fullScore());
+        response.put("status", grade.status());
+        response.put("sourceVersion", grade.sourceVersion());
+        response.put("updatedAt", grade.updatedAt().toString());
+        return response;
     }
 }

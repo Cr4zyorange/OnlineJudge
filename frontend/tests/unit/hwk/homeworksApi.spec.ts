@@ -312,6 +312,12 @@ describe('homeworks api', () => {
       ['/api/v1/homeworks/11/scores/publish', 'PUT'],
       ['/api/v1/homeworks/11/statistics?page=2&size=2', 'GET']
     ]);
+    expect((fetchMock.mock.calls[0][1] as RequestInit).headers).toEqual(expect.objectContaining({
+      Authorization: 'Bearer token-1',
+      'X-Request-Id': expect.stringMatching(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+      )
+    }));
   });
 
   it('uploads one homework attachment as authenticated multipart data', async () => {
