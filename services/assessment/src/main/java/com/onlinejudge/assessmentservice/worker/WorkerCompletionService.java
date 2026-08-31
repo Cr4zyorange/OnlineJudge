@@ -71,7 +71,8 @@ class WorkerCompletionService {
         }
         outbox.append("assessment.evaluation.completed.v2", "assessment-submission", task.submissionId(), task.generation(), task.id(),
                 Map.of("courseId", task.courseId(), "submissionId", task.submissionId(), "evaluationStatus", outcome.successful() ? "SUCCESS" : "FAILED", "evaluationVersion", task.generation(), "completedAt", finished.toString()), finished);
-        if (outcome.successful() && (!"HWK".equals(task.sourceType()) || !homeworkProjection)) {
+        if (outcome.successful() && (!"HWK".equals(task.sourceType()) || !homeworkProjection)
+                && shouldPublishSourceGrade(task)) {
             long version = grades.upsertScored(task.sourceType(), task.sourceId(), task.courseId(), task.studentId(), outcome.score(), outcome.fullScore(), finished);
             outbox.append("assessment.source-grade.changed.v2", "assessment-source-grade", task.sourceType() + ":" + task.sourceId() + ":" + task.studentId(), version, task.id(),
                     Map.of("courseId", task.courseId(), "sourceType", task.sourceType(), "sourceId", task.sourceId(), "studentId", task.studentId(), "score", outcome.score(), "fullScore", outcome.fullScore(), "status", "SCORED", "sourceVersion", version), finished);
@@ -86,6 +87,14 @@ class WorkerCompletionService {
                 """, task.id(), task.generation(), task.submissionId(), Long.parseLong(task.sourceId()), task.studentId(),
                 task.generation() > 1 ? "REJUDGE" : "CODE_JUDGE", outcome.status(),
                 outcome.successful() ? outcome.score() : null, outcome.fullScore(), finished, finished);
+    }
+
+    private boolean shouldPublishSourceGrade(EvaluationTask task) {
+        if (!"LAB".equals(task.sourceType())) return true;
+        if (jdbc == null) return false;
+        String status = jdbc.query("SELECT status FROM assessment_lab_experiment WHERE id = ?",
+                rows -> rows.next() ? rows.getString(1) : null, Long.parseLong(task.sourceId()));
+        return "SCORE_PUBLISHED".equals(status) || "ARCHIVED".equals(status);
     }
     private boolean retryable(String status) { return "SANDBOX_TIMEOUT".equals(status) || "SANDBOX_ERROR".equals(status) || "SYSTEM_ERROR".equals(status); }
 }

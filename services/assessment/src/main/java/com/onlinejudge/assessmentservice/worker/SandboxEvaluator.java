@@ -105,6 +105,10 @@ public class SandboxEvaluator {
     }
 
     private Execution execute(String storageKey, String standardInput) {
+        return execute(storageKey, standardInput, timeout, null);
+    }
+
+    private Execution execute(String storageKey, String standardInput, Duration executionTimeout, LabLimits limits) {
         if (command.isEmpty()) return Execution.failed("SANDBOX_UNCONFIGURED");
         try {
             if (!preExecutionDelay.isZero()) Thread.sleep(preExecutionDelay.toMillis());
@@ -112,7 +116,12 @@ public class SandboxEvaluator {
             if (!input.startsWith(root) || !Files.isRegularFile(input)) return Execution.failed("SUBMISSION_FILE_MISSING");
             List<String> invocation = new ArrayList<>(command);
             invocation.add(input.toString());
-            Process process = new ProcessBuilder(invocation).redirectErrorStream(true).start();
+            ProcessBuilder builder = new ProcessBuilder(invocation).redirectErrorStream(true);
+            if (limits != null) {
+                builder.environment().put("OJ_TIME_LIMIT_MS", Integer.toString(limits.timeLimitMs()));
+                builder.environment().put("OJ_MEMORY_LIMIT_KB", Integer.toString(limits.memoryLimitKb()));
+            }
+            Process process = builder.start();
             try (var output = process.getOutputStream()) {
                 output.write(standardInput.getBytes(StandardCharsets.UTF_8));
             }
@@ -120,12 +129,12 @@ public class SandboxEvaluator {
             AtomicBoolean outputExceeded = new AtomicBoolean();
             try (var reader = Executors.newVirtualThreadPerTaskExecutor()) {
                 var reading = reader.submit(() -> copyBounded(process, captured, maxOutputBytes, outputExceeded));
-                if (!process.waitFor(timeout.toMillis(), TimeUnit.MILLISECONDS)) {
+                if (!process.waitFor(executionTimeout.toMillis(), TimeUnit.MILLISECONDS)) {
                     process.destroyForcibly();
                     reading.cancel(true);
                     return Execution.failed("SANDBOX_TIMEOUT");
                 }
-                reading.get(Math.max(1, timeout.toMillis()), TimeUnit.MILLISECONDS);
+                reading.get(Math.max(1, executionTimeout.toMillis()), TimeUnit.MILLISECONDS);
             }
             if (outputExceeded.get()) return Execution.failed("OUTPUT_LIMIT_EXCEEDED");
             return process.exitValue() == 0
@@ -166,6 +175,9 @@ public class SandboxEvaluator {
     }
 
     private AssessmentWorker.EvaluationOutcome evaluateLab(EvaluationTask task, String storageKey) {
+        LabLimits limits = jdbc.query("SELECT time_limit_ms, memory_limit_kb FROM assessment_lab_experiment WHERE id = ?",
+                (rs, ignored) -> new LabLimits(rs.getInt("time_limit_ms"), rs.getInt("memory_limit_kb")), Long.parseLong(task.sourceId()))
+                .stream().findFirst().orElseThrow(() -> new IllegalStateException("LAB does not exist"));
         List<LabCase> cases = jdbc.query("""
                 SELECT id, input_text, expected_output, score_weight
                   FROM assessment_lab_testcase WHERE lab_id = ? ORDER BY order_num, id
@@ -177,7 +189,7 @@ public class SandboxEvaluator {
         List<AssessmentWorker.LabCaseResult> results = new ArrayList<>();
         BigDecimal awarded = BigDecimal.ZERO;
         for (LabCase testcase : cases) {
-            Execution process = execute(storageKey, testcase.input());
+            Execution process = execute(storageKey, testcase.input(), Duration.ofMillis(limits.timeLimitMs()), limits);
             if (!process.successful()) return new AssessmentWorker.EvaluationOutcome(false, process.status(), awarded, fullScore, results);
             boolean passed = normalize(process.output()).equals(normalize(testcase.expectedOutput()));
             BigDecimal score = passed ? testcase.scoreWeight() : BigDecimal.ZERO;
@@ -188,4 +200,5 @@ public class SandboxEvaluator {
         return new AssessmentWorker.EvaluationOutcome(true, awarded.compareTo(fullScore) == 0 ? "ACCEPTED" : "WRONG_ANSWER", awarded, fullScore, results);
     }
     private record LabCase(long id, String input, String expectedOutput, BigDecimal scoreWeight) { }
+    private record LabLimits(int timeLimitMs, int memoryLimitKb) { }
 }

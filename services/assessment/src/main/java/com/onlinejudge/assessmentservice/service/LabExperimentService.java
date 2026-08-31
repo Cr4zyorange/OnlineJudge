@@ -1,6 +1,7 @@
 package com.onlinejudge.assessmentservice.service;
 
 import com.onlinejudge.assessmentservice.persistence.AssessmentOutboxRepository;
+import com.onlinejudge.assessmentservice.persistence.SourceGradeRepository;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
@@ -23,17 +24,24 @@ import java.util.Comparator;
 public class LabExperimentService {
     private final JdbcTemplate jdbc;
     private final AssessmentOutboxRepository outbox;
+    private final SourceGradeRepository grades;
     private final Clock clock;
 
-    @Autowired
     public LabExperimentService(JdbcTemplate jdbc, AssessmentOutboxRepository outbox) {
-        this(jdbc, outbox, Clock.systemUTC());
+        this(jdbc, outbox, null, Clock.systemUTC());
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public LabExperimentService(JdbcTemplate jdbc, AssessmentOutboxRepository outbox, SourceGradeRepository grades) {
+        this(jdbc, outbox, grades, Clock.systemUTC());
     }
 
     LabExperimentService(JdbcTemplate jdbc, AssessmentOutboxRepository outbox, Clock clock) {
-        this.jdbc = jdbc;
-        this.outbox = outbox;
-        this.clock = clock;
+        this(jdbc, outbox, null, clock);
+    }
+
+    LabExperimentService(JdbcTemplate jdbc, AssessmentOutboxRepository outbox, SourceGradeRepository grades, Clock clock) {
+        this.jdbc = jdbc; this.outbox = outbox; this.grades = grades; this.clock = clock;
     }
 
     @Transactional
@@ -173,9 +181,27 @@ public class LabExperimentService {
         if (!"PUBLISHED".equals(current.status()) && !"CLOSED".equals(current.status())) throw new IllegalStateException("only an open or closed LAB can publish scores");
         Instant now = clock.instant();
         jdbc.update("UPDATE assessment_lab_experiment SET status = 'SCORE_PUBLISHED', updated_at = ? WHERE id = ? AND status IN ('PUBLISHED', 'CLOSED')", Timestamp.from(now), labId);
-        outbox.append("assessment.lab.scores.published.v2", "assessment-lab", Long.toString(labId), 2,
-                java.util.UUID.randomUUID().toString(), java.util.Map.of("courseId", current.courseId(), "labId", Long.toString(labId), "publishedAt", now.toString()), now);
+        publishStoredScores(current, now);
         return new LabSummary(current.labId(), current.courseId(), current.title(), "SCORE_PUBLISHED", current.deadline(), current.maxScore(), current.autoEvaluate(), current.createdAt(), current.evaluationMode(), current.reportRequired(), current.publishedAt(), false);
+    }
+
+    private void publishStoredScores(LabSummary lab, Instant now) {
+        if (grades == null || outbox == null) return;
+        jdbc.query("""
+                SELECT s.submission_id, s.student_id, COALESCE(s.final_score, s.auto_score) AS score
+                  FROM assessment_lab_submission s
+                 WHERE s.lab_id = ? AND COALESCE(s.final_score, s.auto_score) IS NOT NULL
+                   AND s.submission_version = (SELECT MAX(s2.submission_version) FROM assessment_lab_submission s2 WHERE s2.lab_id = s.lab_id AND s2.student_id = s.student_id)
+                """, (rs, ignored) -> {
+            String studentId = rs.getString("student_id");
+            BigDecimal score = rs.getBigDecimal("score");
+            long version = grades.upsertScored("LAB", Long.toString(lab.labId()), lab.courseId(), studentId, score, lab.maxScore(), now);
+            outbox.append("assessment.source-grade.changed.v2", "assessment-source-grade", "LAB:" + lab.labId() + ":" + studentId,
+                    version, rs.getString("submission_id"), java.util.Map.of("courseId", lab.courseId(), "sourceType", "LAB",
+                            "sourceId", Long.toString(lab.labId()), "studentId", studentId, "score", score,
+                            "fullScore", lab.maxScore(), "status", "SCORED", "sourceVersion", version), now);
+            return null;
+        }, lab.labId());
     }
 
     @Transactional
@@ -196,6 +222,7 @@ public class LabExperimentService {
     }
 
     private void validate(CreateLabCommand command) {
+        if (command.timeLimitMs() <= 0 || command.memoryLimitKb() <= 0) throw new IllegalArgumentException("time and memory limits must be positive");
         if (command.courseId() == null || command.courseId().isBlank()) throw new IllegalArgumentException("courseId is required");
         if (command.title() == null || command.title().isBlank() || command.title().trim().length() > 100) throw new IllegalArgumentException("title must be 1-100 characters");
         if (command.description() == null || command.description().isBlank()) throw new IllegalArgumentException("description is required");
@@ -209,6 +236,7 @@ public class LabExperimentService {
     }
 
     private void validate(UpdateLabCommand command) {
+        if (command.timeLimitMs() <= 0 || command.memoryLimitKb() <= 0) throw new IllegalArgumentException("time and memory limits must be positive");
         if (command.title() == null || command.title().isBlank() || command.title().trim().length() > 100) throw new IllegalArgumentException("title must be 1-100 characters");
         if (command.description() == null || command.description().isBlank()) throw new IllegalArgumentException("description is required");
         if (command.deadline() == null || !command.deadline().isAfter(clock.instant())) throw new IllegalArgumentException("deadline must be in the future");

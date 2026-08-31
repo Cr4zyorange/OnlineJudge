@@ -170,6 +170,57 @@ class LabWorkflowContractTest {
     }
 
     @Test
+    void manualLabSubmissionIsRecordedWithoutCreatingAnEvaluationTask() throws Exception {
+        String teacherToken = TestJwtFactory.userToken(KEY, "lab-workflow-kid", "teacher-314", List.of("TEACHER"));
+        String studentToken = TestJwtFactory.userToken(KEY, "lab-workflow-kid", "student-manual-314", List.of("STUDENT"));
+        jdbc.update("INSERT INTO assessment_course_member_projection (course_id, user_id, membership_status, member_version) VALUES ('course-314', 'student-manual-314', 'ACTIVE', 1)");
+        mockMvc.perform(post("/api/v1/courses/{courseId}/labs", "course-314")
+                        .header("Authorization", "Bearer " + teacherToken).header("X-Request-Id", "manual-create-314")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"manual-lab-314\",\"description\":\"teacher review\",\"deadline\":\"2030-01-01T12:00:00Z\",\"maxScore\":100,\"allowedLanguages\":[\"python\"],\"autoEvaluate\":false,\"evaluationMode\":\"MANUAL\"}"))
+                .andExpect(status().isCreated());
+        Long labId = jdbc.queryForObject("SELECT id FROM assessment_lab_experiment WHERE title = 'manual-lab-314'", Long.class);
+        mockMvc.perform(post("/api/v1/labs/{labId}/publish", labId)
+                        .header("Authorization", "Bearer " + teacherToken).header("X-Request-Id", "manual-publish-314"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(multipart("/api/v1/labs/{labId}/submissions", labId)
+                        .file("file", "print('manual')".getBytes()).param("language", "python")
+                        .header("Authorization", "Bearer " + studentToken).header("X-Request-Id", "manual-submit-314"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.evaluationStatus").value("NONE"))
+                .andExpect(jsonPath("$.taskId").value(org.hamcrest.Matchers.nullValue()));
+        org.assertj.core.api.Assertions.assertThat(jdbc.queryForObject("SELECT evaluation_status FROM assessment_submission", String.class)).isEqualTo("NONE");
+        org.assertj.core.api.Assertions.assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM evaluation_task", Integer.class)).isZero();
+        String submissionId = jdbc.queryForObject("SELECT submission_id FROM assessment_lab_submission WHERE lab_id = ?", String.class, labId);
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/v1/labs/{labId}/submissions/{submissionId}/evaluate", labId, submissionId)
+                        .header("Authorization", "Bearer " + teacherToken).header("X-Request-Id", "manual-evaluate-314"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.state").value("PENDING"));
+        org.assertj.core.api.Assertions.assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM evaluation_task", Integer.class)).isEqualTo(1);
+    }
+
+    @Test
+    void hiddenLabTestcasesAreOmittedFromStudentDetail() throws Exception {
+        String teacherToken = TestJwtFactory.userToken(KEY, "lab-workflow-kid", "teacher-314", List.of("TEACHER"));
+        String studentToken = TestJwtFactory.userToken(KEY, "lab-workflow-kid", "student-hidden-314", List.of("STUDENT"));
+        jdbc.update("INSERT INTO assessment_course_member_projection (course_id, user_id, membership_status, member_version) VALUES ('course-314', 'student-hidden-314', 'ACTIVE', 1)");
+        mockMvc.perform(post("/api/v1/courses/{courseId}/labs", "course-314")
+                        .header("Authorization", "Bearer " + teacherToken).header("X-Request-Id", "hidden-create-314")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"hidden-lab-314\",\"description\":\"private testcase\",\"deadline\":\"2030-01-01T12:00:00Z\",\"maxScore\":100,\"allowedLanguages\":[\"python\"],\"autoEvaluate\":true,\"testcases\":[{\"input\":\"secret\",\"expectedOutput\":\"answer\",\"scoreWeight\":100,\"public\":false,\"orderNum\":1}]}"))
+                .andExpect(status().isCreated());
+        Long labId = jdbc.queryForObject("SELECT id FROM assessment_lab_experiment WHERE title = 'hidden-lab-314'", Long.class);
+        mockMvc.perform(post("/api/v1/labs/{labId}/publish", labId)
+                        .header("Authorization", "Bearer " + teacherToken).header("X-Request-Id", "hidden-publish-314"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/v1/labs/{labId}", labId).header("Authorization", "Bearer " + studentToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.testcases").isEmpty());
+    }
+
+    @Test
     void completedLabTaskPublishesVersionedSourceGradeAndStudentCanReadThePassiveResult() throws Exception {
         String teacherToken = TestJwtFactory.userToken(KEY, "lab-workflow-kid", "teacher-314", List.of("TEACHER"));
         String studentToken = TestJwtFactory.userToken(KEY, "lab-workflow-kid", "student-314", List.of("STUDENT"));
@@ -201,10 +252,55 @@ class LabWorkflowContractTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.taskId").value(taskId))
                 .andExpect(jsonPath("$.evaluationStatus").value("ACCEPTED"))
-                .andExpect(jsonPath("$.score").value(80));
+                .andExpect(jsonPath("$.score").value(org.hamcrest.Matchers.nullValue()));
 
+        org.assertj.core.api.Assertions.assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM assessment_source_grade WHERE source_type = 'LAB' AND source_id = ? AND student_id = 'student-314'", Integer.class, Long.toString(labId))).isZero();
+        org.assertj.core.api.Assertions.assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM assessment_event_outbox WHERE event_type = 'assessment.source-grade.changed.v2' AND aggregate_id = ?", Integer.class, "LAB:" + labId + ":student-314")).isZero();
+
+        mockMvc.perform(put("/api/v1/labs/{labId}/release-scores", labId)
+                        .header("Authorization", "Bearer " + teacherToken).header("X-Request-Id", "lab-grade-release-314"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("SCORE_PUBLISHED"));
         org.assertj.core.api.Assertions.assertThat(jdbc.queryForObject("SELECT source_version FROM assessment_source_grade WHERE source_type = 'LAB' AND source_id = ? AND student_id = 'student-314'", Long.class, Long.toString(labId))).isEqualTo(1L);
         org.assertj.core.api.Assertions.assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM assessment_event_outbox WHERE event_type = 'assessment.source-grade.changed.v2' AND aggregate_id = ?", Integer.class, "LAB:" + labId + ":student-314")).isEqualTo(1);
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/labs/{labId}/submissions/{submissionId}/result", labId, submissionId)
+                        .header("Authorization", "Bearer " + studentToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.score").value(80));
+    }
+
+    @Test
+    void studentResultRedactsScoresBeforeReleaseAndRejectsRemovedMember() throws Exception {
+        String teacherToken = TestJwtFactory.userToken(KEY, "lab-workflow-kid", "teacher-314", List.of("TEACHER"));
+        String studentToken = TestJwtFactory.userToken(KEY, "lab-workflow-kid", "student-redaction-314", List.of("STUDENT"));
+        jdbc.update("INSERT INTO assessment_course_member_projection (course_id, user_id, membership_status, member_version) VALUES ('course-314', 'student-redaction-314', 'ACTIVE', 1)");
+        mockMvc.perform(post("/api/v1/courses/{courseId}/labs", "course-314")
+                        .header("Authorization", "Bearer " + teacherToken).header("X-Request-Id", "redaction-create-314")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"redaction-lab-314\",\"description\":\"score visibility\",\"deadline\":\"2030-01-01T12:00:00Z\",\"maxScore\":100,\"allowedLanguages\":[\"python\"],\"autoEvaluate\":true}"))
+                .andExpect(status().isCreated());
+        Long labId = jdbc.queryForObject("SELECT id FROM assessment_lab_experiment WHERE title = 'redaction-lab-314'", Long.class);
+        mockMvc.perform(post("/api/v1/labs/{labId}/publish", labId)
+                        .header("Authorization", "Bearer " + teacherToken).header("X-Request-Id", "redaction-publish-314"))
+                .andExpect(status().isOk());
+        mockMvc.perform(multipart("/api/v1/labs/{labId}/submissions", labId).file("file", "print(1)".getBytes()).param("language", "python")
+                        .header("Authorization", "Bearer " + studentToken).header("X-Request-Id", "redaction-submit-314"))
+                .andExpect(status().isCreated());
+        String submissionId = jdbc.queryForObject("SELECT submission_id FROM assessment_lab_submission WHERE lab_id = ?", String.class, labId);
+        mockMvc.perform(post("/api/v1/labs/{labId}/submissions/{submissionId}/score", labId, submissionId)
+                        .header("Authorization", "Bearer " + teacherToken).header("X-Request-Id", "redaction-score-314")
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"manualScore\":80,\"finalScore\":80}"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/v1/labs/{labId}/results/{studentId}", labId, "student-redaction-314").header("Authorization", "Bearer " + studentToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.submission").value(org.hamcrest.Matchers.nullValue()))
+                .andExpect(jsonPath("$.evaluationResult").value(org.hamcrest.Matchers.nullValue()))
+                .andExpect(jsonPath("$.latestScore").value(org.hamcrest.Matchers.nullValue()));
+
+        jdbc.update("UPDATE assessment_course_member_projection SET membership_status = 'REMOVED' WHERE course_id = 'course-314' AND user_id = 'student-redaction-314'");
+        mockMvc.perform(get("/api/v1/labs/{labId}/results/{studentId}", labId, "student-redaction-314").header("Authorization", "Bearer " + studentToken))
+                .andExpect(status().isForbidden());
     }
 
     @Test
@@ -234,6 +330,10 @@ class LabWorkflowContractTest {
         String submissionId = jdbc.queryForObject("SELECT submission_id FROM assessment_lab_submission WHERE lab_id = ?", String.class, labId);
         worker.runOne("lab-sandbox-worker", sandbox::evaluate);
 
+        mockMvc.perform(put("/api/v1/labs/{labId}/release-scores", labId)
+                        .header("Authorization", "Bearer " + teacherToken).header("X-Request-Id", "lab-sandbox-release-314"))
+                .andExpect(status().isOk());
+
         mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/labs/{labId}/submissions/{submissionId}/result", labId, submissionId)
                         .header("Authorization", "Bearer " + studentToken))
                 .andExpect(status().isOk())
@@ -242,6 +342,39 @@ class LabWorkflowContractTest {
                 .andExpect(jsonPath("$.passedCases").value(1))
                 .andExpect(jsonPath("$.caseResults[0].passed").value(true));
         org.assertj.core.api.Assertions.assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM assessment_lab_evaluation_result WHERE submission_id = ?", Integer.class, submissionId)).isEqualTo(1);
+    }
+
+    @Test
+    void sandboxUsesEachLabTimeLimitInsteadOfGlobalTimeout() throws Exception {
+        String teacherToken = TestJwtFactory.userToken(KEY, "lab-workflow-kid", "teacher-314", List.of("TEACHER"));
+        String studentToken = TestJwtFactory.userToken(KEY, "lab-workflow-kid", "student-limits-314", List.of("STUDENT"));
+        jdbc.update("INSERT INTO assessment_course_member_projection (course_id, user_id, membership_status, member_version) VALUES ('course-314', 'student-limits-314', 'ACTIVE', 1)");
+        String payload = "{\"title\":\"%s\",\"description\":\"limit\",\"deadline\":\"2030-01-01T12:00:00Z\",\"maxScore\":100,\"allowedLanguages\":[\"python\"],\"autoEvaluate\":true,\"timeLimitMs\":%d,\"memoryLimitKb\":65536,\"testcases\":[{\"input\":\"x\",\"expectedOutput\":\"x\",\"scoreWeight\":100,\"public\":true,\"orderNum\":1}]}";
+        for (String[] lab : List.of(new String[]{"fast-limit-lab-314", "10"}, new String[]{"slow-limit-lab-314", "1000"})) {
+            mockMvc.perform(post("/api/v1/courses/{courseId}/labs", "course-314")
+                            .header("Authorization", "Bearer " + teacherToken).header("X-Request-Id", lab[0] + "-create")
+                            .contentType(MediaType.APPLICATION_JSON).content(payload.formatted(lab[0], Integer.parseInt(lab[1]))))
+                    .andExpect(status().isCreated());
+            Long labId = jdbc.queryForObject("SELECT id FROM assessment_lab_experiment WHERE title = ?", Long.class, lab[0]);
+            mockMvc.perform(post("/api/v1/labs/{labId}/publish", labId)
+                            .header("Authorization", "Bearer " + teacherToken).header("X-Request-Id", lab[0] + "-publish"))
+                    .andExpect(status().isOk());
+            mockMvc.perform(multipart("/api/v1/labs/{labId}/submissions", labId)
+                            .file("file", "import os,time\nassert os.getenv('OJ_MEMORY_LIMIT_KB') == '65536'\ntime.sleep(0.1)\nprint('x')".getBytes()).param("language", "python")
+                            .header("Authorization", "Bearer " + studentToken).header("X-Request-Id", lab[0] + "-submit"))
+                    .andExpect(status().isCreated());
+            String submissionId = jdbc.queryForObject("SELECT submission_id FROM assessment_lab_submission WHERE lab_id = ?", String.class, labId);
+            worker.runOne(lab[0] + "-worker", sandbox::evaluate);
+            if ("10".equals(lab[1])) {
+                jdbc.update("UPDATE evaluation_task SET next_attempt_at = TIMESTAMP '1970-01-01 00:00:00' WHERE submission_id = ?", submissionId);
+                worker.runOne(lab[0] + "-worker-retry", sandbox::evaluate);
+                jdbc.update("UPDATE evaluation_task SET next_attempt_at = TIMESTAMP '1970-01-01 00:00:00' WHERE submission_id = ?", submissionId);
+                worker.runOne(lab[0] + "-worker-final", sandbox::evaluate);
+            }
+            String status = jdbc.queryForObject("SELECT evaluation_status FROM assessment_submission WHERE id = ?", String.class, submissionId);
+            if ("10".equals(lab[1])) org.assertj.core.api.Assertions.assertThat(status).isEqualTo("SANDBOX_TIMEOUT");
+            else org.assertj.core.api.Assertions.assertThat(status).isEqualTo("ACCEPTED");
+        }
     }
 
     @Test
@@ -405,6 +538,11 @@ class LabWorkflowContractTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.finalScore").value(80));
         org.assertj.core.api.Assertions.assertThat(jdbc.queryForObject("SELECT final_score FROM assessment_lab_submission WHERE submission_id = ?", BigDecimal.class, submissionId)).isEqualByComparingTo("80");
+        org.assertj.core.api.Assertions.assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM assessment_source_grade WHERE source_type = 'LAB' AND source_id = ? AND student_id = ?", Integer.class, Long.toString(labId), "student-score-314")).isZero();
+        org.assertj.core.api.Assertions.assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM assessment_event_outbox WHERE event_type = 'assessment.source-grade.changed.v2' AND aggregate_id = ?", Integer.class, "LAB:" + labId + ":student-score-314")).isZero();
+        mockMvc.perform(put("/api/v1/labs/{labId}/release-scores", labId)
+                        .header("Authorization", "Bearer " + teacherToken).header("X-Request-Id", "score-release-314"))
+                .andExpect(status().isOk());
         org.assertj.core.api.Assertions.assertThat(jdbc.queryForObject("SELECT score FROM assessment_source_grade WHERE source_type = 'LAB' AND source_id = ? AND student_id = ?", BigDecimal.class, Long.toString(labId), "student-score-314")).isEqualByComparingTo("80");
         org.assertj.core.api.Assertions.assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM assessment_event_outbox WHERE event_type = 'assessment.source-grade.changed.v2' AND aggregate_id = ?", Integer.class, "LAB:" + labId + ":student-score-314")).isEqualTo(1);
         mockMvc.perform(get("/api/v1/labs/{labId}/statistics", labId)

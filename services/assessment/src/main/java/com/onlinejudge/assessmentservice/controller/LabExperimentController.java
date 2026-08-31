@@ -103,12 +103,14 @@ public class LabExperimentController {
         response.put("memoryLimitKb", detail.memoryLimitKb());
         response.put("publishedAt", detail.publishedAt());
         response.put("deleted", detail.deleted());
-        response.put("testcases", detail.testcases().stream().map(testcase -> {
+        response.put("testcases", detail.testcases().stream()
+                .filter(testcase -> canManage(detail.courseId(), user) || testcase.isPublic())
+                .map(testcase -> {
             var item = new java.util.LinkedHashMap<String, Object>();
             item.put("id", testcase.id());
             item.put("labId", detail.id());
             item.put("input", testcase.input());
-            item.put("expectedOutput", canManage(detail.courseId(), user) || testcase.isPublic() ? testcase.expectedOutput() : null);
+            item.put("expectedOutput", testcase.expectedOutput());
             item.put("scoreWeight", testcase.scoreWeight());
             item.put("public", testcase.isPublic());
             item.put("orderNum", testcase.orderNum());

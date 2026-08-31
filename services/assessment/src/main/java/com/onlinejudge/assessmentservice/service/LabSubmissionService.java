@@ -49,19 +49,23 @@ public class LabSubmissionService {
         PersistentSubmissionFileStore.StoredFile stored = null;
         try {
             String submissionId = UUID.randomUUID().toString();
-            String taskId = UUID.randomUUID().toString();
+            boolean autoEvaluation = lab.autoEvaluate() && !"MANUAL".equalsIgnoreCase(lab.evaluationMode());
+            String taskId = autoEvaluation ? UUID.randomUUID().toString() : null;
+            String evaluationStatus = autoEvaluation ? "PENDING" : "NONE";
             stored = files.store(submissionId, command.originalFilename(), command.content());
             int version = nextVersion(lab.labId(), command.studentId());
             jdbc.update("""
                     INSERT INTO assessment_submission (id, source_type, source_id, course_id, student_id, content_ref,
-                        evaluation_status, code_content, created_at) VALUES (?, 'LAB', ?, ?, ?, ?, 'PENDING', ?, ?)
-                    """, submissionId, Long.toString(lab.labId()), lab.courseId(), command.studentId(), stored.storageKey(), command.codeContent(), Timestamp.from(now));
+                        evaluation_status, code_content, created_at) VALUES (?, 'LAB', ?, ?, ?, ?, ?, ?, ?)
+                    """, submissionId, Long.toString(lab.labId()), lab.courseId(), command.studentId(), stored.storageKey(), evaluationStatus, command.codeContent(), Timestamp.from(now));
             jdbc.update("""
                     INSERT INTO assessment_lab_submission (submission_id, lab_id, student_id, submission_version, language,
                         submit_status, has_file, submitted_at) VALUES (?, ?, ?, ?, ?, 'SUBMITTED', ?, ?)
                     """, submissionId, lab.labId(), command.studentId(), version, command.language(), command.hasFile(), Timestamp.from(now));
-            tasks.insert(taskId, submissionId, "LAB", Long.toString(lab.labId()), lab.courseId(), command.studentId(), now);
-            return new SubmittedLabSubmission(submissionId, taskId, lab.labId(), version, "SUBMITTED", "PENDING", now);
+            if (autoEvaluation) {
+                tasks.insert(taskId, submissionId, "LAB", Long.toString(lab.labId()), lab.courseId(), command.studentId(), now);
+            }
+            return new SubmittedLabSubmission(submissionId, taskId, lab.labId(), version, "SUBMITTED", evaluationStatus, now);
         } catch (RuntimeException | java.io.IOException failed) {
             if (stored != null) {
                 try { files.delete(stored.storageKey()); }
@@ -74,11 +78,12 @@ public class LabSubmissionService {
 
     private LabExperimentService.LabSummary lockedLab(long labId) {
         return jdbc.query("""
-                SELECT id, course_id, title, status, deadline, max_score, auto_evaluate, created_at
+                SELECT id, course_id, title, status, deadline, max_score, auto_evaluate, evaluation_mode, created_at
                   FROM assessment_lab_experiment WHERE id = ? FOR UPDATE
                 """, (rs, ignored) -> new LabExperimentService.LabSummary(rs.getLong("id"), rs.getString("course_id"),
                 rs.getString("title"), rs.getString("status"), rs.getTimestamp("deadline").toInstant(),
-                rs.getBigDecimal("max_score"), rs.getBoolean("auto_evaluate"), rs.getTimestamp("created_at").toInstant()), labId)
+                rs.getBigDecimal("max_score"), rs.getBoolean("auto_evaluate"), rs.getTimestamp("created_at").toInstant(),
+                rs.getString("evaluation_mode"), false, null, false), labId)
                 .stream().findFirst().orElseThrow(() -> new java.util.NoSuchElementException("LAB does not exist"));
     }
 
