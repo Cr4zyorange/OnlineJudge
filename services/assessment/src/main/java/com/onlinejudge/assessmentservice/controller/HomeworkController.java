@@ -4,7 +4,6 @@ import com.onlinejudge.assessmentservice.security.CurrentUser;
 import com.onlinejudge.assessmentservice.service.CoursePermissionClient;
 import com.onlinejudge.assessmentservice.service.HomeworkService;
 import com.onlinejudge.assessmentservice.service.HomeworkSubmissionService;
-import com.onlinejudge.assessmentservice.service.HomeworkPublicationException;
 import com.onlinejudge.assessmentservice.persistence.CourseMemberProjectionRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -21,7 +20,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
@@ -149,10 +147,4 @@ public class HomeworkController {
     }
 
     public record SubmitHomeworkRequest(@NotBlank String code, @NotBlank String language) { }
-
-    @ExceptionHandler(HomeworkPublicationException.class)
-    @ResponseStatus(HttpStatus.SERVICE_UNAVAILABLE)
-    public java.util.Map<String, Object> publicationFailed(HomeworkPublicationException ignored) {
-        return java.util.Map.of("code", "HWK_5003", "message", "作业发布未完成，请稍后重试", "retryable", true);
-    }
 }
