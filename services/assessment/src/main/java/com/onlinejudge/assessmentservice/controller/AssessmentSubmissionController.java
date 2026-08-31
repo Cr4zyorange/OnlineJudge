@@ -38,7 +38,7 @@ public class AssessmentSubmissionController {
         if ("LAB".equals(request.sourceType())) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "LAB submissions must use the LAB submission endpoint");
         if (!user.hasRole("STUDENT") || !courseMembers.isActive(request.courseId(), user.id())) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "active course student membership is required");
         if ("HWK".equalsIgnoreCase(request.sourceType())) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "HWK submissions must use the canonical homework endpoint");
-        return submissions.submit(new AssessmentSubmissionService.SubmissionCommand(request.sourceType(), request.sourceId(), request.courseId(), user.id(), request.contentRef()));
+        return submissions.submit(new AssessmentSubmissionService.SubmissionCommand(request.sourceType(), request.sourceId(), request.courseId(), user.id(), request.contentRef(), http.getHeader("X-Request-Id")));
     }
 
     @PostMapping(path = "/labs/{sourceId}/submissions", consumes = "multipart/form-data")
@@ -58,7 +58,7 @@ public class AssessmentSubmissionController {
             byte[] content = hasFile ? file.getBytes() : code.getBytes(java.nio.charset.StandardCharsets.UTF_8);
             String filename = hasFile ? file.getOriginalFilename() : "Main." + language;
             return labSubmissions.submit(new LabSubmissionService.SubmitLabCommand(sourceId, courseId, user.id(), language,
-                    filename, content, hasFile, hasFile ? null : code));
+                    filename, content, hasFile, hasFile ? null : code, http.getHeader("X-Request-Id")));
         } catch (IllegalArgumentException invalid) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, invalid.getMessage(), invalid);
         } catch (IllegalStateException invalidState) {
@@ -76,7 +76,7 @@ public class AssessmentSubmissionController {
         try {
             // The persisted key, rather than a client path or bytes in memory, crosses into the queue transaction.
             var stored = files.store(java.util.UUID.randomUUID().toString(), file.getOriginalFilename(), file.getBytes());
-            return submissions.submit(new AssessmentSubmissionService.SubmissionCommand(sourceType, sourceId, courseId, user.id(), stored.storageKey()));
+            return submissions.submit(new AssessmentSubmissionService.SubmissionCommand(sourceType, sourceId, courseId, user.id(), stored.storageKey(), http.getHeader("X-Request-Id")));
         } catch (java.io.IOException failure) {
             throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "submission storage unavailable", failure);
         }

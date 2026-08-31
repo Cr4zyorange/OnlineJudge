@@ -18,6 +18,9 @@ import java.time.Instant;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.UUID;
 
 /** LAB's lifecycle aggregate; generic Assessment tasks are created only for an accepted LAB submission. */
 @Service
@@ -171,39 +174,57 @@ public class LabExperimentService {
         LabSummary current = find(labId);
         if (!"PUBLISHED".equals(current.status())) throw new IllegalStateException("only a published LAB can be closed");
         Instant now = clock.instant();
-        jdbc.update("UPDATE assessment_lab_experiment SET status = 'CLOSED', updated_at = ? WHERE id = ? AND status = 'PUBLISHED'", Timestamp.from(now), labId);
+        if (jdbc.update("UPDATE assessment_lab_experiment SET status = 'CLOSED', updated_at = ? WHERE id = ? AND status = 'PUBLISHED'", Timestamp.from(now), labId) != 1) {
+            throw new IllegalStateException("LAB lifecycle changed concurrently");
+        }
         return new LabSummary(current.labId(), current.courseId(), current.title(), "CLOSED", current.deadline(), current.maxScore(), current.autoEvaluate(), current.createdAt(), current.evaluationMode(), current.reportRequired(), current.publishedAt(), false);
     }
 
     @Transactional
     public LabSummary releaseScores(long labId) {
+        return releaseScores(labId, UUID.randomUUID().toString());
+    }
+
+    @Transactional
+    public LabSummary releaseScores(long labId, String requestId) {
+        requireRequestId(requestId);
         LabSummary current = find(labId);
         if (!"PUBLISHED".equals(current.status()) && !"CLOSED".equals(current.status())) throw new IllegalStateException("only an open or closed LAB can publish scores");
         Instant now = clock.instant();
         if (jdbc.update("UPDATE assessment_lab_experiment SET status = 'SCORE_PUBLISHED', updated_at = ? WHERE id = ? AND status IN ('PUBLISHED', 'CLOSED')", Timestamp.from(now), labId) != 1) {
             throw new IllegalStateException("LAB lifecycle changed concurrently");
         }
-        publishStoredScores(current, now);
+        publishStoredScores(current, now, requestId);
         return new LabSummary(current.labId(), current.courseId(), current.title(), "SCORE_PUBLISHED", current.deadline(), current.maxScore(), current.autoEvaluate(), current.createdAt(), current.evaluationMode(), current.reportRequired(), current.publishedAt(), false);
     }
 
-    private void publishStoredScores(LabSummary lab, Instant now) {
+    private void publishStoredScores(LabSummary lab, Instant now, String requestId) {
         if (grades == null || outbox == null) return;
         jdbc.query("""
                 SELECT s.submission_id, s.student_id, COALESCE(s.final_score, s.auto_score) AS score
                   FROM assessment_lab_submission s
-                 WHERE s.lab_id = ? AND COALESCE(s.final_score, s.auto_score) IS NOT NULL
+                 WHERE s.lab_id = ?
                    AND ((s.final_score IS NOT NULL AND s.submission_version = (SELECT MAX(s2.submission_version) FROM assessment_lab_submission s2 WHERE s2.lab_id = s.lab_id AND s2.student_id = s.student_id AND s2.final_score IS NOT NULL))
                      OR (s.final_score IS NULL AND NOT EXISTS (SELECT 1 FROM assessment_lab_submission sf WHERE sf.lab_id = s.lab_id AND sf.student_id = s.student_id AND sf.final_score IS NOT NULL)
                          AND s.submission_version = (SELECT MAX(s3.submission_version) FROM assessment_lab_submission s3 WHERE s3.lab_id = s.lab_id AND s3.student_id = s.student_id)))
                 """, (rs, ignored) -> {
             String studentId = rs.getString("student_id");
             BigDecimal score = rs.getBigDecimal("score");
-            long version = grades.upsertScored("LAB", Long.toString(lab.labId()), lab.courseId(), studentId, score, lab.maxScore(), now);
+            String status = score == null ? "UNGRADED" : "SCORED";
+            long version = score == null
+                    ? grades.upsertUngraded("LAB", Long.toString(lab.labId()), lab.courseId(), studentId, lab.maxScore(), now)
+                    : grades.upsertScored("LAB", Long.toString(lab.labId()), lab.courseId(), studentId, score, lab.maxScore(), now);
+            Map<String, Object> payload = new LinkedHashMap<>();
+            payload.put("courseId", lab.courseId());
+            payload.put("sourceType", "LAB");
+            payload.put("sourceId", Long.toString(lab.labId()));
+            payload.put("studentId", studentId);
+            payload.put("score", score);
+            payload.put("fullScore", lab.maxScore());
+            payload.put("status", status);
+            payload.put("sourceVersion", version);
             outbox.append("assessment.source-grade.changed.v2", "assessment-source-grade", "LAB:" + lab.labId() + ":" + studentId,
-                    version, rs.getString("submission_id"), java.util.Map.of("courseId", lab.courseId(), "sourceType", "LAB",
-                            "sourceId", Long.toString(lab.labId()), "studentId", studentId, "score", score,
-                            "fullScore", lab.maxScore(), "status", "SCORED", "sourceVersion", version), now);
+                    version, requestId, payload, now);
             return null;
         }, lab.labId());
     }
@@ -266,6 +287,10 @@ public class LabExperimentService {
         if (totalWeight.compareTo(maxScore) != 0) {
             throw new IllegalArgumentException("automatic LAB testcase weights must equal maxScore");
         }
+    }
+
+    private static void requireRequestId(String requestId) {
+        if (requestId == null || requestId.isBlank() || requestId.length() > 80) throw new IllegalArgumentException("X-Request-Id must be 1-80 characters");
     }
 
     public record CreateLabCommand(String courseId, String title, String description, Instant deadline,

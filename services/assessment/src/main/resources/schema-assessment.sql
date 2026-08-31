@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS evaluation_task (
   state VARCHAR(16) NOT NULL, lease_owner VARCHAR(120), lease_until TIMESTAMP, heartbeat_at TIMESTAMP,
   attempt INTEGER NOT NULL, generation BIGINT NOT NULL, result_status VARCHAR(32), next_attempt_at TIMESTAMP,
   manual_replay_count INTEGER NOT NULL DEFAULT 0, manual_replayed_by VARCHAR(80), manual_replayed_at TIMESTAMP,
+  origin_request_id VARCHAR(80) NOT NULL,
   finished_at TIMESTAMP,
   created_at TIMESTAMP NOT NULL, updated_at TIMESTAMP NOT NULL,
   INDEX idx_evaluation_task_claim (state, lease_until, created_at)
@@ -153,7 +154,7 @@ CREATE TABLE IF NOT EXISTS assessment_lab_evaluation_result (
 CREATE TABLE IF NOT EXISTS assessment_lab_score (
   submission_id VARCHAR(36) PRIMARY KEY, lab_id BIGINT NOT NULL, report_id BIGINT NULL,
   auto_score DECIMAL(10,2) NULL, report_score DECIMAL(10,2) NULL, manual_score DECIMAL(10,2) NULL,
-  final_score DECIMAL(10,2) NOT NULL, comment VARCHAR(2000) NULL,
+  final_score DECIMAL(10,2) NOT NULL, comment VARCHAR(500) NULL,
   scored_at TIMESTAMP NOT NULL, updated_at TIMESTAMP NOT NULL,
   INDEX idx_assessment_lab_score_lab (lab_id)
 );

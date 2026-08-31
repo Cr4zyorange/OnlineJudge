@@ -38,7 +38,7 @@ public class AssessmentEvaluationController {
         if (request.getHeader("X-Request-Id") == null || request.getHeader("X-Request-Id").isBlank()) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "X-Request-Id is required");
         EvaluationTask task = tasks.find(taskId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "evaluation not found"));
         if (!user.hasRole("TEACHER") || !courseMembers.isActive(task.courseId(), user.id())) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "active course teacher membership is required");
-        if (!tasks.manualReplay(task.id(), user.id(), java.time.Instant.now())) throw new ResponseStatusException(HttpStatus.CONFLICT, "only a terminal failed evaluation can be replayed");
+        if (!tasks.manualReplay(task.id(), user.id(), request.getHeader("X-Request-Id"), java.time.Instant.now())) throw new ResponseStatusException(HttpStatus.CONFLICT, "only a terminal failed evaluation can be replayed");
         EvaluationTask replayed = tasks.find(task.id()).orElseThrow();
         return Map.of("taskId", replayed.id(), "state", replayed.state().name(), "generation", replayed.generation());
     }

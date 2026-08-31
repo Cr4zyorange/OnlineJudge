@@ -175,7 +175,7 @@ public class LabExperimentController {
             @RequestAttribute("assessment.currentUser") CurrentUser user, HttpServletRequest http) {
         requireRequestId(http);
         LabExperimentService.LabSummary current = findAndAuthorize(labId, user);
-        try { return labs.releaseScores(current.labId()); }
+        try { return labs.releaseScores(current.labId(), http.getHeader("X-Request-Id")); }
         catch (IllegalStateException invalidState) { throw new ResponseStatusException(HttpStatus.CONFLICT, invalidState.getMessage(), invalidState); }
     }
 

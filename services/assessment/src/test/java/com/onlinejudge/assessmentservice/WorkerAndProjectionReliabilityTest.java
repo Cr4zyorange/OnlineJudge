@@ -52,7 +52,8 @@ class WorkerAndProjectionReliabilityTest {
     void outboxPersistsTheCanonicalV2EnvelopeRatherThanAnUnaddressablePayloadFragment() throws Exception {
         var submitted = submissions.submit(new AssessmentSubmissionService.SubmissionCommand("HWK", "homework-envelope", "course-1", "student-1", "persistent://one"));
         worker.runOne("worker-envelope", task -> AssessmentWorker.EvaluationOutcome.successful("ACCEPTED"));
-        String json = jdbc.queryForObject("SELECT payload_json FROM assessment_event_outbox WHERE correlation_id = ? AND event_type = 'assessment.source-grade.changed.v2'", String.class, submitted.taskId());
+        String originRequestId = tasks.find(submitted.taskId()).orElseThrow().originRequestId();
+        String json = jdbc.queryForObject("SELECT payload_json FROM assessment_event_outbox WHERE correlation_id = ? AND event_type = 'assessment.source-grade.changed.v2'", String.class, originRequestId);
         var root = new ObjectMapper().readTree(json);
         assertThat(root.path("eventType").asText()).isEqualTo("assessment.source-grade.changed.v2");
         assertThat(root.path("eventId").asText()).isNotBlank();

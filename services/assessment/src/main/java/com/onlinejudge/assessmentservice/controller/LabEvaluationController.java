@@ -23,6 +23,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.List;
 import java.time.Instant;
+import java.math.RoundingMode;
 
 /** Read-only LAB result projection.  It deliberately never invokes a worker or evaluator. */
 @RestController
@@ -213,7 +214,8 @@ public class LabEvaluationController {
         String submissionId = jdbc.query("""
                 SELECT submission_id FROM assessment_lab_submission
                  WHERE lab_id = ? AND student_id = ?
-                 ORDER BY submission_version DESC, submitted_at DESC
+                 ORDER BY CASE WHEN final_score IS NOT NULL THEN 0 ELSE 1 END,
+                          submission_version DESC, submitted_at DESC
                  LIMIT 1
                 """, rows -> rows.next() ? rows.getString(1) : null, labId, studentId);
         if (submissionId == null) {
@@ -267,7 +269,9 @@ public class LabEvaluationController {
     @org.springframework.transaction.annotation.Transactional
     public Map<String, Object> score(@PathVariable long labId, @PathVariable String submissionId,
             @RequestAttribute("assessment.currentUser") CurrentUser user,
-            @org.springframework.web.bind.annotation.RequestBody ScoreRequest request) {
+            @org.springframework.web.bind.annotation.RequestBody ScoreRequest request,
+            jakarta.servlet.http.HttpServletRequest http) {
+        String requestId = requireRequestId(http);
         LabExperimentService.LabSummary lab = findLab(labId);
         if (!canManage(lab, user)) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "course management permission is required");
         Map<String, Object> submission = jdbc.query("SELECT student_id, auto_score FROM assessment_lab_submission WHERE lab_id = ? AND submission_id = ? FOR UPDATE",
@@ -278,9 +282,7 @@ public class LabEvaluationController {
                     return value;
                 }, labId, submissionId)
                 .stream().findFirst().orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "LAB submission does not exist"));
-        if (request == null || request.finalScore() == null || request.finalScore().signum() < 0 || request.finalScore().compareTo(lab.maxScore()) > 0) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "finalScore must be within the LAB score range");
-        }
+        validateScoreRequest(lab, request);
         BigDecimal previousFinalScore = jdbc.query("SELECT final_score FROM assessment_lab_score WHERE submission_id = ? FOR UPDATE",
                 rows -> rows.next() ? rows.getBigDecimal(1) : null, submissionId);
         String changeReason = request.changeReason() == null ? null : request.changeReason().trim();
@@ -308,9 +310,16 @@ public class LabEvaluationController {
         }
         if (grades != null && outbox != null && scoresPublished(lab)) {
             long version = grades.upsertScored("LAB", Long.toString(labId), lab.courseId(), (String) submission.get("studentId"), request.finalScore(), lab.maxScore(), now);
-            outbox.append("assessment.source-grade.changed.v2", "assessment-source-grade", "LAB:" + labId + ":" + submission.get("studentId"), version, submissionId,
-                    Map.of("courseId", lab.courseId(), "sourceType", "LAB", "sourceId", Long.toString(labId), "studentId", submission.get("studentId"),
-                            "score", request.finalScore(), "fullScore", lab.maxScore(), "status", "SCORED", "sourceVersion", version), now);
+            Map<String, Object> payload = new LinkedHashMap<>();
+            payload.put("courseId", lab.courseId());
+            payload.put("sourceType", "LAB");
+            payload.put("sourceId", Long.toString(labId));
+            payload.put("studentId", submission.get("studentId"));
+            payload.put("score", request.finalScore());
+            payload.put("fullScore", lab.maxScore());
+            payload.put("status", "SCORED");
+            payload.put("sourceVersion", version);
+            outbox.append("assessment.source-grade.changed.v2", "assessment-source-grade", "LAB:" + labId + ":" + submission.get("studentId"), version, requestId, payload, now);
         }
         return jdbc.query("SELECT submission_id, report_id, auto_score, report_score, manual_score, final_score, comment, scored_at, updated_at FROM assessment_lab_score WHERE submission_id = ?",
                 (rs, ignored) -> {
@@ -338,7 +347,11 @@ public class LabEvaluationController {
         int total = jdbc.queryForObject("SELECT COUNT(*) FROM assessment_course_member_projection WHERE course_id = ? AND membership_status = 'ACTIVE' AND user_id <> ?", Integer.class, lab.courseId(), creator);
         int submitted = jdbc.queryForObject("SELECT COUNT(DISTINCT student_id) FROM assessment_lab_submission WHERE lab_id = ?", Integer.class, labId);
         int evaluated = jdbc.queryForObject("SELECT COUNT(DISTINCT lab.student_id) FROM assessment_lab_submission lab JOIN assessment_submission submission ON submission.id = lab.submission_id WHERE lab.lab_id = ? AND submission.evaluation_status IN ('ACCEPTED','WRONG_ANSWER','COMPILE_ERROR','RUNTIME_ERROR','TIME_LIMIT_EXCEEDED','SYSTEM_ERROR')", Integer.class, labId);
-        BigDecimal average = jdbc.queryForObject("SELECT AVG(COALESCE(final_score, auto_score)) FROM assessment_lab_submission WHERE lab_id = ? AND COALESCE(final_score, auto_score) IS NOT NULL", BigDecimal.class, labId);
+        List<BigDecimal> effectiveScores = jdbc.query(effectiveSubmissionsSql("COALESCE(s.final_score, s.auto_score) AS score"),
+                (rs, ignored) -> rs.getBigDecimal("score"), labId);
+        List<BigDecimal> scored = effectiveScores.stream().filter(java.util.Objects::nonNull).toList();
+        BigDecimal average = scored.isEmpty() ? null : scored.stream().reduce(BigDecimal.ZERO, BigDecimal::add)
+                .divide(BigDecimal.valueOf(scored.size()), 2, RoundingMode.HALF_UP);
         int late = jdbc.queryForObject("SELECT COUNT(*) FROM assessment_lab_submission WHERE lab_id = ? AND submit_status = 'LATE'", Integer.class, labId);
         List<String> unsubmitted = jdbc.queryForList("""
                 SELECT member.user_id FROM assessment_course_member_projection member
@@ -358,7 +371,7 @@ public class LabEvaluationController {
         response.put("averageScore", average);
         response.put("lateSubmissionCount", late);
         response.put("unsubmittedStudentIds", unsubmitted);
-        response.put("scoreDistribution", Map.of());
+        response.put("scoreDistribution", scoreDistribution(scored));
         response.put("generatedAt", Instant.now());
         return response;
     }
@@ -383,12 +396,12 @@ public class LabEvaluationController {
                     .stream().findFirst().orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "LAB submission does not exist"));
             String taskId = java.util.UUID.randomUUID().toString();
             Instant now = Instant.now();
-            tasks.insert(taskId, submissionId, "LAB", Long.toString(labId), lab.courseId(), (String) submission.get("studentId"), now);
+            tasks.insert(taskId, submissionId, "LAB", Long.toString(labId), lab.courseId(), (String) submission.get("studentId"), request.getHeader("X-Request-Id"), now);
             jdbc.update("UPDATE assessment_submission SET evaluation_status = 'PENDING' WHERE id = ?", submissionId);
             EvaluationTask created = tasks.find(taskId).orElseThrow();
             return Map.of("taskId", created.id(), "submissionId", submissionId, "state", created.state().name(), "generation", created.generation());
         }
-        if (!tasks.manualReplay(task.id(), user.id(), Instant.now())) {
+        if (!tasks.manualReplay(task.id(), user.id(), request.getHeader("X-Request-Id"), Instant.now())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "only a terminal failed evaluation can be replayed");
         }
         EvaluationTask replayed = tasks.find(task.id()).orElseThrow();
@@ -398,4 +411,69 @@ public class LabEvaluationController {
     public record ScoreRequest(BigDecimal manualScore, BigDecimal reportScore, BigDecimal finalScore, String comment, String changeReason) { }
 
     private record LabSubmission(String studentId, BigDecimal autoScore) { }
+
+    private void validateScoreRequest(LabExperimentService.LabSummary lab, ScoreRequest request) {
+        if (request == null || request.manualScore() == null || request.finalScore() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "manualScore and finalScore are required");
+        }
+        validateScoreComponent("manualScore", request.manualScore(), lab.maxScore());
+        validateScoreComponent("finalScore", request.finalScore(), lab.maxScore());
+        if (request.reportScore() != null) validateScoreComponent("reportScore", request.reportScore(), lab.maxScore());
+        if (request.comment() != null && request.comment().length() > 500) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "comment must be at most 500 characters");
+        }
+        BigDecimal expectedFinal = request.manualScore().add(request.reportScore() == null ? BigDecimal.ZERO : request.reportScore());
+        if (request.finalScore().compareTo(expectedFinal) != 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "finalScore must equal manualScore plus reportScore");
+        }
+    }
+
+    private static void validateScoreComponent(String name, BigDecimal value, BigDecimal maxScore) {
+        if (value.signum() < 0 || value.compareTo(maxScore) > 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, name + " must be within the LAB score range");
+        }
+    }
+
+    private static String requireRequestId(jakarta.servlet.http.HttpServletRequest request) {
+        String requestId = request.getHeader("X-Request-Id");
+        if (requestId == null || requestId.isBlank() || requestId.length() > 80) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "X-Request-Id is required and must be at most 80 characters");
+        }
+        return requestId;
+    }
+
+    private static String effectiveSubmissionsSql(String projection) {
+        return """
+                SELECT %s
+                  FROM assessment_lab_submission s
+                 WHERE s.lab_id = ?
+                   AND ((s.final_score IS NOT NULL AND s.submission_version = (SELECT MAX(finalized.submission_version)
+                          FROM assessment_lab_submission finalized
+                         WHERE finalized.lab_id = s.lab_id AND finalized.student_id = s.student_id
+                           AND finalized.final_score IS NOT NULL))
+                     OR (s.final_score IS NULL AND NOT EXISTS (SELECT 1 FROM assessment_lab_submission finalized
+                          WHERE finalized.lab_id = s.lab_id AND finalized.student_id = s.student_id
+                            AND finalized.final_score IS NOT NULL)
+                         AND s.submission_version = (SELECT MAX(latest.submission_version)
+                              FROM assessment_lab_submission latest
+                             WHERE latest.lab_id = s.lab_id AND latest.student_id = s.student_id)))
+                """.formatted(projection);
+    }
+
+    private static Map<String, Integer> scoreDistribution(List<BigDecimal> scores) {
+        Map<String, Integer> distribution = new LinkedHashMap<>();
+        distribution.put("0-59", 0);
+        distribution.put("60-69", 0);
+        distribution.put("70-79", 0);
+        distribution.put("80-89", 0);
+        distribution.put("90-100", 0);
+        for (BigDecimal score : scores) {
+            String bucket = score.compareTo(BigDecimal.valueOf(60)) < 0 ? "0-59"
+                    : score.compareTo(BigDecimal.valueOf(70)) < 0 ? "60-69"
+                    : score.compareTo(BigDecimal.valueOf(80)) < 0 ? "70-79"
+                    : score.compareTo(BigDecimal.valueOf(90)) < 0 ? "80-89" : "90-100";
+            distribution.compute(bucket, (ignored, count) -> count == null ? 1 : count + 1);
+        }
+        return distribution;
+    }
 }

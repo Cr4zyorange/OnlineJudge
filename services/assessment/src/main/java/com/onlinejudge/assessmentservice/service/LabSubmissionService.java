@@ -63,7 +63,7 @@ public class LabSubmissionService {
                         submit_status, has_file, submitted_at) VALUES (?, ?, ?, ?, ?, 'SUBMITTED', ?, ?)
                     """, submissionId, lab.labId(), command.studentId(), version, command.language(), command.hasFile(), Timestamp.from(now));
             if (autoEvaluation) {
-                tasks.insert(taskId, submissionId, "LAB", Long.toString(lab.labId()), lab.courseId(), command.studentId(), now);
+                tasks.insert(taskId, submissionId, "LAB", Long.toString(lab.labId()), lab.courseId(), command.studentId(), command.originRequestId(), now);
             }
             return new SubmittedLabSubmission(submissionId, taskId, lab.labId(), version, "SUBMITTED", evaluationStatus, now);
         } catch (RuntimeException | java.io.IOException failed) {
@@ -99,15 +99,20 @@ public class LabSubmissionService {
     }
 
     public record SubmitLabCommand(long labId, String courseId, String studentId, String language, String originalFilename, byte[] content,
-                                   boolean hasFile, String codeContent) {
+                                   boolean hasFile, String codeContent, String originRequestId) {
+        public SubmitLabCommand(long labId, String courseId, String studentId, String language, String originalFilename, byte[] content,
+                                boolean hasFile, String codeContent) {
+            this(labId, courseId, studentId, language, originalFilename, content, hasFile, codeContent, UUID.randomUUID().toString());
+        }
         public SubmitLabCommand(long labId, String courseId, String studentId, String language, String originalFilename, byte[] content) {
-            this(labId, courseId, studentId, language, originalFilename, content, true, null);
+            this(labId, courseId, studentId, language, originalFilename, content, true, null, UUID.randomUUID().toString());
         }
         public SubmitLabCommand {
             if (studentId == null || studentId.isBlank() || language == null || language.isBlank()) {
                 throw new IllegalArgumentException("studentId and language are required");
             }
             if (content == null || content.length == 0) throw new IllegalArgumentException("submission file is required");
+            if (originRequestId == null || originRequestId.isBlank() || originRequestId.length() > 80) throw new IllegalArgumentException("origin request id is required");
         }
     }
     public record SubmittedLabSubmission(String submissionId, String taskId, long labId, int version,
