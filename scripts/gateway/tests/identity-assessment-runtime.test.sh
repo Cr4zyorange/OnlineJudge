@@ -64,7 +64,9 @@ pathlib.Path(output_path).write_text(
 PY
 chmod 600 "$login_payload"
 
-curl -fsS --connect-timeout 5 --max-time 15 "$IDENTITY_BASE/.well-known/jwks.json" >/dev/null
+curl -fsS --connect-timeout 5 --max-time 15 \
+  -H 'X-Request-Id: issue317-real-jwks-online' \
+  "$IDENTITY_BASE/.well-known/jwks.json" >/dev/null
 curl -fsS --connect-timeout 5 --max-time 15 "$ASSESSMENT_BASE/health/ready" >/dev/null
 
 login_status="$(curl -sS --connect-timeout 5 --max-time 15 \
@@ -98,7 +100,7 @@ assert_assessment_local_verification() {
     "$GATEWAY_BASE/api/v1/evaluations/gateway-probe-missing")"
   [[ "$status" == 404 ]] \
     || { printf 'Assessment local verification probe returned HTTP %s, expected 404\n' "$status" >&2; exit 1; }
-  grep -Eqi "^X-Request-Id:[[:space:]]*$expected_request_id\\r?$" "$response_headers" \
+  tr -d '\r' < "$response_headers" | grep -Fxi "X-Request-Id: $expected_request_id" \
     || { printf 'Assessment probe lost request ID continuity\n' >&2; exit 1; }
 }
 
@@ -110,7 +112,9 @@ docker start "$IDENTITY_CONTAINER" >/dev/null
 identity_stopped=0
 
 for _attempt in {1..30}; do
-  if curl -fsS --connect-timeout 1 --max-time 2 "$IDENTITY_BASE/.well-known/jwks.json" >/dev/null 2>&1; then
+  if curl -fsS --connect-timeout 1 --max-time 2 \
+    -H 'X-Request-Id: issue317-real-jwks-recovered' \
+    "$IDENTITY_BASE/.well-known/jwks.json" >/dev/null 2>&1; then
     printf 'identity-assessment-runtime.test: PASS (JWT locally verified while Identity offline)\n'
     exit 0
   fi

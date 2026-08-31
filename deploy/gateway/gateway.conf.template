@@ -1,6 +1,6 @@
 map $http_x_request_id $gateway_request_id {
     default $request_id;
-    ~^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$ $http_x_request_id;
+    "~^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" $http_x_request_id;
 }
 
 limit_req_zone $binary_remote_addr zone=identity_limit:10m rate=5r/s;

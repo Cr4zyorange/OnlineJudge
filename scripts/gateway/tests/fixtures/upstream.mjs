@@ -1,6 +1,7 @@
 import http from "node:http";
 
 const service = process.env.SERVICE ?? "unknown";
+const port = Number(process.env.PORT ?? "8080");
 let uploadCount = 0;
 const requestCounts = new Map();
 
@@ -54,4 +55,4 @@ function respond(response, request, path, status, body) {
   response.end(payload);
 }
 
-server.listen(8080, "0.0.0.0");
+server.listen(port, "0.0.0.0");

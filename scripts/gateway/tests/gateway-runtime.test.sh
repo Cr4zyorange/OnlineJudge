@@ -37,9 +37,10 @@ fi
 create_upstream() {
   local service="$1"
   local alias="$2"
+  local port="${3:-8080}"
   local container="$prefix-$service"
   docker create --name "$container" --network "$network" --network-alias "$alias" \
-    --env "SERVICE=$service" node:22-alpine node upstream.mjs >/dev/null
+    --env "SERVICE=$service" --env "PORT=$port" node:22-alpine node upstream.mjs >/dev/null
   containers+=("$container")
   docker cp "$fixture_dir/upstream.mjs" "$container:/upstream.mjs"
   docker start "$container" >/dev/null
@@ -73,7 +74,7 @@ create_upstream course course-service
 create_upstream assessment assessment-api
 create_upstream grade grade-service
 create_upstream learning learning-service
-create_upstream frontend frontend
+create_upstream frontend frontend 80
 
 cp "$repo_root/deploy/gateway/gateway.conf.template" "$runtime_dir/gateway.conf.template"
 sed -e 's/proxy_read_timeout 60s;/proxy_read_timeout 1s;/' \
@@ -81,19 +82,29 @@ sed -e 's/proxy_read_timeout 60s;/proxy_read_timeout 1s;/' \
   "$runtime_dir/gateway.conf.template" > "$runtime_dir/gateway.test.conf.template"
 mv -- "$runtime_dir/gateway.test.conf.template" "$runtime_dir/gateway.conf.template"
 
+gateway_template_source="$runtime_dir/gateway.conf.template"
+gateway_create_command=(docker create)
+if [[ -n "${MSYSTEM:-}" ]]; then
+  gateway_template_source="$(cygpath -w "$gateway_template_source")"
+  gateway_create_command=(env MSYS_NO_PATHCONV=1 docker create)
+fi
+
 docker build --file "$repo_root/services/gateway/Dockerfile" --tag "$image" "$repo_root" >/dev/null
 
 gateway_container="$prefix-gateway"
-docker create --name "$gateway_container" --network "$network" -p 127.0.0.1::8080 \
+"${gateway_create_command[@]}" --name "$gateway_container" --network "$network" -p 127.0.0.1::8080 \
   --env IDENTITY_UPSTREAM=identity-service:8080 \
   --env COURSE_UPSTREAM=course-service:8080 \
   --env ASSESSMENT_UPSTREAM=assessment-api:8080 \
   --env GRADE_UPSTREAM=grade-service:8080 \
   --env LEARNING_UPSTREAM=learning-service:8080 \
-  --volume "$runtime_dir/gateway.conf.template:/opt/onlinejudge/gateway.conf.template:ro" \
+  --volume "$gateway_template_source:/opt/onlinejudge/gateway.conf.template:ro" \
   "$image" >/dev/null
 containers+=("$gateway_container")
 docker start "$gateway_container" >/dev/null
+
+[[ "$(docker inspect -f '{{.State.Running}}' "$gateway_container")" == true ]] \
+  || fail "gateway exited during startup: $(docker logs "$gateway_container" 2>&1 | tail -n 30)"
 
 published="$(docker port "$gateway_container" 8080/tcp | head -n 1)"
 gateway="http://$published"
