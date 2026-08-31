@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 /** Read-only rebuild input for Grade; it never exposes Assessment's schema directly. */
@@ -30,8 +31,22 @@ public class AssessmentSourceGradeController {
         int offset;
         try { offset = Math.multiplyExact(page, size); }
         catch (ArithmeticException overflow) { throw new SourceGradeRequestException("invalid source-grade filter"); }
-        List<Map<String, Object>> items = grades.page(courseId, sourceType, sourceId, snapshotVersion, offset, size).stream().map(grade -> Map.<String, Object>of(
-                "courseId", grade.courseId(), "sourceType", grade.sourceType(), "sourceId", grade.sourceId(), "studentId", grade.studentId(), "score", grade.score(), "fullScore", grade.fullScore(), "status", grade.status(), "sourceVersion", grade.sourceVersion(), "updatedAt", grade.updatedAt().toString())).toList();
+        List<Map<String, Object>> items = grades.page(courseId, sourceType, sourceId, snapshotVersion, offset, size)
+                .stream().map(this::response).toList();
         return Map.of("items", items, "page", page, "size", size, "total", total, "sourceSnapshotVersion", snapshotVersion);
+    }
+
+    private Map<String, Object> response(SourceGradeRepository.SourceGrade grade) {
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("courseId", grade.courseId());
+        response.put("sourceType", grade.sourceType());
+        response.put("sourceId", grade.sourceId());
+        response.put("studentId", grade.studentId());
+        response.put("score", grade.score());
+        response.put("fullScore", grade.fullScore());
+        response.put("status", grade.status());
+        response.put("sourceVersion", grade.sourceVersion());
+        response.put("updatedAt", grade.updatedAt().toString());
+        return response;
     }
 }

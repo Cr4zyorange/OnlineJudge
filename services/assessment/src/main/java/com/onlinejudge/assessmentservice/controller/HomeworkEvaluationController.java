@@ -90,7 +90,7 @@ public class HomeworkEvaluationController {
         if (!managerRole || !coursePermissions.canManageCourse(task.courseId(), user.id())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "course management permission is required");
         }
-        if (!replayService.replay(task.id(), submissionId, user.id(), java.time.Instant.now())) {
+        if (!replayService.replay(task, user.id(), requestId, java.time.Instant.now())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "only a terminal homework evaluation can be replayed");
         }
         EvaluationTask replayed = tasks.find(task.id()).orElseThrow();

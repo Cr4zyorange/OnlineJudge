@@ -7,6 +7,7 @@ import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public class SourceGradeRepository {
@@ -20,6 +21,33 @@ public class SourceGradeRepository {
         long version = jdbc.queryForObject("SELECT source_version FROM assessment_source_grade WHERE source_type=? AND source_id=? AND student_id=? FOR UPDATE", Long.class, sourceType, sourceId, studentId);
         jdbc.update("INSERT INTO assessment_source_grade_snapshot (source_type, source_id, course_id, snapshot_version) VALUES (?, ?, ?, 1) ON DUPLICATE KEY UPDATE course_id=VALUES(course_id), snapshot_version=snapshot_version+1", sourceType, sourceId, courseId);
         return version;
+    }
+    @Transactional
+    public Optional<SourceGrade> markUngradedIfPresent(String sourceType, String sourceId, String studentId,
+                                                       Instant now) {
+        int updated = jdbc.update("""
+                UPDATE assessment_source_grade
+                   SET score = NULL, status = 'UNGRADED', source_version = source_version + 1, updated_at = ?
+                 WHERE source_type = ? AND source_id = ? AND student_id = ?
+                """, Timestamp.from(now), sourceType, sourceId, studentId);
+        if (updated == 0) return Optional.empty();
+        SourceGrade grade = jdbc.query("""
+                SELECT course_id, source_type, source_id, student_id, score, full_score, status,
+                       source_version, updated_at
+                  FROM assessment_source_grade
+                 WHERE source_type = ? AND source_id = ? AND student_id = ?
+                   FOR UPDATE
+                """, (rs, ignored) -> new SourceGrade(rs.getString("course_id"), rs.getString("source_type"),
+                rs.getString("source_id"), rs.getString("student_id"), rs.getBigDecimal("score"),
+                rs.getBigDecimal("full_score"), rs.getString("status"), rs.getLong("source_version"),
+                rs.getTimestamp("updated_at").toInstant()), sourceType, sourceId, studentId).stream().findFirst()
+                .orElseThrow();
+        jdbc.update("""
+                INSERT INTO assessment_source_grade_snapshot (source_type, source_id, course_id, snapshot_version)
+                VALUES (?, ?, ?, 1)
+                ON DUPLICATE KEY UPDATE course_id=VALUES(course_id), snapshot_version=snapshot_version+1
+                """, sourceType, sourceId, grade.courseId());
+        return Optional.of(grade);
     }
     public long snapshotVersion(String courseId, String sourceType, String sourceId) {
         return jdbc.query("SELECT snapshot_version FROM assessment_source_grade_snapshot WHERE course_id=? AND source_type=? AND source_id=?", (rs, ignored) -> rs.getLong(1), courseId, sourceType, sourceId).stream().findFirst().orElse(1L);
