@@ -16,6 +16,7 @@ import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import com.onlinejudge.assessmentservice.service.CoursePermissionClient;
+import com.onlinejudge.assessmentservice.service.CourseAuthorizationUnavailableException;
 import com.onlinejudge.assessmentservice.worker.AssessmentWorker;
 
 import java.security.KeyPair;
@@ -182,17 +183,84 @@ class HomeworkWorkflowContractTest {
                 .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
         long homeworkId = mapper.readTree(created).path("id").asLong();
         jdbc.execute("ALTER TABLE assessment_event_outbox ADD CONSTRAINT force_homework_outbox_failure CHECK (event_type <> 'assessment.homework.published.v2')");
+        String requestId = UUID.randomUUID().toString();
         try {
             mockMvc.perform(put("/api/v1/homeworks/{homeworkId}/publish", homeworkId)
-                            .header("Authorization", "Bearer " + teacherToken).header("X-Request-Id", UUID.randomUUID().toString()))
+                            .header("Authorization", "Bearer " + teacherToken).header("X-Request-Id", requestId))
                     .andExpect(status().isServiceUnavailable())
-                    .andExpect(jsonPath("$.code").value("HWK_5003"));
+                    .andExpect(jsonPath("$.code").value("HWK_5003"))
+                    .andExpect(jsonPath("$.retryable").value(true))
+                    .andExpect(jsonPath("$.requestId").value(requestId));
         } finally {
             jdbc.execute("ALTER TABLE assessment_event_outbox DROP CONSTRAINT force_homework_outbox_failure");
         }
 
         assertThat(jdbc.queryForObject("SELECT status FROM assessment_homework WHERE id = ?", String.class, homeworkId)).isEqualTo("DRAFT");
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM assessment_event_outbox WHERE aggregate_id = ?", Integer.class, Long.toString(homeworkId))).isZero();
+    }
+
+    @Test
+    void unavailableCourseAuthorizationReturns503AndWritesNoBusinessFacts() throws Exception {
+        String teacherId = "teacher-315-" + UUID.randomUUID();
+        String teacherToken = TestJwtFactory.userToken(KEY, "homework-workflow-kid", teacherId, List.of("TEACHER"));
+        long homeworkId = createAndPublishCodeHomework(teacherId, "auth-down-315-" + UUID.randomUUID(), true, false,
+                Instant.parse("2030-01-01T12:00:00Z"));
+        when(coursePermissions.canManageCourse("course-315", teacherId))
+                .thenThrow(new CourseAuthorizationUnavailableException("course authorization is unavailable"));
+        String requestId = UUID.randomUUID().toString();
+        mockMvc.perform(put("/api/v1/homeworks/{homeworkId}/publish", homeworkId)
+                        .header("Authorization", "Bearer " + teacherToken)
+                        .header("X-Request-Id", requestId))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.code").value("COURSE_AUTHORIZATION_UNAVAILABLE"))
+                .andExpect(jsonPath("$.retryable").value(true))
+                .andExpect(jsonPath("$.requestId").value(requestId));
+        assertThat(jdbc.queryForObject("SELECT status FROM assessment_homework WHERE id = ?", String.class, homeworkId))
+                .isEqualTo("PUBLISHED");
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM assessment_event_outbox", Integer.class)).isEqualTo(1);
+    }
+
+    @Test
+    void managerWriteRejectionsUseTheCanonicalErrorEnvelope() throws Exception {
+        String teacherId = "teacher-315-" + UUID.randomUUID();
+        String studentId = "student-315-" + UUID.randomUUID();
+        long homeworkId = createAndPublishCodeHomework(teacherId, "envelope-315-" + UUID.randomUUID(), true, false,
+                Instant.parse("2030-01-01T12:00:00Z"));
+        String studentToken = TestJwtFactory.userToken(KEY, "homework-workflow-kid", studentId, List.of("STUDENT"));
+        String requestId = UUID.randomUUID().toString();
+        mockMvc.perform(put("/api/v1/homeworks/{homeworkId}/publish", homeworkId)
+                        .header("Authorization", "Bearer " + studentToken)
+                        .header("X-Request-Id", requestId))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("HWK_4003"))
+                .andExpect(jsonPath("$.retryable").value(false))
+                .andExpect(jsonPath("$.requestId").value(requestId));
+    }
+
+    @Test
+    void ownerCanReadOwnEvaluationWhenCourseAuthorizationIsUnavailable() throws Exception {
+        String teacherId = "teacher-315-" + UUID.randomUUID();
+        String studentId = "student-315-" + UUID.randomUUID();
+        long homeworkId = createAndPublishCodeHomework(teacherId, "owner-read-315-" + UUID.randomUUID(), true, false,
+                Instant.parse("2030-01-01T12:00:00Z"));
+        jdbc.update("INSERT INTO assessment_course_member_projection (course_id, user_id, membership_status, member_version) VALUES ('course-315', ?, 'ACTIVE', 1)", studentId);
+        String studentToken = TestJwtFactory.userToken(KEY, "homework-workflow-kid", studentId, List.of("STUDENT"));
+        String submitted = mockMvc.perform(post("/api/v1/homeworks/{homeworkId}/submissions", homeworkId)
+                        .header("Authorization", "Bearer " + studentToken).header("X-Request-Id", UUID.randomUUID().toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"code\":\"print('result')\",\"language\":\"python\"}"))
+                .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+        String submissionId = mapper.readTree(submitted).path("submissionId").asText();
+        worker.runOne("homework-worker-owner-read", task -> new AssessmentWorker.EvaluationOutcome(
+                true, "ACCEPTED", new BigDecimal("80"), new BigDecimal("100")));
+        when(coursePermissions.canManageCourse("course-315", studentId))
+                .thenThrow(new CourseAuthorizationUnavailableException("course authorization is unavailable"));
+
+        mockMvc.perform(get("/api/v1/submissions/{submissionId}/evaluation", submissionId)
+                        .header("Authorization", "Bearer " + studentToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.evaluationStatus").value("ACCEPTED"))
+                .andExpect(jsonPath("$.score").value(80));
     }
 
     @Test
