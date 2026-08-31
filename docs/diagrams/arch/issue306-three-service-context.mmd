@@ -1,0 +1,9 @@
+flowchart LR
+  Identity[Identity support] -. JWT/JWKS .-> Course[Course: CRS + LRN]
+  Identity -. JWT/JWKS .-> Assessment[Assessment: LAB + HWK]
+  Identity -. JWT/JWKS .-> Grade[Grade: GRD]
+  Course -->|authorization API| Assessment
+  Course -->|authorization API| Grade
+  Assessment -->|source-grade events| Grade
+  Assessment -->|notification facts| Course
+  Grade -->|publication/review facts| Course

@@ -19,7 +19,7 @@ import java.util.Set;
 /** Issues one audience-bound service JWT per idempotent mTLS workload request. */
 @Service
 public class ServiceTokenService {
-    private static final Set<String> VALID_AUDIENCES = Set.of("course", "assessment", "grade", "learning");
+    private static final Set<String> VALID_AUDIENCES = Set.of("course", "assessment", "grade");
 
     private final JwtTokenService jwtTokenService;
     private final ServiceTokenIdempotencyRepository idempotency;
@@ -72,7 +72,7 @@ public class ServiceTokenService {
 
     private void validate(String audience, List<String> scopes, String idempotencyKey) {
         if (audience == null || !VALID_AUDIENCES.contains(audience)) {
-            throw ServiceTokenException.badRequest("audience must be one of course, assessment, grade, learning");
+            throw ServiceTokenException.badRequest("audience must be one of course, assessment, grade");
         }
         if (scopes == null || scopes.isEmpty() || scopes.stream().anyMatch(scope -> scope == null || scope.isBlank())) {
             throw ServiceTokenException.badRequest("scopes must contain at least one non-blank value");

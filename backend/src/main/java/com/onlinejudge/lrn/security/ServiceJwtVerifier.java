@@ -19,9 +19,9 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * Frozen v2 service-identity protocol verifier for the Learning internal
+ * Frozen v2 service-identity protocol verifier for Course's LRN internal
  * endpoints: an RS256 service JWT signed by Identity, audience-bound to
- * {@code learning}, carrying a {@code scopes} list.  Request handling never
+ * {@code course}, carrying a {@code scopes} list.  Request handling never
  * calls Identity synchronously; only the last valid JWKS snapshot is used.
  */
 @Component
@@ -37,7 +37,7 @@ public class ServiceJwtVerifier {
     public ServiceJwtVerifier(
             ObjectMapper objectMapper,
             @Value("${onlinejudge.identity.jwt.issuer:onlinejudge.identity.v2}") String issuer,
-            @Value("${onlinejudge.identity.service.learning.audience:learning}") String audience,
+            @Value("${onlinejudge.identity.service.course.audience:course}") String audience,
             @Value("${onlinejudge.identity.jwks.trust-bundle:}") String trustBundle
     ) {
         this.objectMapper = objectMapper;

@@ -13,17 +13,17 @@ function writeExecutable(path, contents) {
   chmodSync(path, 0o755);
 }
 
-test('the formal frontend gate rejects a malformed #305 Mermaid source after its locked dependency install', () => {
-  const root = mkdtempSync(join(tmpdir(), 'onlinejudge-final-architecture-305-frontend-gate-'));
+test('the formal frontend gate rejects a malformed #306 Mermaid source after its locked dependency install', () => {
+  const root = mkdtempSync(join(tmpdir(), 'onlinejudge-three-service-baseline-306-frontend-gate-'));
   try {
     for (const relativePath of [
       'scripts/ci/frontend-verify.sh',
-      'scripts/test/verify-final-architecture-305-render.test.mjs',
-      'scripts/test/verify-final-architecture-305-frontend-gate.test.mjs',
+      'scripts/test/verify-three-service-baseline-306-render.test.mjs',
+      'scripts/test/verify-three-service-baseline-306-frontend-gate.test.mjs',
       'scripts/dev/render-mermaid.mjs',
-      'docs/diagrams/arch/issue305-five-service-context.mmd',
-      'docs/diagrams/arch/issue305-assessment-worker-fencing.mmd',
-      'docs/diagrams/arch/issue305-five-service-deployment.mmd',
+      'docs/diagrams/arch/issue306-three-service-context.mmd',
+      'docs/diagrams/arch/issue306-assessment-worker-fencing.mmd',
+      'docs/diagrams/arch/issue306-three-service-deployment.mmd',
       'frontend/package.json',
       'frontend/package-lock.json'
     ]) {
@@ -35,7 +35,7 @@ test('the formal frontend gate rejects a malformed #305 Mermaid source after its
       'formal frontend gate must run this mutation after npm ci installs locked Mermaid');
     symlinkSync(nodeModules, join(root, 'frontend/node_modules'), 'dir');
 
-    const brokenDiagram = join(root, 'docs/diagrams/arch/issue305-five-service-context.mmd');
+    const brokenDiagram = join(root, 'docs/diagrams/arch/issue306-three-service-context.mmd');
     writeFileSync(brokenDiagram, `${readFileSync(brokenDiagram, 'utf8')}\nCourse -->\n`, 'utf8');
 
     const fakeBin = join(root, 'fake-bin');
@@ -64,13 +64,13 @@ esac
         PATH: `${fakeBin}:${process.env.PATH}`,
         OJ_CI_NODE_MAJOR: '22',
         OJ_CI_NPM_VERSION: '10.9.2',
-        OJ305_RENDER_GATE_MUTATION: '1'
+        OJ306_RENDER_GATE_MUTATION: '1'
       }
     });
 
     assert.notEqual(result.status, 0, `${result.stdout}\n${result.stderr}`);
-    assert.match(`${result.stdout}\n${result.stderr}`, /verify-final-architecture-305-render\.test\.mjs/);
-    assert.match(`${result.stdout}\n${result.stderr}`, /渲染失败：.*issue305-five-service-context\.mmd/);
+    assert.match(`${result.stdout}\n${result.stderr}`, /verify-three-service-baseline-306-render\.test\.mjs/);
+    assert.match(`${result.stdout}\n${result.stderr}`, /渲染失败：.*issue306-three-service-context\.mmd/);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

@@ -25,7 +25,7 @@
       "properties": {
         "name": {"const": "onlinejudge-platform"},
         "version": {"const": "v2"},
-        "ownerIssue": {"const": "#336"}
+        "ownerIssue": {"const": "#306"}
       }
     },
     "sharedTriggerPaths": {
@@ -225,7 +225,7 @@
       "additionalProperties": false,
       "properties": {
         "name": {"type": "string", "pattern": "^[a-z][a-z0-9-]*$"},
-        "schema": {"enum": ["identity", "course", "assessment", "grade", "learning"]},
+        "schema": {"enum": ["identity", "course", "assessment", "grade"]},
         "forWorkload": {"type": "string", "pattern": "^[a-z][a-z0-9-]*$"},
         "sourcePaths": {"type": "array", "minItems": 1, "items": {"type": "string"}},
         "command": {"type": "string", "minLength": 1},

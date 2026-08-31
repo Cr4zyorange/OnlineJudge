@@ -46,15 +46,15 @@ printf 'node=%s\nnpm=%s\n' "$node_major" "$npm_current" > "$artifact_dir/version
 # 依赖安装：以 lockfile 为准，验证可复现性。
 (cd "$frontend_dir" && log_run npm ci --no-audit --no-fund)
 
-# #305 的图源依赖 frontend lockfile 中锁定的 Mermaid。必须在同一个 Node
+# #306 的图源依赖 frontend lockfile 中锁定的 Mermaid。必须在同一个 Node
 # 22 前端门禁内实际渲染，而不只是运行无依赖的文本/语义检查；否则损坏的
 # .mmd 会在 CI 全绿时进入主干。
-log_run node --test "$checkout/scripts/test/verify-final-architecture-305-render.test.mjs"
+log_run node --test "$checkout/scripts/test/verify-three-service-baseline-306-render.test.mjs"
 
 # 用隔离 checkout 与伪造的已成功 npm 子命令重跑本脚本：破坏一张图时只有
 # 上述正式 render command 能使 pipeline 非零。嵌套调用关闭自身，避免递归。
-if [[ "${OJ305_RENDER_GATE_MUTATION:-0}" != "1" ]]; then
-  log_run node --test "$checkout/scripts/test/verify-final-architecture-305-frontend-gate.test.mjs"
+if [[ "${OJ306_RENDER_GATE_MUTATION:-0}" != "1" ]]; then
+  log_run node --test "$checkout/scripts/test/verify-three-service-baseline-306-frontend-gate.test.mjs"
 fi
 
 # 类型检查。

@@ -2,9 +2,9 @@
 set -euo pipefail
 
 # Course's Compose/operations migration job.  It owns only oj_course and its
-# runtime account; the five-domain #341 controller remains responsible for a
+# runtime account; the #306 four-domain baseline owns migration ordering and
 # quiescent cross-schema data cutover.  This runner is safe for fresh startup,
-# resume after a failed DDL step, and an already-migrated #341 target.
+# resume after a failed DDL step, and an already-migrated #306 target.
 repo_root="$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"
 migration_dir="${COURSE_MIGRATIONS_DIR:-$repo_root/database/migrations/course}"
 host="${COURSE_DATABASE_HOST:-mysql}"
@@ -70,7 +70,8 @@ for migration in \
   V20260831_03__course_runtime_version_columns.sql \
   V20260831_04__course_outbox_fencing.sql \
   V20260831_05__course_file_delete_journal.sql \
-  V20260831_06__course_chapter_active_order_uniqueness.sql; do
+  V20260831_06__course_chapter_active_order_uniqueness.sql \
+  V20260901_07__course_lrn_owned_tables.sql; do
   path="$migration_dir/$migration"
   [[ -f "$path" ]] || fail "missing migration $path"
   expected_checksum="$(checksum "$path")"
@@ -86,4 +87,4 @@ for migration in \
   printf 'course-migrations: applied %s checksum=%s\n' "$migration" "$expected_checksum"
 done
 
-printf 'course-migrations: PASS schema=%s account=%s migrations=6\n' "$database" "$account"
+printf 'course-migrations: PASS schema=%s account=%s migrations=7\n' "$database" "$account"

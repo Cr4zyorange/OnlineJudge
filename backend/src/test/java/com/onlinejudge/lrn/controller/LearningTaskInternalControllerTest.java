@@ -31,8 +31,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * The bounded Course -> LRN recent-task summary contract (learning.openapi.json):
- * an authenticated Learning service principal with learning.tasks.read scope gets
+ * The bounded Course LRN recent-task summary contract (course.openapi.json):
+ * an authenticated Course service principal with learning.tasks.read scope gets
  * at most five deadline-ordered tasks for one member in one course; missing or
  * invalid service identity is 401, an authenticated principal without the scope is 403.
  */
@@ -188,8 +188,8 @@ class LearningTaskInternalControllerTest {
     }
 
     private static String serviceToken(List<String> scopes) {
-        return header("RS256", KID) + "." + payload("course-service", "learning", scopes)
-                + "." + sign("course-service", "learning", scopes);
+        return header("RS256", KID) + "." + payload("course-service", "course", scopes)
+                + "." + sign("course-service", "course", scopes);
     }
 
     private static String header(String algorithm, String kid) {

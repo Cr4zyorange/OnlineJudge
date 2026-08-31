@@ -1,6 +1,6 @@
 # D6-AUTH 独立身份服务交付（v2）
 
-本文件是 Issue #311 的交付与消费契约。身份服务唯一入口为 `services/identity`，是五服务架构中的 `identity` 服务；它独立拥有账号、角色、权限、会话、安全版本、签名密钥和身份失效事实。既有 `/api/v1/auth/**` 兼容入口保留，但 Bearer 凭证已改为短时、受众绑定的 JWT。
+本文件是 Issue #311 的交付与消费契约。身份服务唯一入口为 `services/identity`，是三业务服务架构的支撑 `identity` 服务；它独立拥有账号、角色、权限、会话、安全版本、签名密钥和身份失效事实。既有 `/api/v1/auth/**` 兼容入口保留，但 Bearer 凭证已改为短时、受众绑定的 JWT。
 
 ## 1. 信任边界
 
@@ -98,4 +98,4 @@ docker compose -f deploy/docker/compose.identity.yml up -d --wait
 
 ## 7. 合并和集成门槛
 
-#338 已确定五服务与 v2 契约，#309 已合入 `dev`，因此它不再阻止 #311 结束 Draft。#337 的 outbox 投递仍是独立后续工作；本交付已投产业务服务的 bundle bootstrap 和请求路径外 JWKS 刷新，但不虚报 securityVersion 事件的跨服务投递已经完成。
+#306 已冻结三业务服务与 v2 契约，#309 已合入 `dev`，因此它不再阻止 #311 结束 Draft。#337 的 outbox 投递仍是独立后续工作；本交付已投产业务服务的 bundle bootstrap 和请求路径外 JWKS 刷新，但不虚报 securityVersion 事件的跨服务投递已经完成。

@@ -8,23 +8,23 @@ import { fileURLToPath } from 'node:url';
 
 const repoRoot = resolve(fileURLToPath(new URL('../..', import.meta.url)));
 
-test('the frozen context, fencing and deployment diagrams have the required semantics and really render', () => {
-  const renderDirectory = mkdtempSync(join(tmpdir(), 'onlinejudge-final-architecture-305-mermaid-'));
+test('the three-service context, fencing and deployment diagrams have the required semantics and really render', () => {
+  const renderDirectory = mkdtempSync(join(tmpdir(), 'onlinejudge-three-service-baseline-306-mermaid-'));
   const diagrams = [
     {
-      source: 'docs/diagrams/arch/issue305-five-service-context.mmd',
+      source: 'docs/diagrams/arch/issue306-three-service-context.mmd',
       output: 'context.svg',
-      expected: [/Course -->\|authorization API\| Assessment/, /Course -->\|authorization API\| Grade/, /Assessment -->\|source-grade events\| Grade/, /Grade -->\|publication\/review events\| Learning/]
+      expected: [/Course -->\|authorization API\| Assessment/, /Course -->\|authorization API\| Grade/, /Assessment -->\|source-grade events\| Grade/, /Grade -->\|publication\/review facts\| Course/]
     },
     {
-      source: 'docs/diagrams/arch/issue305-assessment-worker-fencing.mmd',
+      source: 'docs/diagrams/arch/issue306-assessment-worker-fencing.mmd',
       output: 'fencing.svg',
-      expected: [/conditional re-claim at next generation/, /stale sandbox output is fenced and discarded/, /conditional final write checks task, generation, owner, live lease/]
+      expected: [/claim increments generation/, /fenced final write: task, generation, owner, live lease/, /stale worker writes zero rows/]
     },
     {
-      source: 'docs/diagrams/arch/issue305-five-service-deployment.mmd',
+      source: 'docs/diagrams/arch/issue306-three-service-deployment.mmd',
       output: 'deployment.svg',
-      expected: [/AssessmentWorker\[Assessment Worker\]/, /five schemas \/ five accounts/, /RabbitMQ --> AssessmentWorker\[Assessment Worker\]/, /Course --> ObjectStore/]
+      expected: [/AssessmentWorker\[Assessment Worker\]/, /four schemas \/ four accounts/, /RabbitMQ --> AssessmentWorker\[Assessment Worker\]/, /Gateway --> Course/]
     }
   ];
   try {
@@ -41,9 +41,7 @@ test('the frozen context, fencing and deployment diagrams have the required sema
       { cwd: repoRoot, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }
     );
     assert.equal(render.status, 0, `${render.stdout}\n${render.stderr}`);
-    for (const diagram of diagrams) {
-      assert.match(readFileSync(join(renderDirectory, diagram.output), 'utf8'), /<svg[\s>]/);
-    }
+    for (const diagram of diagrams) assert.match(readFileSync(join(renderDirectory, diagram.output), 'utf8'), /<svg[\s>]/);
   } finally {
     rmSync(renderDirectory, { recursive: true, force: true });
   }

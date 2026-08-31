@@ -3,7 +3,7 @@
   "info": {
     "title": "OnlineJudge Identity Service internal contract",
     "version": "2.0.0",
-    "description": "Audience-bound identity documents for the five-service architecture. This is a service contract, not a public login API replacement."
+    "description": "Audience-bound identity documents for the frozen three-business-service architecture. This is a service contract, not a public login API replacement."
   },
   "x-onlinejudge-service": "identity",
   "paths": {
@@ -89,8 +89,8 @@
           "aud": { "type": "string", "const": "onlinejudge.api" }
         }
       },
-      "ServiceTokenRequest": { "type": "object", "additionalProperties": false, "required": ["audience", "scopes"], "properties": { "audience": { "type": "string", "enum": ["course", "assessment", "grade", "learning"] }, "scopes": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } } } },
-      "ServiceTokenResponse": { "type": "object", "additionalProperties": false, "required": ["accessToken", "expiresAt", "audience"], "properties": { "accessToken": { "type": "string", "readOnly": true, "description": "The newly minted, audience-bound service JWT. This response-only secret is never accepted in the mint request body." }, "expiresAt": { "type": "string", "format": "date-time" }, "audience": { "type": "string", "enum": ["course", "assessment", "grade", "learning"] } } }
+      "ServiceTokenRequest": { "type": "object", "additionalProperties": false, "required": ["audience", "scopes"], "properties": { "audience": { "type": "string", "enum": ["course", "assessment", "grade"] }, "scopes": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } } } },
+      "ServiceTokenResponse": { "type": "object", "additionalProperties": false, "required": ["accessToken", "expiresAt", "audience"], "properties": { "accessToken": { "type": "string", "readOnly": true, "description": "The newly minted, audience-bound service JWT. This response-only secret is never accepted in the mint request body." }, "expiresAt": { "type": "string", "format": "date-time" }, "audience": { "type": "string", "enum": ["course", "assessment", "grade"] } } }
     }
   }
 }

@@ -72,7 +72,7 @@ class AuthServiceExtractionContractTest {
     }
 
     @Test
-    void businessConsumersDeclareTheCanonicalJwksTrustBundleAndRefreshConfiguration() throws IOException {
+    void frozenBusinessServicesDeclareTheCanonicalJwksTrustBundleAndRefreshConfiguration() throws IOException {
         String application = Files.readString(Path.of("src/main/resources/application.yml"));
         String composeProperties = Files.readString(Path.of("src/main/resources/application-compose.properties"));
         String compose = Files.readString(REPOSITORY.resolve("deploy/docker/compose.yml"));
@@ -91,9 +91,14 @@ class AuthServiceExtractionContractTest {
                 "IDENTITY_JWKS_TRUST_BUNDLE: ${IDENTITY_JWKS_TRUST_BUNDLE:?IDENTITY_JWKS_TRUST_BUNDLE is required}",
                 "IDENTITY_JWKS_URI: ${IDENTITY_JWKS_URI:?IDENTITY_JWKS_URI is required}"
         );
-        assertThat(count(workloads, "IDENTITY_JWKS_TRUST_BUNDLE")).isGreaterThanOrEqualTo(5);
-        assertThat(count(workloads, "IDENTITY_JWKS_URI")).isGreaterThanOrEqualTo(4);
-        assertThat(count(workloads, "IDENTITY_JWKS_REFRESH_INTERVAL")).isGreaterThanOrEqualTo(4);
+        // #306 has the three Course/Assessment/Grade business services.
+        // Gateway also has the public-key trust bundle for route validation;
+        // only the three HTTP business service workloads need URI refresh.
+        // Assessment Worker uses its workload identity instead of a JWKS
+        // refresh client, and Learning is carried by Course.
+        assertThat(count(workloads, "IDENTITY_JWKS_TRUST_BUNDLE")).isEqualTo(4);
+        assertThat(count(workloads, "IDENTITY_JWKS_URI")).isEqualTo(3);
+        assertThat(count(workloads, "IDENTITY_JWKS_REFRESH_INTERVAL")).isEqualTo(3);
     }
 
     private static int count(String value, String fragment) {

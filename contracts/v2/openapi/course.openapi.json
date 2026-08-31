@@ -36,6 +36,44 @@
         ],
         "responses": { "200": { "description": "Member page", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Page" } } } }, "401": { "description": "Missing, invalid, expired, or wrong-audience service JWT; or invalid workload mTLS service identity", "x-onlinejudge-error-codes": ["SERVICE_IDENTITY_INVALID"], "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }, "403": { "description": "Authenticated service principal lacks the required course member-read scope", "x-onlinejudge-error-codes": ["SERVICE_IDENTITY_FORBIDDEN"], "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }, "503": { "description": "Unavailable", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } } }
       }
+    },
+    "/internal/v2/learning/tasks/recent": {
+      "get": {
+        "operationId": "getRecentCourseLearningTasks", "x-onlinejudge-timeout-ms": 800,
+        "description": "Course's LRN role returns bounded recent task summaries for one active course member. An outage is not an empty task list.",
+        "security": [{ "serviceJwt": [] }, { "mTLS": [] }],
+        "parameters": [
+          { "name": "X-Request-Id", "in": "header", "required": true, "schema": { "type": "string", "format": "uuid" } },
+          { "name": "courseId", "in": "query", "required": true, "schema": { "type": "integer", "minimum": 1 } },
+          { "name": "userId", "in": "query", "required": true, "schema": { "type": "integer", "minimum": 1 } },
+          { "name": "limit", "in": "query", "required": false, "schema": { "type": "integer", "minimum": 1, "maximum": 5, "default": 5 } }
+        ],
+        "responses": {
+          "200": { "description": "Recent task page", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RecentTaskPage" } } } },
+          "401": { "description": "Missing, invalid, expired, or wrong-audience service JWT", "x-onlinejudge-error-codes": ["SERVICE_IDENTITY_INVALID"], "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "403": { "description": "Authenticated service principal lacks the learning.tasks.read scope", "x-onlinejudge-error-codes": ["SERVICE_IDENTITY_FORBIDDEN"], "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "503": { "description": "Course cannot answer; caller rejects the user operation without a local task fallback", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      }
+    },
+    "/internal/v2/notifications/reconciliation-requests": {
+      "post": {
+        "operationId": "requestCourseNotificationReconciliation", "x-onlinejudge-timeout-ms": 1000,
+        "description": "A Course-owned durable reconciliation request for an LRN DLQ or projection gap. Source business facts are never rolled back because this endpoint is unavailable.",
+        "security": [{ "serviceJwt": [] }, { "mTLS": [] }],
+        "parameters": [
+          { "name": "X-Request-Id", "in": "header", "required": true, "schema": { "type": "string" } },
+          { "name": "Idempotency-Key", "in": "header", "required": true, "schema": { "type": "string", "minLength": 16, "maxLength": 128 } }
+        ],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ReconciliationRequest" } } } },
+        "responses": {
+          "202": { "description": "A durable reconciliation request was accepted", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ReconciliationAccepted" } } } },
+          "401": { "description": "Missing, invalid, expired, or wrong-audience service JWT", "x-onlinejudge-error-codes": ["SERVICE_IDENTITY_INVALID"], "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "403": { "description": "Authenticated service principal lacks notification-reconciliation scope", "x-onlinejudge-error-codes": ["SERVICE_IDENTITY_FORBIDDEN"], "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "409": { "description": "Idempotency key conflict", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "503": { "description": "Course cannot accept reconciliation now; caller records an operational alert", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      }
     }
   },
   "components": {
@@ -44,7 +82,11 @@
       "Error": { "type": "object", "required": ["code", "message", "requestId", "retryable"], "properties": { "code": { "type": "string" }, "message": { "type": "string" }, "requestId": { "type": "string" }, "retryable": { "type": "boolean" } } },
       "Page": { "type": "object", "required": ["items", "page", "size", "total"], "properties": { "items": { "type": "array", "items": { "$ref": "#/components/schemas/Member" } }, "page": { "type": "integer" }, "size": { "type": "integer" }, "total": { "type": "integer" } } },
       "Member": { "type": "object", "required": ["userId", "role", "memberVersion"], "properties": { "userId": { "type": "string" }, "role": { "type": "string" }, "memberVersion": { "type": "integer", "minimum": 1 } } },
-      "AuthorizationDecision": { "type": "object", "required": ["allowed", "courseId", "userId", "action", "memberVersion"], "properties": { "allowed": { "type": "boolean" }, "courseId": { "type": "string" }, "userId": { "type": "string" }, "action": { "type": "string" }, "memberVersion": { "type": "integer", "minimum": 1 } } }
+      "AuthorizationDecision": { "type": "object", "required": ["allowed", "courseId", "userId", "action", "memberVersion"], "properties": { "allowed": { "type": "boolean" }, "courseId": { "type": "string" }, "userId": { "type": "string" }, "action": { "type": "string" }, "memberVersion": { "type": "integer", "minimum": 1 } } },
+      "ReconciliationRequest": { "type": "object", "required": ["sourceService", "eventId", "reason"], "properties": { "sourceService": { "enum": ["course", "assessment", "grade"] }, "eventId": { "type": "string", "format": "uuid" }, "reason": { "enum": ["DLQ", "PROJECTION_GAP", "OPERATOR_REPLAY"] } } },
+      "ReconciliationAccepted": { "type": "object", "required": ["requestId", "status"], "properties": { "requestId": { "type": "string", "format": "uuid" }, "status": { "const": "ACCEPTED" } } },
+      "RecentTask": { "type": "object", "required": ["taskId", "taskType", "title", "courseId", "courseName", "progress", "status"], "properties": { "taskId": { "type": "integer" }, "taskType": { "enum": ["RESOURCE", "EXPERIMENT", "HOMEWORK"] }, "title": { "type": "string" }, "courseId": { "type": "integer", "minimum": 1 }, "courseName": { "type": "string" }, "deadline": { "type": ["string", "null"] }, "progress": { "type": "integer", "minimum": 0, "maximum": 100 }, "status": { "enum": ["NOT_STARTED", "IN_PROGRESS", "COMPLETED", "OVERDUE"] }, "actionUrl": { "type": ["string", "null"] } } },
+      "RecentTaskPage": { "type": "object", "required": ["items", "page", "size", "total"], "properties": { "items": { "type": "array", "items": { "$ref": "#/components/schemas/RecentTask" } }, "page": { "type": "integer" }, "size": { "type": "integer" }, "total": { "type": "integer" } } }
     }
   }
 }

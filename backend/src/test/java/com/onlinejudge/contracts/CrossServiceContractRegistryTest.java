@@ -14,7 +14,7 @@ import java.util.Set;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * 五服务迁移期结构约束：保证消费方只能通过 contract 包访问其他服务数据。
+ * 三业务服务迁移期结构约束：保证消费方只能通过 contract 包访问其他服务数据。
  * 任何把 integration.course / integration.grade 消费端与生产者内部实现（mapper/repository/domain）
  * 重新耦合的改动都必须先在这里显式失败。
  */
@@ -26,12 +26,12 @@ class CrossServiceContractRegistryTest {
     @Test
     void contractDocumentIsTheSingleSourceOfTruth() {
         assertThat(CONTRACT_DOC)
-                .as("五服务 v2 契约正本必须存在")
+                .as("三业务服务 v2 契约正本必须存在")
                 .isRegularFile();
     }
 
     private static Path contractDocumentPath() {
-        String relative = "docs/开发/D6-D7-五服务共享契约-v2.md";
+        String relative = "docs/开发/D6-三服务共享契约-306.md";
         Path direct = Path.of(relative);
         if (Files.isRegularFile(direct)) {
             return direct;

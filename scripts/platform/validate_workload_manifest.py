@@ -31,23 +31,24 @@ CORE_WORKLOADS = {
     "assessment-api",
     "assessment-worker",
     "grade-service",
-    "learning-service",
     "frontend",
     "rabbitmq",
     "mysql",
 }
-ORDERED_SCHEMAS = ["identity", "course", "assessment", "grade", "learning"]
+ORDERED_SCHEMAS = ["identity", "course", "assessment", "grade"]
 BACKEND_APPLICATION_WORKLOADS = (
     "identity-service",
     "course-service",
     "assessment-api",
     "assessment-worker",
     "grade-service",
-    "learning-service",
 )
 CURRENT_MONOLITH_MODULE_PATHS = {
     "identity-service": ("backend/src/main/java/com/onlinejudge/auth/**",),
-    "course-service": ("backend/src/main/java/com/onlinejudge/crs/**",),
+    "course-service": (
+        "backend/src/main/java/com/onlinejudge/crs/**",
+        "backend/src/main/java/com/onlinejudge/lrn/**",
+    ),
     "assessment-api": (
         "backend/src/main/java/com/onlinejudge/lab/**",
         "backend/src/main/java/com/onlinejudge/hwk/**",
@@ -57,7 +58,6 @@ CURRENT_MONOLITH_MODULE_PATHS = {
         "backend/src/main/java/com/onlinejudge/hwk/**",
     ),
     "grade-service": ("backend/src/main/java/com/onlinejudge/grd/**",),
-    "learning-service": ("backend/src/main/java/com/onlinejudge/lrn/**",),
 }
 SHARED_BACKEND_INPUTS = (
     "backend/src/main/java/com/onlinejudge/common/**",
@@ -67,12 +67,12 @@ SHARED_BACKEND_INPUTS = (
 )
 MICROSERVICE_V2_SHARED_SERVICE_CONTRACT_INPUTS = (
     "contracts/v2/**",
-    "docs/adr/ADR-006-五业务服务与可靠消息契约.md",
-    "docs/开发/D6-D7-五服务共享契约-v2.md",
-    "docs/开发/D6-D7-五服务架构冻结-305.md",
-    "docs/diagrams/arch/issue305-*.mmd",
+    "docs/adr/ADR-006-三业务服务与可靠消息契约.md",
+    "docs/开发/D6-三服务共享契约-306.md",
+    "docs/开发/D6-三服务架构冻结-306.md",
+    "docs/diagrams/arch/issue306-*.mmd",
     "scripts/ci/contract-verify.sh",
-    "scripts/ci/verify-final-architecture-305.mjs",
+    "scripts/ci/verify-three-service-baseline-306.mjs",
     "scripts/ci/verify-microservice-contract-v2.mjs",
     "scripts/ci/verify-workflow-gates.test.sh",
 )
@@ -226,8 +226,8 @@ def validate_manifest_shape(manifest: dict[str, Any]) -> list[dict[str, Any]]:
     if manifest["kind"] != "WorkloadManifest":
         raise ManifestValidationError("manifest.kind must be WorkloadManifest")
     required_fields(manifest["metadata"], ("name", "version", "ownerIssue"), "metadata")
-    if manifest["metadata"] != {"name": "onlinejudge-platform", "version": "v2", "ownerIssue": "#336"}:
-        raise ManifestValidationError("metadata must identify the #336 onlinejudge-platform v2 contract")
+    if manifest["metadata"] != {"name": "onlinejudge-platform", "version": "v2", "ownerIssue": "#306"}:
+        raise ManifestValidationError("metadata must identify the #306 onlinejudge-platform v2 contract")
     if not isinstance(manifest["sharedTriggerPaths"], list) or not manifest["sharedTriggerPaths"]:
         raise ManifestValidationError("manifest.sharedTriggerPaths must be a non-empty array")
     if (
@@ -383,7 +383,7 @@ def validate_microservice_v2_contract_mappings(
 ) -> None:
     """Bind each v2 cross-service contract input to its actual backend participants.
 
-    These files describe five business services plus the Assessment API/Worker
+    These files describe three business services plus Identity support and the Assessment API/Worker
     deployment pair.  The current gateway routes opaque public traffic and the
     SPA does not consume generated v2 clients, so neither is rebuilt merely for
     a v2 contract-document or verifier change.

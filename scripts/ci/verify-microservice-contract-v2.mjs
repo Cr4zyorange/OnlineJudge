@@ -19,8 +19,7 @@ const serviceContracts = {
     '/internal/v2/courses/{courseId}/members'
   ],
   assessment: ['/internal/v2/source-grades'],
-  grade: ['/internal/v2/courses/{courseId}/grade-publications'],
-  learning: ['/internal/v2/learning/tasks/recent', '/internal/v2/notifications/reconciliation-requests']
+  grade: ['/internal/v2/courses/{courseId}/grade-publications']
 };
 
 const expectedEventTypes = [
@@ -634,8 +633,8 @@ function serviceTokenDocumentationProblems(relativePath, text) {
 }
 
 function validateDocumentation() {
-  const currentContract = 'docs/开发/D6-D7-五服务共享契约-v2.md';
-  const adr = 'docs/adr/ADR-006-五业务服务与可靠消息契约.md';
+  const currentContract = 'docs/开发/D6-三服务共享契约-306.md';
+  const adr = 'docs/adr/ADR-006-三业务服务与可靠消息契约.md';
   const finalOverview = 'docs/最终提交/软件概要设计说明书.md';
   const finalDetail = 'docs/最终提交/软件详细设计说明书.md';
   for (const relativePath of [currentContract, adr, finalOverview, finalDetail]) {
@@ -651,7 +650,7 @@ function validateDocumentation() {
   }
   if (existsSync(resolve(repoRoot, currentContract))) {
     const text = readFileSync(resolve(repoRoot, currentContract), 'utf8');
-    for (const expectedText of ['Identity', 'Course', 'Assessment', 'Grade', 'Learning', 'at-least-once', 'DLQ', 'X-Internal-Token']) {
+    for (const expectedText of ['Identity', 'Course', 'Assessment', 'Grade', 'at-least-once', 'DLQ', 'X-Internal-Token']) {
       assert(text.includes(expectedText), `${currentContract}: missing required policy text ${expectedText}`);
     }
     for (const failure of serviceTokenDocumentationProblems(currentContract, text)) problem(failure);
@@ -698,8 +697,8 @@ function validateHomeworkPublicationMigrationDocs() {
     'docs/最终提交/测试文档.md',
     'docs/开发/HWK-作业与自动评测模块开发流程.md',
     'docs/开发/LRN-学习过程与通知提醒模块开发流程.md',
-    'docs/adr/ADR-006-五业务服务与可靠消息契约.md',
-    'docs/开发/D6-D7-五服务共享契约-v2.md',
+    'docs/adr/ADR-006-三业务服务与可靠消息契约.md',
+    'docs/开发/D6-三服务共享契约-306.md',
     'docs/diagrams/srs/fig_4_14b_hwk_publish_ssd.mmd',
     'docs/diagrams/arch/fig_5_2_hwk_02_publish_component.mmd',
     'docs/diagrams/dsd/fig_3_5_3a_hwk_publish_object.mmd'

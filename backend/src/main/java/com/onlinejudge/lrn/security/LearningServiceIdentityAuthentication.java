@@ -11,8 +11,8 @@ import java.util.Arrays;
 import java.util.Set;
 
 /**
- * Internal Learning endpoints accept an audience-bound service JWT
- * (aud=learning, scope learning.tasks.read) or an explicitly configured mTLS
+ * Course-owned LRN endpoints accept an audience-bound service JWT
+ * (aud=course, scope learning.tasks.read) or an explicitly configured mTLS
  * workload identity.  Missing/invalid service identity is 401
  * SERVICE_IDENTITY_INVALID; an authenticated principal without the scope is
  * 403 SERVICE_IDENTITY_FORBIDDEN, per the v2 OpenAPI contract.

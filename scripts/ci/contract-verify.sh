@@ -5,6 +5,7 @@ set -euo pipefail
 repo_root="$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"
 checkout="${1:-$repo_root}"
 side="${2:-all}"
+checkout="$(CDPATH= cd -- "$checkout" && pwd)"
 artifact_dir="$checkout/ci-artifacts/contracts-gate"
 [[ "$side" == "consumer" || "$side" == "producer" ]] && artifact_dir="$artifact_dir/$side"
 log="$artifact_dir/gate.log"
@@ -55,38 +56,16 @@ java_major="$(java -version 2>&1 | sed -n '1s/.*version "\([0-9][0-9]*\).*/\1/p'
   fail "expected Java $expected_java_major, got $java_major (override with OJ_CI_JAVA_MAJOR)"
 }
 
-# #338 五服务 v2 契约完全由版本化 OpenAPI/AsyncAPI 制品表达；校验器只依赖 Node 标准库，
+# #306 三业务服务 v2 契约完全由版本化 OpenAPI/AsyncAPI 制品表达；校验器只依赖 Node 标准库，
 # 因而可以在生产者和消费者 Java 套件之外先阻断不兼容的文档、事件信封或反例回归。
 log_run node "$checkout/scripts/ci/verify-microservice-contract-v2.mjs"
 
-# #305 is the integration freeze over the merged ownership, v2 and workload
-# inputs.  Keep its lightweight, dependency-free semantic verifier in both
-# producer and consumer gates so stale merge evidence, a four-service rewrite,
-# or removal of Assessment Worker fencing cannot pass as documentation-only
-# drift.
-log_run node "$checkout/scripts/ci/verify-final-architecture-305.mjs"
-log_run node --test "$checkout/scripts/test/verify-final-architecture-305.test.mjs"
-
-# #309 freezes the five-domain ownership input for #341.  Run both the
-# source-schema catalog verifier and its mutation tests in the canonical gate,
-# so no future schema/account change can silently restore a fourth combined
-# domain or grant a runtime account access to another owner.
-log_run node "$checkout/scripts/ci/verify-data-ownership-contract.mjs"
-log_run node --test "$checkout/scripts/test/verify-data-ownership-contract.test.mjs"
-
-# #341 turns #309's static owner catalog into executable five-schema data
-# migration.  Keep its pure Node contract test on both sides; run the real
-# disposable MySQL 8.4 lifecycle once on the consumer gate so its Docker work
-# is not duplicated by producer-side Java contracts.
-log_run node --test "$checkout/scripts/test/verify-five-domain-data-migration.test.mjs"
+# #306 is the single three-business-service baseline. Its semantic verifier
+# rejects a standalone Learning deployment and requires four schema accounts.
+log_run node "$checkout/scripts/ci/verify-three-service-baseline-306.mjs"
+log_run node --test "$checkout/scripts/test/verify-three-service-baseline-306.test.mjs"
 if [[ "$side" == "consumer" || "$side" == "all" ]]; then
-  log_run bash "$checkout/database/tests/verify-five-domain-migration.sh"
-  # The generic runner is the executable migration path consumed by the D7
-  # Jobs.  Keep it adjacent to #341's 45/45 runtime-account gate: both run on
-  # disposable MySQL 8.4, and a service migration cannot pass by falling back
-  # to application boot DDL.
-  log_run bash "$checkout/database/tests/verify-assessment-migration-runner.sh"
-  log_run bash "$checkout/database/tests/verify-course-migration-runner.sh"
+  log_run bash "$checkout/database/tests/verify-four-domain-baseline.sh"
 fi
 
 # 仓库脚本契约：所有跟踪的 *.sh 必须 LF + bash 语法合法。

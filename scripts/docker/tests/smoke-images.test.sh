@@ -272,7 +272,7 @@ run_expected_failure http-verify 'simulated HTTP verification failure' CONTAINER
 : > "$verify_log"
 env "${common_env[@]}" bash "$source_script" >"$fixture_root/success.out" 2>"$fixture_root/success.err" || {
   cat "$fixture_root/success.err" >&2
-  fail "valid five-service smoke failed"
+  fail "valid service-topology smoke failed"
 }
 
 project_suffix="${head_sha:0:12}-contract"
