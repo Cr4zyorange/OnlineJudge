@@ -61,7 +61,7 @@ first_output="$(run_runner 2>&1)" || {
   fail 'first controlled migration run failed'
 }
 printf '%s\n' "$first_output" >>"$raw_log"
-grep -Fq 'PASS schema=course applied=4' <<<"$first_output" || fail 'first run did not apply 01/02/03/04'
+grep -Fq 'PASS schema=course applied=6' <<<"$first_output" || fail 'first run did not apply 01/02/03/04/05/06'
 
 repeat_output="$(run_runner 2>&1)" || {
   printf '%s\n' "$repeat_output" >>"$raw_log"
@@ -71,7 +71,7 @@ printf '%s\n' "$repeat_output" >>"$raw_log"
 grep -Fq 'PASS schema=course applied=0' <<<"$repeat_output" || fail 'repeat run was not idempotent'
 
 history_count="$(admin_mysql -N -Doj_course -e "SELECT COUNT(*) FROM schema_migrations WHERE version LIKE 'V20260831_%';")"
-[[ "$history_count" == 4 ]] || fail "expected four migration checkpoints, found $history_count"
+[[ "$history_count" == 6 ]] || fail "expected six migration checkpoints, found $history_count"
 admin_mysql -e "CREATE USER 'oj_course_rw'@'%' IDENTIFIED BY '$runtime_password'; GRANT SELECT, INSERT, UPDATE, DELETE ON oj_course.* TO 'oj_course_rw'@'%'; FLUSH PRIVILEGES;" >>"$raw_log" 2>&1
 MYSQL_PWD="$runtime_password" mysql --protocol=TCP --host=127.0.0.1 --port="$mysql_port" --user=oj_course_rw oj_course -e 'SELECT COUNT(*) FROM crs_course;' >>"$raw_log" 2>&1
 if MYSQL_PWD="$runtime_password" mysql --protocol=TCP --host=127.0.0.1 --port="$mysql_port" --user=oj_course_rw oj_course -e 'CREATE TABLE forbidden_runtime_ddl (id INT);' >>"$raw_log" 2>&1; then

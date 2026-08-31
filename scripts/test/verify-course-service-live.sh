@@ -58,6 +58,8 @@ apply_course_migrations() {
   mysql_file "$repo_root/database/migrations/course/V20260831_02__course_security_version_inbox.sql"
   mysql_file "$repo_root/database/migrations/course/V20260831_03__course_runtime_version_columns.sql"
   mysql_file "$repo_root/database/migrations/course/V20260831_04__course_outbox_fencing.sql"
+  mysql_file "$repo_root/database/migrations/course/V20260831_05__course_file_delete_journal.sql"
+  mysql_file "$repo_root/database/migrations/course/V20260831_06__course_chapter_active_order_uniqueness.sql"
 }
 
 verify_upgrade_red_green_and_repeat() {
@@ -97,8 +99,8 @@ verify_upgrade_red_green_and_repeat() {
 
   # The cutover rollback is routing traffic back to the legacy reader.  V3 is
   # additive, so it preserves all DB-CRS columns and facts; no down-DDL may
-  # discard newly written Course data.  Reapplying all three files proves a
-  # resumed cutover is safe and does not rewrite the preserved source fact.
+  # discard newly written Course data.  Reapplying the full migration set
+  # proves a resumed cutover is safe and does not rewrite the preserved fact.
   docker exec "$mysql_name" mysql -N -uroot -p"$mysql_password" "$database_name" -e "
     SELECT CONCAT('rollback-legacy-read=', course_name, ':', join_status, ':', chapter_name, ':', resource_name)
       FROM crs_course c JOIN crs_course_member m ON m.course_id = c.id
