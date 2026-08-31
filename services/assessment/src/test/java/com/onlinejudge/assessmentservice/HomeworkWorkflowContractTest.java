@@ -26,6 +26,7 @@ import java.math.BigDecimal;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -278,8 +279,20 @@ class HomeworkWorkflowContractTest {
                 .andExpect(jsonPath("$.taskId").value(taskId))
                 .andExpect(jsonPath("$.taskState").value("PENDING"));
 
+        mockMvc.perform(get("/api/v1/submissions/{submissionId}/evaluation", submissionId)
+                        .header("Authorization", "Bearer " + teacherToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.taskState").value("PENDING"))
+                .andExpect(jsonPath("$.evaluationStatus").value("PENDING"))
+                .andExpect(jsonPath("$.score").value(org.hamcrest.Matchers.nullValue()))
+                .andExpect(jsonPath("$.finalScore").value(org.hamcrest.Matchers.nullValue()));
+
         assertThat(jdbc.queryForObject("SELECT manual_replay_count FROM evaluation_task WHERE id = ?", Integer.class, taskId))
                 .isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT evaluation_status FROM assessment_submission WHERE id = ?", String.class,
+                submissionId)).isEqualTo("PENDING");
+        assertThat(jdbc.queryForObject("SELECT evaluation_status FROM assessment_homework_submission WHERE submission_id = ?",
+                String.class, submissionId)).isEqualTo("PENDING");
     }
 
     @Test
