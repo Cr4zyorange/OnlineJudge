@@ -2,11 +2,14 @@ package com.onlinejudge.assessmentservice;
 
 import com.onlinejudge.assessmentservice.security.TestJwtFactory;
 import com.onlinejudge.assessmentservice.worker.AssessmentWorker;
+import com.onlinejudge.assessmentservice.worker.SandboxEvaluator;
+import com.onlinejudge.assessmentservice.service.CoursePermissionClient;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -22,6 +25,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.mockito.Mockito.when;
 
 /**
  * Issue #314 starts with the durable LAB aggregate rather than treating a generic
@@ -36,22 +40,28 @@ class LabWorkflowContractTest {
     @Autowired MockMvc mockMvc;
     @Autowired JdbcTemplate jdbc;
     @Autowired AssessmentWorker worker;
+    @Autowired SandboxEvaluator sandbox;
+    @MockBean CoursePermissionClient coursePermissions;
 
     @DynamicPropertySource
     static void identity(DynamicPropertyRegistry registry) {
         registry.add("assessment.identity.jwks-trust-bundle", () -> TestJwtFactory.jwks("lab-workflow-kid", KEY));
         registry.add("assessment.identity.refresh-enabled", () -> false);
+        registry.add("assessment.sandbox.command", () -> "/opt/homebrew/bin/python3");
     }
 
     @BeforeEach
     void activeTeacherMembership() {
         jdbc.update("DELETE FROM assessment_event_outbox");
         jdbc.update("DELETE FROM assessment_source_grade");
+        jdbc.update("DELETE FROM assessment_lab_evaluation_result");
+        jdbc.update("DELETE FROM assessment_lab_testcase");
         jdbc.update("DELETE FROM assessment_lab_submission");
         jdbc.update("DELETE FROM assessment_lab_experiment");
         jdbc.update("DELETE FROM evaluation_task");
         jdbc.update("DELETE FROM assessment_submission");
         jdbc.update("DELETE FROM assessment_course_member_projection");
+        when(coursePermissions.canManageCourse("course-314", "teacher-314")).thenReturn(true);
         jdbc.update("INSERT INTO assessment_course_member_projection (course_id, user_id, membership_status, member_version) VALUES ('course-314', 'teacher-314', 'ACTIVE', 1)");
     }
 
@@ -81,6 +91,9 @@ class LabWorkflowContractTest {
 
         org.assertj.core.api.Assertions.assertThat(jdbc.queryForObject(
                 "SELECT status FROM assessment_lab_experiment WHERE id = ?", String.class, labId)).isEqualTo("PUBLISHED");
+        org.assertj.core.api.Assertions.assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM assessment_event_outbox WHERE event_type = 'assessment.lab.published.v2' AND aggregate_id = ?",
+                Integer.class, Long.toString(labId))).isEqualTo(1);
 
         jdbc.update("INSERT INTO assessment_course_member_projection (course_id, user_id, membership_status, member_version) VALUES ('course-314', 'student-reader-314', 'ACTIVE', 1)");
         String studentToken = TestJwtFactory.userToken(KEY, "lab-workflow-kid", "student-reader-314", List.of("STUDENT"));
@@ -157,5 +170,56 @@ class LabWorkflowContractTest {
 
         org.assertj.core.api.Assertions.assertThat(jdbc.queryForObject("SELECT source_version FROM assessment_source_grade WHERE source_type = 'LAB' AND source_id = ? AND student_id = 'student-314'", Long.class, Long.toString(labId))).isEqualTo(1L);
         org.assertj.core.api.Assertions.assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM assessment_event_outbox WHERE event_type = 'assessment.source-grade.changed.v2' AND aggregate_id = ?", Integer.class, "LAB:" + labId + ":student-314")).isEqualTo(1);
+    }
+
+    @Test
+    void workerExecutesPersistedLabCodeAgainstTestcasesAndStoresCaseResults() throws Exception {
+        String teacherToken = TestJwtFactory.userToken(KEY, "lab-workflow-kid", "teacher-314", List.of("TEACHER"));
+        String studentToken = TestJwtFactory.userToken(KEY, "lab-workflow-kid", "student-sandbox-314", List.of("STUDENT"));
+        jdbc.update("INSERT INTO assessment_course_member_projection (course_id, user_id, membership_status, member_version) VALUES ('course-314', 'student-sandbox-314', 'ACTIVE', 1)");
+        mockMvc.perform(post("/api/v1/courses/{courseId}/labs", "course-314")
+                        .header("Authorization", "Bearer " + teacherToken).header("X-Request-Id", "lab-sandbox-create-314")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"title":"sandbox-lab-314","description":"real persisted code","deadline":"2030-01-01T12:00:00Z",
+                                 "maxScore":100,"allowedLanguages":["python"],"autoEvaluate":true,
+                                 "testcases":[{"input":"lab\\n","expectedOutput":"LAB\\n","scoreWeight":100,"public":true,"orderNum":1}]}
+                                """))
+                .andExpect(status().isCreated());
+        Long labId = jdbc.queryForObject("SELECT id FROM assessment_lab_experiment WHERE title = 'sandbox-lab-314'", Long.class);
+        org.assertj.core.api.Assertions.assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM assessment_lab_testcase WHERE lab_id = ?", Integer.class, labId)).isEqualTo(1);
+        mockMvc.perform(post("/api/v1/labs/{labId}/publish", labId)
+                        .header("Authorization", "Bearer " + teacherToken).header("X-Request-Id", "lab-sandbox-publish-314"))
+                .andExpect(status().isOk());
+        mockMvc.perform(multipart("/api/v1/labs/{labId}/submissions", labId)
+                        .file("file", "import sys\nprint(sys.stdin.read().strip().upper())\n".getBytes())
+                        .param("language", "python")
+                        .header("Authorization", "Bearer " + studentToken).header("X-Request-Id", "lab-sandbox-submit-314"))
+                .andExpect(status().isCreated());
+        String submissionId = jdbc.queryForObject("SELECT submission_id FROM assessment_lab_submission WHERE lab_id = ?", String.class, labId);
+        worker.runOne("lab-sandbox-worker", sandbox::evaluate);
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/labs/{labId}/submissions/{submissionId}/result", labId, submissionId)
+                        .header("Authorization", "Bearer " + studentToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.evaluationStatus").value("ACCEPTED"))
+                .andExpect(jsonPath("$.score").value(100))
+                .andExpect(jsonPath("$.passedCases").value(1))
+                .andExpect(jsonPath("$.caseResults[0].passed").value(true));
+        org.assertj.core.api.Assertions.assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM assessment_lab_evaluation_result WHERE submission_id = ?", Integer.class, submissionId)).isEqualTo(1);
+    }
+
+    @Test
+    void globalTeacherWhoCannotManageThisCourseCannotCreateLabs() throws Exception {
+        String token = TestJwtFactory.userToken(KEY, "lab-workflow-kid", "teacher-as-student-314", List.of("TEACHER"));
+        jdbc.update("INSERT INTO assessment_course_member_projection (course_id, user_id, membership_status, member_version) VALUES ('course-314', 'teacher-as-student-314', 'ACTIVE', 1)");
+        when(coursePermissions.canManageCourse("course-314", "teacher-as-student-314")).thenReturn(false);
+
+        mockMvc.perform(post("/api/v1/courses/{courseId}/labs", "course-314")
+                        .header("Authorization", "Bearer " + token).header("X-Request-Id", "teacher-not-manager-314")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"forbidden\",\"description\":\"must not create\",\"deadline\":\"2030-01-01T12:00:00Z\",\"maxScore\":100,\"allowedLanguages\":[\"python\"],\"autoEvaluate\":true}"))
+                .andExpect(status().isForbidden());
+        org.assertj.core.api.Assertions.assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM assessment_lab_experiment WHERE title = 'forbidden'", Integer.class)).isZero();
     }
 }

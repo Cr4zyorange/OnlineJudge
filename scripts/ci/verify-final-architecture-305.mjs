@@ -151,7 +151,7 @@ export function verifyFinalArchitecture305({ rootPath = defaultRoot } = {}) {
   let asyncEventCount = 0;
   try {
     asyncEventCount = Object.keys(JSON.parse(asyncApiText).components.messages).length;
-    if (asyncEventCount !== 9) problems.push(`v2 AsyncAPI must contain 9 messages, found ${asyncEventCount}`);
+    if (asyncEventCount !== 10) problems.push(`v2 AsyncAPI must contain 10 messages, found ${asyncEventCount}`);
   } catch (error) {
     problems.push(`cannot read v2 AsyncAPI messages: ${error.message}`);
   }

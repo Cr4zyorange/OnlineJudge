@@ -30,6 +30,10 @@ assessment:
     heartbeat-interval: ${ASSESSMENT_WORKER_HEARTBEAT_INTERVAL:PT5S}
     max-attempts: ${ASSESSMENT_WORKER_MAX_ATTEMPTS:3}
     retry-backoff: ${ASSESSMENT_WORKER_RETRY_BACKOFF:PT5S}
+  course:
+    authorization-uri: ${ASSESSMENT_COURSE_AUTHORIZATION_URI:}
+    service-authorization: ${ASSESSMENT_COURSE_SERVICE_AUTHORIZATION:}
+    timeout: ${ASSESSMENT_COURSE_AUTHORIZATION_TIMEOUT:PT0.8S}
   rabbit:
     enabled: ${ASSESSMENT_RABBIT_ENABLED:false}
     host: ${ASSESSMENT_RABBIT_HOST:${RABBITMQ_HOST:127.0.0.1}}

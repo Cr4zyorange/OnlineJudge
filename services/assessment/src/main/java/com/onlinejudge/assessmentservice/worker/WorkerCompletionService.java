@@ -43,6 +43,14 @@ class WorkerCompletionService {
             if ("LAB".equals(task.sourceType())) {
                 jdbc.update("UPDATE assessment_submission SET evaluation_status = ? WHERE id = ?", outcome.status(), task.submissionId());
                 jdbc.update("UPDATE assessment_lab_submission SET auto_score = ? WHERE submission_id = ?", outcome.successful() ? outcome.score() : null, task.submissionId());
+                jdbc.update("DELETE FROM assessment_lab_evaluation_result WHERE submission_id = ?", task.submissionId());
+                for (AssessmentWorker.LabCaseResult result : outcome.caseResults()) {
+                    jdbc.update("""
+                            INSERT INTO assessment_lab_evaluation_result (submission_id, testcase_id, passed, score, actual_output, message, executed_at)
+                            VALUES (?, ?, ?, ?, ?, ?, ?)
+                            """, task.submissionId(), result.testcaseId(), result.passed(), result.score(), result.actualOutput(),
+                            result.message(), java.sql.Timestamp.from(finished));
+                }
             }
             if ("HWK".equals(task.sourceType())) {
             homeworkProjection = !jdbc.query("""

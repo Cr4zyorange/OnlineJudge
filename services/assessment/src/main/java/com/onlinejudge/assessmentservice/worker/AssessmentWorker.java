@@ -79,8 +79,13 @@ public class AssessmentWorker {
     }
 
     public interface EvaluationExecutor { EvaluationOutcome evaluate(EvaluationTask task) throws Exception; }
-    public record EvaluationOutcome(boolean successful, String status, java.math.BigDecimal score, java.math.BigDecimal fullScore) {
+    public record EvaluationOutcome(boolean successful, String status, java.math.BigDecimal score, java.math.BigDecimal fullScore,
+                                    java.util.List<LabCaseResult> caseResults) {
+        public EvaluationOutcome(boolean successful, String status, java.math.BigDecimal score, java.math.BigDecimal fullScore) {
+            this(successful, status, score, fullScore, java.util.List.of());
+        }
         public static EvaluationOutcome successful(String status) { return new EvaluationOutcome(true, status, java.math.BigDecimal.ONE, java.math.BigDecimal.ONE); }
         public static EvaluationOutcome failed(String status) { return new EvaluationOutcome(false, status, java.math.BigDecimal.ZERO, java.math.BigDecimal.ONE); }
     }
+    public record LabCaseResult(long testcaseId, boolean passed, java.math.BigDecimal score, String actualOutput, String message) { }
 }

@@ -68,6 +68,7 @@ public class SandboxEvaluator {
         if (jdbc == null) return AssessmentWorker.EvaluationOutcome.failed("SANDBOX_UNAVAILABLE");
         String key = jdbc.queryForObject("SELECT content_ref FROM assessment_submission WHERE id = ?", String.class, task.submissionId());
         if ("HWK".equals(task.sourceType())) return evaluateHomework(task.sourceId(), key);
+        if ("LAB".equals(task.sourceType())) return evaluateLab(task, key);
         return evaluate(key);
     }
 
@@ -163,4 +164,28 @@ public class SandboxEvaluator {
     private record Execution(boolean successful, String status, String output) {
         private static Execution failed(String status) { return new Execution(false, status, ""); }
     }
+
+    private AssessmentWorker.EvaluationOutcome evaluateLab(EvaluationTask task, String storageKey) {
+        List<LabCase> cases = jdbc.query("""
+                SELECT id, input_text, expected_output, score_weight
+                  FROM assessment_lab_testcase WHERE lab_id = ? ORDER BY order_num, id
+                """, (rs, ignored) -> new LabCase(rs.getLong("id"), rs.getString("input_text"),
+                rs.getString("expected_output"), rs.getBigDecimal("score_weight")), Long.parseLong(task.sourceId()));
+        if (cases.isEmpty()) return AssessmentWorker.EvaluationOutcome.failed("SYSTEM_ERROR");
+        BigDecimal fullScore = cases.stream().map(LabCase::scoreWeight).reduce(BigDecimal.ZERO, BigDecimal::add);
+        if (fullScore.signum() <= 0) return AssessmentWorker.EvaluationOutcome.failed("SYSTEM_ERROR");
+        List<AssessmentWorker.LabCaseResult> results = new ArrayList<>();
+        BigDecimal awarded = BigDecimal.ZERO;
+        for (LabCase testcase : cases) {
+            Execution process = execute(storageKey, testcase.input());
+            if (!process.successful()) return new AssessmentWorker.EvaluationOutcome(false, process.status(), awarded, fullScore, results);
+            boolean passed = normalize(process.output()).equals(normalize(testcase.expectedOutput()));
+            BigDecimal score = passed ? testcase.scoreWeight() : BigDecimal.ZERO;
+            awarded = awarded.add(score);
+            results.add(new AssessmentWorker.LabCaseResult(testcase.id(), passed, score, process.output(),
+                    passed ? "accepted" : "output does not match expected result"));
+        }
+        return new AssessmentWorker.EvaluationOutcome(true, awarded.compareTo(fullScore) == 0 ? "ACCEPTED" : "WRONG_ANSWER", awarded, fullScore, results);
+    }
+    private record LabCase(long id, String input, String expectedOutput, BigDecimal scoreWeight) { }
 }

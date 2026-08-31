@@ -42,7 +42,7 @@ public class AssessmentSubmissionService {
 
     public record SubmissionCommand(String sourceType, String sourceId, String courseId, String studentId, String contentRef) {
         public SubmissionCommand {
-            if (!("LAB".equals(sourceType) || "HWK".equals(sourceType))) throw new IllegalArgumentException("sourceType must be LAB or HWK");
+            if (!"HWK".equals(sourceType)) throw new IllegalArgumentException("generic submissions only support HWK");
             if (sourceId == null || sourceId.isBlank() || courseId == null || courseId.isBlank() || studentId == null || studentId.isBlank()) {
                 throw new IllegalArgumentException("sourceId, courseId and studentId are required");
             }

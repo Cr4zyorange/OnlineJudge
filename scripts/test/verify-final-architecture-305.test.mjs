@@ -43,7 +43,7 @@ test('Issue #305 freezes the current five-service boundary against the merged co
     accountCount: 5,
     crossDomainReferenceCount: 59,
     openApiCount: 5,
-    asyncEventCount: 9,
+    asyncEventCount: 10,
     workloadCount: 10,
     migrationJobCount: 5,
     identityRuntimeTables: {

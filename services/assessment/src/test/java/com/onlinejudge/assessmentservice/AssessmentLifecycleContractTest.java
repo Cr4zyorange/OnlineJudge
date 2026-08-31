@@ -48,6 +48,8 @@ class AssessmentLifecycleContractTest {
         jdbc.update("DELETE FROM assessment_homework_evaluation");
         jdbc.update("DELETE FROM evaluation_task");
         jdbc.update("DELETE FROM assessment_homework_submission");
+        jdbc.update("DELETE FROM assessment_lab_evaluation_result");
+        jdbc.update("DELETE FROM assessment_lab_testcase");
         jdbc.update("DELETE FROM assessment_lab_submission");
         jdbc.update("DELETE FROM assessment_submission");
         jdbc.update("DELETE FROM assessment_lab_experiment");
@@ -68,7 +70,7 @@ class AssessmentLifecycleContractTest {
     @Test
     void resultReadAllowsTheSubmitterOrAnActiveCourseTeacherButRejectsOtherStudents() throws Exception {
         var submitted = submissions.submit(new AssessmentSubmissionService.SubmissionCommand(
-                "LAB", "lab-result", "course-7", "student-42", "stored://submission-result"));
+                "HWK", "homework-result", "course-7", "student-42", "stored://submission-result"));
         jdbc.update("INSERT INTO assessment_course_member_projection (course_id, user_id, membership_status, member_version) VALUES ('course-7', 'teacher-7', 'ACTIVE', 1)");
         jdbc.update("INSERT INTO assessment_course_member_projection (course_id, user_id, membership_status, member_version) VALUES ('course-7', 'student-99', 'ACTIVE', 1)");
 
@@ -81,7 +83,7 @@ class AssessmentLifecycleContractTest {
     @Test
     void expiredClaimCanBeTakenOverButStaleGenerationCannotWriteTerminalResult() {
         var submitted = submissions.submit(new AssessmentSubmissionService.SubmissionCommand(
-                "LAB", "lab-1", "course-7", "student-42", "stored://submission-2"));
+                "HWK", "homework-1", "course-7", "student-42", "stored://submission-2"));
         Instant started = Instant.parse("2026-08-31T00:00:00Z");
         EvaluationTask first = tasks.claimNext("worker-a", started, Duration.ofSeconds(10)).orElseThrow();
         EvaluationTask replacement = tasks.claimNext("worker-b", started.plusSeconds(11), Duration.ofSeconds(10)).orElseThrow();

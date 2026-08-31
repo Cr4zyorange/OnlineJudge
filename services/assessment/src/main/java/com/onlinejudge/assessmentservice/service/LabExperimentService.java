@@ -1,5 +1,6 @@
 package com.onlinejudge.assessmentservice.service;
 
+import com.onlinejudge.assessmentservice.persistence.AssessmentOutboxRepository;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
@@ -15,20 +16,23 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
 import java.util.NoSuchElementException;
+import java.util.Comparator;
 
 /** LAB's lifecycle aggregate; generic Assessment tasks are created only for an accepted LAB submission. */
 @Service
 public class LabExperimentService {
     private final JdbcTemplate jdbc;
+    private final AssessmentOutboxRepository outbox;
     private final Clock clock;
 
     @Autowired
-    public LabExperimentService(JdbcTemplate jdbc) {
-        this(jdbc, Clock.systemUTC());
+    public LabExperimentService(JdbcTemplate jdbc, AssessmentOutboxRepository outbox) {
+        this(jdbc, outbox, Clock.systemUTC());
     }
 
-    LabExperimentService(JdbcTemplate jdbc, Clock clock) {
+    LabExperimentService(JdbcTemplate jdbc, AssessmentOutboxRepository outbox, Clock clock) {
         this.jdbc = jdbc;
+        this.outbox = outbox;
         this.clock = clock;
     }
 
@@ -58,6 +62,12 @@ public class LabExperimentService {
         }, id);
         Number generated = id.getKey();
         if (generated == null) throw new IllegalStateException("LAB creation did not return an id");
+        for (LabTestcase testcase : command.testcases()) {
+            jdbc.update("""
+                    INSERT INTO assessment_lab_testcase (lab_id, input_text, expected_output, score_weight, is_public, order_num)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    """, generated.longValue(), testcase.input(), testcase.expectedOutput(), testcase.scoreWeight(), testcase.isPublic(), testcase.orderNum());
+        }
         return new LabSummary(generated.longValue(), command.courseId(), command.title().trim(), "DRAFT", command.deadline(), command.maxScore(), command.autoEvaluate(), now);
     }
 
@@ -92,6 +102,10 @@ public class LabExperimentService {
                 Timestamp.from(now), labId) != 1) {
             throw new IllegalStateException("LAB lifecycle changed concurrently");
         }
+        outbox.append("assessment.lab.published.v2", "assessment-lab", Long.toString(labId), 2,
+                java.util.UUID.randomUUID().toString(), java.util.Map.of(
+                        "courseId", current.courseId(), "labId", Long.toString(labId), "title", current.title(),
+                        "deadline", current.deadline().toString(), "receiverScope", "COURSE_ACTIVE_STUDENTS", "publishedAt", now.toString()), now);
         return new LabSummary(current.labId(), current.courseId(), current.title(), "PUBLISHED", current.deadline(),
                 current.maxScore(), current.autoEvaluate(), current.createdAt());
     }
@@ -103,10 +117,22 @@ public class LabExperimentService {
         if (command.deadline() == null || !command.deadline().isAfter(clock.instant())) throw new IllegalArgumentException("deadline must be in the future");
         if (command.maxScore() == null || command.maxScore().signum() <= 0) throw new IllegalArgumentException("maxScore must be positive");
         if (command.allowedLanguages() == null || command.allowedLanguages().isEmpty() || command.allowedLanguages().stream().anyMatch(value -> value == null || value.isBlank() || value.contains(","))) throw new IllegalArgumentException("at least one valid language is required");
+        if (command.testcases() == null) throw new IllegalArgumentException("testcases are required");
+        long orders = command.testcases().stream().map(LabTestcase::orderNum).distinct().count();
+        if (orders != command.testcases().size()) throw new IllegalArgumentException("testcase orderNum values must be unique");
+        command.testcases().forEach(LabTestcase::validate);
     }
 
     public record CreateLabCommand(String courseId, String title, String description, Instant deadline,
-                                   BigDecimal maxScore, List<String> allowedLanguages, boolean autoEvaluate) { }
+                                   BigDecimal maxScore, List<String> allowedLanguages, boolean autoEvaluate,
+                                   List<LabTestcase> testcases) { }
+    public record LabTestcase(String input, String expectedOutput, BigDecimal scoreWeight, boolean isPublic, int orderNum) {
+        void validate() {
+            if (input == null || expectedOutput == null || scoreWeight == null || scoreWeight.signum() < 0 || orderNum < 0) {
+                throw new IllegalArgumentException("LAB testcase is invalid");
+            }
+        }
+    }
     public record LabSummary(long labId, String courseId, String title, String status, Instant deadline,
                              BigDecimal maxScore, boolean autoEvaluate, Instant createdAt) {
         /** Existing web client uses id, while the API-LAB example also exposes labId. */

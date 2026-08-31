@@ -33,6 +33,9 @@ public class AssessmentSubmissionController {
     @org.springframework.web.bind.annotation.ResponseStatus(HttpStatus.CREATED)
     public AssessmentSubmissionService.SubmittedSubmission submit(@Valid @RequestBody SubmissionRequest request, @RequestAttribute("assessment.currentUser") CurrentUser user, HttpServletRequest http) {
         if (http.getHeader("X-Request-Id") == null || http.getHeader("X-Request-Id").isBlank()) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "X-Request-Id is required");
+        // LAB facts are owned by the LAB aggregate.  This generic Core endpoint
+        // cannot establish publication, deadline, language, or course ownership.
+        if ("LAB".equals(request.sourceType())) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "LAB submissions must use the LAB submission endpoint");
         if (!user.hasRole("STUDENT") || !courseMembers.isActive(request.courseId(), user.id())) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "active course student membership is required");
         if ("HWK".equalsIgnoreCase(request.sourceType())) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "HWK submissions must use the canonical homework endpoint");
         return submissions.submit(new AssessmentSubmissionService.SubmissionCommand(request.sourceType(), request.sourceId(), request.courseId(), user.id(), request.contentRef()));
