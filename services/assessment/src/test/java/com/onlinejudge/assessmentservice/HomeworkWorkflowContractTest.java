@@ -23,6 +23,7 @@ import java.util.UUID;
 import java.math.BigDecimal;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -51,8 +52,8 @@ class HomeworkWorkflowContractTest {
     void clean() {
         jdbc.update("DELETE FROM assessment_event_outbox");
         jdbc.update("DELETE FROM evaluation_task");
-        jdbc.update("DELETE FROM assessment_submission");
         jdbc.update("DELETE FROM assessment_homework_submission");
+        jdbc.update("DELETE FROM assessment_submission");
         jdbc.update("DELETE FROM assessment_homework_testcase");
         jdbc.update("DELETE FROM assessment_homework");
         jdbc.update("DELETE FROM assessment_course_member_projection");
@@ -245,6 +246,23 @@ class HomeworkWorkflowContractTest {
         assertThat(jdbc.queryForObject("SELECT manual_replay_count FROM evaluation_task WHERE id = ?", Integer.class, taskId)).isEqualTo(1);
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM assessment_source_grade WHERE source_id = ?", Integer.class,
                 Long.toString(homeworkId))).isZero();
+    }
+
+    @Test
+    void homeworkTablesRejectOrphanTestcasesAndBusinessSubmissions() {
+        assertThatThrownBy(() -> jdbc.update("""
+                INSERT INTO assessment_homework_testcase
+                    (homework_id, input_text, expected_output, score_weight, is_hidden, sort_order)
+                VALUES (315404, 'input', 'output', 100, TRUE, 1)
+                """)).isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
+
+        assertThatThrownBy(() -> jdbc.update("""
+                INSERT INTO assessment_homework_submission
+                    (submission_id, homework_id, student_id, submission_version, language, submit_status,
+                     evaluation_status, is_final, submitted_at)
+                VALUES ('orphan-submission-315', 315404, 'student-315', 1, 'python', 'SUBMITTED',
+                        'PENDING', TRUE, CURRENT_TIMESTAMP)
+                """)).isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
     }
 
     private long createAndPublishCodeHomework(String teacherId, String title, boolean allowResubmit,

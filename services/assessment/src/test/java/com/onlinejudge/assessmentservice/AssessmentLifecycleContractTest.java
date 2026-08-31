@@ -22,6 +22,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
@@ -44,6 +45,7 @@ class AssessmentLifecycleContractTest {
     void clean() {
         jdbc.update("DELETE FROM assessment_event_outbox");
         jdbc.update("DELETE FROM evaluation_task");
+        jdbc.update("DELETE FROM assessment_homework_submission");
         jdbc.update("DELETE FROM assessment_submission");
         jdbc.update("DELETE FROM assessment_course_member_projection");
     }
@@ -112,6 +114,22 @@ class AssessmentLifecycleContractTest {
                         .header("X-Request-Id", "req-homework-bypass")
                         .header("Authorization", "Bearer " + token))
                 .andExpect(status().isUnsupportedMediaType());
+
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM assessment_submission", Integer.class)).isZero();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM evaluation_task", Integer.class)).isZero();
+    }
+
+    @Test
+    void genericSubmissionEndpointCannotBypassCanonicalHomeworkRules() throws Exception {
+        jdbc.update("INSERT INTO assessment_course_member_projection (course_id, user_id, membership_status, member_version) VALUES ('course-7', 'student-42', 'ACTIVE', 1)");
+        String token = TestJwtFactory.userToken(KEY, "lifecycle-kid", "student-42", List.of("STUDENT"));
+
+        mockMvc.perform(post("/api/v1/submissions")
+                        .header("Authorization", "Bearer " + token)
+                        .header("X-Request-Id", "76182bb7-49d9-49b8-847e-ad7f66336d8d")
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"sourceType\":\"HWK\",\"sourceId\":\"999\",\"courseId\":\"course-7\",\"contentRef\":\"client-controlled\"}"))
+                .andExpect(status().isBadRequest());
 
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM assessment_submission", Integer.class)).isZero();
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM evaluation_task", Integer.class)).isZero();

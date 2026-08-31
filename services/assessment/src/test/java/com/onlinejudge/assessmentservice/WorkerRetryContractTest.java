@@ -28,6 +28,7 @@ class WorkerRetryContractTest {
         jdbc.update("DELETE FROM assessment_event_outbox");
         jdbc.update("DELETE FROM assessment_source_grade");
         jdbc.update("DELETE FROM evaluation_task");
+        jdbc.update("DELETE FROM assessment_homework_submission");
         jdbc.update("DELETE FROM assessment_submission");
     }
 

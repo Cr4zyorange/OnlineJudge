@@ -30,7 +30,15 @@ class HomeworkSandboxEvaluatorTest {
         long homeworkId = 315001L;
         String submissionId = "submission-sandbox-315";
         jdbc.update("DELETE FROM assessment_homework_testcase WHERE homework_id = ?", homeworkId);
+        jdbc.update("DELETE FROM assessment_homework WHERE id = ?", homeworkId);
         jdbc.update("DELETE FROM assessment_submission WHERE id = ?", submissionId);
+        jdbc.update("""
+                INSERT INTO assessment_homework
+                    (id, course_id, title, description, type, status, deadline, total_score, allow_resubmit,
+                     allow_late_submit, allowed_languages, created_by, aggregate_version, created_at, updated_at)
+                VALUES (?, 'course-315', 'sandbox', '', 'CODE', 'PUBLISHED', ?, 100, TRUE, FALSE,
+                        'python', 'teacher-315', 2, ?, ?)
+                """, homeworkId, Timestamp.from(Instant.now().plusSeconds(3600)), Timestamp.from(Instant.now()), Timestamp.from(Instant.now()));
         jdbc.update("""
                 INSERT INTO assessment_homework_testcase
                     (homework_id, input_text, expected_output, score_weight, is_hidden, sort_order)

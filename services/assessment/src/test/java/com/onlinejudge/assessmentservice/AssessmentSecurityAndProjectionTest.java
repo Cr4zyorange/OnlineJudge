@@ -41,11 +41,11 @@ class AssessmentSecurityAndProjectionTest {
     @Test
     void forgedHeadersAreRejectedWhileCachedJwtAndCourseProjectionAuthorizeSubmission() throws Exception {
         mockMvc.perform(post("/api/v1/submissions").header("X-User-Id", "student-42").header("X-User-Role", "STUDENT")
-                        .contentType(MediaType.APPLICATION_JSON).content("{\"sourceType\":\"HWK\",\"sourceId\":\"h-1\",\"courseId\":\"course-7\"}"))
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"sourceType\":\"LAB\",\"sourceId\":\"lab-1\",\"courseId\":\"course-7\"}"))
                 .andExpect(status().isUnauthorized());
         mockMvc.perform(post("/api/v1/submissions").header("Authorization", "Bearer " + TestJwtFactory.userToken(KEY, "assessment-test-kid", "student-42", List.of("STUDENT")))
                         .header("X-Request-Id", "8f647722-1c27-4dcb-b388-6004a0d8929d").contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"sourceType\":\"HWK\",\"sourceId\":\"h-1\",\"courseId\":\"course-7\"}"))
+                        .content("{\"sourceType\":\"LAB\",\"sourceId\":\"lab-1\",\"courseId\":\"course-7\"}"))
                 .andExpect(status().isCreated());
     }
 }
