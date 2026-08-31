@@ -21,10 +21,11 @@ MySQL、迁移任务或服务内部管理端点。
 
 评估过三个方案：
 
-1. **独立 Nginx + njs Gateway（采用）**：保留 PR #333 已验证的 Nginx 转发、
-   无重试、错误映射和可回滚框架；迁移到 `services/gateway/` workload，并用 njs
-   处理原生 Nginx 无法表达的任意 `X-User-*` 清理和请求 ID 校验。该方案改动集中，
-   与现有运维经验兼容，也满足 workload manifest 的独立镜像要求。
+1. **独立 Nginx + 请求 Header 白名单 Gateway（采用）**：保留 PR #333 已验证的
+   Nginx 转发、无重试、错误映射和可回滚框架；迁移到 `services/gateway/` workload，
+   关闭客户端请求 Header 的默认转发，再只重建公开契约允许的 Header。该方案能自然
+   清除任意未来 `X-User-*` 和 `Connection` 声明的逐跳 Header，无需依赖不可写的
+   Nginx/njs `headersIn` 对象。
 2. **Spring Cloud Gateway**：自定义过滤器可以满足全部安全规则，但会引入新的响应式
    Java 运行时、依赖树和构建边界，超出 #317 所需范围。
 3. **纯 Nginx 固定 Header 名单**：实现最小，但无法证明未知的 `X-User-*` 被剥离，
@@ -32,8 +33,8 @@ MySQL、迁移任务或服务内部管理端点。
 
 ## 3. 组件与配置边界
 
-新增的 `services/gateway/` 包含独立镜像、启动入口、Nginx 配置和 njs 请求过滤器。
-`deploy/gateway/` 保存五服务公开路由矩阵、环境模板和部署配置。旧
+新增的 `services/gateway/` 包含独立镜像、启动入口和 Nginx 主配置。
+`deploy/gateway/` 保存五服务公开路由矩阵、Header 白名单、环境模板和部署配置。旧
 `deploy/nginx/gateway.conf.template` 只作为迁移输入，最终不得继续成为生产正本。
 
 五个上游与 workload manifest 一致：
@@ -61,9 +62,11 @@ SPA deep link 由 frontend 自己处理。
 
 1. 校验 `X-Request-Id`。只接受 1–128 个 ASCII 字母、数字、点、下划线、冒号或连字符，
    且首字符必须是字母或数字；缺失或非法时生成新的不透明 ID。
-2. 删除所有大小写不敏感的 `X-User-*`，以及
-   `X-OnlineJudge-Service-Authorization`、`X-Internal-Token` 和其他已冻结的内部身份头。
-3. 删除或重建 hop-by-hop headers，禁止客户端利用 `Connection` 声明额外逐跳头。
+2. 关闭客户端请求 Header 默认透传，只重建 `Host`、转发链、`Authorization`、
+   `Content-*`、内容协商、Range 条件请求、`Idempotency-Key` 与最终 request ID。
+   因此所有大小写形式和未来新增的 `X-User-*`、服务身份 Header、内部 Token 以及
+   `Connection` 声明的扩展逐跳 Header 都不会进入上游。
+3. 显式清空标准 hop-by-hop headers，禁止客户端利用连接级语义影响上游。
 4. 原样透传客户端 `Authorization`，不解析、不 introspect、不把 JWT claims 转成 Header。
 5. 将最终 request ID 传给下游，并在响应 `X-Request-Id` 中返回同一值。
 6. 按公开路径选择唯一业务上游；每个业务服务继续本地校验 JWT、audience、签名、
@@ -108,7 +111,7 @@ secret 或完整请求。旧的“四服务 target”状态文件不兼容五服
 所有行为遵守 RED–GREEN–REFACTOR。第一阶段先编写并亲眼确认以下失败测试：
 
 - 旧渲染器缺少 Grade、仍允许单体默认值；
-- 未知 `X-User-*` 与服务身份 Header 能到达 upstream；
+- 未知 `X-User-*`、服务身份 Header 或不在白名单中的自定义 Header 能到达 upstream；
 - 合法 request ID 未被保留，非法 ID 未被替换；
 - `/internal/v2/**` 或未知 `/api/**` 被错误转发；
 - 五服务路径、课程子资源优先级或端口与 workload manifest 不一致；
