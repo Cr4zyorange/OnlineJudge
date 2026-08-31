@@ -40,6 +40,7 @@ import java.security.KeyStore;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -266,6 +267,32 @@ class CourseServiceContractTest {
                 .andExpect(jsonPath("$.items[0].userId").value("501"))
                 .andExpect(jsonPath("$.page").value(0))
                 .andExpect(jsonPath("$.total").value(1));
+    }
+
+    @Test
+    void nonUuidCorrelationIdIsAcceptedPerThePublishedCourseV2HeaderContract() throws Exception {
+        // course.openapi.json declares X-Request-Id as type string without a
+        // uuid format, so any nonblank correlation id must be accepted and
+        // propagated as the durable outbox correlation fact.
+        String correlationId = "course-members-request-42";
+        String courseResponse = mockMvc.perform(post("/api/v1/courses")
+                        .header("Authorization", userToken("551", List.of("TEACHER")))
+                        .header("X-Request-Id", correlationId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{" + "\"name\":\"non uuid correlation\"}"))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        String courseId = objectMapper.readTree(courseResponse).at("/data/id").asText();
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM course_event_outbox WHERE correlation_id = ?",
+                Integer.class, correlationId)).isGreaterThan(0);
+
+        mockMvc.perform(get("/internal/v2/courses/{courseId}/members?page=0&size=20", courseId)
+                        .header("X-Request-Id", correlationId)
+                        .header("X-OnlineJudge-Service-Authorization",
+                                serviceToken("assessment-api", "course", List.of("course.members.read"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].userId").value("551"));
     }
 
     @Test
@@ -1053,6 +1080,33 @@ class CourseServiceContractTest {
         assertThat(orphan).doesNotExist();
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT status FROM course_file_delete_journal WHERE resource_id = 424242", String.class))
+                .isEqualTo("COMPLETED");
+    }
+
+    @Test
+    void forcedStorageIoFailureKeepsJournalPendingAndTheSweepRetriesUntilTheObjectIsGone() throws Exception {
+        // A storage key that resolves to a non-empty directory forces
+        // Files.deleteIfExists to throw an IOException on the journaled delete.
+        Path blocked = STORAGE_ROOT.resolve("forced-io-failure-" + UUID.randomUUID() + ".txt");
+        Files.createDirectories(blocked);
+        Files.writeString(blocked.resolve("blocking-child"), "block");
+        jdbcTemplate.update("""
+                INSERT INTO course_file_delete_journal (course_id, resource_id, storage_key, status)
+                VALUES (1, 424243, ?, 'PENDING')
+                """, blocked.getFileName().toString());
+
+        assertThat(courseService.recoverPendingFileDeletions()).isEqualTo(1);
+        assertThat(jdbcTemplate.queryForMap(
+                "SELECT status, attempt_count FROM course_file_delete_journal WHERE resource_id = 424243"))
+                .containsEntry("status", "PENDING").containsEntry("attempt_count", 1);
+
+        // The physical failure is gone, so the same scheduled sweep completes
+        // the journaled delete instead of leaving the orphan forever.
+        Files.delete(blocked.resolve("blocking-child"));
+        Files.delete(blocked);
+        assertThat(courseService.recoverPendingFileDeletions()).isEqualTo(1);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT status FROM course_file_delete_journal WHERE resource_id = 424243", String.class))
                 .isEqualTo("COMPLETED");
     }
 

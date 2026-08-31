@@ -10,8 +10,6 @@ import org.springframework.web.servlet.HandlerInterceptor;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
-import java.util.UUID;
-
 @Component
 public class CourseWebConfig implements WebMvcConfigurer {
     private final CourseAuthentication authentication;
@@ -32,9 +30,9 @@ public class CourseWebConfig implements WebMvcConfigurer {
             if (requestId == null || requestId.isBlank()) {
                 throw new CourseException(HttpStatus.BAD_REQUEST, "REQUEST_ID_REQUIRED", "X-Request-Id is required", false);
             }
-            try { UUID.fromString(requestId); } catch (IllegalArgumentException invalid) {
-                throw new CourseException(HttpStatus.BAD_REQUEST, "REQUEST_ID_INVALID", "X-Request-Id must be a UUID", false);
-            }
+            // course.openapi.json declares X-Request-Id as a plain required
+            // string (no uuid format), so every nonblank value a caller sends
+            // is accepted and propagated as the correlation id.
             request.setAttribute("course.requestId", requestId);
             return true;
         }

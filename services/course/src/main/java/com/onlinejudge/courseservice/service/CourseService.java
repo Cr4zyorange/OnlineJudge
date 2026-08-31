@@ -60,12 +60,14 @@ public class CourseService {
     public CourseView update(long courseId, String name, String description, String enrollmentMode, String inviteCode,
                              Integer maxStudents, String status, CurrentUser actor) {
         requireOwner(courseId, actor);
-        requireMutableCourse(courseId);
+        // The lifecycle check runs on the locked row this transaction will
+        // write.  archive() takes the same FOR UPDATE lock, so an update can
+        // never pass an ACTIVE read, have the archive commit, and then revive
+        // the archived row with a stale status.
+        CourseRepository.Course current = requireMutableCourseLocked(courseId);
         // The course-row lock keeps the roster comparison and the persisted
         // capacity one guarded decision: join() reserves seats under the same
         // lock, so lowering the limit can never strand active members.
-        CourseRepository.Course current = courses.lockCourse(courseId)
-                .orElseThrow(() -> new CourseException(HttpStatus.NOT_FOUND, "COURSE_NOT_FOUND", "course does not exist", false));
         String nextName = name == null ? current.name() : courseName(name);
         String nextDescription = description == null ? current.description() : description(description);
         String nextMode = enrollmentMode == null ? current.enrollmentMode() : enrollmentMode(enrollmentMode, current.enrollmentMode());
@@ -82,7 +84,7 @@ public class CourseService {
     @Transactional
     public CourseView archive(long courseId, CurrentUser actor) {
         requireOwner(courseId, actor);
-        requireMutableCourse(courseId);
+        requireMutableCourseLocked(courseId);
         return view(courses.archiveCourse(courseId), actor);
     }
 
@@ -183,7 +185,7 @@ public class CourseService {
     public ChapterView createChapter(long courseId, String title, String parentId, Integer sortOrder, String objective,
                                      Boolean visible, Integer chapterType, CurrentUser actor) {
         requireContentManager(courseId, actor);
-        requireMutableCourse(courseId);
+        requireMutableCourseLocked(courseId);
         Long parent = validateParent(courseId, null, parentId);
         int order = order(sortOrder);
         int type = chapterType == null ? 1 : chapterType;
@@ -200,7 +202,7 @@ public class CourseService {
     public ChapterView updateChapter(long courseId, long chapterId, String title, String parentId, Integer sortOrder,
                                      String objective, Boolean visible, Integer chapterType, CurrentUser actor) {
         requireContentManager(courseId, actor);
-        requireMutableCourse(courseId);
+        requireMutableCourseLocked(courseId);
         CourseRepository.Chapter current = courses.chapter(courseId, chapterId)
                 .orElseThrow(() -> new CourseException(HttpStatus.NOT_FOUND, "CHAPTER_NOT_FOUND", "chapter does not exist", false));
         Long parent = parentId == null ? current.parentId() : validateParent(courseId, chapterId, parentId);
@@ -221,7 +223,7 @@ public class CourseService {
     @Transactional
     public void deleteChapter(long courseId, long chapterId, CurrentUser actor) {
         requireContentManager(courseId, actor);
-        requireMutableCourse(courseId);
+        requireMutableCourseLocked(courseId);
         courses.chapter(courseId, chapterId).orElseThrow(() -> new CourseException(HttpStatus.NOT_FOUND, "CHAPTER_NOT_FOUND", "chapter does not exist", false));
         if (courses.chapterHasChildren(courseId, chapterId)) {
             throw new CourseException(HttpStatus.CONFLICT, "CHAPTER_HAS_CHILDREN", "remove child chapters before deleting this chapter", false);
@@ -238,7 +240,7 @@ public class CourseService {
     public ResourceView createResource(long courseId, String title, String url, String chapterId, String resourceType,
                                        String visibility, LocalDateTime publishAt, CurrentUser actor) {
         requireContentManager(courseId, actor);
-        requireMutableCourse(courseId);
+        requireMutableCourseLocked(courseId);
         Long chapter = validateResourceChapter(courseId, chapterId);
         String normalizedUrl = resourceUrl(url);
         String normalizedTitle = resourceTitle(title);
@@ -252,7 +254,7 @@ public class CourseService {
     public ResourceView uploadResource(long courseId, MultipartFile file, String title, String chapterId, String resourceType,
                                        String visibility, LocalDateTime publishAt, CurrentUser actor) {
         requireContentManager(courseId, actor);
-        requireMutableCourse(courseId);
+        requireMutableCourseLocked(courseId);
         Long chapter = validateResourceChapter(courseId, chapterId);
         CourseFileStorage.StoredFile stored = fileStorage.store(file);
         try {
@@ -270,7 +272,7 @@ public class CourseService {
     public ResourceView updateResource(long courseId, long resourceId, String title, String url, String chapterId,
                                        String resourceType, String visibility, LocalDateTime publishAt, CurrentUser actor) {
         requireContentManager(courseId, actor);
-        requireMutableCourse(courseId);
+        requireMutableCourseLocked(courseId);
         CourseRepository.Resource current = resource(courseId, resourceId);
         Long chapter = chapterId == null ? current.chapterId() : validateResourceChapter(courseId, chapterId);
         String nextUrl = url == null ? current.externalUrl() : resourceUrl(url);
@@ -283,7 +285,7 @@ public class CourseService {
     @Transactional
     public void deleteResource(long courseId, long resourceId, CurrentUser actor) {
         requireContentManager(courseId, actor);
-        requireMutableCourse(courseId);
+        requireMutableCourseLocked(courseId);
         CourseRepository.Resource resource = resource(courseId, resourceId);
         courses.deleteResource(courseId, resourceId);
         String storageKey = resource.storageKey();
@@ -317,7 +319,7 @@ public class CourseService {
     public AnnouncementView createAnnouncement(long courseId, String title, String content, Boolean top, CurrentUser actor,
                                                String correlationId) {
         requireContentManager(courseId, actor);
-        requireMutableCourse(courseId);
+        requireMutableCourseLocked(courseId);
         Instant publishedAt = Instant.now();
         CourseRepository.Announcement announcement = courses.createAnnouncement(courseId, announcementTitle(title), announcementContent(content),
                 Boolean.TRUE.equals(top), actor.id());
@@ -330,7 +332,7 @@ public class CourseService {
     @Transactional
     public AnnouncementView updateAnnouncement(long courseId, long announcementId, String title, String content, Boolean top, CurrentUser actor) {
         requireContentManager(courseId, actor);
-        requireMutableCourse(courseId);
+        requireMutableCourseLocked(courseId);
         CourseRepository.Announcement current = announcement(courseId, announcementId);
         courses.updateAnnouncement(courseId, announcementId, title == null ? current.title() : announcementTitle(title),
                 content == null ? current.content() : announcementContent(content), top == null ? current.top() : top);
@@ -340,7 +342,7 @@ public class CourseService {
     @Transactional
     public void deleteAnnouncement(long courseId, long announcementId, CurrentUser actor) {
         requireContentManager(courseId, actor);
-        requireMutableCourse(courseId);
+        requireMutableCourseLocked(courseId);
         announcement(courseId, announcementId);
         courses.deleteAnnouncement(courseId, announcementId);
     }
@@ -469,7 +471,7 @@ public class CourseService {
 
     private void deleteStoredFile(long resourceId, String storageKey) {
         try {
-            fileStorage.deleteQuietly(storageKey);
+            fileStorage.delete(storageKey);
             courses.completeFileDeletion(resourceId);
         } catch (RuntimeException failure) {
             courses.failFileDeletion(resourceId, failure.getMessage());
@@ -524,8 +526,11 @@ public class CourseService {
                 .filter(member -> role == null || role.equals(member.role())).count();
     }
     private void requireContentManager(long courseId, CurrentUser user) { if (!canManageContent(courseId, user)) throw forbidden(); }
-    private void requireMutableCourse(long courseId) {
-        requireMutableCourse(course(courseId));
+    /** Lock-first lifecycle gate: validates the exact row this transaction will write. */
+    private CourseRepository.Course requireMutableCourseLocked(long courseId) {
+        CourseRepository.Course course = lockCourse(courseId);
+        requireMutableCourse(course);
+        return course;
     }
     private void requireMutableCourse(CourseRepository.Course course) {
         String status = course.status();

@@ -122,7 +122,7 @@ printf '%s' "$backend_readiness" | grep -Eq '"status"[[:space:]]*:[[:space:]]*"U
   fail "backend readiness did not report UP"
 
 course_readiness="$("${compose_command[@]}" exec -T course-service \
-  wget -qO- http://127.0.0.1:8082/actuator/health/readiness)"
+  wget -qO- --no-check-certificate https://127.0.0.1:8082/actuator/health/readiness)"
 printf '%s' "$course_readiness" | grep -Eq '"status"[[:space:]]*:[[:space:]]*"UP"' || \
   fail "Course readiness did not report UP"
 

@@ -16,6 +16,7 @@ cached_runtime="$checkout/services/course/Dockerfile.cached-runtime"
 live_smoke="$checkout/scripts/test/verify-course-compose-live.sh"
 live_learning="$checkout/scripts/test/verify-course-to-learning-live.sh"
 learning_overlay="$checkout/deploy/docker/compose.course-learning-live.yml"
+mtls_overlay="$checkout/deploy/docker/compose.course-mtls-live.yml"
 
 fail() {
   printf 'course-compose-contract: FAIL: %s\n' "$*" >&2
@@ -31,6 +32,7 @@ fail() {
 [[ -x "$live_smoke" ]] || fail "missing executable Course Compose live smoke"
 [[ -x "$live_learning" ]] || fail "missing executable Course-to-Learning live proof"
 [[ -f "$learning_overlay" ]] || fail "missing Course-to-Learning disposable Compose overlay"
+[[ -f "$mtls_overlay" ]] || fail "missing Course mTLS disposable Compose overlay"
 command -v node >/dev/null 2>&1 || fail "node is required to validate the Course migration manifest command"
 
 course_migration_command="$(node -e '
@@ -61,6 +63,16 @@ validate_compose_interpolation() {
   IDENTITY_JWKS_URI='http://127.0.0.1:9/.well-known/jwks.json' \
     docker compose --file "$compose" config --quiet >/dev/null || \
     fail "supported Compose manifest has invalid interpolation"
+  GIT_SHA='0000000000000000000000000000000000000000' \
+  MYSQL_PASSWORD='contract-mysql-password' \
+  MYSQL_ROOT_PASSWORD='contract-mysql-root-password' \
+  COURSE_DATABASE_PASSWORD='contract-course-password' \
+  RABBITMQ_PASSWORD='contract-rabbit-password' \
+  IDENTITY_JWKS_TRUST_BUNDLE='{"keys":[]}' \
+  IDENTITY_JWKS_URI='http://127.0.0.1:9/.well-known/jwks.json' \
+  OJ312_COURSE_PORT='39082' \
+    docker compose --file "$compose" --file "$mtls_overlay" config --quiet >/dev/null || \
+    fail "Course mTLS live overlay has invalid interpolation"
 }
 
 require "$compose" 'rabbitmq:' 'RabbitMQ service is missing'
@@ -76,6 +88,12 @@ require "$compose" 'RABBITMQ_EXCHANGE: onlinejudge.events.v2' 'Course does not u
 require "$compose" 'SPRING_RABBITMQ_HOST: rabbitmq' 'Compose backend cannot consume Course v2 events'
 require "$compose" 'course-data:' 'Course non-root storage volume is missing'
 require "$compose" '/actuator/health/readiness' 'Course readiness probe is missing'
+require "$compose" 'SERVER_SSL_ENABLED: "true"' 'Course TLS listener is not enabled'
+require "$compose" 'SERVER_SSL_KEY_STORE: /tls/course-server.p12' 'Course TLS listener has no server keystore'
+require "$compose" 'SERVER_SSL_CLIENT_AUTH: want' 'Course TLS listener does not request client certificates'
+require "$compose" 'SERVER_SSL_TRUST_STORE: /tls/course-truststore.p12' 'Course TLS trust boundary is not configured'
+require "$compose" 'COURSE_INTERNAL_MTLS_SERVICE_SUBJECTS' 'Course mTLS subject allowlist is not configured'
+require "$compose" '--no-check-certificate https://127.0.0.1:8082/actuator/health/readiness' 'Course readiness probe does not use the TLS listener'
 require "$config" 'spring.sql.init.mode=never' 'Course Compose runtime still creates test schema'
 require "$config" 'COURSE_DATABASE_USER' 'Course Compose username does not use the canonical variable'
 require "$migrator" 'oj_course_rw' 'migration entrypoint does not provision the canonical Course account'
@@ -93,6 +111,9 @@ require "$live_smoke" 'require_clean_source_tree "$repo_root"' 'Course Compose l
 require "$live_smoke" 'mvn -B -ntp clean package -DskipTests' 'Course Compose live smoke does not package the exact Course source'
 require "$live_smoke" 'docker build --pull=false --no-cache' 'Course Compose live smoke can reuse a stale Course image layer'
 require "$live_smoke" 'Course source image provenance did not match its clean package' 'Course Compose live smoke does not verify clean-package image provenance before startup'
+require "$live_smoke" 'compose.course-mtls-live.yml' 'Course Compose live smoke does not run the mTLS overlay'
+require "$live_smoke" 'backend-server.p12' 'Course Compose live smoke does not present a real workload client certificate'
+require "$live_smoke" 'https://127.0.0.1:8082' 'Course Compose live smoke does not exercise the TLS listener'
 require "$live_learning" 'pending-before-binding=4' 'Course-to-Learning proof does not retain unbound durable facts'
 require "$live_learning" 'watermark=2 notifications=1' 'Course-to-Learning proof does not verify Learning convergence'
 require "$learning_overlay" 'OJ312_MYSQL_PORT' 'Course-to-Learning overlay does not isolate the disposable MySQL port'
@@ -113,6 +134,7 @@ mkdir -p "$fixture/scripts/test"
 cp "$compose" "$fixture/deploy/docker/compose.yml"
 cp "$repo_root/deploy/platform/workloads.json" "$fixture/deploy/platform/workloads.json"
 cp "$learning_overlay" "$fixture/deploy/docker/compose.course-learning-live.yml"
+cp "$mtls_overlay" "$fixture/deploy/docker/compose.course-mtls-live.yml"
 cp "$config" "$fixture/services/course/src/main/resources/application-compose.properties"
 cp "$cached_runtime" "$fixture/services/course/Dockerfile.cached-runtime"
 cp "$live_smoke" "$fixture/scripts/test/verify-course-compose-live.sh"

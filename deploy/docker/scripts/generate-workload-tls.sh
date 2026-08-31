@@ -31,13 +31,24 @@ fi
   -dname "CN=course-service" \
   -storetype PKCS12 -keystore "$out/course-client.p12" -storepass "$storepass" -keypass "$storepass"
 
+# Course server identity: the TLS listener that terminates inbound internal
+# v2 requests.  The SAN covers the compose DNS name and the loopback address
+# used by the container health check; the subject is Course's own workload
+# name (same single-RDN rule as the other receivers).
+"$keytool" -genkeypair -alias course-server -keyalg RSA -keysize 2048 -validity 3650 \
+  -dname "CN=course-service" \
+  -ext "SAN=dns:course-service,dns:localhost,ip:127.0.0.1" \
+  -storetype PKCS12 -keystore "$out/course-server.p12" -storepass "$storepass" -keypass "$storepass"
+
 "$keytool" -exportcert -alias backend-server -file "$out/backend-server.cer" \
   -keystore "$out/backend-server.p12" -storepass "$storepass"
 "$keytool" -exportcert -alias course-client -file "$out/course-client.cer" \
   -keystore "$out/course-client.p12" -storepass "$storepass"
 
-# Course trusts the backend server certificate; the backend trusts only the
-# Course client certificate for the Learning internal boundary.
+# Course trusts the backend certificate both as the Learning server on the
+# outbound hop and as the backend client identity on Course's own TLS
+# listener; the backend trusts only the Course client certificate for the
+# Learning internal boundary.
 "$keytool" -importcert -noprompt -alias backend-server -file "$out/backend-server.cer" \
   -storetype PKCS12 -keystore "$out/course-truststore.p12" -storepass "$storepass"
 "$keytool" -importcert -noprompt -alias course-client -file "$out/course-client.cer" \

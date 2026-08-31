@@ -105,13 +105,27 @@ services:
       COURSE_LEARNING_MTLS_TRUSTSTORE_PATH: /tls/course-truststore.p12
       COURSE_LEARNING_MTLS_TRUSTSTORE_PASSWORD: changeit
       COURSE_LEARNING_MTLS_TRUSTSTORE_TYPE: PKCS12
-      COURSE_INTERNAL_MTLS_SERVICE_SUBJECTS: ${COURSE_INTERNAL_MTLS_SERVICE_SUBJECTS:-CN=assessment-api,CN=learning-api,CN=grade-api}
+      # Course's own TLS listener: the internal v2 receiving boundary is a
+      # real mTLS server, so inbound callers present a workload client
+      # certificate that CourseAuthentication observes after TLS termination.
+      # client-auth is 'want' so the readiness probe and the user API keep
+      # working without a certificate; only internal endpoints require a
+      # service identity (audience-bound JWT or a trusted mTLS client).
+      SERVER_SSL_ENABLED: "true"
+      SERVER_SSL_KEY_STORE: /tls/course-server.p12
+      SERVER_SSL_KEY_STORE_TYPE: PKCS12
+      SERVER_SSL_KEY_STORE_PASSWORD: changeit
+      SERVER_SSL_CLIENT_AUTH: want
+      SERVER_SSL_TRUST_STORE: /tls/course-truststore.p12
+      SERVER_SSL_TRUST_STORE_TYPE: PKCS12
+      SERVER_SSL_TRUST_STORE_PASSWORD: changeit
+      COURSE_INTERNAL_MTLS_SERVICE_SUBJECTS: ${COURSE_INTERNAL_MTLS_SERVICE_SUBJECTS:-CN=backend,CN=assessment-api,CN=learning-api,CN=grade-api}
       COURSE_STORAGE_ROOT: /opt/onlinejudge-course/data
     volumes:
       - course-data:/opt/onlinejudge-course/data
       - workload-tls:/tls:ro
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8082/actuator/health/readiness | grep -q '\"status\":\"UP\"'"]
+      test: ["CMD-SHELL", "wget -qO- --no-check-certificate https://127.0.0.1:8082/actuator/health/readiness | grep -q '\"status\":\"UP\"'"]
       interval: 10s
       timeout: 5s
       retries: 12

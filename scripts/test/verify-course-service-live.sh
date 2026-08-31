@@ -155,7 +155,7 @@ mvn -B -ntp -f "$repo_root/services/course/pom.xml" \
   -Dcourse.test.rabbit=true \
   -Dcourse.test.mysql=true \
   -Dcourse.test.rabbit.port="$rabbit_port" \
-  -Dtest=CourseServiceContractTest,CourseSecurityVersionProjectionTest,CourseOutboxRelayRecoveryTest,IdentitySecurityVersionRabbitConsumerTest,CourseOutboxLeaseTest,CourseGeneratedKeyMySqlConcurrencyTest,CourseCapacityConcurrencyMySqlTest,JwksCacheTest \
+  -Dtest=CourseServiceContractTest,CourseSecurityVersionProjectionTest,CourseOutboxRelayRecoveryTest,IdentitySecurityVersionRabbitConsumerTest,CourseOutboxLeaseTest,CourseGeneratedKeyMySqlConcurrencyTest,CourseCapacityConcurrencyMySqlTest,CourseArchiveUpdateInterleavingMySqlTest,JwksCacheTest \
   test | tee "$evidence_dir/course-service-live.log"
 
 test_total="$(bash "$repo_root/scripts/test/course-surefire-summary.sh" "$evidence_dir/course-service-live.log")"

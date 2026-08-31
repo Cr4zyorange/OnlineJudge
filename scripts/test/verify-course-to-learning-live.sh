@@ -88,21 +88,21 @@ export OJ312_RABBITMQ_PORT="$(free_port)"
 compose_started=1
 "${compose[@]}" up -d --no-build --wait --wait-timeout 180 course-service
 
-created="$("${compose[@]}" exec -T course-service wget -qO- \
+created="$("${compose[@]}" exec -T course-service wget -qO- --no-check-certificate \
   --header="Authorization: Bearer $teacher_token" \
   --header='X-Request-Id: 89dcfe94-417e-4d5e-a7e6-dc6777cb8ef5' \
   --header='Content-Type: application/json' \
   --post-data='{"name":"Course to Learning live","description":"real producer route","enrollmentMode":"PUBLIC"}' \
-  http://127.0.0.1:8082/api/v1/courses)"
+  https://127.0.0.1:8082/api/v1/courses)"
 course_id="$(printf '%s' "$created" | jq -r '.data.id')"
 [[ "$course_id" =~ ^[1-9][0-9]*$ ]] || fail "Course HTTP create did not return a positive id"
 
-joined="$("${compose[@]}" exec -T course-service wget -qO- \
+joined="$("${compose[@]}" exec -T course-service wget -qO- --no-check-certificate \
   --header="Authorization: Bearer $student_token" \
   --header='X-Request-Id: f4374e85-7a48-4cd7-9a23-6fd5088733d8' \
   --header='Content-Type: application/json' \
   --post-data='{}' \
-  "http://127.0.0.1:8082/api/v1/courses/$course_id/join")"
+  "https://127.0.0.1:8082/api/v1/courses/$course_id/join")"
 [[ "$(printf '%s' "$joined" | jq -r '.data.userId')" == '7412' ]] || fail "Course HTTP join did not persist the student membership"
 
 # No Learning queue exists yet.  A mandatory producer must retain all four

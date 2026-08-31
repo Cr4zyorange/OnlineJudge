@@ -65,6 +65,20 @@ public class CourseFileStorage {
         }
     }
 
+    public void delete(String key) {
+        try {
+            Files.deleteIfExists(resolve(key));
+        } catch (IOException exception) {
+            throw new CourseException(HttpStatus.INTERNAL_SERVER_ERROR, "RESOURCE_STORAGE_FAILED",
+                    "resource file could not be deleted from storage", true);
+        }
+    }
+
+    /**
+     * Best-effort compensation only for the upload-failure path: the primary
+     * error is already surfaced to the caller and no journal row exists to
+     * keep PENDING, so a cleanup miss must not replace that error.
+     */
     public void deleteQuietly(String key) {
         try { Files.deleteIfExists(resolve(key)); } catch (IOException ignored) { }
     }
