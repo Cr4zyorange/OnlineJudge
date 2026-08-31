@@ -29,14 +29,20 @@ public class HomeworkEvaluationReplayService {
     }
 
     @Transactional
-    public boolean replay(EvaluationTask task, String requestedBy, String requestId, Instant now) {
+    public boolean replay(EvaluationTask task, String requestedBy, String reason, String requestId, Instant now) {
         ReplayTarget target = jdbc.query("""
-                SELECT homework_id, student_id, is_final, evaluation_status, auto_score
-                  FROM assessment_homework_submission
-                 WHERE submission_id = ? FOR UPDATE
+                SELECT hs.homework_id, hs.student_id, hs.is_final, hs.evaluation_status, hs.auto_score,
+                       h.status AS homework_status
+                  FROM assessment_homework_submission hs
+                  JOIN assessment_homework h ON h.id = hs.homework_id
+                 WHERE hs.submission_id = ? FOR UPDATE
                 """, (rs, ignored) -> new ReplayTarget(rs.getLong("homework_id"), rs.getString("student_id"),
-                rs.getBoolean("is_final"), rs.getString("evaluation_status"), rs.getBigDecimal("auto_score")),
+                rs.getBoolean("is_final"), rs.getString("evaluation_status"), rs.getBigDecimal("auto_score"),
+                rs.getString("homework_status")),
                 task.submissionId()).stream().findFirst().orElseThrow();
+        if ("SCORE_PUBLISHED".equals(target.homeworkStatus())) {
+            throw new HomeworkScoresPublishedException();
+        }
         if (!tasks.manualReplayHomework(task.id(), requestedBy, now)) {
             return false;
         }
@@ -56,7 +62,7 @@ public class HomeworkEvaluationReplayService {
                     (submission_id, homework_id, student_id, operation_type, old_score, new_score, operator_id, reason, created_at)
                 VALUES (?, ?, ?, 'REJUDGE', ?, NULL, ?, ?, ?)
                 """, task.submissionId(), target.homeworkId(), target.studentId(), target.autoScore(), requestedBy,
-                "replayed from " + target.evaluationStatus(), java.sql.Timestamp.from(now));
+                reason, java.sql.Timestamp.from(now));
         if (target.current()) {
             grades.markUngradedIfPresent(task.sourceType(), task.sourceId(), task.studentId(), now)
                     .ifPresent(grade -> appendUngradedEvent(grade, requestId, now));
@@ -65,7 +71,11 @@ public class HomeworkEvaluationReplayService {
     }
 
     private record ReplayTarget(long homeworkId, String studentId, boolean current, String evaluationStatus,
-                                java.math.BigDecimal autoScore) { }
+                                java.math.BigDecimal autoScore, String homeworkStatus) { }
+
+    public static final class HomeworkScoresPublishedException extends RuntimeException {
+        public HomeworkScoresPublishedException() { super("published homework cannot be reevaluated"); }
+    }
 
     private void appendUngradedEvent(SourceGradeRepository.SourceGrade grade, String requestId, Instant now) {
         Map<String, Object> payload = new LinkedHashMap<>();

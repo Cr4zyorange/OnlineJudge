@@ -202,6 +202,40 @@ class HomeworkWorkflowContractTest {
                 .andExpect(jsonPath("$.status").value("SCORE_PUBLISHED"));
         assertThat(jdbc.queryForObject("SELECT source_version FROM assessment_source_grade WHERE source_type = 'HWK' AND source_id = ? AND student_id = ?", Long.class, Long.toString(homeworkId), studentId)).isEqualTo(1L);
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM assessment_event_outbox WHERE event_type = 'assessment.source-grade.changed.v2' AND aggregate_id = ?", Integer.class, "HWK:" + homeworkId + ":" + studentId)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM assessment_homework_review_log WHERE submission_id = ? AND operation_type = 'SCORE_PUBLISHED' AND operator_id = ? AND new_score = ?",
+                Integer.class, submissionId, teacherId, new BigDecimal("80"))).isEqualTo(1);
+    }
+
+    @Test
+    void scorePublicationRejectsPendingFinalSubmissionUntilItsWorkerCompletes() throws Exception {
+        String teacherId = "teacher-315-" + UUID.randomUUID();
+        String studentId = "student-315-" + UUID.randomUUID();
+        String teacherToken = TestJwtFactory.userToken(KEY, "homework-workflow-kid", teacherId, List.of("TEACHER"));
+        long homeworkId = createAndPublishCodeHomework(teacherId, "publish-fence-315-" + UUID.randomUUID(), true, false,
+                Instant.parse("2030-01-01T12:00:00Z"));
+        jdbc.update("INSERT INTO assessment_course_member_projection (course_id, user_id, membership_status, member_version) VALUES ('course-315', ?, 'ACTIVE', 1)", studentId);
+        String studentToken = TestJwtFactory.userToken(KEY, "homework-workflow-kid", studentId, List.of("STUDENT"));
+        String submissionId = submitCodeHomework(homeworkId, studentToken, "print('pending')");
+
+        mockMvc.perform(put("/api/v1/homeworks/{homeworkId}/scores/publish", homeworkId)
+                        .header("Authorization", "Bearer " + teacherToken)
+                        .header("X-Request-Id", UUID.randomUUID().toString()))
+                .andExpect(status().isConflict());
+
+        assertThat(jdbc.queryForObject("SELECT status FROM assessment_homework WHERE id = ?", String.class, homeworkId))
+                .isEqualTo("PUBLISHED");
+        assertThat(jdbc.queryForObject("SELECT state FROM evaluation_task WHERE submission_id = ?", String.class, submissionId))
+                .isEqualTo("PENDING");
+        assertNoSourceGrade(homeworkId, studentId);
+
+        worker.runOne("homework-worker-publish-fence", task -> new AssessmentWorker.EvaluationOutcome(
+                true, "ACCEPTED", new BigDecimal("86"), new BigDecimal("100")));
+        mockMvc.perform(put("/api/v1/homeworks/{homeworkId}/scores/publish", homeworkId)
+                        .header("Authorization", "Bearer " + teacherToken)
+                        .header("X-Request-Id", UUID.randomUUID().toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("SCORE_PUBLISHED"));
+        assertCurrentSourceGrade(homeworkId, studentId, "SCORED", new BigDecimal("86"), 1);
     }
 
     @Test
@@ -351,6 +385,13 @@ class HomeworkWorkflowContractTest {
         mockMvc.perform(post("/api/v1/submissions/{submissionId}/reevaluate", submissionId)
                         .header("Authorization", "Bearer " + teacherToken)
                         .header("X-Request-Id", UUID.randomUUID().toString()))
+                .andExpect(status().isBadRequest());
+
+        mockMvc.perform(post("/api/v1/submissions/{submissionId}/reevaluate", submissionId)
+                        .header("Authorization", "Bearer " + teacherToken)
+                        .header("X-Request-Id", UUID.randomUUID().toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\":\"rerun after sandbox configuration repair\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.taskId").value(taskId))
                 .andExpect(jsonPath("$.data.taskState").value("PENDING"));
@@ -358,6 +399,8 @@ class HomeworkWorkflowContractTest {
         assertThat(jdbc.queryForObject("SELECT manual_replay_count FROM evaluation_task WHERE id = ?", Integer.class, taskId)).isEqualTo(1);
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM assessment_source_grade WHERE source_id = ?", Integer.class,
                 Long.toString(homeworkId))).isZero();
+        assertThat(jdbc.queryForObject("SELECT reason FROM assessment_homework_review_log WHERE submission_id = ? AND operation_type = 'REJUDGE'",
+                String.class, submissionId)).isEqualTo("rerun after sandbox configuration repair");
     }
 
     @ParameterizedTest(name = "teacher can replay successful homework result {0}")
@@ -387,7 +430,9 @@ class HomeworkWorkflowContractTest {
 
         mockMvc.perform(post("/api/v1/submissions/{submissionId}/reevaluate", submissionId)
                         .header("Authorization", "Bearer " + teacherToken)
-                        .header("X-Request-Id", UUID.randomUUID().toString()))
+                        .header("X-Request-Id", UUID.randomUUID().toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\":\"teacher requested rejudge\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.taskId").value(taskId))
                 .andExpect(jsonPath("$.data.taskState").value("PENDING"));
@@ -428,11 +473,15 @@ class HomeworkWorkflowContractTest {
 
         mockMvc.perform(post("/api/v1/submissions/{submissionId}/reevaluate", submissionId)
                         .header("Authorization", "Bearer " + teacherToken)
-                        .header("X-Request-Id", UUID.randomUUID().toString()))
+                        .header("X-Request-Id", UUID.randomUUID().toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\":\"rerun evidence collection\"}"))
                 .andExpect(status().isOk());
 
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM assessment_homework_evaluation WHERE submission_id = ? AND status = 'ACCEPTED'", Integer.class, submissionId)).isEqualTo(1);
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM assessment_homework_review_log WHERE submission_id = ? AND operation_type = 'REJUDGE'", Integer.class, submissionId)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT reason FROM assessment_homework_review_log WHERE submission_id = ? AND operation_type = 'REJUDGE'", String.class, submissionId))
+                .isEqualTo("rerun evidence collection");
         mockMvc.perform(get("/api/v1/submissions/{submissionId}/evaluation", submissionId)
                         .header("Authorization", "Bearer " + teacherToken))
                 .andExpect(status().isOk())
@@ -460,7 +509,9 @@ class HomeworkWorkflowContractTest {
         String requestId = UUID.randomUUID().toString();
         mockMvc.perform(post("/api/v1/submissions/{submissionId}/reevaluate", submissionId)
                         .header("Authorization", "Bearer " + teacherToken)
-                        .header("X-Request-Id", requestId))
+                        .header("X-Request-Id", requestId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\":\"rerun before publication\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.taskState").value("PENDING"));
 
@@ -508,9 +559,10 @@ class HomeworkWorkflowContractTest {
 
         mockMvc.perform(post("/api/v1/submissions/{submissionId}/reevaluate", firstSubmissionId)
                         .header("Authorization", "Bearer " + teacherToken)
-                        .header("X-Request-Id", UUID.randomUUID().toString()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.taskState").value("PENDING"));
+                        .header("X-Request-Id", UUID.randomUUID().toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\":\"must not reopen published homework\"}"))
+                .andExpect(status().isConflict());
 
         assertCurrentSourceGrade(homeworkId, studentId, "SCORED", new BigDecimal("90"), 1);
         assertThat(jdbc.queryForObject("""
@@ -519,6 +571,37 @@ class HomeworkWorkflowContractTest {
                 """, Integer.class, "HWK:" + homeworkId + ":" + studentId)).isEqualTo(1);
         assertThat(jdbc.queryForObject("SELECT is_final FROM assessment_homework_submission WHERE submission_id = ?",
                 Boolean.class, currentSubmissionId)).isTrue();
+    }
+
+    @Test
+    void publishedHomeworkRejectsCurrentSubmissionReevaluationWithoutRevokingItsGrade() throws Exception {
+        String teacherId = "teacher-315-" + UUID.randomUUID();
+        String studentId = "student-315-" + UUID.randomUUID();
+        long homeworkId = createAndPublishCodeHomework(teacherId, "published-rejudge-315-" + UUID.randomUUID(), true,
+                false, Instant.parse("2030-01-01T12:00:00Z"));
+        jdbc.update("INSERT INTO assessment_course_member_projection (course_id, user_id, membership_status, member_version) VALUES ('course-315', ?, 'ACTIVE', 1)", studentId);
+        String studentToken = TestJwtFactory.userToken(KEY, "homework-workflow-kid", studentId, List.of("STUDENT"));
+        String teacherToken = TestJwtFactory.userToken(KEY, "homework-workflow-kid", teacherId, List.of("TEACHER"));
+        String submissionId = submitCodeHomework(homeworkId, studentToken, "print('published')");
+        worker.runOne("homework-worker-published-rejudge", task -> new AssessmentWorker.EvaluationOutcome(
+                true, "ACCEPTED", new BigDecimal("91"), new BigDecimal("100")));
+        mockMvc.perform(put("/api/v1/homeworks/{homeworkId}/scores/publish", homeworkId)
+                        .header("Authorization", "Bearer " + teacherToken)
+                        .header("X-Request-Id", UUID.randomUUID().toString()))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/v1/submissions/{submissionId}/reevaluate", submissionId)
+                        .header("Authorization", "Bearer " + teacherToken)
+                        .header("X-Request-Id", UUID.randomUUID().toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\":\"post-publication correction\"}"))
+                .andExpect(status().isConflict());
+
+        assertCurrentSourceGrade(homeworkId, studentId, "SCORED", new BigDecimal("91"), 1);
+        assertThat(jdbc.queryForObject("SELECT state FROM evaluation_task WHERE submission_id = ?", String.class, submissionId))
+                .isEqualTo("SUCCEEDED");
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM assessment_homework_review_log WHERE submission_id = ? AND operation_type = 'REJUDGE'", Integer.class, submissionId))
+                .isZero();
     }
 
     @Test
@@ -541,7 +624,9 @@ class HomeworkWorkflowContractTest {
 
         mockMvc.perform(post("/api/v1/submissions/{submissionId}/reevaluate", submissionId)
                         .header("Authorization", "Bearer " + teacherToken)
-                        .header("X-Request-Id", UUID.randomUUID().toString()))
+                        .header("X-Request-Id", UUID.randomUUID().toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\":\"lab route must remain unavailable\"}"))
                 .andExpect(status().isNotFound());
 
         assertThat(jdbc.queryForObject("SELECT state FROM evaluation_task WHERE id = ?", String.class, taskId))

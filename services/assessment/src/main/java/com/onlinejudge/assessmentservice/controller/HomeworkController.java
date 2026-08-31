@@ -139,7 +139,7 @@ public class HomeworkController {
         }
         requireManager(homework.courseId(), user);
         try {
-            return homeworks.publishScores(homeworkId, requestId);
+            return homeworks.publishScores(homeworkId, user.id(), requestId);
         } catch (IllegalStateException conflict) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, conflict.getMessage(), conflict);
         }

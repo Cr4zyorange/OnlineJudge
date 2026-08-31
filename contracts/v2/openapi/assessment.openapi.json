@@ -18,6 +18,24 @@
         }
       }
     },
+    "/api/v1/homeworks/{homeworkId}/scores/publish": {
+      "put": {
+        "operationId": "publishHomeworkScores",
+        "x-onlinejudge-api-id": "API-HWK-14",
+        "description": "Publishes a settled snapshot of final HWK submissions. The service rejects the request while any final evaluation is non-terminal, so no late worker completion is omitted from Grade.",
+        "security": [{ "userJwt": [] }],
+        "parameters": [
+          { "name": "homeworkId", "in": "path", "required": true, "schema": { "type": "integer", "minimum": 1 } },
+          { "name": "X-Request-Id", "in": "header", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": {
+          "200": { "description": "Scores and their canonical Grade source facts were published", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/HomeworkSummary" } } } },
+          "403": { "description": "Not a course manager", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "404": { "description": "Homework not found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "409": { "description": "Homework is not PUBLISHED or a final evaluation is still non-terminal", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      }
+    },
     "/api/v1/submissions/{submissionId}/evaluation": {
       "get": {
         "operationId": "getHomeworkEvaluation",
@@ -33,14 +51,17 @@
     "/api/v1/submissions/{submissionId}/reevaluate": {
       "post": {
         "operationId": "reevaluateHomeworkSubmission",
+        "x-onlinejudge-api-id": "API-HWK-12",
         "description": "Queues a new fenced HWK evaluation and records a REJUDGE audit entry without deleting the completed execution record.",
         "security": [{ "userJwt": [] }],
         "parameters": [{ "name": "submissionId", "in": "path", "required": true, "schema": { "type": "integer", "minimum": 1 } }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/HomeworkReevaluationRequest" } } } },
         "responses": {
           "200": { "description": "Terminal evaluation reset to PENDING", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/HomeworkReevaluationEnvelope" } } } },
+          "400": { "description": "A nonblank re-evaluation reason is required", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
           "403": { "description": "Not a course manager", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
           "404": { "description": "Not a CODE homework evaluation", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
-          "409": { "description": "Evaluation is not terminal", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+          "409": { "description": "Evaluation is not terminal or homework scores are already published", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
         }
       }
     },
@@ -77,6 +98,8 @@
       "SourceGradePage": { "allOf": [{ "$ref": "#/components/schemas/Page" }, { "type": "object", "required": ["sourceSnapshotVersion"], "properties": { "sourceSnapshotVersion": { "type": "integer", "minimum": 1 }, "items": { "type": "array", "items": { "$ref": "#/components/schemas/SourceGrade" } } } }] },
       "SourceGrade": { "type": "object", "additionalProperties": false, "required": ["courseId", "sourceType", "sourceId", "studentId", "score", "fullScore", "status", "updatedAt", "sourceVersion"], "properties": { "courseId": { "type": "string", "minLength": 1 }, "sourceType": { "type": "string", "enum": ["LAB", "HWK"] }, "sourceId": { "type": "string", "minLength": 1 }, "studentId": { "type": "string", "minLength": 1 }, "score": { "type": ["number", "null"], "minimum": 0, "description": "A published numeric score only when status is SCORED; null only when status is UNGRADED. Producers keep numeric scores within fullScore." }, "fullScore": { "type": "number", "exclusiveMinimum": 0 }, "status": { "type": "string", "enum": ["SCORED", "UNGRADED"], "description": "SCORED requires numeric score; UNGRADED requires score=null and must not fabricate a score." }, "updatedAt": { "type": "string", "format": "date-time" }, "sourceVersion": { "type": "integer", "minimum": 1 } }, "oneOf": [{ "type": "object", "required": ["status", "score"], "properties": { "status": { "const": "SCORED" }, "score": { "type": "number", "minimum": 0 } } }, { "type": "object", "required": ["status", "score"], "properties": { "status": { "const": "UNGRADED" }, "score": { "type": "null" } } }] },
       "HomeworkCodeSubmissionRequest": { "type": "object", "additionalProperties": false, "required": ["codeText", "language"], "properties": { "codeText": { "type": "string", "minLength": 1 }, "language": { "type": "string", "minLength": 1 } } },
+      "HomeworkReevaluationRequest": { "type": "object", "additionalProperties": false, "required": ["reason"], "properties": { "reason": { "type": "string", "minLength": 1, "maxLength": 500 } } },
+      "HomeworkSummary": { "type": "object", "additionalProperties": false, "required": ["id", "courseId", "title", "description", "type", "status", "deadline", "totalScore", "allowResubmit", "allowLateSubmit", "languages", "aggregateVersion", "publishedAt"], "properties": { "id": { "type": "integer", "minimum": 1 }, "courseId": { "type": "string", "minLength": 1 }, "title": { "type": "string", "minLength": 1 }, "description": { "type": "string" }, "type": { "const": "CODE" }, "status": { "type": "string", "enum": ["DRAFT", "PUBLISHED", "SCORE_PUBLISHED"] }, "deadline": { "type": "string", "format": "date-time" }, "totalScore": { "type": "number", "exclusiveMinimum": 0 }, "allowResubmit": { "type": "boolean" }, "allowLateSubmit": { "type": "boolean" }, "languages": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } }, "aggregateVersion": { "type": "integer", "minimum": 1 }, "publishedAt": { "type": ["string", "null"], "format": "date-time" } } },
       "HomeworkSubmission": { "type": "object", "additionalProperties": false, "required": ["submissionId", "homeworkId", "submitType", "language", "submitStatus", "evaluationStatus", "reviewStatus", "version", "final", "submittedAt"], "properties": { "submissionId": { "type": "integer", "minimum": 1 }, "homeworkId": { "type": "integer", "minimum": 1 }, "studentId": { "type": "string" }, "submitType": { "const": "CODE" }, "language": { "type": "string", "minLength": 1 }, "submitStatus": { "type": "string", "enum": ["SUBMITTED", "LATE"] }, "evaluationStatus": { "const": "PENDING" }, "reviewStatus": { "const": "UNREVIEWED" }, "autoScore": { "type": "null" }, "manualScore": { "type": "null" }, "finalScore": { "type": "null" }, "version": { "type": "integer", "minimum": 1 }, "final": { "const": true }, "submittedAt": { "type": "string", "format": "date-time" } } },
       "HomeworkSubmissionEnvelope": { "type": "object", "additionalProperties": false, "required": ["code", "message", "data"], "properties": { "code": { "const": 0 }, "message": { "type": "string" }, "data": { "$ref": "#/components/schemas/HomeworkSubmission" } } },
       "HomeworkEvaluation": { "type": "object", "additionalProperties": false, "required": ["submissionId", "homeworkId", "taskId", "taskState", "generation", "evaluationStatus", "score", "finalScore", "evaluationHistory"], "properties": { "submissionId": { "type": "integer", "minimum": 1 }, "homeworkId": { "type": "integer", "minimum": 1 }, "taskId": { "type": "string", "minLength": 1 }, "taskState": { "type": "string", "enum": ["PENDING", "RUNNING", "RETRY_WAIT", "SUCCEEDED", "FAILED"] }, "generation": { "type": "integer", "minimum": 0 }, "evaluationStatus": { "type": "string", "minLength": 1 }, "score": { "type": ["number", "null"] }, "finalScore": { "type": ["number", "null"] }, "evaluationHistory": { "type": "array", "items": { "type": "object" } } } },

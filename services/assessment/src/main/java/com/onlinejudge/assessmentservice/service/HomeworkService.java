@@ -107,19 +107,30 @@ public class HomeworkService {
 
     /** Grades become available to GRD only once a course manager explicitly publishes them. */
     @Transactional
-    public HomeworkSummary publishScores(long homeworkId, String correlationId) {
+    public HomeworkSummary publishScores(long homeworkId, String publishedBy, String correlationId) {
         HomeworkSummary homework = findForUpdate(homeworkId);
         if (!"PUBLISHED".equals(homework.status())) {
             throw new IllegalStateException("only a published homework can have its scores published");
         }
         Instant publishedAt = clock.instant();
-        List<PublishedScore> scores = jdbc.query("""
-                SELECT hs.student_id, hs.final_score
+        // Lock every current submission/task pair before changing the homework state.  A worker
+        // either finishes before this read and is included, or is observed as non-terminal and
+        // publication remains retryable while the homework stays PUBLISHED.
+        List<FinalSubmission> finalSubmissions = jdbc.query("""
+                SELECT hs.submission_id, hs.student_id, hs.final_score, task.state AS task_state
                   FROM assessment_homework_submission hs
-                  JOIN evaluation_task task ON task.submission_id = hs.submission_id
+                  LEFT JOIN evaluation_task task ON task.submission_id = hs.submission_id
                  WHERE hs.homework_id = ? AND hs.is_final = TRUE
-                   AND task.state = 'SUCCEEDED' AND hs.final_score IS NOT NULL
-                """, (rs, ignored) -> new PublishedScore(rs.getString("student_id"), rs.getBigDecimal("final_score")), homeworkId);
+                 FOR UPDATE
+                """, (rs, ignored) -> new FinalSubmission(rs.getString("submission_id"), rs.getString("student_id"),
+                rs.getBigDecimal("final_score"), rs.getString("task_state")), homeworkId);
+        if (finalSubmissions.stream().anyMatch(submission -> !submission.terminal())) {
+            throw new IllegalStateException("all final homework submissions must reach a terminal evaluation state before scores can be published");
+        }
+        List<PublishedScore> scores = finalSubmissions.stream()
+                .filter(FinalSubmission::scored)
+                .map(submission -> new PublishedScore(submission.submissionId(), submission.studentId(), submission.finalScore()))
+                .toList();
         int updated = jdbc.update("""
                 UPDATE assessment_homework
                    SET status = 'SCORE_PUBLISHED', aggregate_version = aggregate_version + 1, updated_at = ?
@@ -134,6 +145,12 @@ public class HomeworkService {
                     Map.of("courseId", homework.courseId(), "sourceType", "HWK", "sourceId", Long.toString(homeworkId),
                             "studentId", score.studentId(), "score", score.score(), "fullScore", homework.totalScore(),
                             "status", "SCORED", "sourceVersion", version), publishedAt);
+            jdbc.update("""
+                    INSERT INTO assessment_homework_review_log
+                        (submission_id, homework_id, student_id, operation_type, old_score, new_score, operator_id, reason, created_at)
+                    VALUES (?, ?, ?, 'SCORE_PUBLISHED', NULL, ?, ?, 'teacher published homework scores', ?)
+                    """, score.submissionId(), homeworkId, score.studentId(), score.score(), publishedBy,
+                    Timestamp.from(publishedAt));
         }
         return find(homeworkId);
     }
@@ -195,5 +212,10 @@ public class HomeworkService {
                                   Instant deadline, BigDecimal totalScore, boolean allowResubmit, boolean allowLateSubmit,
                                   List<String> languages, long aggregateVersion, Instant publishedAt) { }
 
-    private record PublishedScore(String studentId, BigDecimal score) { }
+    private record FinalSubmission(String submissionId, String studentId, BigDecimal finalScore, String taskState) {
+        boolean terminal() { return "SUCCEEDED".equals(taskState) || "FAILED".equals(taskState); }
+        boolean scored() { return "SUCCEEDED".equals(taskState) && finalScore != null; }
+    }
+
+    private record PublishedScore(String submissionId, String studentId, BigDecimal score) { }
 }

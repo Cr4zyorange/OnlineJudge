@@ -5,11 +5,15 @@ import com.onlinejudge.assessmentservice.persistence.EvaluationTaskRepository;
 import com.onlinejudge.assessmentservice.security.CurrentUser;
 import com.onlinejudge.assessmentservice.service.CoursePermissionClient;
 import com.onlinejudge.assessmentservice.service.HomeworkEvaluationReplayService;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestAttribute;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -60,6 +64,7 @@ public class HomeworkEvaluationController {
 
     @PostMapping("/{submissionId}/reevaluate")
     public Map<String, Object> reevaluate(@PathVariable String submissionId,
+            @Valid @RequestBody ReevaluateHomeworkRequest requestBody,
             @RequestAttribute("assessment.currentUser") CurrentUser user, HttpServletRequest request) {
         String requestId = requestId(request);
         SubmissionResult submission = resolveSubmission(submissionId);
@@ -77,8 +82,12 @@ public class HomeworkEvaluationController {
         if (!managerRole || !coursePermissions.canManageCourse(task.courseId(), user.id())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "course management permission is required");
         }
-        if (!replayService.replay(task, user.id(), requestId, java.time.Instant.now())) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "only a terminal homework evaluation can be replayed");
+        try {
+            if (!replayService.replay(task, user.id(), requestBody.reason().trim(), requestId, java.time.Instant.now())) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "only a terminal homework evaluation can be replayed");
+            }
+        } catch (HomeworkEvaluationReplayService.HomeworkScoresPublishedException published) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, published.getMessage(), published);
         }
         EvaluationTask replayed = tasks.find(task.id()).orElseThrow();
         Map<String, Object> data = new LinkedHashMap<>();
@@ -162,4 +171,6 @@ public class HomeworkEvaluationController {
 
     private record SubmissionResult(String internalSubmissionId, long publicSubmissionId, long homeworkId, String studentId, String evaluationStatus,
                                     BigDecimal autoScore, BigDecimal finalScore, String courseId) { }
+
+    public record ReevaluateHomeworkRequest(@NotBlank @Size(max = 500) String reason) { }
 }
