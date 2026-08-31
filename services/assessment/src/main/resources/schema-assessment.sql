@@ -1,7 +1,7 @@
 CREATE TABLE IF NOT EXISTS assessment_submission (
   id VARCHAR(36) PRIMARY KEY, source_type VARCHAR(8) NOT NULL, source_id VARCHAR(80) NOT NULL,
   course_id VARCHAR(80) NOT NULL, student_id VARCHAR(80) NOT NULL, content_ref VARCHAR(500),
-  evaluation_status VARCHAR(32) NOT NULL, created_at TIMESTAMP NOT NULL
+  evaluation_status VARCHAR(32) NOT NULL, code_content CLOB NULL, created_at TIMESTAMP NOT NULL
 );
 CREATE TABLE IF NOT EXISTS evaluation_task (
   id VARCHAR(36) PRIMARY KEY, submission_id VARCHAR(36) NOT NULL UNIQUE, source_type VARCHAR(8) NOT NULL,
@@ -125,13 +125,17 @@ CREATE TABLE IF NOT EXISTS assessment_lab_experiment (
   id BIGINT AUTO_INCREMENT PRIMARY KEY, course_id VARCHAR(80) NOT NULL, title VARCHAR(100) NOT NULL,
   description CLOB NOT NULL, status VARCHAR(20) NOT NULL, deadline TIMESTAMP NOT NULL,
   max_score DECIMAL(10,2) NOT NULL, allowed_languages VARCHAR(500) NOT NULL,
-  auto_evaluate BOOLEAN NOT NULL, created_by VARCHAR(80) NOT NULL,
+  auto_evaluate BOOLEAN NOT NULL, chapter_id BIGINT NULL, attachment_ids VARCHAR(1000) NOT NULL DEFAULT '',
+  evaluation_mode VARCHAR(20) NOT NULL DEFAULT 'DOCKER_IO', report_required BOOLEAN NOT NULL DEFAULT FALSE,
+  time_limit_ms INT NOT NULL DEFAULT 30000, memory_limit_kb INT NOT NULL DEFAULT 262144,
+  published_at TIMESTAMP NULL, deleted BOOLEAN NOT NULL DEFAULT FALSE, created_by VARCHAR(80) NOT NULL,
   created_at TIMESTAMP NOT NULL, updated_at TIMESTAMP NOT NULL,
   INDEX idx_assessment_lab_course_status (course_id, status)
 );
 CREATE TABLE IF NOT EXISTS assessment_lab_submission (
   submission_id VARCHAR(36) PRIMARY KEY, lab_id BIGINT NOT NULL, student_id VARCHAR(80) NOT NULL,
   submission_version INT NOT NULL, language VARCHAR(40) NOT NULL, submit_status VARCHAR(20) NOT NULL,
+  has_file BOOLEAN NOT NULL DEFAULT TRUE,
   auto_score DECIMAL(10,2), final_score DECIMAL(10,2), submitted_at TIMESTAMP NOT NULL,
   UNIQUE KEY uq_assessment_lab_submission_version (lab_id, student_id, submission_version),
   INDEX idx_assessment_lab_submission_lab_student (lab_id, student_id, submitted_at)
@@ -145,4 +149,11 @@ CREATE TABLE IF NOT EXISTS assessment_lab_evaluation_result (
   submission_id VARCHAR(36) NOT NULL, testcase_id BIGINT NOT NULL, passed BOOLEAN NOT NULL,
   score DECIMAL(10,2) NOT NULL, actual_output CLOB, message VARCHAR(500), executed_at TIMESTAMP NOT NULL,
   PRIMARY KEY (submission_id, testcase_id)
+);
+CREATE TABLE IF NOT EXISTS assessment_lab_score (
+  submission_id VARCHAR(36) PRIMARY KEY, lab_id BIGINT NOT NULL, report_id BIGINT NULL,
+  auto_score DECIMAL(10,2) NULL, report_score DECIMAL(10,2) NULL, manual_score DECIMAL(10,2) NULL,
+  final_score DECIMAL(10,2) NOT NULL, comment VARCHAR(2000) NULL,
+  scored_at TIMESTAMP NOT NULL, updated_at TIMESTAMP NOT NULL,
+  INDEX idx_assessment_lab_score_lab (lab_id)
 );

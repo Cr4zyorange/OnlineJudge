@@ -44,17 +44,21 @@ public class AssessmentSubmissionController {
     @PostMapping(path = "/labs/{sourceId}/submissions", consumes = "multipart/form-data")
     @org.springframework.web.bind.annotation.ResponseStatus(HttpStatus.CREATED)
     public LabSubmissionService.SubmittedLabSubmission submitLab(@PathVariable long sourceId, @RequestParam(required = false) String courseId,
-            @RequestParam String language,
-            @RequestParam MultipartFile file, @RequestAttribute("assessment.currentUser") CurrentUser user, HttpServletRequest http) {
+    @RequestParam String language,
+            @RequestParam(required = false) MultipartFile file, @RequestParam(required = false) String code,
+            @RequestAttribute("assessment.currentUser") CurrentUser user, HttpServletRequest http) {
         if (http.getHeader("X-Request-Id") == null || http.getHeader("X-Request-Id").isBlank()) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "X-Request-Id is required");
         LabExperimentService.LabSummary lab;
         try { lab = labs.find(sourceId); }
         catch (java.util.NoSuchElementException missing) { throw new ResponseStatusException(HttpStatus.NOT_FOUND, "LAB does not exist", missing); }
         if (!user.hasRole("STUDENT") || !courseMembers.isActive(lab.courseId(), user.id())) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "active course student membership is required");
-        if (file.isEmpty()) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "submission file is required");
+        if ((file == null || file.isEmpty()) && (code == null || code.isBlank())) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "submission code or file is required");
         try {
+            boolean hasFile = file != null && !file.isEmpty();
+            byte[] content = hasFile ? file.getBytes() : code.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            String filename = hasFile ? file.getOriginalFilename() : "Main." + language;
             return labSubmissions.submit(new LabSubmissionService.SubmitLabCommand(sourceId, courseId, user.id(), language,
-                    file.getOriginalFilename(), file.getBytes()));
+                    filename, content, hasFile, hasFile ? null : code));
         } catch (IllegalArgumentException invalid) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, invalid.getMessage(), invalid);
         } catch (IllegalStateException invalidState) {

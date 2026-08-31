@@ -29,7 +29,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * Submission and result reads deliberately use separate entrypoints: API GET is a pure query,
  * while only a worker can claim a durable task.
  */
-@SpringBootTest
+@SpringBootTest(properties = "assessment.worker.enabled=false")
 @AutoConfigureMockMvc
 class AssessmentLifecycleContractTest {
     private static final KeyPair KEY = TestJwtFactory.rsaKeyPair();

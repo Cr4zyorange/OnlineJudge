@@ -54,12 +54,12 @@ public class LabSubmissionService {
             int version = nextVersion(lab.labId(), command.studentId());
             jdbc.update("""
                     INSERT INTO assessment_submission (id, source_type, source_id, course_id, student_id, content_ref,
-                        evaluation_status, created_at) VALUES (?, 'LAB', ?, ?, ?, ?, 'PENDING', ?)
-                    """, submissionId, Long.toString(lab.labId()), lab.courseId(), command.studentId(), stored.storageKey(), Timestamp.from(now));
+                        evaluation_status, code_content, created_at) VALUES (?, 'LAB', ?, ?, ?, ?, 'PENDING', ?, ?)
+                    """, submissionId, Long.toString(lab.labId()), lab.courseId(), command.studentId(), stored.storageKey(), command.codeContent(), Timestamp.from(now));
             jdbc.update("""
                     INSERT INTO assessment_lab_submission (submission_id, lab_id, student_id, submission_version, language,
-                        submit_status, submitted_at) VALUES (?, ?, ?, ?, ?, 'SUBMITTED', ?)
-                    """, submissionId, lab.labId(), command.studentId(), version, command.language(), Timestamp.from(now));
+                        submit_status, has_file, submitted_at) VALUES (?, ?, ?, ?, ?, 'SUBMITTED', ?, ?)
+                    """, submissionId, lab.labId(), command.studentId(), version, command.language(), command.hasFile(), Timestamp.from(now));
             tasks.insert(taskId, submissionId, "LAB", Long.toString(lab.labId()), lab.courseId(), command.studentId(), now);
             return new SubmittedLabSubmission(submissionId, taskId, lab.labId(), version, "SUBMITTED", "PENDING", now);
         } catch (RuntimeException | java.io.IOException failed) {
@@ -93,7 +93,11 @@ public class LabSubmissionService {
         return configured != null && java.util.Arrays.stream(configured.split(",")).anyMatch(language::equalsIgnoreCase);
     }
 
-    public record SubmitLabCommand(long labId, String courseId, String studentId, String language, String originalFilename, byte[] content) {
+    public record SubmitLabCommand(long labId, String courseId, String studentId, String language, String originalFilename, byte[] content,
+                                   boolean hasFile, String codeContent) {
+        public SubmitLabCommand(long labId, String courseId, String studentId, String language, String originalFilename, byte[] content) {
+            this(labId, courseId, studentId, language, originalFilename, content, true, null);
+        }
         public SubmitLabCommand {
             if (studentId == null || studentId.isBlank() || language == null || language.isBlank()) {
                 throw new IllegalArgumentException("studentId and language are required");

@@ -3,6 +3,8 @@ package com.onlinejudge.assessmentservice.controller;
 import com.onlinejudge.assessmentservice.model.EvaluationTask;
 import com.onlinejudge.assessmentservice.persistence.CourseMemberProjectionRepository;
 import com.onlinejudge.assessmentservice.persistence.EvaluationTaskRepository;
+import com.onlinejudge.assessmentservice.persistence.AssessmentOutboxRepository;
+import com.onlinejudge.assessmentservice.persistence.SourceGradeRepository;
 import com.onlinejudge.assessmentservice.security.CurrentUser;
 import com.onlinejudge.assessmentservice.service.LabExperimentService;
 import com.onlinejudge.assessmentservice.service.CoursePermissionClient;
@@ -10,6 +12,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestAttribute;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -19,6 +22,7 @@ import java.math.BigDecimal;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.List;
+import java.time.Instant;
 
 /** Read-only LAB result projection.  It deliberately never invokes a worker or evaluator. */
 @RestController
@@ -29,14 +33,25 @@ public class LabEvaluationController {
     private final CourseMemberProjectionRepository courseMembers;
     private final CoursePermissionClient coursePermissions;
     private final JdbcTemplate jdbc;
+    private final SourceGradeRepository grades;
+    private final AssessmentOutboxRepository outbox;
 
     public LabEvaluationController(LabExperimentService labs, EvaluationTaskRepository tasks,
             CourseMemberProjectionRepository courseMembers, CoursePermissionClient coursePermissions, JdbcTemplate jdbc) {
+        this(labs, tasks, courseMembers, coursePermissions, jdbc, null, null);
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public LabEvaluationController(LabExperimentService labs, EvaluationTaskRepository tasks,
+            CourseMemberProjectionRepository courseMembers, CoursePermissionClient coursePermissions, JdbcTemplate jdbc,
+            SourceGradeRepository grades, AssessmentOutboxRepository outbox) {
         this.labs = labs;
         this.tasks = tasks;
         this.courseMembers = courseMembers;
         this.coursePermissions = coursePermissions;
         this.jdbc = jdbc;
+        this.grades = grades;
+        this.outbox = outbox;
     }
 
     @GetMapping("/{labId}/submissions/{submissionId}/result")
@@ -89,6 +104,242 @@ public class LabEvaluationController {
         response.put("caseResults", caseResults);
         return response;
     }
+
+    @GetMapping("/{labId}/submissions")
+    public List<Map<String, Object>> submissions(@PathVariable long labId,
+            @RequestParam(required = false) String studentId,
+            @RequestAttribute("assessment.currentUser") CurrentUser user) {
+        LabExperimentService.LabSummary lab = findLab(labId);
+        boolean manager = canManage(lab, user);
+        if (!manager && !courseMembers.isActive(lab.courseId(), user.id())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "active course membership is required");
+        }
+        String requestedStudent = manager && studentId != null && !studentId.isBlank() ? studentId : (manager ? null : user.id());
+        String sql = """
+                SELECT submission_id, student_id, language, submit_status, submission_version, auto_score, final_score, has_file, submitted_at
+                  FROM assessment_lab_submission
+                 WHERE lab_id = ?
+                """ + (requestedStudent == null ? "" : " AND student_id = ?") + " ORDER BY submitted_at DESC, submission_version DESC";
+        return jdbc.query(sql, (rs, ignored) -> {
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("submissionId", rs.getString("submission_id"));
+            item.put("labId", labId);
+            item.put("studentId", rs.getString("student_id"));
+            item.put("language", rs.getString("language"));
+            item.put("submitStatus", rs.getString("submit_status"));
+            String status = jdbc.query("SELECT evaluation_status FROM assessment_submission WHERE id = ?", rows -> rows.next() ? rows.getString(1) : "NONE", rs.getString("submission_id"));
+            item.put("evaluationStatus", status == null ? "NONE" : status);
+            item.put("autoScore", rs.getBigDecimal("auto_score"));
+            item.put("finalScore", rs.getBigDecimal("final_score"));
+            item.put("version", rs.getInt("submission_version"));
+            item.put("submittedAt", rs.getTimestamp("submitted_at").toInstant());
+            int newer = jdbc.queryForObject("SELECT COUNT(*) FROM assessment_lab_submission WHERE lab_id = ? AND student_id = ? AND submission_version > ?", Integer.class, labId, rs.getString("student_id"), rs.getInt("submission_version"));
+            item.put("isLatest", newer == 0);
+            item.put("isFinal", rs.getBigDecimal("final_score") != null);
+            item.put("isScoringBasis", rs.getBigDecimal("final_score") != null || newer == 0);
+            item.put("hasFile", rs.getBoolean("has_file"));
+            return item;
+        }, requestedStudent == null ? new Object[]{labId} : new Object[]{labId, requestedStudent});
+    }
+
+    @GetMapping("/{labId}/submissions/{submissionId}")
+    public Map<String, Object> submissionDetail(@PathVariable long labId, @PathVariable String submissionId,
+            @RequestAttribute("assessment.currentUser") CurrentUser user) {
+        LabExperimentService.LabSummary lab = findLab(labId);
+        Map<String, Object> item = jdbc.query("""
+                SELECT submission_id, student_id, language, submit_status, submission_version, auto_score, final_score, has_file, submitted_at
+                  FROM assessment_lab_submission WHERE submission_id = ? AND lab_id = ?
+                """, (rs, ignored) -> {
+            Map<String, Object> value = new LinkedHashMap<>();
+            value.put("submissionId", rs.getString("submission_id"));
+            value.put("labId", labId);
+            value.put("studentId", rs.getString("student_id"));
+            value.put("language", rs.getString("language"));
+            value.put("submitStatus", rs.getString("submit_status"));
+            value.put("evaluationStatus", jdbc.query("SELECT evaluation_status FROM assessment_submission WHERE id = ?", rows -> rows.next() ? rows.getString(1) : "NONE", submissionId));
+            value.put("autoScore", rs.getBigDecimal("auto_score"));
+            value.put("finalScore", rs.getBigDecimal("final_score"));
+            value.put("version", rs.getInt("submission_version"));
+            value.put("submittedAt", rs.getTimestamp("submitted_at").toInstant());
+            int newer = jdbc.queryForObject("SELECT COUNT(*) FROM assessment_lab_submission WHERE lab_id = ? AND student_id = ? AND submission_version > ?", Integer.class, labId, rs.getString("student_id"), rs.getInt("submission_version"));
+            value.put("isLatest", newer == 0);
+            value.put("isFinal", rs.getBigDecimal("final_score") != null);
+            value.put("isScoringBasis", rs.getBigDecimal("final_score") != null || newer == 0);
+            value.put("hasFile", rs.getBoolean("has_file"));
+            value.put("code", jdbc.query("SELECT code_content FROM assessment_submission WHERE id = ?", rows -> rows.next() ? rows.getString(1) : null, submissionId));
+            value.put("sourceFile", null);
+            value.put("latestReport", null);
+            return value;
+        }, submissionId, labId).stream().findFirst().orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "LAB submission does not exist"));
+        boolean manager = canManage(lab, user);
+        if (!manager && !item.get("studentId").equals(user.id())) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "LAB submission access is restricted");
+        if (!manager && !courseMembers.isActive(lab.courseId(), user.id())) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "active course membership is required");
+        return item;
+    }
+
+    @GetMapping("/{labId}/results/{studentId}")
+    public Map<String, Object> studentResult(@PathVariable long labId, @PathVariable String studentId,
+            @RequestAttribute("assessment.currentUser") CurrentUser user) {
+        LabExperimentService.LabSummary lab = findLab(labId);
+        boolean manager = canManage(lab, user);
+        if (!manager && !user.id().equals(studentId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "LAB result access is restricted");
+        }
+        if (!manager && !courseMembers.isActive(lab.courseId(), user.id())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "active course membership is required");
+        }
+        String submissionId = jdbc.query("""
+                SELECT submission_id FROM assessment_lab_submission
+                 WHERE lab_id = ? AND student_id = ?
+                 ORDER BY submission_version DESC, submitted_at DESC
+                 LIMIT 1
+                """, rows -> rows.next() ? rows.getString(1) : null, labId, studentId);
+        if (submissionId == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "LAB result does not exist");
+        }
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("labId", labId);
+        response.put("courseId", lab.courseId());
+        response.put("studentId", studentId);
+        response.put("status", lab.status());
+        response.put("publishedAt", lab.publishedAt());
+        response.put("submission", submissionDetail(labId, submissionId, user));
+        response.put("evaluationResult", result(labId, submissionId, user));
+        response.put("latestScore", jdbc.query("""
+                SELECT report_id, auto_score, report_score, manual_score, final_score, comment, scored_at, updated_at
+                  FROM assessment_lab_score
+                 WHERE lab_id = ? AND submission_id = ?
+                """, (rs, ignored) -> {
+            Map<String, Object> score = new LinkedHashMap<>();
+            score.put("reportId", rs.getObject("report_id"));
+            score.put("autoScore", rs.getBigDecimal("auto_score"));
+            score.put("reportScore", rs.getBigDecimal("report_score"));
+            score.put("manualScore", rs.getBigDecimal("manual_score"));
+            score.put("finalScore", rs.getBigDecimal("final_score"));
+            score.put("comment", rs.getString("comment"));
+            score.put("scoredAt", rs.getTimestamp("scored_at") == null ? null : rs.getTimestamp("scored_at").toInstant());
+            score.put("updatedAt", rs.getTimestamp("updated_at") == null ? null : rs.getTimestamp("updated_at").toInstant());
+            return score;
+        }, labId, submissionId).stream().findFirst().orElse(null));
+        response.put("latestReport", null);
+        return response;
+    }
+
+    private LabExperimentService.LabSummary findLab(long labId) {
+        try { return labs.find(labId); }
+        catch (java.util.NoSuchElementException missing) { throw new ResponseStatusException(HttpStatus.NOT_FOUND, "LAB does not exist", missing); }
+    }
+
+    private boolean canManage(LabExperimentService.LabSummary lab, CurrentUser user) {
+        return (user.hasRole("TEACHER") || user.hasRole("ADMIN")) && coursePermissions.canManageCourse(lab.courseId(), user.id());
+    }
+
+    @org.springframework.web.bind.annotation.PostMapping("/{labId}/submissions/{submissionId}/score")
+    @org.springframework.transaction.annotation.Transactional
+    public Map<String, Object> score(@PathVariable long labId, @PathVariable String submissionId,
+            @RequestAttribute("assessment.currentUser") CurrentUser user,
+            @org.springframework.web.bind.annotation.RequestBody ScoreRequest request) {
+        LabExperimentService.LabSummary lab = findLab(labId);
+        if (!canManage(lab, user)) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "course management permission is required");
+        Map<String, Object> submission = jdbc.query("SELECT student_id, auto_score FROM assessment_lab_submission WHERE lab_id = ? AND submission_id = ?",
+                (rs, ignored) -> {
+                    Map<String, Object> value = new LinkedHashMap<>();
+                    value.put("studentId", rs.getString("student_id"));
+                    value.put("autoScore", rs.getBigDecimal("auto_score"));
+                    return value;
+                }, labId, submissionId)
+                .stream().findFirst().orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "LAB submission does not exist"));
+        if (request == null || request.finalScore() == null || request.finalScore().signum() < 0 || request.finalScore().compareTo(lab.maxScore()) > 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "finalScore must be within the LAB score range");
+        }
+        Instant now = Instant.now();
+        jdbc.update("""
+                INSERT INTO assessment_lab_score (submission_id, lab_id, report_id, auto_score, report_score, manual_score, final_score, comment, scored_at, updated_at)
+                VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, ?)
+                ON DUPLICATE KEY UPDATE report_score = VALUES(report_score), manual_score = VALUES(manual_score),
+                    final_score = VALUES(final_score), comment = VALUES(comment), updated_at = VALUES(updated_at)
+                """, submissionId, labId, submission.get("autoScore"), request.reportScore(), request.manualScore(), request.finalScore(), request.comment(), java.sql.Timestamp.from(now), java.sql.Timestamp.from(now));
+        jdbc.update("UPDATE assessment_lab_submission SET final_score = ? WHERE submission_id = ? AND lab_id = ?", request.finalScore(), submissionId, labId);
+        if (grades != null && outbox != null) {
+            long version = grades.upsertScored("LAB", Long.toString(labId), lab.courseId(), (String) submission.get("studentId"), request.finalScore(), lab.maxScore(), now);
+            outbox.append("assessment.source-grade.changed.v2", "assessment-source-grade", "LAB:" + labId + ":" + submission.get("studentId"), version, submissionId,
+                    Map.of("courseId", lab.courseId(), "sourceType", "LAB", "sourceId", Long.toString(labId), "studentId", submission.get("studentId"),
+                            "score", request.finalScore(), "fullScore", lab.maxScore(), "status", "SCORED", "sourceVersion", version), now);
+        }
+        return jdbc.query("SELECT submission_id, report_id, auto_score, report_score, manual_score, final_score, comment, scored_at, updated_at FROM assessment_lab_score WHERE submission_id = ?",
+                (rs, ignored) -> {
+                    Map<String, Object> response = new LinkedHashMap<>();
+                    response.put("submissionId", rs.getString("submission_id"));
+                    response.put("reportId", rs.getObject("report_id"));
+                    response.put("autoScore", rs.getBigDecimal("auto_score"));
+                    response.put("reportScore", rs.getBigDecimal("report_score"));
+                    response.put("manualScore", rs.getBigDecimal("manual_score"));
+                    response.put("finalScore", rs.getBigDecimal("final_score"));
+                    response.put("comment", rs.getString("comment"));
+                    response.put("hasChangeLogs", false);
+                    response.put("scoredAt", rs.getTimestamp("scored_at").toInstant());
+                    response.put("updatedAt", rs.getTimestamp("updated_at").toInstant());
+                    return response;
+                }, submissionId).stream().findFirst().orElseThrow();
+    }
+
+    @GetMapping("/{labId}/statistics")
+    public Map<String, Object> statistics(@PathVariable long labId,
+            @RequestAttribute("assessment.currentUser") CurrentUser user) {
+        LabExperimentService.LabSummary lab = findLab(labId);
+        if (!canManage(lab, user)) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "course management permission is required");
+        String creator = jdbc.queryForObject("SELECT created_by FROM assessment_lab_experiment WHERE id = ?", String.class, labId);
+        int total = jdbc.queryForObject("SELECT COUNT(*) FROM assessment_course_member_projection WHERE course_id = ? AND membership_status = 'ACTIVE' AND user_id <> ?", Integer.class, lab.courseId(), creator);
+        int submitted = jdbc.queryForObject("SELECT COUNT(DISTINCT student_id) FROM assessment_lab_submission WHERE lab_id = ?", Integer.class, labId);
+        int evaluated = jdbc.queryForObject("SELECT COUNT(DISTINCT lab.student_id) FROM assessment_lab_submission lab JOIN assessment_submission submission ON submission.id = lab.submission_id WHERE lab.lab_id = ? AND submission.evaluation_status IN ('ACCEPTED','WRONG_ANSWER','COMPILE_ERROR','RUNTIME_ERROR','TIME_LIMIT_EXCEEDED','SYSTEM_ERROR')", Integer.class, labId);
+        BigDecimal average = jdbc.queryForObject("SELECT AVG(COALESCE(final_score, auto_score)) FROM assessment_lab_submission WHERE lab_id = ? AND COALESCE(final_score, auto_score) IS NOT NULL", BigDecimal.class, labId);
+        int late = jdbc.queryForObject("SELECT COUNT(*) FROM assessment_lab_submission WHERE lab_id = ? AND submit_status = 'LATE'", Integer.class, labId);
+        List<String> unsubmitted = jdbc.queryForList("""
+                SELECT member.user_id FROM assessment_course_member_projection member
+                 WHERE member.course_id = ? AND member.membership_status = 'ACTIVE' AND member.user_id <> ?
+                   AND NOT EXISTS (SELECT 1 FROM assessment_lab_submission submission WHERE submission.lab_id = ? AND submission.student_id = member.user_id)
+                 ORDER BY member.user_id
+                """, String.class, lab.courseId(), creator, labId);
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("labId", labId);
+        response.put("courseId", lab.courseId());
+        response.put("totalStudentCount", total);
+        response.put("submittedCount", submitted);
+        response.put("unsubmittedCount", Math.max(0, total - submitted));
+        response.put("evaluatedCount", evaluated);
+        response.put("submissionRate", total == 0 ? BigDecimal.ZERO : BigDecimal.valueOf(submitted * 100.0 / total));
+        response.put("evaluationCompletionRate", submitted == 0 ? BigDecimal.ZERO : BigDecimal.valueOf(evaluated * 100.0 / submitted));
+        response.put("averageScore", average);
+        response.put("lateSubmissionCount", late);
+        response.put("unsubmittedStudentIds", unsubmitted);
+        response.put("scoreDistribution", Map.of());
+        response.put("generatedAt", Instant.now());
+        return response;
+    }
+
+    @org.springframework.web.bind.annotation.PostMapping("/{labId}/submissions/{submissionId}/evaluate")
+    public Map<String, Object> evaluate(@PathVariable long labId, @PathVariable String submissionId,
+            @RequestAttribute("assessment.currentUser") CurrentUser user,
+            jakarta.servlet.http.HttpServletRequest request) {
+        if (request.getHeader("X-Request-Id") == null || request.getHeader("X-Request-Id").isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "X-Request-Id is required");
+        }
+        LabExperimentService.LabSummary lab = findLab(labId);
+        if (!canManage(lab, user)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "course management permission is required");
+        }
+        EvaluationTask task = tasks.findBySubmission(submissionId)
+                .filter(candidate -> "LAB".equals(candidate.sourceType()) && Long.toString(labId).equals(candidate.sourceId()))
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "LAB evaluation task does not exist"));
+        if (!tasks.manualReplay(task.id(), user.id(), Instant.now())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "only a terminal failed evaluation can be replayed");
+        }
+        EvaluationTask replayed = tasks.find(task.id()).orElseThrow();
+        return Map.of("taskId", replayed.id(), "submissionId", submissionId, "state", replayed.state().name(),
+                "generation", replayed.generation());
+    }
+
+    public record ScoreRequest(BigDecimal manualScore, BigDecimal reportScore, BigDecimal finalScore, String comment, String changeReason) { }
 
     private record LabSubmission(String studentId, BigDecimal autoScore) { }
 }
