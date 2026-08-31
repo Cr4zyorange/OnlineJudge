@@ -2,12 +2,23 @@ import http from "node:http";
 
 const service = process.env.SERVICE ?? "unknown";
 let uploadCount = 0;
+const requestCounts = new Map();
 
 const server = http.createServer((request, response) => {
   const chunks = [];
   request.on("data", (chunk) => chunks.push(chunk));
   request.on("end", () => {
-    const path = new URL(request.url, "http://upstream").pathname;
+    const url = new URL(request.url, "http://upstream");
+    const path = url.pathname;
+
+    if (path === "/__fixture/count") {
+      const target = url.searchParams.get("target") ?? "";
+      response.writeHead(200, { "content-type": "application/json" });
+      response.end(JSON.stringify({ target, count: requestCounts.get(target) ?? 0 }));
+      return;
+    }
+
+    requestCounts.set(path, (requestCounts.get(path) ?? 0) + 1);
 
     if (path.endsWith("/unavailable")) {
       request.socket.destroy();
@@ -18,7 +29,7 @@ const server = http.createServer((request, response) => {
       return;
     }
 
-    let status = 200;
+    let status = path.endsWith("/controlled-unavailable") ? 503 : 200;
     if (path.endsWith("/unauthorized")) status = 401;
     if (path.endsWith("/forbidden")) status = 403;
     if (path.endsWith("/999999")) status = 404;
@@ -28,23 +39,16 @@ const server = http.createServer((request, response) => {
 });
 
 function respond(response, request, path, status, body) {
-  const stripped = [
-    "x-user-id",
-    "x-username",
-    "x-user-role",
-    "x-permissions",
-    "x-course-ids",
-    "x-manageable-course-ids",
-  ].every((name) => request.headers[name] === undefined);
   const payload = JSON.stringify({
     service,
     path,
     status,
     authorization: request.headers.authorization ?? "",
-    stripped,
+    headers: Object.keys(request.headers).sort(),
     requestId: request.headers["x-request-id"] ?? "",
     bytes: body.length,
     uploadCount,
+    requestCount: requestCounts.get(path) ?? 0,
   });
   response.writeHead(status, { "content-type": "application/json" });
   response.end(payload);

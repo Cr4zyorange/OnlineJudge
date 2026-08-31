@@ -31,7 +31,7 @@ request_private() {
   fi
 }
 
-request_public /api/v1/system/health
-request_public /api/v1/system/readiness
+request_public /health/live
+request_public /health/ready
 request_private "$smoke_path"
 printf 'gateway verification passed\n'

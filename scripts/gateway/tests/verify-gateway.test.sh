@@ -37,8 +37,12 @@ PATH="$fake_bin:$PATH" GATEWAY_TEST_CURL_LOG="$curl_log" \
   GATEWAY_BASE=http://offline.test GATEWAY_BEARER_TOKEN=secret-bearer-value \
   GATEWAY_SMOKE_PATH=/api/v1/auth/me "$verifier" > "$stdout_file"
 
-grep -Fq 'http://offline.test/api/v1/system/health' "$curl_log"
-grep -Fq 'http://offline.test/api/v1/system/readiness' "$curl_log"
+grep -Fq 'http://offline.test/health/live' "$curl_log"
+grep -Fq 'http://offline.test/health/ready' "$curl_log"
+if grep -Fq '/api/v1/system/' "$curl_log"; then
+  printf 'verifier still depends on a monolith system endpoint\n' >&2
+  exit 1
+fi
 grep -Fq 'http://offline.test/api/v1/auth/me' "$curl_log"
 grep -Fq 'Authorization: Bearer secret-bearer-value' "$curl_log"
 if grep -Fq 'secret-bearer-value' "$stdout_file"; then
