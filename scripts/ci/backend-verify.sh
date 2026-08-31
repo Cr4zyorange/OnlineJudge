@@ -111,6 +111,7 @@ preserve_course_reports
 if [[ "${OJ312_COURSE_GATE_MUTATION:-0}" != "1" ]]; then
   log_run bash "$checkout/scripts/test/verify-course-service-ci-gate.test.sh" "$checkout"
 fi
+log_run bash "$checkout/scripts/test/verify-course-service-live-summary.test.sh" "$checkout"
 log_run bash "$checkout/scripts/test/verify-course-compose-contract.test.sh" "$checkout"
 log_run bash "$checkout/scripts/test/verify-course-reproducible-build.sh" "$checkout"
 
