@@ -180,7 +180,9 @@ public class LabExperimentService {
         LabSummary current = find(labId);
         if (!"PUBLISHED".equals(current.status()) && !"CLOSED".equals(current.status())) throw new IllegalStateException("only an open or closed LAB can publish scores");
         Instant now = clock.instant();
-        jdbc.update("UPDATE assessment_lab_experiment SET status = 'SCORE_PUBLISHED', updated_at = ? WHERE id = ? AND status IN ('PUBLISHED', 'CLOSED')", Timestamp.from(now), labId);
+        if (jdbc.update("UPDATE assessment_lab_experiment SET status = 'SCORE_PUBLISHED', updated_at = ? WHERE id = ? AND status IN ('PUBLISHED', 'CLOSED')", Timestamp.from(now), labId) != 1) {
+            throw new IllegalStateException("LAB lifecycle changed concurrently");
+        }
         publishStoredScores(current, now);
         return new LabSummary(current.labId(), current.courseId(), current.title(), "SCORE_PUBLISHED", current.deadline(), current.maxScore(), current.autoEvaluate(), current.createdAt(), current.evaluationMode(), current.reportRequired(), current.publishedAt(), false);
     }

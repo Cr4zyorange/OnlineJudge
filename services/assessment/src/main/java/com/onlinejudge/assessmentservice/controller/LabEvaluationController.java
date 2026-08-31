@@ -270,7 +270,7 @@ public class LabEvaluationController {
             @org.springframework.web.bind.annotation.RequestBody ScoreRequest request) {
         LabExperimentService.LabSummary lab = findLab(labId);
         if (!canManage(lab, user)) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "course management permission is required");
-        Map<String, Object> submission = jdbc.query("SELECT student_id, auto_score FROM assessment_lab_submission WHERE lab_id = ? AND submission_id = ?",
+        Map<String, Object> submission = jdbc.query("SELECT student_id, auto_score FROM assessment_lab_submission WHERE lab_id = ? AND submission_id = ? FOR UPDATE",
                 (rs, ignored) -> {
                     Map<String, Object> value = new LinkedHashMap<>();
                     value.put("studentId", rs.getString("student_id"));
@@ -281,7 +281,7 @@ public class LabEvaluationController {
         if (request == null || request.finalScore() == null || request.finalScore().signum() < 0 || request.finalScore().compareTo(lab.maxScore()) > 0) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "finalScore must be within the LAB score range");
         }
-        BigDecimal previousFinalScore = jdbc.query("SELECT final_score FROM assessment_lab_score WHERE submission_id = ?",
+        BigDecimal previousFinalScore = jdbc.query("SELECT final_score FROM assessment_lab_score WHERE submission_id = ? FOR UPDATE",
                 rows -> rows.next() ? rows.getBigDecimal(1) : null, submissionId);
         String changeReason = request.changeReason() == null ? null : request.changeReason().trim();
         if (changeReason != null && changeReason.length() > 500) {

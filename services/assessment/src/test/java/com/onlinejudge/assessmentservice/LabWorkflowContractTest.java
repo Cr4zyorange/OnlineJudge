@@ -698,6 +698,55 @@ class LabWorkflowContractTest {
                 .andExpect(status().isOk());
         org.assertj.core.api.Assertions.assertThat(jdbc.queryForObject("SELECT score FROM assessment_source_grade WHERE source_type = 'LAB' AND source_id = ? AND student_id = ?", BigDecimal.class, Long.toString(labId), "student-final-priority-314"))
                 .isEqualByComparingTo("80");
+        int eventsAfterRelease = jdbc.queryForObject("SELECT COUNT(*) FROM assessment_event_outbox WHERE event_type = 'assessment.source-grade.changed.v2' AND aggregate_id = ?", Integer.class, "LAB:" + labId + ":student-final-priority-314");
+        mockMvc.perform(put("/api/v1/labs/{labId}/release-scores", labId)
+                        .header("Authorization", "Bearer " + teacherToken).header("X-Request-Id", "final-priority-release-again-314"))
+                .andExpect(status().isConflict());
+        org.assertj.core.api.Assertions.assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM assessment_event_outbox WHERE event_type = 'assessment.source-grade.changed.v2' AND aggregate_id = ?", Integer.class, "LAB:" + labId + ":student-final-priority-314"))
+                .isEqualTo(eventsAfterRelease);
+    }
+
+    @Test
+    void releasedTeacherFinalScoreSurvivesReplayOfLaterSubmission() throws Exception {
+        String teacherToken = TestJwtFactory.userToken(KEY, "lab-workflow-kid", "teacher-314", List.of("TEACHER"));
+        String studentToken = TestJwtFactory.userToken(KEY, "lab-workflow-kid", "student-replay-history-314", List.of("STUDENT"));
+        jdbc.update("INSERT INTO assessment_course_member_projection (course_id, user_id, membership_status, member_version) VALUES ('course-314', 'student-replay-history-314', 'ACTIVE', 1)");
+        mockMvc.perform(post("/api/v1/courses/{courseId}/labs", "course-314")
+                        .header("Authorization", "Bearer " + teacherToken).header("X-Request-Id", "replay-history-create-314")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"replay-history-lab-314\",\"description\":\"history final score\",\"deadline\":\"2030-01-01T12:00:00Z\",\"maxScore\":100,\"allowedLanguages\":[\"python\"],\"autoEvaluate\":true,\"testcases\":[{\"input\":\"x\",\"expectedOutput\":\"x\",\"scoreWeight\":100,\"public\":true,\"orderNum\":1}]}"))
+                .andExpect(status().isCreated());
+        Long labId = jdbc.queryForObject("SELECT id FROM assessment_lab_experiment WHERE title = 'replay-history-lab-314'", Long.class);
+        mockMvc.perform(post("/api/v1/labs/{labId}/publish", labId).header("Authorization", "Bearer " + teacherToken).header("X-Request-Id", "replay-history-publish-314"))
+                .andExpect(status().isOk());
+        mockMvc.perform(multipart("/api/v1/labs/{labId}/submissions", labId).file("file", "print('first')".getBytes()).param("language", "python")
+                        .header("Authorization", "Bearer " + studentToken).header("X-Request-Id", "replay-history-first-314"))
+                .andExpect(status().isCreated());
+        String firstSubmissionId = jdbc.queryForObject("SELECT submission_id FROM assessment_lab_submission WHERE lab_id = ? AND submission_version = 1", String.class, labId);
+        worker.runOne("replay-history-first-worker-314", task -> new AssessmentWorker.EvaluationOutcome(true, "ACCEPTED", new BigDecimal("30"), new BigDecimal("100")));
+        mockMvc.perform(post("/api/v1/labs/{labId}/submissions/{submissionId}/score", labId, firstSubmissionId)
+                        .header("Authorization", "Bearer " + teacherToken).header("X-Request-Id", "replay-history-score-314")
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"finalScore\":80}"))
+                .andExpect(status().isOk());
+        mockMvc.perform(multipart("/api/v1/labs/{labId}/submissions", labId).file("file", "print('second')".getBytes()).param("language", "python")
+                        .header("Authorization", "Bearer " + studentToken).header("X-Request-Id", "replay-history-second-314"))
+                .andExpect(status().isCreated());
+        String secondSubmissionId = jdbc.queryForObject("SELECT submission_id FROM assessment_lab_submission WHERE lab_id = ? AND submission_version = 2", String.class, labId);
+        for (int attempt = 0; attempt < 3; attempt++) {
+            worker.runOne("replay-history-failing-worker-314", task -> AssessmentWorker.EvaluationOutcome.failed("SANDBOX_ERROR"));
+            jdbc.update("UPDATE evaluation_task SET next_attempt_at = TIMESTAMP '1970-01-01 00:00:00' WHERE submission_id = ? AND state = 'RETRY_WAIT'", secondSubmissionId);
+        }
+        mockMvc.perform(put("/api/v1/labs/{labId}/release-scores", labId)
+                        .header("Authorization", "Bearer " + teacherToken).header("X-Request-Id", "replay-history-release-314"))
+                .andExpect(status().isOk());
+        org.assertj.core.api.Assertions.assertThat(jdbc.queryForObject("SELECT score FROM assessment_source_grade WHERE source_type = 'LAB' AND source_id = ? AND student_id = ?", BigDecimal.class, Long.toString(labId), "student-replay-history-314"))
+                .isEqualByComparingTo("80");
+        mockMvc.perform(post("/api/v1/labs/{labId}/submissions/{submissionId}/evaluate", labId, secondSubmissionId)
+                        .header("Authorization", "Bearer " + teacherToken).header("X-Request-Id", "replay-history-requeue-314"))
+                .andExpect(status().isOk());
+        worker.runOne("replay-history-success-worker-314", task -> new AssessmentWorker.EvaluationOutcome(true, "ACCEPTED", new BigDecimal("20"), new BigDecimal("100")));
+        org.assertj.core.api.Assertions.assertThat(jdbc.queryForObject("SELECT score FROM assessment_source_grade WHERE source_type = 'LAB' AND source_id = ? AND student_id = ?", BigDecimal.class, Long.toString(labId), "student-replay-history-314"))
+                .isEqualByComparingTo("80");
     }
 
     @Test

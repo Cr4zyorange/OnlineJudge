@@ -49,9 +49,6 @@ public class HttpCoursePermissionClient implements CoursePermissionClient {
                     .header("X-OnlineJudge-Service-Authorization", serviceAuthorization)
                     .GET().build();
             HttpResponse<String> response = http.send(request, HttpResponse.BodyHandlers.ofString());
-            if (response.statusCode() == 401 || response.statusCode() == 403) {
-                return false;
-            }
             if (response.statusCode() != 200) {
                 throw new CourseAuthorizationUnavailableException("CRS authorization returned HTTP " + response.statusCode());
             }

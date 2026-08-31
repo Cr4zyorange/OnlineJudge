@@ -75,8 +75,15 @@ class WorkerCompletionService {
                 && shouldPublishSourceGrade(task)) {
             java.math.BigDecimal publishedScore = outcome.score();
             if ("LAB".equals(task.sourceType()) && jdbc != null) {
-                java.math.BigDecimal finalScore = jdbc.query("SELECT final_score FROM assessment_lab_submission WHERE submission_id = ?",
-                        rows -> rows.next() ? rows.getBigDecimal(1) : null, task.submissionId());
+                // Release selects the newest finalized submission for a student;
+                // replaying a later unfinalized submission must preserve that basis.
+                java.math.BigDecimal finalScore = jdbc.query("""
+                        SELECT final_score FROM assessment_lab_submission
+                         WHERE lab_id = ? AND student_id = ? AND final_score IS NOT NULL
+                         ORDER BY submission_version DESC, submitted_at DESC
+                         LIMIT 1
+                        """, rows -> rows.next() ? rows.getBigDecimal(1) : null,
+                        Long.parseLong(task.sourceId()), task.studentId());
                 if (finalScore != null) publishedScore = finalScore;
             }
             long version = grades.upsertScored(task.sourceType(), task.sourceId(), task.courseId(), task.studentId(), publishedScore, outcome.fullScore(), finished);

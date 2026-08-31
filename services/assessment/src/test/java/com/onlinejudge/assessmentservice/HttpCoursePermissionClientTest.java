@@ -23,10 +23,20 @@ class HttpCoursePermissionClientTest {
                 exchange.getResponseBody().write(body.getBytes());
                 exchange.close();
             });
+            server.createContext("/forbidden/course-1/user-1", exchange -> {
+                exchange.sendResponseHeaders(403, -1);
+                exchange.close();
+            });
             server.start();
             String base = "http://127.0.0.1:" + server.getAddress().getPort() + "/courses/{courseId}/permission/{userId}";
             HttpCoursePermissionClient denial = new HttpCoursePermissionClient(new ObjectMapper(), base, "assessment-test", Duration.ofSeconds(1));
             assertThat(denial.canManageCourse("course-1", "user-1")).isFalse();
+
+            HttpCoursePermissionClient invalidServiceIdentity = new HttpCoursePermissionClient(new ObjectMapper(),
+                    "http://127.0.0.1:" + server.getAddress().getPort() + "/forbidden/{courseId}/{userId}",
+                    "assessment-test", Duration.ofSeconds(1));
+            assertThatThrownBy(() -> invalidServiceIdentity.canManageCourse("course-1", "user-1"))
+                    .isInstanceOf(CourseAuthorizationUnavailableException.class);
 
             HttpCoursePermissionClient outage = new HttpCoursePermissionClient(new ObjectMapper(),
                     "http://127.0.0.1:" + server.getAddress().getPort() + "/unavailable/{courseId}/{userId}",
