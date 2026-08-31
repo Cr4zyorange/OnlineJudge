@@ -106,6 +106,7 @@ public class CourseService {
 
     @Transactional
     public MemberView leave(long courseId, CurrentUser actor, String correlationId) {
+        requireMutableCourse(courseId);
         CourseRepository.Member current = courses.member(courseId, actor.id()).orElseThrow(this::forbidden);
         if (!"ACTIVE".equals(current.status()) || "TEACHER".equals(current.role())) throw forbidden();
         CourseRepository.Member changed = courses.updateMember(courseId, actor.id(), current.role(), "REMOVED", null);
@@ -117,10 +118,16 @@ public class CourseService {
     @Transactional
     public MemberView changeMember(long courseId, long userId, String role, String status, CurrentUser actor, String correlationId) {
         requireOwner(courseId, actor);
+        requireMutableCourse(courseId);
         CourseRepository.Member current = courses.member(courseId, userId)
                 .orElseThrow(() -> new CourseException(HttpStatus.NOT_FOUND, "COURSE_MEMBER_NOT_FOUND", "course member does not exist", false));
         String nextRole = role == null || role.isBlank() ? current.role() : memberRole(role);
         String nextStatus = status == null || status.isBlank() ? current.status() : memberStatus(status);
+        validateMemberTransition(current.status(), nextStatus);
+        if (actor.id() == userId && (!"TEACHER".equals(nextRole) || "REMOVED".equals(nextStatus))) {
+            throw new CourseException(HttpStatus.CONFLICT, "CANNOT_CHANGE_SELF_TEACHER",
+                    "a teacher cannot change their own course teacher identity", false);
+        }
         if (current.role().equals("TEACHER") && "ACTIVE".equals(current.status())
                 && (!"TEACHER".equals(nextRole) || !"ACTIVE".equals(nextStatus))
                 && courses.activeMemberCount(courseId, "TEACHER") <= 1) {
@@ -544,6 +551,17 @@ public class CourseService {
         String status = value.trim().toUpperCase(Locale.ROOT);
         if (!List.of("ACTIVE", "PENDING", "REMOVED", "REJECTED").contains(status)) throw new CourseException(HttpStatus.BAD_REQUEST, "COURSE_MEMBER_INVALID", "member status is invalid", false);
         return status;
+    }
+    private void validateMemberTransition(String current, String next) {
+        boolean valid = switch (current) {
+            case "PENDING" -> "ACTIVE".equals(next) || "REJECTED".equals(next);
+            case "ACTIVE" -> "ACTIVE".equals(next) || "REMOVED".equals(next);
+            default -> false;
+        };
+        if (!valid) {
+            throw new CourseException(HttpStatus.CONFLICT, "INVALID_MEMBER_STATUS_TRANSITION",
+                    "member status transition from " + current + " to " + next + " is not allowed", false);
+        }
     }
     private String joinMethod(String mode) { return switch (mode) { case "INVITE" -> "INVITE"; case "REVIEW" -> "REVIEW"; default -> "PUBLIC"; }; }
     private boolean constantTimeEquals(String expected, String provided) {

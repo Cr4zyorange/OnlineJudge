@@ -646,6 +646,197 @@ class CourseServiceContractTest {
                 .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("COURSE_READ_ONLY"));
     }
 
+    @Test
+    void archivedAndClosedCoursesRejectMemberMutationsAndLeaveWhileStayingReadable() throws Exception {
+        String teacher = userToken("944", List.of("TEACHER"));
+        String student = userToken("945", List.of("STUDENT"));
+        String archivedId = createdCourse(teacher, "member read only after archive");
+        mockMvc.perform(post("/api/v1/courses/{courseId}/join", archivedId)
+                        .header("Authorization", student).header("X-Request-Id", requestId()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.status").value("ACTIVE"));
+        mockMvc.perform(delete("/api/v1/courses/{courseId}", archivedId)
+                        .header("Authorization", teacher).header("X-Request-Id", requestId()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.status").value("ARCHIVED"));
+
+        mockMvc.perform(put("/api/v1/courses/{courseId}/members/{userId}", archivedId, "945")
+                        .header("Authorization", teacher).header("X-Request-Id", requestId())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"role\":\"ASSISTANT\",\"status\":\"ACTIVE\"}"))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("COURSE_READ_ONLY"));
+        mockMvc.perform(delete("/api/v1/courses/{courseId}/members/{userId}", archivedId, "945")
+                        .header("Authorization", teacher).header("X-Request-Id", requestId()))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("COURSE_READ_ONLY"));
+        mockMvc.perform(post("/api/v1/courses/{courseId}/leave", archivedId)
+                        .header("Authorization", student).header("X-Request-Id", requestId()))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("COURSE_READ_ONLY"));
+        assertThat(jdbcTemplate.queryForMap(
+                "SELECT role, join_status, member_version FROM crs_course_member WHERE course_id = ? AND user_id = ?",
+                Long.parseLong(archivedId), 945L))
+                .containsEntry("role", "STUDENT").containsEntry("join_status", "ACTIVE").containsEntry("member_version", 1L);
+
+        String closedId = createdCourse(teacher, "member read only when closed");
+        String closedStudent = userToken("946", List.of("STUDENT"));
+        mockMvc.perform(post("/api/v1/courses/{courseId}/join", closedId)
+                        .header("Authorization", closedStudent).header("X-Request-Id", requestId()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.status").value("ACTIVE"));
+        mockMvc.perform(put("/api/v1/courses/{courseId}", closedId)
+                        .header("Authorization", teacher).header("X-Request-Id", requestId())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"status\":\"CLOSED\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.status").value("CLOSED"));
+        mockMvc.perform(post("/api/v1/courses/{courseId}/leave", closedId)
+                        .header("Authorization", closedStudent).header("X-Request-Id", requestId()))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("COURSE_READ_ONLY"));
+        mockMvc.perform(put("/api/v1/courses/{courseId}/members/{userId}", closedId, "946")
+                        .header("Authorization", teacher).header("X-Request-Id", requestId())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"role\":\"STUDENT\",\"status\":\"REMOVED\"}"))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("COURSE_READ_ONLY"));
+    }
+
+    @Test
+    void memberStatusChangesFollowEnrollmentStateMachineAndRejectDirectActivation() throws Exception {
+        String teacher = userToken("751", List.of("TEACHER"));
+        String student = userToken("752", List.of("STUDENT"));
+        String create = mockMvc.perform(post("/api/v1/courses")
+                        .header("Authorization", teacher).header("X-Request-Id", requestId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"member state machine\",\"enrollmentMode\":\"REVIEW\"}"))
+                .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+        String courseId = objectMapper.readTree(create).at("/data/id").asText();
+
+        mockMvc.perform(post("/api/v1/courses/{courseId}/join", courseId)
+                        .header("Authorization", student).header("X-Request-Id", requestId()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.status").value("PENDING"));
+
+        mockMvc.perform(put("/api/v1/courses/{courseId}/members/{userId}", courseId, "752")
+                        .header("Authorization", teacher).header("X-Request-Id", requestId())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"role\":\"STUDENT\",\"status\":\"ACTIVE\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.status").value("ACTIVE"));
+        mockMvc.perform(put("/api/v1/courses/{courseId}/members/{userId}", courseId, "752")
+                        .header("Authorization", teacher).header("X-Request-Id", requestId())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"status\":\"PENDING\"}"))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("INVALID_MEMBER_STATUS_TRANSITION"));
+        mockMvc.perform(put("/api/v1/courses/{courseId}/members/{userId}", courseId, "752")
+                        .header("Authorization", teacher).header("X-Request-Id", requestId())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"status\":\"REJECTED\"}"))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("INVALID_MEMBER_STATUS_TRANSITION"));
+        mockMvc.perform(put("/api/v1/courses/{courseId}/members/{userId}", courseId, "752")
+                        .header("Authorization", teacher).header("X-Request-Id", requestId())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"status\":\"REMOVED\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.status").value("REMOVED"));
+
+        int outboxBefore = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM course_event_outbox", Integer.class);
+        mockMvc.perform(put("/api/v1/courses/{courseId}/members/{userId}", courseId, "752")
+                        .header("Authorization", teacher).header("X-Request-Id", requestId())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"role\":\"STUDENT\",\"status\":\"ACTIVE\"}"))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("INVALID_MEMBER_STATUS_TRANSITION"));
+        assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM course_event_outbox", Integer.class))
+                .isEqualTo(outboxBefore);
+
+        mockMvc.perform(post("/api/v1/courses/{courseId}/join", courseId)
+                        .header("Authorization", student).header("X-Request-Id", requestId()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.status").value("PENDING"));
+        mockMvc.perform(put("/api/v1/courses/{courseId}/members/{userId}", courseId, "752")
+                        .header("Authorization", teacher).header("X-Request-Id", requestId())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"role\":\"STUDENT\",\"status\":\"ACTIVE\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.status").value("ACTIVE"));
+
+        String secondStudent = userToken("753", List.of("STUDENT"));
+        mockMvc.perform(post("/api/v1/courses/{courseId}/join", courseId)
+                        .header("Authorization", secondStudent).header("X-Request-Id", requestId()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.status").value("PENDING"));
+        mockMvc.perform(put("/api/v1/courses/{courseId}/members/{userId}", courseId, "753")
+                        .header("Authorization", teacher).header("X-Request-Id", requestId())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"status\":\"REJECTED\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.status").value("REJECTED"));
+        mockMvc.perform(put("/api/v1/courses/{courseId}/members/{userId}", courseId, "753")
+                        .header("Authorization", teacher).header("X-Request-Id", requestId())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"role\":\"STUDENT\",\"status\":\"ACTIVE\"}"))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("INVALID_MEMBER_STATUS_TRANSITION"));
+        mockMvc.perform(post("/api/v1/courses/{courseId}/join", courseId)
+                        .header("Authorization", secondStudent).header("X-Request-Id", requestId()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.status").value("PENDING"));
+        mockMvc.perform(put("/api/v1/courses/{courseId}/members/{userId}", courseId, "753")
+                        .header("Authorization", teacher).header("X-Request-Id", requestId())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"role\":\"STUDENT\",\"status\":\"ACTIVE\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.status").value("ACTIVE"));
+    }
+
+    @Test
+    void courseOwnerCannotChangeOwnTeacherIdentityInMultiTeacherCourse() throws Exception {
+        String owner = userToken("761", List.of("TEACHER"));
+        String secondTeacher = userToken("762", List.of("TEACHER"));
+        String courseId = createdCourse(owner, "owner teacher identity lock");
+        mockMvc.perform(post("/api/v1/courses/{courseId}/join", courseId)
+                        .header("Authorization", secondTeacher).header("X-Request-Id", requestId()))
+                .andExpect(status().isOk());
+        mockMvc.perform(put("/api/v1/courses/{courseId}/members/{userId}", courseId, "762")
+                        .header("Authorization", owner).header("X-Request-Id", requestId())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"role\":\"TEACHER\",\"status\":\"ACTIVE\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.role").value("TEACHER"));
+
+        mockMvc.perform(put("/api/v1/courses/{courseId}/members/{userId}", courseId, "761")
+                        .header("Authorization", owner).header("X-Request-Id", requestId())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"role\":\"ASSISTANT\",\"status\":\"ACTIVE\"}"))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("CANNOT_CHANGE_SELF_TEACHER"));
+        mockMvc.perform(put("/api/v1/courses/{courseId}/members/{userId}", courseId, "761")
+                        .header("Authorization", owner).header("X-Request-Id", requestId())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"role\":\"TEACHER\",\"status\":\"REMOVED\"}"))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("CANNOT_CHANGE_SELF_TEACHER"));
+        mockMvc.perform(delete("/api/v1/courses/{courseId}/members/{userId}", courseId, "761")
+                        .header("Authorization", owner).header("X-Request-Id", requestId()))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("CANNOT_CHANGE_SELF_TEACHER"));
+
+        assertThat(jdbcTemplate.queryForMap(
+                "SELECT role, join_status FROM crs_course_member WHERE course_id = ? AND user_id = ?",
+                Long.parseLong(courseId), 761L))
+                .containsEntry("role", "TEACHER").containsEntry("join_status", "ACTIVE");
+    }
+
+    @Test
+    void resourceUploadRejectsDisguisedExecutablesAndUnmatchedContentWithoutLeavingRecords() throws Exception {
+        String teacher = userToken("771", List.of("TEACHER"));
+        String courseId = createdCourse(teacher, "resource content safety");
+
+        byte[] pe = new byte[]{'M', 'Z', 0, 0, 0, 0, (byte) 0x90, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+        mockMvc.perform(multipart("/api/v1/courses/{courseId}/resources", courseId)
+                        .file(new MockMultipartFile("file", "slides.pdf", "application/pdf", pe))
+                        .param("name", "slides.pdf").param("resourceType", "DOCUMENT").param("visibility", "STUDENT")
+                        .header("Authorization", teacher).header("X-Request-Id", requestId()))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("RESOURCE_INVALID"));
+
+        byte[] elf = new byte[]{0x7F, 'E', 'L', 'F', 2, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+        mockMvc.perform(multipart("/api/v1/courses/{courseId}/resources", courseId)
+                        .file(new MockMultipartFile("file", "notes.pdf", "application/pdf", elf))
+                        .param("name", "notes.pdf")
+                        .header("Authorization", teacher).header("X-Request-Id", requestId()))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("RESOURCE_INVALID"));
+
+        mockMvc.perform(multipart("/api/v1/courses/{courseId}/resources", courseId)
+                        .file(new MockMultipartFile("file", "run.txt", "text/plain",
+                                "#!/bin/sh\nrm -rf /tmp/pwn\n".getBytes(StandardCharsets.UTF_8)))
+                        .param("name", "run.txt")
+                        .header("Authorization", teacher).header("X-Request-Id", requestId()))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("RESOURCE_INVALID"));
+
+        mockMvc.perform(multipart("/api/v1/courses/{courseId}/resources", courseId)
+                        .file(new MockMultipartFile("file", "notes.pdf", "application/pdf",
+                                "plain text is not a pdf".getBytes(StandardCharsets.UTF_8)))
+                        .param("name", "notes.pdf")
+                        .header("Authorization", teacher).header("X-Request-Id", requestId()))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("RESOURCE_INVALID"));
+
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM crs_resource WHERE course_id = ?", Integer.class, Long.parseLong(courseId))).isZero();
+
+        mockMvc.perform(multipart("/api/v1/courses/{courseId}/resources", courseId)
+                        .file(new MockMultipartFile("file", "slides.pdf", "application/pdf",
+                                "%PDF-1.4\n1 0 obj\n%%EOF\n".getBytes(StandardCharsets.UTF_8)))
+                        .param("name", "slides.pdf").param("resourceType", "DOCUMENT").param("visibility", "STUDENT")
+                        .header("Authorization", teacher).header("X-Request-Id", requestId()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.title").value("slides.pdf"));
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM crs_resource WHERE course_id = ?", Integer.class, Long.parseLong(courseId))).isEqualTo(1);
+    }
+
     private String createdCourse(String teacherToken, String name) throws Exception {
         String response = mockMvc.perform(post("/api/v1/courses")
                         .header("Authorization", teacherToken)

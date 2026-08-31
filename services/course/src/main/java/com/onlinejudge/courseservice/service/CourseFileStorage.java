@@ -7,9 +7,11 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
@@ -18,6 +20,7 @@ import java.util.UUID;
 @Component
 public class CourseFileStorage {
     private static final long MAX_BYTES = 50L * 1024 * 1024;
+    private static final int SNIFF_LENGTH = 4096;
     private static final Set<String> ALLOWED_EXTENSIONS = Set.of(
             "pdf", "ppt", "pptx", "doc", "docx", "xls", "xlsx", "txt", "md", "zip", "rar", "png", "jpg", "jpeg", "gif", "mp4");
 
@@ -37,8 +40,18 @@ public class CourseFileStorage {
         Path target = resolve(key);
         try {
             Files.createDirectories(root);
-            Files.copy(file.getInputStream(), target, StandardCopyOption.REPLACE_EXISTING);
+        } catch (IOException exception) {
+            throw new CourseException(HttpStatus.INTERNAL_SERVER_ERROR, "RESOURCE_STORAGE_FAILED", "resource file could not be stored", true);
+        }
+        try (InputStream in = file.getInputStream(); OutputStream out = Files.newOutputStream(target)) {
+            byte[] header = in.readNBytes(SNIFF_LENGTH);
+            validateContent(extension, header);
+            out.write(header);
+            in.transferTo(out);
             return new StoredFile(key, original, file.getContentType() == null ? "application/octet-stream" : file.getContentType(), file.getSize());
+        } catch (CourseException rejected) {
+            try { Files.deleteIfExists(target); } catch (IOException ignored) { }
+            throw rejected;
         } catch (IOException exception) {
             throw new CourseException(HttpStatus.INTERNAL_SERVER_ERROR, "RESOURCE_STORAGE_FAILED", "resource file could not be stored", true);
         }
@@ -71,6 +84,62 @@ public class CourseFileStorage {
     private String extension(String filename) {
         int dot = filename.lastIndexOf('.');
         return dot < 1 || dot == filename.length() - 1 ? "" : filename.substring(dot + 1).toLowerCase(Locale.ROOT);
+    }
+
+    /**
+     * CRS-SC-03 controlled rejection: reject executable payloads regardless of
+     * the claimed extension, and reject content that does not match the allowed
+     * extension's signature so renamed or fabricated files cannot be stored.
+     */
+    private void validateContent(String extension, byte[] header) {
+        if (looksExecutable(header)) throw invalid("resource file content looks like an executable");
+        if (!contentMatchesExtension(extension, header)) throw invalid("resource file content does not match its type");
+    }
+
+    private boolean looksExecutable(byte[] header) {
+        if (header.length >= 2) {
+            if (header[0] == 'M' && header[1] == 'Z') return true;
+            if (header[0] == '#' && header[1] == '!') return true;
+        }
+        if (header.length >= 4 && (header[0] & 0xFF) == 0x7F && header[1] == 'E' && header[2] == 'L' && header[3] == 'F') return true;
+        if (header.length >= 4) {
+            int magic = ((header[0] & 0xFF) << 24) | ((header[1] & 0xFF) << 16) | ((header[2] & 0xFF) << 8) | (header[3] & 0xFF);
+            return switch (magic) {
+                case 0xFEEDFACE, 0xCEFAEDFE, 0xFEEDFACF, 0xCFFAEDFE, 0xCAFEBABE, 0xBEBAFECA -> true;
+                default -> false;
+            };
+        }
+        return false;
+    }
+
+    private boolean contentMatchesExtension(String extension, byte[] header) {
+        return switch (extension) {
+            case "pdf" -> startsWith(header, "%PDF");
+            case "doc", "ppt", "xls" -> startsWith(header,
+                    new byte[]{(byte) 0xD0, (byte) 0xCF, 0x11, (byte) 0xE0, (byte) 0xA1, (byte) 0xB1, 0x1A, (byte) 0xE1});
+            case "docx", "pptx", "xlsx", "zip" -> startsWith(header, "PK");
+            case "rar" -> header.length >= 6 && header[0] == 'R' && header[1] == 'a' && header[2] == 'r' && header[3] == '!'
+                    && header[4] == 0x1A && header[5] == 0x07;
+            case "png" -> startsWith(header,
+                    new byte[]{(byte) 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A});
+            case "jpg", "jpeg" -> header.length >= 3 && (header[0] & 0xFF) == 0xFF && (header[1] & 0xFF) == 0xD8 && (header[2] & 0xFF) == 0xFF;
+            case "gif" -> startsWith(header, "GIF8");
+            case "mp4" -> header.length >= 8 && header[4] == 'f' && header[5] == 't' && header[6] == 'y' && header[7] == 'p';
+            case "txt", "md" -> true;
+            default -> false;
+        };
+    }
+
+    private boolean startsWith(byte[] header, String prefix) {
+        return startsWith(header, prefix.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private boolean startsWith(byte[] header, byte[] magic) {
+        if (header.length < magic.length) return false;
+        for (int i = 0; i < magic.length; i++) {
+            if (header[i] != magic[i]) return false;
+        }
+        return true;
     }
 
     private CourseException invalid(String message) { return new CourseException(HttpStatus.BAD_REQUEST, "RESOURCE_INVALID", message, false); }

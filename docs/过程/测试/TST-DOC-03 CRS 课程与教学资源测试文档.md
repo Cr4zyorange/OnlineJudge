@@ -40,6 +40,9 @@
 | TC-CR-06  | FR-CR-06  | 教师发布、编辑、置顶、删除公告，成员查看置顶优先     | `API-CRS-20`、`API-CRS-21`、`API-CRS-22`、`DB-CRS-05`、LRN 近期任务 | 中     | 通过       |
 | TC-CR-07  | FR-CR-01 ~ FR-CR-06 | CRS 主流程闭环（建课/章节/资源/公告，三模式加入，审批前后权限，非法邀请码/满员/重复加入/资源失败） | `CrsClosureE2EApiTest`、`scripts/test/crs-e2e-http.ps1`、共享 E2E 入口 `frontend/tests/e2e/`（#267 runner） | 高     | 通过       |
 | TC-CR-08  | FR-CR-04、FR-CR-05、NFR-CR-02/03 | 真实 MySQL 并发加入/审批与唯一约束、满员约束（真实 `CourseService` 调用；独立临时测试库） | `CrsMysqlConcurrencyTest`、`CourseService`、`DB-CRS-01 ~ DB-CRS-05`、`uq_crs_course_member` | 高     | 通过（MySQL 9.6，H2 不替代） |
+| TC-CR-09  | FR-CR-01、FR-CR-05 | 归档/关闭课程历史数据只读：成员角色调整、移除与 leave 均被拒绝且成员行不变 | `services/course` `CourseServiceContractTest`（`COURSE_READ_ONLY` 409） | 高     | 通过 |
+| TC-CR-10  | FR-CR-05 | 成员状态机与负责人身份保护：仅 PENDING→ACTIVE/REJECTED、ACTIVE→ACTIVE/REMOVED 合法；REMOVED/REJECTED 不可经成员接口直接激活；教师不得修改自身 TEACHER/ACTIVE 身份 | `services/course` `CourseServiceContractTest`（`INVALID_MEMBER_STATUS_TRANSITION`、`CANNOT_CHANGE_SELF_TEACHER` 409，重入课走 join） | 高     | 通过 |
+| TC-CR-11  | FR-CR-03、NFR-CR-04 | 资源上传内容级受控拒绝：伪装可执行（PE/ELF/脚本 shebang/Mach-O）与扩展名-内容签名不符均 400/`RESOURCE_INVALID`，不产生资源记录；合法文件仍可上传 | `services/course` `CourseServiceContractTest` | 高     | 通过 |
 | TC-CR-N01 | NFR-CR-01 | 未登录、越权、移除成员访问资源被拒绝                 | 安全与权限控制                                               | 高     | 通过       |
 | TC-CR-N02 | NFR-CR-02 | 课程列表分页参数归一化                               | 分页与稳定性                                                 | 中     | 通过       |
 | TC-CR-N03 | NFR-CR-03 | 105 门课程、105 个资源基础规模列表响应               | 基础性能样本                                                 | 中     | 通过       |
