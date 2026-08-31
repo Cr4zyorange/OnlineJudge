@@ -49,6 +49,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -930,6 +931,28 @@ class CourseServiceContractTest {
                 .andExpect(status().isOk()).andExpect(jsonPath("$.data.title").value("slides.pdf"));
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM crs_resource WHERE course_id = ?", Integer.class, Long.parseLong(courseId))).isEqualTo(1);
+    }
+
+    @Test
+    void resourceDownloadUsesTheTrustedTypeInsteadOfTheUploadersClaim() throws Exception {
+        String teacher = userToken("772", List.of("TEACHER"));
+        String courseId = createdCourse(teacher, "resource trusted download type");
+        String upload = mockMvc.perform(multipart("/api/v1/courses/{courseId}/resources", courseId)
+                        .file(new MockMultipartFile("file", "notes.txt", "text/html",
+                                "plain course notes".getBytes(StandardCharsets.UTF_8)))
+                        .param("name", "notes.txt").param("resourceType", "DOCUMENT").param("visibility", "STUDENT")
+                        .header("Authorization", teacher).header("X-Request-Id", requestId()))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        String resourceId = objectMapper.readTree(upload).at("/data/id").asText();
+
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT content_type FROM crs_resource WHERE id = ?", String.class, Long.parseLong(resourceId)))
+                .isEqualTo(MediaType.TEXT_PLAIN_VALUE);
+
+        mockMvc.perform(get("/api/v1/courses/{courseId}/resources/{resourceId}/download", courseId, resourceId)
+                        .header("Authorization", teacher).header("X-Request-Id", requestId()))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Content-Type", MediaType.TEXT_PLAIN_VALUE));
     }
 
     @Test

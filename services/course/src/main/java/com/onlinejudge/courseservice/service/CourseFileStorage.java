@@ -13,6 +13,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -23,6 +24,23 @@ public class CourseFileStorage {
     private static final int SNIFF_LENGTH = 4096;
     private static final Set<String> ALLOWED_EXTENSIONS = Set.of(
             "pdf", "ppt", "pptx", "doc", "docx", "xls", "xlsx", "txt", "md", "zip", "rar", "png", "jpg", "jpeg", "gif", "mp4");
+    private static final Map<String, String> TRUSTED_CONTENT_TYPES = Map.ofEntries(
+            Map.entry("pdf", "application/pdf"),
+            Map.entry("ppt", "application/vnd.ms-powerpoint"),
+            Map.entry("pptx", "application/vnd.openxmlformats-officedocument.presentationml.presentation"),
+            Map.entry("doc", "application/msword"),
+            Map.entry("docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
+            Map.entry("xls", "application/vnd.ms-excel"),
+            Map.entry("xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
+            Map.entry("txt", "text/plain"),
+            Map.entry("md", "text/markdown"),
+            Map.entry("zip", "application/zip"),
+            Map.entry("rar", "application/vnd.rar"),
+            Map.entry("png", "image/png"),
+            Map.entry("jpg", "image/jpeg"),
+            Map.entry("jpeg", "image/jpeg"),
+            Map.entry("gif", "image/gif"),
+            Map.entry("mp4", "video/mp4"));
 
     private final Path root;
 
@@ -48,7 +66,7 @@ public class CourseFileStorage {
             validateContent(extension, header);
             out.write(header);
             in.transferTo(out);
-            return new StoredFile(key, original, file.getContentType() == null ? "application/octet-stream" : file.getContentType(), file.getSize());
+            return new StoredFile(key, original, trustedContentType(extension), file.getSize());
         } catch (CourseException rejected) {
             try { Files.deleteIfExists(target); } catch (IOException ignored) { }
             throw rejected;
@@ -83,6 +101,15 @@ public class CourseFileStorage {
         try { Files.deleteIfExists(resolve(key)); } catch (IOException ignored) { }
     }
 
+    /**
+     * The persisted MIME type and the download response are derived from the
+     * accepted extension, never from a multipart header supplied by the user.
+     * The octet-stream fallback keeps existing malformed legacy rows safe.
+     */
+    public String trustedContentTypeForFilename(String filename) {
+        return trustedContentType(extension(filename == null ? "" : filename));
+    }
+
     private Path resolve(String key) {
         Path resolved = root.resolve(key).normalize();
         if (!resolved.startsWith(root) || key.contains("/")) throw invalid("resource storage key is invalid");
@@ -98,6 +125,10 @@ public class CourseFileStorage {
     private String extension(String filename) {
         int dot = filename.lastIndexOf('.');
         return dot < 1 || dot == filename.length() - 1 ? "" : filename.substring(dot + 1).toLowerCase(Locale.ROOT);
+    }
+
+    private String trustedContentType(String extension) {
+        return TRUSTED_CONTENT_TYPES.getOrDefault(extension, "application/octet-stream");
     }
 
     /**

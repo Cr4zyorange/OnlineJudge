@@ -312,7 +312,8 @@ public class CourseService {
         if (resource.externalUrl() != null && !resource.externalUrl().isBlank()) {
             return new ResourceDownload(null, null, null, resource.externalUrl());
         }
-        return new ResourceDownload(fileStorage.load(resource.storageKey()), resource.contentType(), resource.originalFilename(), null);
+        return new ResourceDownload(fileStorage.load(resource.storageKey()),
+                fileStorage.trustedContentTypeForFilename(resource.originalFilename()), resource.originalFilename(), null);
     }
 
     @Transactional
