@@ -230,7 +230,10 @@ class CourseMembershipReliableFlowTest {
         int expected = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM course_event_outbox WHERE delivery_status = 'PENDING'", Integer.class);
         int alreadyPublished = count("course_event_outbox WHERE delivery_status = 'PUBLISHED'");
-        assertThat(productionPublisher.drain(Instant.parse("2026-08-31T09:16:00Z"))).isEqualTo(expected);
+        // The claim clock must be relative: outbox rows carry their real
+        // append time (Instant.now()), so a fixed drain instant goes stale as
+        // soon as the wall clock passes it and no row is ever due.
+        assertThat(productionPublisher.drain(Instant.now().plusSeconds(1))).isEqualTo(expected);
         for (ReliableEventEnvelope envelope : publisher.envelopes) {
             assertThat(learning.consume(envelope)).isEqualTo(EventProcessingDecision.ACK);
         }
