@@ -20,6 +20,7 @@ reject_text() {
 }
 
 reject_text 'name: gateway-config' "$deployment"
+reject_text 'five-service Gateway' "$deployment"
 reject_text 'mountPath: /etc/nginx/conf.d/default.conf' "$deployment"
 reject_text 'create configmap gateway-config' "$deploy_script"
 reject_text 'render-gateway-config.sh' "$deploy_script"
@@ -36,5 +37,11 @@ grep -Fq -- '--from-file=gateway.conf=' "$switch_script"
 grep -Fq 'rollout restart deployment/gateway' "$switch_script"
 grep -Fq '"name": "gateway"' "$workloads"
 grep -Fq '"dockerfile": "services/gateway/Dockerfile"' "$workloads"
+node -e '
+const manifest = require(process.argv[1]);
+if (manifest.workloads.length !== 9) throw new Error("#306 requires exactly 9 workloads");
+if (manifest.migrationJobs.length !== 4) throw new Error("#306 requires exactly 4 migration jobs");
+if (manifest.workloads.some(({name}) => name === "learning-service")) throw new Error("Learning workload is retired");
+' "$workloads"
 
 printf 'kind-gateway-config.test: PASS (legacy frontend decoupled; #318 owns workload deployment)\n'

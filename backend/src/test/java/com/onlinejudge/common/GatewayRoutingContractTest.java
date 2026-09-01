@@ -35,6 +35,9 @@ class GatewayRoutingContractTest {
         assertThat(template.indexOf("/(grades|grade-items|grade-rules"))
                 .isLessThan(template.indexOf("location /api/v1/courses/"));
         assertThat(template).doesNotContain("location ^~ /api/v1/courses/");
+        assertThat(template).doesNotContain("LEARNING_UPSTREAM", "learning-service");
+        assertThat(locationBlock(template, "location ^~ /api/v1/learning/")).contains("__COURSE_UPSTREAM__");
+        assertThat(locationBlock(template, "location = /api/v1/notifications")).contains("__COURSE_UPSTREAM__");
     }
 
     @Test
@@ -83,5 +86,13 @@ class GatewayRoutingContractTest {
                 "location ^~ /api/",
                 "proxy_pass http://frontend:80;");
         assertThat(template).doesNotContain("backend:8080", "try_files $uri /index.html;");
+    }
+
+    private String locationBlock(String template, String location) {
+        int start = template.indexOf(location);
+        assertThat(start).isGreaterThanOrEqualTo(0);
+        int end = template.indexOf("\n    }", start);
+        assertThat(end).isGreaterThan(start);
+        return template.substring(start, end);
     }
 }
