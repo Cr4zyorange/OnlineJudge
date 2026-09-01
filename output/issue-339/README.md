@@ -25,12 +25,14 @@ GREEN implementation:
 
 ### AC01 — independent build, migration, start, and readiness
 
-- `mvn -f services/grade/pom.xml test`: PASS, 21 tests, 0 failures/errors.
+- `mvn -f services/grade/pom.xml clean package`: PASS, 22 tests, 0 failures/errors.
 - `mvn -f services/grade/pom.xml package`: PASS.
 - Packaged JAR started independently on port 18084.
 - `GET /actuator/health/readiness`: `{"status":"UP"}`.
 - `GET /health/ready`: `{"status":"UP"}`.
 - MySQL 8.0.45 disposable-instance run: V01 and V02 both applied successfully to a fresh `oj_grade` schema; 18 Grade-owned tables were present.
+- AC01 review remediation: Spring SQL initialization now defaults to `embedded`, so H2 remains available for test bootstrap while production MySQL consumes only V01/V02. With `SPRING_SQL_INIT_MODE` explicitly absent, the packaged JAR started against the migrated MySQL schema as `oj_grade_rw`; both readiness endpoints returned `UP`.
+- `scripts/test/verify-grade-service-mysql-live.sh` makes that migration → restricted-account JAR start → two-readiness sequence a required backend CI gate on disposable MySQL 8.4, without an SQL-init override.
 - The image is a multi-stage pinned JRE build, runs as non-root UID/GID 10004, and exposes port 8084.
 
 ### AC02 — local source projection, including incomplete gaps
@@ -69,7 +71,7 @@ GREEN implementation:
 
 ## Contract and regression gates
 
-- Directly affected automated tests: 56 passed (21 standalone Grade + 35 existing GRD regression).
+- Directly affected automated tests: 57 passed (22 standalone Grade + 35 existing GRD regression).
 - `node scripts/ci/verify-microservice-contract-v2.mjs`: PASS — 4 OpenAPI documents, 10 AsyncAPI messages, 4 valid fixtures, 8 incompatible fixtures, 18 rejecting mutations.
 - `node scripts/ci/verify-three-service-baseline-306.mjs`: PASS — 9 workloads, 4 migration jobs, 4 isolated database accounts.
 - `git diff --check`: PASS.
@@ -77,4 +79,4 @@ GREEN implementation:
 
 ## Environment limitation
 
-Docker Desktop's Linux daemon was not running locally, so a real local image build could not be executed. The Dockerfile/deployment artifact tests, Maven package, independent JAR startup, readiness probes, and real MySQL migration/account probes passed; the remote PR image/check pipeline remains the final independent confirmation.
+Docker Desktop's Linux daemon failed locally in its Inference manager before a container could start, so a real local image build could not be executed. Dockerfile/deployment artifact tests, Maven package, and the equivalent production path on a native disposable MySQL 8.0.45 instance passed. GitHub's Linux backend gate runs the committed disposable MySQL 8.4 acceptance script and is the independent containerized confirmation.
