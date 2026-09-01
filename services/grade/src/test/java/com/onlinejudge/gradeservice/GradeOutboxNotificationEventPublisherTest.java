@@ -55,6 +55,24 @@ class GradeOutboxNotificationEventPublisherTest {
         assertThat(outboxCount()).isZero();
     }
 
+    @Test
+    void processedReviewUsesTheFrozenClosedPayload() {
+        jdbc.update("""
+                INSERT INTO t_grade_review_request
+                    (id,course_id,student_id,target_type,reason,status,submitted_at,processed_by,processed_at,created_at,updated_at)
+                VALUES (903,101,601,'COURSE_TOTAL','check','APPROVED',CURRENT_TIMESTAMP,7,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)
+                """);
+        publisher.publish(new NotificationEvent("GRD:GRADE_REVIEW_PROCESSED:REQUEST:903", "GRADE_REVIEW_PROCESSED",
+                101, List.of(601L), "processed", "processed", "GRADE_REVIEW_REQUEST", 903L,
+                "/courses/101/grades/reviews/903", LocalDateTime.of(2026, 9, 1, 8, 0)));
+
+        assertThat(jdbc.queryForObject("SELECT payload_json FROM grade_event_outbox", String.class))
+                .contains("\"eventType\":\"grade.review.processed.v2\"")
+                .contains("\"studentId\":\"601\"")
+                .contains("\"reviewStatus\":\"APPROVED\"")
+                .contains("\"resultVersion\":1");
+    }
+
     private NotificationEvent publication(String key) {
         return new NotificationEvent(key, "GRADE_PUBLISHED", 101, List.of(601L, 602L),
                 "成绩已发布", "课程成绩已发布", "GRADE_PUBLISH_RECORD", 901L,

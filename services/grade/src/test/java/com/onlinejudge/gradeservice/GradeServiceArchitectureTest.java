@@ -24,6 +24,7 @@ class GradeServiceArchitectureTest {
         assertThat(tableExists("T_GRADE_RECORD")).isTrue();
         assertThat(tableExists("T_COURSE_GRADE_SUMMARY")).isTrue();
         assertThat(tableExists("T_GRADE_CALCULATION_BATCH")).isTrue();
+        assertThat(tableExists("GRADE_RESULT_TRACE")).isTrue();
         assertThat(tableExists("GRADE_EVENT_OUTBOX")).isTrue();
         assertThat(tableExists("GRADE_EVENT_INBOX")).isTrue();
     }

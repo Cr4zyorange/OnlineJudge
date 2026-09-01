@@ -51,6 +51,18 @@ class ProjectionSourceGradeClientTest {
                 .hasMessageContaining("revision gap");
     }
 
+    @Test
+    void detectsAnInitialRevisionGapBeforeAnyProjectionRowExists() {
+        jdbc.update("""
+                INSERT INTO grade_source_projection_gap
+                    (aggregate_id, expected_version, observed_version, correlation_id, updated_at)
+                VALUES ('LAB:71:11', 1, 2, '11111111-1111-4111-8111-111111111111', CURRENT_TIMESTAMP)
+                """);
+
+        assertThatThrownBy(() -> sourceGrades.findSourceGrades(101, SourceGradeType.LAB, 71))
+                .isInstanceOf(SourceProjectionGapException.class);
+    }
+
     private void insertProjection(String aggregateId, long courseId, String sourceType, long sourceId,
                                   long studentId, String score, long sourceVersion) {
         jdbc.update("""
