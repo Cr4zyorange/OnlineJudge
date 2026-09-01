@@ -132,6 +132,45 @@ class LrnFoldServiceTest {
     }
 
     @Test
+    void staleMembershipSnapshotCannotDowngradeTheRosterWatermark() throws Exception {
+        String courseId = createCourseWithRosterWatermark("805", "806");
+
+        // A later complete snapshot (rosterVersion 2) with a new member advances the watermark.
+        String newer = """
+                {
+                  "eventId": "5a10fd0e-0000-4f5b-9432-000000000002",
+                  "eventType": "course.membership.snapshot.v2",
+                  "payloadVersion": 2,
+                  "aggregateType": "course-membership-roster",
+                  "aggregateId": "%s",
+                  "aggregateVersion": 2,
+                  "occurredAt": "2026-08-30T09:05:00Z",
+                  "correlationId": "34c3bdce-e3ff-45b0-8c75-3e46d0e57f5c",
+                  "payload": {
+                    "courseId": "course-%s",
+                    "rosterVersion": 2,
+                    "members": [
+                      {"userId": "805", "membershipStatus": "ACTIVE", "memberVersion": 1},
+                      {"userId": "806", "membershipStatus": "ACTIVE", "memberVersion": 1},
+                      {"userId": "807", "membershipStatus": "ACTIVE", "memberVersion": 1}
+                    ]
+                  }
+                }
+                """.formatted(courseId, courseId);
+        projection.consume(newer);
+
+        // A stale replay of the version-1 snapshot must not downgrade watermark or roster.
+        projection.consume(membershipSnapshotEnvelope(courseId, "805", "806"));
+
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT snapshot_version FROM learning_course_membership_watermark WHERE course_id = ?",
+                Long.class, Long.parseLong(courseId))).isEqualTo(2);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM learning_course_member_projection WHERE course_id = ?",
+                Integer.class, Long.parseLong(courseId))).isEqualTo(3);
+    }
+
+    @Test
     void notificationEventEntryIsIdempotentByEventKey() throws Exception {
         String payload = """
                 {

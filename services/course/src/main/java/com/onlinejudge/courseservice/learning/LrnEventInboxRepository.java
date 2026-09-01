@@ -48,13 +48,14 @@ public class LrnEventInboxRepository {
         int updated = jdbc.update("""
                 UPDATE learning_course_membership_watermark
                    SET snapshot_version = ?, updated_at = CURRENT_TIMESTAMP
-                 WHERE course_id = ?
-                """, snapshotVersion, courseId);
+                 WHERE course_id = ? AND snapshot_version < ?
+                """, snapshotVersion, courseId, snapshotVersion);
         if (updated == 0) {
             jdbc.update("""
                     INSERT INTO learning_course_membership_watermark (course_id, snapshot_version)
-                    VALUES (?, ?)
-                    """, courseId, snapshotVersion);
+                    SELECT ?, ?
+                     WHERE NOT EXISTS (SELECT 1 FROM learning_course_membership_watermark WHERE course_id = ?)
+                    """, courseId, snapshotVersion, courseId);
         }
     }
 

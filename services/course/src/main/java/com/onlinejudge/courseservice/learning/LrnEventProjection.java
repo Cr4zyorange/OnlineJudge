@@ -95,6 +95,9 @@ public class LrnEventProjection {
         long courseId = parseId(payload.path("courseId").asText());
         long version = payload.path("rosterVersion").asLong(0);
         if (courseId <= 0 || version <= 0) return;
+        // The watermark only advances: a stale replayed snapshot must never
+        // downgrade the roster that receiver resolution depends on.
+        if (inbox.watermarkVersion(courseId).map(current -> current >= version).orElse(false)) return;
         List<LrnEventInboxRepository.MemberRow> members = new ArrayList<>();
         for (JsonNode member : payload.path("members")) {
             long userId = parseId(member.path("userId").asText());
