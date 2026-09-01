@@ -11,7 +11,7 @@ builder="$repo_root/scripts/platform/build_workload_images.sh"
 
 usage() {
   cat <<'USAGE'
-Usage: scripts/platform/run_disposable_environment.sh [--git-sha SHA] [--output-dir DIR] [--keep] [--skip-build] [--inject-failure migration|readiness]
+Usage: scripts/platform/run_disposable_environment.sh [--git-sha SHA] [--output-dir DIR] [--keep] [--skip-build] [--skip-tests] [--inject-failure migration|readiness]
 
 Builds (unless --skip-build), starts and verifies an isolated nine-workload,
 four-migration Compose environment. --inject-failure proves that a controlled
@@ -24,6 +24,7 @@ git_sha=""
 output_dir=""
 keep=0
 skip_build=0
+skip_tests=0
 failure_mode=""
 while (($#)); do
   case "$1" in
@@ -31,6 +32,7 @@ while (($#)); do
     --output-dir) output_dir="${2:?--output-dir requires a value}"; shift 2 ;;
     --keep) keep=1; shift ;;
     --skip-build) skip_build=1; shift ;;
+    --skip-tests) skip_tests=1; shift ;;
     --inject-failure) failure_mode="${2:?--inject-failure requires migration or readiness}"; shift 2 ;;
     --help|-h) usage; exit 0 ;;
     *) printf 'run-disposable-environment: unknown argument: %s\n' "$1" >&2; usage >&2; exit 2 ;;
@@ -90,8 +92,12 @@ umask 077
   printf 'GRADE_SERVICE_IDENTITY=issue318-grade\n'
 } > "$runtime_env"
 
-python3 "$renderer" --schema "$schema" --manifest "$manifest" --git-sha "$git_sha" --compose-output "$compose_file" --kubernetes-output "$kubernetes_file" --repository-root "$repo_root"
-if (( ! skip_build )); then "$builder" --git-sha "$git_sha" --output-dir "$output_dir/artifacts"; fi
+PYTHONDONTWRITEBYTECODE=1 python3 "$renderer" --schema "$schema" --manifest "$manifest" --git-sha "$git_sha" --compose-output "$compose_file" --kubernetes-output "$kubernetes_file" --repository-root "$repo_root"
+if (( ! skip_build )); then
+  build_arguments=(--git-sha "$git_sha" --output-dir "$output_dir/artifacts")
+  if (( skip_tests )); then build_arguments+=(--skip-tests); fi
+  "$builder" "${build_arguments[@]}"
+fi
 
 collect_diagnostics() {
   local reason="$1"

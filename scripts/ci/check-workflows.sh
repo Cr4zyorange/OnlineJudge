@@ -182,7 +182,7 @@ for job in "${required_jobs[@]}"; do
     'grep -Eq "^    timeout-minutes: [0-9]+$" <<< "$1"' _ "$section"
 done
 
-# 9. if: always() 只允许用于证据/诊断步骤；delivery 一律禁止。
+# 9. if: always() 只允许用于证据/诊断步骤；交付执行本身一律禁止。
 while IFS= read -r line_number; do
   step_start="$((line_number - 3))"
   step_end="$((line_number + 3))"
@@ -197,8 +197,16 @@ while IFS= read -r line_number; do
 done < <(grep -nF 'if: always()' "$workflow_file" | cut -d: -f1 || true)
 
 delivery_section="$(job_section "$workflow_file" delivery)"
-run_check "delivery steps never use if: always()" bash -c \
-  '! grep -Fq "if: always()" <<< "$1"' _ "$delivery_section"
+run_check "delivery calls the disposable executor after the checkpoint" bash -c \
+  'grep -Fq "scripts/ci/delivery-checkpoint.sh" <<< "$1" \
+    && grep -Fq "scripts/ci/disposable-delivery.sh" <<< "$1"' _ "$delivery_section"
+run_check "delivery installs checksum-verified Docker Scout before SBOM generation" bash -c \
+  'grep -Fq "docker-scout_1.24.0_linux_amd64.tar.gz" <<< "$1" \
+    && grep -Fq "f4e2814bd61040365153d5b964b144cb2dc6ee536a68b5bac4cadf00fc0ec34b" <<< "$1" \
+    && grep -Fq "sha256sum --check --status" <<< "$1" \
+    && grep -Fq "cli-plugins/docker-scout" <<< "$1" \
+    && grep -Fq "docker scout version" <<< "$1"' _ "$delivery_section"
+run_check "disposable delivery executor exists" test -x "$checkout/scripts/ci/disposable-delivery.sh"
 
 # 10. 第三方 Action 必须固定到受控 SHA 与版本注释。
 uses_seen=0

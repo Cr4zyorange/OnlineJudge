@@ -10,10 +10,11 @@ usage() {
   cat <<'USAGE'
 Usage: scripts/platform/rollback_disposable_environment.sh --from-sha SHA --artifact-manifest FILE --env-file FILE --project-name NAME [--output-dir DIR]
 
-Verifies source image tags and all local content digests against
-artifact-manifest.json, then renders the old immutable SHA and recreates that
-Compose project. The two platform base images are accepted only at their
-attested local content digests; it never accepts "latest" as a rollback version.
+Verifies each artifact image exactly matches the historical workload manifest,
+then verifies all local content digests before rendering the old immutable SHA
+and recreating that Compose project. The two platform base images are accepted
+only at their attested local content digests; it never accepts "latest" or a
+substituted repository/tag as a rollback version.
 USAGE
 }
 
@@ -46,22 +47,46 @@ manifest_snapshot="$output_dir/workloads.json"
 git -C "$repo_root" show "$from_sha:deploy/platform/workload-manifest.schema.json" > "$schema_snapshot"
 git -C "$repo_root" show "$from_sha:deploy/platform/workloads.json" > "$manifest_snapshot"
 
-python3 - "$artifact_manifest" "$from_sha" <<'PY'
+python3 - "$artifact_manifest" "$from_sha" "$manifest_snapshot" <<'PY'
 import json
 import re
 import sys
 
 manifest = json.load(open(sys.argv[1], encoding="utf-8"))
 sha = sys.argv[2]
+workload_manifest = json.load(open(sys.argv[3], encoding="utf-8"))
 if manifest.get("kind") != "ArtifactManifest" or manifest.get("gitSha") != sha:
     raise SystemExit("artifact-manifest.json does not attest --from-sha")
-for artifact in manifest.get("artifacts", []):
+artifacts = manifest.get("artifacts")
+if not isinstance(artifacts, list):
+    raise SystemExit("artifact-manifest.json must contain exactly the expected workload and migration-runner records")
+
+expected_sources = {
+    workload["name"]: "infrastructure" if not workload["image"]["build"] else "source"
+    for workload in workload_manifest["workloads"]
+}
+expected_sources["platform-migration-runner"] = "source"
+expected_images = {
+    workload["name"]: (
+        workload["image"]["repository"]
+        + ":"
+        + workload["image"]["tagTemplate"].replace("${GIT_SHA}", sha)
+    )
+    for workload in workload_manifest["workloads"]
+}
+expected_images["platform-migration-runner"] = "onlinejudge/platform-migration-runner:" + sha
+record_names = [artifact.get("workload") for artifact in artifacts if isinstance(artifact, dict)]
+if len(artifacts) != len(expected_sources) or len(record_names) != len(artifacts) or set(record_names) != set(expected_sources):
+    raise SystemExit("artifact-manifest.json must contain exactly the expected workload and migration-runner records")
+
+for artifact in artifacts:
+    workload = artifact["workload"]
+    if artifact.get("source") != expected_sources[workload]:
+        raise SystemExit("artifact-manifest.json has an unexpected artifact source classification")
+    if artifact.get("image") != expected_images[workload]:
+        raise SystemExit("artifact-manifest.json image does not match the workload's expected image reference")
     if not re.fullmatch(r"sha256:[0-9a-f]+", artifact.get("digest", "")):
         raise SystemExit("artifact-manifest.json contains a non-immutable image record")
-    if artifact.get("source") != "infrastructure" and not artifact.get("image", "").endswith(":" + sha):
-        raise SystemExit("artifact-manifest.json contains a source image that does not match --from-sha")
-    if artifact.get("source") == "infrastructure" and artifact.get("workload") not in {"mysql", "rabbitmq"}:
-        raise SystemExit("artifact-manifest.json contains an unexpected infrastructure image")
 PY
 
 while IFS=$'\t' read -r image digest; do

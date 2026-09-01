@@ -42,6 +42,7 @@ RUNTIME_PASSWORD = {
     "grade": "GRADE_DATABASE_PASSWORD",
 }
 MIGRATION_RUNNER_REPOSITORY = "onlinejudge/platform-migration-runner"
+FRONTEND_PROXY_CONFIG_TEMPLATE = REPOSITORY_ROOT / "deploy/platform/frontend-disposable.conf.template"
 
 
 def parse_arguments() -> argparse.Namespace:
@@ -51,6 +52,11 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument("--git-sha", required=True, help="immutable full 40-character Git SHA")
     parser.add_argument("--compose-output", type=Path, required=True, help="generated Docker Compose YAML")
     parser.add_argument("--kubernetes-output", type=Path, required=True, help="generated Kubernetes YAML")
+    parser.add_argument(
+        "--kubernetes-stage-dir",
+        type=Path,
+        help="optional directory for executable, dependency-ordered Kubernetes stage manifests",
+    )
     parser.add_argument(
         "--repository-root",
         type=Path,
@@ -253,7 +259,12 @@ def compose_depends_on(workload: dict[str, Any]) -> dict[str, str]:
     return dependencies
 
 
-def compose_service(workload: dict[str, Any], git_sha: str, repository_root: Path) -> list[str]:
+def compose_service(
+    workload: dict[str, Any],
+    git_sha: str,
+    repository_root: Path,
+    frontend_proxy_config_path: Path,
+) -> list[str]:
     name = workload["name"]
     image = image_reference(workload, git_sha)
     lines = [f"  {name}:", f"    image: {yaml_scalar(image)}"]
@@ -293,6 +304,16 @@ def compose_service(workload: dict[str, Any], git_sha: str, repository_root: Pat
         lines.append("    depends_on:")
         for dependency, condition in dependencies.items():
             lines.extend([f"      {dependency}:", f"        condition: {condition}"])
+    if name == "frontend":
+        lines.extend(
+            [
+                "    volumes:",
+                "      - "
+                + yaml_scalar(
+                    str(frontend_proxy_config_path) + ":/etc/nginx/conf.d/default.conf:ro"
+                ),
+            ]
+        )
     if name == "assessment-api" or name == "assessment-worker":
         lines.extend(["    volumes:", "      - assessment-files:/var/lib/onlinejudge-assessment"])
     if name == "assessment-worker":
@@ -306,20 +327,28 @@ def compose_service(workload: dict[str, Any], git_sha: str, repository_root: Pat
     return lines
 
 
-def init_runtime_accounts_command() -> str:
-    commands = ['export MYSQL_PWD="$$MYSQL_ROOT_PASSWORD"']
+def init_runtime_accounts_command(*, compose_escaped: bool) -> str:
+    """Render the account bootstrap shell program for Compose or Kubernetes.
+
+    Compose consumes ``$$`` as a literal dollar while Kubernetes passes command
+    arguments directly to ``sh``.  Keeping the two escaping modes explicit
+    prevents a Kubernetes Job from treating ``$$`` as a process ID.
+    """
+
+    dollar = "$$" if compose_escaped else "$"
+    commands = [f'export MYSQL_PWD="{dollar}MYSQL_ROOT_PASSWORD"']
     for schema in ("identity", "course", "assessment", "grade"):
         database = DATABASE_NAME[schema]
         account = RUNTIME_ACCOUNT[schema]
         password = RUNTIME_PASSWORD[schema]
         commands.extend(
             [
-                f'''escaped_password=$$(printf '%s' "$${{{password}}}" | sed -e 's/\\\\/\\\\\\\\/g' -e "s/'/''/g")''',
+                f'''escaped_password={dollar}(printf '%s' "{dollar}{{{password}}}" | sed -e 's/\\\\/\\\\\\\\/g' -e "s/'/''/g")''',
                 (
                     "mysql --protocol=tcp --host=mysql --port=3306 --user=root --execute "
                     f'"CREATE DATABASE IF NOT EXISTS {database} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci; '
-                    f"CREATE USER IF NOT EXISTS '{account}'@'%' IDENTIFIED BY '$$escaped_password'; "
-                    f"ALTER USER '{account}'@'%' IDENTIFIED BY '$$escaped_password'; "
+                    f"CREATE USER IF NOT EXISTS '{account}'@'%' IDENTIFIED BY '{dollar}escaped_password'; "
+                    f"ALTER USER '{account}'@'%' IDENTIFIED BY '{dollar}escaped_password'; "
                     f"REVOKE ALL PRIVILEGES, GRANT OPTION FROM '{account}'@'%'; "
                     f"GRANT SELECT, INSERT, UPDATE, DELETE ON {database}.* TO '{account}'@'%';\""
                 ),
@@ -342,7 +371,7 @@ def compose_runtime_account_init() -> list[str]:
         "      COURSE_DATABASE_PASSWORD: \"${COURSE_DATABASE_PASSWORD:?COURSE_DATABASE_PASSWORD is required}\"",
         "      ASSESSMENT_DATABASE_PASSWORD: \"${ASSESSMENT_DATABASE_PASSWORD:?ASSESSMENT_DATABASE_PASSWORD is required}\"",
         "      GRADE_DATABASE_PASSWORD: \"${GRADE_DATABASE_PASSWORD:?GRADE_DATABASE_PASSWORD is required}\"",
-        "    entrypoint: [\"sh\", \"-ec\", " + yaml_scalar(init_runtime_accounts_command()) + "]",
+        "    entrypoint: [\"sh\", \"-ec\", " + yaml_scalar(init_runtime_accounts_command(compose_escaped=True)) + "]",
         "    restart: \"no\"",
     ]
 
@@ -384,7 +413,12 @@ def compose_migration_job(job: dict[str, Any], repository_root: Path) -> list[st
     return lines
 
 
-def render_compose(manifest: dict[str, Any], git_sha: str, repository_root: Path) -> str:
+def render_compose(
+    manifest: dict[str, Any],
+    git_sha: str,
+    repository_root: Path,
+    frontend_proxy_config_path: Path,
+) -> str:
     lines = [
         "# Generated by scripts/platform/render_disposable_environment.py; do not edit.",
         "# Source of truth: deploy/platform/workloads.json",
@@ -392,7 +426,7 @@ def render_compose(manifest: dict[str, Any], git_sha: str, repository_root: Path
         "services:",
     ]
     for workload in manifest["workloads"]:
-        lines.extend(compose_service(workload, git_sha, repository_root))
+        lines.extend(compose_service(workload, git_sha, repository_root, frontend_proxy_config_path))
     lines.extend(compose_runtime_account_init())
     for declared_job in manifest["migrationJobs"]:
         job = {**declared_job, "_gitSha": git_sha}
@@ -406,8 +440,26 @@ def kube_env_lines(environment: dict[str, str], workload: dict[str, Any]) -> lis
     secret_keys = {secret["key"] for secret in workload["secrets"]}
     for key, value in sorted(environment.items()):
         lines.extend(["- name: " + key])
+        optional_reference = re.fullmatch(r"\$\{([A-Z][A-Z0-9_]*):-([^}]*)\}", value)
         reference = re.fullmatch(r"\$\{([A-Z][A-Z0-9_]*)(?::[^}]*)?\}", value)
-        if key in secret_keys or key.endswith("PASSWORD") or key.endswith("IDENTITY") or reference:
+        if optional_reference and key not in secret_keys:
+            # Optional Compose knobs such as the controlled failure toggle and
+            # LAB's sandbox endpoint must remain optional in Kubernetes too.
+            lines.append("  value: " + yaml_scalar(optional_reference.group(2)))
+        elif optional_reference:
+            # A declared optional secret remains injectable without making the
+            # entire Pod fail when the optional key is absent from the runtime
+            # Secret.
+            lines.extend(
+                [
+                    "  valueFrom:",
+                    "    secretKeyRef:",
+                    "      name: onlinejudge-platform-runtime",
+                    "      key: " + optional_reference.group(1),
+                    "      optional: true",
+                ]
+            )
+        elif key in secret_keys or key.endswith("PASSWORD") or key.endswith("IDENTITY") or reference:
             secret_key = reference.group(1) if reference else key
             if key == "MIGRATION_DATABASE_PASSWORD":
                 secret_key = "MYSQL_ROOT_PASSWORD"
@@ -427,6 +479,31 @@ def kube_probe(probe: dict[str, Any], port: int, field: str, workload_name: str)
         lines.extend(["  exec:", "    command: [\"sh\", \"-ec\", " + yaml_scalar(command) + "]"])
     lines.extend(["  periodSeconds: 5", "  timeoutSeconds: 3", "  failureThreshold: 24"])
     return lines
+
+
+def frontend_proxy_config(resolver: str) -> str:
+    """Render the target-specific resolver into the shared frontend template."""
+
+    template = FRONTEND_PROXY_CONFIG_TEMPLATE.read_text(encoding="utf-8")
+    return template.replace("__GATEWAY_RESOLVER__", resolver)
+
+
+def kube_frontend_proxy_config(namespace: str) -> str:
+    config = frontend_proxy_config("kube-dns.kube-system.svc.cluster.local")
+    return "\n".join(
+        [
+            "apiVersion: v1",
+            "kind: ConfigMap",
+            "metadata:",
+            "  name: frontend-proxy-config",
+            "  namespace: " + namespace,
+            "  labels:",
+            "    app.kubernetes.io/part-of: onlinejudge-platform",
+            "data:",
+            "  frontend-disposable.conf: |",
+            *indent(config.rstrip().splitlines(), 4),
+        ]
+    )
 
 
 def kube_workload(workload: dict[str, Any], git_sha: str, namespace: str) -> str:
@@ -493,8 +570,27 @@ def kube_workload(workload: dict[str, Any], git_sha: str, namespace: str) -> str
         lines[env_index:env_index] = port_lines
     if name == "assessment-worker":
         lines.extend(["          command: [\"java\"]", "          args: [\"-jar\", \"/opt/onlinejudge-assessment/app.jar\", \"--spring.main.web-application-type=none\", \"--assessment.worker.enabled=true\"]"])
+    if name == "frontend":
+        lines.extend(
+            [
+                "          volumeMounts:",
+                "            - name: frontend-proxy-config",
+                "              mountPath: /etc/nginx/conf.d/default.conf",
+                "              subPath: frontend-disposable.conf",
+                "              readOnly: true",
+            ]
+        )
     for field, probe_name in (("startupProbe", "startup"), ("livenessProbe", "liveness"), ("readinessProbe", "readiness")):
         lines.extend(indent(kube_probe(workload["health"][probe_name], port, field, name), 10))
+    if name == "frontend":
+        lines.extend(
+            [
+                "      volumes:",
+                "        - name: frontend-proxy-config",
+                "          configMap:",
+                "            name: frontend-proxy-config",
+            ]
+        )
     if declared_port is None:
         return "\n".join(lines)
     service = [
@@ -511,7 +607,7 @@ def kube_workload(workload: dict[str, Any], git_sha: str, namespace: str) -> str
         "      port: " + str(port),
         "      targetPort: " + str(port),
     ]
-    return "\n".join(lines) + "\n---\n" + "\n".join(service)
+    return "\n---\n".join(["\n".join(lines), "\n".join(service)])
 
 
 def kube_migration_job(job: dict[str, Any], namespace: str) -> str:
@@ -574,7 +670,7 @@ def kube_runtime_account_init(namespace: str) -> str:
             "      containers:",
             "        - name: mysql-runtime-account-init",
             "          image: mysql:8.4",
-            "          command: [\"sh\", \"-ec\", " + yaml_scalar(init_runtime_accounts_command()) + "]",
+            "          command: [\"sh\", \"-ec\", " + yaml_scalar(init_runtime_accounts_command(compose_escaped=False)) + "]",
             "          env:",
             "            - name: MYSQL_ROOT_PASSWORD",
             "              valueFrom:",
@@ -596,23 +692,72 @@ def kube_runtime_account_init(namespace: str) -> str:
     )
 
 
+def kube_namespace(namespace: str) -> str:
+    return "\n".join(
+        [
+            "apiVersion: v1",
+            "kind: Namespace",
+            "metadata:",
+            "  name: " + namespace,
+            "  labels:",
+            "    app.kubernetes.io/part-of: onlinejudge-platform",
+        ]
+    )
+
+
 def render_kubernetes(manifest: dict[str, Any], git_sha: str, namespace: str) -> str:
-    documents = [
-        "\n".join(
-            [
-                "apiVersion: v1",
-                "kind: Namespace",
-                "metadata:",
-                "  name: " + namespace,
-                "  labels:",
-                "    app.kubernetes.io/part-of: onlinejudge-platform",
-            ]
-        )
-    ]
+    """Render a complete inventory only; staged files are the deployable input.
+
+    A Kubernetes multi-document stream has no execution dependencies.  The
+    companion staged files and deployer therefore form the only supported
+    application path; this inventory remains useful for inspection and schema
+    tooling without pretending that document order gates migrations.
+    """
+
+    documents = [kube_namespace(namespace), kube_frontend_proxy_config(namespace)]
     documents.extend(kube_workload(workload, git_sha, namespace) for workload in manifest["workloads"])
     documents.append(kube_runtime_account_init(namespace))
     documents.extend(kube_migration_job(job, namespace).replace("${GIT_SHA}", git_sha) for job in manifest["migrationJobs"])
-    return "\n---\n".join(documents) + "\n"
+    return (
+        "# Inventory only: deploy with scripts/platform/deploy_kubernetes_disposable_environment.sh.\n"
+        "# Kubernetes does not treat YAML document order as a dependency graph.\n"
+        + "\n---\n".join(documents)
+        + "\n"
+    )
+
+
+def render_kubernetes_stages(manifest: dict[str, Any], git_sha: str, namespace: str) -> dict[str, str]:
+    """Split Kubernetes resources into the only safe application sequence."""
+
+    workloads = manifest["workloads"]
+    infrastructure = [
+        workload
+        for workload in workloads
+        if workload["type"] in {"database", "broker"}
+    ]
+    applications = [
+        workload
+        for workload in workloads
+        if workload["type"] not in {"database", "broker"} and workload["name"] != "gateway"
+    ]
+    gateway = next(workload for workload in workloads if workload["name"] == "gateway")
+    stages = {
+        "00-namespace.yaml": kube_namespace(namespace),
+        "10-infrastructure.yaml": "\n---\n".join(
+            kube_workload(workload, git_sha, namespace) for workload in infrastructure
+        ),
+        "20-runtime-account-init.yaml": kube_runtime_account_init(namespace),
+    }
+    for index, job in enumerate(manifest["migrationJobs"], start=3):
+        stages[f"{index * 10:02d}-{job['name']}.yaml"] = kube_migration_job(job, namespace).replace("${GIT_SHA}", git_sha)
+    stages["70-applications.yaml"] = "\n---\n".join(
+        [
+            kube_frontend_proxy_config(namespace),
+            *(kube_workload(workload, git_sha, namespace) for workload in applications),
+        ]
+    )
+    stages["80-gateway.yaml"] = kube_workload(gateway, git_sha, namespace)
+    return {name: content + "\n" for name, content in stages.items()}
 
 
 def write_output(path: Path, content: str) -> None:
@@ -634,8 +779,21 @@ def main() -> int:
         repository_root = arguments.repository_root.resolve()
         if not (repository_root / "database/mysql/migrate-service.sh").is_file():
             raise ManifestValidationError("--repository-root must contain database/mysql/migrate-service.sh")
-        write_output(arguments.compose_output, render_compose(manifest, arguments.git_sha, repository_root))
+        compose_frontend_proxy_config = arguments.compose_output.parent / "frontend-disposable.conf"
+        write_output(compose_frontend_proxy_config, frontend_proxy_config("127.0.0.11"))
+        # The runner creates runtime secrets under umask 077.  This generated
+        # Nginx configuration contains no secrets and is mounted into an image
+        # that deliberately runs as the unprivileged nginx user, so its mode
+        # must be explicitly readable on Linux hosts as well.
+        compose_frontend_proxy_config.chmod(0o644)
+        write_output(
+            arguments.compose_output,
+            render_compose(manifest, arguments.git_sha, repository_root, compose_frontend_proxy_config),
+        )
         write_output(arguments.kubernetes_output, render_kubernetes(manifest, arguments.git_sha, arguments.namespace))
+        if arguments.kubernetes_stage_dir is not None:
+            for name, content in render_kubernetes_stages(manifest, arguments.git_sha, arguments.namespace).items():
+                write_output(arguments.kubernetes_stage_dir / name, content)
     except ManifestValidationError as error:
         print(f"ERROR: {error}", file=sys.stderr)
         return 2

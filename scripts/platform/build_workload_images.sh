@@ -10,7 +10,7 @@ planner="$repo_root/scripts/platform/plan_delivery.py"
 
 usage() {
   cat <<'USAGE'
-Usage: scripts/platform/build_workload_images.sh [--git-sha SHA] [--output-dir DIR] [--skip-tests]
+Usage: scripts/platform/build_workload_images.sh [--git-sha SHA] [--output-dir DIR] [--changed-path PATH]... [--skip-tests]
 
 Builds the seven source-backed images, attests the two pinned infrastructure
 images, and builds the platform migration runner. Writes plan.json, SPDX SBOMs,
@@ -22,10 +22,12 @@ USAGE
 git_sha=""
 output_dir=""
 skip_tests=0
+changed_path_count=0
 while (($#)); do
   case "$1" in
     --git-sha) git_sha="${2:?--git-sha requires a value}"; shift 2 ;;
     --output-dir) output_dir="${2:?--output-dir requires a value}"; shift 2 ;;
+    --changed-path) changed_paths[$changed_path_count]="${2:?--changed-path requires a value}"; changed_path_count=$((changed_path_count + 1)); shift 2 ;;
     --skip-tests) skip_tests=1; shift ;;
     --help|-h) usage; exit 0 ;;
     *) printf 'build-workload-images: unknown argument: %s\n' "$1" >&2; usage >&2; exit 2 ;;
@@ -35,6 +37,15 @@ done
 if [[ -z "$git_sha" ]]; then git_sha="$(git -C "$repo_root" rev-parse HEAD)"; fi
 if [[ ! "$git_sha" =~ ^[0-9a-f]{40}$ ]]; then
   printf 'build-workload-images: --git-sha must be a full 40-character Git SHA\n' >&2
+  exit 2
+fi
+checkout_sha="$(git -C "$repo_root" rev-parse HEAD)"
+if [[ "$git_sha" != "$checkout_sha" ]]; then
+  printf 'build-workload-images: --git-sha %s does not match checked-out HEAD %s\n' "$git_sha" "$checkout_sha" >&2
+  exit 2
+fi
+if [[ -n "$(git -C "$repo_root" status --porcelain --untracked-files=all)" ]]; then
+  printf 'build-workload-images: checkout must be clean before producing immutable artifacts\n' >&2
   exit 2
 fi
 if [[ -z "$output_dir" ]]; then output_dir="$repo_root/output/issue-318/$git_sha/artifacts"; fi
@@ -82,7 +93,12 @@ java_version="$($java_home/bin/java -version 2>&1 | sed -n '1s/.*version "\([0-9
 }
 mkdir -p "$output_dir/sbom"
 plan="$output_dir/plan.json"
-python3 "$planner" --schema "$schema" --manifest "$manifest" --git-sha "$git_sha" > "$plan"
+planner_arguments=(--schema "$schema" --manifest "$manifest" --git-sha "$git_sha")
+for (( changed_path_index=0; changed_path_index<changed_path_count; changed_path_index++ )); do
+  changed_path="${changed_paths[$changed_path_index]}"
+  planner_arguments+=(--changed-path "$changed_path")
+done
+PYTHONDONTWRITEBYTECODE=1 python3 "$planner" "${planner_arguments[@]}" > "$plan"
 
 run_tests() {
   local module
