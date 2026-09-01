@@ -111,7 +111,7 @@ jobs:
             reject_source quality-gate-not-success
           fi
       - name: Checkout exact quality-gate revision
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ steps.source.outputs.git_sha }}
           fetch-depth: 0
@@ -166,7 +166,7 @@ jobs:
       EVIDENCE_DIR: d3-build-evidence
     steps:
       - name: Checkout exact quality-gate revision
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.quality-gate.outputs.git_sha }}
           fetch-depth: 0
@@ -213,7 +213,7 @@ jobs:
       D3_DELIVERY_FORCED_FAILURE: ${{ inputs.forced_failure || 'none' }}
     steps:
       - name: Checkout exact quality-gate revision
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.quality-gate.outputs.git_sha }}
           fetch-depth: 0
