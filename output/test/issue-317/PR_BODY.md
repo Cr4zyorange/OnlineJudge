@@ -13,6 +13,10 @@ closes #317
 - 保留伪造身份 Header 过滤、Bearer/request ID 透传、无代理重试和脱敏错误。
 - 增加深链、查询串、Range 下载、流式响应及四上游逐一停机隔离验证。
 - Kind 切流固定到 `kind-onlinejudge-ci`，临时转发 `svc/gateway`，并按所切服务执行专属 smoke。
+- `/.well-known/jwks.json` 精确路由到 Identity，保留上游缓存响应；Compose Gateway 的四个 upstream
+  使用可覆盖插值，切流/回滚会改变重建容器的实际配置。
+- 最终部署文档已收敛到四 upstream、9 workloads、4 migrations；当前 Docker runtime 原始日志已随 PR
+  提交并绑定测试代码提交 `1b40279040b45330ad3b2981472b4cefaf766711`。
 
 ## 已验证
 
