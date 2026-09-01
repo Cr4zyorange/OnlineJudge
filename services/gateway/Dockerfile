@@ -1,5 +1,11 @@
 FROM nginx:1.27-alpine
 
+ARG GIT_SHA
+ARG IMAGE_SOURCE=https://github.com/Cr4zyorange/OnlineJudge
+LABEL org.opencontainers.image.revision="$GIT_SHA" \
+      org.opencontainers.image.version="$GIT_SHA" \
+      org.opencontainers.image.source="$IMAGE_SOURCE"
+
 RUN apk add --no-cache bash
 
 COPY services/gateway/nginx.conf /etc/nginx/nginx.conf
