@@ -30,22 +30,32 @@ fi
 EOF
 chmod +x "$fixture_root/verify.sh"
 
+cat > "$runtime_dir/targets.env" <<'EOF'
+IDENTITY_UPSTREAM=identity-service:8081
+COURSE_UPSTREAM=course-service:8082
+ASSESSMENT_UPSTREAM=assessment-api:8083
+GRADE_UPSTREAM=grade-service:8084
+EOF
+
 PATH="$fake_bin:$PATH" GATEWAY_TEST_LOG="$log" \
-  "$switcher" --mode compose --service grade --target grade-canary:9084 \
+  "$switcher" --mode compose --service course --target course-canary:9082 \
   --runtime-dir "$runtime_dir" --verify-command "$fixture_root/verify.sh"
 
 grep -Fqx 'IDENTITY_UPSTREAM=identity-service:8081' "$runtime_dir/targets.env"
-grep -Fqx 'COURSE_UPSTREAM=course-service:8082' "$runtime_dir/targets.env"
+grep -Fqx 'COURSE_UPSTREAM=course-canary:9082' "$runtime_dir/targets.env"
 grep -Fqx 'ASSESSMENT_UPSTREAM=assessment-api:8083' "$runtime_dir/targets.env"
-grep -Fqx 'GRADE_UPSTREAM=grade-canary:9084' "$runtime_dir/targets.env"
-grep -Fqx 'LEARNING_UPSTREAM=learning-service:8085' "$runtime_dir/targets.env"
+grep -Fqx 'GRADE_UPSTREAM=grade-service:8084' "$runtime_dir/targets.env"
+if grep -Fq 'LEARNING_UPSTREAM=' "$runtime_dir/targets.env"; then
+  printf 'switch state still contains the retired Learning target\n' >&2
+  exit 1
+fi
 grep -Fq 'docker compose' "$log"
 cp "$runtime_dir/targets.env" "$fixture_root/expected-after-rollback.env"
 
 set +e
 PATH="$fake_bin:$PATH" GATEWAY_TEST_LOG="$log" GATEWAY_SMOKE_FAIL=1 \
   GATEWAY_TEST_VERIFY_MARKER="$fixture_root/verify-marker" \
-  "$switcher" --mode compose --service learning --target learning-canary:9085 \
+  "$switcher" --mode compose --service grade --target grade-canary:9084 \
   --runtime-dir "$runtime_dir" --verify-command "$fixture_root/verify.sh"
 status=$?
 set -e
@@ -55,20 +65,32 @@ set -e
 cmp "$runtime_dir/targets.env" "$fixture_root/expected-after-rollback.env"
 
 cat > "$runtime_dir/targets.env" <<'EOF'
-AUTH_UPSTREAM=auth-service:8081
-CRS_UPSTREAM=crs-service:8082
-ASSESSMENT_UPSTREAM=assessment-service:8083
-LEARNING_GRADE_UPSTREAM=learning-grade-service:8084
+IDENTITY_UPSTREAM=identity-service:8081
+COURSE_UPSTREAM=course-service:8082
+ASSESSMENT_UPSTREAM=assessment-api:8083
+GRADE_UPSTREAM=grade-service:8084
+LEARNING_UPSTREAM=learning-service:8085
 EOF
 
 set +e
 PATH="$fake_bin:$PATH" GATEWAY_TEST_LOG="$log" \
   "$switcher" --mode compose --service identity --target identity-canary:9081 \
   --runtime-dir "$runtime_dir" --verify-command "$fixture_root/verify.sh" \
-  >"$fixture_root/legacy.stdout" 2>"$fixture_root/legacy.stderr"
-legacy_status=$?
+  >"$fixture_root/five-target.stdout" 2>"$fixture_root/five-target.stderr"
+five_target_status=$?
 set -e
 
-[[ "$legacy_status" -eq 64 ]] || { printf 'expected legacy target rejection exit 64, got %s\n' "$legacy_status" >&2; exit 1; }
-grep -Fq 'legacy four-service target file is not supported' "$fixture_root/legacy.stderr"
+[[ "$five_target_status" -eq 64 ]] || { printf 'expected retired five-target rejection exit 64, got %s\n' "$five_target_status" >&2; exit 1; }
+grep -Fq 'LEARNING_UPSTREAM is retired; Learning is owned by Course' "$fixture_root/five-target.stderr"
+
+set +e
+PATH="$fake_bin:$PATH" GATEWAY_TEST_LOG="$log" \
+  "$switcher" --mode compose --service learning --target learning-canary:9085 \
+  --runtime-dir "$runtime_dir" --verify-command "$fixture_root/verify.sh" \
+  >"$fixture_root/learning.stdout" 2>"$fixture_root/learning.stderr"
+learning_status=$?
+set -e
+
+[[ "$learning_status" -eq 64 ]] || { printf 'expected Learning service rejection exit 64, got %s\n' "$learning_status" >&2; exit 1; }
+grep -Fq 'service must be identity, course, assessment, or grade' "$fixture_root/learning.stderr"
 printf 'switch-gateway-target.test: PASS\n'
