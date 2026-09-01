@@ -78,4 +78,16 @@ docker run --rm -v "$(dirname "$staging"):/local" ubuntu:24.04 \
   rm -rf "/local/$(basename "$staging")" >/dev/null 2>&1 || rm -rf "$staging"
 hash -r
 "${prefix}/bin/git" --version
+# 编译期 prefix=/usr/local 被写死，helper（git-remote-https 等）在 ~/.local/libexec，
+# 必须显式设置 GIT_EXEC_PATH；同时写入 ~/.bashrc 保证后续会话可用。
+export GIT_EXEC_PATH="${prefix}/libexec/git-core"
+if ! grep -q 'GIT_EXEC_PATH' "${HOME}/.bashrc" 2>/dev/null; then
+  {
+    echo ''
+    echo '# OnlineJudge WSL dev: latest git installed to ~/.local (built in container)'
+    echo 'export PATH="$HOME/.local/bin:$PATH"'
+    echo 'export GIT_EXEC_PATH="$HOME/.local/libexec/git-core"'
+  } >> "${HOME}/.bashrc"
+  echo "install-git.sh: GIT_EXEC_PATH added to ~/.bashrc"
+fi
 echo "install-git.sh: git $version installed to $prefix/bin (PATH already includes $prefix/bin)"
