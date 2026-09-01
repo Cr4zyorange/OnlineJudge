@@ -3,6 +3,7 @@ package com.onlinejudge.assessmentservice.controller;
 import com.onlinejudge.assessmentservice.persistence.CourseMemberProjectionRepository;
 import com.onlinejudge.assessmentservice.security.CurrentUser;
 import com.onlinejudge.assessmentservice.service.LabExperimentService;
+import com.onlinejudge.assessmentservice.service.CourseMembershipGuard;
 import com.onlinejudge.assessmentservice.service.CoursePermissionClient;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -34,13 +35,15 @@ import java.util.NoSuchElementException;
 public class LabExperimentController {
     private final LabExperimentService labs;
     private final CourseMemberProjectionRepository courseMembers;
+    private final CourseMembershipGuard membershipGuard;
     private final CoursePermissionClient coursePermissions;
 
     public LabExperimentController(LabExperimentService labs, CourseMemberProjectionRepository courseMembers,
-            CoursePermissionClient coursePermissions) {
+            CoursePermissionClient coursePermissions, CourseMembershipGuard membershipGuard) {
         this.labs = labs;
         this.courseMembers = courseMembers;
         this.coursePermissions = coursePermissions;
+        this.membershipGuard = membershipGuard;
     }
 
     @PostMapping("/courses/{courseId}/labs")
@@ -63,8 +66,8 @@ public class LabExperimentController {
 
     @GetMapping("/courses/{courseId}/labs")
     public List<LabExperimentService.LabSummary> list(@PathVariable String courseId,
-            @RequestAttribute("assessment.currentUser") CurrentUser user) {
-        if (!courseMembers.isActive(courseId, user.id())) {
+            @RequestAttribute("assessment.currentUser") CurrentUser user, HttpServletRequest http) {
+        if (!membershipGuard.isActiveMember(courseId, user.id(), requestIdOrGenerated(http))) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "active course membership is required");
         }
         return labs.list(courseId, canManage(courseId, user));
@@ -72,12 +75,12 @@ public class LabExperimentController {
 
     @GetMapping("/labs/{labId}")
     public java.util.Map<String, Object> detail(@PathVariable long labId,
-            @RequestAttribute("assessment.currentUser") CurrentUser user) {
+            @RequestAttribute("assessment.currentUser") CurrentUser user, HttpServletRequest http) {
         LabExperimentService.LabDetail detail;
         try { detail = labs.detail(labId); }
         catch (NoSuchElementException missing) { throw new ResponseStatusException(HttpStatus.NOT_FOUND, "LAB does not exist", missing); }
         if (!canManage(detail.courseId(), user)) {
-            if (!courseMembers.isActive(detail.courseId(), user.id())) {
+            if (!membershipGuard.isActiveMember(detail.courseId(), user.id(), requestIdOrGenerated(http))) {
                 throw new ResponseStatusException(HttpStatus.FORBIDDEN, "active course membership is required");
             }
             if (!List.of("PUBLISHED", "CLOSED", "SCORE_PUBLISHED", "ARCHIVED").contains(detail.status())) {
@@ -204,6 +207,11 @@ public class LabExperimentController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "X-Request-Id is required");
         }
         return requestId;
+    }
+
+    private static String requestIdOrGenerated(HttpServletRequest request) {
+        String requestId = request.getHeader("X-Request-Id");
+        return requestId == null || requestId.isBlank() ? java.util.UUID.randomUUID().toString() : requestId;
     }
 
     private boolean canManage(String courseId, CurrentUser user) {

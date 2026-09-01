@@ -8,6 +8,8 @@ import com.onlinejudge.assessmentservice.persistence.SourceGradeRepository;
 import com.onlinejudge.assessmentservice.security.CurrentUser;
 import com.onlinejudge.assessmentservice.service.LabExperimentService;
 import com.onlinejudge.assessmentservice.service.CoursePermissionClient;
+import com.onlinejudge.assessmentservice.service.CourseMembershipGuard;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -32,6 +34,7 @@ public class LabEvaluationController {
     private final LabExperimentService labs;
     private final EvaluationTaskRepository tasks;
     private final CourseMemberProjectionRepository courseMembers;
+    private final CourseMembershipGuard membershipGuard;
     private final CoursePermissionClient coursePermissions;
     private final JdbcTemplate jdbc;
     private final SourceGradeRepository grades;
@@ -39,16 +42,18 @@ public class LabEvaluationController {
 
     public LabEvaluationController(LabExperimentService labs, EvaluationTaskRepository tasks,
             CourseMemberProjectionRepository courseMembers, CoursePermissionClient coursePermissions, JdbcTemplate jdbc) {
-        this(labs, tasks, courseMembers, coursePermissions, jdbc, null, null);
+        this(labs, tasks, courseMembers, coursePermissions, jdbc, null, null,
+                new CourseMembershipGuard(courseMembers, coursePermissions));
     }
 
     @org.springframework.beans.factory.annotation.Autowired
     public LabEvaluationController(LabExperimentService labs, EvaluationTaskRepository tasks,
             CourseMemberProjectionRepository courseMembers, CoursePermissionClient coursePermissions, JdbcTemplate jdbc,
-            SourceGradeRepository grades, AssessmentOutboxRepository outbox) {
+            SourceGradeRepository grades, AssessmentOutboxRepository outbox, CourseMembershipGuard membershipGuard) {
         this.labs = labs;
         this.tasks = tasks;
         this.courseMembers = courseMembers;
+        this.membershipGuard = membershipGuard;
         this.coursePermissions = coursePermissions;
         this.jdbc = jdbc;
         this.grades = grades;
@@ -57,8 +62,8 @@ public class LabEvaluationController {
 
     @GetMapping("/{labId}/submissions/{submissionId}/result")
     public Map<String, Object> result(@PathVariable long labId, @PathVariable String submissionId,
-            @RequestAttribute("assessment.currentUser") CurrentUser user) {
-        return evaluationResult(labId, submissionId, user, false);
+            @RequestAttribute("assessment.currentUser") CurrentUser user, HttpServletRequest http) {
+        return evaluationResult(labId, submissionId, user, false, requestIdOrGenerated(http));
     }
 
     /**
@@ -66,7 +71,7 @@ public class LabEvaluationController {
      * manual LABs to have no task, while the dedicated result endpoint keeps its
      * historical not-found contract for an uncreated evaluation task.
      */
-    private Map<String, Object> evaluationResult(long labId, String submissionId, CurrentUser user, boolean allowMissingTask) {
+    private Map<String, Object> evaluationResult(long labId, String submissionId, CurrentUser user, boolean allowMissingTask, String requestId) {
         LabExperimentService.LabSummary lab;
         try { lab = labs.find(labId); }
         catch (java.util.NoSuchElementException missing) { throw new ResponseStatusException(HttpStatus.NOT_FOUND, "LAB does not exist", missing); }
@@ -78,7 +83,7 @@ public class LabEvaluationController {
         boolean owner = user.id().equals(submission.studentId());
         boolean manager = (user.hasRole("TEACHER") || user.hasRole("ADMIN")) && coursePermissions.canManageCourse(lab.courseId(), user.id());
         if (!owner && !manager) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "LAB result access is restricted");
-        if (!manager && !courseMembers.isActive(lab.courseId(), user.id())) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "active course membership is required");
+        if (!manager && !membershipGuard.isActiveMember(lab.courseId(), user.id(), requestId)) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "active course membership is required");
         EvaluationTask task = tasks.findBySubmission(submissionId).orElse(null);
         if (task == null && !allowMissingTask) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "evaluation task does not exist");
@@ -123,10 +128,10 @@ public class LabEvaluationController {
     @GetMapping("/{labId}/submissions")
     public List<Map<String, Object>> submissions(@PathVariable long labId,
             @RequestParam(required = false) String studentId,
-            @RequestAttribute("assessment.currentUser") CurrentUser user) {
+            @RequestAttribute("assessment.currentUser") CurrentUser user, HttpServletRequest http) {
         LabExperimentService.LabSummary lab = findLab(labId);
         boolean manager = canManage(lab, user);
-        if (!manager && !courseMembers.isActive(lab.courseId(), user.id())) {
+        if (!manager && !membershipGuard.isActiveMember(lab.courseId(), user.id(), requestIdOrGenerated(http))) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "active course membership is required");
         }
         String requestedStudent = manager && studentId != null && !studentId.isBlank() ? studentId : (manager ? null : user.id());
@@ -160,7 +165,11 @@ public class LabEvaluationController {
 
     @GetMapping("/{labId}/submissions/{submissionId}")
     public Map<String, Object> submissionDetail(@PathVariable long labId, @PathVariable String submissionId,
-            @RequestAttribute("assessment.currentUser") CurrentUser user) {
+            @RequestAttribute("assessment.currentUser") CurrentUser user, HttpServletRequest http) {
+        return submissionDetail(labId, submissionId, user, requestIdOrGenerated(http));
+    }
+
+    private Map<String, Object> submissionDetail(long labId, String submissionId, CurrentUser user, String requestId) {
         LabExperimentService.LabSummary lab = findLab(labId);
         Map<String, Object> item = jdbc.query("""
                 SELECT submission_id, student_id, language, submit_status, submission_version, auto_score, final_score, has_file, submitted_at
@@ -189,7 +198,7 @@ public class LabEvaluationController {
         }, submissionId, labId).stream().findFirst().orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "LAB submission does not exist"));
         boolean manager = canManage(lab, user);
         if (!manager && !item.get("studentId").equals(user.id())) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "LAB submission access is restricted");
-        if (!manager && !courseMembers.isActive(lab.courseId(), user.id())) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "active course membership is required");
+        if (!manager && !membershipGuard.isActiveMember(lab.courseId(), user.id(), requestId)) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "active course membership is required");
         boolean scoresVisible = manager || scoresPublished(lab);
         if (!scoresVisible) {
             item.put("autoScore", null);
@@ -202,13 +211,14 @@ public class LabEvaluationController {
 
     @GetMapping("/{labId}/results/{studentId}")
     public Map<String, Object> studentResult(@PathVariable long labId, @PathVariable String studentId,
-            @RequestAttribute("assessment.currentUser") CurrentUser user) {
+            @RequestAttribute("assessment.currentUser") CurrentUser user, HttpServletRequest http) {
         LabExperimentService.LabSummary lab = findLab(labId);
         boolean manager = canManage(lab, user);
         if (!manager && !user.id().equals(studentId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "LAB result access is restricted");
         }
-        if (!manager && !courseMembers.isActive(lab.courseId(), user.id())) {
+        String requestId = requestIdOrGenerated(http);
+        if (!manager && !membershipGuard.isActiveMember(lab.courseId(), user.id(), requestId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "active course membership is required");
         }
         String submissionId = jdbc.query("""
@@ -230,8 +240,8 @@ public class LabEvaluationController {
         boolean scoresVisible = manager || scoresPublished(lab);
         // The aggregate always exposes the submission and public testcase feedback;
         // only score-bearing fields are gated until the teacher releases them.
-        response.put("submission", submissionDetail(labId, submissionId, user));
-        response.put("evaluationResult", evaluationResult(labId, submissionId, user, true));
+        response.put("submission", submissionDetail(labId, submissionId, user, requestId));
+        response.put("evaluationResult", evaluationResult(labId, submissionId, user, true, requestId));
         response.put("latestScore", scoresVisible ? jdbc.query("""
                 SELECT report_id, auto_score, report_score, manual_score, final_score, comment, scored_at, updated_at
                   FROM assessment_lab_score
@@ -465,6 +475,11 @@ public class LabEvaluationController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "X-Request-Id is required and must be at most 80 characters");
         }
         return requestId;
+    }
+
+    private static String requestIdOrGenerated(HttpServletRequest request) {
+        String requestId = request.getHeader("X-Request-Id");
+        return requestId == null || requestId.isBlank() ? java.util.UUID.randomUUID().toString() : requestId;
     }
 
     private static String effectiveSubmissionsSql(String projection, boolean activeRosterOnly) {

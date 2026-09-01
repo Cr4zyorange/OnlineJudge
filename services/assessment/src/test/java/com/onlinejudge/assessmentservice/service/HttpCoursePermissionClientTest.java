@@ -10,6 +10,7 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -29,6 +30,23 @@ class HttpCoursePermissionClientTest {
                 {"allowed":true,"courseId":"course-1","userId":"user-1","action":"MANAGE","memberVersion":2}
                 """);
         assertThat(client().canManageCourse("course-1", "user-1")).isTrue();
+    }
+
+    @Test
+    void viewAuthorizationForwardsTheRequestIdAndRequiresAMatchingViewDecision() throws Exception {
+        AtomicReference<String> query = new AtomicReference<>();
+        AtomicReference<String> requestId = new AtomicReference<>();
+        server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/internal/v2/courses", exchange -> {
+            query.set(exchange.getRequestURI().getQuery());
+            requestId.set(exchange.getRequestHeaders().getFirst("X-Request-Id"));
+            respond(exchange, 200, "{\"allowed\":true,\"courseId\":\"course-1\",\"userId\":\"user-1\",\"action\":\"VIEW\",\"memberVersion\":2}");
+        });
+        server.start();
+
+        assertThat(client().canViewCourse("course-1", "user-1", "request-357")).isTrue();
+        assertThat(query.get()).isEqualTo("action=VIEW");
+        assertThat(requestId.get()).isEqualTo("request-357");
     }
 
     @Test
