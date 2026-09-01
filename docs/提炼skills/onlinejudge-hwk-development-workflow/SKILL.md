@@ -5,6 +5,8 @@ description: Use when implementing, testing, documenting, repairing, or locally 
 
 # OnlineJudge HWK Development Workflow
 
+> 环境说明（2026-09 迁移后）：本 skill 为 HWK 模块专用历史版本；仓库级整合版已迁至 `.agents/skills/onlinejudge-development-workflow/`，两者以整合版为准。开发环境已从 Windows 迁至 WSL + Dev Container（仓库 `/home/skk4784/repos/OnlineJudge`；工具链在容器 `onlinejudge-dev` 内，固定入口 `scripts/dev/container.sh`），`references/workflow.md` 中的 Windows/PowerShell 命令仅作历史参考，实际命令见整合版 `references/verification.md`。
+
 Use this skill as a compact operating loop. Load the reference files only for the issue or failure mode in front of you.
 
 ## Reference Loading
