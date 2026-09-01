@@ -99,3 +99,6 @@ data/
 # Docker and deployment local overrides
 docker-compose.override.yml
 *.pid
+
+# Git worktree checkouts (managed by git worktree, not committed)
+.worktrees/
