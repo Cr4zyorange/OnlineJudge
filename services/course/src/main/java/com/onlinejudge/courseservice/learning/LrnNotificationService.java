@@ -98,7 +98,7 @@ public class LrnNotificationService {
         List<Long> createdIds = new ArrayList<>();
         for (Long receiverUserId : receiverUserIds.stream().distinct().toList()) {
             if (receiverUserId == null || receiverUserId <= 0) continue;
-            if (courseId != null && !notifications.isActiveCourseMember(receiverUserId, courseId)) continue;
+            if (courseId != null && !notifications.isActiveProjectedMember(receiverUserId, courseId)) continue;
             notifications.save(receiverUserId, courseId, idempotency + ":" + receiverUserId, normalizedTitle, normalizedContent,
                             type, normalizedPriority, module, sourceId, blankToNull(actionUrl))
                     .ifPresent(createdIds::add);

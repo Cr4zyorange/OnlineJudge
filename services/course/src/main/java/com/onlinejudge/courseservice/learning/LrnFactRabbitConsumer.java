@@ -23,11 +23,14 @@ import java.nio.charset.StandardCharsets;
 public class LrnFactRabbitConsumer {
     private static final Logger log = LoggerFactory.getLogger(LrnFactRabbitConsumer.class);
     private static final String[] ROUTING_KEYS = {
+            "onlinejudge.course.member.changed.v2",
             "onlinejudge.course.membership.snapshot.v2",
+            "onlinejudge.course.announcement.published.v2",
             "onlinejudge.assessment.homework.published.v2",
             "onlinejudge.assessment.lab.published.v2",
             "onlinejudge.assessment.evaluation.completed.v2",
-            "onlinejudge.grade.published.v2"
+            "onlinejudge.grade.published.v2",
+            "onlinejudge.grade.review.processed.v2"
     };
     private static final int MAX_MESSAGES_PER_DRAIN = 50;
 

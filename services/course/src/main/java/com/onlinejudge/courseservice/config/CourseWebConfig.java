@@ -56,8 +56,17 @@ public class CourseWebConfig implements WebMvcConfigurer {
         InternalInterceptor(CourseAuthentication authentication) { this.authentication = authentication; }
         @Override
         public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
-            String requiredScope = request.getRequestURI().endsWith("/members")
-                    ? "course.members.read" : "course.authorizations.read";
+            String uri = request.getRequestURI();
+            String requiredScope;
+            if (uri.contains("/learning/tasks/recent")) {
+                requiredScope = "learning.tasks.read";
+            } else if (uri.contains("/notifications/reconciliation-requests")) {
+                requiredScope = "notification-reconciliation";
+            } else if (uri.endsWith("/members")) {
+                requiredScope = "course.members.read";
+            } else {
+                requiredScope = "course.authorizations.read";
+            }
             request.setAttribute("course.servicePrincipal", authentication.service(request, requiredScope));
             return true;
         }

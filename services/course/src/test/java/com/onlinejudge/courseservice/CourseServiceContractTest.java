@@ -178,8 +178,14 @@ class CourseServiceContractTest {
         jdbcTemplate.update("DELETE FROM lrn_notification");
         jdbcTemplate.update("DELETE FROM lrn_reminder_rule");
         jdbcTemplate.update("DELETE FROM lrn_notification_setting");
-        jdbcTemplate.update("DELETE FROM course_learning_event_inbox");
-        jdbcTemplate.update("DELETE FROM course_learning_membership_watermark");
+        jdbcTemplate.update("DELETE FROM lrn_reminder_scan_log");
+        jdbcTemplate.update("DELETE FROM learning_event_inbox");
+        jdbcTemplate.update("DELETE FROM learning_event_delivery_attempt");
+        jdbcTemplate.update("DELETE FROM learning_event_dead_letter");
+        jdbcTemplate.update("DELETE FROM learning_event_reconciliation_request");
+        jdbcTemplate.update("DELETE FROM learning_deferred_event");
+        jdbcTemplate.update("DELETE FROM learning_course_member_projection");
+        jdbcTemplate.update("DELETE FROM learning_course_membership_watermark");
         jdbcTemplate.update("DELETE FROM course_file_delete_journal");
         jdbcTemplate.update("DELETE FROM course_event_outbox");
         jdbcTemplate.update("DELETE FROM course_membership_reconciliation_checkpoint");

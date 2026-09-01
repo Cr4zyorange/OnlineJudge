@@ -25,8 +25,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * #355 LRN fold-in: notifications, learning tasks/records/progress and the
- * idempotent #306 fact projection all live inside the Course service.
+ * #355 LRN fold-in against the #306 frozen Course-owned tables: notifications,
+ * learning tasks/records/progress and the idempotent fact projection all live
+ * inside the Course service, and receiver resolution is gated by the complete
+ * roster watermark.
  */
 @SpringBootTest(classes = CourseServiceApplication.class)
 @AutoConfigureMockMvc
@@ -64,8 +66,14 @@ class LrnFoldServiceTest {
         jdbcTemplate.update("DELETE FROM lrn_notification");
         jdbcTemplate.update("DELETE FROM lrn_reminder_rule");
         jdbcTemplate.update("DELETE FROM lrn_notification_setting");
-        jdbcTemplate.update("DELETE FROM course_learning_event_inbox");
-        jdbcTemplate.update("DELETE FROM course_learning_membership_watermark");
+        jdbcTemplate.update("DELETE FROM lrn_reminder_scan_log");
+        jdbcTemplate.update("DELETE FROM learning_event_inbox");
+        jdbcTemplate.update("DELETE FROM learning_event_delivery_attempt");
+        jdbcTemplate.update("DELETE FROM learning_event_dead_letter");
+        jdbcTemplate.update("DELETE FROM learning_event_reconciliation_request");
+        jdbcTemplate.update("DELETE FROM learning_deferred_event");
+        jdbcTemplate.update("DELETE FROM learning_course_member_projection");
+        jdbcTemplate.update("DELETE FROM learning_course_membership_watermark");
         jdbcTemplate.update("DELETE FROM course_file_delete_journal");
         jdbcTemplate.update("DELETE FROM course_event_outbox");
         jdbcTemplate.update("DELETE FROM course_membership_reconciliation_checkpoint");
@@ -77,49 +85,17 @@ class LrnFoldServiceTest {
     }
 
     @Test
-    void duplicateHomeworkFactAppliesOneTaskAndOneNotificationPerStudent() throws Exception {
-        String teacher = userToken("801", List.of("TEACHER"));
-        String student = userToken("802", List.of("STUDENT"));
-        String courseResponse = mockMvc.perform(post("/api/v1/courses")
-                        .header("Authorization", teacher)
-                        .header("X-Request-Id", "5d2ff3f0-0e29-4b5f-9432-cc9ec51ac722")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"name\":\"fact projection course\",\"enrollmentMode\":\"PUBLIC\"}"))
-                .andExpect(status().isCreated())
-                .andReturn().getResponse().getContentAsString();
-        String courseId = objectMapper.readTree(courseResponse).at("/data/id").asText();
-        mockMvc.perform(post("/api/v1/courses/{courseId}/join", courseId)
-                        .header("Authorization", student)
-                        .header("X-Request-Id", "5d2ff3f0-0e29-4b5f-9432-cc9ec51ac723"))
-                .andExpect(status().isOk());
-
-        String envelope = """
-                {
-                  "eventId": "0b277609-059f-4bd2-b26d-f54341003ecc",
-                  "eventType": "assessment.homework.published.v2",
-                  "payloadVersion": 2,
-                  "aggregateType": "assessment-homework",
-                  "aggregateId": "homework-77",
-                  "aggregateVersion": 4,
-                  "occurredAt": "2026-08-30T09:15:30Z",
-                  "correlationId": "34c3bdce-e3ff-45b0-8c75-3e46d0e57f5b",
-                  "payload": {
-                    "courseId": "course-%s",
-                    "homeworkId": "homework-77",
-                    "title": "Java collections homework",
-                    "deadline": "2026-09-06T16:00:00Z",
-                    "receiverScope": "COURSE_ACTIVE_STUDENTS",
-                    "publishedAt": "2026-08-30T09:15:30Z"
-                  }
-                }
-                """.formatted(courseId);
+    void duplicateHomeworkFactAppliesOneTaskAndOneNotificationPerActiveMember() throws Exception {
+        String courseId = createCourseWithRosterWatermark("801", "802");
+        String envelope = homeworkEnvelope(courseId);
 
         projection.consume(envelope);
         projection.consume(envelope);
 
-        assertThat(jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM course_learning_event_inbox WHERE event_id = '0b277609-059f-4bd2-b26d-f54341003ecc'",
-                Integer.class)).isEqualTo(1);
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM learning_event_inbox
+                 WHERE consumer_name = 'course-lrn' AND event_id = '0b277609-059f-4bd2-b26d-f54341003ecc'
+                """, Integer.class)).isEqualTo(1);
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM lrn_learning_task WHERE user_id = 802 AND course_id = ?",
                 Integer.class, Long.parseLong(courseId))).isEqualTo(1);
@@ -129,6 +105,30 @@ class LrnFoldServiceTest {
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT title FROM lrn_learning_task WHERE user_id = 802", String.class))
                 .isEqualTo("Java collections homework");
+    }
+
+    @Test
+    void homeworkFactBeforeCompleteRosterWatermarkFailsClosedWithReconciliationGap() throws Exception {
+        String teacher = userToken("803", List.of("TEACHER"));
+        String courseResponse = mockMvc.perform(post("/api/v1/courses")
+                        .header("Authorization", teacher)
+                        .header("X-Request-Id", "5d2ff3f0-0e29-4b5f-9432-cc9ec51ac701")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"gap course\",\"enrollmentMode\":\"PUBLIC\"}"))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        String courseId = objectMapper.readTree(courseResponse).at("/data/id").asText();
+
+        projection.consume(homeworkEnvelope(courseId));
+
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM lrn_learning_task", Integer.class)).isZero();
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM lrn_notification", Integer.class)).isZero();
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM learning_event_reconciliation_request
+                 WHERE consumer_name = 'course-lrn' AND aggregate_type = 'course-membership-roster'
+                """, Integer.class)).isEqualTo(1);
     }
 
     @Test
@@ -219,15 +219,119 @@ class LrnFoldServiceTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.rules[0].aheadMinutes").value(60))
                 .andExpect(jsonPath("$.data.rules[0].enabled").value(false));
+    }
 
-        mockMvc.perform(get("/api/v1/reminder-rules")
-                        .header("Authorization", student)
-                        .header("X-Request-Id", "7d2ff3f0-0e29-4b5f-9432-cc9ec51ac738"))
+    @Test
+    void internalLearningTasksAndReconciliationRequestsFollowTheFrozenContract() throws Exception {
+        String courseId = createCourseWithRosterWatermark("821", "822");
+        projection.consume(homeworkEnvelope(courseId));
+
+        mockMvc.perform(get("/internal/v2/learning/tasks/recent?courseId=" + courseId + "&userId=822&limit=5")
+                        .header("X-Request-Id", "8d2ff3f0-0e29-4b5f-9432-cc9ec51ac801")
+                        .header("X-OnlineJudge-Service-Authorization",
+                                serviceToken("assessment-api", List.of("learning.tasks.read"))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.settings.enableExperiment").value(false));
+                .andExpect(jsonPath("$.items.length()").value(1))
+                .andExpect(jsonPath("$.items[0].title").value("Java collections homework"))
+                .andExpect(jsonPath("$.size").value(5));
+
+        mockMvc.perform(get("/internal/v2/learning/tasks/recent?courseId=" + courseId + "&userId=822&limit=5")
+                        .header("X-Request-Id", "8d2ff3f0-0e29-4b5f-9432-cc9ec51ac802")
+                        .header("X-OnlineJudge-Service-Authorization",
+                                serviceToken("assessment-api", List.of("course.members.read"))))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("SERVICE_IDENTITY_FORBIDDEN"));
+
+        String body = "{\"sourceService\":\"assessment\",\"eventId\":\"0b277609-059f-4bd2-b26d-f54341003ecc\",\"reason\":\"PROJECTION_GAP\"}";
+        mockMvc.perform(post("/internal/v2/notifications/reconciliation-requests")
+                        .header("X-Request-Id", "8d2ff3f0-0e29-4b5f-9432-cc9ec51ac803")
+                        .header("Idempotency-Key", "reconcile-homework-77-0001")
+                        .header("X-OnlineJudge-Service-Authorization",
+                                serviceToken("assessment-api", List.of("notification-reconciliation")))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isAccepted())
+                .andExpect(jsonPath("$.status").value("ACCEPTED"));
+
+        mockMvc.perform(post("/internal/v2/notifications/reconciliation-requests")
+                        .header("X-Request-Id", "8d2ff3f0-0e29-4b5f-9432-cc9ec51ac804")
+                        .header("Idempotency-Key", "reconcile-homework-77-0001")
+                        .header("X-OnlineJudge-Service-Authorization",
+                                serviceToken("assessment-api", List.of("notification-reconciliation")))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("RECONCILIATION_IDEMPOTENCY_CONFLICT"));
+    }
+
+    private String createCourseWithRosterWatermark(String teacherId, String studentId) throws Exception {
+        String courseResponse = mockMvc.perform(post("/api/v1/courses")
+                        .header("Authorization", userToken(teacherId, List.of("TEACHER")))
+                        .header("X-Request-Id", "5d2ff3f0-0e29-4b5f-9432-cc9ec51ac711")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"fact projection course\",\"enrollmentMode\":\"PUBLIC\"}"))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        String courseId = objectMapper.readTree(courseResponse).at("/data/id").asText();
+        mockMvc.perform(post("/api/v1/courses/{courseId}/join", courseId)
+                        .header("Authorization", userToken(studentId, List.of("STUDENT")))
+                        .header("X-Request-Id", "5d2ff3f0-0e29-4b5f-9432-cc9ec51ac712"))
+                .andExpect(status().isOk());
+        projection.consume(membershipSnapshotEnvelope(courseId, teacherId, studentId));
+        return courseId;
+    }
+
+    private String membershipSnapshotEnvelope(String courseId, String teacherId, String studentId) {
+        return """
+                {
+                  "eventId": "5a10fd0e-0000-4f5b-9432-000000000001",
+                  "eventType": "course.membership.snapshot.v2",
+                  "payloadVersion": 2,
+                  "aggregateType": "course-membership-roster",
+                  "aggregateId": "%s",
+                  "aggregateVersion": 1,
+                  "occurredAt": "2026-08-30T09:00:00Z",
+                  "correlationId": "34c3bdce-e3ff-45b0-8c75-3e46d0e57f5a",
+                  "payload": {
+                    "courseId": "course-%s",
+                    "rosterVersion": 1,
+                    "members": [
+                      {"userId": "%s", "membershipStatus": "ACTIVE", "memberVersion": 1},
+                      {"userId": "%s", "membershipStatus": "ACTIVE", "memberVersion": 1}
+                    ]
+                  }
+                }
+                """.formatted(courseId, courseId, teacherId, studentId);
+    }
+
+    private String homeworkEnvelope(String courseId) {
+        return """
+                {
+                  "eventId": "0b277609-059f-4bd2-b26d-f54341003ecc",
+                  "eventType": "assessment.homework.published.v2",
+                  "payloadVersion": 2,
+                  "aggregateType": "assessment-homework",
+                  "aggregateId": "homework-77",
+                  "aggregateVersion": 4,
+                  "occurredAt": "2026-08-30T09:15:30Z",
+                  "correlationId": "34c3bdce-e3ff-45b0-8c75-3e46d0e57f5b",
+                  "payload": {
+                    "courseId": "course-%s",
+                    "homeworkId": "homework-77",
+                    "title": "Java collections homework",
+                    "deadline": "2026-09-06T16:00:00Z",
+                    "receiverScope": "COURSE_ACTIVE_STUDENTS",
+                    "publishedAt": "2026-08-30T09:15:30Z"
+                  }
+                }
+                """.formatted(courseId);
     }
 
     private String userToken(String userId, List<String> roles) {
         return TestJwtFactory.userToken(KEY_PAIR, "course-test-kid", userId, roles, List.of("course:manage"));
+    }
+
+    private String serviceToken(String subject, List<String> scopes) {
+        return TestJwtFactory.serviceToken(KEY_PAIR, "course-test-kid", subject, "course", scopes);
     }
 }

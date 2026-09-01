@@ -110,15 +110,6 @@ public class LrnTaskRepository {
                 """, percent, status, userId, courseId, sourceModule, sourceId);
     }
 
-    public List<Long> activeMemberUserIds(long courseId, String role) {
-        String sql = "SELECT user_id FROM crs_course_member WHERE course_id = ? AND join_status = 'ACTIVE' AND is_deleted = FALSE"
-                + (role == null ? "" : " AND role = ?");
-        List<Long> ids = role == null
-                ? jdbc.queryForList(sql, Long.class, courseId)
-                : jdbc.queryForList(sql, Long.class, courseId, role);
-        return ids == null ? List.of() : ids;
-    }
-
     private TaskRow task(ResultSet rs) throws SQLException {
         Timestamp deadline = rs.getTimestamp("deadline");
         return new TaskRow(rs.getLong("id"), rs.getLong("user_id"), rs.getLong("course_id"), rs.getString("course_name"),

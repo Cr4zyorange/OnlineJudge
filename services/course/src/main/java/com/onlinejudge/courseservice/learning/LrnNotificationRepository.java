@@ -99,21 +99,12 @@ public class LrnNotificationRepository {
         return id == null ? Optional.empty() : Optional.of(id);
     }
 
-    public boolean isActiveCourseMember(long userId, long courseId) {
+    public boolean isActiveProjectedMember(long userId, long courseId) {
         Integer count = jdbc.queryForObject("""
-                SELECT COUNT(*) FROM crs_course_member
-                 WHERE course_id = ? AND user_id = ? AND join_status = 'ACTIVE' AND is_deleted = FALSE
+                SELECT COUNT(*) FROM learning_course_member_projection
+                 WHERE course_id = ? AND user_id = ? AND membership_status = 'ACTIVE'
                 """, Integer.class, courseId, userId);
         return count != null && count > 0;
-    }
-
-    public List<Long> activeMemberUserIds(long courseId, String role) {
-        String sql = "SELECT user_id FROM crs_course_member WHERE course_id = ? AND join_status = 'ACTIVE' AND is_deleted = FALSE"
-                + (role == null ? "" : " AND role = ?");
-        List<Long> ids = role == null
-                ? jdbc.queryForList(sql, Long.class, courseId)
-                : jdbc.queryForList(sql, Long.class, courseId, role);
-        return ids == null ? List.of() : ids;
     }
 
     private NotificationRow row(ResultSet rs) throws SQLException {

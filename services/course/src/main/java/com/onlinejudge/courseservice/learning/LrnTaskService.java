@@ -49,18 +49,14 @@ public class LrnTaskService {
      * projection.
      */
     public List<Long> applyPublishedFact(long courseId, String sourceModule, String taskType, String title,
-                                         LocalDateTime deadline, String actionUrl, long sourceId) {
-        List<Long> studentIds = tasks.activeMemberUserIds(courseId, "STUDENT");
-        for (Long studentId : studentIds) {
+                                         LocalDateTime deadline, String actionUrl, long sourceId,
+                                         List<Long> receiverUserIds) {
+        for (Long studentId : receiverUserIds) {
             if (!tasks.exists(studentId, courseId, sourceModule, sourceId)) {
                 tasks.insert(studentId, courseId, sourceModule, sourceId, taskType, title, deadline, actionUrl);
             }
         }
-        return studentIds;
-    }
-
-    public List<Long> activeStudentIds(long courseId) {
-        return tasks.activeMemberUserIds(courseId, "STUDENT");
+        return receiverUserIds;
     }
 
     public void reflectProgress(long userId, long courseId, String sourceModule, long sourceId, int percent) {
