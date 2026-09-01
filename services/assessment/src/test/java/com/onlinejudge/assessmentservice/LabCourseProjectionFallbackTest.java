@@ -63,6 +63,10 @@ class LabCourseProjectionFallbackTest {
 
     @BeforeEach
     void resetFacts() {
+        // HWK facts reference evaluation_task, so drop them first when the shared JVM left rows behind.
+        jdbc.update("DELETE FROM assessment_homework_evaluation");
+        jdbc.update("DELETE FROM assessment_homework_review_log");
+        jdbc.update("DELETE FROM assessment_homework_submission");
         jdbc.update("DELETE FROM evaluation_task");
         jdbc.update("DELETE FROM assessment_source_grade");
         jdbc.update("DELETE FROM assessment_lab_score");
