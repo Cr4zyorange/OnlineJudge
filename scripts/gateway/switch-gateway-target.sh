@@ -28,8 +28,7 @@ case "$service" in
   course) variable=COURSE_UPSTREAM ;;
   assessment) variable=ASSESSMENT_UPSTREAM ;;
   grade) variable=GRADE_UPSTREAM ;;
-  learning) variable=LEARNING_UPSTREAM ;;
-  *) printf 'service must be identity, course, assessment, grade, or learning\n' >&2; exit 64 ;;
+  *) printf 'service must be identity, course, assessment, or grade\n' >&2; exit 64 ;;
 esac
 
 mkdir -p "$runtime_dir"
@@ -51,10 +50,15 @@ validate_targets_file() {
     printf 'legacy four-service target file is not supported\n' >&2
     return 64
   fi
+  if grep -Eq '^LEARNING_UPSTREAM=' "$source_file"; then
+    printf 'LEARNING_UPSTREAM is retired; Learning is owned by Course\n' >&2
+    return 64
+  fi
 
   while IFS='=' read -r key value; do
+    value="${value%$'\r'}"
     case "$key" in
-      IDENTITY_UPSTREAM|COURSE_UPSTREAM|ASSESSMENT_UPSTREAM|GRADE_UPSTREAM|LEARNING_UPSTREAM) ;;
+      IDENTITY_UPSTREAM|COURSE_UPSTREAM|ASSESSMENT_UPSTREAM|GRADE_UPSTREAM) ;;
       *) printf 'invalid gateway target key: %s\n' "$key" >&2; return 64 ;;
     esac
     [[ -z "${seen[$key]:-}" ]] || { printf 'duplicate gateway target key: %s\n' "$key" >&2; return 64; }
@@ -64,8 +68,8 @@ validate_targets_file() {
     count=$((count + 1))
   done < "$source_file"
 
-  [[ "$count" -eq 5 ]] || { printf 'gateway target file must contain exactly five services\n' >&2; return 64; }
-  for key in IDENTITY_UPSTREAM COURSE_UPSTREAM ASSESSMENT_UPSTREAM GRADE_UPSTREAM LEARNING_UPSTREAM; do
+  [[ "$count" -eq 4 ]] || { printf 'gateway target file must contain exactly four services\n' >&2; return 64; }
+  for key in IDENTITY_UPSTREAM COURSE_UPSTREAM ASSESSMENT_UPSTREAM GRADE_UPSTREAM; do
     [[ -n "${seen[$key]:-}" ]] || { printf 'missing gateway target key: %s\n' "$key" >&2; return 64; }
   done
 }
