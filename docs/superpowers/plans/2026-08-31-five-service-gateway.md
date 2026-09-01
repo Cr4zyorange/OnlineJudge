@@ -1,4 +1,7 @@
-# Five-Service Gateway Implementation Plan
+# Five-Service Gateway Implementation Plan (Superseded)
+
+> Historical plan only. The executable plan is `2026-09-01-three-service-gateway.md`; independent
+> Learning and the five-target state must not be restored.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
