@@ -46,6 +46,9 @@ const server = http.createServer((request, response) => {
       responseHeaders["content-disposition"] = 'attachment; filename="fixture.bin"';
       responseHeaders["accept-ranges"] = "bytes";
     }
+    if (path === "/.well-known/jwks.json") {
+      responseHeaders["cache-control"] = "public, max-age=300";
+    }
     if (request.method === "POST" && path.endsWith("/upload")) uploadCount += 1;
     respond(response, request, path, url.search, status, Buffer.concat(chunks), responseHeaders);
   });

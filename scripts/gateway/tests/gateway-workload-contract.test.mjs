@@ -34,10 +34,10 @@ assert.match(nginxConfig, /include \/etc\/nginx\/conf\.d\/\*\.conf;/);
 assert.match(compose, /^\s{2}gateway:/m);
 assert.match(compose, /target:\s*8080/);
 assert.match(compose, /published:\s*"?\$\{GATEWAY_HTTP_PORT:-8088\}"?/);
-assert.match(compose, /IDENTITY_UPSTREAM:\s*identity-service:8081/);
-assert.match(compose, /COURSE_UPSTREAM:\s*course-service:8082/);
-assert.match(compose, /ASSESSMENT_UPSTREAM:\s*assessment-api:8083/);
-assert.match(compose, /GRADE_UPSTREAM:\s*grade-service:8084/);
+assert.match(compose, /IDENTITY_UPSTREAM:\s*"?\$\{IDENTITY_UPSTREAM:-identity-service:8081\}"?/);
+assert.match(compose, /COURSE_UPSTREAM:\s*"?\$\{COURSE_UPSTREAM:-course-service:8082\}"?/);
+assert.match(compose, /ASSESSMENT_UPSTREAM:\s*"?\$\{ASSESSMENT_UPSTREAM:-assessment-api:8083\}"?/);
+assert.match(compose, /GRADE_UPSTREAM:\s*"?\$\{GRADE_UPSTREAM:-grade-service:8084\}"?/);
 assert.doesNotMatch(compose, /LEARNING_UPSTREAM|learning-service/);
 assert.doesNotMatch(compose, /frontend:[\s\S]*gateway-runtime\/default\.conf/);
 

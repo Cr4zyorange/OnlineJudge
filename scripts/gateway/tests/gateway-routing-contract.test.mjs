@@ -35,6 +35,7 @@ for (const [name, port, token] of expected) {
 }
 
 const requiredRoutes = [
+  "location = /.well-known/jwks.json",
   "location ^~ /api/v1/auth/",
   "location = /api/v1/users/me",
   "location ^~ /api/v1/admin/",
@@ -100,5 +101,13 @@ for (const route of [
     `${route} must route to Course`,
   );
 }
+
+const jwksRouteStart = template.indexOf("location = /.well-known/jwks.json");
+const jwksRouteEnd = template.indexOf("\n    }", jwksRouteStart);
+assert.match(
+  template.slice(jwksRouteStart, jwksRouteEnd),
+  /proxy_pass http:\/\/__IDENTITY_UPSTREAM__;/,
+  "the public JWKS document must be served by Identity",
+);
 
 console.log("gateway-routing-contract.test: PASS (services=4)");

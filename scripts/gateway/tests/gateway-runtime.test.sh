@@ -118,6 +118,12 @@ curl -fsS --connect-timeout 1 --max-time 2 "$gateway/health/live" >/dev/null \
   || fail "gateway did not become ready within 20 seconds"
 
 assert_service /api/v1/auth/login identity
+jwks_headers="$runtime_dir/jwks.headers"
+jwks_body="$runtime_dir/jwks.json"
+jwks_status="$(curl -sS --connect-timeout 3 --max-time 8 -D "$jwks_headers" -o "$jwks_body" -w '%{http_code}' "$gateway/.well-known/jwks.json")"
+[[ "$jwks_status" == 200 ]] || fail "JWKS returned $jwks_status, expected 200"
+grep -Fq '"service":"identity"' "$jwks_body" || fail "JWKS did not reach Identity: $(cat "$jwks_body")"
+grep -Eqi '^Cache-Control:' "$jwks_headers" || fail "JWKS response lost Cache-Control"
 assert_service /api/v1/courses course
 assert_service /api/v1/homeworks assessment
 assert_service /api/v1/grades grade

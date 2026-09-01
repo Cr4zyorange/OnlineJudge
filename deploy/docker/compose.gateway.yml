@@ -8,10 +8,10 @@ services:
       dockerfile: services/gateway/Dockerfile
     image: onlinejudge/gateway:${GIT_SHA:?GIT_SHA must be the current full 40-character commit SHA}
     environment:
-      IDENTITY_UPSTREAM: identity-service:8081
-      COURSE_UPSTREAM: course-service:8082
-      ASSESSMENT_UPSTREAM: assessment-api:8083
-      GRADE_UPSTREAM: grade-service:8084
+      IDENTITY_UPSTREAM: "${IDENTITY_UPSTREAM:-identity-service:8081}"
+      COURSE_UPSTREAM: "${COURSE_UPSTREAM:-course-service:8082}"
+      ASSESSMENT_UPSTREAM: "${ASSESSMENT_UPSTREAM:-assessment-api:8083}"
+      GRADE_UPSTREAM: "${GRADE_UPSTREAM:-grade-service:8084}"
     ports:
       - name: gateway-http
         target: 8080
