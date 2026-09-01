@@ -1,73 +1,68 @@
-# 本地执行与验证（WSL 工作区 + Dev Container）
+# 本地执行与验证（Windows 工作区）
 
 来源：codex skill 的 `workflow.md` 与 `review-checklist.md`。适用于开分支、规划文件、写测试、跑验证，以及处理本机工具异常。
-
-## 环境布局（2026-09 迁移后）
-
-项目已从 Windows（`D:\repos\OnlineJudge`）迁移到 WSL 开发，固定环境如下：
-
-- **仓库位置**：`/home/skk4784/repos/OnlineJudge`（WSL ext4，行尾统一 LF）。
-- **宿主机公共工具**：`git`（最新版，位于 `~/.local/bin`，`git --version` 应 ≥ 2.55）；`gh` 未装在 WSL 本体，使用 Windows 互操作 `gh.exe`（凭据在 Windows keyring，账号 `terrana37`）。
-- **Java/Maven/Node 等工具链**：统一放在 Dev Container（`onlinejudge-dev`）内，宿主机不安装、不依赖。容器固定入口：
-  1. `scripts/dev/container.sh` —— 统一 CLI（`up` / `exec <cmd>` / `shell` / `version` / `status` / `down`）。
-  2. `.devcontainer/devcontainer.json` —— IDE（VS Code “Reopen in Container”）。
-  3. `deploy/dev/docker-compose.yml` —— 机器级 compose 定义，容器名固定 `onlinejudge-dev`，工作目录固定 `/workspace`。
-  4. 已进入容器后直接执行命令（本文件所有命令均以“容器内视角”给出）。
-- **凭据**：容器内 `git` 通过挂载 `~/.git-credentials`（宿主机）使用 GitHub token，`container.sh` 会自动检查该文件存在。
-
-判断当前环境：`test -f /.dockerenv` 为真即已在容器内；否则所有工具链命令须经 `scripts/dev/container.sh exec "..."` 或 `docker exec -it onlinejudge-dev bash` 进入容器执行。
 
 ## 在线预检
 
 任何实质性工作前：
 
-```bash
+```powershell
 git status --short --branch
 git fetch origin
-gh.exe --version        # 宿主机（Windows 互操作）
-gh.exe auth status
+gh --version
+gh auth status
 git remote -v
 ```
 
 读 `AGENTS.md`、在线 issue、其 Project 状态与相邻阶段 issue 再选文件。工作区脏或涉及共享文档时，加 `git diff --name-only` 与精确文件 diff；保护无关工作并应用协作参考中的所有权规则。
 
-## 工具可用性与排查
+## Windows 工具路径
 
-- `git` 缺失或过旧：`~/.local/bin/git --version`；最新版安装方式见 `scripts/dev/install-git.sh`（在容器内编译后安装到 `~/.local`）。
-- `rg`：宿主机与容器均有；容器内用 `rg` 搜索仓库，避免跨 `/mnt` 慢目录。
-- 需要 Java/Maven/Node 的命令一律进容器：`scripts/dev/container.sh exec "mvn -version"`。
-- 容器未启动：`scripts/dev/container.sh up dev`；需要完整链路（MySQL）时 `scripts/dev/container.sh up`。
-- 大文件（`OnlineJudge.pptx`、`演示视频.mp4`、`output/` 证据日志）位于仓库内但多数被 gitignore；`rg`/`grep` 时用 `--glob '!output/**'` 或限定目录 `backend frontend database docs scripts`。
+`git`/`rg` 不在 PATH 时，先查已知安装位置再用完整路径，不静默改机器 PATH、不装工具：
+
+```powershell
+Get-Command git -ErrorAction SilentlyContinue
+Get-Command rg -ErrorAction SilentlyContinue
+& 'D:\software\Git\cmd\git.exe' status --short --branch
+& 'C:\Program Files\GitHub CLI\gh.exe' auth status
+```
+
+`rg` 不可用或 WindowsApps 报 `Access is denied` 时用 PowerShell 替代：
+
+```powershell
+Get-ChildItem -Recurse -File backend,frontend,database |
+  Select-String -Pattern 'TODO','FIXME','console\.log','debugger','<<<<<<<','=======','>>>>>>>'
+```
 
 ## gh CLI 可靠性
 
 `gh` 元数据命令用 8-15 秒短超时，大查询拆成小调用串行执行；不合并 `body`、`files`、`statusCheckRollup` 到一次 `gh pr view --json`：
 
-```bash
-gh.exe pr view <number> --json number,title,url
-gh.exe pr view <number> --json baseRefName,headRefName,isDraft,state,mergeStateStatus,closingIssuesReferences
-gh.exe pr view <number> --json files
-gh.exe pr view <number> --json statusCheckRollup
-gh.exe pr view <number> --json body
+```powershell
+gh pr view <number> --json number,title,url
+gh pr view <number> --json baseRefName,headRefName,isDraft,state,mergeStateStatus,closingIssuesReferences
+gh pr view <number> --json files
+gh pr view <number> --json statusCheckRollup
+gh pr view <number> --json body
 ```
 
 不并行跑多个 `gh` 命令——被中断或并行的 `gh` 会留下僵尸 `gh.exe` 让后续命令假挂起。超时/中断/卡住时先清理再重试：
 
-```bash
-ps aux | grep -E 'gh\.exe' | grep -v grep
-ps aux | grep -E 'gh\.exe' | grep -v grep | awk '{print $2}' | xargs -r kill -9
+```powershell
+Get-Process gh -ErrorAction SilentlyContinue | Select-Object Id,StartTime,CPU,Path
+Get-Process gh -ErrorAction SilentlyContinue | Stop-Process -Force
 ```
 
-GitHub 访问不稳或用户要求代理时，为命令会话设置 WSL 可见的本地代理端口 `7897`（Windows 侧代理进程需运行；WSL2 通过 localhost 转发）：
+GitHub 访问不稳或用户要求代理时，为本命令会话设置本地代理端口 `7897`：
 
-```bash
-export HTTPS_PROXY='http://127.0.0.1:7897'
-export HTTP_PROXY='http://127.0.0.1:7897'
-export ALL_PROXY='http://127.0.0.1:7897'
-export NO_PROXY='localhost,127.0.0.1'
+```powershell
+$env:HTTPS_PROXY='http://127.0.0.1:7897'
+$env:HTTP_PROXY='http://127.0.0.1:7897'
+$env:ALL_PROXY='http://127.0.0.1:7897'
+$env:NO_PROXY='localhost,127.0.0.1'
 ```
 
-`gh issue view --json projectItems` 或 `gh project ...` 因缺 project scope 失败时尝试 `gh.exe auth refresh --hostname github.com -s read:project`；设备码或网络失败则记录确切错误，可见 Project 状态无法核验时不批准。
+`gh issue view --json projectItems` 或 `gh project ...` 因缺 project scope 失败时尝试 `gh auth refresh --hostname github.com -s read:project`；设备码或网络失败则记录确切错误，可见 Project 状态无法核验时不批准。
 
 ## 规划模板
 
@@ -118,30 +113,30 @@ database/migration/test data -> domain enum/entity/command -> repository query
 
 ## 验证命令
 
-先目标后宽泛。以下命令默认在容器内执行（宿主机包一层 `scripts/dev/container.sh exec "..."`，或先 `scripts/dev/container.sh shell`）：
+先目标后宽泛：
 
-```bash
+```powershell
 # 后端定点
-cd /workspace/backend && mvn -Dtest=HomeworkControllerTest test
-cd /workspace/backend && mvn -Dtest=HomeworkMigrationTest test
+mvn -Dtest=HomeworkControllerTest test
+mvn -Dtest=HomeworkMigrationTest test
 
 # 后端全量
-cd /workspace/backend && mvn test
+mvn test
 
 # 前端定点
-cd /workspace/frontend && npx vitest run tests/unit/hwk/homeworksApi.spec.ts --pool=threads
+& 'D:\Program Files\nodejs\node.exe' node_modules/vitest/vitest.mjs run tests/unit/hwk/homeworksApi.spec.ts --pool=threads
 
 # 前端宽泛
-cd /workspace/frontend && npx vitest run --pool=threads
-cd /workspace/frontend && npx vue-tsc --noEmit
-cd /workspace/frontend && npx vite build --debug
+& 'D:\Program Files\nodejs\node.exe' node_modules/vitest/vitest.mjs run --pool=threads
+& 'D:\Program Files\nodejs\node.exe' node_modules/vue-tsc/bin/vue-tsc.js --noEmit
+& 'D:\Program Files\nodejs\node.exe' node_modules/vite/bin/vite.js build --debug
 
 # 仓库
 git diff --check
 git status --short --branch
 ```
 
-前端首次依赖安装：`cd /workspace/frontend && npm ci`（package.json 声明 `npm@10.9.2`；容器 npm 版本与 `packageManager` 不一致时按 `npm ci` 输出为准，不要静默改 package.json）。非 HWK 模块把 `Homework*` 换成对应模块测试类/目录。
+本机上 `npm run build` 可能卡在输出管道而直接 Vite debug 能完成；使用直接 Vite 命令时要记录。非 HWK 模块把 `Homework*` 换成对应模块测试类/目录。
 
 ## 前端测试陷阱
 

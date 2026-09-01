@@ -1,6 +1,6 @@
 ---
 name: onlinejudge-development-workflow
-description: 在 OnlineJudge（OnlineJudgeForSE）仓库内做任何功能开发、缺陷修复、测试、文档编写、issue 规划、PR 评审或本地自检时使用。覆盖 AUTH/CRS/LAB/HWK/GRD/LRN 六模块的纵向全栈交付（数据库→后端→前端→权限→测试）、文档驱动与测试驱动纪律、GitHub 分支/issue/PR 协作规则、SRS/概要/详细设计文档评审，以及 WSL + Dev Container 环境入口与验证命令。用户提到模块开发、写测试、闭环 issue、提 PR、评审 PR、改设计文档，或说"按仓库规范做"时都应触发。
+description: 在 OnlineJudge（OnlineJudgeForSE）仓库内做任何功能开发、缺陷修复、测试、文档编写、issue 规划、PR 评审或本地自检时使用。覆盖 AUTH/CRS/LAB/HWK/GRD/LRN 六模块的纵向全栈交付（数据库→后端→前端→权限→测试）、文档驱动与测试驱动纪律、GitHub 分支/issue/PR 协作规则、SRS/概要/详细设计文档评审，以及 Windows 本地验证命令。用户提到模块开发、写测试、闭环 issue、提 PR、评审 PR、改设计文档，或说"按仓库规范做"时都应触发。
 ---
 
 # OnlineJudge 开发工作流（整合版）
@@ -27,16 +27,6 @@ description: 在 OnlineJudge（OnlineJudgeForSE）仓库内做任何功能开发
 3. `docs/最终提交/软件需求规格说明书.md`、`软件概要设计说明书.md`、`软件详细设计说明书.md` —— 需求、接口、数据结构、模块边界与验收行为的主要依据。
 4. `docs/过程/` 下对应模块的源文档（需求/概要/详细设计/测试/项目管理）。
 5. 涉及前端时：详细设计第 4 章对应 `UI-*` 编号，以及 `docs/过程/UI设计参考/` 的 `index.html`、`style.css`、`img/back.jpg`。
-
-## 环境入口（WSL + Dev Container）
-
-- 仓库位于 `/home/skk4784/repos/OnlineJudge`（WSL，行尾统一 LF）。宿主机只保证公共工具（`git` 最新版）；Java/Maven/Node 工具链全部在 Dev Container `onlinejudge-dev` 内，不在宿主机对齐。
-- 固定入口（详细命令见 `references/verification.md`）：
-  1. `scripts/dev/container.sh` —— 统一 CLI：`up`（启动容器，含 MySQL 用 `up`、仅 dev 用 `up dev`）、`exec "<命令>"`（容器内跑单条命令）、`shell`（交互进入）、`version`（工具链自检）、`status`、`down`。
-  2. `.devcontainer/devcontainer.json` —— IDE “Reopen in Container”。
-  3. `deploy/dev/docker-compose.yml` —— 机器级定义，容器名固定 `onlinejudge-dev`、工作目录固定 `/workspace`。
-- 判断是否已在容器内：`test -f /.dockerenv`。容器内 `git` 凭据来自挂载的宿主机 `~/.git-credentials`。
-- 需要 Java/Maven/Node 的命令必须进容器执行；只做 git/文档操作时可在宿主机直接执行。
 
 ## 硬性纪律（不可协商）
 

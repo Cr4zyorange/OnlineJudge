@@ -25,22 +25,6 @@
 
 测试驱动是代码实现的进入条件。除纯文档、纯配置、一次性脚手架外，任何新功能、缺陷修复、重构和行为调整都必须先定义可执行验证，再写实现代码。
 
-## 本地环境（WSL + Dev Container）
-
-本项目自 2026-09 起在 WSL 开发，仓库位于 `/home/skk4784/repos/OnlineJudge`。环境分工：
-
-- **宿主机（WSL）**：只维护公共工具，如 `git`（最新版，见 `scripts/dev/install-git.sh`）。GitHub 凭据经 `gh.exe`（Windows 互操作）或 `~/.git-credentials` 使用。
-- **Dev Container（`onlinejudge-dev`）**：承载 Java 21、Maven 3.9.16、Node 22 等工具链，版本与 CI 对齐。所有编译、测试、构建命令必须在容器内执行。
-
-固定入口（详见 `.agents/skills/onlinejudge-development-workflow/references/verification.md`）：
-
-1. `scripts/dev/container.sh` —— 统一 CLI：`up` / `exec "<命令>"` / `shell` / `version` / `status` / `down`。
-2. `.devcontainer/devcontainer.json` —— IDE “Reopen in Container”。
-3. `deploy/dev/docker-compose.yml` —— 机器级定义；容器名 `onlinejudge-dev`，工作目录 `/workspace`。
-4. 已进入容器时直接执行命令（用 `test -f /.dockerenv` 判断）。
-
-需要 `mvn`/`npm`/`node` 的命令一律先经 `scripts/dev/container.sh exec "..."` 或 `shell` 进入容器执行，不得在宿主机直接调用缺失的工具链。
-
 ## 开发前必须阅读
 
 开始任何代码修改前，必须按当前 issue 或模块阅读以下材料：
