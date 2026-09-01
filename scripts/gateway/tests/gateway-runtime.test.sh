@@ -73,7 +73,6 @@ create_upstream identity identity-service
 create_upstream course course-service
 create_upstream assessment assessment-api
 create_upstream grade grade-service
-create_upstream learning learning-service
 create_upstream frontend frontend 80
 
 cp "$repo_root/deploy/gateway/gateway.conf.template" "$runtime_dir/gateway.conf.template"
@@ -97,7 +96,6 @@ gateway_container="$prefix-gateway"
   --env COURSE_UPSTREAM=course-service:8080 \
   --env ASSESSMENT_UPSTREAM=assessment-api:8080 \
   --env GRADE_UPSTREAM=grade-service:8080 \
-  --env LEARNING_UPSTREAM=learning-service:8080 \
   --volume "$gateway_template_source:/opt/onlinejudge/gateway.conf.template:ro" \
   "$image" >/dev/null
 containers+=("$gateway_container")
@@ -123,8 +121,28 @@ assert_service /api/v1/auth/login identity
 assert_service /api/v1/courses course
 assert_service /api/v1/homeworks assessment
 assert_service /api/v1/grades grade
-assert_service /api/v1/notifications learning
+assert_service '/api/v1/learning/tasks?page=2&size=20' course
+assert_service /api/v1/notifications course
 assert_service / frontend
+
+body="$(request GET '/courses/9501/assignments?tab=active' 200)"
+[[ "$body" == *'"service":"frontend"'* && "$body" == *'"path":"/courses/9501/assignments"'* && "$body" == *'"query":"?tab=active"'* ]] \
+  || fail "frontend deep link or query was not preserved: $body"
+
+download_headers="$runtime_dir/download.headers"
+download_body="$runtime_dir/download.json"
+download_status="$(curl -sS --connect-timeout 3 --max-time 8 \
+  -D "$download_headers" -o "$download_body" -w '%{http_code}' \
+  -H 'Range: bytes=10-19' "$gateway/api/v1/labs/download")"
+[[ "$download_status" == 206 ]] || fail "Range download returned $download_status, expected 206"
+body="$(cat "$download_body")"
+[[ "$body" == *'"service":"assessment"'* && "$body" == *'"range":"bytes=10-19"'* ]] \
+  || fail "Range download request was not preserved: $body"
+tr -d '\r' < "$download_headers" | grep -Fxi 'Content-Disposition: attachment; filename="fixture.bin"' >/dev/null \
+  || fail "download response lost Content-Disposition"
+
+body="$(request GET /api/v1/grades/stream 200)"
+[[ "$body" == $'stream-one\nstream-two' ]] || fail "streamed response was not preserved: $body"
 
 body="$(request GET /api/v1/auth/headers 200 \
   -H 'Authorization: Bearer runtime-test-token' \
@@ -158,7 +176,7 @@ body="$(request GET /api/v1/unknown 404)"
 body="$(request GET /api/v1/auth/unauthorized 401)"
 [[ "$body" == *'"service":"identity"'* ]] || fail "401 application body was not preserved"
 body="$(request GET /api/v1/learning/forbidden 403)"
-[[ "$body" == *'"service":"learning"'* ]] || fail "403 application body was not preserved"
+[[ "$body" == *'"service":"course"'* ]] || fail "403 application body was not preserved"
 body="$(request GET /api/v1/courses/999999 404)"
 [[ "$body" == *'"service":"course"'* ]] || fail "404 application body was not preserved"
 
@@ -188,9 +206,34 @@ for body in \
   "$(request GET /api/v1/grades/controlled-unavailable 503)" \
   "$(request GET /api/v1/notifications/slow 504)"; do
   [[ "$body" == *'"requestId":"'* ]] || fail "Gateway error omitted request ID"
-  ! grep -Eqi 'identity-service|assessment-api|grade-service|learning-service|exception|stacktrace|runtime-test-token' <<<"$body" \
+  ! grep -Eqi 'identity-service|course-service|assessment-api|grade-service|learning-service|exception|stacktrace|runtime-test-token' <<<"$body" \
     || fail "Gateway error leaked internal details"
 done
+
+assert_isolated_failure() {
+  local failed_service="$1"
+  local failed_path="$2"
+  shift 2
+  docker stop "$prefix-$failed_service" >/dev/null
+  local failure_body
+  failure_body="$(request GET "$failed_path" 504)"
+  [[ "$failure_body" == *'"code":"GATEWAY_504"'* && "$failure_body" == *'"requestId":"'* ]] \
+    || fail "$failed_service stop did not return the stable timeout contract: $failure_body"
+  while (($#)); do
+    assert_service "$1" "$2"
+    shift 2
+  done
+  docker start "$prefix-$failed_service" >/dev/null
+}
+
+assert_isolated_failure identity /api/v1/auth/me \
+  /api/v1/courses course /api/v1/homeworks assessment /api/v1/grades grade
+assert_isolated_failure course /api/v1/notifications \
+  /api/v1/auth/me identity /api/v1/homeworks assessment /api/v1/grades grade
+assert_isolated_failure assessment /api/v1/evaluations/probe \
+  /api/v1/auth/me identity /api/v1/courses course /api/v1/grades grade
+assert_isolated_failure grade /api/v1/grades \
+  /api/v1/auth/me identity /api/v1/courses course /api/v1/homeworks assessment
 
 rate_codes="$runtime_dir/rate.codes"
 for _request in {1..40}; do
@@ -199,4 +242,4 @@ done
 grep -Fqx '429' "$rate_codes" || fail "identity route did not enforce rate limiting"
 
 docker exec "$gateway_container" nginx -t >/dev/null
-printf 'gateway-runtime.test: PASS (services=5 headers=request-allowlist status=401/403/404/413/429/502/503/504 retry=off)\n'
+printf 'gateway-runtime.test: PASS (services=4 deep-link=pass stream=pass isolation=4/4 headers=request-allowlist status=401/403/404/413/429/502/503/504 retry=off)\n'
