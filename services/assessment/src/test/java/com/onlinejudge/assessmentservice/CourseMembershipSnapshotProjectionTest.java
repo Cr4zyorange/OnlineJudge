@@ -34,8 +34,11 @@ class CourseMembershipSnapshotProjectionTest {
                 new CourseMembershipProjectionService.RosterMember("former-student", "REMOVED", 4)));
 
         assertThat(projection.applySnapshot(snapshot).decision()).isEqualTo("APPLIED");
+        assertThat(members.isAuthoritativeFor("course-preexisting", "student-1")).isTrue();
         assertThat(members.isActive("course-preexisting", "student-1")).isTrue();
         assertThat(members.isActive("course-preexisting", "former-student")).isFalse();
+        assertThat(members.isAuthoritativeFor("course-preexisting", "never-enrolled")).isTrue();
+        assertThat(members.isActive("course-preexisting", "never-enrolled")).isFalse();
         assertThat(jdbc.queryForObject("SELECT roster_version FROM assessment_course_membership_watermark WHERE course_id='course-preexisting'", Long.class)).isEqualTo(7L);
         assertThat(projection.applySnapshot(snapshot).decision()).isEqualTo("DUPLICATE");
         assertThat(projection.applySnapshot(new CourseMembershipProjectionService.RosterSnapshot("snapshot-6", "course-preexisting", 6, List.of())).decision()).isEqualTo("STALE");
