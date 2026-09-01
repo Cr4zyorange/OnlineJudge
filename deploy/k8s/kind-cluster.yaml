@@ -1,9 +1,11 @@
 # Kind cluster definition consumed by scripts/kind/kind-create.sh.
-# Single control-plane node; no extraPortMappings: the frontend is only
-# reachable through kubectl port-forward, matching the contract's rule that
-# mysql and backend are never published.
+# Single control-plane node pinned to a fixed node image so the baseline is
+# deterministic across local runs and CI runners; no extraPortMappings: the
+# frontend is only reachable through kubectl port-forward, matching the
+# contract's rule that mysql and backend are never published.
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
 name: onlinejudge-ci
 nodes:
   - role: control-plane
+    image: kindest/node:v1.36.1
