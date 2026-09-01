@@ -15,7 +15,7 @@
 
 不包含：
 
-- 完整 Kubernetes 清单与镜像/部署实现（后续子任务以 `needs: [delivery]` 串联）。
+- 远程镜像仓库推送、长期 Kubernetes 集群与生产凭据；#318 的 delivery 仅在 GitHub-hosted runner 构建本地不可变制品并复演隔离 Compose 环境。
 - 在仓库保存 Actions secrets（只声明名称与注入位置，见第 7 节）。
 - 弱化测试断言、跳过测试或伪造 PASS。
 
@@ -46,7 +46,7 @@ browser-e2e-gate（依赖三个质量门禁；一次性 H2 + RabbitMQ + Spring B
         │
         │
         ▼
-      delivery（needs 全部五个门禁；后续镜像/Kind 部署 job 以 needs: [delivery] 挂接）
+      delivery（needs 全部五个门禁；生成变更 DeliveryPlan → 构建受影响映像/SBOM → 完整 disposable Compose 部署）
 ```
 
 规则：
@@ -54,7 +54,7 @@ browser-e2e-gate（依赖三个质量门禁；一次性 H2 + RabbitMQ + Spring B
 - 每个 job 有显式 `timeout-minutes`。
 - 门禁 job 只能调用 `scripts/ci/` 正本脚本，不允许内联构建命令。
 - 不使用 `continue-on-error`；前置失败时依赖它的 job 自动 `skipped`。
-- `if: always()` 只允许出现在证据/诊断步骤（上传、汇总、收集环境）；`delivery` 步骤一律禁用。
+- `if: always()` 只允许出现在证据/诊断步骤（上传、汇总、收集环境）；实际构建和部署步骤一律禁用，delivery 的上传步骤必须保留失败证据。
 
 ## 4. 版本固定与缓存
 
@@ -74,7 +74,7 @@ browser-e2e-gate（依赖三个质量门禁；一次性 H2 + RabbitMQ + Spring B
 - `environment.json`：event、repository、workflow、run id、ref、base_ref、精确 head SHA、runner OS/arch、Java/Maven/Node/npm 版本、UTC 时间戳。
 - `gate.log`：正本脚本完整输出（含每个命令回显）；`contracts-gate/consumer/gate.log` 同时保留 D7 workload manifest 的 schema/语义校验和 Python mutation regression 原始输出。
 - surefire/vitest/Playwright JUnit XML 报告（按单元/集成/契约/E2E 分目录）、Playwright HTML 报告与 `test-summary.txt`（tests/failures/errors/skipped 计数）。
-- `check-result.txt`（validate-workflows）与 `checkpoint.txt`（delivery）。
+- `check-result.txt`（validate-workflows）、`checkpoint.txt`、变更选择的 `selected-plan.json`、受影响映像制品及 disposable 环境诊断（delivery）。
 
 上传步骤使用 `if: always()` 与 `if-no-files-found: warn`，保证失败运行同样可审计；`delivery` 只在全部门禁通过后运行并上传证据。
 
@@ -102,6 +102,15 @@ browser-e2e-gate（依赖三个质量门禁；一次性 H2 + RabbitMQ + Spring B
 
 `check-workflows.sh` 会拒绝任何未经声明、或硬编码到 workflow 中的凭据。
 
+### Docker Scout SBOM 工具链
+
+`delivery` job 不依赖 GitHub Runner 的预装 Docker Scout。它从 Docker 官方
+`docker/scout-cli` release 下载固定的 `v1.24.0` Linux AMD64 压缩包
+`docker-scout_1.24.0_linux_amd64.tar.gz`，并以发布文件的 SHA-256
+`f4e2814bd61040365153d5b964b144cb2dc6ee536a68b5bac4cadf00fc0ec34b` 校验后，
+安装为 Docker CLI plugin。校验失败或 `docker scout version` 不能执行都会在生成
+任何镜像 SBOM 前失败；升级版本必须同时更新 workflow、`check-workflows.sh` 和本节。
+
 ## 8. 本地运行与验收
 
 正本脚本均可独立运行（`bash scripts/ci/<script>.sh [checkout]`）：
@@ -116,6 +125,7 @@ bash scripts/ci/browser-e2e-verify.sh
 bash scripts/ci/collect-environment.sh
 bash scripts/ci/summarize-tests.sh
 bash scripts/ci/delivery-checkpoint.sh
+bash scripts/ci/disposable-delivery.sh --checkout . --dry-run
 ```
 
 本地开发机工具链与 CI 不一致时，通过环境变量覆盖预期版本（CI 仍由 workflow `env:` 严格固定）：
