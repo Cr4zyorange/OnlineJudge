@@ -3,6 +3,7 @@ package com.onlinejudge.assessmentservice.controller;
 import com.fasterxml.jackson.annotation.JsonAlias;
 import com.onlinejudge.assessmentservice.security.CurrentUser;
 import com.onlinejudge.assessmentservice.service.CoursePermissionClient;
+import com.onlinejudge.assessmentservice.service.CourseProjectionUnavailableException;
 import com.onlinejudge.assessmentservice.service.HomeworkService;
 import com.onlinejudge.assessmentservice.service.HomeworkSubmissionService;
 import com.onlinejudge.assessmentservice.persistence.CourseMemberProjectionRepository;
@@ -60,6 +61,9 @@ public class HomeworkController {
             homework = homeworks.find(homeworkId);
         } catch (NoSuchElementException missing) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "homework not found", missing);
+        }
+        if (courseMembers.hasProjectionGap(homework.courseId())) {
+            throw new CourseProjectionUnavailableException("course membership projection is incomplete; retry after reconciliation");
         }
         if (!courseMembers.isActive(homework.courseId(), user.id())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "active course student membership is required");

@@ -1,6 +1,7 @@
 package com.onlinejudge.assessmentservice.controller;
 
 import com.onlinejudge.assessmentservice.service.CourseAuthorizationUnavailableException;
+import com.onlinejudge.assessmentservice.service.CourseProjectionUnavailableException;
 import com.onlinejudge.assessmentservice.service.HomeworkPublicationException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatusCode;
@@ -26,6 +27,12 @@ class HomeworkApiExceptionHandler {
     ResponseEntity<Map<String, Object>> courseAuthorizationUnavailable(CourseAuthorizationUnavailableException failure,
             HttpServletRequest request) {
         return error(HttpStatusCode.valueOf(503), "COURSE_AUTHORIZATION_UNAVAILABLE", failure.getMessage(), true, request);
+    }
+
+    @ExceptionHandler(CourseProjectionUnavailableException.class)
+    ResponseEntity<Map<String, Object>> courseProjectionUnavailable(CourseProjectionUnavailableException failure,
+            HttpServletRequest request) {
+        return error(HttpStatusCode.valueOf(503), "COURSE_PROJECTION_UNAVAILABLE", failure.getMessage(), true, request);
     }
 
     @ExceptionHandler(ResponseStatusException.class)
