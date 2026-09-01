@@ -9,3 +9,6 @@ database/**/*.sql text eol=lf
 # line ending so their documented SHA-256 values are directly reproducible.
 output/issue-265/*.log text eol=lf -whitespace
 output/test/issue-262/raw/*.log text eol=lf -whitespace
+
+# #307 hashes the frozen performance dataset byte-for-byte.
+performance/issue-307/*.json text eol=lf
