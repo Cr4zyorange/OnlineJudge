@@ -11,7 +11,7 @@ Docker Compose 教学部署与本地开发是两条不同链路：
 
 如果你要验证 issue `DEP-01` 对应的一键部署方案，请直接阅读 [docs/最终提交/部署文档.md](docs/最终提交/部署文档.md)。
 
-五服务统一入口的路由清单、零信任 Header 边界、独立 Gateway workload、按服务切流和自动回滚命令见[部署文档的“Gateway 五服务入口、切流与回滚”章节](docs/最终提交/部署文档.md#59-gateway-五服务入口切流与回滚)。前端始终使用原有 `/api` 基址，不需要知道各业务服务地址；真实五服务编排与主链验收分别由 #318、#320 完成。
+三业务服务架构的四上游统一入口由 Identity、Course（承接 Learning、notifications、reminders）、Assessment 和 Grade 组成；路由清单、零信任 Header 边界、独立 Gateway workload、按服务切流和自动回滚命令见[部署文档的“Gateway 四上游入口、切流与回滚”章节](docs/最终提交/部署文档.md#59-gateway-四上游入口切流与回滚)。前端始终使用原有 `/api` 基址，不需要知道各业务服务地址；真实服务编排、浏览器主链和跨服务停机验收分别由 #318、#320、#340 完成。
 
 小学期正式提交的六目录聚合入口位于 [submission/README.md](submission/README.md)。该目录只维护交付物映射和待补清单，不在开发期复制或搬移现有源码、文档、部署脚本和测试材料；版本冻结后再按映射生成最终压缩包。
 
