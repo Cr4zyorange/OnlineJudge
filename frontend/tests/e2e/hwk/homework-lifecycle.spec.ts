@@ -101,15 +101,17 @@ test.describe('@hwk HWK 真实业务闭环', () => {
     const student = await apiData<AuthUserRecord>(await request.get('/api/v1/auth/me', {
       headers: studentHeaders
     }));
-    const publishedNotifications = await apiData<NotificationPage>(await request.get(
-      '/api/v1/notifications?page=1&size=100',
-      { headers: studentHeaders }
-    ));
-    expect(publishedNotifications.records).toContainEqual(expect.objectContaining({
-      sourceModule: 'HWK',
-      sourceId: homeworkId,
-      title: 'homework published'
-    }));
+    await expect.poll(async () => {
+      const publishedNotifications = await apiData<NotificationPage>(await request.get(
+        '/api/v1/notifications?page=1&size=100',
+        { headers: studentHeaders }
+      ));
+      return publishedNotifications.records.some((notification) => (
+        notification.sourceModule === 'HWK'
+          && notification.sourceId === homeworkId
+          && notification.title === 'homework published'
+      ));
+    }, { intervals: [100, 250, 500, 1_000], timeout: 10_000 }).toBe(true);
 
     await page.goto(`/courses/${COURSE_ID}/homeworks/${homeworkId}/submit`);
     await expect(page.getByRole('heading', { name: title })).toBeVisible();

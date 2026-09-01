@@ -42,7 +42,7 @@ validate-workflows（无前置，静态校验 + dry-run 链路模拟）
         ├── contracts-gate  shell 契约 + 公共基础设施契约 + D7 workload manifest
         │
         ▼
-browser-e2e-gate（依赖三个质量门禁；一次性 H2 + Spring Boot + Vite + Chromium）
+browser-e2e-gate（依赖三个质量门禁；一次性 H2 + RabbitMQ + Spring Boot + Vite + Chromium）
         │
         │
         ▼
@@ -138,7 +138,7 @@ bash scripts/ci/verify-workflow-gates.test.sh
 | --- | --- |
 | PR 与 `dev` push 自动触发，并发避免旧提交覆盖 | `ci.yml` 的 `on:`/`concurrency` |
 | checkout、依赖安装、编译、单元/集成测试、前端构建 | `backend-verify.sh`、`frontend-verify.sh` |
-| 真实浏览器业务 E2E | `browser-e2e-verify.sh` → `run-business-e2e-disposable.mjs`；一次性 H2、Spring Boot、Vite 与 Chromium 覆盖 AUTH、CRS、LAB、HWK、GRD、LRN 维护中的业务场景 |
+| 真实浏览器业务 E2E | `browser-e2e-verify.sh` → `run-business-e2e-disposable.mjs`；一次性 H2、RabbitMQ、Spring Boot、Vite 与 Chromium 覆盖 AUTH、CRS、LAB、HWK、GRD、LRN 维护中的业务场景；RabbitMQ 使用每轮随机端口、容器名和临时凭据，原始 broker 日志随 E2E 证据归档 |
 | 前置失败阻断后续交付 job | `needs` 链 + 无 `continue-on-error` |
 | 失败运行保留报告/日志/环境/精确 SHA | `if: always()` 上传 + `collect-environment.sh` |
 | 成功运行记录通过/失败/跳过数量 | `summarize-tests.sh` + surefire/vitest XML |

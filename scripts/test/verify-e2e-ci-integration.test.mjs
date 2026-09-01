@@ -31,6 +31,9 @@ test('the disposable business E2E command runs every maintained browser scenario
     assert.match(runner, new RegExp(target.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   }
   assert.match(runner, /ONLINEJUDGE_EVALUATION_SANDBOX_MODE:\s*'fake'/);
+  assert.match(runner, /rabbitmq:4\.1-management/);
+  assert.match(runner, /ONLINEJUDGE_RELIABILITY_RABBITMQ_ENABLED:\s*'true'/);
+  assert.match(runner, /ONLINEJUDGE_RELIABILITY_PUBLISHER_ENABLED:\s*'true'/);
   assert.match(runner, /E2E_GRD_DISPOSABLE_PROOF_FILE/);
   assert.match(runner, /E2E_LRN_DISPOSABLE_PROOF_FILE/);
   assert.match(runner, /E2E_ARTIFACT_DIR/);

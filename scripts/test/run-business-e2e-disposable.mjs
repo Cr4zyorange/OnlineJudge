@@ -3,7 +3,7 @@ import { randomBytes } from 'node:crypto';
 import { spawn, spawnSync } from 'node:child_process';
 import { closeSync, existsSync, openSync } from 'node:fs';
 import { chmod, copyFile, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
-import { createServer } from 'node:net';
+import { createConnection, createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -14,6 +14,9 @@ const frontendDir = join(repositoryRoot, 'frontend');
 const backendJar = join(backendDir, 'target', 'onlinejudge-backend-0.1.0-SNAPSHOT.jar');
 const commandSuffix = process.platform === 'win32' ? '.cmd' : '';
 const javaCommand = process.platform === 'win32' ? 'java.exe' : 'java';
+const dockerCommand = process.platform === 'win32' ? 'docker.exe' : 'docker';
+const rabbitImage = 'rabbitmq:4.1-management';
+const rabbitUsername = 'onlinejudge_e2e';
 const e2eTargets = [
   'tests/e2e/auth',
   'tests/e2e/crs',
@@ -34,6 +37,9 @@ let backendLogPath = '';
 let frontendLogPath = '';
 let backendUrl = '';
 let baseUrl = '';
+let rabbitPort = 0;
+let rabbitContainerName = '';
+let rabbitPassword = '';
 let failed = false;
 
 try {
@@ -44,10 +50,25 @@ try {
   backendLogPath = join(tempDir, 'backend.log');
   frontendLogPath = join(tempDir, 'frontend.log');
 
-  const backendPort = await choosePort(process.env.E2E_BUSINESS_BACKEND_PORT);
-  const frontendPort = await choosePort(process.env.E2E_BUSINESS_FRONTEND_PORT, new Set([backendPort]));
+  rabbitPort = await choosePort(process.env.E2E_BUSINESS_RABBITMQ_PORT);
+  const backendPort = await choosePort(process.env.E2E_BUSINESS_BACKEND_PORT, new Set([rabbitPort]));
+  const frontendPort = await choosePort(
+    process.env.E2E_BUSINESS_FRONTEND_PORT,
+    new Set([rabbitPort, backendPort])
+  );
   backendUrl = `http://127.0.0.1:${backendPort}`;
   baseUrl = `http://127.0.0.1:${frontendPort}`;
+
+  rabbitContainerName = `onlinejudge-e2e-rabbit-${randomBytes(8).toString('hex')}`;
+  rabbitPassword = randomBytes(24).toString('base64url');
+  await run(dockerCommand, [
+    'run', '--detach', '--rm', '--name', rabbitContainerName,
+    '--publish', `127.0.0.1:${rabbitPort}:5672`,
+    '--env', `RABBITMQ_DEFAULT_USER=${rabbitUsername}`,
+    '--env', `RABBITMQ_DEFAULT_PASS=${rabbitPassword}`,
+    rabbitImage
+  ], repositoryRoot);
+  await waitForRabbit(rabbitPort);
 
   await run(`mvn${commandSuffix}`, ['-q', '-DskipTests', 'package'], backendDir);
   if (!existsSync(backendJar)) {
@@ -68,6 +89,13 @@ try {
       ONLINEJUDGE_COURSE_SCHEMA_INITIALIZER_ENABLED: 'true',
       ONLINEJUDGE_DEMO_DATA_ENABLED: 'true',
       ONLINEJUDGE_EVALUATION_SANDBOX_MODE: 'fake',
+      ONLINEJUDGE_RELIABILITY_RABBITMQ_ENABLED: 'true',
+      ONLINEJUDGE_RELIABILITY_PUBLISHER_ENABLED: 'true',
+      ONLINEJUDGE_RELIABILITY_PUBLISHER_FIXED_DELAY_MS: '250',
+      SPRING_RABBITMQ_HOST: '127.0.0.1',
+      SPRING_RABBITMQ_PORT: String(rabbitPort),
+      SPRING_RABBITMQ_USERNAME: rabbitUsername,
+      SPRING_RABBITMQ_PASSWORD: rabbitPassword,
       ONLINEJUDGE_STORAGE_LOCAL_ROOT: join(tempDir, 'uploads'),
       SERVER_ADDRESS: '127.0.0.1',
       SERVER_PORT: String(backendPort)
@@ -139,6 +167,8 @@ try {
   for (const child of children.reverse()) {
     stopProcessTree(child.pid);
   }
+  await retainRabbitLog();
+  removeRabbitContainer();
   await retainArtifacts();
   await removeTempDirectory(tempDir, 'onlinejudge-lrn-e2e-');
   await removeTempDirectory(grdProofDir, 'onlinejudge-grd-e2e.');
@@ -215,6 +245,31 @@ async function waitForLogin(url, account, password) {
   throw new Error(`seeded account ${account} did not become ready within 30 seconds`);
 }
 
+async function waitForRabbit(port) {
+  for (let attempt = 0; attempt < 120; attempt += 1) {
+    try {
+      await new Promise((resolveProbe, rejectProbe) => {
+        const socket = createConnection({ host: '127.0.0.1', port });
+        socket.setTimeout(1_000);
+        socket.once('connect', () => {
+          socket.end();
+          resolveProbe(undefined);
+        });
+        socket.once('error', rejectProbe);
+        socket.once('timeout', () => {
+          socket.destroy();
+          rejectProbe(new Error('RabbitMQ connection timed out'));
+        });
+      });
+      return;
+    } catch {
+      // The disposable broker is still booting.
+    }
+    await new Promise((resolveWait) => setTimeout(resolveWait, 250));
+  }
+  throw new Error('isolated RabbitMQ did not become ready within 30 seconds');
+}
+
 function run(command, args, cwd, env = process.env) {
   return new Promise((resolveRun, reject) => {
     const child = spawnPortable(command, args, {
@@ -279,9 +334,34 @@ async function retainArtifacts() {
     status: failed ? 'failed' : 'passed',
     backendUrl,
     baseUrl,
+    rabbitPort,
     targets: e2eTargets,
     timestamp: new Date().toISOString()
   }, null, 2)}\n`);
+}
+
+async function retainRabbitLog() {
+  if (!rabbitContainerName) {
+    return;
+  }
+  const result = spawnSync(dockerCommand, ['logs', rabbitContainerName], {
+    encoding: 'utf8',
+    windowsHide: true
+  });
+  const output = `${result.stdout || ''}${result.stderr || ''}`;
+  if (output) {
+    await writeFile(join(artifactDir, 'rabbitmq.log'), output);
+  }
+}
+
+function removeRabbitContainer() {
+  if (!rabbitContainerName) {
+    return;
+  }
+  spawnSync(dockerCommand, ['rm', '--force', rabbitContainerName], {
+    stdio: 'ignore',
+    windowsHide: true
+  });
 }
 
 async function retainFile(source, name) {

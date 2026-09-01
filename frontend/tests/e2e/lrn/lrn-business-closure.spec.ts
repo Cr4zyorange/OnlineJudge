@@ -71,7 +71,13 @@ test.describe('@lrn UC-LRN-01 business closure', () => {
 
     await loginAs('student');
     const studentHeaders = await authHeaders(page);
-    const list = await notificationPage(page, studentHeaders);
+    const list = await waitForBusinessNotifications(
+      page,
+      studentHeaders,
+      lab.id,
+      homework.id,
+      beforeGradeNotificationIds
+    );
     const labNotice = findNotice(list, 'LAB', lab.id);
     const homeworkNotice = findNotice(list, 'HWK', homework.id);
     const gradeNotice = findNewNotice(list, 'GRD', DEMO_GRADE_SUMMARY_ID, beforeGradeNotificationIds);
@@ -171,6 +177,29 @@ async function expectOk(response: APIResponse) {
 
 async function notificationPage(page: Page, headers: Record<string, string>) {
   return apiData<NotificationPage>(await page.request.get('/api/v1/notifications?size=100', { headers }));
+}
+
+async function waitForBusinessNotifications(
+  page: Page,
+  headers: Record<string, string>,
+  labId: number,
+  homeworkId: number,
+  beforeGradeNotificationIds: Set<number>
+) {
+  let latest: NotificationPage | undefined;
+  await expect.poll(async () => {
+    latest = await notificationPage(page, headers);
+    return Boolean(
+      latest.records.some((notice) => notice.sourceModule === 'LAB' && notice.sourceId === labId)
+        && latest.records.some((notice) => notice.sourceModule === 'HWK' && notice.sourceId === homeworkId)
+        && latest.records.some((notice) => (
+          notice.sourceModule === 'GRD'
+            && notice.sourceId === DEMO_GRADE_SUMMARY_ID
+            && !beforeGradeNotificationIds.has(notice.notificationId)
+        ))
+    );
+  }, { intervals: [100, 250, 500, 1_000], timeout: 10_000 }).toBe(true);
+  return latest!;
 }
 
 function findNotice(page: NotificationPage, sourceModule: string, sourceId: number) {
