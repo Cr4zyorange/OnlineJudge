@@ -3,11 +3,16 @@
 set -Eeuo pipefail
 
 repo_root="$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"
+# shellcheck source=scripts/kind/lib.sh
+source "$repo_root/scripts/kind/lib.sh"
 mode=""
 service=""
 target=""
 runtime_dir="$repo_root/tmp/gateway-runtime"
 verify_command=""
+kind_gateway_port="${GATEWAY_KIND_LOCAL_PORT:-18090}"
+smoke_path=""
+kind_port_forward_pid=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -24,12 +29,15 @@ done
 [[ "$target" =~ ^[a-z0-9][a-z0-9.-]*:[0-9]{2,5}$ ]] || { printf 'target must be a lowercase host:port value\n' >&2; exit 64; }
 
 case "$service" in
-  identity) variable=IDENTITY_UPSTREAM ;;
-  course) variable=COURSE_UPSTREAM ;;
-  assessment) variable=ASSESSMENT_UPSTREAM ;;
-  grade) variable=GRADE_UPSTREAM ;;
+  identity) variable=IDENTITY_UPSTREAM; smoke_path=/api/v1/auth/me ;;
+  course) variable=COURSE_UPSTREAM; smoke_path=/api/v1/courses ;;
+  assessment) variable=ASSESSMENT_UPSTREAM; smoke_path=/api/v1/homeworks ;;
+  grade) variable=GRADE_UPSTREAM; smoke_path=/api/v1/grades ;;
   *) printf 'service must be identity, course, assessment, or grade\n' >&2; exit 64 ;;
 esac
+
+[[ "$kind_gateway_port" =~ ^[0-9]{2,5}$ && "$kind_gateway_port" -le 65535 ]] \
+  || { printf 'GATEWAY_KIND_LOCAL_PORT must be a valid local TCP port\n' >&2; exit 64; }
 
 mkdir -p "$runtime_dir"
 targets_file="$runtime_dir/targets.env"
@@ -105,20 +113,57 @@ reload_gateway() {
         up -d --no-deps --force-recreate gateway
       ;;
     kind)
-      kubectl --namespace onlinejudge-ci create configmap gateway-config \
+      kindlib_kubectl --namespace "$K8S_NAMESPACE" create configmap gateway-config \
         --from-file=gateway.conf="$config_file" \
-        --dry-run=client -o yaml | kubectl --namespace onlinejudge-ci apply -f -
-      kubectl --namespace onlinejudge-ci rollout restart deployment/gateway
-      kubectl --namespace onlinejudge-ci rollout status deployment/gateway --timeout=120s
+        --dry-run=client -o yaml | kindlib_kubectl --namespace "$K8S_NAMESPACE" apply -f -
+      kindlib_kubectl --namespace "$K8S_NAMESPACE" rollout restart deployment/gateway
+      kindlib_kubectl --namespace "$K8S_NAMESPACE" rollout status deployment/gateway --timeout=120s
       ;;
   esac
 }
 
+stop_kind_port_forward() {
+  if [[ -n "$kind_port_forward_pid" ]]; then
+    kill "$kind_port_forward_pid" 2>/dev/null || true
+    wait "$kind_port_forward_pid" 2>/dev/null || true
+    kind_port_forward_pid=""
+  fi
+}
+
+trap stop_kind_port_forward EXIT INT TERM
+
+start_kind_port_forward() {
+  local port_forward_log="$runtime_dir/kind-gateway-port-forward.log"
+  kindlib_kubectl --namespace "$K8S_NAMESPACE" port-forward svc/gateway "${kind_gateway_port}:8080" \
+    >"$port_forward_log" 2>&1 &
+  kind_port_forward_pid="$!"
+  # Detect an immediate bind/resource failure before delegating the bounded
+  # readiness and authenticated smoke checks to verify-gateway.sh.
+  sleep 1
+  kill -0 "$kind_port_forward_pid" 2>/dev/null \
+    || { cat "$port_forward_log" >&2; return 1; }
+}
+
 verify_gateway() {
+  local status
+  if [[ "$mode" == kind ]]; then
+    start_kind_port_forward || return 1
+    if [[ -n "$verify_command" ]]; then
+      GATEWAY_BASE="http://127.0.0.1:${kind_gateway_port}" GATEWAY_SMOKE_PATH="$smoke_path" "$verify_command"
+      status=$?
+    else
+      GATEWAY_BASE="http://127.0.0.1:${kind_gateway_port}" GATEWAY_SMOKE_PATH="$smoke_path" \
+        "$repo_root/scripts/gateway/verify-gateway.sh"
+      status=$?
+    fi
+    stop_kind_port_forward
+    return "$status"
+  fi
+
   if [[ -n "$verify_command" ]]; then
-    "$verify_command"
+    GATEWAY_SMOKE_PATH="$smoke_path" "$verify_command"
   else
-    "$repo_root/scripts/gateway/verify-gateway.sh"
+    GATEWAY_SMOKE_PATH="$smoke_path" "$repo_root/scripts/gateway/verify-gateway.sh"
   fi
 }
 

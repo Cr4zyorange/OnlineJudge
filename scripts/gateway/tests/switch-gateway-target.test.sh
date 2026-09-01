@@ -21,8 +21,28 @@ printf 'docker %s\n' "$*" >> "$GATEWAY_TEST_LOG"
 EOF
 chmod +x "$fake_bin/docker"
 
+cat > "$fake_bin/kubectl" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+printf 'kubectl %s\n' "$*" >> "$GATEWAY_TEST_LOG"
+if [[ " $* " == *" create configmap gateway-config "* ]]; then
+  printf 'apiVersion: v1\nkind: ConfigMap\n'
+  exit 0
+fi
+if [[ " $* " == *" apply -f - "* ]]; then
+  cat >/dev/null
+  exit 0
+fi
+if [[ " $* " == *" port-forward svc/gateway "* ]]; then
+  trap 'exit 0' INT TERM
+  while :; do sleep 1; done
+fi
+EOF
+chmod +x "$fake_bin/kubectl"
+
 cat > "$fixture_root/verify.sh" <<'EOF'
 #!/usr/bin/env bash
+printf 'verify base=%s smoke=%s\n' "${GATEWAY_BASE:-}" "${GATEWAY_SMOKE_PATH:-}" >> "$GATEWAY_TEST_LOG"
 if [[ "${GATEWAY_SMOKE_FAIL:-0}" == 1 && ! -f "$GATEWAY_TEST_VERIFY_MARKER" ]]; then
   touch "$GATEWAY_TEST_VERIFY_MARKER"
   exit 1
@@ -50,6 +70,16 @@ if grep -Fq 'LEARNING_UPSTREAM=' "$runtime_dir/targets.env"; then
   exit 1
 fi
 grep -Fq 'docker compose' "$log"
+
+PATH="$fake_bin:$PATH" GATEWAY_TEST_LOG="$log" \
+  "$switcher" --mode kind --service assessment --target assessment-canary:9083 \
+  --runtime-dir "$runtime_dir" --verify-command "$fixture_root/verify.sh"
+
+grep -Fq 'kubectl --context kind-onlinejudge-ci --namespace onlinejudge-ci create configmap gateway-config' "$log"
+grep -Fq 'kubectl --context kind-onlinejudge-ci --namespace onlinejudge-ci rollout restart deployment/gateway' "$log"
+grep -Fq 'kubectl --context kind-onlinejudge-ci --namespace onlinejudge-ci rollout status deployment/gateway --timeout=120s' "$log"
+grep -Fq 'kubectl --context kind-onlinejudge-ci --namespace onlinejudge-ci port-forward svc/gateway 18090:8080' "$log"
+grep -Fqx 'verify base=http://127.0.0.1:18090 smoke=/api/v1/homeworks' "$log"
 cp "$runtime_dir/targets.env" "$fixture_root/expected-after-rollback.env"
 
 set +e
