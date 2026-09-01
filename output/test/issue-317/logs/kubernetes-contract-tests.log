@@ -1,0 +1,40 @@
+PASS: expected manifest files exist
+PASS: no SQL copies under deploy/k8s
+PASS: no latest image tags
+PASS: network boundary keeps mysql/backend/frontend cluster-internal
+PASS: namespace manifest declares onlinejudge-ci
+PASS: configmap carries only the shared non-sensitive keys
+PASS: secret example lists key names only with placeholder values
+PASS: mysql statefulset follows the contract
+PASS: mysql service is headless on 3306
+PASS: backend deployment uses contract probes and rolling update
+PASS: backend service is ClusterIP on 8080
+PASS: frontend deployment uses contract probes and rolling update
+PASS: frontend service is ClusterIP on 80
+PASS: kind cluster config declares a single control-plane node
+verify-k8s-manifests.test: PASS
+PASS: expected scripts/kind entrypoints exist
+PASS: all tracked scripts/kind entrypoints are executable (100755)
+PASS: scripts/kind pass bash -n
+lib: invalid GIT_SHA (expected full 40-char lowercase commit sha, got: )
+lib: invalid GIT_SHA (expected full 40-char lowercase commit sha, got: latest)
+lib: invalid GIT_SHA (expected full 40-char lowercase commit sha, got: abc1234)
+lib: invalid GIT_SHA (expected full 40-char lowercase commit sha, got: 0123456789abcdef0123456789abcdef0123456Z)
+lib: invalid GIT_SHA (expected full 40-char lowercase commit sha, got: 0123456789ABCDEF0123456789ABCDEF01234567)
+PASS: lib.sh validates GIT_SHA (rejects empty/latest/short/non-hex, accepts full sha)
+PASS: deploy rejects missing GIT_SHA before touching the cluster
+PASS: deploy rejects GIT_SHA=latest
+PASS: deploy rejects missing MYSQL_PASSWORD before touching the cluster
+PASS: deploy succeeds end to end against fake cluster tooling
+PASS: all kubectl calls pin --context kind-onlinejudge-ci
+PASS: deploy applies and waits in contract order (mysql -> backend -> frontend)
+PASS: manifests render with the exact GIT_SHA and reuse the schema original
+PASS: kind image loading uses contract image references
+PASS: secret values never reach logs, rendered manifests, or tool arguments
+PASS: no fixed sleep; waits are bounded by --timeout
+PASS: failed rollout exports events/pods/describe/logs/rollout and exits non-zero
+PASS: default cleanup deletes only the onlinejudge-ci namespace
+PASS: cleanup --cluster also removes the named kind cluster
+PASS: missing versioned image fails image loading with a precise error
+PASS: KIND_SKIP_LOAD=1 keeps local presence checks but skips kind load
+verify-kind-scripts.test: PASS

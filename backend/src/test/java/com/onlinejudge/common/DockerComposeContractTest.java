@@ -105,6 +105,26 @@ class DockerComposeContractTest {
     }
 
     @Test
+    void gatewayComposeOverrideRunsAnIndependentFourUpstreamGateway() throws IOException {
+        String override = Files.readString(Path.of("..", "deploy", "docker", "compose.gateway.yml"));
+        String defaults = Files.readString(Path.of("..", "deploy", "gateway", "upstreams.env"));
+
+        assertThat(override).contains("gateway:", "dockerfile: services/gateway/Dockerfile");
+        assertThat(override).doesNotContain("gateway-runtime/default.conf:/etc/nginx/conf.d/default.conf:ro");
+        assertThat(defaults.lines()).hasSize(4);
+        assertThat(defaults).doesNotContain(
+                "backend:8080",
+                "LEARNING_GRADE_UPSTREAM",
+                "LEARNING_UPSTREAM",
+                "learning-service");
+        assertThat(defaults).contains(
+                "IDENTITY_UPSTREAM=identity-service:8081",
+                "COURSE_UPSTREAM=course-service:8082",
+                "ASSESSMENT_UPSTREAM=assessment-api:8083",
+                "GRADE_UPSTREAM=grade-service:8084");
+    }
+
+    @Test
     void dockerBuildContextExcludesLocalBuildArtifacts() throws IOException {
         Path dockerIgnore = Path.of("..", ".dockerignore");
         String ignores = Files.readString(dockerIgnore);

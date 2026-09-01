@@ -1,0 +1,64 @@
+#0 building with "desktop-linux" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 794B 0.0s done
+#1 DONE 0.1s
+
+#2 [internal] load metadata for docker.io/library/nginx:1.27-alpine
+#2 DONE 0.1s
+
+#3 [internal] load .dockerignore
+#3 transferring context: 283B 0.0s done
+#3 DONE 0.1s
+
+#4 [internal] load build context
+#4 DONE 0.0s
+
+#5 [1/8] FROM docker.io/library/nginx:1.27-alpine@sha256:65645c7bb6a0661892a8b03b89d0743208a18dd2f3f17a54ef4b76fb8e2f2a10
+#5 resolve docker.io/library/nginx:1.27-alpine@sha256:65645c7bb6a0661892a8b03b89d0743208a18dd2f3f17a54ef4b76fb8e2f2a10 0.1s done
+#5 DONE 0.1s
+
+#4 [internal] load build context
+#4 transferring context: 9.88kB 0.0s done
+#4 DONE 0.1s
+
+#6 [2/8] RUN apk add --no-cache bash
+#6 CACHED
+
+#7 [3/8] COPY services/gateway/nginx.conf /etc/nginx/nginx.conf
+#7 CACHED
+
+#8 [4/8] COPY services/gateway/entrypoint.sh /usr/local/bin/gateway-entrypoint
+#8 CACHED
+
+#9 [5/8] COPY scripts/gateway/render-gateway-config.sh /usr/local/bin/render-gateway-config
+#9 CACHED
+
+#10 [6/8] COPY deploy/gateway/gateway.conf.template /opt/onlinejudge/gateway.conf.template
+#10 DONE 0.1s
+
+#11 [7/8] COPY deploy/gateway/proxy-request-headers.conf /etc/nginx/includes/proxy-request-headers.conf
+#11 DONE 0.1s
+
+#12 [8/8] RUN chmod 0555 /usr/local/bin/gateway-entrypoint /usr/local/bin/render-gateway-config
+#12 DONE 1.8s
+
+#13 exporting to image
+#13 exporting layers
+#13 exporting layers 0.2s done
+#13 exporting manifest sha256:5bb49c99611b17a9dbf364282750e1cac0f5536bc65463faa85bfb5a22d9f67a 0.0s done
+#13 exporting config sha256:bba8815dca252119fbfe7a1d3cfcf6e2ef0ebc690864bddf5552bee7dad41c1b 0.0s done
+#13 exporting attestation manifest sha256:043599ffaca48522f524dd34bbe7ec010ef40846b53286fcdd5294030995fdf0 0.0s done
+#13 exporting manifest list sha256:01f7cf6449ade6e34dcac287eb15cbe277c67a1988bfb1604943c4e18a29ef9d
+#13 exporting manifest list sha256:01f7cf6449ade6e34dcac287eb15cbe277c67a1988bfb1604943c4e18a29ef9d 0.0s done
+#13 naming to docker.io/library/oj-gateway-test-1788246483-7079-gateway:latest done
+#13 unpacking to docker.io/library/oj-gateway-test-1788246483-7079-gateway:latest
+#13 unpacking to docker.io/library/oj-gateway-test-1788246483-7079-gateway:latest 0.3s done
+#13 DONE 0.7s
+nginx: the configuration file /etc/nginx/nginx.conf syntax is ok
+nginx: configuration file /etc/nginx/nginx.conf test is successful
+gateway-runtime.test: PASS (services=4 deep-link=pass stream=pass isolation=4/4 headers=request-allowlist status=401/403/404/413/429/502/503/504 retry=off)
+# Issue #317 Gateway disposable runtime evidence
+# commit=1b40279040b45330ad3b2981472b4cefaf766711
+# command=Git Bash: scripts/gateway/tests/gateway-runtime.test.sh
+# environment=Docker Linux engine; isolated temporary Docker network and fixture containers
