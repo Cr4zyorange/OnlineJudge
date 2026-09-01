@@ -171,6 +171,21 @@ class CourseServiceContractTest {
     @BeforeEach
     void clearCourseFacts() {
         LEARNING_RESPONSE.set(new LearningStubResponse(200, EMPTY_TASK_PAGE));
+        jdbcTemplate.update("DELETE FROM lrn_learning_record");
+        jdbcTemplate.update("DELETE FROM lrn_learning_progress");
+        jdbcTemplate.update("DELETE FROM lrn_learning_task");
+        jdbcTemplate.update("DELETE FROM lrn_notification_status_log");
+        jdbcTemplate.update("DELETE FROM lrn_notification");
+        jdbcTemplate.update("DELETE FROM lrn_reminder_rule");
+        jdbcTemplate.update("DELETE FROM lrn_notification_setting");
+        jdbcTemplate.update("DELETE FROM lrn_reminder_scan_log");
+        jdbcTemplate.update("DELETE FROM learning_event_inbox");
+        jdbcTemplate.update("DELETE FROM learning_event_delivery_attempt");
+        jdbcTemplate.update("DELETE FROM learning_event_dead_letter");
+        jdbcTemplate.update("DELETE FROM learning_event_reconciliation_request");
+        jdbcTemplate.update("DELETE FROM learning_deferred_event");
+        jdbcTemplate.update("DELETE FROM learning_course_member_projection");
+        jdbcTemplate.update("DELETE FROM learning_course_membership_watermark");
         jdbcTemplate.update("DELETE FROM course_file_delete_journal");
         jdbcTemplate.update("DELETE FROM course_event_outbox");
         jdbcTemplate.update("DELETE FROM course_membership_reconciliation_checkpoint");
@@ -609,7 +624,7 @@ class CourseServiceContractTest {
     }
 
     @Test
-    void memberHomeSummaryReturnsCourseAnnouncementsAndRealRecentTasksFromLearning() throws Exception {
+    void memberHomeSummaryReturnsCourseAnnouncementsAndLocalRecentTasksFromTheFoldedProjection() throws Exception {
         String teacher = userToken("921", List.of("TEACHER"));
         String student = userToken("922", List.of("STUDENT"));
         String courseId = createdCourse(teacher, "home summary course");
@@ -627,12 +642,16 @@ class CourseServiceContractTest {
                         .header("Authorization", student).header("X-Request-Id", requestId()))
                 .andExpect(status().isOk());
 
-        LEARNING_RESPONSE.set(new LearningStubResponse(200, """
-                {"items":[
-                  {"taskId":77,"taskType":"HOMEWORK","title":"Submit homework 1","courseId":%s,"courseName":"home summary course","deadline":"2026-09-03 10:00:00","progress":20,"status":"IN_PROGRESS","actionUrl":"/courses/%s/homeworks/77"},
-                  {"taskId":88,"taskType":"EXPERIMENT","title":"Lab 1","courseId":%s,"courseName":"home summary course","deadline":"2026-09-05 10:00:00","progress":0,"status":"NOT_STARTED","actionUrl":"/courses/%s/labs/88"}
-                ],"page":0,"size":5,"total":2}
-                """.formatted(courseId, courseId, courseId, courseId)));
+        jdbcTemplate.update("""
+                INSERT INTO lrn_learning_task
+                    (user_id, course_id, source_module, source_id, task_type, title, deadline, progress, status, action_url)
+                VALUES (?, ?, 'HWK', 77, 'HOMEWORK', 'Submit homework 1', '2026-09-03 10:00:00', 20, 'IN_PROGRESS', ?)
+                """, 922L, Long.parseLong(courseId), "/courses/" + courseId + "/homeworks/77");
+        jdbcTemplate.update("""
+                INSERT INTO lrn_learning_task
+                    (user_id, course_id, source_module, source_id, task_type, title, deadline, progress, status, action_url)
+                VALUES (?, ?, 'LAB', 88, 'EXPERIMENT', 'Lab 1', '2026-09-05 10:00:00', 0, 'NOT_STARTED', ?)
+                """, 922L, Long.parseLong(courseId), "/courses/" + courseId + "/labs/88");
 
         mockMvc.perform(get("/api/v1/courses/{courseId}/home-summary", courseId)
                         .header("Authorization", student).header("X-Request-Id", requestId()))
@@ -650,7 +669,7 @@ class CourseServiceContractTest {
     }
 
     @Test
-    void memberHomeSummaryShowsEmptyTaskSectionWhenLearningReturnsNoTasks() throws Exception {
+    void memberHomeSummaryShowsEmptyTaskSectionWithoutFabricatingRows() throws Exception {
         String teacher = userToken("925", List.of("TEACHER"));
         String student = userToken("926", List.of("STUDENT"));
         String courseId = createdCourse(teacher, "no task home summary");
@@ -666,7 +685,7 @@ class CourseServiceContractTest {
     }
 
     @Test
-    void memberHomeSummaryFailsClosedWhenLearningTaskSummaryIsUnavailable() throws Exception {
+    void memberHomeSummaryUsesLocalProjectionEvenWhenLegacyLearningEndpointIsUnreachable() throws Exception {
         String teacher = userToken("927", List.of("TEACHER"));
         String student = userToken("928", List.of("STUDENT"));
         String courseId = createdCourse(teacher, "unavailable task home summary");
@@ -679,9 +698,9 @@ class CourseServiceContractTest {
 
         mockMvc.perform(get("/api/v1/courses/{courseId}/home-summary", courseId)
                         .header("Authorization", student).header("X-Request-Id", requestId()))
-                .andExpect(status().isServiceUnavailable())
-                .andExpect(jsonPath("$.code").value("LEARNING_TASKS_UNAVAILABLE"))
-                .andExpect(jsonPath("$.retryable").value(true));
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.course.name").value("unavailable task home summary"))
+                .andExpect(jsonPath("$.data.recentTasks").isEmpty());
     }
 
     @Test

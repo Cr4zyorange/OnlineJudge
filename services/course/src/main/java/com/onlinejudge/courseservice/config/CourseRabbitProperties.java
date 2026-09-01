@@ -14,6 +14,7 @@ public class CourseRabbitProperties {
     // unroutable instead of silently missing membership facts.
     private String exchange = "onlinejudge.events.v2";
     private String identitySecurityVersionQueue = "course.identity-security-version.v2";
+    private String learningFactsQueue = "course.learning-facts.v2";
 
     public boolean isEnabled() { return enabled; }
     public void setEnabled(boolean enabled) { this.enabled = enabled; }
@@ -29,4 +30,6 @@ public class CourseRabbitProperties {
     public void setExchange(String exchange) { this.exchange = exchange; }
     public String getIdentitySecurityVersionQueue() { return identitySecurityVersionQueue; }
     public void setIdentitySecurityVersionQueue(String identitySecurityVersionQueue) { this.identitySecurityVersionQueue = identitySecurityVersionQueue; }
+    public String getLearningFactsQueue() { return learningFactsQueue; }
+    public void setLearningFactsQueue(String learningFactsQueue) { this.learningFactsQueue = learningFactsQueue; }
 }
