@@ -18,7 +18,7 @@ Identity、Course、Assessment、Grade 四类 upstream，Learning、通知与提
 | 执行日期 | 2026-09-01（Asia/Shanghai） |
 | 分支 | `feature/317-gateway-routing` |
 | `dev` 基线 | `f948869799e2e561d6cfa2208acaf26627aa1ba1` |
-| 已验证实现 Head | `c15c734`（证据文档提交前） |
+| 已验证实现 Head | `1b40279040b45330ad3b2981472b4cefaf766711` |
 | 部署拓扑 | 9 workloads、4 个有序 migration jobs、无独立 Learning |
 | Gateway 镜像 | `services/gateway/Dockerfile`，基于 `nginx:1.27-alpine` |
 
@@ -45,9 +45,9 @@ WSL Python 运行；测试脚本及断言未修改或降低。Docker 运行时�
 
 | 验证 | 结果 |
 | --- | --- |
-| 请求边界、路由、workload、真实服务脚本契约 | PASS |
+| 请求边界、路由、workload、真实服务脚本契约 | PASS；含 `/.well-known/jwks.json` → Identity |
 | renderer、默认配置、切流/回滚、健康检查、Kind 解耦 | PASS |
-| disposable 运行时 | PASS：`services=4 deep-link=pass stream=pass isolation=4/4 headers=request-allowlist status=401/403/404/413/429/502/503/504 retry=off` |
+| disposable 运行时 | PASS：`services=4 deep-link=pass stream=pass isolation=4/4 headers=request-allowlist status=401/403/404/413/429/502/503/504 retry=off`；原始日志：`output/test/issue-317/logs/gateway-tests.log` |
 | Identity + Assessment 真实服务门禁 | PASS（既有可部署服务范围） |
 
 ### 三服务共享契约与部署
@@ -71,7 +71,7 @@ WSL Python 运行；测试脚本及断言未修改或降低。Docker 运行时�
 | AC | 当前状态 | 证据/缺口 |
 | --- | --- | --- |
 | AC-317-01 | 自动化通过 | learning、notifications、reminder-rules 唯一转发到 Course；无第五业务 upstream |
-| AC-317-02 | 自动化通过 | LAB/HWK→Assessment，Grade→Grade，身份→Identity；四 fixture 已实际命中 |
+| AC-317-02 | 自动化通过 | `/.well-known/jwks.json` 与身份路由→Identity（保留 Cache-Control）；LAB/HWK→Assessment，Grade→Grade；四 fixture 已实际命中 |
 | AC-317-03 | 自动化通过 | 任意伪造身份 Header 已过滤，Bearer 保持原样；Gateway 不解析或注入身份信息 |
 | AC-317-04 | disposable 通过 | 四个 upstream 逐个停止时目标路由稳定 504，其余三类与 Gateway 健康保持可用 |
 | AC-317-05 | disposable 通过 | 深链、查询串、Range、下载、流式、multipart、分页契约通过 |
