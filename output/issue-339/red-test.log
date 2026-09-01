@@ -1,0 +1,61 @@
+[ERROR] COMPILATION ERROR :
+[ERROR] /C:/mySet/Learning_materials/short_semester/code/OnlineJudge-issue339-red/services/grade/src/test/java/com/onlinejudge/gradeservice/SourceGradeProjectionServiceTest.java:[4,46] 找不到符号
+  符号:   类 SourceGradeChangedEnvelope
+  位置: 程序包 com.onlinejudge.gradeservice.messaging
+[ERROR] /C:/mySet/Learning_materials/short_semester/code/OnlineJudge-issue339-red/services/grade/src/test/java/com/onlinejudge/gradeservice/SourceGradeProjectionServiceTest.java:[5,44] 程序包com.onlinejudge.gradeservice.service不存在
+[ERROR] /C:/mySet/Learning_materials/short_semester/code/OnlineJudge-issue339-red/services/grade/src/test/java/com/onlinejudge/gradeservice/SourceGradeProjectionServiceTest.java:[21,16] 找不到符号
+  符号:   类 SourceGradeProjectionService
+  位置: 类 com.onlinejudge.gradeservice.SourceGradeProjectionServiceTest
+[ERROR] /C:/mySet/Learning_materials/short_semester/code/OnlineJudge-issue339-red/services/grade/src/test/java/com/onlinejudge/gradeservice/SourceGradeProjectionServiceTest.java:[110,13] 找不到符号
+  符号:   类 SourceGradeChangedEnvelope
+  位置: 类 com.onlinejudge.gradeservice.SourceGradeProjectionServiceTest
+[ERROR] /C:/mySet/Learning_materials/short_semester/code/OnlineJudge-issue339-red/services/grade/src/test/java/com/onlinejudge/gradeservice/SourceGradeProjectionServiceTest.java:[101,22] 不兼容的类型: java.util.List<java.lang.Object>无法转换为java.util.List<java.lang.String>
+[ERROR] /C:/mySet/Learning_materials/short_semester/code/OnlineJudge-issue339-red/services/grade/src/test/java/com/onlinejudge/gradeservice/SourceGradeProjectionServiceTest.java:[112,16] 找不到符号
+  符号:   变量 SourceGradeChangedEnvelope
+  位置: 类 com.onlinejudge.gradeservice.SourceGradeProjectionServiceTest
+[ERROR] /C:/mySet/Learning_materials/short_semester/code/OnlineJudge-issue339-red/services/grade/src/test/java/com/onlinejudge/gradeservice/messaging/SourceGradeChangedEnvelopeTest.java:[14,24] 找不到符号
+  符号:   变量 SourceGradeChangedEnvelope
+  位置: 类 com.onlinejudge.gradeservice.messaging.SourceGradeChangedEnvelopeTest
+[ERROR] /C:/mySet/Learning_materials/short_semester/code/OnlineJudge-issue339-red/services/grade/src/test/java/com/onlinejudge/gradeservice/messaging/SourceGradeChangedEnvelopeTest.java:[36,34] 找不到符号
+  符号:   变量 SourceGradeChangedEnvelope
+  位置: 类 com.onlinejudge.gradeservice.messaging.SourceGradeChangedEnvelopeTest
+[ERROR] /C:/mySet/Learning_materials/short_semester/code/OnlineJudge-issue339-red/services/grade/src/test/java/com/onlinejudge/gradeservice/messaging/SourceGradeChangedEnvelopeTest.java:[38,34] 找不到符号
+  符号:   变量 SourceGradeChangedEnvelope
+  位置: 类 com.onlinejudge.gradeservice.messaging.SourceGradeChangedEnvelopeTest
+[ERROR] /C:/mySet/Learning_materials/short_semester/code/OnlineJudge-issue339-red/services/grade/src/test/java/com/onlinejudge/gradeservice/messaging/SourceGradeChangedEnvelopeTest.java:[40,34] 找不到符号
+  符号:   变量 SourceGradeChangedEnvelope
+  位置: 类 com.onlinejudge.gradeservice.messaging.SourceGradeChangedEnvelopeTest
+[ERROR] Failed to execute goal org.apache.maven.plugins:maven-compiler-plugin:3.13.0:testCompile (default-testCompile) on project onlinejudge-grade-service: Compilation failure: Compilation failure:
+[ERROR] /C:/mySet/Learning_materials/short_semester/code/OnlineJudge-issue339-red/services/grade/src/test/java/com/onlinejudge/gradeservice/SourceGradeProjectionServiceTest.java:[4,46] 找不到符号
+[ERROR]   符号:   类 SourceGradeChangedEnvelope
+[ERROR]   位置: 程序包 com.onlinejudge.gradeservice.messaging
+[ERROR] /C:/mySet/Learning_materials/short_semester/code/OnlineJudge-issue339-red/services/grade/src/test/java/com/onlinejudge/gradeservice/SourceGradeProjectionServiceTest.java:[5,44] 程序包com.onlinejudge.gradeservice.service不存在
+[ERROR] /C:/mySet/Learning_materials/short_semester/code/OnlineJudge-issue339-red/services/grade/src/test/java/com/onlinejudge/gradeservice/SourceGradeProjectionServiceTest.java:[21,16] 找不到符号
+[ERROR]   符号:   类 SourceGradeProjectionService
+[ERROR]   位置: 类 com.onlinejudge.gradeservice.SourceGradeProjectionServiceTest
+[ERROR] /C:/mySet/Learning_materials/short_semester/code/OnlineJudge-issue339-red/services/grade/src/test/java/com/onlinejudge/gradeservice/SourceGradeProjectionServiceTest.java:[110,13] 找不到符号
+[ERROR]   符号:   类 SourceGradeChangedEnvelope
+[ERROR]   位置: 类 com.onlinejudge.gradeservice.SourceGradeProjectionServiceTest
+[ERROR] /C:/mySet/Learning_materials/short_semester/code/OnlineJudge-issue339-red/services/grade/src/test/java/com/onlinejudge/gradeservice/SourceGradeProjectionServiceTest.java:[101,22] 不兼容的类型: java.util.List<java.lang.Object>无法转换为java.util.List<java.lang.String>
+[ERROR] /C:/mySet/Learning_materials/short_semester/code/OnlineJudge-issue339-red/services/grade/src/test/java/com/onlinejudge/gradeservice/SourceGradeProjectionServiceTest.java:[112,16] 找不到符号
+[ERROR]   符号:   变量 SourceGradeChangedEnvelope
+[ERROR]   位置: 类 com.onlinejudge.gradeservice.SourceGradeProjectionServiceTest
+[ERROR] /C:/mySet/Learning_materials/short_semester/code/OnlineJudge-issue339-red/services/grade/src/test/java/com/onlinejudge/gradeservice/messaging/SourceGradeChangedEnvelopeTest.java:[14,24] 找不到符号
+[ERROR]   符号:   变量 SourceGradeChangedEnvelope
+[ERROR]   位置: 类 com.onlinejudge.gradeservice.messaging.SourceGradeChangedEnvelopeTest
+[ERROR] /C:/mySet/Learning_materials/short_semester/code/OnlineJudge-issue339-red/services/grade/src/test/java/com/onlinejudge/gradeservice/messaging/SourceGradeChangedEnvelopeTest.java:[36,34] 找不到符号
+[ERROR]   符号:   变量 SourceGradeChangedEnvelope
+[ERROR]   位置: 类 com.onlinejudge.gradeservice.messaging.SourceGradeChangedEnvelopeTest
+[ERROR] /C:/mySet/Learning_materials/short_semester/code/OnlineJudge-issue339-red/services/grade/src/test/java/com/onlinejudge/gradeservice/messaging/SourceGradeChangedEnvelopeTest.java:[38,34] 找不到符号
+[ERROR]   符号:   变量 SourceGradeChangedEnvelope
+[ERROR]   位置: 类 com.onlinejudge.gradeservice.messaging.SourceGradeChangedEnvelopeTest
+[ERROR] /C:/mySet/Learning_materials/short_semester/code/OnlineJudge-issue339-red/services/grade/src/test/java/com/onlinejudge/gradeservice/messaging/SourceGradeChangedEnvelopeTest.java:[40,34] 找不到符号
+[ERROR]   符号:   变量 SourceGradeChangedEnvelope
+[ERROR]   位置: 类 com.onlinejudge.gradeservice.messaging.SourceGradeChangedEnvelopeTest
+[ERROR] -> [Help 1]
+[ERROR]
+[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.
+[ERROR] Re-run Maven using the -X switch to enable full debug logging.
+[ERROR]
+[ERROR] For more information about the errors and possible solutions, please read the following articles:
+[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException

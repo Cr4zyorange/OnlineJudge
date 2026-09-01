@@ -11,13 +11,14 @@ cleanup() { rm -rf "$scratch"; }
 trap cleanup EXIT INT TERM
 
 mkdir -p "$scratch/scripts/ci" "$scratch/backend/target/surefire-reports" \
-  "$scratch/services/assessment" "$scratch/services/course"
+  "$scratch/services/assessment" "$scratch/services/course" "$scratch/services/grade"
 cp "$gate" "$scratch/scripts/ci/backend-verify.sh"
 # The shared gate now also validates the independently deployed Assessment
 # service.  Keep this mutation fixture structurally complete so the deliberate
 # Course compiler failure remains the first failure and proves Course is still
 # mandatory, rather than failing on an unrelated prerequisite.
-touch "$scratch/backend/pom.xml" "$scratch/services/assessment/pom.xml" "$scratch/services/course/pom.xml"
+touch "$scratch/backend/pom.xml" "$scratch/services/assessment/pom.xml" \
+  "$scratch/services/course/pom.xml" "$scratch/services/grade/pom.xml"
 mkdir "$scratch/fake-bin"
 
 cat > "$scratch/fake-bin/java" <<'EOF'
