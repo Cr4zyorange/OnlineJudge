@@ -42,6 +42,8 @@ test("formal window evidence must prove readiness and an uncontaminated exclusiv
     e2eRunning: false,
     faultInjectionRunning: false,
     otherPressureRunning: false,
+    datasetRestoreEvidence: "snapshot=dataset-v1 round-reset=verified",
+    resourcePolicyEvidence: "cpu=4 memory=6144MiB limits=verified",
   };
   assert.doesNotThrow(() => validateFormalWindowEvidence(evidence));
 
@@ -56,6 +58,10 @@ test("formal window evidence must prove readiness and an uncontaminated exclusiv
   assert.throws(
     () => validateFormalWindowEvidence({ ...evidence, exclusiveWindow: false }),
     /exclusive/i,
+  );
+  assert.throws(
+    () => validateFormalWindowEvidence({ ...evidence, datasetRestoreEvidence: null }),
+    /dataset.*restore/i,
   );
 });
 

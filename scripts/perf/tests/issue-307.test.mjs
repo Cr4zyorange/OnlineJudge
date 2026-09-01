@@ -99,10 +99,14 @@ function rawRound({ architecture, scenario, round, contaminated = false, machine
     },
     formalWindow: {
       environmentReadySignal: "ENVIRONMENT_READY issue=#318 sha=example",
+      dockerDaemonReady: true,
+      exclusiveWindow: true,
       hpaEnabled: false,
       e2eRunning: false,
       faultInjectionRunning: false,
       otherPressureRunning: contaminated,
+      datasetRestoreEvidence: "snapshot=dataset-v1 round-reset=verified",
+      resourcePolicyEvidence: "cpu=4 memory=6144MiB limits=verified",
     },
     measuredDurationMs: 1000,
     requests: [
@@ -187,6 +191,14 @@ test("aggregate rejects cherry-picked, contaminated or incomparable evidence", (
   const differentMachine = structuredClone(complete);
   differentMachine.at(-1).machineFingerprint = "machine-b";
   assert.throws(() => aggregateComparison(plan, differentMachine), /same machine/i);
+
+  const nonExclusive = structuredClone(complete);
+  nonExclusive[0].formalWindow.exclusiveWindow = false;
+  assert.throws(() => aggregateComparison(plan, nonExclusive), /exclusive/i);
+
+  const missingReset = structuredClone(complete);
+  missingReset[0].formalWindow.datasetRestoreEvidence = null;
+  assert.throws(() => aggregateComparison(plan, missingReset), /dataset.*restore/i);
 });
 
 test("docker stats parser exposes aggregateable CPU and memory values", () => {
