@@ -41,6 +41,25 @@ public class SourceGradeProjectionService {
         return new ApplyResult("APPLIED");
     }
 
+    /** Applies one fact from Assessment's immutable, versioned rebuild snapshot. */
+    @Transactional
+    public ApplyResult reconcileSnapshot(SourceGradeChangedEnvelope snapshot) {
+        long currentVersion = lockAggregate(snapshot.aggregateId());
+        if (snapshot.sourceVersion() < currentVersion) return new ApplyResult("STALE");
+        applyProjection(snapshot);
+        jdbc.update("UPDATE grade_source_projection_watermark SET current_version=? WHERE aggregate_id=?",
+                snapshot.sourceVersion(), snapshot.aggregateId());
+        jdbc.update("DELETE FROM grade_source_deferred_event WHERE aggregate_id=? AND source_version<=?",
+                snapshot.aggregateId(), snapshot.sourceVersion());
+        jdbc.update("DELETE FROM grade_source_projection_gap WHERE aggregate_id=?", snapshot.aggregateId());
+        jdbc.update("""
+                UPDATE grade_source_reconciliation_request
+                   SET request_status='RESOLVED', resolved_at=CURRENT_TIMESTAMP
+                 WHERE aggregate_id=? AND request_status='PENDING'
+                """, snapshot.aggregateId());
+        return new ApplyResult("RECONCILED");
+    }
+
     private boolean inboxContains(String eventId) {
         Integer count = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM grade_event_inbox WHERE consumer_name=? AND event_id=?",
@@ -88,6 +107,13 @@ public class SourceGradeProjectionService {
     }
 
     private void applyInOrder(SourceGradeChangedEnvelope event) {
+        applyProjection(event);
+        jdbc.update("UPDATE grade_source_projection_watermark SET current_version=? WHERE aggregate_id=?",
+                event.sourceVersion(), event.aggregateId());
+        recordInbox(event, "APPLIED");
+    }
+
+    private void applyProjection(SourceGradeChangedEnvelope event) {
         jdbc.update("""
                 INSERT INTO grade_source_projection
                     (aggregate_id, course_id, source_type, source_id, student_id, score, full_score,
@@ -99,9 +125,6 @@ public class SourceGradeProjectionService {
                     source_version=VALUES(source_version), occurred_at=VALUES(occurred_at), updated_at=CURRENT_TIMESTAMP
                 """, event.aggregateId(), event.courseId(), event.sourceType(), event.sourceId(), event.studentId(),
                 event.score(), event.fullScore(), event.status(), event.sourceVersion(), Timestamp.from(event.occurredAt()));
-        jdbc.update("UPDATE grade_source_projection_watermark SET current_version=? WHERE aggregate_id=?",
-                event.sourceVersion(), event.aggregateId());
-        recordInbox(event, "APPLIED");
     }
 
     private void drainDeferred(String aggregateId, long currentVersion) {

@@ -8,6 +8,48 @@ spring:
     driver-class-name: ${GRADE_DATABASE_DRIVER:org.h2.Driver}
   sql.init:
     mode: always
-    schema-locations: classpath:schema-grade.sql
+    schema-locations: classpath:20260525_01_create_grd_grade_item.sql,classpath:schema-grade.sql
 server:
   port: ${GRADE_HTTP_PORT:8084}
+management:
+  endpoints.web.exposure.include: health,info
+  endpoint.health.probes.enabled: true
+  info.env.enabled: true
+info:
+  app:
+    name: grade-service
+    version: ${GRADE_SERVICE_VERSION:0.1.0-SNAPSHOT}
+    revision: ${GIT_SHA:unknown}
+grade:
+  identity:
+    issuer: ${IDENTITY_JWT_ISSUER:onlinejudge.identity.v2}
+    audience: ${IDENTITY_JWT_AUDIENCE:onlinejudge.api}
+    jwks-uri: ${IDENTITY_JWKS_URI:}
+    jwks-trust-bundle: ${IDENTITY_JWKS_TRUST_BUNDLE:}
+    request-timeout: ${IDENTITY_JWKS_REQUEST_TIMEOUT:PT1S}
+    refresh-enabled: ${IDENTITY_JWKS_REFRESH_ENABLED:true}
+    refresh-initial-delay-ms: ${IDENTITY_JWKS_REFRESH_INITIAL_DELAY_MS:30000}
+    refresh-interval-ms: ${IDENTITY_JWKS_REFRESH_INTERVAL_MS:300000}
+  course:
+    base-url: ${GRADE_COURSE_BASE_URL:http://127.0.0.1:8082}
+    service-authorization: ${GRADE_COURSE_SERVICE_AUTHORIZATION:}
+    timeout: ${GRADE_COURSE_TIMEOUT:PT1S}
+    member-page-size: ${GRADE_COURSE_MEMBER_PAGE_SIZE:100}
+  assessment:
+    base-url: ${GRADE_ASSESSMENT_BASE_URL:http://127.0.0.1:8083}
+    service-authorization: ${GRADE_ASSESSMENT_SERVICE_AUTHORIZATION:}
+    timeout: ${GRADE_ASSESSMENT_TIMEOUT:PT1S}
+    reconciliation-interval-ms: ${GRADE_RECONCILIATION_INTERVAL_MS:5000}
+  rabbit:
+    enabled: ${GRADE_RABBIT_ENABLED:false}
+    relay-enabled: ${GRADE_RABBIT_RELAY_ENABLED:true}
+    host: ${RABBITMQ_HOST:127.0.0.1}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
+    exchange: ${GRADE_RABBIT_EXCHANGE:onlinejudge.events.v2}
+    source-queue: ${GRADE_SOURCE_QUEUE:grade.source-grades.v2}
+    source-routing-key: ${GRADE_SOURCE_ROUTING_KEY:onlinejudge.assessment.source-grade.changed.v2}
+    dead-letter-exchange: ${GRADE_RABBIT_DLX:onlinejudge.events.dlx.v2}
+    source-dead-letter-queue: ${GRADE_SOURCE_DLQ:grade.source-grades.dlq.v2}
+    source-dead-letter-routing-key: ${GRADE_SOURCE_DLQ_ROUTING_KEY:onlinejudge.assessment.source-grade.changed.invalid.v2}

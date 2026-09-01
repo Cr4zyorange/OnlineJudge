@@ -22,6 +22,7 @@ import com.onlinejudge.integration.course.CoursePermissionClient;
 import com.onlinejudge.integration.grade.SourceGradeClient;
 import com.onlinejudge.integration.grade.SourceGradeDTO;
 import com.onlinejudge.integration.grade.SourceGradeType;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -51,6 +52,7 @@ public class GradeRecordService {
     private final SourceGradeClient sourceGradeClient;
     private final CoursePermissionClient coursePermissionClient;
     private final NotificationEventPublisher notificationEventPublisher;
+    private GradeResultTraceRecorder gradeResultTraceRecorder = (courseId, calculationBatchId) -> { };
 
     public GradeRecordService(
             GradeItemRepository gradeItemRepository,
@@ -72,6 +74,11 @@ public class GradeRecordService {
         this.sourceGradeClient = sourceGradeClient;
         this.coursePermissionClient = coursePermissionClient;
         this.notificationEventPublisher = notificationEventPublisher;
+    }
+
+    @Autowired(required = false)
+    public void setGradeResultTraceRecorder(GradeResultTraceRecorder gradeResultTraceRecorder) {
+        this.gradeResultTraceRecorder = gradeResultTraceRecorder;
     }
 
     @Transactional
@@ -188,6 +195,7 @@ public class GradeRecordService {
                     now
             ));
         }
+        gradeResultTraceRecorder.record(courseId, calculationBatchId);
         return new GradeRecalculationResult(calculationBatchId, studentIds.size());
     }
 
