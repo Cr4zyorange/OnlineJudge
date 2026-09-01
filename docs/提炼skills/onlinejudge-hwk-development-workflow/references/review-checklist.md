@@ -53,12 +53,12 @@ Required:
 
 - Base branch is `dev`.
 - PR is open and not draft unless intentionally still draft.
-- Head branch matches `feature/<issue-id>-<name>`, `fix/<issue-id>-<name>`, or another AGENTS-approved pattern.
+- Head branch matches the task type: `feature/<issue-id>-<name>`, `fix/<issue-id>-<name>`, `docs/<issue-id>-<name>`, or another AGENTS-approved `test/release/hotfix` pattern.
 - `mergeStateStatus` is not `DIRTY`; if it is, merge latest `origin/dev`, resolve conflicts locally, rerun verification, and report readiness. Push only after the user orders send-for-review/update PR.
 - GitHub recognizes issue linkage through `closingIssuesReferences`, `closedByPullRequestsReferences`, or Project linked PR.
 - Issue Project state is visible and appropriate when `gh` has project scopes. If `gh` lacks `read:project`, report the exact auth blocker.
 - PR scope belongs to one issue.
-- PR body explains issue completion and verification.
+- PR body includes Goal, Changes, Verification, Risks and boundaries, an AI usage statement, and `Closes #<issue-id>`.
 - Required local checks pass or the PR documents a credible substitute.
 - No local env files, generated junk, secrets, debug output, or unrelated artifacts.
 - No silent public-contract drift.
@@ -67,14 +67,16 @@ Required:
 
 Map the issue to:
 
-- FR-HW/NFR-HW row
+- FR-HWK/NFR-HWK row
 - UI-HWK pages and states
 - API-HWK routes and permissions
 - SVC-HWK responsibilities
 - DB-HWK tables/constraints/indexes
-- TC-HW tests
+- TC-HWK tests
 
 Request changes, or fix before review, when any mapped page/API/table/test is missing without an explicit follow-up issue.
+
+For document-phase work, also verify that the diff stays inside the issue's module ownership: no other module rewrite, global formatting, heading renumbering, or integrator-owned consolidation. New or changed HWK UML must use the repository's established diagram tool and neighboring visual style, include its single editable source and rendered asset, and have successful rendering plus visual-inspection evidence.
 
 ## Common HWK Review Failures
 
@@ -92,6 +94,8 @@ These have already caused blockers; check them every time:
 - Migration SQL passes H2 but fails MySQL 8.0, especially `ALTER TABLE ... ADD CONSTRAINT IF NOT EXISTS ...`. MySQL 8.0 does not allow `IF NOT EXISTS` after `ADD CONSTRAINT`; use MySQL-compatible DDL such as inline `CONSTRAINT ... FOREIGN KEY ...` in an ordered `CREATE TABLE IF NOT EXISTS`, or a compatible migration script.
 - API wrappers and frontend union types drifting from backend DTO/enums.
 - Event publishing failure rolling back core HWK data when the design expects failure-tolerant notification/grade integration.
+- FILE attachment work omitting API-HWK-23/24, DB-HWK-08, ownership/expiry/binding checks, or internal `storage_key` secrecy.
+- Treating automated review as approval, or claiming CI passed while the repository has no configured workflow checks.
 
 ## Code Review Pass
 
@@ -126,6 +130,8 @@ gh auth refresh --hostname github.com -s read:project
 ```
 
 If device-code auth or network access fails, record the exact error and do not approve while the visible Project state remains unverifiable or wrong. Even when auth succeeds, do not move Project status until the user explicitly asks to send for review or merge.
+
+Final approval and merge authority belong to the project lead. A module/domain lead's review or automated `+1` is not a merge authorization.
 
 ## Review Output Shape
 

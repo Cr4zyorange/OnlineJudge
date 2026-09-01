@@ -12,6 +12,8 @@ gh auth status
 git remote -v
 ```
 
+Read `AGENTS.md`, the live issue, its Project state, and adjacent phase issues before choosing files. If the workspace is dirty or a shared document is involved, also inspect `git diff --name-only` and the exact file diff; preserve unrelated work and apply the ownership rules in `project-collaboration.md`.
+
 If `git` or `gh` is missing from PATH on Windows, check known installs before giving up:
 
 ```powershell
@@ -54,10 +56,11 @@ $env:NO_PROXY='localhost,127.0.0.1'
 ## Branch And Issue Rules
 
 - PR base is `dev`.
-- Feature branches must look like `feature/<issue-id>-<short-name>`.
+- Use `feature/<issue-id>-<short-name>` for features, `fix/<issue-id>-<short-name>` for fixes, `docs/<issue-id>-<short-name>` for documentation, and the AGENTS-approved `test/release/hotfix` patterns for those task types.
 - Do not write feature code on `dev`, `main`, `release/*`, or an invalid branch.
 - Prepare PR body text with `closes #<issue-id>` or equivalent recognized by GitHub, but do not create or edit a PR until the user explicitly orders send-for-review.
 - Keep one issue per PR. Avoid mixing unrelated LAB/GRD/LRN fixes unless they are required to unblock the HWK contract and are explained.
+- In phase work split across AUTH/CRS/LRN/LAB/HWK/GRD issues, inspect neighboring ownership before editing shared documents. Change only HWK-owned sections or explicitly assigned global rows; avoid whole-document formatting and renumbering.
 - Before declaring work ready for review, sync the current feature branch with the latest `origin/dev` and resolve conflicts locally:
 
 ```powershell
@@ -76,12 +79,13 @@ Before editing, write a tiny private plan:
 
 ```text
 Issue: #<id> / <title>
-Trace: FR-HW-.., UI-HWK-.., API-HWK-.., DB-HWK-.., TC-HW-..
+Trace: FR-HWK-.., UI-HWK-.., API-HWK-.., DB-HWK-.., TC-HWK-..
 First red test: <test name and command>
 Slice: DB -> backend -> service -> frontend -> permission -> states
 Files likely touched: <paths>
 Verification: <targeted>, mvn test, frontend unit/typecheck/build
-Risk: <cross-module or design uncertainty>
+Ownership: <HWK sections/rows/assets only; shared-file collision check>
+Risk: <cross-module, environment, or design uncertainty>
 ```
 
 ## Red-Green-Refactor
@@ -191,18 +195,24 @@ Get-ChildItem -Recurse -File backend,frontend,database |
 Draft this body locally or include it in the final report. Do not run `gh pr create`, `gh pr edit`, `gh pr review`, or `gh pr merge` until the user explicitly asks to send/review/merge.
 
 ```markdown
-closes #<issue-id>
+## Goal
+- <issue goal and acceptance boundary>
 
-## Summary
+## Changes
 - <behavior 1>
 - <behavior 2>
 
-## Traceability
-- FR/UI/API/DB/TC: <ids>
-
 ## Verification
-- <commands actually run>
+- `<command actually run>` — `<observed PASS/FAIL/BLOCKED result>`
 
-## Notes
-- <design deviation, skipped check, or residual risk if any>
+## Risks and boundaries
+- Traceability: <FR/UC/OP/UI/API/SVC/DB/TC/MAN IDs>
+- <shared document boundary, design deviation, skipped check, or residual risk>
+
+## AI usage
+- <what AI assisted with and what was manually verified; do not insert conversational text into deliverable documents>
+
+Closes #<issue-id>
 ```
+
+Automated review is supporting evidence, not merge authorization. Until repository CI exists under `.github/workflows/`, record local commands and results instead of claiming CI success. Final approval and merge belong to the project lead.

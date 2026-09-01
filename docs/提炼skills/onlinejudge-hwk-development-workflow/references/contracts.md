@@ -16,7 +16,7 @@ Read in this order:
 Useful searches:
 
 ```powershell
-rg -n "FR-HW|NFR-HW|UI-HWK|API-HWK|SVC-HWK|DB-HWK|TC-HW|HWK_" docs
+rg -n "FR-HWK|NFR-HWK|UC-HWK|OP-HWK|UI-HWK|API-HWK|SVC-HWK|DB-HWK|TC-HWK|HWK_" docs
 rg -n "CoursePermissionClient|HeaderCoursePermissionClient|CurrentUser|NotificationEvent|SourceGradeDTO|EvaluationTask|EvaluationResult|SandboxExecutor" backend/src/main/java
 rg -n "request<|LabTeacherView|StudentGradeView|GradeItemConfigView|Homework" frontend/src frontend/tests
 ```
@@ -47,8 +47,12 @@ rg -n "request<|LabTeacherView|StudentGradeView|GradeItemConfigView|Homework" fr
 | API-HWK-20 | GET | `/api/v1/evaluations/{evaluationId}/logs` | course manager |
 | API-HWK-21 | GET | `/api/v1/submissions/{submissionId}/review-logs` | course manager |
 | API-HWK-22 | DELETE | `/api/v1/homeworks/{homeworkId}` | course manager; DRAFT only |
+| API-HWK-23 | POST/GET/DELETE | `/api/v1/homeworks/{homeworkId}/attachments[/{fileId}]` | current student member; own unbound upload only |
+| API-HWK-24 | GET | `/api/v1/homeworks/{homeworkId}/submissions/{submissionId}/attachment/download` | submitting student or course manager; reauthorize every download |
 
 API-HWK-22 reuses `HomeworkResponse` and returns `deleted=true` plus deletion-time `updatedAt`. Return `403 / HWK_4031` without course-management permission, `404 / HWK_4001` when absent/already deleted, and `409 / HWK_4095` for every non-DRAFT status.
+
+API-HWK-23 accepts one multipart `file`, limits it to 10 MiB, and validates extension, declared MIME, and content signature against `pdf, zip, docx, xlsx, pptx, txt, md, csv, png, jpg, jpeg`. Its DTO returns only server UUID, sanitized filename, trusted MIME, size, status, upload time, and expiry; never expose `storage_key`, server path, or a raw URL. API-HWK-24 rechecks identity, course permission, homework/submission ownership, and exact attachment binding on every request and sends safe content headers including `nosniff`.
 
 ## UI Pages
 
@@ -75,6 +79,7 @@ API-HWK-22 reuses `HomeworkResponse` and returns `deleted=true` plus deletion-ti
 | DB-HWK-05 | `t_hwk_evaluation` | each objective/code evaluation and reevaluation record |
 | DB-HWK-06 | `t_hwk_review_log` | teacher review, score updates, reevaluation, publish audit |
 | DB-HWK-07 | `t_hwk_judge_config` | code evaluation config; final DSD associates it through `t_hwk_homework.judge_config_id`; prevent orphan/multiple config ambiguity with constraints |
+| DB-HWK-08 | `t_hwk_submission_attachment` | server UUID, nullable unique submission, homework/course/uploader ownership, private storage key, trusted metadata, expiry and `UPLOADED/BOUND/DELETED`; `(homework_id,uploader_id,active_slot)` permits one active upload |
 
 Indexes should support course, homework, student, status, deadline, and submission-history queries.
 
@@ -109,8 +114,14 @@ Preserve stable HWK semantics:
 - `HWK_4009 EVALUATION_TASK_FAILED`
 - `HWK_4010 EVALUATION_RESULT_NOT_VISIBLE`
 - `HWK_4031 COURSE_PERMISSION_DENIED`
+- `HWK_4042 ATTACHMENT_NOT_FOUND_OR_NOT_VISIBLE`
+- `HWK_4091 ATTACHMENT_EXPIRED`
+- `HWK_4092 ATTACHMENT_STATE_CONFLICT`
 - `HWK_4095 HOMEWORK_DELETE_STATE_CONFLICT`
+- `HWK_4131 ATTACHMENT_TOO_LARGE`
+- `HWK_4151 ATTACHMENT_TYPE_UNSUPPORTED`
 - `HWK_5001 INTERNAL_ERROR`
+- `HWK_5002 FILE_STORAGE_ERROR`
 
 ## Draft Delete Integrity
 
@@ -118,6 +129,14 @@ Preserve stable HWK semantics:
 - Ordinary update/publish/close/score-publish SQL must not set `is_deleted` and must include `is_deleted=FALSE`, so a stale entity cannot resurrect a deleted draft.
 - When the atomic delete affects zero rows, classify the current row: absent/deleted is HWK_4001; present but non-DRAFT is HWK_4095.
 - Trace through FR-HWK-01, UI-HWK-01, API-HWK-22, DB-HWK-01, and TC-HWK-19.
+
+## FILE Attachment Integrity
+
+- A FILE submission contains exactly one API-HWK-23 UUID. Bind `UPLOADED -> BOUND` in the same transaction that creates the submission; never use client filenames, CSV fields, paths, or URLs as ownership proof.
+- An unbound upload expires after 24 hours. Sequential replacement atomically marks the old active upload `DELETED`; concurrent active-slot conflicts converge to `409/HWK_4092` and leave only one active record/object.
+- Only the uploader may inspect/delete an unbound upload. Only the submitting student or CRS-authorized course manager may use API-HWK-24 for an exact bound version.
+- If metadata persistence or streaming fails, attempt immediate physical deletion; persist a deferred-delete marker and retry when deletion fails. A corrupt marker must not starve valid cleanup work.
+- Trace through FR-HWK-02/03/05, API-HWK-23/24, DB-HWK-08, TC-HWK-20..27, and MAN-HWK-012.
 
 ## Cross-Module Contracts
 
