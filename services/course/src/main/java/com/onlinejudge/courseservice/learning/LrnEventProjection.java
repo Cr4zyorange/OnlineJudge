@@ -18,8 +18,10 @@ import java.util.List;
  * recorded in the durable inbox in the same transaction as the projection, so
  * a crash or duplicate broker delivery never applies a fact twice.  Receiver
  * resolution is gated by the complete-roster watermark: before it exists, a
- * task/notification fact is recorded as an open reconciliation gap and never
- * fabricates a member conclusion.
+ * task/notification fact is durably deferred (the original envelope is
+ * persisted in the same transaction), recorded as an open reconciliation gap,
+ * and replayed exactly once by its original eventId after the authoritative
+ * roster snapshot catches up.
  */
 @Component
 public class LrnEventProjection {
@@ -55,25 +57,26 @@ public class LrnEventProjection {
             if (!inbox.record(eventId, eventType, aggregateType, aggregateId, aggregateVersion, correlationId)) {
                 return;
             }
-            apply(eventId, eventType, envelope.path("payload"), correlationId);
+            apply(eventId, eventType, envelope, correlationId, body);
         } catch (JsonProcessingException malformed) {
             throw new IllegalArgumentException("malformed v2 envelope", malformed);
         }
     }
 
-    private void apply(String eventId, String eventType, JsonNode payload, String correlationId) {
+    private void apply(String eventId, String eventType, JsonNode envelope, String correlationId, String envelopeJson) {
+        JsonNode payload = envelope.path("payload");
         switch (eventType) {
-            case "course.member.changed.v2" -> memberChanged(payload);
+            case "course.member.changed.v2" -> memberChanged(eventId, payload, correlationId);
             case "course.membership.snapshot.v2" -> membershipSnapshot(payload);
             case "course.announcement.published.v2" -> announcementPublished(eventId, payload);
             case "assessment.homework.published.v2" ->
-                    publishTask(eventId, "HWK", "HOMEWORK", "TASK", "homeworkId", payload, correlationId);
+                    publishTask(eventId, "HWK", "HOMEWORK", "TASK", "homeworkId", envelope, correlationId, envelopeJson);
             case "assessment.lab.published.v2" ->
-                    publishTask(eventId, "LAB", "EXPERIMENT", "TASK", "labId", payload, correlationId);
+                    publishTask(eventId, "LAB", "EXPERIMENT", "TASK", "labId", envelope, correlationId, envelopeJson);
             case "assessment.evaluation.completed.v2" ->
-                    notifyCourse(eventId, "TASK", "HWK", payload, "评测完成", correlationId);
+                    notifyCourse(eventId, "TASK", "HWK", envelope, "评测完成", correlationId, envelopeJson);
             case "grade.published.v2" ->
-                    notifyCourse(eventId, "GRADE", "GRD", payload, "成绩已发布", correlationId);
+                    notifyCourse(eventId, "GRADE", "GRD", envelope, "成绩已发布", correlationId, envelopeJson);
             case "grade.review.processed.v2" -> notifyStudent(eventId, "GRADE", "GRD", payload);
             default -> {
                 // Retained in the inbox (idempotency) but no LRN projection is needed.
@@ -81,13 +84,13 @@ public class LrnEventProjection {
         }
     }
 
-    private void memberChanged(JsonNode payload) {
+    private void memberChanged(String eventId, JsonNode payload, String correlationId) {
         long courseId = parseId(payload.path("courseId").asText());
         long userId = parseId(payload.path("userId").asText());
         String status = payload.path("membershipStatus").asText("");
         long memberVersion = payload.path("memberVersion").asLong(0);
         if (courseId > 0 && userId > 0 && !status.isBlank() && memberVersion > 0) {
-            inbox.upsertMember(courseId, userId, status, memberVersion);
+            inbox.upsertMember(courseId, userId, status, memberVersion, eventId, correlationId);
         }
     }
 
@@ -109,6 +112,37 @@ public class LrnEventProjection {
         }
         inbox.replaceRoster(courseId, members);
         inbox.recordWatermark(courseId, version);
+        for (LrnEventInboxRepository.MemberRow member : members) {
+            inbox.resolveMemberGap(courseId, member.userId(), member.memberVersion());
+        }
+        replayDeferredFacts(courseId);
+    }
+
+    /**
+     * Once the complete roster has replaced the projection, replay every
+     * pending deferred fact of that course exactly once by its original
+     * eventId and close the roster gap.  The inbox already carries the event,
+     * so replay applies the projection directly; task and notification
+     * creation are idempotent per eventId.
+     */
+    private void replayDeferredFacts(long courseId) {
+        boolean replayedAny = false;
+        for (LrnEventInboxRepository.DeferredEvent deferred : inbox.pendingDeferredEvents()) {
+            JsonNode envelope;
+            try {
+                envelope = mapper.readTree(deferred.envelopeJson());
+            } catch (JsonProcessingException malformed) {
+                continue;
+            }
+            if (parseId(envelope.path("payload").path("courseId").asText()) != courseId) continue;
+            String eventId = envelope.path("eventId").asText("");
+            String eventType = envelope.path("eventType").asText("");
+            apply(eventId, eventType, envelope, deferred.correlationId(), deferred.envelopeJson());
+            replayedAny |= inbox.markDeferredResolved(eventId);
+        }
+        if (replayedAny) {
+            inbox.resolveRosterGap(courseId);
+        }
     }
 
     private void announcementPublished(String eventId, JsonNode payload) {
@@ -128,36 +162,48 @@ public class LrnEventProjection {
     }
 
     private void publishTask(String eventId, String sourceModule, String taskType, String notificationType,
-                             String idField, JsonNode payload, String correlationId) {
+                             String idField, JsonNode envelope, String correlationId, String envelopeJson) {
+        JsonNode payload = envelope.path("payload");
         long courseId = parseId(payload.path("courseId").asText());
         long sourceId = parseId(payload.path(idField).asText());
         if (courseId <= 0 || sourceId <= 0) return;
         if (inbox.watermarkVersion(courseId).isEmpty()) {
-            inbox.recordGap(courseId, 0, eventId, correlationId);
+            deferAndRecordGap(courseId, eventId, envelope, correlationId, envelopeJson);
             return;
         }
         String title = payload.path("title").asText("").trim();
         LocalDateTime deadline = parseTime(payload.path("deadline").asText(null));
         String actionUrl = "/learning/tasks";
         List<Long> receivers = inbox.activeMemberUserIds(courseId);
+        if (receivers.isEmpty()) return;
         tasks.applyPublishedFact(courseId, sourceModule, taskType, title, deadline, actionUrl, sourceId, receivers);
         String content = "新的" + ("HWK".equals(sourceModule) ? "作业" : "实验") + "已发布：" + (title.isEmpty() ? "查看详情" : title);
         notifications.createForFact(eventId, eventTypeOf(sourceModule), notificationType, courseId, sourceModule,
                 sourceId, receivers, title.isEmpty() ? content : title, content, 1, actionUrl);
     }
 
-    private void notifyCourse(String eventId, String notificationType, String sourceModule, JsonNode payload,
-                              String defaultTitle, String correlationId) {
+    private void notifyCourse(String eventId, String notificationType, String sourceModule, JsonNode envelope,
+                              String defaultTitle, String correlationId, String envelopeJson) {
+        JsonNode payload = envelope.path("payload");
         long courseId = parseId(payload.path("courseId").asText());
         if (courseId <= 0) return;
         if (inbox.watermarkVersion(courseId).isEmpty()) {
-            inbox.recordGap(courseId, 0, eventId, correlationId);
+            deferAndRecordGap(courseId, eventId, envelope, correlationId, envelopeJson);
             return;
         }
         List<Long> receivers = inbox.activeMemberUserIds(courseId);
         if (receivers.isEmpty()) return;
         notifications.createForFact(eventId, eventTypeOf(sourceModule), notificationType, courseId, sourceModule, null,
                 receivers, defaultTitle, defaultTitle + "，请前往对应课程查看。", 1, "/learning/tasks");
+    }
+
+    /** Same transaction: keep the original envelope replayable and record the open roster gap. */
+    private void deferAndRecordGap(long courseId, String eventId, JsonNode envelope,
+                                   String correlationId, String envelopeJson) {
+        inbox.deferEvent(eventId, envelope.path("eventType").asText(""),
+                envelope.path("aggregateType").asText(""), envelope.path("aggregateId").asText(""),
+                envelope.path("aggregateVersion").asLong(0), correlationId, envelopeJson);
+        inbox.recordGap(courseId, 0, eventId, correlationId);
     }
 
     private void notifyStudent(String eventId, String notificationType, String sourceModule, JsonNode payload) {

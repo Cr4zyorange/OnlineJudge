@@ -132,6 +132,155 @@ class LrnFoldServiceTest {
     }
 
     @Test
+    void homeworkFactBeforeRosterIsDurablyDeferredAndReplayedExactlyOnceAfterTheSnapshotCatchesUp() throws Exception {
+        String courseId = createCourse("831", "9d2ff3f0-0e29-4b5f-9432-cc9ec51ac901");
+        String envelope = homeworkEnvelope(courseId);
+
+        projection.consume(envelope);
+
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM lrn_learning_task", Integer.class)).isZero();
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM lrn_notification", Integer.class)).isZero();
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM learning_deferred_event
+                 WHERE consumer_name = 'course-lrn' AND event_id = '0b277609-059f-4bd2-b26d-f54341003ecc'
+                """, Integer.class)).isEqualTo(1);
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT delivery_status FROM learning_deferred_event
+                 WHERE consumer_name = 'course-lrn' AND event_id = '0b277609-059f-4bd2-b26d-f54341003ecc'
+                """, String.class)).isEqualTo("PENDING");
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT request_status FROM learning_event_reconciliation_request
+                 WHERE consumer_name = 'course-lrn' AND aggregate_type = 'course-membership-roster'
+                """, String.class)).isEqualTo("OPEN");
+
+        projection.consume(membershipSnapshotEnvelope(courseId, "831", "832"));
+
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM lrn_learning_task WHERE user_id = 832 AND course_id = ?",
+                Integer.class, Long.parseLong(courseId))).isEqualTo(1);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM lrn_notification WHERE user_id = 832", Integer.class)).isEqualTo(1);
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT delivery_status FROM learning_deferred_event
+                 WHERE consumer_name = 'course-lrn' AND event_id = '0b277609-059f-4bd2-b26d-f54341003ecc'
+                """, String.class)).isEqualTo("RESOLVED");
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT request_status FROM learning_event_reconciliation_request
+                 WHERE consumer_name = 'course-lrn' AND aggregate_type = 'course-membership-roster'
+                """, String.class)).isEqualTo("RESOLVED");
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM learning_event_inbox
+                 WHERE consumer_name = 'course-lrn' AND event_id = '0b277609-059f-4bd2-b26d-f54341003ecc'
+                """, Integer.class)).isEqualTo(1);
+
+        // Snapshot or homework redelivery must never duplicate the replayed side effects.
+        projection.consume(membershipSnapshotEnvelope(courseId, "831", "832"));
+        projection.consume(envelope);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM lrn_learning_task WHERE user_id = 832 AND course_id = ?",
+                Integer.class, Long.parseLong(courseId))).isEqualTo(1);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM lrn_notification WHERE user_id = 832", Integer.class)).isEqualTo(1);
+    }
+
+    @Test
+    void outOfOrderMemberFactsNeverRollBackTheProjectionAndVersionGapsEnterReconciliation() throws Exception {
+        String courseId = createCourse("833", "9d2ff3f0-0e29-4b5f-9432-cc9ec51ac911");
+
+        projection.consume(memberChangedEnvelope(courseId, "834", "REMOVED", 3, "member-remove-v3"));
+
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT membership_status FROM learning_course_member_projection WHERE course_id = ? AND user_id = 834
+                """, String.class, Long.parseLong(courseId))).isEqualTo("REMOVED");
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT member_version FROM learning_course_member_projection WHERE course_id = ? AND user_id = 834
+                """, Long.class, Long.parseLong(courseId))).isEqualTo(3L);
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM learning_event_reconciliation_request
+                 WHERE consumer_name = 'course-lrn' AND aggregate_type = 'course-member'
+                   AND aggregate_id = ? AND request_status = 'OPEN'
+                """, Integer.class, courseId + ":834")).isEqualTo(1);
+
+        projection.consume(memberChangedEnvelope(courseId, "834", "ACTIVE", 2, "member-active-v2"));
+
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT membership_status FROM learning_course_member_projection WHERE course_id = ? AND user_id = 834
+                """, String.class, Long.parseLong(courseId))).isEqualTo("REMOVED");
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT member_version FROM learning_course_member_projection WHERE course_id = ? AND user_id = 834
+                """, Long.class, Long.parseLong(courseId))).isEqualTo(3L);
+
+        // The authoritative snapshot covers the missing versions and closes the member gap.
+        projection.consume("""
+                {
+                  "eventId": "5a10fd0e-0000-4f5b-9432-000000000003",
+                  "eventType": "course.membership.snapshot.v2",
+                  "payloadVersion": 2,
+                  "aggregateType": "course-membership-roster",
+                  "aggregateId": "%s",
+                  "aggregateVersion": 2,
+                  "occurredAt": "2026-08-30T09:30:00Z",
+                  "correlationId": "34c3bdce-e3ff-45b0-8c75-3e46d0e57f5d",
+                  "payload": {
+                    "courseId": "course-%s",
+                    "rosterVersion": 2,
+                    "members": [
+                      {"userId": "834", "membershipStatus": "REMOVED", "memberVersion": 3}
+                    ]
+                  }
+                }
+                """.formatted(courseId, courseId));
+
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT request_status FROM learning_event_reconciliation_request
+                 WHERE consumer_name = 'course-lrn' AND aggregate_type = 'course-member'
+                   AND aggregate_id = ?
+                """, String.class, courseId + ":834")).isEqualTo("RESOLVED");
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT membership_status FROM learning_course_member_projection WHERE course_id = ? AND user_id = 834
+                """, String.class, Long.parseLong(courseId))).isEqualTo("REMOVED");
+    }
+
+    @Test
+    void deferredHomeworkConvergesWithZeroSideEffectsWhenTheSnapshotRosterHasNoActiveStudents() throws Exception {
+        String courseId = createCourse("835", "9d2ff3f0-0e29-4b5f-9432-cc9ec51ac921");
+
+        projection.consume(homeworkEnvelope(courseId));
+        projection.consume("""
+                {
+                  "eventId": "5a10fd0e-0000-4f5b-9432-000000000004",
+                  "eventType": "course.membership.snapshot.v2",
+                  "payloadVersion": 2,
+                  "aggregateType": "course-membership-roster",
+                  "aggregateId": "%s",
+                  "aggregateVersion": 1,
+                  "occurredAt": "2026-08-30T09:40:00Z",
+                  "correlationId": "34c3bdce-e3ff-45b0-8c75-3e46d0e57f5e",
+                  "payload": {
+                    "courseId": "course-%s",
+                    "rosterVersion": 1,
+                    "members": []
+                  }
+                }
+                """.formatted(courseId, courseId));
+
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM lrn_learning_task", Integer.class)).isZero();
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM lrn_notification", Integer.class)).isZero();
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT delivery_status FROM learning_deferred_event
+                 WHERE consumer_name = 'course-lrn' AND event_id = '0b277609-059f-4bd2-b26d-f54341003ecc'
+                """, String.class)).isEqualTo("RESOLVED");
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT request_status FROM learning_event_reconciliation_request
+                 WHERE consumer_name = 'course-lrn' AND aggregate_type = 'course-membership-roster'
+                """, String.class)).isEqualTo("RESOLVED");
+    }
+
+    @Test
     void staleMembershipSnapshotCannotDowngradeTheRosterWatermark() throws Exception {
         String courseId = createCourseWithRosterWatermark("805", "806");
 
@@ -304,20 +453,46 @@ class LrnFoldServiceTest {
     }
 
     private String createCourseWithRosterWatermark(String teacherId, String studentId) throws Exception {
-        String courseResponse = mockMvc.perform(post("/api/v1/courses")
-                        .header("Authorization", userToken(teacherId, List.of("TEACHER")))
-                        .header("X-Request-Id", "5d2ff3f0-0e29-4b5f-9432-cc9ec51ac711")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"name\":\"fact projection course\",\"enrollmentMode\":\"PUBLIC\"}"))
-                .andExpect(status().isCreated())
-                .andReturn().getResponse().getContentAsString();
-        String courseId = objectMapper.readTree(courseResponse).at("/data/id").asText();
+        String courseId = createCourse(teacherId, "5d2ff3f0-0e29-4b5f-9432-cc9ec51ac711");
         mockMvc.perform(post("/api/v1/courses/{courseId}/join", courseId)
                         .header("Authorization", userToken(studentId, List.of("STUDENT")))
                         .header("X-Request-Id", "5d2ff3f0-0e29-4b5f-9432-cc9ec51ac712"))
                 .andExpect(status().isOk());
         projection.consume(membershipSnapshotEnvelope(courseId, teacherId, studentId));
         return courseId;
+    }
+
+    private String createCourse(String teacherId, String requestId) throws Exception {
+        String courseResponse = mockMvc.perform(post("/api/v1/courses")
+                        .header("Authorization", userToken(teacherId, List.of("TEACHER")))
+                        .header("X-Request-Id", requestId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"fact projection course\",\"enrollmentMode\":\"PUBLIC\"}"))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        return objectMapper.readTree(courseResponse).at("/data/id").asText();
+    }
+
+    private String memberChangedEnvelope(String courseId, String userId, String status,
+                                         long memberVersion, String eventId) {
+        return """
+                {
+                  "eventId": "%s",
+                  "eventType": "course.member.changed.v2",
+                  "payloadVersion": 2,
+                  "aggregateType": "course-member",
+                  "aggregateId": "%s:%s",
+                  "aggregateVersion": %d,
+                  "occurredAt": "2026-08-30T09:20:00Z",
+                  "correlationId": "34c3bdce-e3ff-45b0-8c75-3e46d0e57f5c",
+                  "payload": {
+                    "courseId": "%s",
+                    "userId": "%s",
+                    "membershipStatus": "%s",
+                    "memberVersion": %d
+                  }
+                }
+                """.formatted(eventId, courseId, userId, memberVersion, courseId, userId, status, memberVersion);
     }
 
     private String membershipSnapshotEnvelope(String courseId, String teacherId, String studentId) {
