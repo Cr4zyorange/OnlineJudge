@@ -12,6 +12,7 @@ closes #317
 - renderer、Compose、Kind、切流/回滚和运行时 fixture 统一为四 upstream 模型。
 - 保留伪造身份 Header 过滤、Bearer/request ID 透传、无代理重试和脱敏错误。
 - 增加深链、查询串、Range 下载、流式响应及四上游逐一停机隔离验证。
+- Kind 切流固定到 `kind-onlinejudge-ci`，临时转发 `svc/gateway`，并按所切服务执行专属 smoke。
 
 ## 已验证
 
@@ -25,9 +26,9 @@ closes #317
 
 ## 当前验收状态
 
-PR 保持 Draft。AC-317-01 已由自动化完整覆盖；AC-317-02 至 AC-317-06 的 Gateway disposable
-部分已覆盖，但 #355、#357、#356、#339 尚未全部提供可部署 Head，#318 最终环境也未完成。
-因此四类真实 upstream smoke、Course/Grade 独立验签、真实逐服务停机及浏览器主链尚未计为通过，
-不会提前发布 `READY_FOR_INTEGRATION`。
+项目负责人于 2026-09-01 通过 `SCOPE_GATE_RESET` 明确：#317 只按 AC-317-01～06 的四类
+固定 upstream stub 收口，不等待 #355/#357/#356/#339/#318。现有 stub、镜像、健康、隔离及
+Kind 切流证据覆盖全部 AC；真实 upstream、浏览器主链和跨服务停机移交 #318/#320/#340。
+本 PR 可以转为 Ready 请求审核。
 
 详细证据见 `output/test/issue-317/README.md`。

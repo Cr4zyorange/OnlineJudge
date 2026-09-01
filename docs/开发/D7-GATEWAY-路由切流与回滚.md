@@ -81,12 +81,19 @@ bash scripts/gateway/switch-gateway-target.sh --mode compose --service grade --t
 后置检查失败时恢复完整前一快照并重复验证；回滚验证成功时原操作退出 1，回滚也无法验证
 时退出 2。
 
+Kind 模式只经 `scripts/kind/lib.sh` 的 `kindlib_kubectl` 操作 `kind-onlinejudge-ci` 上下文，
+绝不依赖调用者当前 kubeconfig context。每次重载后，脚本临时转发 `svc/gateway` 的
+`8080` 到 `127.0.0.1:${GATEWAY_KIND_LOCAL_PORT:-18090}`，验证结束或失败回滚前均回收该
+进程。受保护 smoke 路径由所切服务固定：Identity 为 `/api/v1/auth/me`、Course 为
+`/api/v1/courses`、Assessment 为 `/api/v1/homeworks`、Grade 为 `/api/v1/grades`；因此不能
+用另一服务的健康响应误判本次切流成功。
+
 ## 7. 验证入口
 
 无需真实业务服务即可运行 Gateway 契约、渲染、默认配置、切流回滚、部署与 disposable
 运行时测试。`gateway-runtime.test.sh` 会启动四个独立 fixture upstream 与 Frontend，覆盖
 路由、深链、查询串、Range 下载、流式响应、错误边界和逐上游停机隔离，并在退出时清理。
 
-真实服务验收由 `identity-assessment-runtime.test.sh` 及 #318 disposable 环境完成。#317
-只有在 #355、#357、#356、#339 提供可部署 Head 后，才能记录四类真实 smoke、独立 JWT
-验证、浏览器主链和逐服务故障隔离；在此之前 PR 必须保持 Draft。
+按项目负责人 2026-09-01 的 `SCOPE_GATE_RESET`，#317 的 AC-317-01～06 以四类固定 upstream
+stub 的可重复验收收口，不等待 #355、#357、#356、#339、#318。真实服务、浏览器主链和跨服务
+停机演练由 #318/#320/#340 继续负责；它们是后续集成证据，不能作为本 issue 保持 Draft 的条件。

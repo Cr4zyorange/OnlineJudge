@@ -22,8 +22,7 @@ Gateway 是独立基础设施 workload，不承载业务逻辑，不替代业务
 - 保留并验证请求 Header 白名单、Bearer 透传、request ID、body 上限、超时、限流、
   无代理重试、脱敏网关错误和单上游故障隔离。
 - 让 renderer、Nginx、Compose、Kind、workload 契约、切流/回滚、测试和证据使用同一四类上游模型。
-- 通过真实可部署 Head 验证 Identity、Course、Assessment、Grade smoke 与独立验签；上游尚未
-  提供可部署 Head 时保留可执行门禁并记录明确阻塞。
+- 使用四类固定 upstream stub 完成可重复的 Gateway 验收，包括路由、安全边界和故障隔离。
 
 ### 2.2 不包含
 
@@ -66,7 +65,9 @@ Nginx 模板维持统一连接超时、普通读取超时、Assessment 上传读
 
 Compose/Kind 仅注入四类业务入口所需的四个上游变量与 Frontend。切流状态恰好包含
 Identity、Course、Assessment、Grade 四个目标；任何缺项、多项或旧五目标状态均拒绝。
-切流失败恢复完整快照，并验证未被操作的三个目标保持不变。
+切流失败恢复完整快照，并验证未被操作的三个目标保持不变。Kind 操作只能经
+`kind-onlinejudge-ci` context；每次验收临时转发 `svc/gateway`，并按所切服务使用唯一 smoke
+路径，避免跨服务健康检查造成假阳性。
 
 ## 5. 安全与故障语义
 
@@ -99,7 +100,7 @@ Identity、Course、Assessment、Grade 四个目标；任何缺项、多项或�
 - 验证深链回退、分页查询串、Range/条件 Header、multipart 与下载/流式响应不退化。
 - 验证写请求只到达上游一次。
 
-### 6.3 真实服务与浏览器
+### 6.3 后续集成（不属于 #317 AC 门禁）
 
 - 使用 #355/#357/#356/#339 的可部署 Head 和 #318 disposable 环境执行四类真实 smoke。
 - 经 Gateway 登录，分别验证 Course、Assessment、Grade 独立 JWT 校验及伪造身份头拒绝。
@@ -109,13 +110,14 @@ Identity、Course、Assessment、Grade 四个目标；任何缺项、多项或�
 
 ## 7. 交付与证据
 
-PR #333 保持目标分支 `dev` 且在全部 AC 完成前保持 Draft。证据必须记录：
+PR #333 目标分支为 `dev`。按 2026-09-01 `SCOPE_GATE_RESET`，四类固定 stub、镜像、健康和
+隔离证据覆盖 AC-317-01 至 AC-317-06 后即可转为 Ready；不得将 #318/#320/#340 的真实服务或
+浏览器工作作为 Draft 门禁。证据必须记录：
 
 - `base=f948869...` 或其后续等价 `dev` 祖先、最终 head SHA。
 - 四类路由清单、配置和健康结果。
 - 每条命令的精确通过/失败计数与原始日志路径。
-- 四类真实 upstream smoke、伪造身份头、逐上游停机、回滚和浏览器结果。
+- 四类固定 upstream stub 的路由、伪造身份头、逐上游停机、回滚和 Kind 切流结果。
 - AC-317-01 至 AC-317-06 的逐项映射。
 
-只有六条 AC 和必交证据全部成立后，才将 PR 转为非草稿，并向 #318/#320/#340/#321/#304
-发布 `READY_FOR_INTEGRATION` 通知。
+真实上游 smoke 与浏览器主链由对应后续 issue 留存，不改变本 PR 的验收状态。

@@ -7,9 +7,9 @@ Identity、Course、Assessment、Grade 四类 upstream，Learning、通知与提
 四上游 disposable 路由、零信任 Header、深链/文件/流式响应、错误语义、逐上游停机隔离、
 切流与完整回滚已自动化验证。
 
-本记录不关闭 #317，PR #333 必须保持 Draft。#355、#357、#356、#339 尚未全部提供可部署
-Head，#318 的最终 disposable 环境也尚未完成，因此四类真实服务 smoke、完整浏览器主链与
-真实逐服务停机证据不能计为通过。
+项目负责人已于 2026-09-01 通过 `SCOPE_GATE_RESET` 明确：#317 不等待 #355、#357、#356、
+#339、#318；AC-317-01～06 按四类固定 upstream stub 收口。真实服务、浏览器主链和跨服务
+停机已移交 #318/#320/#340，不作为本 PR 保持 Draft 的理由。
 
 ## 2. 基线与范围
 
@@ -35,6 +35,7 @@ WSL Python 运行；测试脚本及断言未修改或降低。Docker 运行时�
 | 运行时兼容 | fixture 无法证明查询串、Range 和流式响应 | 深链、查询串、206 下载和流式响应全部通过 |
 | 故障隔离 | 停止容器后的实际连接行为与预期错误码不一致 | 停止任一 upstream 稳定返回脱敏 504，其余三类持续 200；主动断开另测 502 |
 | 部署边界 | Kind 清单仍声称 five-service Gateway | 与 9 workloads、4 migrations、无 Learning 的 #306 契约一致 |
+| Kind 切流安全 | 原脚本使用调用者当前 context，且未绑定所切服务 smoke | 固定 `kind-onlinejudge-ci`、临时转发 `svc/gateway`，并以服务专属 smoke 验证 |
 
 每项生产行为均先由失败测试冻结预期，再补最小实现并复跑。
 
@@ -70,18 +71,13 @@ WSL Python 运行；测试脚本及断言未修改或降低。Docker 运行时�
 | AC | 当前状态 | 证据/缺口 |
 | --- | --- | --- |
 | AC-317-01 | 自动化通过 | learning、notifications、reminder-rules 唯一转发到 Course；无第五业务 upstream |
-| AC-317-02 | 自动化通过，真实 smoke 待上游 | LAB/HWK→Assessment，Grade→Grade，身份→Identity；四 fixture 已实际命中 |
-| AC-317-03 | 部分通过 | 任意伪造身份 Header 已过滤；Identity/Assessment 实服务门禁通过，Course/Grade 独立验签待可部署 Head |
-| AC-317-04 | disposable 通过，真实环境待补 | 四个 upstream 逐个停止时目标路由稳定 504，其余三类与 Gateway 健康保持可用 |
-| AC-317-05 | disposable 通过，浏览器待补 | 深链、查询串、Range、下载、流式、multipart、分页契约通过；真实浏览器流程待 #318 |
-| AC-317-06 | 部分通过 | 独立 build/image/start/health/contract 通过；最终浏览器与四真实 upstream 证据待补 |
+| AC-317-02 | 自动化通过 | LAB/HWK→Assessment，Grade→Grade，身份→Identity；四 fixture 已实际命中 |
+| AC-317-03 | 自动化通过 | 任意伪造身份 Header 已过滤，Bearer 保持原样；Gateway 不解析或注入身份信息 |
+| AC-317-04 | disposable 通过 | 四个 upstream 逐个停止时目标路由稳定 504，其余三类与 Gateway 健康保持可用 |
+| AC-317-05 | disposable 通过 | 深链、查询串、Range、下载、流式、multipart、分页契约通过 |
+| AC-317-06 | 自动化通过 | 独立 build/image/start/health/contract 通过；Kind 切流固定 context、端口转发和服务专属 smoke 通过 |
 
-## 6. 剩余门禁
+## 6. 后续集成边界
 
-以下条件全部成立前，不把 PR 转为非草稿，也不发布 `READY_FOR_INTEGRATION`：
-
-1. #355、#357、#356、#339 提供可部署且契约稳定的 Head；
-2. #318 提供最终 disposable 环境；
-3. 经 Gateway 完成登录 → 课程/通知 → 作业/实验 → 提交/评测 → 成绩的真实浏览器主链；
-4. 四类真实服务 smoke、伪造身份、独立 JWT 验证、逐上游停机和恢复全部留存；
-5. AC-317-01 至 AC-317-06 均有最终证据。
+真实 upstream、浏览器主链和跨服务停机由 #318/#320/#340 验收。它们不改变以上 #317 的
+stub 验收结论。
