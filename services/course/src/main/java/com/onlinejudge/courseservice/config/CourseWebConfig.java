@@ -19,7 +19,10 @@ public class CourseWebConfig implements WebMvcConfigurer {
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
         registry.addInterceptor(new RequestIdInterceptor()).addPathPatterns("/api/v1/**", "/internal/v2/**");
-        registry.addInterceptor(new UserInterceptor(authentication)).addPathPatterns("/api/v1/courses/**");
+        registry.addInterceptor(new UserInterceptor(authentication))
+                .addPathPatterns("/api/v1/courses/**", "/api/v1/learning/**", "/api/v1/notifications/**",
+                        "/api/v1/reminder-rules/**")
+                .excludePathPatterns("/api/v1/notifications/events");
         registry.addInterceptor(new InternalInterceptor(authentication)).addPathPatterns("/internal/v2/**");
     }
 

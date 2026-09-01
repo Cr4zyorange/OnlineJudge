@@ -3,6 +3,7 @@ package com.onlinejudge.courseservice.service;
 import com.onlinejudge.courseservice.persistence.CourseOutboxRepository;
 import com.onlinejudge.courseservice.persistence.CourseRosterReconciliationRepository;
 import com.onlinejudge.courseservice.persistence.CourseRepository;
+import com.onlinejudge.courseservice.learning.LrnTaskService;
 import com.onlinejudge.courseservice.security.CurrentUser;
 import com.onlinejudge.courseservice.web.CourseException;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -30,10 +31,10 @@ public class CourseService {
     private final CourseOutboxRepository outbox;
     private final CourseRosterReconciliationRepository reconciliation;
     private final CourseFileStorage fileStorage;
-    private final LearningTaskSummaryClient learningTasks;
+    private final LrnTaskService learningTasks;
 
     public CourseService(CourseRepository courses, CourseOutboxRepository outbox, CourseRosterReconciliationRepository reconciliation,
-                         CourseFileStorage fileStorage, LearningTaskSummaryClient learningTasks) {
+                         CourseFileStorage fileStorage, LrnTaskService learningTasks) {
         this.courses = courses;
         this.outbox = outbox;
         this.reconciliation = reconciliation;
@@ -350,29 +351,21 @@ public class CourseService {
 
     /**
      * API-CRS-22 / CRS-SC-09: course home summary for an authenticated member.
-     * Course owns the course and announcement facts; LRN owns recent-task
-     * facts, so the task section comes from the bounded Course -> LRN internal
-     * contract.  A Learning outage is a 503 LEARNING_TASKS_UNAVAILABLE, never
-     * a fabricated empty task list.
+     * Course owns the course, announcement and LRN task facts (#355), so recent
+     * tasks come from the local projection, never from a downstream service.
      */
     public HomeSummaryView homeSummary(long courseId, CurrentUser actor, String requestId) {
         CourseRepository.Course course = course(courseId);
         requireMember(courseId, actor);
-        List<RecentTaskView> tasks;
-        try {
-            tasks = learningTasks.recentTasks(courseId, actor.id(), requestId).stream()
-                    .map(this::recentTaskView)
-                    .toList();
-        } catch (LearningTaskSummaryClient.LearningTasksUnavailableException unavailable) {
-            throw new CourseException(HttpStatus.SERVICE_UNAVAILABLE, "LEARNING_TASKS_UNAVAILABLE",
-                    "recent tasks are temporarily unavailable", true);
-        }
+        List<RecentTaskView> tasks = learningTasks.recentTasks(courseId, actor.id(), 5).stream()
+                .map(this::recentTaskView)
+                .toList();
         return new HomeSummaryView(view(course, actor),
                 courses.announcements(courseId).stream().limit(5).map(this::announcementView).toList(),
                 tasks);
     }
 
-    private RecentTaskView recentTaskView(LearningTaskSummaryClient.RecentTask task) {
+    private RecentTaskView recentTaskView(LrnTaskService.RecentTask task) {
         return new RecentTaskView(
                 task.taskId(), task.taskType(), task.title(), task.courseId(), task.courseName(),
                 task.deadline(), task.progress(), task.status(), task.actionUrl()
