@@ -33,6 +33,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /** Issue #315 acceptance through newly-created, run-scoped Homework facts. */
@@ -321,7 +322,7 @@ class HomeworkWorkflowContractTest {
     }
 
     @Test
-    void incompleteCourseProjectionReturns503AndWritesNoHomeworkFacts() throws Exception {
+    void courseProjectionGapFallsBackToCourseAuthorizationAndWritesNothingWhenDenied() throws Exception {
         String teacherId = "teacher-356-" + UUID.randomUUID();
         String studentId = "student-356-" + UUID.randomUUID();
         long homeworkId = createAndPublishCodeHomework(teacherId, "projection-gap-356-" + UUID.randomUUID(), true,
@@ -330,16 +331,18 @@ class HomeworkWorkflowContractTest {
         jdbc.update("INSERT INTO assessment_course_projection_gap (course_id, user_id, expected_version, observed_version) VALUES ('course-315', ?, 1, 3)", studentId);
         String studentToken = TestJwtFactory.userToken(KEY, "homework-workflow-kid", studentId, List.of("STUDENT"));
         String requestId = UUID.randomUUID().toString();
+        when(coursePermissions.canViewCourse("course-315", studentId, requestId)).thenReturn(false);
 
         mockMvc.perform(post("/api/v1/homeworks/{homeworkId}/submissions", homeworkId)
                         .header("Authorization", "Bearer " + studentToken).header("X-Request-Id", requestId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"code\":\"print('gap')\",\"language\":\"python\"}"))
-                .andExpect(status().isServiceUnavailable())
-                .andExpect(jsonPath("$.code").value("COURSE_PROJECTION_UNAVAILABLE"))
-                .andExpect(jsonPath("$.retryable").value(true))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("HWK_4003"))
+                .andExpect(jsonPath("$.retryable").value(false))
                 .andExpect(jsonPath("$.requestId").value(requestId));
 
+        verify(coursePermissions).canViewCourse("course-315", studentId, requestId);
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM assessment_homework_submission", Integer.class)).isZero();
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM assessment_submission", Integer.class)).isZero();
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM evaluation_task", Integer.class)).isZero();
