@@ -55,6 +55,14 @@ export function validateFormalWindowEvidence(evidence) {
   );
   invariant(evidence.dockerDaemonReady === true, "formal counting requires a ready Docker daemon");
   invariant(evidence.exclusiveWindow === true, "formal counting requires an exclusive test window");
+  invariant(
+    typeof evidence.datasetRestoreEvidence === "string" && evidence.datasetRestoreEvidence.length > 0,
+    "formal counting requires dataset restore evidence for the current round",
+  );
+  invariant(
+    typeof evidence.resourcePolicyEvidence === "string" && evidence.resourcePolicyEvidence.length > 0,
+    "formal counting requires resource policy evidence",
+  );
   const contaminants = [
     ["HPA", evidence.hpaEnabled],
     ["E2E", evidence.e2eRunning],

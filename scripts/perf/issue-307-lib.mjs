@@ -215,6 +215,22 @@ function assertFormalWindow(raw) {
     typeof window?.environmentReadySignal === "string" && window.environmentReadySignal.startsWith("ENVIRONMENT_READY"),
     `${raw.architecture}/${raw.scenario}/round-${raw.round} lacks ENVIRONMENT_READY evidence`,
   );
+  invariant(
+    window.dockerDaemonReady === true,
+    `${raw.architecture}/${raw.scenario}/round-${raw.round} lacks Docker daemon readiness evidence`,
+  );
+  invariant(
+    window.exclusiveWindow === true,
+    `${raw.architecture}/${raw.scenario}/round-${raw.round} lacks an exclusive formal window`,
+  );
+  invariant(
+    typeof window.datasetRestoreEvidence === "string" && window.datasetRestoreEvidence.length > 0,
+    `${raw.architecture}/${raw.scenario}/round-${raw.round} lacks dataset restore evidence`,
+  );
+  invariant(
+    typeof window.resourcePolicyEvidence === "string" && window.resourcePolicyEvidence.length > 0,
+    `${raw.architecture}/${raw.scenario}/round-${raw.round} lacks resource policy evidence`,
+  );
   const contaminants = [
     ["HPA", window.hpaEnabled],
     ["E2E", window.e2eRunning],
