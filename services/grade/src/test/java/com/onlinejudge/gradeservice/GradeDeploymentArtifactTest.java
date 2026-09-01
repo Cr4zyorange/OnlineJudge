@@ -26,4 +26,25 @@ class GradeDeploymentArtifactTest {
                 .contains("backend/src/main/java")
                 .doesNotContain("GRADE_DATABASE_PASSWORD");
     }
+
+    @Test
+    void productionMysqlUsesOnlyVersionedMigrationsAndHasALiveReadinessGate() throws Exception {
+        String application = Files.readString(Path.of("src/main/resources/application.yml"));
+        assertThat(application)
+                .contains("mode: embedded")
+                .doesNotContain("mode: always");
+
+        Path liveAcceptance = Path.of("../../scripts/test/verify-grade-service-mysql-live.sh");
+        assertThat(liveAcceptance).exists();
+        String acceptance = Files.readString(liveAcceptance);
+        assertThat(acceptance)
+                .contains("V20260901_01__grade_service_schema.sql")
+                .contains("V20260901_02__complete_grade_runtime.sql")
+                .contains("/actuator/health/readiness")
+                .contains("/health/ready")
+                .doesNotContain("SPRING_SQL_INIT_MODE=");
+
+        String backendGate = Files.readString(Path.of("../../scripts/ci/backend-verify.sh"));
+        assertThat(backendGate).contains("verify-grade-service-mysql-live.sh");
+    }
 }

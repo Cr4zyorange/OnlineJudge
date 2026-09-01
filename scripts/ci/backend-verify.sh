@@ -8,12 +8,13 @@ checkout="$(CDPATH= cd -- "$checkout" && pwd)"
 backend_dir="$checkout/backend"
 assessment_dir="$checkout/services/assessment"
 course_dir="$checkout/services/course"
+grade_dir="$checkout/services/grade"
 artifact_dir="$checkout/ci-artifacts/backend-gate"
 log="$artifact_dir/gate.log"
 expected_java_major="${OJ_CI_JAVA_MAJOR:-21}"
 expected_maven_min_version="${OJ_CI_MAVEN_MIN_VERSION:-3.9.0}"
 
-mkdir -p "$artifact_dir/unit" "$artifact_dir/integration" "$artifact_dir/course"
+mkdir -p "$artifact_dir/unit" "$artifact_dir/integration" "$artifact_dir/course" "$artifact_dir/grade"
 : > "$log"
 
 fail() {
@@ -80,6 +81,7 @@ printf 'backend-verify: java=%s maven=%s\n' "$java_major" "$maven_version" | tee
 [[ -f "$backend_dir/pom.xml" ]] || fail "missing $backend_dir/pom.xml"
 [[ -f "$assessment_dir/pom.xml" ]] || fail "missing $assessment_dir/pom.xml"
 [[ -f "$course_dir/pom.xml" ]] || fail "missing $course_dir/pom.xml"
+[[ -f "$grade_dir/pom.xml" ]] || fail "missing $grade_dir/pom.xml"
 
 preserve_reports() {
   local phase="$1"
@@ -94,6 +96,13 @@ preserve_course_reports() {
   mkdir -p "$dest"
   rm -f "$dest"/*.xml
   (cd "$course_dir" && cp target/surefire-reports/*.xml "$dest"/)
+}
+
+preserve_grade_reports() {
+  local dest="$artifact_dir/grade/surefire-reports"
+  mkdir -p "$dest"
+  rm -f "$dest"/*.xml
+  (cd "$grade_dir" && cp target/surefire-reports/*.xml "$dest"/)
 }
 
 # #312 is independently deployable and owns Course facts.  The formal backend
@@ -114,6 +123,14 @@ fi
 log_run bash "$checkout/scripts/test/verify-course-service-live-summary.test.sh" "$checkout"
 log_run bash "$checkout/scripts/test/verify-course-compose-contract.test.sh" "$checkout"
 log_run bash "$checkout/scripts/test/verify-course-reproducible-build.sh" "$checkout"
+
+# #339 owns an independently packaged Grade service. Its formal gate includes
+# the production JAR and a disposable MySQL migration/start/readiness probe;
+# an H2-only unit suite cannot prove the production SQL-init path is valid.
+printf '\n$ mvn -B -ntp -f services/grade/pom.xml clean package\n' | tee -a "$log"
+(cd "$checkout" && run_mvn_retry mvn -B -ntp -f services/grade/pom.xml clean package)
+preserve_grade_reports
+log_run bash "$checkout/scripts/test/verify-grade-service-mysql-live.sh"
 
 # 编译门禁：主代码必须可编译。
 printf '\n$ mvn -B -ntp -q -DskipTests compile\n' | tee -a "$log"
@@ -142,4 +159,4 @@ printf '\n$ mvn -B -ntp -f services/assessment/pom.xml test\n' | tee -a "$log"
 (cd "$checkout" && rm -f services/assessment/target/surefire-reports/*.xml \
   && run_mvn_retry mvn -B -ntp -f services/assessment/pom.xml test)
 
-printf 'backend-verify: PASS (Course compile/test/Compose contract; Assessment compile/test; legacy backend compile + unit + integration)\n' | tee -a "$log"
+printf 'backend-verify: PASS (Course compile/test/Compose contract; Grade package/MySQL readiness; Assessment compile/test; legacy backend compile + unit + integration)\n' | tee -a "$log"
