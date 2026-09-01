@@ -1,0 +1,57 @@
+name: onlinejudge-dev
+
+# OnlineJudge 开发容器（机器级固定入口）。
+#
+# 与 .devcontainer/devcontainer.json 共用同一份镜像（.devcontainer/Dockerfile），
+# 供没有 devcontainer CLI 的环境（WSL 宿主机、ZCode/Codex agent）直接使用：
+#   docker compose -f deploy/dev/docker-compose.yml up -d dev
+#   docker compose -f deploy/dev/docker-compose.yml exec -T dev <cmd>
+# 统一入口见 scripts/dev/container.sh。
+
+services:
+  dev:
+    # 镜像由 scripts/dev/container.sh build 手动构建（docker compose build 会把宿主
+    # 代理环境注入 FROM 解析导致 docker hub 证书校验失败，勿直接 `up --build`）。
+    image: onlinejudge/dev:latest
+    container_name: onlinejudge-dev
+    working_dir: /workspace
+    command: sleep infinity
+    environment:
+      # 与 deploy/docker/.env.example 对齐；缺省口令仅供本地开发容器使用
+      MYSQL_HOST: mysql
+      MYSQL_PORT: "3306"
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-onlinejudge}
+      MYSQL_USER: ${MYSQL_USER:-onlinejudge}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-onlinejudge}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-onlinejudge}
+    volumes:
+      - ../../:/workspace
+      - /var/run/docker.sock:/var/run/docker.sock
+      # 复用 WSL 宿主机的 GitHub 凭据（scripts/dev/container.sh 会确保该文件存在）
+      - ${HOME:-/home/skk4784}/.git-credentials:/root/.git-credentials:ro
+    # 不设置 depends_on：agent 快速循环（H2 测试）不需要 MySQL；
+    # 需要完整链路时用 scripts/dev/container.sh up 一并启动 mysql。
+
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-onlinejudge}
+      MYSQL_USER: ${MYSQL_USER:-onlinejudge}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-onlinejudge}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-onlinejudge}
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    volumes:
+      - oj-dev-mysql-data:/var/lib/mysql
+      - ../../database/mysql/compose-schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ../../database/seeds/dev-ci.sql:/docker-entrypoint-initdb.d/02-dev-ci-seed.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+volumes:
+  oj-dev-mysql-data:

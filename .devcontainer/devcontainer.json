@@ -1,0 +1,32 @@
+{
+  "name": "onlinejudge-dev",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": ".."
+  },
+  "workspaceFolder": "/workspace",
+  "containerUser": "root",
+  "mounts": [
+    "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind",
+    "source=${localEnv:HOME}/.git-credentials,target=/root/.git-credentials,type=bind,readonly"
+  ],
+  "postCreateCommand": "git config --global --add safe.directory /workspace && git config --global credential.helper store && git config --global user.name \"24784\" && git config --global user.email \"huangjialiang37@gmail.com\"",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "vscjava.vscode-java-pack",
+        "vmware.vscode-spring-boot",
+        "Vue.volar"
+      ],
+      "settings": {
+        "java.configuration.runtimes": [
+          {
+            "name": "JavaSE-21",
+            "path": "/opt/java",
+            "default": true
+          }
+        ]
+      }
+    }
+  }
+}
