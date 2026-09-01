@@ -14,8 +14,14 @@ const expected = [
   ["course-service", 8082, "COURSE"],
   ["assessment-api", 8083, "ASSESSMENT"],
   ["grade-service", 8084, "GRADE"],
-  ["learning-service", 8085, "LEARNING"],
 ];
+
+assert.equal(manifest.workloads.length, 9, "#306 freezes exactly nine workloads");
+assert.equal(
+  manifest.workloads.some((entry) => entry.name === "learning-service"),
+  false,
+  "Learning must be hosted by Course",
+);
 
 for (const [name, port, token] of expected) {
   const workload = manifest.workloads.find((entry) => entry.name === name);
@@ -56,6 +62,7 @@ for (const rejectedPrefix of ["location ^~ /internal/v2/ {", "location ^~ /api/ 
   assert.ok(template.slice(start, end).includes("return 404"), `${rejectedPrefix} must return 404`);
 }
 assert.doesNotMatch(template, /backend:8080|LEARNING_GRADE|__AUTH_UPSTREAM__|__CRS_UPSTREAM__/);
+assert.doesNotMatch(template, /LEARNING_UPSTREAM|__LEARNING_UPSTREAM__|learning-service/);
 assert.match(template, /proxy_pass_request_headers off|proxy-request-headers\.conf/);
 assert.match(template, /proxy_next_upstream off;/);
 assert.match(template, /error_page 413 = @gateway_payload_too_large;/);
@@ -77,4 +84,21 @@ assert.ok(gradeCourseRoute >= 0, "missing Grade course subresource route");
 assert.ok(genericCourseRoute > assessmentCourseRoute, "Course route must follow Assessment route");
 assert.ok(genericCourseRoute > gradeCourseRoute, "Course route must follow Grade route");
 
-console.log("gateway-routing-contract.test: PASS (services=5)");
+for (const route of [
+  "location ^~ /api/v1/learning/",
+  "location = /api/v1/notifications",
+  "location ^~ /api/v1/notifications/",
+  "location = /api/v1/reminder-rules",
+  "location ^~ /api/v1/reminder-rules/",
+]) {
+  const start = template.indexOf(route);
+  assert.ok(start >= 0, `missing Course-owned route: ${route}`);
+  const end = template.indexOf("\n    }", start);
+  assert.match(
+    template.slice(start, end),
+    /proxy_pass http:\/\/__COURSE_UPSTREAM__;/,
+    `${route} must route to Course`,
+  );
+}
+
+console.log("gateway-routing-contract.test: PASS (services=4)");

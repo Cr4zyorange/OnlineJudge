@@ -38,7 +38,7 @@ assert.match(compose, /IDENTITY_UPSTREAM:\s*identity-service:8081/);
 assert.match(compose, /COURSE_UPSTREAM:\s*course-service:8082/);
 assert.match(compose, /ASSESSMENT_UPSTREAM:\s*assessment-api:8083/);
 assert.match(compose, /GRADE_UPSTREAM:\s*grade-service:8084/);
-assert.match(compose, /LEARNING_UPSTREAM:\s*learning-service:8085/);
+assert.doesNotMatch(compose, /LEARNING_UPSTREAM|learning-service/);
 assert.doesNotMatch(compose, /frontend:[\s\S]*gateway-runtime\/default\.conf/);
 
 console.log("gateway-workload-contract.test: PASS");
