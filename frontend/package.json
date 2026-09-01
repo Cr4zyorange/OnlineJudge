@@ -7,6 +7,7 @@
     "dev": "vite",
     "test:unit": "vitest run",
     "test:e2e": "playwright test",
+    "test:e2e:business:disposable": "node ../scripts/test/run-business-e2e-disposable.mjs",
     "test:e2e:lrn:disposable": "node ../scripts/test/run-lrn-e2e-disposable.mjs",
     "test:e2e:grd:disposable": "bash ../scripts/test/run-grd-e2e-disposable.sh",
     "test:e2e:lrn:nfr:disposable": "bash ../scripts/test/run-lrn-e2e-disposable.sh",

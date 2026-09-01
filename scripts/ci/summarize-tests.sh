@@ -45,6 +45,7 @@ count_reports "backend integration" "$checkout/backend/target/surefire-reports/i
 count_reports "backend contract" "$checkout/backend/target/surefire-reports/contract"
 count_reports "assessment service" "$checkout/services/assessment/target/surefire-reports"
 count_reports "frontend unit" "$checkout/ci-artifacts/frontend-gate"
+count_reports "browser E2E" "$checkout/ci-artifacts/browser-e2e-gate"
 
 # 前端共享运行器契约计数（node --test 的 spec 汇总行）。
 if [[ -f "$checkout/ci-artifacts/frontend-gate/runner-contracts.txt" ]]; then

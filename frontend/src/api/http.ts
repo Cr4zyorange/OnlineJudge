@@ -41,9 +41,18 @@ interface ApiResponse<T> {
 type AuthContextProvider = () => AuthContext | null;
 
 const NAVIGATION_EVENT = 'onlinejudge:navigation';
+let explicitLogoutInProgress = false;
 
 export function configureAuthContext(_provider: AuthContextProvider | null) {
   // Bearer/session auth is the only runtime identity source.
+}
+
+export function beginExplicitLogout() {
+  explicitLogoutInProgress = true;
+}
+
+export function endExplicitLogout() {
+  explicitLogoutInProgress = false;
 }
 
 export async function request<T>(url: string, options: RequestOptions = {}): Promise<T> {
@@ -182,8 +191,11 @@ function handleAuthFailure(code: string | number | undefined) {
     return;
   }
   if (code === 'ERR-AUTH-04') {
+    const shouldReportSessionExpiry = !explicitLogoutInProgress && Boolean(storedToken());
     clearStoredAuthSession();
-    redirectTo('/session-expired');
+    if (shouldReportSessionExpiry) {
+      redirectTo('/session-expired');
+    }
     return;
   }
   if (code === 'ERR-AUTH-05') {

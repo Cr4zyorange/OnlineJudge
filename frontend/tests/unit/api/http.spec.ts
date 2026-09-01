@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { logout } from '../../../src/api/auth/auth';
 import { currentCourse, currentUser, resetRuntimeContext } from '../../../src/app/runtimeContext';
 import { readAuthStorage, removeAuthStorage, writeAuthStorage } from '../../../src/api/auth/storage';
 import { configureAuthContext, request, requestBlob } from '../../../src/api/http';
@@ -188,6 +189,35 @@ describe('shared API request client', () => {
     expect(currentUser.value).toBeNull();
     expect(currentCourse.value).toBeNull();
     expect(window.location.pathname).toBe('/session-expired');
+  });
+
+  it('does not replace an explicit logout with session-expired from a concurrent request', async () => {
+    writeAuthStorage('onlinejudge.authToken', 'logout-token');
+    let completeLogout: (() => void) | undefined;
+    vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
+      if (input === '/api/v1/auth/logout') {
+        return new Promise<Response>((resolve) => {
+          completeLogout = () => resolve(jsonResponse(undefined));
+        });
+      }
+      return Promise.resolve({
+        ok: false,
+        status: 401,
+        json: async () => ({
+          code: 'ERR-AUTH-04',
+          message: '登录已失效，请重新登录',
+          data: null
+        })
+      } as Response);
+    });
+
+    const logoutOperation = logout();
+    await expect(request('/api/v1/notifications')).rejects.toThrow('登录已失效，请重新登录');
+
+    expect(window.location.pathname).not.toBe('/session-expired');
+    completeLogout?.();
+    await logoutOperation;
+    expect(readAuthStorage('onlinejudge.authToken')).toBeNull();
   });
 
   it('clears persisted and cached session state for disabled or locked account responses', async () => {

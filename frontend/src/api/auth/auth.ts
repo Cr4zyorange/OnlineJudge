@@ -1,4 +1,4 @@
-import { publicRequest, request } from '../http';
+import { beginExplicitLogout, endExplicitLogout, publicRequest, request } from '../http';
 import { resetRuntimeContext } from '../../app/runtimeContext';
 import { removeAuthStorage, writeAuthStorage } from './storage';
 
@@ -175,10 +175,12 @@ export function checkPermission(payload: PermissionCheckPayload) {
 }
 
 export async function logout() {
+  beginExplicitLogout();
   try {
     await request<void>('/api/v1/auth/logout', { method: 'POST' });
   } finally {
     clearAuthSession();
+    endExplicitLogout();
   }
 }
 

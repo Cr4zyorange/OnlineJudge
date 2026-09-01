@@ -4,7 +4,7 @@
 
 ## 1. 目标与边界
 
-目标：PR 与 `dev` push 自动完成取代码、依赖安装、编译、单元测试、集成测试与跨模块契约验证；任何前置门禁失败都会阻断后续镜像/部署阶段，并保留可审计证据。
+目标：PR 与 `dev` push 自动完成取代码、依赖安装、编译、单元测试、集成测试、跨模块契约验证与真实浏览器业务 E2E；任何前置门禁失败都会阻断后续镜像/部署阶段，并保留可审计证据。
 
 范围：
 
@@ -42,7 +42,11 @@ validate-workflows（无前置，静态校验 + dry-run 链路模拟）
         ├── contracts-gate  shell 契约 + 公共基础设施契约 + D7 workload manifest
         │
         ▼
-      delivery（needs 全部四个门禁；后续镜像/Kind 部署 job 以 needs: [delivery] 挂接）
+browser-e2e-gate（依赖三个质量门禁；一次性 H2 + RabbitMQ + Spring Boot + Vite + Chromium）
+        │
+        │
+        ▼
+      delivery（needs 全部五个门禁；后续镜像/Kind 部署 job 以 needs: [delivery] 挂接）
 ```
 
 规则：
@@ -69,7 +73,7 @@ validate-workflows（无前置，静态校验 + dry-run 链路模拟）
 
 - `environment.json`：event、repository、workflow、run id、ref、base_ref、精确 head SHA、runner OS/arch、Java/Maven/Node/npm 版本、UTC 时间戳。
 - `gate.log`：正本脚本完整输出（含每个命令回显）；`contracts-gate/consumer/gate.log` 同时保留 D7 workload manifest 的 schema/语义校验和 Python mutation regression 原始输出。
-- surefire/vitest XML 报告（按单元/集成/契约分目录）与 `test-summary.txt`（tests/failures/errors/skipped 计数）。
+- surefire/vitest/Playwright JUnit XML 报告（按单元/集成/契约/E2E 分目录）、Playwright HTML 报告与 `test-summary.txt`（tests/failures/errors/skipped 计数）。
 - `check-result.txt`（validate-workflows）与 `checkpoint.txt`（delivery）。
 
 上传步骤使用 `if: always()` 与 `if-no-files-found: warn`，保证失败运行同样可审计；`delivery` 只在全部门禁通过后运行并上传证据。
@@ -108,6 +112,7 @@ bash scripts/ci/verify-gate-chain.sh --dry-run
 bash scripts/ci/backend-verify.sh
 bash scripts/ci/frontend-verify.sh
 bash scripts/ci/contract-verify.sh
+bash scripts/ci/browser-e2e-verify.sh
 bash scripts/ci/collect-environment.sh
 bash scripts/ci/summarize-tests.sh
 bash scripts/ci/delivery-checkpoint.sh
@@ -133,6 +138,7 @@ bash scripts/ci/verify-workflow-gates.test.sh
 | --- | --- |
 | PR 与 `dev` push 自动触发，并发避免旧提交覆盖 | `ci.yml` 的 `on:`/`concurrency` |
 | checkout、依赖安装、编译、单元/集成测试、前端构建 | `backend-verify.sh`、`frontend-verify.sh` |
+| 真实浏览器业务 E2E | `browser-e2e-verify.sh` → `run-business-e2e-disposable.mjs`；一次性 H2、RabbitMQ、Spring Boot、Vite 与 Chromium 覆盖 AUTH、CRS、LAB、HWK、GRD、LRN 维护中的业务场景；RabbitMQ 使用每轮随机端口、容器名和临时凭据，原始 broker 日志随 E2E 证据归档 |
 | 前置失败阻断后续交付 job | `needs` 链 + 无 `continue-on-error` |
 | 失败运行保留报告/日志/环境/精确 SHA | `if: always()` 上传 + `collect-environment.sh` |
 | 成功运行记录通过/失败/跳过数量 | `summarize-tests.sh` + surefire/vitest XML |
