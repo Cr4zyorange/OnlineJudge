@@ -1,6 +1,7 @@
 # Frontend Deployment (Nginx serving the Vue build). During the D3 compatibility
 # window its packaged default config still proxies /api/ to backend:8080. The
-# independent five-service Gateway is a separate workload owned by #317/#318.
+# independent Gateway for Identity plus the three business services is a separate
+# workload owned by #317/#318.
 # The image tag is the __GIT_SHA__ placeholder rendered by
 # scripts/kind/k8s-deploy.sh (D3 contract #293 section 3; latest is forbidden).
 apiVersion: apps/v1
