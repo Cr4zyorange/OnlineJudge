@@ -12,7 +12,6 @@ services:
       COURSE_UPSTREAM: course-service:8082
       ASSESSMENT_UPSTREAM: assessment-api:8083
       GRADE_UPSTREAM: grade-service:8084
-      LEARNING_UPSTREAM: learning-service:8085
     ports:
       - name: gateway-http
         target: 8080

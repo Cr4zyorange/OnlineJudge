@@ -29,14 +29,12 @@ done
 : "${COURSE_UPSTREAM:?COURSE_UPSTREAM is required}"
 : "${ASSESSMENT_UPSTREAM:?ASSESSMENT_UPSTREAM is required}"
 : "${GRADE_UPSTREAM:?GRADE_UPSTREAM is required}"
-: "${LEARNING_UPSTREAM:?LEARNING_UPSTREAM is required}"
 
 for value in \
   "$IDENTITY_UPSTREAM" \
   "$COURSE_UPSTREAM" \
   "$ASSESSMENT_UPSTREAM" \
-  "$GRADE_UPSTREAM" \
-  "$LEARNING_UPSTREAM"; do
+  "$GRADE_UPSTREAM"; do
   [[ "$value" =~ ^[a-z0-9][a-z0-9.-]*:[0-9]{2,5}$ ]] || {
     printf 'upstream must be a lowercase host:port value\n' >&2
     exit 64
@@ -52,7 +50,6 @@ sed \
   -e "s|__COURSE_UPSTREAM__|$COURSE_UPSTREAM|g" \
   -e "s|__ASSESSMENT_UPSTREAM__|$ASSESSMENT_UPSTREAM|g" \
   -e "s|__GRADE_UPSTREAM__|$GRADE_UPSTREAM|g" \
-  -e "s|__LEARNING_UPSTREAM__|$LEARNING_UPSTREAM|g" \
   "$template" > "$temporary_output"
 
 if grep -Eq '__[A-Z_]+__' "$temporary_output"; then

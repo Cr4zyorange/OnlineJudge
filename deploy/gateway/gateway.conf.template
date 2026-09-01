@@ -173,31 +173,31 @@ server {
     location ^~ /api/v1/learning/ {
         limit_req zone=read_limit burst=60 nodelay;
         include /etc/nginx/includes/proxy-request-headers.conf;
-        proxy_pass http://__LEARNING_UPSTREAM__;
+        proxy_pass http://__COURSE_UPSTREAM__;
     }
 
     location = /api/v1/notifications {
         limit_req zone=read_limit burst=60 nodelay;
         include /etc/nginx/includes/proxy-request-headers.conf;
-        proxy_pass http://__LEARNING_UPSTREAM__;
+        proxy_pass http://__COURSE_UPSTREAM__;
     }
 
     location ^~ /api/v1/notifications/ {
         limit_req zone=write_limit burst=20 nodelay;
         include /etc/nginx/includes/proxy-request-headers.conf;
-        proxy_pass http://__LEARNING_UPSTREAM__;
+        proxy_pass http://__COURSE_UPSTREAM__;
     }
 
     location = /api/v1/reminder-rules {
         limit_req zone=write_limit burst=20 nodelay;
         include /etc/nginx/includes/proxy-request-headers.conf;
-        proxy_pass http://__LEARNING_UPSTREAM__;
+        proxy_pass http://__COURSE_UPSTREAM__;
     }
 
     location ^~ /api/v1/reminder-rules/ {
         limit_req zone=write_limit burst=20 nodelay;
         include /etc/nginx/includes/proxy-request-headers.conf;
-        proxy_pass http://__LEARNING_UPSTREAM__;
+        proxy_pass http://__COURSE_UPSTREAM__;
     }
 
     location ^~ /api/v1/chapters/ {
