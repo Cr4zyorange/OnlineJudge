@@ -54,6 +54,14 @@ test("dataset load, reset, and verification isolate every API-visible course", (
   }
 });
 
+test("course isolation only clears the course outbox in the schema that owns it", () => {
+  const monolith = renderDatasetSql({ architecture: "monolith", phase: "load" });
+  const threeService = renderDatasetSql({ architecture: "three-service", phase: "load" });
+
+  assert.doesNotMatch(monolith, /course_event_outbox/);
+  assert.match(threeService, /DELETE FROM course_event_outbox;/);
+});
+
 test("verification summary is stable and machine-parseable", () => {
   assert.equal(
     verificationSummary(),
