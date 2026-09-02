@@ -50,10 +50,11 @@ actual_sha="$(git -C "$runtime_repo" rev-parse HEAD)"
 launcher_root="$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"
 renderer="$runtime_repo/scripts/platform/render_disposable_environment.py"
 bundle_generator="$launcher_root/scripts/platform/generate_jwks_trust_bundle.mjs"
+service_jwt_generator="$launcher_root/scripts/platform/generate_service_identity_jwt.mjs"
 schema="$runtime_repo/deploy/platform/workload-manifest.schema.json"
 manifest="$runtime_repo/deploy/platform/workloads.json"
 policy_renderer="$launcher_root/scripts/perf/issue-307-resource-policy.mjs"
-for required in "$renderer" "$schema" "$manifest" "$policy_renderer" "$bundle_generator"; do
+for required in "$renderer" "$schema" "$manifest" "$policy_renderer" "$bundle_generator" "$service_jwt_generator"; do
   [[ -f "$required" ]] || { printf 'issue-307-three-service-runtime: missing required file %s\n' "$required" >&2; exit 2; }
 done
 
@@ -68,6 +69,9 @@ random_secret() { openssl rand -hex 24; }
 identity_key="$(openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 2>/dev/null | openssl pkcs8 -topk8 -nocrypt -outform DER | base64 | tr -d '\n')"
 identity_kid="issue318-disposable"
 identity_jwks="$(IDENTITY_JWT_SIGNING_KEY="$identity_key" IDENTITY_JWT_KID="$identity_kid" node "$bundle_generator")"
+grade_service_token="$(IDENTITY_JWT_SIGNING_KEY="$identity_key" IDENTITY_JWT_KID="$identity_kid" \
+  SERVICE_IDENTITY_SUBJECT=grade-service SERVICE_IDENTITY_AUDIENCE=course \
+  SERVICE_IDENTITY_SCOPES=course.authorizations.read,course.members.read node "$service_jwt_generator")"
 umask 077
 {
   printf 'MYSQL_ROOT_PASSWORD=%s\n' "$(random_secret)"
@@ -83,7 +87,7 @@ umask 077
   printf 'COURSE_SERVICE_IDENTITY=issue307-course\n'
   printf 'ASSESSMENT_SERVICE_IDENTITY=issue307-assessment\n'
   printf 'ASSESSMENT_WORKER_IDENTITY=issue307-worker\n'
-  printf 'GRADE_SERVICE_IDENTITY=issue307-grade\n'
+  printf 'GRADE_SERVICE_IDENTITY="Bearer %s"\n' "$grade_service_token"
   printf 'GATEWAY_HTTP_PORT=127.0.0.1:%s\n' "$gateway_port"
 } > "$runtime_env"
 
