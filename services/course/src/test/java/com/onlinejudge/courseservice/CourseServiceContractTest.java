@@ -207,6 +207,8 @@ class CourseServiceContractTest {
                                 """))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.data.teacherId").value("101"))
+                .andExpect(jsonPath("$.data.member").value(true))
+                .andExpect(jsonPath("$.data.manageable").value(true))
                 .andReturn().getResponse().getContentAsString();
 
         String courseId = objectMapper.readTree(response).at("/data/id").asText();

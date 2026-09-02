@@ -127,45 +127,61 @@ function isSuccessCode(code: string | number | undefined) {
 }
 
 async function unwrap<T>(response: Response): Promise<T> {
-  const body = await readApiResponse<T>(response);
-  if (!response.ok || !isSuccessCode(body.code)) {
+  const body = await readApiResponse(response);
+  if (!response.ok) {
+    throw apiError(response, body);
+  }
+  if (!isApiResponse(body)) {
+    return body as T;
+  }
+  if (!isSuccessCode(body.code)) {
     handleAuthFailure(body.code);
     throw new ApiError(body.code, body.message || '接口请求失败');
   }
-  return body.data;
+  return body.data as T;
 }
 
 async function responseError(response: Response) {
   try {
-    const body = await readApiResponse<unknown>(response);
-    handleAuthFailure(body.code);
-    return new ApiError(body.code, body.message || '接口请求失败');
+    return apiError(response, await readApiResponse(response));
   } catch {
     return new ApiError(response.status, response.statusText || '接口请求失败');
   }
 }
 
-async function readApiResponse<T>(response: Response): Promise<ApiResponse<T>> {
+function apiError(response: Response, body: unknown) {
+  if (isApiResponse(body)) {
+    handleAuthFailure(body.code);
+    return new ApiError(body.code, body.message || '接口请求失败');
+  }
+  return new ApiError(response.status, response.statusText || '接口请求失败');
+}
+
+function isApiResponse(body: unknown): body is ApiResponse<unknown> {
+  return typeof body === 'object' && body !== null && 'code' in body && 'data' in body;
+}
+
+async function readApiResponse(response: Response): Promise<unknown> {
   if (typeof response.text === 'function') {
     const text = await response.text();
     if (!text.trim()) {
       return {
         code: response.ok ? '0' : response.status,
         message: response.statusText,
-        data: undefined as T
+        data: undefined
       };
     }
     try {
-      return JSON.parse(text) as ApiResponse<T>;
+      return JSON.parse(text);
     } catch {
       return {
         code: response.status,
         message: text,
-        data: undefined as T
+        data: undefined
       };
     }
   }
-  return (await response.json()) as ApiResponse<T>;
+  return response.json();
 }
 
 function filenameFromDisposition(disposition: string | null) {

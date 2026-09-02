@@ -661,7 +661,7 @@ public class CourseService {
     private CourseView view(CourseRepository.Course course, CurrentUser viewer) {
         boolean manager = canManageContent(course.id(), viewer);
         return new CourseView(String.valueOf(course.id()), course.name(), course.description(), String.valueOf(course.teacherId()), course.enrollmentMode(), course.status(),
-                isMember(course.id(), viewer.id()), manager ? course.inviteCode() : null, course.maxStudents());
+                isMember(course.id(), viewer.id()), manager, manager ? course.inviteCode() : null, course.maxStudents());
     }
     private MemberView memberView(CourseRepository.Member member) { return new MemberView(String.valueOf(member.userId()), member.role(), member.status(), member.memberVersion(), member.joinMethod()); }
     private ChapterView chapterView(CourseRepository.Chapter chapter) { return new ChapterView(chapter.id(), chapter.courseId(), chapter.title(), chapter.parentId(), chapter.sortOrder(), chapter.objective(), chapter.visible(), chapter.chapterType()); }
@@ -673,7 +673,7 @@ public class CourseService {
     private AnnouncementView announcementView(CourseRepository.Announcement announcement) { return new AnnouncementView(announcement.id(), announcement.courseId(), announcement.title(), announcement.content(), announcement.top(), announcement.publisherId()); }
 
     public record CourseView(String id, String name, String description, String teacherId, String enrollmentMode, String status,
-                             boolean member, String inviteCode, Integer maxStudents) { }
+                             boolean member, boolean manageable, String inviteCode, Integer maxStudents) { }
     public record HomeSummaryView(CourseView course, List<AnnouncementView> announcements, List<RecentTaskView> recentTasks) { }
     public record RecentTaskView(long taskId, String taskType, String title, long courseId, String courseName,
                                  String deadline, Integer progress, String status, String actionUrl) { }

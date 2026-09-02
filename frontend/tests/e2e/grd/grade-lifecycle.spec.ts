@@ -380,8 +380,9 @@ async function login(request: APIRequestContext, account: string, password: stri
 }
 
 async function ok<T>(response: APIResponse, label: string): Promise<T> {
-  const body = await json<ApiEnvelope<T>>(response);
+  const body = await json<ApiEnvelope<T> | T>(response);
   expect(response.ok(), `${label}: HTTP ${response.status()} ${JSON.stringify(body)}`).toBe(true);
+  if (!isApiEnvelope<T>(body)) return body;
   expect(body.code, `${label}: ${body.message}`).toBe('0');
   return body.data;
 }
@@ -399,6 +400,10 @@ async function responseLabel(response: APIResponse, label: string) {
 
 async function json<T = unknown>(response: APIResponse): Promise<T> {
   return response.json() as Promise<T>;
+}
+
+function isApiEnvelope<T>(body: ApiEnvelope<T> | T): body is ApiEnvelope<T> {
+  return typeof body === 'object' && body !== null && 'code' in body && 'data' in body;
 }
 
 function bearer(token: string) {

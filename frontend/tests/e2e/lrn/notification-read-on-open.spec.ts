@@ -109,13 +109,18 @@ async function notificationPage(page: Page, headers: Record<string, string>) {
 
 async function apiData<T>(response: APIResponse) {
   expect(response.ok(), `${response.url()} returned ${response.status()}`).toBe(true);
-  const envelope = await response.json() as ApiEnvelope<T>;
+  const envelope = await response.json() as ApiEnvelope<T> | T;
+  if (!isApiEnvelope<T>(envelope)) return envelope;
   expect(envelope.code).toBe('0');
   return envelope.data;
 }
 
 async function expectOk(response: APIResponse) {
   await apiData<unknown>(response);
+}
+
+function isApiEnvelope<T>(body: ApiEnvelope<T> | T): body is ApiEnvelope<T> {
+  return typeof body === 'object' && body !== null && 'code' in body && 'data' in body;
 }
 
 function findNotice(page: NotificationPage, sourceId: number) {

@@ -98,7 +98,7 @@ test.describe('@crs CRS 主流程闭环', () => {
       }).then(async (res) => ({ status: res.status, body: await res.json() }));
     }, { courseId: created.inviteId });
     expect(wrongCode.status).toBe(400);
-    expect(wrongCode.body.message).toBe('INVALID_INVITE_CODE');
+    expect(wrongCode.body.code).toBe('INVALID_INVITE_CODE');
 
     // 审批课加入为 PENDING，审批前无权限
     const pending = await page.evaluate(async ({ courseId }) => {
