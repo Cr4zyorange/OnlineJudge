@@ -74,6 +74,19 @@ test('mints a scoped Course service JWT for Assessment in the disposable runtime
   assert.match(runner, /tr '\+' '-' \| tr '\/' '_'/);
 });
 
+test('mints disposable service JWTs after the optional image build completes', () => {
+  const runner = readFileSync(
+    resolve(import.meta.dirname, '../platform/run_disposable_environment.sh'),
+    'utf8'
+  );
+
+  const build = runner.indexOf('if (( ! skip_build ));');
+  const identities = runner.indexOf('assessment_course_identity="$(mint_service_token');
+  assert.ok(build >= 0, 'the disposable runner must retain its optional image build');
+  assert.ok(identities > build,
+    'short-lived Assessment-to-Course authorization credentials must be minted after image builds');
+});
+
 test('uses audience-specific Grade service identities in the disposable environment', () => {
   const renderer = readFileSync(
     resolve(import.meta.dirname, '../platform/render_disposable_environment.py'),

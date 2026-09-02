@@ -145,6 +145,16 @@ PY
   rm -f "$private_key"
   printf 'Bearer %s.%s.%s' "$header" "$payload" "$signature"
 }
+PYTHONDONTWRITEBYTECODE=1 python3 "$renderer" --schema "$schema" --manifest "$manifest" --git-sha "$git_sha" --compose-output "$compose_file" --kubernetes-output "$kubernetes_file" --repository-root "$repo_root"
+if (( ! skip_build )); then
+  build_arguments=(--git-sha "$git_sha" --output-dir "$output_dir/artifacts")
+  if (( skip_tests )); then build_arguments+=(--skip-tests); fi
+  "$builder" "${build_arguments[@]}"
+fi
+
+# Service JWTs are intentionally short lived.  Mint them only after any image
+# build has completed, so the first Assessment -> Course authorization call
+# always starts with the complete credential lifetime available.
 assessment_course_identity="$(mint_service_token assessment-api course course.authorizations.read)"
 grade_course_identity="$(mint_service_token grade-service course course.authorizations.read course.members.read)"
 grade_assessment_identity="$(mint_service_token grade-service assessment grades:read)"
@@ -165,13 +175,6 @@ umask 077
   printf 'GRADE_COURSE_SERVICE_IDENTITY=%s\n' "$grade_course_identity"
   printf 'GRADE_ASSESSMENT_SERVICE_IDENTITY=%s\n' "$grade_assessment_identity"
 } > "$runtime_env"
-
-PYTHONDONTWRITEBYTECODE=1 python3 "$renderer" --schema "$schema" --manifest "$manifest" --git-sha "$git_sha" --compose-output "$compose_file" --kubernetes-output "$kubernetes_file" --repository-root "$repo_root"
-if (( ! skip_build )); then
-  build_arguments=(--git-sha "$git_sha" --output-dir "$output_dir/artifacts")
-  if (( skip_tests )); then build_arguments+=(--skip-tests); fi
-  "$builder" "${build_arguments[@]}"
-fi
 
 collect_diagnostics() {
   local reason="$1"
