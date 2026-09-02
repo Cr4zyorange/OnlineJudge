@@ -2,13 +2,15 @@
 
 ## 当前状态
 
-压测计划、逻辑数据集、原始请求采集、Docker 资源采样、完整性校验和报告聚合工具已经具备。正式性能数字尚未生成，也不得提前声明 Issue 完成。
+压测计划、逻辑数据集、原始请求采集、Docker 资源采样、完整性校验和报告聚合工具已经具备。#318 已发布 `ENVIRONMENT_READY` 并合入 `dev`，正式计数不再等待三服务环境。
 
-当前正式计数被以下外部条件阻塞：
+正式计数仍必须逐轮证明以下条件；缺任意一项时不得声明 Issue 完成：
 
-- #318 仍为 `In progress`，截至 2026-09-01 尚未发布 `ENVIRONMENT_READY`；最新通知明确说明运行中的 9-workload 环境仍依赖 #355、#356、#357、#339 和 #317。
-- 本机 Docker CLI 为 29.3.1，但 Docker daemon 未运行。
-- 当前 `dev@f948869799e2e561d6cfa2208acaf26627aa1ba1` 的 Compose 仍是 Course + 模块化单体后端的过渡编排，不是可用于 #307 正式计数的三服务环境。
+- #318 的完整 `ENVIRONMENT_READY` 信号：`ENVIRONMENT_READY issue=#318 sha=2d6160fe570f60bba73922640cb8a58bdb692b97 endpoint=http://127.0.0.1:18080 workloads=9 migrations=4 evidence=https://github.com/Cr4zyorange/OnlineJudge/pull/363 actions=https://github.com/Cr4zyorange/OnlineJudge/actions/runs/33500641015`。
+- Docker daemon ready，并记录 `docker info`、Compose project、镜像 SHA 和容器清单。
+- 正式窗口独占；关闭 HPA、E2E、故障注入和其他压力任务。
+- 每轮开始前恢复同一数据库与文件快照。
+- 两种架构使用相同总资源预算、相同脚本、相同负载和同一逻辑数据集。
 
 工具会拒绝缺少上述证据、环境受污染、轮次不完整、机器/数据/负载不同或资源不可比的样本。
 
@@ -18,8 +20,8 @@
 | --- | --- |
 | 单体 tag | `monolith-start` |
 | 单体 commit | `78715f21288782a2c7ef1d9c23f933c46569b108` |
-| 三服务合入 dev commit | `f948869799e2e561d6cfa2208acaf26627aa1ba1` |
-| 三服务内容基线 | `921af331e785551107466c8267d5f988436e1d14` |
+| 三服务执行 commit | `b1121cf89e15731e3e8246a4abb2cb055d326d3b` |
+| 三服务业务内容基线 | `84e017dd466e330cea723441979842d0633c14eb` |
 | 数据集 | `performance/issue-307/dataset.json` |
 | 数据集 SHA-256 | `733338e1ba51a64b693b60678eeacaa78a0597f7e2034bba6dc2b09e067885c6` |
 | 并发 | 10，不超过 SRS 的 20 并发业务请求边界 |
@@ -54,7 +56,7 @@ node scripts/perf/issue-307.mjs validate-window \
 
 ## 正式执行
 
-收到 #318 的 `ENVIRONMENT_READY` 后，为每次数据库快照恢复生成一份实际 formal-window JSON。不得修改模板来伪造通过；实际文件至少要记录：
+为每次数据库快照恢复生成一份实际 formal-window JSON。不得修改模板来伪造通过；实际文件至少要记录：
 
 - #318 的完整 `ENVIRONMENT_READY` 原文和证据链接；
 - Docker daemon 已就绪；
@@ -112,7 +114,7 @@ node scripts/perf/issue-307.mjs aggregate \
 | --- | --- | --- |
 | AC-307-01 同机、同数据、同脚本、同负载、可比资源 | plan、dataset checksum、机器指纹和聚合拒绝门禁 | 准备完成，待正式环境执行 |
 | AC-307-02 3 API × 2 架构 × 3 轮 | 18 轮完整性门禁和原始请求样本格式 | 准备完成，尚无正式样本 |
-| AC-307-03 无 HPA/E2E/故障/压力污染 | formal-window fail-closed 校验 | 准备完成，待 #318 独占窗口 |
+| AC-307-03 无 HPA/E2E/故障/压力污染 | formal-window fail-closed 校验 | 准备完成，待独占窗口逐轮记录 |
 | AC-307-04 P95/吞吐/错误率/CPU/内存 | nearest-rank P95、Docker stats 汇总、JSON/Markdown/CSV | 工具完成，尚无正式数值 |
 | AC-307-05 有限解释且不宣称未测结论 | 报告解释边界与差异字段 | 工具完成，待真实结果解释 |
 
