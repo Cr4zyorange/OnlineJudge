@@ -39,6 +39,21 @@ for (const architecture of ["monolith", "three-service"]) {
   });
 }
 
+test("dataset load, reset, and verification isolate every API-visible course", () => {
+  for (const architecture of ["monolith", "three-service"]) {
+    const load = renderDatasetSql({ architecture, phase: "load" });
+    const reset = renderDatasetSql({ architecture, phase: "reset" });
+    const verify = renderDatasetSql({ architecture, phase: "verify" });
+
+    assert.match(load, /DELETE FROM crs_course;/);
+    assert.match(load, /DELETE FROM crs_course_member;/);
+    assert.match(reset, /DELETE FROM crs_course;/);
+    assert.match(reset, /DELETE FROM crs_course_member;/);
+    assert.match(verify, /COUNT\(\*\) FROM (?:oj_course\.)?crs_course WHERE is_deleted=FALSE/);
+    assert.doesNotMatch(verify, /description='issue-307-v1'/);
+  }
+});
+
 test("verification summary is stable and machine-parseable", () => {
   assert.equal(
     verificationSummary(),

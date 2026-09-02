@@ -195,6 +195,24 @@ function monolithResetSql() {
   ].join("\n");
 }
 
+// The Course list scenario is intentionally unfiltered.  Because each
+// benchmark project owns its own database, remove every Course-owned row
+// before each fixture restore instead of merely upserting the 105 tagged rows.
+// That makes the API-visible collection exactly the frozen dataset on both
+// architectures, even when application bootstrap data created a course.
+function courseIsolationSql() {
+  return [
+    "SET FOREIGN_KEY_CHECKS=0;",
+    "DELETE FROM crs_resource;",
+    "DELETE FROM crs_announcement;",
+    "DELETE FROM crs_chapter;",
+    "DELETE FROM crs_course_member;",
+    "DELETE FROM crs_course;",
+    "DELETE FROM course_event_outbox;",
+    "SET FOREIGN_KEY_CHECKS=1;",
+  ].join("\n");
+}
+
 function microResetSql() {
   return [
     "USE oj_assessment;",
@@ -213,7 +231,7 @@ function verificationSql(architecture) {
   if (architecture === "monolith") {
     return "USE onlinejudge;\nSELECT CONCAT(" +
       "'users=',(SELECT COUNT(*) FROM t_auth_user WHERE username LIKE 'perf307\\_%' ESCAPE '\\\\')," +
-      "' courses=',(SELECT COUNT(*) FROM crs_course WHERE description='" + DATASET_ID + "')," +
+      "' courses=',(SELECT COUNT(*) FROM crs_course WHERE is_deleted=FALSE)," +
       "' members=',(SELECT COUNT(*) FROM crs_course_member WHERE course_id=" + PRIMARY_COURSE_ID + " AND is_deleted=FALSE)," +
       "' homeworks=',(SELECT COUNT(*) FROM t_hwk_homework WHERE id=" + HOMEWORK_ID + " AND is_deleted=FALSE)," +
       "' summaries=',(SELECT COUNT(*) FROM t_course_grade_summary WHERE course_id=" + PRIMARY_COURSE_ID + " AND publish_status='PUBLISHED')," +
@@ -223,7 +241,7 @@ function verificationSql(architecture) {
   }
   return "SELECT CONCAT(" +
     "'users=',(SELECT COUNT(*) FROM oj_identity.t_auth_user WHERE username LIKE 'perf307\\_%' ESCAPE '\\\\')," +
-    "' courses=',(SELECT COUNT(*) FROM oj_course.crs_course WHERE description='" + DATASET_ID + "')," +
+    "' courses=',(SELECT COUNT(*) FROM oj_course.crs_course WHERE is_deleted=FALSE)," +
     "' members=',(SELECT COUNT(*) FROM oj_course.crs_course_member WHERE course_id=" + PRIMARY_COURSE_ID + " AND is_deleted=FALSE)," +
     "' homeworks=',(SELECT COUNT(*) FROM oj_assessment.assessment_homework WHERE id=" + HOMEWORK_ID + ")," +
     "' summaries=',(SELECT COUNT(*) FROM oj_grade.t_course_grade_summary WHERE course_id=" + PRIMARY_COURSE_ID + " AND publish_status='PUBLISHED')," +
@@ -236,14 +254,13 @@ export function renderDatasetSql({ architecture, phase }) {
   invariant(["monolith", "three-service"].includes(architecture), "architecture must be monolith or three-service");
   invariant(["load", "reset", "verify"].includes(phase), "phase must be load, reset, or verify");
   if (phase === "verify") return verificationSql(architecture) + "\n";
-  if (phase === "reset") return (architecture === "monolith" ? monolithResetSql() : microResetSql()) + "\n";
 
   const facts = benchmarkFacts();
   const blocks = ["-- " + DATASET_ID + " generated fixture; do not add real credentials"];
   if (architecture === "monolith") {
-    blocks.push("USE onlinejudge;", monolithResetSql(), authSql(facts, false), monolithCourseSql(facts), monolithHomeworkSql(), gradeSql(facts));
+    blocks.push("USE onlinejudge;", monolithResetSql(), courseIsolationSql(), authSql(facts, false), monolithCourseSql(facts), monolithHomeworkSql(), gradeSql(facts));
   } else {
-    blocks.push("USE oj_assessment;", microResetSql(), "USE oj_identity;", authSql(facts, true), "USE oj_course;", microCourseSql(facts), "USE oj_assessment;", microHomeworkSql(facts), "USE oj_grade;", gradeSql(facts));
+    blocks.push("USE oj_assessment;", microResetSql(), "USE oj_course;", courseIsolationSql(), "USE oj_identity;", authSql(facts, true), "USE oj_course;", microCourseSql(facts), "USE oj_assessment;", microHomeworkSql(facts), "USE oj_grade;", gradeSql(facts));
   }
   return blocks.join("\n\n") + "\n";
 }

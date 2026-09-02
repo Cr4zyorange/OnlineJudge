@@ -95,6 +95,32 @@ test("preflight rejects an accepted status when its virtual-student success rate
   );
 });
 
+test("course-list preflight requires every API-visible total to equal the frozen dataset total", () => {
+  const valid = {
+    scenario: "course-list",
+    expectedStatuses: [200],
+    minimumSuccessRatePercent: 100,
+    expectedApiVisibleCourseTotal: 105,
+    responses: [
+      { student: 1, attempt: 1, status: 200, responseFile: "responses/student-001-attempt-1.json", apiVisibleCourseTotal: 105 },
+      { student: 2, attempt: 1, status: 200, responseFile: "responses/student-002-attempt-1.json", apiVisibleCourseTotal: 105 },
+    ],
+  };
+
+  assert.doesNotThrow(() => summarizePreflight(valid));
+  assert.throws(
+    () => summarizePreflight({
+      ...valid,
+      responses: [{ ...valid.responses[0], apiVisibleCourseTotal: 106 }, valid.responses[1]],
+    }),
+    /API-visible.*105/i,
+  );
+  assert.throws(
+    () => summarizePreflight({ ...valid, expectedApiVisibleCourseTotal: undefined }),
+    /expected API-visible course total/i,
+  );
+});
+
 test("HTTP runner excludes warmup, records raw samples and keeps resource measurements", async (context) => {
   const authorizations = new Set();
   const server = http.createServer((request, response) => {

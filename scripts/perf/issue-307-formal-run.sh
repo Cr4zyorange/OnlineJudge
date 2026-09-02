@@ -72,6 +72,11 @@ node "$runner" validate-plan --plan "$plan" >/dev/null
 read -r virtual_students preflight_attempts preflight_minimum_success_rate <<EOF
 $(node -e 'const plan=require(process.argv[1]); process.stdout.write(`${plan.load.concurrency} ${plan.preflight.requestsPerVirtualStudent} ${plan.preflight.minimumSuccessRatePercent}`)' "$plan")
 EOF
+expected_api_visible_course_total="$(node -e 'const dataset=require(process.argv[1]); process.stdout.write(String(dataset.courses.visibleToBenchmarkStudent))' "$repo_root/performance/issue-307/dataset.json")"
+[[ "$expected_api_visible_course_total" == 105 ]] || {
+  printf 'issue-307-formal-run: dataset must require exactly 105 API-visible courses, got %s\n' "$expected_api_visible_course_total" >&2
+  exit 2
+}
 
 case "$architecture" in
   monolith) readiness_path='/api/v1/system/health' ;;
@@ -158,7 +163,7 @@ refresh_benchmark_tokens() {
 run_preflight() {
   local scenario="$1"
   local preflight_dir="$2"
-  local expected_statuses path method body status request_id student_number attempt response_file
+  local expected_statuses path method body status request_id student_number attempt response_file api_visible_course_total
   local -a records=()
   case "$scenario" in
     course-list)
@@ -200,24 +205,45 @@ run_preflight() {
       fi
       status="$(curl "${curl_args[@]}" "$base_url$path" || true)"
       [[ "$status" =~ ^[1-5][0-9][0-9]$ ]] || status=0
-      records+=("${student_number}:${attempt}:${status}:responses/student-$(printf '%03d' "$student_number")-attempt-${attempt}.json")
+      api_visible_course_total=""
+      if [[ "$scenario" == course-list ]]; then
+        api_visible_course_total="$(node - "$response_file" <<'NODE'
+const { readFileSync } = require("node:fs");
+try {
+  const total = JSON.parse(readFileSync(process.argv[2], "utf8"))?.data?.total;
+  if (!Number.isInteger(total) || total < 0) process.exit(2);
+  process.stdout.write(String(total));
+} catch {
+  process.exit(2);
+}
+NODE
+)" || {
+          printf 'issue-307-formal-run: course-list preflight response lacks an integer data.total: %s\n' "$response_file" >&2
+          return 1
+        }
+      fi
+      records+=("${student_number}:${attempt}:${status}:responses/student-$(printf '%03d' "$student_number")-attempt-${attempt}.json:${api_visible_course_total}")
       # This is below the shared 10 r/s write limit; it is also used for reads
       # so every protected route has the same preflight traffic shape.
       sleep 0.11
     done
   done
-  node - "$scenario" "$expected_statuses" "$preflight_minimum_success_rate" "${records[@]}" > "$preflight_dir/summary.json" <<'NODE'
-const [scenario, expectedStatuses, minimumSuccessRatePercent, ...records] = process.argv.slice(2);
+  node - "$scenario" "$expected_statuses" "$preflight_minimum_success_rate" "$expected_api_visible_course_total" "${records[@]}" > "$preflight_dir/summary.json" <<'NODE'
+const [scenario, expectedStatuses, minimumSuccessRatePercent, expectedApiVisibleCourseTotal, ...records] = process.argv.slice(2);
 const responses = records.map((record) => {
-  const [student, attempt, status, responseFile] = record.split(":");
-  return { student: Number(student), attempt: Number(attempt), status: Number(status), responseFile };
+  const [student, attempt, status, responseFile, apiVisibleCourseTotal] = record.split(":");
+  const response = { student: Number(student), attempt: Number(attempt), status: Number(status), responseFile };
+  if (scenario === "course-list") response.apiVisibleCourseTotal = Number(apiVisibleCourseTotal);
+  return response;
 });
-process.stdout.write(`${JSON.stringify({
+const evidence = {
   scenario,
   expectedStatuses: expectedStatuses.split(",").map(Number),
   minimumSuccessRatePercent: Number(minimumSuccessRatePercent),
   responses,
-}, null, 2)}\n`);
+};
+if (scenario === "course-list") evidence.expectedApiVisibleCourseTotal = Number(expectedApiVisibleCourseTotal);
+process.stdout.write(`${JSON.stringify(evidence, null, 2)}\n`);
 NODE
   node "$runner" validate-preflight --evidence "$preflight_dir/summary.json"
 }

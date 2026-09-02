@@ -82,7 +82,13 @@ export function validateFormalWindowEvidence(evidence) {
  * virtual student that will enter the measured window must meet the declared
  * success-rate gate first.
  */
-export function summarizePreflight({ scenario, expectedStatuses, minimumSuccessRatePercent, responses }) {
+export function summarizePreflight({
+  scenario,
+  expectedStatuses,
+  minimumSuccessRatePercent,
+  expectedApiVisibleCourseTotal,
+  responses,
+}) {
   invariant(typeof scenario === "string" && scenario.length > 0, "preflight scenario is required");
   invariant(
     Array.isArray(expectedStatuses) && expectedStatuses.length > 0 &&
@@ -96,7 +102,14 @@ export function summarizePreflight({ scenario, expectedStatuses, minimumSuccessR
   invariant(Array.isArray(responses) && responses.length > 0, "preflight responses are required");
 
   const seen = new Set();
-  const sanitized = responses.map(({ student, attempt, status, responseFile }) => {
+  const requiresCourseTotal = scenario === "course-list";
+  if (requiresCourseTotal) {
+    invariant(
+      Number.isInteger(expectedApiVisibleCourseTotal) && expectedApiVisibleCourseTotal > 0,
+      "preflight expected API-visible course total is required",
+    );
+  }
+  const sanitized = responses.map(({ student, attempt, status, responseFile, apiVisibleCourseTotal }) => {
     invariant(Number.isInteger(student) && student > 0, "preflight student must be a positive integer");
     invariant(Number.isInteger(attempt) && attempt > 0, "preflight attempt must be a positive integer");
     invariant(Number.isInteger(status) && status >= 0 && status <= 599, "preflight status is invalid");
@@ -104,6 +117,13 @@ export function summarizePreflight({ scenario, expectedStatuses, minimumSuccessR
     const key = `${student}:${attempt}`;
     invariant(!seen.has(key), `duplicate preflight response ${key}`);
     seen.add(key);
+    if (requiresCourseTotal) {
+      invariant(
+        apiVisibleCourseTotal === expectedApiVisibleCourseTotal,
+        `course-list preflight API-visible total ${apiVisibleCourseTotal} does not equal ${expectedApiVisibleCourseTotal}`,
+      );
+      return { student, attempt, status, responseFile, apiVisibleCourseTotal };
+    }
     return { student, attempt, status, responseFile };
   });
   const successfulRequestCount = sanitized.filter(({ status }) => expectedStatuses.includes(status)).length;
@@ -113,7 +133,7 @@ export function summarizePreflight({ scenario, expectedStatuses, minimumSuccessR
     successRatePercent >= minimumSuccessRatePercent,
     `preflight success rate ${successRatePercent}% is below required ${minimumSuccessRatePercent}% for ${scenario}`,
   );
-  return {
+  const summary = {
     scenario,
     expectedStatuses: [...expectedStatuses],
     minimumSuccessRatePercent,
@@ -122,6 +142,8 @@ export function summarizePreflight({ scenario, expectedStatuses, minimumSuccessR
     successfulRequestCount,
     successRatePercent,
   };
+  if (requiresCourseTotal) summary.expectedApiVisibleCourseTotal = expectedApiVisibleCourseTotal;
+  return summary;
 }
 
 async function performRequest({ baseUrl, bearerToken, scenario, environment, sequence, requestTimeoutMs }) {

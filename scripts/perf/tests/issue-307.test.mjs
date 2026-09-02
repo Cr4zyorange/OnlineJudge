@@ -127,10 +127,12 @@ function rawRound({ architecture, scenario, round, contaminated = false, machine
         attempt: 1,
         status: scenario === "homework-submission" ? 201 : 200,
         responseFile: `responses/student-${String(index + 1).padStart(3, "0")}-attempt-1.json`,
+        ...(scenario === "course-list" ? { apiVisibleCourseTotal: 105 } : {}),
       })),
       requestCount: 10,
       successfulRequestCount: 10,
       successRatePercent: 100,
+      ...(scenario === "course-list" ? { expectedApiVisibleCourseTotal: 105 } : {}),
     },
     measuredDurationMs: 1000,
     requests: [

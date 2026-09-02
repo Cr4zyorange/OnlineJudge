@@ -335,6 +335,18 @@ function assertPreflightEvidence(raw, plan, scenario) {
     seen.add(responseKey);
     successful += Number(scenario.expectedStatuses.includes(response.status));
   }
+  if (scenario.id === "course-list") {
+    invariant(
+      Number.isInteger(preflight.expectedApiVisibleCourseTotal) && preflight.expectedApiVisibleCourseTotal === 105,
+      `${key} preflight must assert the exact API-visible course total of 105`,
+    );
+    for (const response of preflight.responses) {
+      invariant(
+        response.apiVisibleCourseTotal === preflight.expectedApiVisibleCourseTotal,
+        `${key} preflight API-visible course total does not equal ${preflight.expectedApiVisibleCourseTotal}`,
+      );
+    }
+  }
   const successRatePercent = round((successful / preflight.responses.length) * 100);
   invariant(
     preflight.requestCount === preflight.responses.length &&
