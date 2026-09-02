@@ -9,6 +9,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from base64 import b64encode
 from pathlib import Path
 
 
@@ -19,6 +20,7 @@ ROLLBACK = REPOSITORY_ROOT / "scripts/platform/rollback_disposable_environment.s
 KUBERNETES_DEPLOY = REPOSITORY_ROOT / "scripts/platform/deploy_kubernetes_disposable_environment.sh"
 CI_DELIVERY = REPOSITORY_ROOT / "scripts/ci/disposable-delivery.sh"
 CI_WORKFLOW = REPOSITORY_ROOT / ".github/workflows/ci.yml"
+JWKS_BUNDLE = REPOSITORY_ROOT / "scripts/platform/generate_jwks_trust_bundle.mjs"
 
 
 def bash_executable() -> str:
@@ -100,6 +102,39 @@ class DisposableEnvironmentScriptsTest(unittest.TestCase):
         self.assertIn("collect_diagnostics startup-failure", source)
         self.assertIn("json.loads(line)", source)
         self.assertIn('python_bin="${PYTHON_BIN:-python3}"', source)
+
+    def test_disposable_runtime_generates_a_public_jwks_bootstrap_bundle(self) -> None:
+        generated = subprocess.run(
+            ["openssl", "genpkey", "-algorithm", "RSA", "-pkeyopt", "rsa_keygen_bits:2048"],
+            capture_output=True,
+            check=True,
+        )
+        der = subprocess.run(
+            ["openssl", "pkcs8", "-topk8", "-nocrypt", "-outform", "DER"],
+            input=generated.stdout,
+            capture_output=True,
+            check=True,
+        ).stdout
+        result = subprocess.run(
+            ["node", str(JWKS_BUNDLE)],
+            cwd=REPOSITORY_ROOT,
+            env={
+                **os.environ,
+                "IDENTITY_JWT_SIGNING_KEY": b64encode(der).decode("ascii"),
+                "IDENTITY_JWT_KID": "disposable-test-kid",
+            },
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        bundle = json.loads(result.stdout)
+        self.assertEqual(bundle["keys"][0]["kid"], "disposable-test-kid")
+        self.assertEqual(bundle["keys"][0]["kty"], "RSA")
+        self.assertEqual(bundle["keys"][0]["use"], "sig")
+        self.assertEqual(bundle["keys"][0]["alg"], "RS256")
+        self.assertNotIn("d", bundle["keys"][0], "the bootstrap bundle must never contain a private key")
 
     def test_rollback_command_requires_an_immutable_artifact_manifest(self) -> None:
         source = self.assert_help(ROLLBACK)

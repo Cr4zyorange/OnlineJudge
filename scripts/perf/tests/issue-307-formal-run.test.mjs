@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import test from "node:test";
@@ -14,4 +15,22 @@ test("formal runner documents per-round reset and exclusive Docker-window checks
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /--mysql-container NAME/);
   assert.match(result.stdout, /--expected-live-containers COUNT/);
+  assert.match(result.stdout, /--from-scenario/);
+
+  const source = readFileSync(path.join(repositoryRoot, "scripts/perf/issue-307-formal-run.sh"), "utf8");
+  assert.match(source, /benchmark_tokens/);
+  assert.match(source, /perf307_student%03d/);
+  assert.match(source, /run_preflight/);
+  assert.match(source, /minimumSuccessRatePercent/);
+  assert.match(source, /preflight_minimum_success_rate/);
+  assert.match(source, /validate-preflight/);
+  assert.match(source, /responses\/student-/);
+  assert.match(source, /preflight-reset/);
+  assert.match(source, /readiness_path/);
+  assert.match(source, /\/api\/v1\/system\/health/);
+  assert.match(source, /\/health\/ready/);
+  assert.match(source, /X-Request-Id/);
+  assert.match(source, /randomUUID/);
+  assert.match(source, /from_scenario/);
+  assert.match(source, /scenario_list/);
 });

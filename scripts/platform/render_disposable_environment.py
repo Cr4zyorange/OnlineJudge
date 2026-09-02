@@ -79,11 +79,9 @@ def indent(lines: list[str], amount: int) -> list[str]:
 
 
 def compose_secret_expression(key: str) -> str:
-    # A live JWKS URI is the primary local integration path.  A trust bundle is
-    # optional here, but production injectors can still supply it through the
-    # same key.  All other declared secrets fail closed when omitted.
-    if key == "IDENTITY_JWKS_TRUST_BUNDLE":
-        return "${IDENTITY_JWKS_TRUST_BUNDLE:-}"
+    # Each business workload must have a public-key snapshot before it accepts
+    # requests.  Refresh is deliberately asynchronous and must never be a
+    # substitute for this fail-closed bootstrap secret.
     return "${" + key + ":?" + key + " is required}"
 
 

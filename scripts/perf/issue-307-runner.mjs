@@ -76,6 +76,54 @@ export function validateFormalWindowEvidence(evidence) {
   return evidence;
 }
 
+/**
+ * Makes the protected-API preflight auditable without ever retaining a bearer
+ * token or a response body.  A single happy-path request is not enough: every
+ * virtual student that will enter the measured window must meet the declared
+ * success-rate gate first.
+ */
+export function summarizePreflight({ scenario, expectedStatuses, minimumSuccessRatePercent, responses }) {
+  invariant(typeof scenario === "string" && scenario.length > 0, "preflight scenario is required");
+  invariant(
+    Array.isArray(expectedStatuses) && expectedStatuses.length > 0 &&
+      expectedStatuses.every((status) => Number.isInteger(status) && status >= 100 && status <= 599),
+    "preflight expected statuses are required",
+  );
+  invariant(
+    Number.isFinite(minimumSuccessRatePercent) && minimumSuccessRatePercent > 0 && minimumSuccessRatePercent <= 100,
+    "preflight minimum success rate must be in (0, 100]",
+  );
+  invariant(Array.isArray(responses) && responses.length > 0, "preflight responses are required");
+
+  const seen = new Set();
+  const sanitized = responses.map(({ student, attempt, status, responseFile }) => {
+    invariant(Number.isInteger(student) && student > 0, "preflight student must be a positive integer");
+    invariant(Number.isInteger(attempt) && attempt > 0, "preflight attempt must be a positive integer");
+    invariant(Number.isInteger(status) && status >= 0 && status <= 599, "preflight status is invalid");
+    invariant(typeof responseFile === "string" && responseFile.length > 0, "preflight response file is required");
+    const key = `${student}:${attempt}`;
+    invariant(!seen.has(key), `duplicate preflight response ${key}`);
+    seen.add(key);
+    return { student, attempt, status, responseFile };
+  });
+  const successfulRequestCount = sanitized.filter(({ status }) => expectedStatuses.includes(status)).length;
+  const requestCount = sanitized.length;
+  const successRatePercent = Math.round((successfulRequestCount / requestCount) * 100000) / 1000;
+  invariant(
+    successRatePercent >= minimumSuccessRatePercent,
+    `preflight success rate ${successRatePercent}% is below required ${minimumSuccessRatePercent}% for ${scenario}`,
+  );
+  return {
+    scenario,
+    expectedStatuses: [...expectedStatuses],
+    minimumSuccessRatePercent,
+    responses: sanitized,
+    requestCount,
+    successfulRequestCount,
+    successRatePercent,
+  };
+}
+
 async function performRequest({ baseUrl, bearerToken, scenario, environment, sequence, requestTimeoutMs }) {
   const requestId = randomUUID();
   const request = materializeRequest(scenario, { environment, sequence, requestId });
@@ -119,28 +167,45 @@ async function performRequest({ baseUrl, bearerToken, scenario, environment, seq
   }
 }
 
-async function runPhase({ durationSeconds, concurrency, execute, collect }) {
+async function runPhase({ durationSeconds, concurrency, minimumRequestIntervalMs, execute, collect }) {
   const started = performance.now();
   const deadline = started + durationSeconds * 1000;
   let sequence = 0;
   const samples = [];
-  async function worker() {
+  async function worker(workerIndex) {
+    if (minimumRequestIntervalMs > 0) {
+      await delay((minimumRequestIntervalMs / concurrency) * workerIndex);
+    }
     while (performance.now() < deadline) {
+      const requestStarted = performance.now();
       const current = sequence;
       sequence += 1;
-      const sample = await execute(current);
+      const sample = await execute(current, workerIndex);
       if (collect) {
         samples.push(sample);
       }
+      const remainingInterval = requestStarted + minimumRequestIntervalMs - performance.now();
+      if (remainingInterval > 0) {
+        await delay(remainingInterval);
+      }
     }
   }
-  await Promise.all(Array.from({ length: concurrency }, () => worker()));
+  await Promise.all(Array.from({ length: concurrency }, (_, workerIndex) => worker(workerIndex)));
   return { samples, elapsedMs: performance.now() - started };
+}
+
+export function selectBearerToken({ bearerToken, bearerTokens }, workerIndex) {
+  const tokens = bearerTokens ?? (bearerToken ? [bearerToken] : []);
+  invariant(Array.isArray(tokens) && tokens.length > 0, "at least one bearer token is required");
+  invariant(tokens.every((token) => typeof token === "string" && token.length > 0), "bearer tokens must be non-empty strings");
+  invariant(Number.isInteger(workerIndex) && workerIndex >= 0, "worker index must be a non-negative integer");
+  return tokens[workerIndex % tokens.length];
 }
 
 export async function runHttpLoadRound({
   baseUrl,
   bearerToken,
+  bearerTokens,
   scenario,
   environment,
   load,
@@ -151,19 +216,28 @@ export async function runHttpLoadRound({
   invariant(Number.isInteger(load.concurrency) && load.concurrency > 0, "load concurrency must be positive");
   invariant(load.warmupSeconds > 0 && load.durationSeconds > 0, "warmup and duration must be positive");
   invariant(load.requestTimeoutMs > 0, "request timeout must be positive");
+  const minimumRequestIntervalMs = load.minimumRequestIntervalMs ?? 0;
+  invariant(Number.isFinite(minimumRequestIntervalMs) && minimumRequestIntervalMs >= 0,
+    "minimum request interval must be non-negative");
   invariant(typeof sampleResources === "function", "resource sampler is required");
 
-  const execute = (sequence) =>
+  const execute = (sequence, workerIndex) =>
     performRequest({
       baseUrl,
-      bearerToken,
+      bearerToken: selectBearerToken({ bearerToken, bearerTokens }, workerIndex),
       scenario,
       environment,
       sequence,
       requestTimeoutMs: load.requestTimeoutMs,
     });
 
-  await runPhase({ durationSeconds: load.warmupSeconds, concurrency: load.concurrency, execute, collect: false });
+  await runPhase({
+    durationSeconds: load.warmupSeconds,
+    concurrency: load.concurrency,
+    minimumRequestIntervalMs,
+    execute,
+    collect: false,
+  });
 
   let sampling = true;
   const resourceSamples = [];
@@ -179,6 +253,7 @@ export async function runHttpLoadRound({
   const measured = await runPhase({
     durationSeconds: load.durationSeconds,
     concurrency: load.concurrency,
+    minimumRequestIntervalMs,
     execute,
     collect: true,
   });

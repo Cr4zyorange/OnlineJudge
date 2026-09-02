@@ -90,6 +90,21 @@ export function validatePlan(plan) {
     `concurrency must not exceed ${environment.maxBusinessConcurrency}`,
   );
   invariant(isPositiveNumber(load.requestTimeoutMs), "requestTimeoutMs must be positive");
+  invariant(
+    Number.isFinite(load.minimumRequestIntervalMs) && load.minimumRequestIntervalMs >= 0,
+    "minimumRequestIntervalMs must be a non-negative number",
+  );
+
+  const preflight = plan.preflight;
+  invariant(preflight && typeof preflight === "object", "preflight configuration is required");
+  invariant(
+    Number.isInteger(preflight.requestsPerVirtualStudent) && preflight.requestsPerVirtualStudent > 0,
+    "preflight requestsPerVirtualStudent must be a positive integer",
+  );
+  invariant(
+    Number.isFinite(preflight.minimumSuccessRatePercent) && preflight.minimumSuccessRatePercent === 100,
+    "preflight minimumSuccessRatePercent must be 100 for formal counting",
+  );
 
   invariant(
     Array.isArray(plan.scenarios) && plan.scenarios.length >= 2 && plan.scenarios.length <= 3,
@@ -289,6 +304,7 @@ export function aggregateComparison(plan, rawRounds) {
         warmupSeconds: plan.load.warmupSeconds,
         durationSeconds: plan.load.durationSeconds,
         concurrency: plan.load.concurrency,
+        minimumRequestIntervalMs: plan.load.minimumRequestIntervalMs,
         requestTimeoutMs: plan.load.requestTimeoutMs,
       }),
       `${key} does not use the same load configuration`,

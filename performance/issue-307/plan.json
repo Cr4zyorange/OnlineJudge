@@ -29,7 +29,12 @@
     "warmupSeconds": 30,
     "durationSeconds": 120,
     "concurrency": 10,
+    "minimumRequestIntervalMs": 1000,
     "requestTimeoutMs": 10000
+  },
+  "preflight": {
+    "requestsPerVirtualStudent": 1,
+    "minimumSuccessRatePercent": 100
   },
   "scenarios": [
     {

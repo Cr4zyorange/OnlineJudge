@@ -14,6 +14,7 @@ import {
   renderMarkdownReport,
   runHttpLoadRound,
   sampleDockerResources,
+  summarizePreflight,
   validateFormalWindowEvidence,
 } from "./issue-307-runner.mjs";
 
@@ -58,6 +59,21 @@ function requiredEnvironment(name) {
   return value;
 }
 
+function requiredBearerTokens(name) {
+  const raw = requiredEnvironment(name);
+  try {
+    const tokens = JSON.parse(raw);
+    invariant(Array.isArray(tokens) && tokens.length > 0, `${name} must be a non-empty JSON array`);
+    invariant(tokens.every((token) => typeof token === "string" && token.length > 0), `${name} must contain non-empty strings`);
+    return tokens;
+  } catch (error) {
+    if (error instanceof SyntaxError) {
+      return [raw];
+    }
+    throw error;
+  }
+}
+
 async function loadAndValidatePlan(file) {
   const plan = validatePlan(await readJson(file));
   invariant(plan.environment.datasetFile, "plan environment.datasetFile is required");
@@ -95,6 +111,14 @@ async function validateWindowCommand(options) {
   process.stdout.write(`WINDOW_VALID signal=${evidence.environmentReadySignal}\n`);
 }
 
+async function validatePreflightCommand(options) {
+  const summary = summarizePreflight(await readJson(requiredOption(options, "evidence")));
+  process.stdout.write(
+    `PREFLIGHT_VALID scenario=${summary.scenario} requests=${summary.requestCount} ` +
+    `successful=${summary.successfulRequestCount} success-rate=${summary.successRatePercent}%\n`,
+  );
+}
+
 async function runCommand(options) {
   const plan = await loadAndValidatePlan(requiredOption(options, "plan"));
   const architecture = plan.architectures.find(({ id }) => id === requiredOption(options, "architecture"));
@@ -127,7 +151,7 @@ async function runCommand(options) {
   const startedAt = new Date().toISOString();
   const measured = await runHttpLoadRound({
     baseUrl: requiredEnvironment(architecture.baseUrlEnv),
-    bearerToken: requiredEnvironment(architecture.bearerTokenEnv),
+    bearerTokens: requiredBearerTokens(architecture.bearerTokenEnv),
     scenario,
     environment: process.env,
     load: plan.load,
@@ -150,6 +174,7 @@ async function runCommand(options) {
       warmupSeconds: plan.load.warmupSeconds,
       durationSeconds: plan.load.durationSeconds,
       concurrency: plan.load.concurrency,
+      minimumRequestIntervalMs: plan.load.minimumRequestIntervalMs,
       requestTimeoutMs: plan.load.requestTimeoutMs,
     },
     formalWindow,
@@ -197,6 +222,9 @@ async function main() {
     case "validate-window":
       await validateWindowCommand(options);
       break;
+    case "validate-preflight":
+      await validatePreflightCommand(options);
+      break;
     case "machine":
       process.stdout.write(`${JSON.stringify(machineFingerprint(), null, 2)}\n`);
       break;
@@ -208,7 +236,7 @@ async function main() {
       break;
     default:
       throw new Error(
-        "usage: issue-307.mjs <validate-plan|validate-window|machine|run|aggregate> [options]",
+        "usage: issue-307.mjs <validate-plan|validate-window|validate-preflight|machine|run|aggregate> [options]",
       );
   }
 }

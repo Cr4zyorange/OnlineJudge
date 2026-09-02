@@ -126,6 +126,14 @@ class DisposableEnvironmentRendererTest(unittest.TestCase):
         self.assertNotIn("assessment-password", compose)
         self.assertNotIn("root-password", kubernetes)
 
+    def test_jwks_bootstrap_secret_fails_closed_when_omitted(self) -> None:
+        compose, _ = self.render()
+
+        self.assertIn(
+            "${IDENTITY_JWKS_TRUST_BUNDLE:?IDENTITY_JWKS_TRUST_BUNDLE is required}",
+            compose,
+        )
+
     def test_compose_shell_jobs_pass_the_script_as_the_entrypoint_argument(self) -> None:
         compose, _ = self.render()
 

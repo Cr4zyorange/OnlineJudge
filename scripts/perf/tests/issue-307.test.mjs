@@ -34,7 +34,12 @@ function validPlan() {
       warmupSeconds: 20,
       durationSeconds: 60,
       concurrency: 10,
+      minimumRequestIntervalMs: 1000,
       requestTimeoutMs: 10000,
+    },
+    preflight: {
+      requestsPerVirtualStudent: 1,
+      minimumSuccessRatePercent: 100,
     },
     scenarios: [
       {
@@ -95,6 +100,7 @@ function rawRound({ architecture, scenario, round, contaminated = false, machine
       warmupSeconds: 20,
       durationSeconds: 60,
       concurrency: 10,
+      minimumRequestIntervalMs: 1000,
       requestTimeoutMs: 10000,
     },
     formalWindow: {
@@ -132,6 +138,14 @@ test("AC-307 plan freezes two baselines, two-to-three representative APIs and at
   const excessiveConcurrency = validPlan();
   excessiveConcurrency.load.concurrency = 21;
   assert.throws(() => validatePlan(excessiveConcurrency), /concurrency/i);
+
+  const missingPreflight = validPlan();
+  delete missingPreflight.preflight;
+  assert.throws(() => validatePlan(missingPreflight), /preflight/i);
+
+  const weakPreflight = validPlan();
+  weakPreflight.preflight.minimumSuccessRatePercent = 99;
+  assert.throws(() => validatePlan(weakPreflight), /100/i);
 
   const readOnly = validPlan();
   readOnly.scenarios = readOnly.scenarios.filter((scenario) => scenario.category !== "write");

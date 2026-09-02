@@ -7,6 +7,7 @@ import {
   renderCsvReport,
   renderMarkdownReport,
   runHttpLoadRound,
+  summarizePreflight,
   validateFormalWindowEvidence,
 } from "../issue-307-runner.mjs";
 
@@ -65,10 +66,38 @@ test("formal window evidence must prove readiness and an uncontaminated exclusiv
   );
 });
 
+test("preflight rejects an accepted status when its virtual-student success rate is below the gate", () => {
+  const valid = {
+    scenario: "my-grades",
+    expectedStatuses: [200],
+    minimumSuccessRatePercent: 100,
+    responses: [
+      { student: 1, attempt: 1, status: 200, responseFile: "responses/student-001-attempt-1.json" },
+      { student: 2, attempt: 1, status: 200, responseFile: "responses/student-002-attempt-1.json" },
+      { student: 3, attempt: 1, status: 200, responseFile: "responses/student-003-attempt-1.json" },
+    ],
+  };
+
+  assert.deepEqual(summarizePreflight(valid), {
+    ...valid,
+    requestCount: 3,
+    successfulRequestCount: 3,
+    successRatePercent: 100,
+  });
+
+  assert.throws(
+    () => summarizePreflight({
+      ...valid,
+      responses: [...valid.responses, { student: 4, attempt: 1, status: 401, responseFile: "responses/student-004-attempt-1.json" }],
+    }),
+    /success rate.*100/i,
+  );
+});
+
 test("HTTP runner excludes warmup, records raw samples and keeps resource measurements", async (context) => {
-  let authorization = null;
+  const authorizations = new Set();
   const server = http.createServer((request, response) => {
-    authorization = request.headers.authorization;
+    authorizations.add(request.headers.authorization);
     response.writeHead(200, { "content-type": "application/json" });
     response.end('{"ok":true}');
   });
@@ -79,7 +108,7 @@ test("HTTP runner excludes warmup, records raw samples and keeps resource measur
   let sample = 0;
   const result = await runHttpLoadRound({
     baseUrl: `http://127.0.0.1:${port}`,
-    bearerToken: "not-written-to-result",
+    bearerTokens: ["student-token-a", "student-token-b"],
     scenario: {
       id: "course-list",
       method: "GET",
@@ -101,12 +130,42 @@ test("HTTP runner excludes warmup, records raw samples and keeps resource measur
     }),
   });
 
-  assert.equal(authorization, "Bearer not-written-to-result");
+  assert.deepEqual(authorizations, new Set(["Bearer student-token-a", "Bearer student-token-b"]));
   assert.ok(result.requests.length > 0);
   assert.ok(result.requests.every(({ ok, status, durationMs }) => ok && status === 200 && durationMs >= 0));
   assert.ok(result.measuredDurationMs >= 70);
   assert.ok(result.resourceSamples.length > 0);
-  assert.equal(JSON.stringify(result).includes("not-written-to-result"), false);
+  assert.equal(JSON.stringify(result).includes("student-token-a"), false);
+  assert.equal(JSON.stringify(result).includes("student-token-b"), false);
+});
+
+test("HTTP runner spaces each virtual student's requests at the configured interval", async (context) => {
+  const server = http.createServer((_request, response) => {
+    response.writeHead(200, { "content-type": "application/json" });
+    response.end('{"ok":true}');
+  });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  context.after(() => new Promise((resolve) => server.close(resolve)));
+  const { port } = server.address();
+
+  const result = await runHttpLoadRound({
+    baseUrl: `http://127.0.0.1:${port}`,
+    bearerToken: "paced-student-token",
+    scenario: { id: "course-list", method: "GET", pathTemplate: "/api/v1/courses", expectedStatuses: [200] },
+    environment: {},
+    load: {
+      warmupSeconds: 0.01,
+      durationSeconds: 0.095,
+      concurrency: 1,
+      minimumRequestIntervalMs: 30,
+      requestTimeoutMs: 1000,
+    },
+    resourceSampleIntervalMs: 10,
+    sampleResources: async () => ({ atMs: 0, cpuPercent: 0, memoryMiB: 0 }),
+  });
+
+  assert.ok(result.requests.length >= 2, "the measured phase should issue more than one paced request");
+  assert.ok(result.requests.length <= 4, "the interval must prevent an unbounded tight request loop");
 });
 
 test("reports include every required unit and avoid causal performance claims", () => {
