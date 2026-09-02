@@ -7,6 +7,7 @@ import com.onlinejudge.assessmentservice.persistence.AssessmentOutboxRepository;
 import com.onlinejudge.assessmentservice.persistence.SourceGradeRepository;
 import com.onlinejudge.assessmentservice.security.CurrentUser;
 import com.onlinejudge.assessmentservice.service.LabExperimentService;
+import com.onlinejudge.assessmentservice.service.LabReportService;
 import com.onlinejudge.assessmentservice.service.CoursePermissionClient;
 import com.onlinejudge.assessmentservice.service.CourseMembershipGuard;
 import jakarta.servlet.http.HttpServletRequest;
@@ -39,17 +40,19 @@ public class LabEvaluationController {
     private final JdbcTemplate jdbc;
     private final SourceGradeRepository grades;
     private final AssessmentOutboxRepository outbox;
+    private final LabReportService reports;
 
     public LabEvaluationController(LabExperimentService labs, EvaluationTaskRepository tasks,
             CourseMemberProjectionRepository courseMembers, CoursePermissionClient coursePermissions, JdbcTemplate jdbc) {
         this(labs, tasks, courseMembers, coursePermissions, jdbc, null, null,
-                new CourseMembershipGuard(courseMembers, coursePermissions));
+                new CourseMembershipGuard(courseMembers, coursePermissions), null);
     }
 
     @org.springframework.beans.factory.annotation.Autowired
     public LabEvaluationController(LabExperimentService labs, EvaluationTaskRepository tasks,
             CourseMemberProjectionRepository courseMembers, CoursePermissionClient coursePermissions, JdbcTemplate jdbc,
-            SourceGradeRepository grades, AssessmentOutboxRepository outbox, CourseMembershipGuard membershipGuard) {
+            SourceGradeRepository grades, AssessmentOutboxRepository outbox, CourseMembershipGuard membershipGuard,
+            LabReportService reports) {
         this.labs = labs;
         this.tasks = tasks;
         this.courseMembers = courseMembers;
@@ -58,6 +61,7 @@ public class LabEvaluationController {
         this.jdbc = jdbc;
         this.grades = grades;
         this.outbox = outbox;
+        this.reports = reports;
     }
 
     @GetMapping("/{labId}/submissions/{submissionId}/result")
@@ -200,6 +204,7 @@ public class LabEvaluationController {
         if (!manager && !item.get("studentId").equals(user.id())) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "LAB submission access is restricted");
         if (!manager && !membershipGuard.isActiveMember(lab.courseId(), user.id(), requestId)) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "active course membership is required");
         boolean scoresVisible = manager || scoresPublished(lab);
+        item.put("latestReport", latestReportForView(labId, submissionId, scoresVisible));
         if (!scoresVisible) {
             item.put("autoScore", null);
             item.put("finalScore", null);
@@ -258,8 +263,16 @@ public class LabEvaluationController {
             score.put("updatedAt", rs.getTimestamp("updated_at") == null ? null : rs.getTimestamp("updated_at").toInstant());
             return score;
         }, labId, submissionId).stream().findFirst().orElse(null) : null);
-        response.put("latestReport", null);
+        response.put("latestReport", latestReportForView(labId, submissionId, scoresVisible));
         return response;
+    }
+
+    private LabReportService.LabReportSummary latestReportForView(long labId, String submissionId, boolean scoresVisible) {
+        if (reports == null) return null;
+        LabReportService.LabReportSummary report = reports.latestForSubmission(labId, submissionId);
+        if (report == null || scoresVisible) return report;
+        return new LabReportService.LabReportSummary(report.reportId(), report.submissionId(), report.fileName(),
+                report.fileType(), report.fileSize(), report.version(), null, null, report.submittedAt(), report.downloadUrl());
     }
 
     private LabExperimentService.LabSummary findLab(long labId) {
@@ -312,12 +325,14 @@ public class LabEvaluationController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "changeReason is required when changing an existing score");
         }
         Instant now = Instant.now();
+        Long reportId = reports == null ? null : java.util.Optional.ofNullable(reports.latestForSubmission(labId, submissionId))
+                .map(LabReportService.LabReportSummary::reportId).orElse(null);
         jdbc.update("""
                 INSERT INTO assessment_lab_score (submission_id, lab_id, report_id, auto_score, report_score, manual_score, final_score, comment, scored_at, updated_at)
-                VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, ?)
-                ON DUPLICATE KEY UPDATE report_score = VALUES(report_score), manual_score = VALUES(manual_score),
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON DUPLICATE KEY UPDATE report_id = VALUES(report_id), report_score = VALUES(report_score), manual_score = VALUES(manual_score),
                     final_score = VALUES(final_score), comment = VALUES(comment), updated_at = VALUES(updated_at)
-                """, submissionId, labId, submission.get("autoScore"), request.reportScore(), request.manualScore(), request.finalScore(), request.comment(), java.sql.Timestamp.from(now), java.sql.Timestamp.from(now));
+                """, submissionId, labId, reportId, submission.get("autoScore"), request.reportScore(), request.manualScore(), request.finalScore(), request.comment(), java.sql.Timestamp.from(now), java.sql.Timestamp.from(now));
         jdbc.update("UPDATE assessment_lab_submission SET final_score = ?, submit_status = 'SCORED' WHERE submission_id = ? AND lab_id = ?", request.finalScore(), submissionId, labId);
         if (scoreChanged) {
             jdbc.update("""
