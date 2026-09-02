@@ -108,6 +108,15 @@ mysql_query() {
     mysql-query "$database" "$statement"
 }
 
+redact_bearer_values() {
+  # A Kubernetes snapshot can include a short-lived, inlined service token.
+  # Preserve the surrounding manifest as evidence while never persisting the
+  # credential itself in an output directory.
+  sed -E \
+    -e 's#(value:[[:space:]]*)Bearer[[:space:]]+[^[:space:]]+#\1<redacted>#g' \
+    -e 's#(Authorization:[[:space:]]*)Bearer[[:space:]]+[^[:space:]]+#\1<redacted>#g'
+}
+
 capture_projection_and_lease_diagnostics() {
   local captured_at
   captured_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
@@ -218,7 +227,7 @@ record_rabbitmq_outage_snapshot() {
     kubectl -n "$namespace" get statefulset/rabbitmq -o yaml
     kubectl -n "$namespace" get pods -l app.kubernetes.io/name=rabbitmq -o wide
     kubectl -n "$namespace" get endpoints/rabbitmq -o yaml
-    kubectl -n "$namespace" get deployment/assessment-api -o yaml
+    kubectl -n "$namespace" get deployment/assessment-api -o yaml | redact_bearer_values
   } >> "$output_dir/raw/rabbitmq-outage.txt" 2>&1
   [[ "$available_replicas" =~ ^[1-9][0-9]*$ && "$ready_replicas_assessment" =~ ^[1-9][0-9]*$ ]]
 }
