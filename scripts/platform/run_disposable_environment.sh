@@ -70,12 +70,39 @@ compose=(docker compose --project-name "$project_name" --env-file "$runtime_env"
 
 cleanup() {
   status=$?
+  cleanup_status=0
+  cleanup_containers=()
+  cleanup_volumes=()
   if (( keep )); then
     printf 'DISPOSABLE_ENVIRONMENT_KEPT project=%s compose=%s\n' "$project_name" "$compose_file" >&2
   else
-    "${compose[@]}" down --volumes --remove-orphans >/dev/null 2>&1 || true
+    if ! "${compose[@]}" down --volumes --remove-orphans > "$output_dir/cleanup-command.log" 2>&1; then
+      cleanup_status=1
+    fi
+    mapfile -t cleanup_containers < <("${compose[@]}" ps --all --format '{{.Name}}' 2>/dev/null || true)
+    mapfile -t cleanup_volumes < <(docker volume ls --quiet --filter "label=com.docker.compose.project=$project_name" 2>/dev/null || true)
+    if ((${#cleanup_containers[@]} || ${#cleanup_volumes[@]})); then
+      cleanup_status=1
+    fi
+    python3 - "$output_dir/cleanup-summary.json" "$project_name" "$cleanup_status" "${cleanup_containers[@]}" -- "${cleanup_volumes[@]}" <<'PY'
+import json
+import sys
+
+separator = sys.argv.index("--")
+with open(sys.argv[1], "w", encoding="utf-8") as output:
+    json.dump({
+        "projectName": sys.argv[2],
+        "containers": sys.argv[4:separator],
+        "volumes": sys.argv[separator + 1:],
+        "cleanupFailed": sys.argv[3] != "0",
+    }, output, indent=2)
+    output.write("\n")
+PY
   fi
   rm -f "$runtime_env"
+  if (( status == 0 && cleanup_status != 0 )); then
+    exit "$cleanup_status"
+  fi
   exit "$status"
 }
 trap cleanup EXIT

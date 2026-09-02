@@ -17,6 +17,7 @@ test('business E2E enters the disposable nine-workload platform rather than a mo
   assert.equal(packageJson.scripts['test:e2e:business:disposable'], 'node ../scripts/test/run-business-e2e-disposable.mjs');
   assert.match(entry, /run_disposable_environment\.sh/);
   assert.match(entry, /--after-ready/);
+  assert.match(entry, /Program Files\\\\Git\\\\bin\\\\bash\.exe/);
   assert.doesNotMatch(entry, /jdbc:h2/i);
   assert.doesNotMatch(entry, /SPRING_DATASOURCE_URL/);
   assert.doesNotMatch(entry, /npm.*run.*dev/i);

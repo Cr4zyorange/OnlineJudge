@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { spawn, spawnSync } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { mkdir } from 'node:fs/promises';
 import { createServer } from 'node:net';
 import { dirname, join, resolve } from 'node:path';
@@ -20,16 +21,42 @@ try {
   environment.IDENTITY_SEED_DATA_ENABLED = 'true';
   environment.E2E_ARTIFACT_DIR = artifactDir;
 
-  await run('bash', [
-    platformRunner,
+  const bashCommand = resolveBashCommand();
+  configureGitBashPython(environment, bashCommand);
+  await run(bashCommand, [
+    toBashPath(platformRunner, bashCommand),
     '--git-sha', gitRevision(),
-    '--output-dir', artifactDir,
-    '--after-ready', process.execPath, threeServiceRunner, '--inside-platform'
+    '--output-dir', toBashPath(artifactDir, bashCommand),
+    '--after-ready', toBashPath(process.execPath, bashCommand), toBashPath(threeServiceRunner, bashCommand), '--inside-platform'
   ], environment);
   console.log('run-business-e2e-disposable: PASS; the disposable nine-workload platform was removed');
 } catch (error) {
   console.error(`run-business-e2e-disposable: ${error instanceof Error ? error.message : String(error)}`);
   process.exitCode = 1;
+}
+
+function resolveBashCommand() {
+  if (process.env.E2E_BASH_COMMAND?.trim()) {
+    return process.env.E2E_BASH_COMMAND.trim();
+  }
+  const gitBash = 'C:\\Program Files\\Git\\bin\\bash.exe';
+  return process.platform === 'win32' && existsSync(gitBash) ? gitBash : 'bash';
+}
+
+function toBashPath(path, bashCommand) {
+  if (process.platform !== 'win32' || !/Git\\bin\\bash\.exe$/i.test(bashCommand)) {
+    return path;
+  }
+  return path.replace(/^([A-Za-z]):/, (_, drive) => `/${drive.toLowerCase()}`)
+    .replaceAll('\\', '/');
+}
+
+function configureGitBashPython(environment, bashCommand) {
+  const msysPythonDirectory = 'C:\\msys64\\ucrt64\\bin';
+  if (process.platform === 'win32' && /Git\\bin\\bash\.exe$/i.test(bashCommand)
+    && existsSync(join(msysPythonDirectory, 'python3.exe'))) {
+    environment.Path = `${msysPythonDirectory};${environment.Path || environment.PATH || ''}`;
+  }
 }
 
 function gitRevision() {

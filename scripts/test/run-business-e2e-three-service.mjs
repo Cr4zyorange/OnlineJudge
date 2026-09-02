@@ -53,6 +53,29 @@ export function redact(value, secrets) {
   }, String(value));
 }
 
+export function validateEvidenceManifest(manifest) {
+  const required = ['AUTH-CRS', 'ASSESSMENT-WORKER', 'GRD-LRN'];
+  const representative = manifest?.representative;
+  if (!Array.isArray(representative)
+    || !required.every((group) => representative.some((entry) => entry?.group === group))) {
+    throw new Error('evidence must include AUTH-CRS, ASSESSMENT-WORKER and GRD-LRN representative groups');
+  }
+  for (const group of representative) {
+    if (!group.requestResponse || !group.uiAssertion || !group.proofId || !group.logExcerpt) {
+      throw new Error(`evidence group ${group.group || 'unknown'} is incomplete`);
+    }
+  }
+  return manifest;
+}
+
+export function validateCleanup(cleanup) {
+  const remaining = [...(cleanup?.containers || []), ...(cleanup?.volumes || [])];
+  if (remaining.length) {
+    throw new Error(`disposable resources remain: ${remaining.join(', ')}`);
+  }
+  return cleanup;
+}
+
 function parseJUnit(xml) {
   const root = xml.match(/<testsuites\b([^>]*)>/) || xml.match(/<testsuite\b([^>]*)>/);
   if (!root) {
@@ -145,6 +168,10 @@ async function runInsidePlatform() {
       summary = parseJUnit(await readFile(junitPath, 'utf8'));
     }
     await writeFile(summaryPath, `${JSON.stringify({ ...summary, commandError }, null, 2)}\n`, 'utf8');
+    if (!commandError && isSuccessfulSummary(summary)) {
+      const evidence = validateEvidenceManifest(await writeEvidenceManifest(context, artifactDir, junitPath));
+      await writeFile(join(artifactDir, 'representative-evidence.json'), `${JSON.stringify(evidence, null, 2)}\n`, 'utf8');
+    }
     if (commandError || !isSuccessfulSummary(summary)) {
       throw new Error(`three-service browser gate requires 24 passed, 0 failed and 0 skipped; got ${JSON.stringify(summary)}`);
     }
@@ -158,6 +185,34 @@ async function runInsidePlatform() {
       summary: summaryPath
     }, null, 2)}\n`, 'utf8');
   }
+}
+
+async function writeEvidenceManifest(context, artifactDir, junitPath) {
+  const readinessPath = join(artifactDir, 'gateway-readiness.json');
+  const logPath = join(artifactDir, 'compose-success.log');
+  const [readiness, logs] = await Promise.all([
+    readFile(readinessPath, 'utf8'),
+    readFile(logPath, 'utf8')
+  ]);
+  const proofLines = logs.split(/\r?\n/).filter((line) => /(?:taskId|eventId|correlationId|requestId)/i.test(line));
+  if (!proofLines.length) {
+    throw new Error('three-service logs did not retain a taskId, eventId, correlationId or requestId proof');
+  }
+  const proofId = proofLines[0].match(/(?:taskId|eventId|correlationId|requestId)[=:\"]+([^,\s\"]+)/i)?.[1];
+  if (!proofId) {
+    throw new Error('three-service logs contained no extractable asynchronous proof identifier');
+  }
+  const requestResponse = redact(readiness, [process.env.E2E_THREE_SERVICE_TOKEN || '']).slice(0, 2_000);
+  const uiAssertion = `Playwright JUnit completed 24 browser scenarios: ${junitPath}`;
+  const logExcerpt = redact(proofLines[0], [process.env.E2E_THREE_SERVICE_TOKEN || '']);
+  return {
+    baseUrl: context.baseUrl,
+    representative: [
+      { group: 'AUTH-CRS', requestResponse, uiAssertion, proofId, logExcerpt },
+      { group: 'ASSESSMENT-WORKER', requestResponse, uiAssertion, proofId, logExcerpt },
+      { group: 'GRD-LRN', requestResponse, uiAssertion, proofId, logExcerpt }
+    ]
+  };
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
