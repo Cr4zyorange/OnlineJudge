@@ -40,39 +40,49 @@ bash scripts/platform/run_hpa_observability_experiment.sh \
 
 授权头与请求体都只从调用方受限文件读取，不复制到证据目录或命令行输出。每次实验固定先受控摘除并恢复 RabbitMQ，确认 Assessment API 仍有 Available 副本；随后必须观察到 HPA 相对基线扩容并在负载结束后缩容。实验入口会在 `output/issue-319/<sha>/<utc>/` 保留 HPA/Pod/资源时间线、每次请求的原始耗时和状态、Gateway/Assessment/Grade 日志及 RabbitMQ queue 计数；无论成功或失败均输出证据目录。`kubectl top` 不可用会失败关闭，不能把无 Metrics API 的运行称为扩缩容实验。
 
-## 当前正式运行结论（2026-09-02，Round 7 复审重跑）
+## 当前正式运行结论（2026-09-02，Round 8 复审重跑）
 
-Round 7 是 AC-319-03、AC-319-04 的当前正式证据：
-`docs/过程/测试/Issue-319-HPA实验证据-20260902T130421Z/`。它由提交
-`2e7e11025619ace9e02c6bd3488c50d725119746` 的 runner 执行，明确记录被测
-#318 deployment 版本 `bb4d83ee7a0891490869960370670a2dd03e9962`。结果为：
+Round 8 是 AC-319-03、AC-319-04、AC-319-05 的当前正式证据：
+`docs/过程/测试/Issue-319-HPA实验证据-20260902T161736Z/`。它针对 Round 8 复审
+唯一阻塞（合并后 runner 与 T121/T130 tested runner 均存在实质差异，证据不能外
+推到当前运行器），从干净 worktree 以当前 head 构建全部镜像并以同一提交部署
+环境后重跑。runnerSha / headSha / deploymentVersion 三者同为
+`cf2979dc2fcfd1bc7e6640a71d6f6864e7de7f1b`（被测 deployment 的 `GIT_SHA` env
+由 runner 原子读取），从声明 SHA 可完整复现。结果为：
 
-- 20,700 条真实 JWT Assessment 查询全部 2xx、零错误、P95 20.281ms；HPA 从
+- 31,880 条真实 JWT Assessment 查询全部 2xx、零错误、P95 24.78ms；HPA 从
   1 扩到 3，随后在 300 秒稳定窗后回到 1。
-- RabbitMQ 在 `13:04:27Z` 至 `13:04:38Z` 持续为
-  `readyReplicas=0 / pods=0 / endpoints=0`，同一原始时间戳中 Assessment 始终
-  `availableReplicas=1 / readyReplicas=1`，并在 `13:04:54Z` 恢复 `1/1/1`。
-- Grade 的实际数据库读数为 `LAB:1:1 watermark=1 / projection=1 / lag=0`、
+- RabbitMQ 在 `16:18:05Z` 确认 `readyReplicas=0 / pods=0 / endpoints=0`（3 个
+  连续 outage-window 采样），同一原始时间戳中 Assessment 始终
+  `availableReplicas=1 / readyReplicas=1`，并在 `16:18:42Z` 恢复 `1/1/1`。
+- Grade 的实际数据库读数为 `LAB:5:1 watermark=1 / projection=1 / lag=0`、
   `unresolved_gap_rows=0`、`APPLIED=1`。该投影由真实 Assessment outbox 事件经
-  RabbitMQ/Grade 消费产生；`fact-provenance.txt` 如实记录一次 legacy 迁移缺口、
-  前向迁移和原 eventId 的 DLQ 恢复，未以 SQL 写入 watermarks/projection。
+  RabbitMQ/Grade 消费产生；本轮 `V20260902_03` 由迁移 Job 预先应用，无 DLQ
+  重投；业务事实链（课程/加入/LAB/提交/评分/发布）全部经真实 API 完成，
+  `fact-provenance.txt` 如实记录，未以 SQL 写入 watermarks/projection。
 - 原始 deployment YAML 会脱敏任何 Bearer 值；正式目录经凭据扫描后才入库。
 
-Round 7 的 `NOTES.md` 将每项 AC 映射到 raw 文件；其任务 lease 查询包含终态任务的
-`heartbeat_at`、`attempt`、`generation` 以及按 fenced terminal-write 语义已清空的
-lease 字段。runner 现会查询全部任务，避免只查看 RUNNING 行而遗漏该事实。
+Round 8 的 `NOTES.md` 将每项 AC 映射到 raw 文件；其任务 lease 查询包含终态任务
+的 `heartbeat_at`、`attempt`、`generation` 以及按 fenced terminal-write 语义已
+清空的 lease 字段（`39de4c76...`，attempt=3/generation=3）。活跃 RUNNING 租约
+原始值由 `T121501Z` 互补覆盖。runner 现会查询全部任务，避免只查看 RUNNING 行
+而遗漏该事实。
 
-## 历史运行结论（Round 5 实验；Round 6 复审重跑）
+## 历史运行结论（Round 7 复审重跑；Round 5 实验；Round 6 复审重跑）
 
-在 kind 集群（#318 环境 9 workloads 就绪）执行真实实验后确认：
-
+- Round 7 正式证据（已被 Round 8 独立复现并标注 SUPERSEDED）：
+  `docs/过程/测试/Issue-319-HPA实验证据-20260902T130421Z/` 由提交 `2e7e1102`
+  的 runner 执行，deployment 版本 `bb4d83ee`：20,700 条请求全 2xx、P95
+  20.281ms、HPA 1→3→1、RabbitMQ `13:04:27Z`–`13:04:38Z` 确认 0/0/0 且
+  Assessment available 全程为 1、`LAB:1:1 watermark=1`（经一次 legacy 迁移
+  缺口的前向修复与 DLQ 恢复）。
 - Round 7 的互补活跃租约证据：`docs/过程/测试/Issue-319-HPA实验证据-20260902T121501Z/`
   由提交 `9045592` 的 runner 运行，记录了每秒采样的真实 `RUNNING` 任务
   `lease_owner/lease_until/heartbeat_at`（102 个样本）；同时验证 HPA 从 1 扩到 2、
   36,140 条 Assessment 请求全为 2xx，RabbitMQ `readyReplicas=0` 且 endpoints 为空时
   Assessment 的 10 个可用性采样均为 1。该轮 Grade 投影仍为 0，原因是 Sandbox worker
   对该批事件均写入 SYSTEM_ERROR；它用于补强活跃租约事实，当前 Grade 结论以本文开头
-  `T130421Z` 的真实事件恢复和水印数据为准。
+  Round 8 `T161736Z` 的真实事件恢复和水印数据为准。
 - Round 6 历史证据：`docs/过程/测试/Issue-319-HPA实验证据-20260902T090959Z/`（EXPERIMENT_READY，
   Round 6 从包含最终 runner 的干净提交 `81030437` 重跑；deployment/runner/证据提交
   SHA 分开记录）：HPA 在真实读负载下从 1 扩到 2、负载结束后缩回 1；41,540 个

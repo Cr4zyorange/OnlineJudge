@@ -106,3 +106,39 @@ deployment=`da6fd3f8`、runner/tested=`9045592`、证据提交=`6345a3bf`。
 `grade.source-grades.v2` 队列深度 0，grade_event_inbox/outbox 0 行）→ grade
 投影水印为 0 行是该环境的真实状态，非采集缺失；每项数值均可在集群内复核
 （复核 SQL 见证据目录 NOTES.md）。
+
+## Round 8 — 2026-09-02（复审 Round 7 rework：当前 head 的可复现正式重跑）
+
+owner 复审（head=`cf2979dc`）：Round 7 的两项 FAIL（AC-319-03 故障窗口、
+AC-319-04 Grade 投影水位与 Assessment 租约原始值）均 PASS；范围冻结与
+`git diff --check` PASS。唯一阻塞为 AC-319-05 的 SHA/可重复性回归：两次真实
+实验分别运行在 `90455922`（T121501Z）与 `2e7e1102`（T130421Z），合并后当前
+runner 与两者都有实质差异（相对 T130 tested runner 又新增/变更 41 行；相对
+T121 为 225 additions/98 deletions），现有证据只能证明两个父提交，不能证明
+合并后的运行器能产出同一套通过证据。处置如下：
+
+| 编号 | 阻塞点 | 处置 |
+| --- | --- | --- |
+| R8-01 | AC-319-05：在当前 head（或仅含文档提交的直接后继）重跑一次正式实验并提交 metadata/raw evidence，不新增功能、不扩大范围。 | 1) 本地分支快进到复审 head `cf2979dc`；在 `/tmp` 独立干净 checkout 以该提交构建全部 7 个 workload 镜像 + migration runner（tracked 树无改动），`kind load` 后以 `deploy_kubernetes_disposable_environment.sh --git-sha cf2979dc` 部署一次性环境 `issue319-rerun`（9 workloads / 4 migrations 就绪，`KUBERNETES_ENVIRONMENT_READY`）。2) 经真实 API 重建业务事实链（teacher001/student001 登录 → 建课 → 加入 → 建 LAB（1 测试用例）→ 发布 → 学生提交 → 教师评分 95.00 → 发布成绩），Assessment outbox 真实交付 `assessment.source-grade.changed.v2`，Grade 消费产生 `LAB:5:1 watermark=1 / projection=1 / lag=0 / APPLIED=1`；本轮 `V20260902_03` 由迁移 Job 预先应用，无 DLQ 重投。3) 以当前 head 的 committed runner 正式重跑：EXPERIMENT_READY，HPA 1→3→1，31,880 读请求全 200、零错误、P95 24.78ms，RabbitMQ `16:18:05Z` 确认 0/0/0 且 Assessment available 全程为 1，`16:18:42Z` 恢复 1/1/1。证据提交与目录 `docs/过程/测试/Issue-319-HPA实验证据-20260902T161736Z/`；`T130421Z` 标注 SUPERSEDED。 |
+
+Round 8 正式证据的 SHA 三元组完全同源：deploymentVersion = runnerSha =
+headSha = `cf2979dc2fcfd1bc7e6640a71d6f6864e7de7f1b`，证据提交为其仅含文档的
+直接后继；从声明 SHA 复现 = 干净 checkout 渲染部署 + 重放业务链 + 运行同一
+提交的 runner。被测 deployment 的 `GIT_SHA` env 由 runner 原子读取并写入
+metadata，与 head 一致，不存在"声明 SHA 不可复现"的缺口。
+
+环境运行时修补（与 Round 5 已记录的 #318 渲染器缺陷一致，均属一次性环境
+操作步骤，非 #319 代码改动，已在 `fact-provenance.txt` 登记）：R5-02
+`RABBITMQ_PORT=5672` 显式注入；R5-01 worker args 追加 compose 配置使其连入
+MySQL；R5-03 服务身份缺口的环境侧处置——用环境 secret 的
+`IDENTITY_JWT_SIGNING_KEY` 离线铸造服务 JWT（aud=course/assessment 及对应
+scopes）注入 `*_SERVICE_AUTHORIZATION`，并把
+`ASSESSMENT_COURSE_AUTHORIZATION_URI` 修正为 course 实际暴露的
+`/internal/v2/courses/{courseId}/authorizations/{userId}`（渲染器硬编码 URI
+与控制器映射不一致，归口 #318）。
+
+Round 8 验证：`python3 -m unittest discover -s scripts/platform/tests` 55/55
+通过；`validate_observability_experiment.py` 契约校验 PASS；
+`raw/requests.tsv` 可独立复算为 31,880×200、0 错误、P95 0.02478s，与
+`load-summary.json` 一致；入库文件凭据扫描干净（无 Bearer/JWT/私钥/口令值，
+YAML 快照 Bearer 值已由 runner 脱敏）；`git diff --check` 干净。

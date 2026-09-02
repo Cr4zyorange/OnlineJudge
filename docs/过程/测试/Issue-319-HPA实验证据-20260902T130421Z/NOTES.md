@@ -1,5 +1,9 @@
 # #319 Round 7：HPA、RabbitMQ 故障与投影诊断
 
+> SUPERSEDED（Round 8 复审重跑）：本轮的 runner 与合并后最终 runner 存在差异，
+> AC-319-03/04/05 的当前正式证据为 `Issue-319-HPA实验证据-20260902T161736Z/`；
+> 本轮结论已被该轮独立复现，保留为过程记录。
+
 - runId: `20260902T130421Z`
 - baseSha: `c66686ff0e011f5ee63e3908683f01afd4f83ebc`
 - runnerSha / headSha: `2e7e11025619ace9e02c6bd3488c50d725119746`
