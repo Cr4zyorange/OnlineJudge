@@ -64,6 +64,7 @@ class DisposableEnvironmentScriptsTest(unittest.TestCase):
         self.assertIn('"$java_home/bin/java" -version', source)
         self.assertIn('python_bin="${PYTHON_BIN:-python3}"', source)
         self.assertIn('PYTHONDONTWRITEBYTECODE=1 "$python_bin" "$planner"', source)
+        self.assertIn("tr -d '\\r'", source)
 
     def test_build_command_rejects_a_sha_that_does_not_identify_the_checkout(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -109,6 +110,7 @@ class DisposableEnvironmentScriptsTest(unittest.TestCase):
         self.assertIn('artifact.get("image") != expected_images[workload]', source)
         self.assertIn('show "$from_sha:deploy/platform/workloads.json"', source)
         self.assertIn('python_bin="${PYTHON_BIN:-python3}"', source)
+        self.assertIn("tr -d '\\r'", source)
 
     def test_rollback_rejects_a_manifest_with_missing_artifact_records_before_docker_runs(self) -> None:
         git_sha = subprocess.run(

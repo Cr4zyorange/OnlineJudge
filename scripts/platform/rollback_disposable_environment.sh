@@ -103,7 +103,7 @@ import sys
 for artifact in json.load(open(sys.argv[1], encoding="utf-8"))["artifacts"]:
     print(artifact["image"] + "\t" + artifact["digest"])
 PY
-)
+ | tr -d '\r')
 
 compose_file="$output_dir/compose.yml"
 kubernetes_file="$output_dir/platform.yaml"

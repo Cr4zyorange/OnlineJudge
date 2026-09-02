@@ -151,7 +151,7 @@ import json, sys
 plan = json.load(open(sys.argv[1], encoding="utf-8"))
 for build in plan["builds"]:
     print("\t".join((build["workload"], build["dockerfile"], build["image"])))
-' "$plan")
+' "$plan" | tr -d '\r')
 
 build_one "platform-migration-runner" "deploy/platform/migration-runner.Dockerfile" "onlinejudge/platform-migration-runner:$git_sha"
 
@@ -162,7 +162,7 @@ import json, sys
 plan = json.load(open(sys.argv[1], encoding="utf-8"))
 for workload in plan["releaseTemplate"]["infrastructureWorkloads"]:
     print("\t".join((workload["workload"], workload["image"])))
-' "$plan")
+' "$plan" | tr -d '\r')
 
 "$python_bin" - "$records" "$git_sha" "$output_dir/artifact-manifest.json" <<'PY'
 import csv
