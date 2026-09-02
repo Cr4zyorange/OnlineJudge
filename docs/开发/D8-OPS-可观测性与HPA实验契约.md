@@ -44,12 +44,16 @@ bash scripts/platform/run_hpa_observability_experiment.sh \
 
 在 kind 集群（#318 环境 9 workloads 就绪）执行真实实验后确认：
 
-- 正式实验证据：`docs/过程/测试/Issue-319-HPA实验证据-20260902T090959Z/`（EXPERIMENT_READY，
-  Round 6 从包含最终 runner 的干净提交 `81030437` 重跑；deployment/runner/证据提交
-  SHA 分开记录）：HPA 在真实读负载下从 1 扩到 2、负载结束后缩回 1；41,540 个
-  Assessment 业务请求全部 2xx、错误率 0、P95 17.7ms；RabbitMQ 受控摘除/恢复期间
-  assessment-api 保持 Available。Round 5 目录 `Issue-319-HPA实验证据-20260902T080519Z/`
-  因 SHA 记录不可复现已标记 SUPERSEDED，仅作过程记录保留。
+- 正式实验证据：`docs/过程/测试/Issue-319-HPA实验证据-20260902T121501Z/`（EXPERIMENT_READY，
+  Round 7 从包含最终 runner 的干净提交 `9045592` 重跑；deployment/runner/证据提交
+  SHA 分开记录）：HPA 在真实读负载下从 1 扩到 2、负载结束后缩回 1；36,140 个
+  Assessment 业务请求全部 2xx、错误率 0、P95 23.3ms。RabbitMQ 故障阶段先等待
+  readyReplicas=0 且 service endpoints 为空的"已验证不可用"状态，在该窗口内采样
+  assessment-api availableReplicas（10 个采样保持 1），再恢复并等待副本数回升；
+  `assessment_outbox_pending_and_lease` 与 `grade_projection_watermark` 信号文件
+  均为数据库原始值转储（租约 owner/until/heartbeat、水印表行、source 侧计数），
+  应用日志另存为 `*-applog`。此前的 `...T090959Z/` 与 `...T080519Z/` 目录分别因
+  诊断信号不满足与 SHA 记录不可复现已标记 SUPERSEDED，仅作过程记录保留。
 - 证据入库约定：仓库全局忽略 `*.log`，随 PR 提交的原始证据一律以 `.txt` 命名；
   HWK 佐证流逐条记录 X-Request-Id 与响应 submissionId，经
   assessment_homework_submission.public_id/submission_id 关联 evaluation_task
