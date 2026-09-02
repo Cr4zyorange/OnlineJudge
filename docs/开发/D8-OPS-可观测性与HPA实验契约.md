@@ -44,7 +44,7 @@ bash scripts/platform/run_hpa_observability_experiment.sh \
 
 在 kind 集群（#318 环境 9 workloads 就绪）执行真实实验后确认：
 
-- 正式实验证据：`output/issue-319/da6fd3f8/20260902T080519Z/`（EXPERIMENT_READY）：
+- 正式实验证据：`docs/过程/测试/Issue-319-HPA实验证据-20260902T080519Z/`（EXPERIMENT_READY）：
   HPA 在真实读负载下从 1 扩到 2、负载结束后缩回 1；44,680 个 Assessment 业务请求
   全部 2xx、错误率 0、P95 17ms；RabbitMQ 受控摘除/恢复期间 assessment-api 保持
   Available。

@@ -1,0 +1,12 @@
+# Assessment backlog / delivery diagnostics at experiment finish
+## evaluation_task state distribution
+state	COUNT(*)
+FAILED	511
+PENDING	2270
+RETRY_WAIT	4
+## assessment_event_outbox state distribution
+state	COUNT(*)
+DELIVERED	511
+## homework submissions total
+hw_submissions
+2786

@@ -38,7 +38,7 @@ Round 4 的静态与契约回归已通过；但真实集群实验尚未执行，
 环境缺口已关闭：安装 kubectl v1.37.0、kind 集群 issue319（kindest/node v1.37.0）、
 metrics-server，并按 #318 `deploy_kubernetes_disposable_environment.sh` 部署 9
 workloads / 4 migrations；随后真实运行 HPA 扩缩容实验。正式实验证据目录：
-`output/issue-319/da6fd3f8/20260902T080519Z/`（`EXPERIMENT_READY`）。
+`docs/过程/测试/Issue-319-HPA实验证据-20260902T080519Z/`（`EXPERIMENT_READY`）。
 
 | 编号 | 结论 | 可复现证据 | 处理 |
 | --- | --- | --- | --- |
@@ -52,7 +52,7 @@ workloads / 4 migrations；随后真实运行 HPA 扩缩容实验。正式实验
 | R5-08 | 阻塞 | 调用方 `HTTP(S)_PROXY`（本机 7897 代理）使 127.0.0.1 实验请求被代理拦截返回 502（`no_proxy` 的 `127.*` 模式 curl 不识别）。 | runner 的 curl 增加 `--noproxy '*'`（实验目标是内部端口转发）。 |
 | R5-09 | 非阻塞 | auth 文件约定为只含 `Bearer <token>`；首轮我误存完整 `Authorization:` 头前缀导致双重前缀 401。 | 操作层修正并验证 201；无需改代码。 |
 
-Round 5 正式实验结果（evidence=`output/issue-319/da6fd3f8/20260902T080519Z`）：
+Round 5 正式实验结果（evidence=`docs/过程/测试/Issue-319-HPA实验证据-20260902T080519Z`）：
 44,680 个评估状态读请求全部 200、零错误、P95 17ms；HPA 从基线 1 副本在真实负载下
 扩容至 2（`scaled up replicas=2 baseline=1`）并在负载结束后缩回 1
 （`scaled down replicas=1 baseline=1`）；RabbitMQ 受控摘除期间 assessment-api 保持
