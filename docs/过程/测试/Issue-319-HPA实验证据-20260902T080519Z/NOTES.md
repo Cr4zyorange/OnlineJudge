@@ -1,5 +1,13 @@
 # #319 正式 HPA 扩缩容实验运行说明（EXPERIMENT_READY）
 
+> **SUPERSEDED（Round 6 复审）**：本目录声明 head/deployment 均为 `da6fd3f8`，
+> 但决定实验能否通过的 runner 修复直到 `5d547072` 才提交，该 PASS 无法从声明
+> SHA 复现，且 `*.log` 证据未随 PR 入库、correlation-example.txt 的 DB 映射段
+> 为空。正式证据以 `Issue-319-HPA实验证据-20260902T090959Z/` 为准（从包含最终
+> runner 的干净提交重跑，deployment/runner/证据提交 SHA 分开记录）。本目录仅
+> 保留为过程记录。另：`da6fd3f8` 提交含 #318 构建链变更，该变更已按审核要求
+> 移出 #319 分支另行归口。
+
 - runId: 20260902T080519Z（本证据目录已随 PR 提交至 docs/过程/测试/Issue-319-HPA实验证据-20260902T080519Z）
 - baseSha (merge-base with origin/dev): 65e578b2
 - headSha / deploymentVersion: da6fd3f8

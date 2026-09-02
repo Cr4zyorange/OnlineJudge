@@ -1,0 +1,10 @@
+# Correlated request example (gateway access log + assessment DB submission/task rows)
+## requestIds used:
+request_id=36f0134a-57ab-4337-b7b6-360e6e5486d2
+request_id=b4bf12e5-6a80-41e4-9eb3-9b1b980a99d7
+## gateway access log rows:
+127.0.0.1 - - [02/Sep/2026:09:10:02 +0000] "POST /api/v1/homeworks/9005/submissions HTTP/1.1" 201 356 "-" "curl/8.5.0" request_id=36f0134a-57ab-4337-b7b6-360e6e5486d2
+127.0.0.1 - - [02/Sep/2026:09:10:04 +0000] "POST /api/v1/homeworks/9009/submissions HTTP/1.1" 201 357 "-" "curl/8.5.0" request_id=b4bf12e5-6a80-41e4-9eb3-9b1b980a99d7
+## assessment DB rows (X-Request-Id -> public submissionId -> submission row -> evaluation_task):
+request_id=36f0134a-57ab-4337-b7b6-360e6e5486d2 | submission(public_id=4629): submission_id=c02ce761-0bc2-4b8d-965c-a1b026b25417 homework=9005 student=7 version=63 evaluation_status=PENDING | evaluation_task: id=a2a56e38-35d1-4d21-8f08-e84e97359353 state=PENDING attempt=0
+request_id=b4bf12e5-6a80-41e4-9eb3-9b1b980a99d7 | submission(public_id=4638): submission_id=6e7dec60-c52c-4128-a000-ea4a5a43ec3a homework=9009 student=11 version=64 evaluation_status=PENDING | evaluation_task: id=fce9b97e-d5eb-4a53-b758-3165191c7596 state=PENDING attempt=0

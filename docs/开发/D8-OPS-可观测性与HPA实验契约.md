@@ -40,14 +40,21 @@ bash scripts/platform/run_hpa_observability_experiment.sh \
 
 授权头与请求体都只从调用方受限文件读取，不复制到证据目录或命令行输出。每次实验固定先受控摘除并恢复 RabbitMQ，确认 Assessment API 仍有 Available 副本；随后必须观察到 HPA 相对基线扩容并在负载结束后缩容。实验入口会在 `output/issue-319/<sha>/<utc>/` 保留 HPA/Pod/资源时间线、每次请求的原始耗时和状态、Gateway/Assessment/Grade 日志及 RabbitMQ queue 计数；无论成功或失败均输出证据目录。`kubectl top` 不可用会失败关闭，不能把无 Metrics API 的运行称为扩缩容实验。
 
-## 真实运行结论（2026-09-02，Round 5 实验）
+## 真实运行结论（2026-09-02，Round 5 实验；Round 6 复审重跑）
 
 在 kind 集群（#318 环境 9 workloads 就绪）执行真实实验后确认：
 
-- 正式实验证据：`docs/过程/测试/Issue-319-HPA实验证据-20260902T080519Z/`（EXPERIMENT_READY）：
-  HPA 在真实读负载下从 1 扩到 2、负载结束后缩回 1；44,680 个 Assessment 业务请求
-  全部 2xx、错误率 0、P95 17ms；RabbitMQ 受控摘除/恢复期间 assessment-api 保持
-  Available。
+- 正式实验证据：`docs/过程/测试/Issue-319-HPA实验证据-20260902T090959Z/`（EXPERIMENT_READY，
+  Round 6 从包含最终 runner 的干净提交 `81030437` 重跑；deployment/runner/证据提交
+  SHA 分开记录）：HPA 在真实读负载下从 1 扩到 2、负载结束后缩回 1；41,540 个
+  Assessment 业务请求全部 2xx、错误率 0、P95 17.7ms；RabbitMQ 受控摘除/恢复期间
+  assessment-api 保持 Available。Round 5 目录 `Issue-319-HPA实验证据-20260902T080519Z/`
+  因 SHA 记录不可复现已标记 SUPERSEDED，仅作过程记录保留。
+- 证据入库约定：仓库全局忽略 `*.log`，随 PR 提交的原始证据一律以 `.txt` 命名；
+  HWK 佐证流逐条记录 X-Request-Id 与响应 submissionId，经
+  assessment_homework_submission.public_id/submission_id 关联 evaluation_task
+  （HWK 写路径的 evaluation_task.origin_request_id 由异步触发器生成，不等于网关
+  X-Request-Id）。
 - 压测入口经验：高并发 HWK 新写入会触发 assessment_homework_submission 唯一索引的
   InnoDB 死锁（错误率 ~0.02–0.1%，跨不同 (homework,student) 亦发生）。稳定做法是
   读链路为主负载 + 低速率（≤2 r/s、单在途）HWK 提交做业务链/积压佐证。上述死锁的
@@ -57,4 +64,6 @@ bash scripts/platform/run_hpa_observability_experiment.sh \
   assessment-api 服务（port-forward），去掉与 HPA 目标无关的网关限流瓶颈；请求仍走
   真实 JWT 鉴权、业务校验与 DB。HPA 阈值与网关限流口径的匹配建议后续单独复核。
 - runner 现已支持：多 `--request-url`/多 `--authorization-file` 轮询、单行原子写入、
-  `--noproxy '*'`、`wait_for_replicas` 显式分支（修复左结合优先级导致扩容断言失效）。
+  `--noproxy '*'`、`wait_for_replicas` 显式分支（修复左结合优先级导致扩容断言失效）；
+  metadata 的 `deploymentVersion` 从被测 deployment 的 GIT_SHA 读取，与执行实验的
+  `headSha`/`runnerSha` 分开记录，保证运行可从声明 SHA 复现。
