@@ -851,17 +851,20 @@ class LabWorkflowContractTest {
         mockMvc.perform(post("/api/v1/labs/{labId}/submissions/{submissionId}/score", labId, submissionId)
                         .header("Authorization", "Bearer " + teacherToken).header("X-Request-Id", "score-inconsistent-314")
                         .contentType(MediaType.APPLICATION_JSON).content("{\"manualScore\":80,\"reportScore\":10,\"finalScore\":89}"))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.manualScore").value(80))
+                .andExpect(jsonPath("$.reportScore").value(10))
+                .andExpect(jsonPath("$.finalScore").value(89));
         mockMvc.perform(post("/api/v1/labs/{labId}/submissions/{submissionId}/score", labId, submissionId)
                         .header("Authorization", "Bearer " + teacherToken).header("X-Request-Id", "score-comment-length-314")
                         .contentType(MediaType.APPLICATION_JSON).content("{\"manualScore\":80,\"finalScore\":80,\"comment\":\"" + "x".repeat(501) + "\"}"))
                 .andExpect(status().isBadRequest());
         mockMvc.perform(post("/api/v1/labs/{labId}/submissions/{submissionId}/score", labId, submissionId)
                         .header("Authorization", "Bearer " + teacherToken).header("X-Request-Id", "score-write-314")
-                        .contentType(MediaType.APPLICATION_JSON).content("{\"manualScore\":80,\"finalScore\":80,\"comment\":\"checked\"}"))
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"manualScore\":80,\"finalScore\":80,\"comment\":\"checked\",\"changeReason\":\"replace previous final score\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.finalScore").value(80))
-                .andExpect(jsonPath("$.hasChangeLogs").value(false));
+                .andExpect(jsonPath("$.hasChangeLogs").value(true));
         mockMvc.perform(post("/api/v1/labs/{labId}/submissions/{submissionId}/score", labId, submissionId)
                         .header("Authorization", "Bearer " + teacherToken).header("X-Request-Id", "score-change-without-reason-314")
                         .contentType(MediaType.APPLICATION_JSON).content("{\"manualScore\":90,\"finalScore\":90}"))
@@ -872,10 +875,10 @@ class LabWorkflowContractTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.finalScore").value(90))
                 .andExpect(jsonPath("$.hasChangeLogs").value(true));
-        org.assertj.core.api.Assertions.assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM assessment_lab_score_change_log WHERE submission_id = ?", Integer.class, submissionId)).isEqualTo(1);
-        org.assertj.core.api.Assertions.assertThat(jdbc.queryForObject("SELECT old_final_score FROM assessment_lab_score_change_log WHERE submission_id = ?", BigDecimal.class, submissionId)).isEqualByComparingTo("80");
-        org.assertj.core.api.Assertions.assertThat(jdbc.queryForObject("SELECT new_final_score FROM assessment_lab_score_change_log WHERE submission_id = ?", BigDecimal.class, submissionId)).isEqualByComparingTo("90");
-        org.assertj.core.api.Assertions.assertThat(jdbc.queryForObject("SELECT reason FROM assessment_lab_score_change_log WHERE submission_id = ?", String.class, submissionId)).isEqualTo("rubric correction");
+        org.assertj.core.api.Assertions.assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM assessment_lab_score_change_log WHERE submission_id = ?", Integer.class, submissionId)).isEqualTo(2);
+        org.assertj.core.api.Assertions.assertThat(jdbc.queryForObject("SELECT old_final_score FROM assessment_lab_score_change_log WHERE submission_id = ? ORDER BY id DESC LIMIT 1", BigDecimal.class, submissionId)).isEqualByComparingTo("80");
+        org.assertj.core.api.Assertions.assertThat(jdbc.queryForObject("SELECT new_final_score FROM assessment_lab_score_change_log WHERE submission_id = ? ORDER BY id DESC LIMIT 1", BigDecimal.class, submissionId)).isEqualByComparingTo("90");
+        org.assertj.core.api.Assertions.assertThat(jdbc.queryForObject("SELECT reason FROM assessment_lab_score_change_log WHERE submission_id = ? ORDER BY id DESC LIMIT 1", String.class, submissionId)).isEqualTo("rubric correction");
         org.assertj.core.api.Assertions.assertThat(jdbc.queryForObject("SELECT final_score FROM assessment_lab_submission WHERE submission_id = ?", BigDecimal.class, submissionId)).isEqualByComparingTo("90");
         org.assertj.core.api.Assertions.assertThat(jdbc.queryForObject("SELECT submit_status FROM assessment_lab_submission WHERE submission_id = ?", String.class, submissionId)).isEqualTo("SCORED");
         org.assertj.core.api.Assertions.assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM assessment_source_grade WHERE source_type = 'LAB' AND source_id = ? AND student_id = ?", Integer.class, Long.toString(labId), "student-score-314")).isZero();
