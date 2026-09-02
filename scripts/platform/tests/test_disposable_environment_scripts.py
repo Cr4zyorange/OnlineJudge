@@ -147,6 +147,12 @@ class DisposableEnvironmentScriptsTest(unittest.TestCase):
         # correlation id source cannot rely solely on /proc.
         self.assertIn("new_request_id()", source)
         self.assertIn("uuidgen | tr '[:upper:]' '[:lower:]'", source)
+        # Kubernetes snapshots can contain a temporarily injected service
+        # Authorization value.  Evidence must preserve the resource state
+        # without copying that credential into raw files.
+        self.assertIn("redact_bearer_values()", source)
+        self.assertIn("redact_bearer_values", source)
+        self.assertIn("<redacted>", source)
         # AC-319-04 requires database-backed diagnostic signals. Application
         # logs alone cannot prove projection catch-up or an active task lease.
         self.assertIn("capture_projection_and_lease_diagnostics", source)
