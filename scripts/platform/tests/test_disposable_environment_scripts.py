@@ -105,6 +105,11 @@ class DisposableEnvironmentScriptsTest(unittest.TestCase):
         self.assertIn("collect_diagnostics after-ready-failure", source)
         self.assertIn("exit \"$after_ready_status\"", source)
 
+    def test_run_command_uses_a_portable_unique_runtime_secret_template(self) -> None:
+        source = self.assert_help(RUN)
+        self.assertNotIn('onlinejudge-issue318.XXXXXX.env', source)
+        self.assertIn('onlinejudge-issue318.XXXXXX")', source)
+
     def test_rollback_command_requires_an_immutable_artifact_manifest(self) -> None:
         source = self.assert_help(ROLLBACK)
         self.assertIn("artifact-manifest.json", source)

@@ -64,7 +64,7 @@ if [[ -z "$output_dir" ]]; then output_dir="$repo_root/output/issue-318/$git_sha
 mkdir -p "$output_dir"
 compose_file="$output_dir/compose.yml"
 kubernetes_file="$output_dir/platform.yaml"
-runtime_env="$(mktemp "${TMPDIR:-/tmp}/onlinejudge-issue318.XXXXXX.env")"
+runtime_env="$(mktemp "${TMPDIR:-/tmp}/onlinejudge-issue318.XXXXXX")"
 project_name="oj318-${git_sha:0:12}-${run_id##*-}"
 compose=(docker compose --project-name "$project_name" --env-file "$runtime_env" --file "$compose_file")
 
