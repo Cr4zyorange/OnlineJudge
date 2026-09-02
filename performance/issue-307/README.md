@@ -2,9 +2,9 @@
 
 ## 当前状态
 
-压测计划、逻辑数据集、原始请求采集、Docker 资源采样、完整性校验和报告聚合工具已经具备。#318 已发布 `ENVIRONMENT_READY` 并合入 `dev`，正式计数不再等待三服务环境。
+压测计划、逻辑数据集、原始请求采集、Docker 资源采样、完整性校验和报告聚合工具已经具备。#318 已发布 `ENVIRONMENT_READY` 并合入 `dev`，并已在同一台机器完成正式 18 轮实测，结果位于 [20260902T0958Z](results/20260902T0958Z/report/comparison.md)。
 
-正式计数仍必须逐轮证明以下条件；缺任意一项时不得声明 Issue 完成：
+正式计数逐轮证明了以下条件；缺任意一项时工具会拒绝聚合：
 
 - #318 的完整 `ENVIRONMENT_READY` 信号：`ENVIRONMENT_READY issue=#318 sha=2d6160fe570f60bba73922640cb8a58bdb692b97 endpoint=http://127.0.0.1:18080 workloads=9 migrations=4 evidence=https://github.com/Cr4zyorange/OnlineJudge/pull/363 actions=https://github.com/Cr4zyorange/OnlineJudge/actions/runs/33500641015`。
 - Docker daemon ready，并记录 `docker info`、Compose project、镜像 SHA 和容器清单。
@@ -20,8 +20,8 @@
 | --- | --- |
 | 单体 tag | `monolith-start` |
 | 单体 commit | `78715f21288782a2c7ef1d9c23f933c46569b108` |
-| 三服务执行 commit | `84e017dd466e330cea723441979842d0633c14eb` |
-| 三服务业务内容基线 | `84e017dd466e330cea723441979842d0633c14eb` |
+| 三服务执行 commit | `bb4d83ee7a0891490869960370670a2dd03e9962` |
+| 三服务业务内容基线 | `bb4d83ee7a0891490869960370670a2dd03e9962` |
 | 压测工具分支 | `test/307-monolith-three-service-perf` |
 | 数据集 | `performance/issue-307/dataset.json` |
 | 数据集 SHA-256 | `733338e1ba51a64b693b60678eeacaa78a0597f7e2034bba6dc2b09e067885c6` |
@@ -107,15 +107,31 @@ node scripts/perf/issue-307.mjs aggregate \
 - `comparison.md`：逐轮、全量聚合和有限解释；
 - `rounds.csv`：图表和二次分析数据。
 
-指标单位固定为延迟 `ms`、吞吐 `requests/second`、错误率 `%`、CPU `%`、内存 `MiB`。报告只陈述观测差异；进程数、网络跳数、序列化、连接池和缓存只能在有对应证据时作为解释，不能自动写成因果结论。
+完成窗口中的全量逐请求 JSON 已无损压缩为 `raw/**/*.json.gz`；`raw/raw-manifest.json` 同时记录压缩前、压缩后 SHA-256 和字节数。聚合器可直接读取 `.json.gz`：
+
+```text
+node scripts/perf/issue-307-archive-raw.mjs \
+  --raw-dir performance/issue-307/results/<window>/raw
+node scripts/perf/issue-307.mjs aggregate \
+  --plan performance/issue-307/plan.json \
+  --raw-dir performance/issue-307/results/<window>/raw \
+  --output-dir performance/issue-307/results/<window>/report
+```
+
+指标单位固定为延迟 `ms`、总请求吞吐 `requests/second`、成功请求吞吐 `requests/second`、错误率 `%`、CPU `%`、内存 `MiB`。报告只陈述观测差异；当错误率非零时，总请求吞吐和 P95 包含快速失败，不能作为成功业务容量结论，必须查看成功请求吞吐。进程数、网络跳数、序列化、连接池和缓存只能在有对应证据时作为解释，不能自动写成因果结论。
+
+## 2026-09-02 正式结果与结论边界
+
+正式窗口完成 `3 API × 2 架构 × 3 轮 = 18` 个样本。三服务的所有九个工作负载和单体的三个工作负载分别限制为同一总预算；逐轮窗口、重置日志、硬限制、镜像 SHA 和压缩原始样本均在 [evidence](results/20260902T0958Z/evidence/README.md) 中可复核。
+
+该窗口不是“成功业务容量”的胜负结论：三服务 `course-list`、`homework-submission`、`my-grades` 的错误率分别为 `99.419%`、`99.822%`、`100%`，对应成功请求吞吐仅为 `30.102`、`10`、`0` requests/second。单体 `homework-submission` 也有 `82.665%` 错误率，成功请求吞吐为 `82.794` requests/second。完整逐轮数据、P95、CPU、内存与差异都以 [comparison.md](results/20260902T0958Z/report/comparison.md) 为准；任何“低 P95 / 高总吞吐”都必须结合该错误率解释为快速失败，而不是性能提升。
 
 ## AC 对照
 
 | 验收项 | 当前证据 | 状态 |
 | --- | --- | --- |
-| AC-307-01 同机、同数据、同脚本、同负载、可比资源 | plan、dataset checksum、机器指纹和聚合拒绝门禁 | 准备完成，待正式环境执行 |
-| AC-307-02 3 API × 2 架构 × 3 轮 | 18 轮完整性门禁和原始请求样本格式 | 准备完成，尚无正式样本 |
-| AC-307-03 无 HPA/E2E/故障/压力污染 | formal-window fail-closed 校验 | 准备完成，待独占窗口逐轮记录 |
-| AC-307-04 P95/吞吐/错误率/CPU/内存 | nearest-rank P95、Docker stats 汇总、JSON/Markdown/CSV | 工具完成，尚无正式数值 |
-| AC-307-05 有限解释且不宣称未测结论 | 报告解释边界与差异字段 | 工具完成，待真实结果解释 |
-
+| AC-307-01 同机、同数据、同脚本、同负载、可比资源 | 同一机器指纹、数据集 SHA、每轮 formal-window、硬限制证据 | 已完成 |
+| AC-307-02 3 API × 2 架构 × 3 轮 | `raw-manifest.json` 的 18 个无损压缩原始样本 | 已完成 |
+| AC-307-03 无 HPA/E2E/故障/压力污染 | 每轮 `formal/**/*.json` 均为独占窗口且污染项为 false | 已完成 |
+| AC-307-04 P95/吞吐/错误率/CPU/内存 | `comparison.json`、`comparison.md`、`rounds.csv`，并拆分成功吞吐 | 已完成 |
+| AC-307-05 有限解释且不宣称未测结论 | 报告和本节明确快速失败不代表性能提升 | 已完成 |

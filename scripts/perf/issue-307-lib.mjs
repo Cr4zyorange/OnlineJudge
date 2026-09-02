@@ -189,6 +189,7 @@ function metricsForRound(raw) {
   const durations = raw.requests.map(({ durationMs }) => Number(durationMs));
   invariant(durations.every((value) => Number.isFinite(value) && value >= 0), "request durations must be finite and non-negative");
   const failures = raw.requests.filter(({ ok }) => !ok).length;
+  const successes = raw.requests.length - failures;
   const cpu = raw.resourceSamples.map(({ cpuPercent }) => Number(cpuPercent));
   const memory = raw.resourceSamples.map(({ memoryMiB }) => Number(memoryMiB));
   invariant(cpu.every(Number.isFinite), "resource CPU samples must be finite");
@@ -201,6 +202,8 @@ function metricsForRound(raw) {
     averageMs: round(durations.reduce((sum, value) => sum + value, 0) / durations.length),
     p95Ms: round(percentileNearestRank(durations, 0.95)),
     throughputRequestsPerSecond: round(raw.requests.length / (raw.measuredDurationMs / 1000)),
+    successfulRequestCount: successes,
+    successfulThroughputRequestsPerSecond: round(successes / (raw.measuredDurationMs / 1000)),
     errorRatePercent: round((failures / raw.requests.length) * 100),
     cpuAveragePercent: round(cpu.reduce((sum, value) => sum + value, 0) / cpu.length),
     cpuMaxPercent: round(Math.max(...cpu)),
@@ -315,6 +318,7 @@ export function aggregateComparison(plan, rawRounds) {
       const resources = group.flatMap(({ resourceSamples }) => resourceSamples);
       const totalMeasuredMs = group.reduce((sum, { measuredDurationMs }) => sum + measuredDurationMs, 0);
       const failures = requests.filter(({ ok }) => !ok).length;
+      const successes = requests.length - failures;
       summary.push({
         architecture,
         scenario,
@@ -323,6 +327,8 @@ export function aggregateComparison(plan, rawRounds) {
         averageMs: round(durations.reduce((sum, value) => sum + value, 0) / durations.length),
         p95Ms: round(percentileNearestRank(durations, 0.95)),
         throughputRequestsPerSecond: round(requests.length / (totalMeasuredMs / 1000)),
+        successfulRequestCount: successes,
+        successfulThroughputRequestsPerSecond: round(successes / (totalMeasuredMs / 1000)),
         errorRatePercent: round((failures / requests.length) * 100),
         cpuAveragePercent: round(
           resources.reduce((sum, { cpuPercent }) => sum + Number(cpuPercent), 0) / resources.length,
@@ -349,6 +355,10 @@ export function aggregateComparison(plan, rawRounds) {
           threeService.throughputRequestsPerSecond,
           monolith.throughputRequestsPerSecond,
         ),
+        successfulThroughputPercent: percentDelta(
+          threeService.successfulThroughputRequestsPerSecond,
+          monolith.successfulThroughputRequestsPerSecond,
+        ),
         errorRatePercentagePoints: round(threeService.errorRatePercent - monolith.errorRatePercent),
         cpuAveragePercentagePoints: round(threeService.cpuAveragePercent - monolith.cpuAveragePercent),
         memoryAverageMiB: round(threeService.memoryAverageMiB - monolith.memoryAverageMiB),
@@ -374,6 +384,8 @@ export function aggregateComparison(plan, rawRounds) {
     summary,
     comparisons,
     interpretationBoundary: [
+      "Total request throughput and P95 include failed responses; use successful throughput for business-capacity comparison.",
+      "Any scenario with a nonzero error rate is not evidence of successful business capacity at that load.",
       "The report records observed deltas; it does not claim an unmeasured cause.",
       "Candidate causes must be supported by process, network, serialization, connection-pool or cache evidence.",
       "All configured rounds are included; favorable rounds are never selected or discarded.",

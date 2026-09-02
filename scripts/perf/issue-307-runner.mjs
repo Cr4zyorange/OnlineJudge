@@ -255,29 +255,29 @@ export function renderMarkdownReport(report) {
     "",
     "## 原始轮次指标",
     "",
-    "| Architecture | Scenario | Round | Requests | Average (ms) | P95 (ms) | Throughput (requests/second) | Error rate (%) | CPU avg (%) | CPU max (%) | Memory avg (MiB) | Memory max (MiB) |",
-    "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+    "| Architecture | Scenario | Round | Requests | Successful requests | Average (ms) | P95 (ms) | Throughput (requests/second) | Successful throughput (requests/second) | Error rate (%) | CPU avg (%) | CPU max (%) | Memory avg (MiB) | Memory max (MiB) |",
+    "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
   ];
   for (const item of report.rounds) {
     lines.push(
-      `| ${markdownCell(item.architecture)} | ${markdownCell(item.scenario)} | ${item.round} | ${item.requestCount} | ${item.averageMs} | ${item.p95Ms} | ${item.throughputRequestsPerSecond} | ${item.errorRatePercent} | ${item.cpuAveragePercent} | ${item.cpuMaxPercent} | ${item.memoryAverageMiB} | ${item.memoryMaxMiB} |`,
+      `| ${markdownCell(item.architecture)} | ${markdownCell(item.scenario)} | ${item.round} | ${item.requestCount} | ${item.successfulRequestCount} | ${item.averageMs} | ${item.p95Ms} | ${item.throughputRequestsPerSecond} | ${item.successfulThroughputRequestsPerSecond} | ${item.errorRatePercent} | ${item.cpuAveragePercent} | ${item.cpuMaxPercent} | ${item.memoryAverageMiB} | ${item.memoryMaxMiB} |`,
     );
   }
   lines.push("", "## 全量聚合", "");
   lines.push(
-    "| Architecture | Scenario | Rounds | Requests | Average (ms) | P95 (ms) | Throughput (requests/second) | Error rate (%) | CPU avg (%) | CPU max (%) | Memory avg (MiB) | Memory max (MiB) |",
-    "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+    "| Architecture | Scenario | Rounds | Requests | Successful requests | Average (ms) | P95 (ms) | Throughput (requests/second) | Successful throughput (requests/second) | Error rate (%) | CPU avg (%) | CPU max (%) | Memory avg (MiB) | Memory max (MiB) |",
+    "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
   );
   for (const item of report.summary) {
     lines.push(
-      `| ${markdownCell(item.architecture)} | ${markdownCell(item.scenario)} | ${item.roundCount} | ${item.requestCount} | ${item.averageMs} | ${item.p95Ms} | ${item.throughputRequestsPerSecond} | ${item.errorRatePercent} | ${item.cpuAveragePercent} | ${item.cpuMaxPercent} | ${item.memoryAverageMiB} | ${item.memoryMaxMiB} |`,
+      `| ${markdownCell(item.architecture)} | ${markdownCell(item.scenario)} | ${item.roundCount} | ${item.requestCount} | ${item.successfulRequestCount} | ${item.averageMs} | ${item.p95Ms} | ${item.throughputRequestsPerSecond} | ${item.successfulThroughputRequestsPerSecond} | ${item.errorRatePercent} | ${item.cpuAveragePercent} | ${item.cpuMaxPercent} | ${item.memoryAverageMiB} | ${item.memoryMaxMiB} |`,
     );
   }
   lines.push("", "## 差异与解释边界", "");
   for (const item of report.comparisons) {
     const delta = item.threeServiceMinusMonolith;
     lines.push(
-      `- ${item.scenario}：三服务相对单体 P95 差异 ${delta.p95Percent ?? "N/A"}%，吞吐差异 ${delta.throughputPercent ?? "N/A"}%，错误率差异 ${delta.errorRatePercentagePoints} 个百分点，CPU 平均差异 ${delta.cpuAveragePercentagePoints} 个百分点，内存平均差异 ${delta.memoryAverageMiB} MiB。`,
+      `- ${item.scenario}：三服务相对单体 P95 差异 ${delta.p95Percent ?? "N/A"}%，总请求吞吐差异 ${delta.throughputPercent ?? "N/A"}%，成功请求吞吐差异 ${delta.successfulThroughputPercent ?? "N/A"}%，错误率差异 ${delta.errorRatePercentagePoints} 个百分点，CPU 平均差异 ${delta.cpuAveragePercentagePoints} 个百分点，内存平均差异 ${delta.memoryAverageMiB} MiB。`,
     );
   }
   for (const boundary of report.interpretationBoundary) {
@@ -300,6 +300,8 @@ export function renderCsvReport(report) {
     ["average_ms", "averageMs"],
     ["p95_ms", "p95Ms"],
     ["throughput_requests_per_second", "throughputRequestsPerSecond"],
+    ["successful_request_count", "successfulRequestCount"],
+    ["successful_throughput_requests_per_second", "successfulThroughputRequestsPerSecond"],
     ["error_rate_percent", "errorRatePercent"],
     ["cpu_average_percent", "cpuAveragePercent"],
     ["cpu_max_percent", "cpuMaxPercent"],

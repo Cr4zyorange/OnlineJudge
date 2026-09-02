@@ -1,9 +1,12 @@
 #!/usr/bin/env node
 
 import { createHash } from "node:crypto";
+import { realpathSync } from "node:fs";
 import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
 import path from "node:path";
 import process from "node:process";
+import { gunzipSync } from "node:zlib";
 
 import { aggregateComparison, machineFingerprint, validatePlan } from "./issue-307-lib.mjs";
 import {
@@ -35,8 +38,9 @@ function parseOptions(argumentsList) {
   return { command, options };
 }
 
-async function readJson(file) {
-  return JSON.parse(await readFile(file, "utf8"));
+export async function readJson(file) {
+  const bytes = await readFile(file);
+  return JSON.parse(file.endsWith(".gz") ? gunzipSync(bytes).toString("utf8") : bytes.toString("utf8"));
 }
 
 async function sha256File(file) {
@@ -72,7 +76,7 @@ async function listJsonFiles(directory) {
     const target = path.join(directory, entry.name);
     if (entry.isDirectory()) {
       files.push(...(await listJsonFiles(target)));
-    } else if (entry.isFile() && entry.name.endsWith(".json")) {
+    } else if (entry.isFile() && (entry.name.endsWith(".json") || entry.name.endsWith(".json.gz"))) {
       files.push(target);
     }
   }
@@ -209,7 +213,9 @@ async function main() {
   }
 }
 
-main().catch((error) => {
-  process.stderr.write(`ERROR: ${error.message}\n`);
-  process.exitCode = 1;
-});
+if (process.argv[1] && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url))) {
+  main().catch((error) => {
+    process.stderr.write(`ERROR: ${error.message}\n`);
+    process.exitCode = 1;
+  });
+}

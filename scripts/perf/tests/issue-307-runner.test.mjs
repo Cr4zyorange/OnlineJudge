@@ -135,6 +135,8 @@ test("reports include every required unit and avoid causal performance claims", 
         averageMs: 10,
         p95Ms: 20,
         throughputRequestsPerSecond: 100,
+        successfulRequestCount: 10,
+        successfulThroughputRequestsPerSecond: 100,
         errorRatePercent: 0,
         cpuAveragePercent: 10,
         cpuMaxPercent: 15,
@@ -150,6 +152,7 @@ test("reports include every required unit and avoid causal performance claims", 
   const markdown = renderMarkdownReport(report);
   const csv = renderCsvReport(report);
   assert.match(markdown, /P95 \(ms\)/);
+  assert.match(markdown, /Successful throughput \(requests\/second\)/);
   assert.match(markdown, /CPU avg \(%\)/);
   assert.match(markdown, /Memory max \(MiB\)/);
   assert.match(markdown, /Observed deltas are not proof of cause/);

@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "issue": 307,
+  "description": "Hard Docker limits for the mutually exclusive #307 formal benchmark windows.",
+  "totalBudget": {
+    "cpuCores": 4,
+    "memoryMiB": 6144
+  },
+  "architectures": {
+    "monolith": {
+      "mysql": { "cpuCores": 1, "memoryMiB": 1536 },
+      "backend": { "cpuCores": 2.5, "memoryMiB": 4096 },
+      "frontend": { "cpuCores": 0.5, "memoryMiB": 512 }
+    },
+    "three-service": {
+      "mysql": { "cpuCores": 0.75, "memoryMiB": 1536 },
+      "rabbitmq": { "cpuCores": 0.25, "memoryMiB": 384 },
+      "identity-service": { "cpuCores": 0.25, "memoryMiB": 384 },
+      "course-service": { "cpuCores": 0.5, "memoryMiB": 768 },
+      "assessment-api": { "cpuCores": 0.75, "memoryMiB": 1024 },
+      "assessment-worker": { "cpuCores": 0.5, "memoryMiB": 768 },
+      "grade-service": { "cpuCores": 0.5, "memoryMiB": 768 },
+      "gateway": { "cpuCores": 0.25, "memoryMiB": 256 },
+      "frontend": { "cpuCores": 0.25, "memoryMiB": 256 }
+    }
+  }
+}

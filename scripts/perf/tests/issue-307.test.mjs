@@ -166,6 +166,8 @@ test("aggregate keeps every round and reports P95, throughput, errors, CPU and m
   });
   assert.equal(result.rounds[0].p95Ms, 40);
   assert.equal(result.rounds[0].throughputRequestsPerSecond, 4);
+  assert.equal(result.rounds[0].successfulRequestCount, 3);
+  assert.equal(result.rounds[0].successfulThroughputRequestsPerSecond, 3);
   assert.equal(result.rounds[0].errorRatePercent, 25);
   assert.equal(result.rounds[0].cpuAveragePercent, 20);
   assert.equal(result.rounds[0].memoryMaxMiB, 140);

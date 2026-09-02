@@ -1,0 +1,17 @@
+{
+  "environmentReadySignal": "ENVIRONMENT_READY issue=#318 sha=2d6160fe570f60bba73922640cb8a58bdb692b97 endpoint=http://127.0.0.1:18080 workloads=9 migrations=4 evidence=https://github.com/Cr4zyorange/OnlineJudge/pull/363 actions=https://github.com/Cr4zyorange/OnlineJudge/actions/runs/33500641015",
+  "dockerDaemonReady": true,
+  "exclusiveWindow": true,
+  "hpaEnabled": false,
+  "e2eRunning": false,
+  "faultInjectionRunning": false,
+  "otherPressureRunning": false,
+  "datasetRestoreEvidence": "DATASET_READY architecture=three-service project=oj307-three-0949 users=101 courses=105 members=101 homeworks=1 summaries=100 grade-records=300 submissions=0 file=performance/issue-307/results/20260902T0958Z/formal/three-service/homework-submission-round-1-dataset-reset.log",
+  "resourcePolicyEvidence": "sha256=e6bce18b324dfb79c0273baef9621f50c826cfae0958ebf1c1a7ead4fe942f57 file=/tmp/oj307-three-service-evidence.0949/hard-limits.txt",
+  "runtime": {
+    "architecture": "three-service",
+    "project": "oj307-three-0949",
+    "expectedLiveContainers": 9,
+    "observedLiveContainers": 9
+  }
+}

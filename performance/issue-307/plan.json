@@ -8,8 +8,8 @@
     },
     "threeService": {
       "ref": "origin/dev",
-      "sha": "84e017dd466e330cea723441979842d0633c14eb",
-      "contentSha": "84e017dd466e330cea723441979842d0633c14eb"
+      "sha": "bb4d83ee7a0891490869960370670a2dd03e9962",
+      "contentSha": "bb4d83ee7a0891490869960370670a2dd03e9962"
     }
   },
   "environment": {
