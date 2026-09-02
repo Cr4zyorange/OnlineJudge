@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-02T07:23:43.931Z",
+  "generatedAt": "2026-09-02T07:40:10.238Z",
   "mapping": {
     "identity|GET /api/v1/admin/permissions": [
       {
