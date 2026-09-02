@@ -83,6 +83,25 @@ class DisposableEnvironmentScriptsTest(unittest.TestCase):
         self.assertIn("rabbitmq_queue_backlog", source)
         self.assertIn("assessment_outbox_pending_and_lease", source)
         self.assertIn("grade_projection_watermark", source)
+        # AC-319-03: the outage phase must prove RabbitMQ really went away
+        # (statefulset readyReplicas at zero AND service endpoints empty) and
+        # must record assessment-api availability samples from inside that
+        # verified outage window; a rollout status on an already-ready
+        # deployment returns immediately and is not evidence.
+        self.assertIn("rabbitmq_outage_window_seconds", source)
+        self.assertIn("status.readyReplicas", source)
+        self.assertIn("endpoints rabbitmq", source)
+        self.assertIn("endpoints assessment-api", source)
+        self.assertIn("availableReplicas", source)
+        self.assertIn("rabbitmq confirmed unavailable", source)
+        self.assertIn("rabbitmq restored", source)
+        # AC-319-04: the two diagnostics signals must carry raw database
+        # values, not just application logs; the logs stay as context files.
+        self.assertIn("lease_owner, lease_until, heartbeat_at", source)
+        self.assertIn("grade_source_projection_watermark", source)
+        self.assertIn("assessment-outbox-lease-timeline", source)
+        self.assertIn("assessment-api-applog", source)
+        self.assertIn("grade-service-applog", source)
         self.assertIn('"finishedAtUtc"', source)
         self.assertIn("request_id", source)
         self.assertIn("rabbitmq_outage=1", source)

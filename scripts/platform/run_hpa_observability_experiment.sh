@@ -17,6 +17,7 @@ sample_seconds=5
 scale_timeout_seconds=420
 rabbitmq_outage=1
 rabbitmq_original_replicas=""
+rabbitmq_outage_window_seconds=30
 
 usage() {
   cat <<'USAGE'
@@ -44,6 +45,14 @@ Options:
   --sample-seconds N        HPA/resource sampling interval (default: 5)
   --scale-timeout-seconds N Maximum wait for each scale transition (default: 420)
   --output-dir DIR          Evidence directory (default: output/issue-319/<sha>/<utc>)
+
+The RabbitMQ outage phase scales the statefulset to zero, waits until its
+readyReplicas reach zero AND its service endpoints are empty, samples
+assessment-api availability inside that verified outage window for
+rabbitmq_outage_window_seconds (default: 30), then restores and waits for the
+original readyReplicas again. Database-backed diagnostics (outbox/lease and
+grade projection watermark) are read through the mysql workload's root
+environment inside the cluster; no secret value is copied into evidence.
 USAGE
 }
 
@@ -92,16 +101,51 @@ base_sha="$(git -C "$repo_root" merge-base HEAD origin/dev 2>/dev/null || git -C
 if [[ -z "$output_dir" ]]; then output_dir="$repo_root/output/issue-319/$head_sha/$(date -u +%Y%m%dT%H%M%SZ)"; fi
 mkdir -p "$output_dir/raw"
 
+# MySQL diagnostic queries run with the credentials already provisioned inside
+# the mysql container; the runner never reads or stores the secret value. The
+# SQL travels on stdin because kubectl exec does not forward local env vars.
+mysql_query() {
+  kubectl -n "$namespace" exec -i statefulset/mysql -- sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql -uroot -t' <<< "${OJ_MYSQL_SQL}" 2>&1
+}
+
 sampler_pid=""
+lease_sampler_pid=""
 started_at=""
 capture_diagnostics() {
   kubectl -n "$namespace" get hpa assessment-api -o yaml > "$output_dir/raw/hpa.yaml" 2>&1 || true
   kubectl -n "$namespace" get pods -l app.kubernetes.io/name=assessment-api -o wide > "$output_dir/raw/pods.txt" 2>&1 || true
   kubectl -n "$namespace" top pod -l app.kubernetes.io/name=assessment-api > "$output_dir/raw/resourceUsage.txt" 2>&1 || true
   kubectl -n "$namespace" logs deployment/gateway --all-containers --tail=-1 > "$output_dir/raw/gateway_request_correlation.log" 2>&1 || true
-  kubectl -n "$namespace" logs deployment/assessment-api --all-containers --tail=-1 > "$output_dir/raw/assessment_outbox_pending_and_lease.log" 2>&1 || true
-  kubectl -n "$namespace" logs deployment/grade-service --all-containers --tail=-1 > "$output_dir/raw/grade_projection_watermark.log" 2>&1 || true
+  kubectl -n "$namespace" logs deployment/assessment-api --all-containers --tail=-1 > "$output_dir/raw/assessment-api-applog.log" 2>&1 || true
+  kubectl -n "$namespace" logs deployment/grade-service --all-containers --tail=-1 > "$output_dir/raw/grade-service-applog.log" 2>&1 || true
   kubectl -n "$namespace" exec statefulset/rabbitmq -- rabbitmqctl list_queues name messages_ready messages_unacknowledged > "$output_dir/raw/rabbitmq_queue_backlog.txt" 2>&1 || true
+
+  {
+    printf '# assessment_event_outbox pending/delivered distribution (raw)\n'
+    OJ_MYSQL_SQL="SELECT state, COUNT(*) AS events FROM oj_assessment.assessment_event_outbox GROUP BY state ORDER BY state;" mysql_query
+    printf '\n# outbox event types by state (raw; grade consumes assessment.source-grade.changed.v2)\n'
+    OJ_MYSQL_SQL="SELECT event_type, state, COUNT(*) AS events FROM oj_assessment.assessment_event_outbox GROUP BY event_type, state ORDER BY event_type, state;" mysql_query
+    printf '\n# evaluation_task state distribution (raw)\n'
+    OJ_MYSQL_SQL="SELECT state, COUNT(*) AS tasks FROM oj_assessment.evaluation_task GROUP BY state ORDER BY state;" mysql_query
+    printf '\n# active leases right now: lease_owner/lease_until/heartbeat_at raw values\n'
+    OJ_MYSQL_SQL="SELECT id, state, attempt, lease_owner, lease_until, heartbeat_at FROM oj_assessment.evaluation_task WHERE lease_until > UTC_TIMESTAMP ORDER BY lease_until DESC LIMIT 20;" mysql_query
+    printf '\n# recently leased tasks (lease lifecycle touched within 60s; heartbeat_at is the last lease heartbeat)\n'
+    OJ_MYSQL_SQL="SELECT id, state, attempt, lease_owner, lease_until, heartbeat_at FROM oj_assessment.evaluation_task WHERE heartbeat_at > UTC_TIMESTAMP - INTERVAL 60 SECOND ORDER BY heartbeat_at DESC LIMIT 20;" mysql_query
+    printf '\n# lease timeline samples captured during the load: raw/assessment-outbox-lease-timeline.log\n'
+  } > "$output_dir/raw/assessment_outbox_pending_and_lease.log" 2>&1
+
+  {
+    printf '# grade_source_projection_watermark raw rows (consumer cursor per aggregate)\n'
+    OJ_MYSQL_SQL="SELECT aggregate_id, current_version FROM oj_grade.grade_source_projection_watermark ORDER BY aggregate_id LIMIT 50;" mysql_query
+    OJ_MYSQL_SQL="SELECT COUNT(*) AS watermark_rows FROM oj_grade.grade_source_projection_watermark;" mysql_query
+    printf '\n# grade_source_projection raw row count (projected source grades)\n'
+    OJ_MYSQL_SQL="SELECT COUNT(*) AS projection_rows FROM oj_grade.grade_source_projection;" mysql_query
+    printf '\n# grade consumer activity: inbox/outbox/deferred raw row counts\n'
+    OJ_MYSQL_SQL="SELECT 'grade_event_inbox' AS tbl, COUNT(*) AS rows_from FROM oj_grade.grade_event_inbox UNION ALL SELECT 'grade_event_outbox', COUNT(*) FROM oj_grade.grade_event_outbox UNION ALL SELECT 'grade_source_deferred_event', COUNT(*) FROM oj_grade.grade_source_deferred_event;" mysql_query
+    printf '\n# projection source side: assessment source grade raw row counts\n'
+    OJ_MYSQL_SQL="SELECT 'assessment_source_grade' AS tbl, COUNT(*) AS rows_from FROM oj_assessment.assessment_source_grade UNION ALL SELECT 'assessment_source_grade_revision', COUNT(*) FROM oj_assessment.assessment_source_grade_revision;" mysql_query
+    printf '\n# grade queue depths at capture time (raw): raw/rabbitmq_queue_backlog.txt\n'
+  } > "$output_dir/raw/grade_projection_watermark.log" 2>&1
 }
 
 wait_for_replicas() {
@@ -128,6 +172,7 @@ wait_for_replicas() {
 finish() {
   status=$?
   if [[ -n "$sampler_pid" ]]; then kill "$sampler_pid" 2>/dev/null || true; fi
+  if [[ -n "$lease_sampler_pid" ]]; then kill "$lease_sampler_pid" 2>/dev/null || true; fi
   if (( rabbitmq_outage )) && [[ -n "$rabbitmq_original_replicas" ]]; then
     kubectl -n "$namespace" scale statefulset/rabbitmq --replicas="$rabbitmq_original_replicas" >> "$output_dir/raw/rabbitmq-restore.log" 2>&1 || true
   fi
@@ -173,12 +218,46 @@ baseline_replicas="$(kubectl -n "$namespace" get deployment/assessment-api -o js
 [[ "$baseline_replicas" =~ ^[1-9][0-9]*$ ]] || { printf 'assessment-api has no baseline replicas\n' >&2; exit 1; }
 started_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 if (( rabbitmq_outage )); then
+  outage_log="$output_dir/raw/rabbitmq-outage.log"
   rabbitmq_original_replicas="$(kubectl -n "$namespace" get statefulset/rabbitmq -o jsonpath='{.spec.replicas}')"
-  kubectl -n "$namespace" scale statefulset/rabbitmq --replicas=0 > "$output_dir/raw/rabbitmq-outage.log" 2>&1
-  kubectl -n "$namespace" rollout status deployment/assessment-api --timeout=60s >> "$output_dir/raw/rabbitmq-outage.log" 2>&1
-  available_replicas="$(kubectl -n "$namespace" get deployment/assessment-api -o jsonpath='{.status.availableReplicas}')"
-  [[ "$available_replicas" =~ ^[1-9][0-9]*$ ]] || { printf 'assessment-api lost readiness during RabbitMQ outage\n' >&2; exit 1; }
-  kubectl -n "$namespace" scale statefulset/rabbitmq --replicas="$rabbitmq_original_replicas" >> "$output_dir/raw/rabbitmq-outage.log" 2>&1
+  printf '%s scaling rabbitmq statefulset to 0 (original replicas=%s)\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$rabbitmq_original_replicas" >> "$outage_log"
+  kubectl -n "$namespace" scale statefulset/rabbitmq --replicas=0 >> "$outage_log" 2>&1
+  # Wait until RabbitMQ is really gone: readyReplicas at zero AND the service
+  # endpoints empty. Scale acceptance alone is not evidence of unavailability.
+  outage_deadline=$((SECONDS + scale_timeout_seconds))
+  while :; do
+    rabbitmq_ready="$(kubectl -n "$namespace" get statefulset/rabbitmq -o jsonpath='{.status.readyReplicas}' 2>/dev/null || true)"
+    rabbitmq_endpoints="$(kubectl -n "$namespace" get endpoints rabbitmq -o jsonpath='{.subsets[*].addresses[*].ip}' 2>/dev/null || true)"
+    printf '%s rabbitmq readyReplicas=%s serviceEndpoints=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "${rabbitmq_ready:-0}" "${rabbitmq_endpoints:-none}" >> "$outage_log"
+    if [[ -z "$rabbitmq_ready" || "$rabbitmq_ready" == "0" ]] && [[ -z "$rabbitmq_endpoints" ]]; then break; fi
+    (( SECONDS < outage_deadline )) || { printf 'rabbitmq still available after %ss: readyReplicas=%s endpoints=%s\n' "$scale_timeout_seconds" "${rabbitmq_ready:-0}" "${rabbitmq_endpoints:-none}" >&2; exit 1; }
+    sleep 2
+  done
+  printf '%s rabbitmq confirmed unavailable (readyReplicas=0, service endpoints empty)\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$outage_log"
+  # Hold the verified outage window and record assessment-api availability
+  # samples from inside it; readiness must not cascade with rabbitmq down.
+  window_deadline=$((SECONDS + rabbitmq_outage_window_seconds))
+  while :; do
+    assessment_available="$(kubectl -n "$namespace" get deployment/assessment-api -o jsonpath='{.status.availableReplicas}' 2>/dev/null || true)"
+    assessment_ready="$(kubectl -n "$namespace" get deployment/assessment-api -o jsonpath='{.status.readyReplicas}' 2>/dev/null || true)"
+    assessment_endpoints="$(kubectl -n "$namespace" get endpoints assessment-api -o jsonpath='{.subsets[*].addresses[*].ip}' 2>/dev/null || true)"
+    printf '%s assessment-api availableReplicas=%s readyReplicas=%s serviceEndpoints=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "${assessment_available:-0}" "${assessment_ready:-0}" "${assessment_endpoints:-none}" >> "$outage_log"
+    (( ${assessment_available:-0} >= 1 )) || { printf 'assessment-api lost availability during the verified rabbitmq outage window\n' >&2; exit 1; }
+    (( SECONDS < window_deadline )) && { sleep 3; continue; }
+    break
+  done
+  printf '%s restoring rabbitmq statefulset to %s replicas\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$rabbitmq_original_replicas" >> "$outage_log"
+  kubectl -n "$namespace" scale statefulset/rabbitmq --replicas="$rabbitmq_original_replicas" >> "$outage_log" 2>&1
+  restore_deadline=$((SECONDS + scale_timeout_seconds))
+  while :; do
+    rabbitmq_ready="$(kubectl -n "$namespace" get statefulset/rabbitmq -o jsonpath='{.status.readyReplicas}' 2>/dev/null || true)"
+    rabbitmq_endpoints="$(kubectl -n "$namespace" get endpoints rabbitmq -o jsonpath='{.subsets[*].addresses[*].ip}' 2>/dev/null || true)"
+    printf '%s rabbitmq readyReplicas=%s serviceEndpoints=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "${rabbitmq_ready:-0}" "${rabbitmq_endpoints:-none}" >> "$outage_log"
+    if [[ "$rabbitmq_ready" == "$rabbitmq_original_replicas" ]] && [[ -n "$rabbitmq_endpoints" ]]; then break; fi
+    (( SECONDS < restore_deadline )) || { printf 'rabbitmq did not return to readyReplicas=%s within %ss\n' "$rabbitmq_original_replicas" "$scale_timeout_seconds" >&2; exit 1; }
+    sleep 3
+  done
+  printf '%s rabbitmq restored (readyReplicas=%s, service endpoints repopulated)\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$rabbitmq_original_replicas" >> "$outage_log"
   rabbitmq_original_replicas=""
 fi
 
@@ -189,6 +268,18 @@ fi
     kubectl -n "$namespace" top pod -l app.kubernetes.io/name=assessment-api >> "$output_dir/raw/resource-timeline.txt" 2>&1 || true
     sleep "$sample_seconds"
   done ) & sampler_pid=$!
+
+# Lease/outbox signal sampled at 1s cadence during the load: worker leases are
+# short-lived (sub-second on a failing sandbox), so coarse sampling misses the
+# raw lease_owner/lease_until/heartbeat_at values.
+( while :; do
+    {
+      printf '=== %s ===\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+      OJ_MYSQL_SQL="SELECT COUNT(*) AS outbox_pending FROM oj_assessment.assessment_event_outbox WHERE state = 'PENDING';" mysql_query
+      OJ_MYSQL_SQL="SELECT id, state, attempt, lease_owner, lease_until, heartbeat_at FROM oj_assessment.evaluation_task WHERE lease_until > UTC_TIMESTAMP ORDER BY lease_until DESC LIMIT 10;" mysql_query
+    } >> "$output_dir/raw/assessment-outbox-lease-timeline.log" 2>&1
+    sleep 1
+  done ) & lease_sampler_pid=$!
 
 deadline=$((SECONDS + duration_seconds))
 request_url_index=0
@@ -215,6 +306,9 @@ done
 kill "$sampler_pid" 2>/dev/null || true
 wait "$sampler_pid" 2>/dev/null || true
 sampler_pid=""
+kill "$lease_sampler_pid" 2>/dev/null || true
+wait "$lease_sampler_pid" 2>/dev/null || true
+lease_sampler_pid=""
 python3 - "$output_dir/raw/requests.tsv" <<'PY'
 import pathlib, sys
 rows = pathlib.Path(sys.argv[1]).read_text(encoding="utf-8").splitlines()
