@@ -127,9 +127,10 @@ mutate "$mutations_dir/permissions.yml" 's#^  contents: read#  contents: write#'
 mutate "$mutations_dir/unpinned-action.yml" \
   's|actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2|actions/checkout@v4|'
 
-# 4d. Delivery steps must never use if: always().
+# 4d. Evidence collection may use if: always(), but the build/deploy execution
+#     itself must remain conditional on every quality gate succeeding.
 mutate "$mutations_dir/delivery-always.yml" \
-  's#^        run: bash scripts/ci/collect-environment.sh "$GITHUB_WORKSPACE" ci-artifacts/delivery/environment.json#        if: always()\n        run: bash scripts/ci/collect-environment.sh "$GITHUB_WORKSPACE" ci-artifacts/delivery/environment.json#'
+  's#^        run: bash scripts/ci/disposable-delivery.sh --checkout "$GITHUB_WORKSPACE"#        if: always()\n        run: bash scripts/ci/disposable-delivery.sh --checkout "$GITHUB_WORKSPACE"#'
 
 # 4e. Every job needs an explicit timeout.
 mutate "$mutations_dir/missing-timeout.yml" '/^    timeout-minutes: 30$/d'
@@ -153,7 +154,7 @@ mutate "$mutations_dir/inline-commands.yml" \
 expect_checker_reject continue-on-error "continue-on-error"
 expect_checker_reject permissions "permissions"
 expect_checker_reject unpinned-action "pinned"
-expect_checker_reject delivery-always "delivery"
+expect_checker_reject delivery-always "if: always()"
 expect_checker_reject missing-timeout "timeout"
 expect_checker_reject missing-needs "needs"
 expect_checker_reject missing-concurrency "concurrency"

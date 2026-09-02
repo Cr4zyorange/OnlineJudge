@@ -184,13 +184,11 @@ done
 
 # 9. if: always() 只允许用于证据/诊断步骤；交付执行本身一律禁止。
 while IFS= read -r line_number; do
-  step_start="$((line_number - 3))"
-  step_end="$((line_number + 3))"
-  block="$(sed -n "${step_start},${step_end}p" "$workflow_file")"
-  if grep -Fq 'actions/upload-artifact@' <<< "$block"; then
-    continue
-  fi
-  if grep -Eq '^      - name: .*(Upload|Summarize|Collect|Evidence|Diagnostic)' <<< "$block"; then
+  # Attribute the condition to the step header above it.  A symmetric window
+  # can see the next "Upload ..." step and incorrectly approve an always()
+  # placed on the preceding build/deploy step.
+  step_header="$(sed -n "1,${line_number}p" "$workflow_file" | grep -E '^      - name: ' | tail -n 1)"
+  if grep -Eq '^      - name: .*(Upload|Summarize|Collect|Evidence|Diagnostic)' <<< "$step_header"; then
     continue
   fi
   fail_check "if: always() only allowed on evidence/diagnostic steps (line $line_number)"
