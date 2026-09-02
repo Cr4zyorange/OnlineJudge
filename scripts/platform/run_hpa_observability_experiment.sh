@@ -123,7 +123,6 @@ capture_projection_and_lease_diagnostics() {
        ORDER BY state;
       SELECT id, submission_id, state, lease_owner, lease_until, heartbeat_at, attempt, generation
         FROM evaluation_task
-       WHERE lease_owner IS NOT NULL OR state = 'RUNNING'
        ORDER BY updated_at DESC, id
        LIMIT 100;
       SELECT state, COUNT(*) AS events, MAX(created_at) AS newest_event_at
