@@ -109,6 +109,37 @@ trap cleanup EXIT
 
 random_secret() { openssl rand -hex 24; }
 identity_key="$(openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 2>/dev/null | openssl pkcs8 -topk8 -nocrypt -outform DER | base64 | tr -d '\n')"
+base64url() { base64 | tr -d '\n=' | tr '+/' '-_'; }
+mint_service_token() {
+  local subject="$1" audience="$2"
+  shift 2
+  local private_key now header payload signature
+  private_key="$(mktemp "${TMPDIR:-/tmp}/onlinejudge-issue318-service-key.XXXXXX")"
+  printf '%s' "$identity_key" | base64 -d > "$private_key"
+  now="$(date +%s)"
+  header="$(printf '%s' '{"alg":"RS256","kid":"issue318-disposable"}' | base64url)"
+  payload="$(python3 - "$subject" "$audience" "$now" "$((now + 300))" "$@" <<'PY' | base64url
+import json
+import sys
+
+print(json.dumps({
+    "sub": sys.argv[1],
+    "scopes": sys.argv[5:],
+    "jti": "issue318-disposable-" + sys.argv[1] + "-" + sys.argv[2],
+    "iat": int(sys.argv[3]),
+    "exp": int(sys.argv[4]),
+    "iss": "onlinejudge.identity.v2",
+    "aud": sys.argv[2],
+}, separators=(",", ":")))
+PY
+)"
+  signature="$(printf '%s.%s' "$header" "$payload" | openssl dgst -sha256 -sign "$private_key" | base64url)"
+  rm -f "$private_key"
+  printf 'Bearer %s.%s.%s' "$header" "$payload" "$signature"
+}
+assessment_course_identity="$(mint_service_token assessment-api course course.authorizations.read)"
+grade_course_identity="$(mint_service_token grade-service course course.authorizations.read course.members.read)"
+grade_assessment_identity="$(mint_service_token grade-service assessment grades:read)"
 umask 077
 {
   printf 'MYSQL_ROOT_PASSWORD=%s\n' "$(random_secret)"
@@ -121,9 +152,10 @@ umask 077
   printf 'IDENTITY_JWKS_TRUST_BUNDLE=\n'
   printf 'GATEWAY_SERVICE_IDENTITY=issue318-gateway\n'
   printf 'COURSE_SERVICE_IDENTITY=issue318-course\n'
-  printf 'ASSESSMENT_SERVICE_IDENTITY=issue318-assessment\n'
+  printf 'ASSESSMENT_SERVICE_IDENTITY=%s\n' "$assessment_course_identity"
   printf 'ASSESSMENT_WORKER_IDENTITY=issue318-worker\n'
-  printf 'GRADE_SERVICE_IDENTITY=issue318-grade\n'
+  printf 'GRADE_COURSE_SERVICE_IDENTITY=%s\n' "$grade_course_identity"
+  printf 'GRADE_ASSESSMENT_SERVICE_IDENTITY=%s\n' "$grade_assessment_identity"
 } > "$runtime_env"
 
 PYTHONDONTWRITEBYTECODE=1 python3 "$renderer" --schema "$schema" --manifest "$manifest" --git-sha "$git_sha" --compose-output "$compose_file" --kubernetes-output "$kubernetes_file" --repository-root "$repo_root"

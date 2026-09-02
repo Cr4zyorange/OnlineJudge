@@ -58,3 +58,33 @@ test('renders the Course authorization endpoint used by Assessment', () => {
     /ASSESSMENT_COURSE_AUTHORIZATION_URI.*\/internal\/v2\/courses\/\{courseId\}\/authorizations\/\{userId\}/
   );
 });
+
+test('mints a scoped Course service JWT for Assessment in the disposable runtime', () => {
+  const runner = readFileSync(
+    resolve(import.meta.dirname, '../platform/run_disposable_environment.sh'),
+    'utf8'
+  );
+
+  assert.match(runner, /mint_service_token\(\)/);
+  assert.match(
+    runner,
+    /assessment_course_identity="\$\(mint_service_token assessment-api course course\.authorizations\.read\)"/
+  );
+  assert.match(runner, /ASSESSMENT_SERVICE_IDENTITY=%s\\n' "\$assessment_course_identity"/);
+});
+
+test('uses audience-specific Grade service identities in the disposable environment', () => {
+  const renderer = readFileSync(
+    resolve(import.meta.dirname, '../platform/render_disposable_environment.py'),
+    'utf8'
+  );
+  const runner = readFileSync(
+    resolve(import.meta.dirname, '../platform/run_disposable_environment.sh'),
+    'utf8'
+  );
+
+  assert.match(renderer, /GRADE_COURSE_SERVICE_AUTHORIZATION.*GRADE_COURSE_SERVICE_IDENTITY/);
+  assert.match(renderer, /GRADE_ASSESSMENT_SERVICE_AUTHORIZATION.*GRADE_ASSESSMENT_SERVICE_IDENTITY/);
+  assert.match(runner, /mint_service_token grade-service course course\.authorizations\.read course\.members\.read/);
+  assert.match(runner, /mint_service_token grade-service assessment grades:read/);
+});
