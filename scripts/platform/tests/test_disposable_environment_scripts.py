@@ -37,7 +37,13 @@ class DisposableEnvironmentScriptsTest(unittest.TestCase):
         self.assertIn("attest_prebuilt", source)
         self.assertIn("infrastructureWorkloads", source)
         self.assertIn("retry 3 docker build", source)
-        self.assertIn("docker build --network=host", source)
+        # Host networking is an explicit opt-in for machines whose default
+        # bridge build network cannot reach the outside (VPN/proxy egress
+        # interception); the shared default must stay on Docker's bridge
+        # network, so the unconditional --network=host flag must not return.
+        self.assertIn("OJ318_DOCKER_BUILD_NETWORK", source)
+        self.assertIn('"${docker_build_network_args[@]}"', source)
+        self.assertNotIn("docker build --network=host", source)
         self.assertIn("PYTHONDONTWRITEBYTECODE=1 python3 \"$planner\"", source)
 
     def test_frontend_image_installation_retries_transient_registry_failures(self) -> None:
