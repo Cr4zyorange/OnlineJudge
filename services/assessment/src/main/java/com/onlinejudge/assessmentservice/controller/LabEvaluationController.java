@@ -538,10 +538,6 @@ public class LabEvaluationController {
         if (request.comment() != null && request.comment().length() > 500) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "comment must be at most 500 characters");
         }
-        BigDecimal expectedFinal = request.manualScore().add(request.reportScore() == null ? BigDecimal.ZERO : request.reportScore());
-        if (request.finalScore().compareTo(expectedFinal) != 0) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "finalScore must equal manualScore plus reportScore");
-        }
     }
 
     private static void validateScoreComponent(String name, BigDecimal value, BigDecimal maxScore) {
