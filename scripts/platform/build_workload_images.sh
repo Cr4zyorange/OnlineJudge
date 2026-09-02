@@ -16,6 +16,10 @@ Builds the seven source-backed images, attests the two pinned infrastructure
 images, and builds the platform migration runner. Writes plan.json, SPDX SBOMs,
 local content digests and artifact-manifest.json to --output-dir. SHA must be a
 full 40-character Git SHA.
+
+Set OJ318_DOCKER_BUILD_NETWORK=host only on machines whose default bridge
+build network cannot reach the outside (VPN/proxy intercepting container
+egress); the shared default is Docker's bridge network.
 USAGE
 }
 
@@ -113,13 +117,22 @@ if (( ! skip_tests )); then run_tests; fi
 
 records="$output_dir/image-records.tsv"
 : > "$records"
+# Docker's default bridge network is the shared default.  OJ318_DOCKER_BUILD_NETWORK=host
+# is an environment workaround for machines where container egress is intercepted
+# (VPN/proxy); it must never become an unconditional flag.
+docker_build_network_args=()
+case "${OJ318_DOCKER_BUILD_NETWORK:-bridge}" in
+  bridge) ;;
+  host) docker_build_network_args+=(--network=host) ;;
+  *) printf 'build-workload-images: unsupported OJ318_DOCKER_BUILD_NETWORK value: %s\n' "${OJ318_DOCKER_BUILD_NETWORK}" >&2; exit 2 ;;
+esac
 build_one() {
   local workload="$1"
   local dockerfile="$2"
   local image="$3"
   local sbom="$output_dir/sbom/$workload.spdx.json"
   local digest revision
-  retry 3 docker build --file "$repo_root/$dockerfile" --build-arg "GIT_SHA=$git_sha" --tag "$image" "$repo_root"
+  retry 3 docker build "${docker_build_network_args[@]}" --file "$repo_root/$dockerfile" --build-arg "GIT_SHA=$git_sha" --tag "$image" "$repo_root"
   digest="$(docker image inspect --format '{{.Id}}' "$image")"
   revision="$(docker image inspect --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' "$image")"
   [[ "$revision" == "$git_sha" ]] || {
