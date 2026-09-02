@@ -133,23 +133,26 @@ esac
 run_preflight() {
   local scenario="$1"
   local preflight_dir="$2"
-  local expected_status path method body status request_id student_number attempt response_file
+  local expected_statuses path method body status request_id student_number attempt response_file
   local -a records=()
   case "$scenario" in
     course-list)
-      expected_status=200
+      expected_statuses=200
       path='/api/v1/courses?page=0&size=20'
       method=GET
       body=""
       ;;
     homework-submission)
-      expected_status=201
+      # The measured contract admits successful create and accepted submission
+      # responses. The preflight must carry that same contract rather than
+      # narrowing it to the particular status observed in this request.
+      expected_statuses=200,201,202
       path="/api/v1/homeworks/${OJ_PERF_HOMEWORK_ID}/submissions"
       method=POST
       body='{"codeText":"print(\"ok\")\\n#preflight\\n","language":"python"}'
       ;;
     my-grades)
-      expected_status=200
+      expected_statuses=200
       path="/api/v1/courses/${OJ_PERF_COURSE_ID}/my-grades"
       method=GET
       body=""
@@ -178,15 +181,15 @@ run_preflight() {
       sleep 0.11
     done
   done
-  node - "$scenario" "$expected_status" "$preflight_minimum_success_rate" "${records[@]}" > "$preflight_dir/summary.json" <<'NODE'
-const [scenario, expectedStatus, minimumSuccessRatePercent, ...records] = process.argv.slice(2);
+  node - "$scenario" "$expected_statuses" "$preflight_minimum_success_rate" "${records[@]}" > "$preflight_dir/summary.json" <<'NODE'
+const [scenario, expectedStatuses, minimumSuccessRatePercent, ...records] = process.argv.slice(2);
 const responses = records.map((record) => {
   const [student, attempt, status, responseFile] = record.split(":");
   return { student: Number(student), attempt: Number(attempt), status: Number(status), responseFile };
 });
 process.stdout.write(`${JSON.stringify({
   scenario,
-  expectedStatuses: [Number(expectedStatus)],
+  expectedStatuses: expectedStatuses.split(",").map(Number),
   minimumSuccessRatePercent: Number(minimumSuccessRatePercent),
   responses,
 }, null, 2)}\n`);
