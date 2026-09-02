@@ -130,7 +130,7 @@ def workload_environment(workload: dict[str, Any], git_sha: str) -> dict[str, st
                 "IDENTITY_DATABASE_USERNAME": RUNTIME_ACCOUNT["identity"],
                 "IDENTITY_JWT_KID": "issue318-disposable",
                 "IDENTITY_SERVICE_REVISION": git_sha,
-                "IDENTITY_SEED_DATA_ENABLED": "false",
+                "IDENTITY_SEED_DATA_ENABLED": "${IDENTITY_SEED_DATA_ENABLED:-false}",
             }
         )
     elif name == "course-service":
@@ -320,7 +320,7 @@ def compose_service(
         lines.append("    command: [\"--spring.main.web-application-type=none\", \"--assessment.worker.enabled=true\"]")
     if workload["traffic"]["exposed"]:
         port = workload["ports"][0]["containerPort"]
-        lines.extend(["    ports:", "      - " + yaml_scalar("${GATEWAY_HTTP_PORT:-18080}:" + str(port))])
+        lines.extend(["    ports:", "      - " + yaml_scalar("127.0.0.1:${GATEWAY_HTTP_PORT:-18080}:" + str(port))])
     lines.extend(indent(compose_healthcheck(workload), 4))
     lines.extend(indent(compose_resources(workload), 4))
     lines.append("    restart: \"no\"")

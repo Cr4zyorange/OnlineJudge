@@ -11,7 +11,7 @@ builder="$repo_root/scripts/platform/build_workload_images.sh"
 
 usage() {
   cat <<'USAGE'
-Usage: scripts/platform/run_disposable_environment.sh [--git-sha SHA] [--output-dir DIR] [--keep] [--skip-build] [--skip-tests] [--inject-failure migration|readiness]
+Usage: scripts/platform/run_disposable_environment.sh [--git-sha SHA] [--output-dir DIR] [--keep] [--skip-build] [--skip-tests] [--inject-failure migration|readiness] [--after-ready COMMAND [ARGS...]]
 
 Builds (unless --skip-build), starts and verifies an isolated nine-workload,
 four-migration Compose environment. --inject-failure proves that a controlled
@@ -26,6 +26,7 @@ keep=0
 skip_build=0
 skip_tests=0
 failure_mode=""
+after_ready_command=()
 while (($#)); do
   case "$1" in
     --git-sha) git_sha="${2:?--git-sha requires a value}"; shift 2 ;;
@@ -34,6 +35,12 @@ while (($#)); do
     --skip-build) skip_build=1; shift ;;
     --skip-tests) skip_tests=1; shift ;;
     --inject-failure) failure_mode="${2:?--inject-failure requires migration or readiness}"; shift 2 ;;
+    --after-ready)
+      shift
+      (($#)) || { printf 'run-disposable-environment: --after-ready requires a command\n' >&2; exit 2; }
+      after_ready_command=("$@")
+      break
+      ;;
     --help|-h) usage; exit 0 ;;
     *) printf 'run-disposable-environment: unknown argument: %s\n' "$1" >&2; usage >&2; exit 2 ;;
   esac
@@ -144,6 +151,30 @@ curl --fail --silent --show-error --header 'X-Request-Id: issue318-disposable' "
 "${compose[@]}" exec -T identity-service wget -qO- http://127.0.0.1:8081/api/v1/system/version > "$output_dir/identity-version.json"
 "${compose[@]}" exec -T grade-service wget -qO- http://127.0.0.1:8084/actuator/info > "$output_dir/grade-version.json"
 collect_diagnostics success
+
+base_url="http://127.0.0.1:${GATEWAY_HTTP_PORT:-18080}"
+context_file="$output_dir/three-service-context.json"
+python3 - "$context_file" "$git_sha" "$project_name" "$base_url" "$compose_file" "$output_dir" <<'PY'
+import json
+import sys
+
+with open(sys.argv[1], "w", encoding="utf-8") as output:
+    json.dump({
+        "gitSha": sys.argv[2],
+        "projectName": sys.argv[3],
+        "baseUrl": sys.argv[4],
+        "composeFile": sys.argv[5],
+        "evidenceDir": sys.argv[6],
+        "workloads": 9,
+    }, output, indent=2)
+    output.write("\n")
+PY
+if ((${#after_ready_command[@]})); then
+  E2E_BASE_URL="$base_url" \
+  E2E_THREE_SERVICE_CONTEXT_FILE="$context_file" \
+  E2E_THREE_SERVICE_PROJECT="$project_name" \
+    "${after_ready_command[@]}"
+fi
 
 ready_count="$(python3 - "$output_dir/compose-ps-success.json" <<'PY'
 import json
