@@ -24,6 +24,7 @@ test("three-service runtime launcher fails closed on a non-frozen checkout or pr
   assert.match(source, /runtime checkout SHA/);
   assert.match(source, /\[\[ "\$project" == oj307-\* \]\]/);
   assert.match(source, /render_disposable_environment\.py/);
+  assert.match(source, /output_dir="\$\(CDPATH= cd -- "\$output_dir" && pwd\)"/);
   assert.match(source, /issue-307-resource-policy\.mjs/);
   assert.match(source, /generate_service_identity_jwt\.mjs/);
   assert.match(source, /GRADE_SERVICE_IDENTITY="Bearer %s"/);

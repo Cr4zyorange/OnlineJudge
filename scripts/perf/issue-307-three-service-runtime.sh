@@ -59,6 +59,7 @@ for required in "$renderer" "$schema" "$manifest" "$policy_renderer" "$bundle_ge
 done
 
 mkdir -p "$output_dir"
+output_dir="$(CDPATH= cd -- "$output_dir" && pwd)"
 runtime_env="$(mktemp "${TMPDIR:-/tmp}/issue-307-three-service.XXXXXX.env")"
 cleanup() {
   rm -f "$runtime_env"
