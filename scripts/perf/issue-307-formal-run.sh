@@ -103,20 +103,6 @@ initial_login_load_log="$output_dir/formal/$architecture/initial-login-load.log"
 bash "$dataset_script" "${initial_login_load_args[@]}" | tee "$initial_login_load_log"
 curl --fail --silent --show-error "$base_url$readiness_path" >/dev/null
 
-benchmark_tokens=()
-for student_number in $(seq 1 "$virtual_students"); do
-  student_account="$(printf 'perf307_student%03d' "$student_number")"
-  token="$(curl --fail --silent --show-error --request POST "$base_url/api/v1/auth/login" \
-    --header 'Content-Type: application/json' \
-    --data "{\"account\":\"$student_account\",\"password\":\"Student001@pass\"}" | \
-    node -e 'let data="";process.stdin.on("data",x=>data+=x).on("end",()=>process.stdout.write(JSON.parse(data).data.token))')"
-  [[ -n "$token" ]] || { printf 'issue-307-formal-run: benchmark login returned no token for %s\n' "$student_account" >&2; exit 1; }
-  benchmark_tokens+=("$token")
-  # Identity's documented public gateway limit is five requests per second;
-  # this keeps fixture login outside the business-load measurement truthful.
-  sleep 0.21
-done
-token_json="$(node -e 'process.stdout.write(JSON.stringify(process.argv.slice(1)))' "${benchmark_tokens[@]}")"
 resource_sha="$(shasum -a 256 "$resource_policy_evidence" | awk '{print $1}')"
 environment_ready_signal='ENVIRONMENT_READY issue=#318 sha=2d6160fe570f60bba73922640cb8a58bdb692b97 endpoint=http://127.0.0.1:18080 workloads=9 migrations=4 evidence=https://github.com/Cr4zyorange/OnlineJudge/pull/363 actions=https://github.com/Cr4zyorange/OnlineJudge/actions/runs/33500641015'
 
@@ -126,15 +112,39 @@ export OJ_PERF_HOMEWORK_BODY='{"codeText":"print(\"ok\")\\n#{{requestId}}\\n","l
 case "$architecture" in
   monolith)
     export OJ_PERF_MONOLITH_URL="$base_url"
-    export OJ_PERF_MONOLITH_TOKEN="$token_json"
     export OJ_PERF_MONOLITH_CONTAINERS="$containers"
     ;;
   three-service)
     export OJ_PERF_THREE_SERVICE_URL="$base_url"
-    export OJ_PERF_THREE_SERVICE_TOKEN="$token_json"
     export OJ_PERF_THREE_SERVICE_CONTAINERS="$containers"
     ;;
 esac
+
+# Each formal round lasts long enough that a single token batch would expire
+# before later protected endpoints. Refresh the same ten fixture accounts only
+# after that round's reset, so its preflight and measured traffic share valid
+# identities without affecting the next round's deterministic data snapshot.
+refresh_benchmark_tokens() {
+  local student_number student_account token
+  benchmark_tokens=()
+  for student_number in $(seq 1 "$virtual_students"); do
+    student_account="$(printf 'perf307_student%03d' "$student_number")"
+    token="$(curl --fail --silent --show-error --request POST "$base_url/api/v1/auth/login" \
+      --header 'Content-Type: application/json' \
+      --data "{\"account\":\"$student_account\",\"password\":\"Student001@pass\"}" | \
+      node -e 'let data="";process.stdin.on("data",x=>data+=x).on("end",()=>process.stdout.write(JSON.parse(data).data.token))')"
+    [[ -n "$token" ]] || { printf 'issue-307-formal-run: benchmark login returned no token for %s\n' "$student_account" >&2; return 1; }
+    benchmark_tokens+=("$token")
+    # Identity's documented public gateway limit is five requests per second;
+    # this fixture setup remains outside the business-load measurement.
+    sleep 0.21
+  done
+  token_json="$(node -e 'process.stdout.write(JSON.stringify(process.argv.slice(1)))' "${benchmark_tokens[@]}")"
+  case "$architecture" in
+    monolith) export OJ_PERF_MONOLITH_TOKEN="$token_json" ;;
+    three-service) export OJ_PERF_THREE_SERVICE_TOKEN="$token_json" ;;
+  esac
+}
 
 run_preflight() {
   local scenario="$1"
@@ -216,6 +226,7 @@ for scenario in "${scenario_list[@]}"; do
     initial_reset_log="$output_dir/formal/$architecture/${scenario}-round-${round}-initial-reset.log"
     bash "$dataset_script" "${reset_args[@]}" | tee "$initial_reset_log"
     curl --fail --silent --show-error "$base_url$readiness_path" >/dev/null
+    refresh_benchmark_tokens
     preflight_dir="$output_dir/preflight/$architecture/${scenario}-round-${round}"
     preflight_log="$preflight_dir/preflight.log"
     mkdir -p "$preflight_dir"

@@ -40,4 +40,9 @@ test("formal runner documents per-round reset and exclusive Docker-window checks
   assert.ok(initialDatasetLoad >= 0, "a fresh runtime must be seeded before benchmark login");
   assert.ok(initialDatasetLoad < benchmarkTokenLogin, "dataset seeding must precede benchmark login");
   assert.match(source, /initial_login_load_args=\(--architecture "\$architecture" --action load/);
+  const roundReset = source.indexOf("initial_reset_log=");
+  const refreshedLogin = source.indexOf("refresh_benchmark_tokens", roundReset);
+  const roundPreflight = source.indexOf('run_preflight "$scenario"', roundReset);
+  assert.ok(refreshedLogin >= 0, "each formal round must refresh expiring student tokens");
+  assert.ok(refreshedLogin < roundPreflight, "fresh tokens must be used by that round's preflight and measurement");
 });
