@@ -24,3 +24,11 @@
 | --- | --- | --- | --- |
 | R3-01 | 阻塞 | RabbitMQ outage 是可选标志；省略标志仍可输出 `EXPERIMENT_READY`，未覆盖 AC-319-03。 | 每轮实验固定执行 outage 与恢复，移除可跳过路径。 |
 | R3-02 | 阻塞 | 运行器只发匿名 GET，无法调用需 JWT 或 POST body 的 Assessment 提交/查询链。 | 增加不记录内容的 Authorization 文件、请求 method 与 body 文件参数；只在 raw evidence 留 requestId/status/耗时。 |
+
+## Round 4 — 2026-09-02
+
+| 编号 | 结论 | 可复现证据 | 统一修复 |
+| --- | --- | --- | --- |
+| R4-01 | 阻塞 | `git log origin/dev..HEAD` 显示 #319 提交之前还包含 9 个 dev-container/skill 维护提交；以当前分支创建 PR 会混入不属于本 issue 的变更。 | 从 `origin/dev` 新建干净的 #319 交付分支，仅顺序移植 #319 的测试、实现、文档和本审查记录提交；移植后重新执行完整回归。 |
+
+Round 4 的静态与契约回归已通过；但真实集群实验尚未执行，原因是当前工作站未安装 `kubectl` 且没有 Kind 集群。该环境缺口不是代码 GREEN，不能以 `EXPERIMENT_READY` 代替 AC-319-01 至 AC-319-05 的实际证据。
