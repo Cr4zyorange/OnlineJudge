@@ -218,6 +218,7 @@ public class LabEvaluationController {
                     item.put("sourceFile", source.publicView(manager)));
         }
         item.put("latestReport", latestReportForView(labId, submissionId, scoresVisible));
+        item.put("latestScore", latestScoreForView(labId, submissionId, scoresVisible));
         if (!scoresVisible) {
             item.put("autoScore", null);
             item.put("finalScore", null);
@@ -313,7 +314,14 @@ public class LabEvaluationController {
         // only score-bearing fields are gated until the teacher releases them.
         response.put("submission", submissionDetail(labId, submissionId, user, requestId));
         response.put("evaluationResult", evaluationResult(labId, submissionId, user, true, requestId));
-        response.put("latestScore", scoresVisible ? jdbc.query("""
+        response.put("latestScore", latestScoreForView(labId, submissionId, scoresVisible));
+        response.put("latestReport", latestReportForView(labId, submissionId, scoresVisible));
+        return response;
+    }
+
+    private Map<String, Object> latestScoreForView(long labId, String submissionId, boolean scoresVisible) {
+        if (!scoresVisible) return null;
+        return jdbc.query("""
                 SELECT report_id, auto_score, report_score, manual_score, final_score, comment, scored_at, updated_at
                   FROM assessment_lab_score
                  WHERE lab_id = ? AND submission_id = ?
@@ -328,9 +336,7 @@ public class LabEvaluationController {
             score.put("scoredAt", rs.getTimestamp("scored_at") == null ? null : rs.getTimestamp("scored_at").toInstant());
             score.put("updatedAt", rs.getTimestamp("updated_at") == null ? null : rs.getTimestamp("updated_at").toInstant());
             return score;
-        }, labId, submissionId).stream().findFirst().orElse(null) : null);
-        response.put("latestReport", latestReportForView(labId, submissionId, scoresVisible));
-        return response;
+        }, labId, submissionId).stream().findFirst().orElse(null);
     }
 
     private LabReportService.LabReportSummary latestReportForView(long labId, String submissionId, boolean scoresVisible) {

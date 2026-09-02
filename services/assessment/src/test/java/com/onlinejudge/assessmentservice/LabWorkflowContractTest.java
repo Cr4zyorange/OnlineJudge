@@ -296,7 +296,7 @@ class LabWorkflowContractTest {
                 .andExpect(status().isBadRequest());
         mockMvc.perform(post("/api/v1/labs/{labId}/submissions/{submissionId}/score", labId, submissionId)
                         .header("Authorization", "Bearer " + teacherToken).header("X-Request-Id", "manual-score-valid-314")
-                        .contentType(MediaType.APPLICATION_JSON).content("{\"manualScore\":80,\"finalScore\":80}"))
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"manualScore\":80,\"finalScore\":80,\"comment\":\"visible published feedback\"}"))
                 .andExpect(status().isOk());
         mockMvc.perform(put("/api/v1/labs/{labId}/release-scores", labId)
                         .header("Authorization", "Bearer " + teacherToken).header("X-Request-Id", "manual-release-314"))
@@ -305,7 +305,7 @@ class LabWorkflowContractTest {
                 "LAB:" + labId + ":student-manual-314")).isEqualTo("manual-release-314");
         mockMvc.perform(post("/api/v1/labs/{labId}/submissions/{submissionId}/score", labId, submissionId)
                         .header("Authorization", "Bearer " + teacherToken).header("X-Request-Id", "manual-rescore-314")
-                        .contentType(MediaType.APPLICATION_JSON).content("{\"manualScore\":90,\"finalScore\":90,\"changeReason\":\"rubric correction\"}"))
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"manualScore\":90,\"finalScore\":90,\"comment\":\"visible published feedback\",\"changeReason\":\"rubric correction\"}"))
                 .andExpect(status().isOk());
         org.assertj.core.api.Assertions.assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM assessment_event_outbox WHERE event_type = 'assessment.source-grade.changed.v2' AND aggregate_id = ? AND correlation_id = ?", Integer.class,
                 "LAB:" + labId + ":student-manual-314", "manual-rescore-314")).isEqualTo(1);
@@ -316,6 +316,11 @@ class LabWorkflowContractTest {
                 .andExpect(jsonPath("$.evaluationResult.evaluationStatus").value("NONE"))
                 .andExpect(jsonPath("$.evaluationResult.state").value("NONE"))
                 .andExpect(jsonPath("$.latestScore.finalScore").value(90));
+        mockMvc.perform(get("/api/v1/labs/{labId}/submissions/{submissionId}", labId, submissionId)
+                        .header("Authorization", "Bearer " + studentToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.latestScore.finalScore").value(90))
+                .andExpect(jsonPath("$.latestScore.comment").value("visible published feedback"));
         mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/v1/labs/{labId}/submissions/{submissionId}/evaluate", labId, submissionId)
                         .header("Authorization", "Bearer " + teacherToken).header("X-Request-Id", "manual-evaluate-314"))
                 .andExpect(status().isOk())
