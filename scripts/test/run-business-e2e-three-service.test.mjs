@@ -4,6 +4,7 @@ import { resolve } from 'node:path';
 import test from 'node:test';
 
 import {
+  createGrdSummaryFixtureLabPayload,
   isSuccessfulSummary,
   parseStudentGradeSummaryIdentifier,
   parsePositiveIdentifier,
@@ -31,6 +32,16 @@ test('selects the bootstrapped student course-grade summary rather than a legacy
     () => parseStudentGradeSummaryIdentifier({ data: { records: [] } }, 8),
     /student.*summary.*positive/i
   );
+});
+
+test('builds the GRD source LAB fixture with an RFC 3339 deadline required by Assessment', () => {
+  const payload = createGrdSummaryFixtureLabPayload();
+  assert.match(payload.deadline, /Z$/);
+  assert.ok(Number.isFinite(Date.parse(payload.deadline)));
+  assert.deepEqual(payload.allowedLanguages, ['python']);
+  assert.equal(payload.evaluationMode, 'MANUAL');
+  assert.equal(payload.autoEvaluate, false);
+  assert.deepEqual(payload.testcases, []);
 });
 
 test('rejects a context that is not a nine-workload loopback platform', () => {

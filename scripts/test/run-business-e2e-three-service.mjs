@@ -65,6 +65,23 @@ export function parseStudentGradeSummaryIdentifier(envelope, studentId) {
   return summaryId;
 }
 
+export function createGrdSummaryFixtureLabPayload() {
+  return {
+    title: 'Issue #320 GRD 总评运行期基线',
+    description: 'Creates a published, adjustable course-grade summary for the LRN closure scenario.',
+    deadline: '2030-12-31T23:59:00Z',
+    maxScore: 100,
+    attachmentIds: [],
+    allowedLanguages: ['python'],
+    evaluationMode: 'MANUAL',
+    autoEvaluate: false,
+    reportRequired: false,
+    timeLimitMs: 1_000,
+    memoryLimitKb: 65_536,
+    testcases: []
+  };
+}
+
 export function redact(value, secrets) {
   return secrets.reduce((result, secret) => {
     if (!secret) {
@@ -195,20 +212,7 @@ async function bootstrapScenarioCourse(context, artifactDir) {
   const fixtureLab = await requestEnvelope(context.baseUrl, `/api/v1/courses/${courseId}/labs`, {
     method: 'POST',
     headers: teacherHeaders,
-    body: JSON.stringify({
-      title: 'Issue #320 GRD 总评运行期基线',
-      description: 'Creates a published, adjustable course-grade summary for the LRN closure scenario.',
-      deadline: '2030-12-31T23:59:00',
-      maxScore: 100,
-      attachmentIds: [],
-      allowedLanguages: 'python',
-      evaluationMode: 'MANUAL',
-      autoEvaluate: false,
-      reportRequired: false,
-      timeLimitMs: 1_000,
-      memoryLimitKb: 65_536,
-      testcases: []
-    })
+    body: JSON.stringify(createGrdSummaryFixtureLabPayload())
   }, 'bootstrap GRD source LAB');
   const fixtureLabId = parsePositiveIdentifier(fixtureLab, 'GRD source LAB');
   await requestEnvelope(context.baseUrl, `/api/v1/labs/${fixtureLabId}/publish`, {
