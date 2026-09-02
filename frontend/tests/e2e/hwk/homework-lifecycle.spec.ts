@@ -162,22 +162,27 @@ test.describe('@hwk HWK 真实业务闭环', () => {
       gradeItemId = gradeItem.id;
 
       let syncResult: GradeSyncResult | undefined;
+      let projectedGradeTable: CourseGradeTablePage | undefined;
       await expect.poll(async () => {
         syncResult = await apiData<GradeSyncResult>(await request.post(
           `/api/v1/courses/${COURSE_ID}/grades/sync`,
           { headers: teacherHeaders }
         ));
-        return syncResult.syncedCount;
-      }, { intervals: [100, 250, 500, 1_000], timeout: 15_000 }).toBeGreaterThan(0);
+        projectedGradeTable = await apiData<CourseGradeTablePage>(await request.get(
+          `/api/v1/courses/${COURSE_ID}/grades?gradeItemId=${gradeItemId}&page=1&size=100`,
+          { headers: teacherHeaders }
+        ));
+        const gradeRecord = projectedGradeTable.records
+          .find((row) => row.studentId === student.id)?.records
+          .find((record) => record.gradeItemId === gradeItemId);
+        return Number(gradeRecord?.rawScore);
+      }, { intervals: [100, 250, 500, 1_000], timeout: 15_000 }).toBe(88);
       const confirmedSync = syncResult!;
       expect(confirmedSync.affectedItemCount).toBeGreaterThan(0);
       expect(confirmedSync.affectedStudentCount).toBeGreaterThan(0);
       expect(confirmedSync.syncedCount).toBeGreaterThan(0);
 
-      const gradeTable = await apiData<CourseGradeTablePage>(await request.get(
-        `/api/v1/courses/${COURSE_ID}/grades?gradeItemId=${gradeItemId}&page=1&size=100`,
-        { headers: teacherHeaders }
-      ));
+      const gradeTable = projectedGradeTable!;
       const studentGradeRow = gradeTable.records.find((row) => row.studentId === student.id);
       const gradeRecord = studentGradeRow?.records.find((record) => record.gradeItemId === gradeItemId);
       expect(gradeRecord).toEqual(expect.objectContaining({
