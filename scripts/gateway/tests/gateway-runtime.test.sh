@@ -179,9 +179,11 @@ grep -Eqi '^X-Request-Id: issue317-valid\.1\r?$' "$valid_headers" || fail "valid
 invalid_headers="$runtime_dir/invalid.headers"
 body="$(curl -sS -D "$invalid_headers" -H 'X-Request-Id: invalid value' "$gateway/api/v1/courses")"
 [[ "$body" != *'"requestId":"invalid value"'* ]] || fail "invalid request ID was forwarded"
-generated_id="$(sed -nE 's/^X-Request-Id:[[:space:]]*([^\r]+)\r?$/\1/ip' "$invalid_headers" | head -n 1)"
+generated_id="$(tr -d '\r' < "$invalid_headers" | sed -nE 's/^X-Request-Id:[[:space:]]*//Ip' | head -n 1)"
 [[ -n "$generated_id" && "$body" == *"\"requestId\":\"$generated_id\""* ]] \
   || fail "generated request ID was not continuous"
+[[ "$generated_id" =~ ^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$ ]] \
+  || fail "generated request ID must be UUID-shaped for asynchronous correlation"
 
 body="$(request GET /internal/v2/source-grades 404)"
 [[ "$body" == *'"code":"GATEWAY_404"'* ]] || fail "internal route rejection is unstable"
