@@ -68,6 +68,19 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: issue-340-resilience-${{ github.run_id }}
-          path: ci-artifacts/issue-340/**
+          path: |
+            ci-artifacts/issue-340/report.json
+            ci-artifacts/issue-340/query-login-meta.json
+            ci-artifacts/issue-340/evidence-scan.json
+            ci-artifacts/issue-340/worker-rabbit-recovery-evidence.log
+            ci-artifacts/issue-340/scenarios/*/status
+            ci-artifacts/issue-340/scenarios/*/before
+            ci-artifacts/issue-340/scenarios/*/during
+            ci-artifacts/issue-340/scenarios/*/recovery
+            ci-artifacts/issue-340/scenarios/*/evidence
+            ci-artifacts/issue-340/scenarios/*/compose-before
+            ci-artifacts/issue-340/scenarios/*/query-status
+            ci-artifacts/issue-340/scenarios/*/domain-before
+            ci-artifacts/issue-340/scenarios/*/domain-after
           if-no-files-found: warn
           retention-days: 14

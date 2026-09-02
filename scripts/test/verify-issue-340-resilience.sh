@@ -126,7 +126,10 @@ mkdir -p "$output_dir/scenarios"
 output_dir="$(CDPATH= cd -- "$output_dir" && pwd)"
 started_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
-mapfile -t matrix_ids < <(python3 - "$matrix" <<'PY'
+matrix_ids=()
+while IFS= read -r matrix_id; do
+  matrix_ids+=("$matrix_id")
+done < <(python3 - "$matrix" <<'PY'
 import json
 import sys
 for item in json.load(open(sys.argv[1], encoding="utf-8"))["scenarios"]:
@@ -236,46 +239,85 @@ else
   command -v curl >/dev/null 2>&1 || { printf 'verify-issue-340-resilience: curl is required\n' >&2; exit 2; }
 
   run_java() {
-    local id="$1" module="$2" tests="$3" log="$(scenario_dir "$1")/maven.log" status=PASS
+    local id="$1" module="$2" tests="$3" log status=PASS
+    log="$(mktemp "${TMPDIR:-/tmp}/oj340-${id}.XXXXXX.log")"
     mkdir -p "$(scenario_dir "$id")"
     if ! (cd "$repo_root/$module" && mvn -B -ntp test "-Dtest=$tests") >"$log" 2>&1; then status=FAIL; fi
     if [[ "$status" == PASS ]]; then
-      record_scenario "$id" PASS "fixture setup was completed" "the Java test injected the bounded failure or duplicate delivery" "the Java test asserted recovery and exact write counts" "maven=$module; tests=$tests; log=${log#$repo_root/}"
+      record_scenario "$id" PASS "fixture setup was completed" "the Java test injected the bounded failure or duplicate delivery" "the Java test asserted recovery and exact write counts" "maven=$module; tests=$tests; result=PASS"
     else
-      record_scenario "$id" FAIL "fixture setup was attempted" "the test command failed before its runtime assertion" "recovery was not proven" "maven=$module; tests=$tests; log=${log#$repo_root/}\n$(redacted_tail "$log")"
+      record_scenario "$id" FAIL "fixture setup was attempted" "the test command failed before its runtime assertion" "recovery was not proven" "maven=$module; tests=$tests; result=FAIL"
     fi
+    rm -f "$log"
   }
 
   if (( ! skip_java )); then
     run_java course-delay services/assessment 'LabCourseProjectionFallbackTest,HomeworkCourseProjectionFallbackTest'
     run_java identity-down services/assessment 'JwksCacheRefreshTest'
     run_java duplicate-gap-dlq services/assessment 'WorkerAndProjectionReliabilityTest,RabbitConsumerRecoveryContractTest'
-    backend_log="$(scenario_dir duplicate-gap-dlq)/backend-maven.log"
+    backend_log="$(mktemp "${TMPDIR:-/tmp}/oj340-learning.XXXXXX.log")"
     if ! (cd "$repo_root/backend" && mvn -B -ntp test "-Dtest=LearningReliableEventConsumerTest,RabbitMqLearningReliableListenerTest") >"$backend_log" 2>&1; then
-      printf 'backend reliability suite failed\n%s\n' "$(redacted_tail "$backend_log")" >> "$(scenario_dir duplicate-gap-dlq)/failure"
+      printf 'backend reliability suite failed\n' >> "$(scenario_dir duplicate-gap-dlq)/failure"
       printf 'FAIL\n' > "$(scenario_dir duplicate-gap-dlq)/status"
     fi
-    grade_log="$(scenario_dir duplicate-gap-dlq)/grade-maven.log"
+    rm -f "$backend_log"
+    grade_log="$(mktemp "${TMPDIR:-/tmp}/oj340-grade.XXXXXX.log")"
     if ! (cd "$repo_root/services/grade" && mvn -B -ntp test "-Dtest=SourceGradeProjectionServiceTest,SourceGradeReconciliationWorkerTest") >"$grade_log" 2>&1; then
-      printf 'Grade gap/reconciliation suite failed\n%s\n' "$(redacted_tail "$grade_log")" >> "$(scenario_dir duplicate-gap-dlq)/failure"
+      printf 'Grade gap/reconciliation suite failed\n' >> "$(scenario_dir duplicate-gap-dlq)/failure"
       printf 'FAIL\n' > "$(scenario_dir duplicate-gap-dlq)/status"
     else
-      printf 'grade-maven=services/grade; tests=SourceGradeProjectionServiceTest,SourceGradeReconciliationWorkerTest; log=%s\n' "${grade_log#$repo_root/}" >> "$(scenario_dir duplicate-gap-dlq)/evidence"
+      printf 'grade-maven=services/grade; tests=SourceGradeProjectionServiceTest,SourceGradeReconciliationWorkerTest; result=PASS\n' >> "$(scenario_dir duplicate-gap-dlq)/evidence"
     fi
+    rm -f "$grade_log"
   fi
 
-  recovery_log="$output_dir/worker-rabbit-recovery.log"
-  recovery_raw_log="$output_dir/worker-rabbit-recovery-raw.log"
+  write_safe_recovery_evidence() {
+    local standard_log="$1" raw_log="$2" evidence_log="$3"
+    python3 - "$standard_log" "$raw_log" "$evidence_log" <<'PY'
+import re
+import sys
+from pathlib import Path
+
+standard_log, raw_log, evidence_log = map(Path, sys.argv[1:])
+allowed = re.compile(r"^(?:worker-fencing-assertion:|verify-issue-314-recovery: PASS )")
+redactions = (
+    (re.compile(r"(?i)(authorization:\s*bearer\s+)[A-Za-z0-9._~+/-]+"), r"\1[REDACTED]"),
+    (re.compile(r"(?i)((?:password|token|secret|cookie|private[_-]?key)\s*[=:]\s*)[^\s,;]+"), r"\1[REDACTED]"),
+)
+lines = []
+for path in (standard_log, raw_log):
+    for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+        if allowed.match(line):
+            for pattern, replacement in redactions:
+                line = pattern.sub(replacement, line)
+            lines.append(line)
+required = ("taskId=", "oldGeneration=", "newGeneration=", "outboxState=", "staleCompletionRows=", "recoverySeconds=")
+if not lines or not all(any(field in line for line in lines) for field in required):
+    raise SystemExit("worker recovery raw assertion extract is incomplete")
+evidence_log.write_text("\n".join(dict.fromkeys(lines)) + "\n", encoding="utf-8")
+PY
+  }
+
+  recovery_log="$(mktemp "${TMPDIR:-/tmp}/oj340-worker-rabbit.XXXXXX.log")"
+  recovery_raw_log="$(mktemp "${TMPDIR:-/tmp}/oj340-worker-rabbit-raw.XXXXXX.log")"
+  recovery_evidence_log="$output_dir/worker-rabbit-recovery-evidence.log"
   if OJ314_KEEP_RAW_LOG=1 OJ314_RAW_LOG_PATH="$recovery_raw_log" \
     bash "$repo_root/scripts/test/verify-issue-314-recovery-disposable.sh" >"$recovery_log" 2>&1; then
-    for id in worker-kill rabbitmq-down; do
-      record_scenario "$id" PASS "the disposable database contained persisted task/outbox facts" "the worker or RabbitMQ was stopped in the live lease/publish window" "replacement generation and broker delivery converged without duplicate facts" "disposable=${recovery_log#$repo_root/}; rawAssertions=${recovery_raw_log#$repo_root/}\n$(redacted_tail "$recovery_log")\n$(redacted_tail "$recovery_raw_log")"
-    done
+    if write_safe_recovery_evidence "$recovery_log" "$recovery_raw_log" "$recovery_evidence_log"; then
+      for id in worker-kill rabbitmq-down; do
+        record_scenario "$id" PASS "the disposable database contained persisted task/outbox facts" "the worker or RabbitMQ was stopped in the live lease/publish window" "replacement generation completed once; a stale completion was fenced; source-grade/outbox counts stayed stable" "rawAssertions=${recovery_evidence_log#$repo_root/}"
+      done
+    else
+      for id in worker-kill rabbitmq-down; do
+        record_scenario "$id" FAIL "the disposable recovery fixture was attempted" "raw worker fencing assertions were incomplete" "recovery evidence was not safe to upload" "rawAssertions=missing-or-incomplete"
+      done
+    fi
   else
     for id in worker-kill rabbitmq-down; do
-      record_scenario "$id" FAIL "the disposable recovery fixture was attempted" "the worker/Rabbit fault could not be completed" "recovery was not proven" "disposable=${recovery_log#$repo_root/}; rawAssertions=${recovery_raw_log#$repo_root/}\n$(redacted_tail "$recovery_log")\n$(redacted_tail "$recovery_raw_log")"
+      record_scenario "$id" FAIL "the disposable recovery fixture was attempted" "the worker/Rabbit fault could not be completed" "recovery was not proven" "rawAssertions=unavailable"
     done
   fi
+  rm -f "$recovery_log" "$recovery_raw_log"
 
   compose=(docker compose --project-name "$project_name")
   if [[ -n "$compose_env_file" ]]; then compose+=(--env-file "$compose_env_file"); fi
@@ -343,6 +385,10 @@ PY
     local output="$1" schema table count
     : > "$output"
     for spec in \
+      'oj_identity t_auth_user' \
+      'oj_identity t_auth_session' \
+      'oj_identity t_auth_audit_log' \
+      'oj_identity t_identity_outbox_event' \
       'oj_assessment assessment_submission' \
       'oj_assessment assessment_lab_submission' \
       'oj_assessment evaluation_task' \
@@ -486,14 +532,56 @@ PY
     ' sh "$payload"
   }
 
+  wait_for_grade_queue_idle() {
+    local deadline=$((SECONDS + timeout_seconds)) queue_counts
+    while (( SECONDS < deadline )); do
+      queue_counts="$(compose_exec rabbitmq rabbitmqctl list_queues name messages messages_unacknowledged -q 2>/dev/null \
+        | awk '$1 == "grade.source-grades.v2" { print $2 " " $3 }')"
+      [[ "$queue_counts" == '0 0' ]] && return 0
+      sleep 2
+    done
+    return 1
+  }
+
+  build_source_grade_payload() {
+    python3 - "$@" <<'PY'
+import json
+import sys
+
+event_id, aggregate_id, occurred_at, correlation_id, course_id, source_id, student_id = sys.argv[1:]
+envelope = {
+    "eventId": event_id,
+    "eventType": "assessment.source-grade.changed.v2",
+    "payloadVersion": 2,
+    "aggregateType": "assessment-source-grade",
+    "aggregateId": aggregate_id,
+    "aggregateVersion": 1,
+    "occurredAt": occurred_at,
+    "correlationId": correlation_id,
+    "payload": {
+        "courseId": course_id,
+        "sourceType": "LAB",
+        "sourceId": source_id,
+        "studentId": student_id,
+        "score": 88.0,
+        "fullScore": 100.0,
+        "status": "SCORED",
+        "sourceVersion": 1,
+    },
+}
+print(json.dumps(envelope, separators=(",", ":")))
+PY
+  }
+
   grade_down_source_fixture() {
     local id=grade-down dir="$(scenario_dir grade-down)"
     local before_status during_status recovery_state recovery_seconds
     local peer_status query_status=FAIL fixture_status=FAIL worker_started=0
     local source_id="issue340-${run_id##*-}" student_id="issue340-student-${run_id##*-}"
     local course_id="issue340-course-${run_id##*-}" source_event_id correlation_id aggregate_id occurred_at source_payload
-    local source_grade_revision=0 source_outbox_state_before=UNKNOWN source_fact_count=0
-    local grade_inbox_status=UNKNOWN grade_projection_count=0 duplicate_decision=NOT_ATTEMPTED initial_publish_decision=NOT_ATTEMPTED
+    local source_grade_revision=0 source_outbox_state_before=UNKNOWN source_outbox_state_after=UNKNOWN source_fact_count=0
+    local grade_inbox_status=UNKNOWN grade_projection_count=0 duplicate_decision=NOT_ATTEMPTED
+    local initial_publish_decision=NOT_ATTEMPTED duplicate_delivery=NOT_CONFIRMED
     local duplicate_inbox_before=0 duplicate_inbox_after=0 duplicate_projection_before=0 duplicate_projection_after=0
     mkdir -p "$dir"
     before_status="$(compose_state grade-service 2>/dev/null || true)"
@@ -518,9 +606,8 @@ PY
     correlation_id="$(python3 -c 'import uuid; print(uuid.uuid4())')"
     aggregate_id="LAB:${source_id}:${student_id}"
     occurred_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-    source_payload="$(printf '{\"eventId\":\"%s\",\"eventType\":\"assessment.source-grade.changed.v2\",\"payloadVersion\":2,\"aggregateType\":\"assessment-source-grade\",\"aggregateId\":\"%s\",\"aggregateVersion\":1,\"occurredAt\":\"%s\",\"correlationId\":\"%s\",\"payload\":{\"courseId\":\"%s\",\"sourceType\":\"LAB\",\"sourceId\":\"%s\",\"studentId\":\"%s\",\"score\":88.00,\"fullScore\":100.00,\"status\":\"SCORED\",\"sourceVersion\":1}}' \
-      "$source_event_id" "$aggregate_id" "$occurred_at" "$correlation_id" "$course_id" "$source_id" "$student_id")"
-    # Pause only the relay worker while the Grade outage is active. This
+    source_payload="$(build_source_grade_payload "$source_event_id" "$aggregate_id" "$occurred_at" "$correlation_id" "$course_id" "$source_id" "$student_id")"
+    # Pause only the relay worker while the Grade outage is active.  This
     # leaves the Assessment-owned transaction visibly PENDING before recovery.
     # Keep the worker stopped until Grade has recreated its durable consumer
     # queue; otherwise a mandatory publish during the outage is returned before
@@ -551,11 +638,14 @@ PY
     fi
     # Start the relay only after Grade's real consumer has declared its queue
     # and binding, making delivery of the same persisted event deterministic.
-    if [[ "$recovery_state" == healthy ]]; then
+    if [[ "$recovery_state" == healthy* ]]; then
       if "${compose[@]}" start assessment-worker >"$dir/worker-start.log" 2>&1; then worker_started=1; fi
     fi
     if [[ "$worker_started" == 1 ]]; then wait_healthy assessment-worker || worker_started=0; fi
     if [[ "$recovery_state" == healthy* && "$fixture_status" == PASS ]]; then
+      if wait_for_db_value 'Assessment source outbox delivery' DELIVERED oj_assessment "SELECT state FROM assessment_event_outbox WHERE event_id='$source_event_id';" 30; then
+        source_outbox_state_after=DELIVERED
+      fi
       # Prefer the Assessment outbox relay. If the disposable broker still
       # loses that first attempt, use the exact same envelope through the real
       # RabbitMQ exchange as a bounded fallback rather than waiting 15 minutes.
@@ -572,19 +662,23 @@ PY
       duplicate_inbox_before="$(db_exec oj_grade "SELECT COUNT(*) FROM grade_event_inbox WHERE event_id='$source_event_id';" 2>/dev/null || printf '0')"
       duplicate_projection_before="$(db_exec oj_grade "SELECT COUNT(*) FROM grade_source_projection WHERE aggregate_id='$aggregate_id';" 2>/dev/null || printf '0')"
       if publish_duplicate_event "$source_payload" >"$dir/duplicate-publish.log" 2>&1; then
-        sleep 3
-        duplicate_inbox_after="$(db_exec oj_grade "SELECT COUNT(*) FROM grade_event_inbox WHERE event_id='$source_event_id';" 2>/dev/null || printf '0')"
-        duplicate_projection_after="$(db_exec oj_grade "SELECT COUNT(*) FROM grade_source_projection WHERE aggregate_id='$aggregate_id';" 2>/dev/null || printf '0')"
-        if [[ "$duplicate_inbox_before" == "$duplicate_inbox_after" && "$duplicate_projection_before" == "$duplicate_projection_after" ]]; then
-          duplicate_decision=no-op
+        if wait_for_grade_queue_idle; then
+          duplicate_delivery=CONSUMED
+          duplicate_inbox_after="$(db_exec oj_grade "SELECT COUNT(*) FROM grade_event_inbox WHERE event_id='$source_event_id';" 2>/dev/null || printf '0')"
+          duplicate_projection_after="$(db_exec oj_grade "SELECT COUNT(*) FROM grade_source_projection WHERE aggregate_id='$aggregate_id';" 2>/dev/null || printf '0')"
+          if [[ "$duplicate_inbox_before" == "$duplicate_inbox_after" && "$duplicate_projection_before" == "$duplicate_projection_after" ]]; then
+            duplicate_decision=no-op
+          else
+            duplicate_decision=changed
+          fi
         else
-          duplicate_decision=changed
+          duplicate_decision=delivery-timeout
         fi
       else
         duplicate_decision=publish-failed
       fi
     fi
-    if [[ "$recovery_state" == healthy* && "$recovery_seconds" -le "$timeout_seconds" && "$during_status" == *'probe=unavailable'* && "$peer_status" == healthy && "$query_status" == PASS && "$fixture_status" == PASS && "$initial_publish_decision" != publish-failed && "$grade_inbox_status" == APPLIED && "$grade_projection_count" == 1 && "$duplicate_decision" == no-op ]]; then
+    if [[ "$recovery_state" == healthy* && "$recovery_seconds" -le "$timeout_seconds" && "$during_status" == *'probe=unavailable'* && "$peer_status" == healthy && "$query_status" == PASS && "$fixture_status" == PASS && "$source_outbox_state_after" == DELIVERED && "$initial_publish_decision" != publish-failed && "$grade_inbox_status" == APPLIED && "$grade_projection_count" == 1 && "$duplicate_decision" == no-op ]]; then
       status=PASS
     else
       status=FAIL
@@ -592,8 +686,8 @@ PY
     record_scenario "$id" "$status" \
       "service=grade-service state=$before_status; Assessment source fact=$source_fact_count eventId=$source_event_id revision=$source_grade_revision outbox=$source_outbox_state_before" \
       "service=grade-service state=$during_status; sourceGradeEventId=$source_event_id sourceGradeRevision=$source_grade_revision sourceGradeOutboxStateBefore=$source_outbox_state_before query=$query_status" \
-      "service=grade-service state=$recovery_state; sourceTransport=real-rabbitmq initialPublish=$initial_publish_decision gradeInboxStatus=$grade_inbox_status gradeProjectionCount=$grade_projection_count duplicateDecision=$duplicate_decision recoverySeconds=$recovery_seconds" \
-      "compose=${dir#$repo_root/}; sourceGradeEventId=$source_event_id; sourceGradeRevision=$source_grade_revision; sourceGradeOutboxStateBefore=$source_outbox_state_before; sourceTransport=real-rabbitmq; initialPublish=$initial_publish_decision; gradeInboxStatus=$grade_inbox_status; gradeProjectionCount=$grade_projection_count; duplicateDecision=$duplicate_decision; duplicateInbox=$duplicate_inbox_before/$duplicate_inbox_after; duplicateProjection=$duplicate_projection_before/$duplicate_projection_after; recoverySeconds=$recovery_seconds"
+      "service=grade-service state=$recovery_state; sourceTransport=real-rabbitmq sourceGradeOutboxStateAfter=$source_outbox_state_after initialPublish=$initial_publish_decision gradeInboxStatus=$grade_inbox_status gradeProjectionCount=$grade_projection_count duplicateDelivery=$duplicate_delivery duplicateDecision=$duplicate_decision recoverySeconds=$recovery_seconds" \
+      "compose=${dir#$repo_root/}; sourceGradeEventId=$source_event_id; sourceGradeRevision=$source_grade_revision; sourceGradeOutboxStateBefore=$source_outbox_state_before; sourceGradeOutboxStateAfter=$source_outbox_state_after; sourceTransport=real-rabbitmq; initialPublish=$initial_publish_decision; gradeInboxStatus=$grade_inbox_status; gradeProjectionCount=$grade_projection_count; duplicateDelivery=$duplicate_delivery; duplicateDecision=$duplicate_decision; duplicateInbox=$duplicate_inbox_before/$duplicate_inbox_after; duplicateProjection=$duplicate_projection_before/$duplicate_projection_after; recoverySeconds=$recovery_seconds"
   }
   grade_down_source_fixture
 
@@ -610,7 +704,11 @@ PY
     cached_query_status="$(query_api GET /api/v1/courses "$identity_dir/cached-jwt-query-body")"
     login_code="$(curl --silent --show-error --output "$identity_dir/login-body" --write-out '%{http_code}' \
       --max-time 10 -X POST "$base_url/api/v1/auth/login" -H 'Content-Type: application/json' \
+      -H 'X-Request-Id: issue340-identity-login' \
       --data '{"account":"issue340-new-login","password":"invalid"}' 2>/dev/null || printf '000')"
+    refresh_code="$(curl --silent --show-error --output "$identity_dir/refresh-body" --write-out '%{http_code}' \
+      --max-time 10 -X POST "$base_url/api/v1/auth/refresh" -H "Authorization: Bearer $query_token" \
+      -H 'X-Request-Id: issue340-identity-refresh' 2>/dev/null || printf '000')"
     snapshot_domain_counts "$identity_dir/domain-after"
     identity_side_effects=PASS
     if ! cmp -s "$identity_dir/domain-before" "$identity_dir/domain-after"; then identity_side_effects=FAIL; fi
@@ -618,12 +716,12 @@ PY
     identity_recovery_started=$SECONDS
     if wait_healthy identity-service; then identity_recovery=healthy; else identity_recovery=timeout; fi
     identity_recovery_seconds=$((SECONDS - identity_recovery_started))
-    [[ "$identity_recovery" == healthy && "$identity_recovery_seconds" -le "$timeout_seconds" && "$cached_query_status" =~ ^2[0-9][0-9]$ && "$login_code" =~ ^(5[0-9][0-9]|000)$ && "$identity_side_effects" == PASS && "$cached_jwt_warm_status" =~ ^2[0-9][0-9]$ ]] && identity_status=PASS || identity_status=FAIL
+    [[ "$identity_recovery" == healthy && "$identity_recovery_seconds" -le "$timeout_seconds" && "$cached_query_status" =~ ^2[0-9][0-9]$ && "$login_code" =~ ^(5[0-9][0-9]|000)$ && "$refresh_code" =~ ^(5[0-9][0-9]|000)$ && "$identity_side_effects" == PASS && "$cached_jwt_warm_status" =~ ^2[0-9][0-9]$ ]] && identity_status=PASS || identity_status=FAIL
     record_scenario identity-down "$identity_status" \
       "identity-service state=$identity_before; cache-warm HTTP=$cached_jwt_warm_status; JWKS cache was primed before stop" \
-      "identity-service state=$identity_during; cached-jwt-query HTTP=$cached_query_status; new-login HTTP=$login_code; protectedReadStatus=$cached_query_status" \
+      "identity-service state=$identity_during; cached-jwt-query HTTP=$cached_query_status; new-login HTTP=$login_code; refresh HTTP=$refresh_code; protectedReadStatus=$cached_query_status" \
       "identity-service state=$identity_recovery; recoverySeconds=$identity_recovery_seconds" \
-      "compose=${identity_dir#$repo_root/}; cachedVerification=$cached_query_status; protectedReadStatus=$cached_query_status; newLoginStatus=$login_code; domainWrites=$identity_side_effects; recoverySeconds=$identity_recovery_seconds"
+      "compose=${identity_dir#$repo_root/}; cachedVerification=$cached_query_status; protectedReadStatus=$cached_query_status; newLoginStatus=$login_code; refreshStatus=$refresh_code; domainWrites=$identity_side_effects; recoverySeconds=$identity_recovery_seconds"
   else
     record_scenario identity-down FAIL "identity-service state=$identity_before" "stop command failed" "service was not restarted" "compose=${identity_dir#$repo_root/}"
   fi
@@ -671,6 +769,7 @@ report = {
     "testedSha": sha,
     "runId": run_id,
     "executionMode": "contract-only" if contract_only == "1" else "live",
+    "environment": "contract-only" if contract_only == "1" else "isolated #318 disposable Compose: 9 workloads / 4 migrations",
     "startedAt": started_at,
     "finishedAt": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
     "status": status,
@@ -683,6 +782,36 @@ report = {
     "scenarios": scenarios,
 }
 (root / "report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+PY
+
+python3 - "$output_dir" <<'PY'
+import json
+import re
+import sys
+from pathlib import Path
+
+root = Path(sys.argv[1])
+paths = [root / "report.json", root / "query-login-meta.json", root / "worker-rabbit-recovery-evidence.log"]
+for scenario in (root / "scenarios").glob("*"):
+    paths.extend(scenario / name for name in ("status", "before", "during", "recovery", "evidence", "compose-before", "query-status", "domain-before", "domain-after"))
+patterns = {
+    "bearer": re.compile(r"(?i)authorization\s*:\s*bearer\s+[A-Za-z0-9._~+/-]{20,}"),
+    "jwt": re.compile(r"\beyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}\b"),
+    "secret-assignment": re.compile(r"(?i)(?:password|token|secret|cookie|private[_-]?key)\s*[=:]\s*(?!\[REDACTED\])[A-Za-z0-9._~+/-]{12,}"),
+    "pem": re.compile(r"-----BEGIN (?:RSA )?PRIVATE KEY-----"),
+}
+matches = []
+for path in paths:
+    if not path.is_file():
+        continue
+    content = path.read_text(encoding="utf-8", errors="replace")
+    for name, pattern in patterns.items():
+        if pattern.search(content):
+            matches.append({"file": str(path.relative_to(root)), "pattern": name})
+scan = {"status": "PASS" if not matches else "FAIL", "filesScanned": sum(path.is_file() for path in paths), "matches": matches}
+(root / "evidence-scan.json").write_text(json.dumps(scan, indent=2) + "\n", encoding="utf-8")
+if matches:
+    raise SystemExit("uploaded #340 evidence failed the token/secret scan")
 PY
 
 report_status="$(python3 - "$output_dir/report.json" <<'PY'

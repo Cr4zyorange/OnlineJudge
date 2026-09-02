@@ -87,6 +87,10 @@ grep -Fq -- 'sourceGradeOutboxStateBefore=' "$runner" \
   || fail 'runner must record the source outbox state before relay recovery'
 grep -Fq -- 'source_outbox_state_before" == PENDING' "$runner" \
   || fail 'runner must assert the source outbox is pending before relay recovery'
+grep -Fq -- 'sourceGradeOutboxStateAfter=' "$runner" \
+  || fail 'runner must record the source outbox state after recovery'
+grep -Fq -- 'source_outbox_state_after" == DELIVERED' "$runner" \
+  || fail 'runner must reject a Grade recovery that leaves the Assessment event pending'
 python3 - "$runner" <<'PY'
 from pathlib import Path
 import sys
@@ -103,12 +107,29 @@ grep -Fq -- 'sourceTransport=real-rabbitmq' "$runner" \
   || fail 'runner must record that source recovery used the real RabbitMQ consumer'
 grep -Fq -- 'cached-jwt-query' "$runner" \
   || fail 'runner must exercise a protected read with the pre-obtained JWT'
+grep -Fq -- 'identity-refresh' "$runner" \
+  || fail 'identity outage must probe the reserved refresh route while Identity is stopped'
+grep -Fq -- 'build_source_grade_payload' "$runner" \
+  || fail 'Grade outage fixture must serialize a valid canonical source-grade envelope'
+grep -Fq -- 'json.dumps(envelope' "$runner" \
+  || fail 'Grade outage envelope must be encoded by JSON rather than shell escaping'
+grep -Fq -- 'write_safe_recovery_evidence' "$runner" \
+  || fail 'runner must retain a redacted raw worker recovery assertion extract'
 grep -Fq -- 'OJ314_RAW_LOG_PATH' "$repo_root/scripts/test/verify-issue-314-recovery-disposable.sh" \
   || fail 'disposable recovery must expose a retained raw log path'
 grep -Fq -- 'OJ314_KEEP_RAW_LOG' "$repo_root/scripts/test/verify-issue-314-recovery-disposable.sh" \
   || fail 'disposable recovery must retain raw assertions for the resilience report'
 grep -Fq -- 'stale completion' "$repo_root/scripts/test/verify-issue-314-recovery-disposable.sh" \
   || fail 'disposable recovery must execute stale completion fencing'
+grep -Fq -- 'newGeneration=' "$repo_root/scripts/test/verify-issue-314-recovery-disposable.sh" \
+  || fail 'worker recovery evidence must retain the replacement generation'
+grep -Fq -- 'outboxState=' "$repo_root/scripts/test/verify-issue-314-recovery-disposable.sh" \
+  || fail 'worker recovery evidence must retain the terminal outbox state'
+if grep -Fq -- 'ci-artifacts/issue-340/**' "$repo_root/.github/workflows/issue-340-resilience.yml"; then
+  fail 'workflow must upload only an explicit evidence whitelist, never the complete runtime directory'
+fi
+grep -Fq -- 'worker-rabbit-recovery-evidence.log' "$repo_root/.github/workflows/issue-340-resilience.yml" \
+  || fail 'workflow must upload the redacted worker recovery evidence extract'
 if grep -Eq 'printf .*PASSWORD|printf .*TOKEN|printf .*SECRET|echo .*PASSWORD' "$runner"; then
   fail 'runner must never print secret values'
 fi
@@ -122,6 +143,7 @@ trap cleanup EXIT INT TERM
 grep -Fq 'RESILIENCE_MATRIX_PASS issue=#340 scenarios=7 passed=7' "$evidence_dir/stdout" \
   || { cat "$evidence_dir/stdout" >&2; fail 'structured PASS marker missing'; }
 [[ -s "$evidence_dir/report.json" ]] || fail 'contract-only report.json was not written'
+[[ -s "$evidence_dir/evidence-scan.json" ]] || fail 'contract-only evidence token/secret scan was not written'
 python3 - "$evidence_dir/report.json" <<'PY'
 import json
 import sys
@@ -134,6 +156,14 @@ assert report["redacted"] is True, report
 for item in report["scenarios"]:
     assert item["status"] == "PASS", item
     assert item["before"] and item["during"] and item["recovery"], item
+PY
+python3 - "$evidence_dir/evidence-scan.json" <<'PY'
+import json
+import sys
+scan = json.load(open(sys.argv[1], encoding="utf-8"))
+assert scan["status"] == "PASS", scan
+assert scan["matches"] == [], scan
+assert scan["filesScanned"] > 0, scan
 PY
 
 printf 'verify-issue-340-resilience.test: PASS\n'

@@ -205,9 +205,16 @@ worker_recovery_started=$SECONDS
 wait_for_worker
 wait_for_task_state "$before_task" SUCCEEDED
 wait_for_value 'replacement generation' '2' "SELECT generation FROM evaluation_task WHERE id = '$before_task';"
+new_generation="$(sql "SELECT generation FROM evaluation_task WHERE id = '$before_task';")"
 wait_for_value 'recovered task source-grade count' '1' "SELECT COUNT(*) FROM assessment_source_grade WHERE source_type='LAB' AND source_id='$before_lab' AND student_id='student-$run_id';"
 wait_for_value 'recovered task terminal outbox count' '2' "SELECT COUNT(*) FROM assessment_event_outbox WHERE correlation_id='$before_request';"
+recovered_outbox_state="$(sql "SELECT GROUP_CONCAT(DISTINCT state ORDER BY state) FROM assessment_event_outbox WHERE correlation_id='$before_request';")"
+[[ "$new_generation" == '2' && -n "$recovered_outbox_state" ]] \
+  || fail "replacement generation or outbox state was not observable for task $before_task"
 worker_recovery_seconds=$((SECONDS - worker_recovery_started))
+printf 'worker-fencing-assertion: taskId=%s leaseOwner=%s leaseUntil=%s oldGeneration=%s newGeneration=%s sourceGradeCount=1 outboxState=%s recoverySeconds=%s\n' \
+  "$before_task" "$before_lease_owner" "$before_lease_until" "$before_generation" "$new_generation" \
+  "$recovered_outbox_state" "$worker_recovery_seconds" >>"$raw_log"
 
 # Simulate a late completion from the killed generation.  The same optimistic
 # fencing predicate used by EvaluationTaskRepository must reject it, while the
@@ -219,9 +226,9 @@ source_grade_after_stale="$(sql "SELECT COUNT(*) FROM assessment_source_grade WH
 outbox_after_stale="$(sql "SELECT COUNT(*) FROM assessment_event_outbox WHERE correlation_id='$before_request';")"
 [[ "$stale_completion_rows" == '0' && "$source_grade_before_stale" == "$source_grade_after_stale" && "$outbox_before_stale" == "$outbox_after_stale" ]] \
   || fail "stale completion was not fenced rows=${stale_completion_rows:-<empty>} source-grade=${source_grade_before_stale}/${source_grade_after_stale} outbox=${outbox_before_stale}/${outbox_after_stale}"
-printf 'worker-fencing-assertion: taskId=%s staleCompletionRows=%s sourceGrade=%s/%s outbox=%s/%s recoverySeconds=%s\n' \
-  "$before_task" "$stale_completion_rows" "$source_grade_before_stale" "$source_grade_after_stale" \
-  "$outbox_before_stale" "$outbox_after_stale" "$worker_recovery_seconds" >>"$raw_log"
+printf 'worker-fencing-assertion: taskId=%s oldGeneration=%s newGeneration=%s staleCompletionRows=%s sourceGrade=%s/%s outbox=%s/%s outboxState=%s recoverySeconds=%s\n' \
+  "$before_task" "$before_generation" "$new_generation" "$stale_completion_rows" "$source_grade_before_stale" "$source_grade_after_stale" \
+  "$outbox_before_stale" "$outbox_after_stale" "$recovered_outbox_state" "$worker_recovery_seconds" >>"$raw_log"
 
 # Kill a worker only after the durable terminal transaction is visible.  A
 # fresh worker must not replay an already-completed generation or duplicate its
@@ -263,11 +270,11 @@ wait_for_value 'broker-recovered delivered outbox count' '2' "SELECT COUNT(*) FR
 queue_messages="$("${compose[@]}" exec -T rabbitmq rabbitmqctl list_queues name messages -q | awk -v queue="$recovery_queue" '$1 == queue { print $2 }')"
 [[ "$queue_messages" =~ ^[2-9][0-9]*$|^[2-9]$ ]] || fail "recovery queue did not receive fresh Assessment events: ${queue_messages:-<empty>}"
 
-printf 'worker-fencing-assertion: taskId=%s leaseOwner=%s leaseUntil=%s oldGeneration=%s staleCompletionRows=%s sourceGrade=%s/%s outbox=%s/%s recoverySeconds=%s\n' \
-  "$before_task" "$before_lease_owner" "$before_lease_until" "$before_generation" "$stale_completion_rows" \
-  "$source_grade_before_stale" "$source_grade_after_stale" "$outbox_before_stale" "$outbox_after_stale" "$worker_recovery_seconds" >>"$raw_log"
+printf 'worker-fencing-assertion: taskId=%s leaseOwner=%s leaseUntil=%s oldGeneration=%s newGeneration=%s staleCompletionRows=%s sourceGrade=%s/%s outbox=%s/%s outboxState=%s recoverySeconds=%s\n' \
+  "$before_task" "$before_lease_owner" "$before_lease_until" "$before_generation" "$new_generation" "$stale_completion_rows" \
+  "$source_grade_before_stale" "$source_grade_after_stale" "$outbox_before_stale" "$outbox_after_stale" "$recovered_outbox_state" "$worker_recovery_seconds" >>"$raw_log"
 
-printf 'verify-issue-314-recovery: PASS sha=%s lab=%s/%s/%s task=%s/%s/%s event-correlation=%s/%s/%s broker-queue=%s messages=%s leaseOwner=%s leaseUntil=%s oldGeneration=%s staleCompletionRows=%s recoverySeconds=%s\n' \
+printf 'verify-issue-314-recovery: PASS sha=%s lab=%s/%s/%s task=%s/%s/%s event-correlation=%s/%s/%s broker-queue=%s messages=%s leaseOwner=%s leaseUntil=%s oldGeneration=%s newGeneration=%s outboxState=%s staleCompletionRows=%s recoverySeconds=%s\n' \
   "$tested_head_sha" "$before_lab" "$after_lab" "$broker_lab" "$before_task" "$after_task" "$broker_task" \
   "$before_request" "$after_request" "$broker_request" "$recovery_queue" "$queue_messages" \
-  "$before_lease_owner" "$before_lease_until" "$before_generation" "$stale_completion_rows" "$worker_recovery_seconds"
+  "$before_lease_owner" "$before_lease_until" "$before_generation" "$new_generation" "$recovered_outbox_state" "$stale_completion_rows" "$worker_recovery_seconds"
