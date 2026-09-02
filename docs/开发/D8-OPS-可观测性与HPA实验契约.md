@@ -39,3 +39,22 @@ bash scripts/platform/run_hpa_observability_experiment.sh \
 ```
 
 授权头与请求体都只从调用方受限文件读取，不复制到证据目录或命令行输出。每次实验固定先受控摘除并恢复 RabbitMQ，确认 Assessment API 仍有 Available 副本；随后必须观察到 HPA 相对基线扩容并在负载结束后缩容。实验入口会在 `output/issue-319/<sha>/<utc>/` 保留 HPA/Pod/资源时间线、每次请求的原始耗时和状态、Gateway/Assessment/Grade 日志及 RabbitMQ queue 计数；无论成功或失败均输出证据目录。`kubectl top` 不可用会失败关闭，不能把无 Metrics API 的运行称为扩缩容实验。
+
+## 真实运行结论（2026-09-02，Round 5 实验）
+
+在 kind 集群（#318 环境 9 workloads 就绪）执行真实实验后确认：
+
+- 正式实验证据：`output/issue-319/da6fd3f8/20260902T080519Z/`（EXPERIMENT_READY）：
+  HPA 在真实读负载下从 1 扩到 2、负载结束后缩回 1；44,680 个 Assessment 业务请求
+  全部 2xx、错误率 0、P95 17ms；RabbitMQ 受控摘除/恢复期间 assessment-api 保持
+  Available。
+- 压测入口经验：高并发 HWK 新写入会触发 assessment_homework_submission 唯一索引的
+  InnoDB 死锁（错误率 ~0.02–0.1%，跨不同 (homework,student) 亦发生）。稳定做法是
+  读链路为主负载 + 低速率（≤2 r/s、单在途）HWK 提交做业务链/积压佐证。上述死锁的
+  失败运行已按 AC-319-05 保留证据。
+- 校准发现：经网关限流（写 10r/s、读 30r/s）时，assessment-api 的 CPU 利用率无法
+  达到 60% HPA 阈值（每请求约 1–5ms CPU，对应 30–150m << 180m）。实验负载因此直连
+  assessment-api 服务（port-forward），去掉与 HPA 目标无关的网关限流瓶颈；请求仍走
+  真实 JWT 鉴权、业务校验与 DB。HPA 阈值与网关限流口径的匹配建议后续单独复核。
+- runner 现已支持：多 `--request-url`/多 `--authorization-file` 轮询、单行原子写入、
+  `--noproxy '*'`、`wait_for_replicas` 显式分支（修复左结合优先级导致扩容断言失效）。
