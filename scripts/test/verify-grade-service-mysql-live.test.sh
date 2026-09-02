@@ -14,6 +14,16 @@ if grep -Fq -- '--protocol=socket' "$runner"; then
   exit 1
 fi
 
+python3 - "$repo_root/database/migrations/grade/V20260903_01__allow_runtime_source_status_projection.sql" <<'PY'
+from pathlib import Path
+import sys
+
+migration = Path(sys.argv[1])
+assert migration.is_file(), "the legacy status column needs a forward-only Grade migration"
+text = migration.read_text(encoding="utf-8")
+assert "MODIFY status VARCHAR(32) NULL" in text, text
+PY
+
 awk '
   function verify_invocation() {
     if (command !~ /(^|[[:space:]])mysql([[:space:]]|$)/ || command !~ /--user=root/) {
@@ -46,12 +56,12 @@ awk '
   }
 
   END {
-    if (root_invocations != 4) {
-      printf "grade-mysql-live-contract: expected 4 root/admin/migration queries, found %d\n", root_invocations > "/dev/stderr"
+    if (root_invocations != 5) {
+      printf "grade-mysql-live-contract: expected 5 root/admin/migration queries, found %d\n", root_invocations > "/dev/stderr"
       failures++
     }
     exit failures != 0
   }
 ' "$runner"
 
-echo "grade-mysql-live-contract: PASS root/admin/migration queries=4 protocol=tcp host=127.0.0.1"
+echo "grade-mysql-live-contract: PASS root/admin/migration queries=5 protocol=tcp host=127.0.0.1"
