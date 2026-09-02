@@ -159,6 +159,21 @@ public class HomeworkService {
         return query(homeworkId, false);
     }
 
+    public List<HomeworkSummary> list(String courseId, boolean includeDrafts) {
+        String visibility = includeDrafts ? "" : " AND status IN ('PUBLISHED', 'SCORE_PUBLISHED')";
+        return jdbc.query("""
+                SELECT id, course_id, title, description, type, status, deadline, total_score,
+                       allow_resubmit, allow_late_submit, allowed_languages, aggregate_version, published_at
+                  FROM assessment_homework
+                 WHERE course_id = ?
+                """ + visibility + " ORDER BY id DESC", (rs, ignored) -> new HomeworkSummary(rs.getLong("id"),
+                rs.getString("course_id"), rs.getString("title"), rs.getString("description"),
+                rs.getString("type"), rs.getString("status"), rs.getTimestamp("deadline").toInstant(),
+                rs.getBigDecimal("total_score"), rs.getBoolean("allow_resubmit"), rs.getBoolean("allow_late_submit"),
+                splitLanguages(rs.getString("allowed_languages")), rs.getLong("aggregate_version"),
+                rs.getTimestamp("published_at") == null ? null : rs.getTimestamp("published_at").toInstant()), courseId);
+    }
+
     private HomeworkSummary findForUpdate(long homeworkId) {
         return query(homeworkId, true);
     }
@@ -173,13 +188,18 @@ public class HomeworkService {
                 rs.getString("title"), rs.getString("description"), rs.getString("type"), rs.getString("status"),
                 rs.getTimestamp("deadline").toInstant(), rs.getBigDecimal("total_score"),
                 rs.getBoolean("allow_resubmit"), rs.getBoolean("allow_late_submit"),
-                List.of(rs.getString("allowed_languages").split(",")), rs.getLong("aggregate_version"),
+                splitLanguages(rs.getString("allowed_languages")), rs.getLong("aggregate_version"),
                 rs.getTimestamp("published_at") == null ? null : rs.getTimestamp("published_at").toInstant()), homeworkId)
                 .stream().findFirst().orElseThrow(() -> new NoSuchElementException("homework not found"));
     }
 
     private int testcaseCount(long homeworkId) {
         return jdbc.queryForObject("SELECT COUNT(*) FROM assessment_homework_testcase WHERE homework_id = ?", Integer.class, homeworkId);
+    }
+
+    private static List<String> splitLanguages(String stored) {
+        if (stored == null || stored.isBlank()) return List.of();
+        return List.of(stored.split(","));
     }
 
     public record CreateHomeworkCommand(String courseId, String title, String description, String type, Instant deadline,
@@ -189,14 +209,21 @@ public class HomeworkService {
             if (courseId == null || courseId.isBlank() || title == null || title.isBlank() || title.trim().length() > 100) {
                 throw new IllegalArgumentException("courseId and a 1-100 character title are required");
             }
-            if (!"CODE".equals(type)) throw new IllegalArgumentException("the durable Assessment HWK slice currently accepts CODE homework");
-            if (deadline == null || totalScore == null || totalScore.signum() <= 0) throw new IllegalArgumentException("deadline and positive totalScore are required");
-            if (languages == null || languages.isEmpty() || languages.stream().anyMatch(value -> value == null || value.isBlank())) {
-                throw new IllegalArgumentException("at least one language is required");
+            if (!List.of("TEXT", "OBJECTIVE", "FILE", "CODE").contains(type)) {
+                throw new IllegalArgumentException("homework type must be TEXT, OBJECTIVE, FILE or CODE");
             }
-            if (testCases == null || testCases.isEmpty()) throw new IllegalArgumentException("code homework requires at least one test case");
-            BigDecimal configured = testCases.stream().map(TestCaseCommand::scoreWeight).reduce(BigDecimal.ZERO, BigDecimal::add);
-            if (configured.compareTo(totalScore) != 0) throw new IllegalArgumentException("test case weights must equal totalScore");
+            if (deadline == null || totalScore == null || totalScore.signum() <= 0) throw new IllegalArgumentException("deadline and positive totalScore are required");
+            if (languages == null || testCases == null) throw new IllegalArgumentException("languages and testCases must be arrays");
+            if ("CODE".equals(type)) {
+                if (languages.isEmpty() || languages.stream().anyMatch(value -> value == null || value.isBlank())) {
+                    throw new IllegalArgumentException("at least one language is required");
+                }
+                if (testCases.isEmpty()) throw new IllegalArgumentException("code homework requires at least one test case");
+                BigDecimal configured = testCases.stream().map(TestCaseCommand::scoreWeight).reduce(BigDecimal.ZERO, BigDecimal::add);
+                if (configured.compareTo(totalScore) != 0) throw new IllegalArgumentException("test case weights must equal totalScore");
+            } else if (!languages.isEmpty() || !testCases.isEmpty()) {
+                throw new IllegalArgumentException("only code homework accepts languages and testCases");
+            }
         }
     }
 
@@ -213,8 +240,8 @@ public class HomeworkService {
                                   List<String> languages, long aggregateVersion, Instant publishedAt) { }
 
     private record FinalSubmission(String submissionId, String studentId, BigDecimal finalScore, String taskState) {
-        boolean terminal() { return "SUCCEEDED".equals(taskState) || "FAILED".equals(taskState); }
-        boolean scored() { return "SUCCEEDED".equals(taskState) && finalScore != null; }
+        boolean terminal() { return taskState == null ? finalScore != null : "SUCCEEDED".equals(taskState) || "FAILED".equals(taskState); }
+        boolean scored() { return finalScore != null && (taskState == null || "SUCCEEDED".equals(taskState)); }
     }
 
     private record PublishedScore(String submissionId, String studentId, BigDecimal score) { }

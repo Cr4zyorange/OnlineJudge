@@ -96,8 +96,10 @@ CREATE TABLE IF NOT EXISTS assessment_homework_testcase (
 );
 CREATE TABLE IF NOT EXISTS assessment_homework_submission (
   submission_id VARCHAR(36) PRIMARY KEY, public_id BIGINT AUTO_INCREMENT UNIQUE, homework_id BIGINT NOT NULL, student_id VARCHAR(80) NOT NULL,
-  submission_version INTEGER NOT NULL, language VARCHAR(40) NOT NULL, submit_status VARCHAR(20) NOT NULL,
-  evaluation_status VARCHAR(32) NOT NULL, auto_score DECIMAL(10,2), final_score DECIMAL(10,2), is_final BOOLEAN NOT NULL,
+  submission_version INTEGER NOT NULL, submit_type VARCHAR(20) NOT NULL DEFAULT 'CODE', language VARCHAR(40) NOT NULL, answer_text TEXT,
+  answer_json TEXT, submit_status VARCHAR(20) NOT NULL, evaluation_status VARCHAR(32) NOT NULL,
+  review_status VARCHAR(32) NOT NULL DEFAULT 'NEED_REVIEW', auto_score DECIMAL(10,2), manual_score DECIMAL(10,2), final_score DECIMAL(10,2),
+  review_comment TEXT, is_final BOOLEAN NOT NULL,
   submitted_at TIMESTAMP NOT NULL, UNIQUE KEY uq_assessment_homework_submission_version (homework_id, student_id, submission_version),
   INDEX idx_assessment_homework_submission_student (homework_id, student_id, is_final, submitted_at),
   CONSTRAINT fk_assessment_homework_submission_homework FOREIGN KEY (homework_id) REFERENCES assessment_homework(id),

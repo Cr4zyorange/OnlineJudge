@@ -692,6 +692,86 @@ class HomeworkWorkflowContractTest {
                 .isZero();
     }
 
+    @Test
+    void textHomeworkCompletesManualReviewAndScorePublicationWithoutCreatingACodeTask() throws Exception {
+        String teacherId = "teacher-text-" + UUID.randomUUID();
+        String studentId = "student-text-" + UUID.randomUUID();
+        String teacherToken = TestJwtFactory.userToken(KEY, "homework-workflow-kid", teacherId, List.of("TEACHER"));
+        String studentToken = TestJwtFactory.userToken(KEY, "homework-workflow-kid", studentId, List.of("STUDENT"));
+        jdbc.update("INSERT INTO assessment_course_member_projection (course_id, user_id, membership_status, member_version) VALUES ('course-315', ?, 'ACTIVE', 1)", teacherId);
+        jdbc.update("INSERT INTO assessment_course_member_projection (course_id, user_id, membership_status, member_version) VALUES ('course-315', ?, 'ACTIVE', 1)", studentId);
+        when(coursePermissions.canManageCourse("course-315", teacherId)).thenReturn(true);
+
+        String created = mockMvc.perform(post("/api/v1/homeworks")
+                        .header("Authorization", "Bearer " + teacherToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"courseId":"course-315","title":"text homework","description":"manual review",
+                                 "type":"TEXT","deadline":"2030-01-01T12:00:00Z","totalScore":100,
+                                 "allowResubmit":true,"allowLateSubmit":false,"questions":[],"testCases":[]}
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.type").value("TEXT"))
+                .andReturn().getResponse().getContentAsString();
+        long homeworkId = mapper.readTree(created).path("id").asLong();
+
+        mockMvc.perform(get("/api/v1/homeworks")
+                        .param("courseId", "course-315")
+                        .header("Authorization", "Bearer " + teacherToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.list[0].id").value(homeworkId))
+                .andExpect(jsonPath("$.data.list[0].type").value("TEXT"));
+
+        mockMvc.perform(put("/api/v1/homeworks/{homeworkId}/publish", homeworkId)
+                        .header("Authorization", "Bearer " + teacherToken))
+                .andExpect(status().isOk());
+
+        String submitted = mockMvc.perform(post("/api/v1/homeworks/{homeworkId}/submissions", homeworkId)
+                        .header("Authorization", "Bearer " + studentToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"answerText\":\"a durable text answer\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.code").value(0))
+                .andExpect(jsonPath("$.data.submitType").value("TEXT"))
+                .andExpect(jsonPath("$.data.evaluationStatus").value("NONE"))
+                .andExpect(jsonPath("$.data.reviewStatus").value("UNREVIEWED"))
+                .andReturn().getResponse().getContentAsString();
+        long publicSubmissionId = publicSubmissionId(submitted);
+
+        mockMvc.perform(get("/api/v1/homeworks/{homeworkId}/my-submissions", homeworkId)
+                        .header("Authorization", "Bearer " + studentToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].submissionId").value(publicSubmissionId))
+                .andExpect(jsonPath("$.data[0].answerText").value("a durable text answer"));
+
+        mockMvc.perform(get("/api/v1/homeworks/{homeworkId}/submissions", homeworkId)
+                        .header("Authorization", "Bearer " + teacherToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.list[0].submissionId").value(publicSubmissionId));
+
+        mockMvc.perform(put("/api/v1/submissions/{submissionId}/review", publicSubmissionId)
+                        .header("Authorization", "Bearer " + teacherToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"manualScore\":88,\"finalScore\":88,\"comment\":\"reviewed\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.finalScore").value(88))
+                .andExpect(jsonPath("$.data.comment").value("reviewed"));
+
+        mockMvc.perform(put("/api/v1/homeworks/{homeworkId}/scores/publish", homeworkId)
+                        .header("Authorization", "Bearer " + teacherToken)
+                        .header("X-Request-Id", UUID.randomUUID().toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("SCORE_PUBLISHED"));
+        assertCurrentSourceGrade(homeworkId, studentId, "SCORED", new BigDecimal("88"), 1);
+
+        mockMvc.perform(get("/api/v1/submissions/{submissionId}", publicSubmissionId)
+                        .header("Authorization", "Bearer " + studentToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.answerText").value("a durable text answer"))
+                .andExpect(jsonPath("$.data.finalScore").value(88))
+                .andExpect(jsonPath("$.data.comment").value("reviewed"));
+    }
+
     private void assertSourceGradeIsUngraded(long homeworkId, String studentId) throws Exception {
         mockMvc.perform(get("/internal/v2/source-grades")
                         .param("courseId", "course-315")

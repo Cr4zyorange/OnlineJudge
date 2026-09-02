@@ -10,15 +10,16 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestAttribute;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
@@ -65,14 +66,15 @@ public class HomeworkController {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "active course student membership is required");
         }
         try {
-            HomeworkSubmissionService.SubmittedHomework submitted = submissions.submit(homeworkId, user.id(),
-                    request.codeText(), request.language());
+            HomeworkSubmissionService.SubmittedHomework submitted = request.answerText() != null && !request.answerText().isBlank()
+                    ? submissions.submitText(homeworkId, user.id(), request.answerText())
+                    : submissions.submit(homeworkId, user.id(), request.codeText(), request.language());
             Map<String, Object> data = new LinkedHashMap<>();
             data.put("submissionId", submitted.publicSubmissionId());
             data.put("homeworkId", submitted.homeworkId());
             data.put("studentId", user.id());
-            data.put("submitType", "CODE");
-            data.put("language", request.language());
+            data.put("submitType", submitted.taskId() == null ? "TEXT" : "CODE");
+            data.put("language", submitted.taskId() == null ? null : request.language());
             data.put("submitStatus", submitted.submitStatus());
             data.put("evaluationStatus", submitted.evaluationStatus());
             data.put("reviewStatus", "UNREVIEWED");
@@ -94,11 +96,45 @@ public class HomeworkController {
         }
     }
 
+    @GetMapping("/submissions/{submissionId}")
+    public Map<String, Object> submission(@PathVariable long submissionId,
+            @RequestAttribute("assessment.currentUser") CurrentUser user) {
+        HomeworkSubmissionService.SubmissionView found;
+        try {
+            found = submissions.find(submissionId);
+        } catch (NoSuchElementException missing) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "homework submission not found", missing);
+        }
+        if (!found.studentId().equals(user.id())) requireManager(found.courseId(), user);
+        return success(submissionResponse(found));
+    }
+
+    @PutMapping("/submissions/{submissionId}/review")
+    public Map<String, Object> review(@PathVariable long submissionId,
+            @Valid @RequestBody ReviewHomeworkRequest request,
+            @RequestAttribute("assessment.currentUser") CurrentUser user) {
+        HomeworkSubmissionService.SubmissionView found;
+        try {
+            found = submissions.find(submissionId);
+        } catch (NoSuchElementException missing) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "homework submission not found", missing);
+        }
+        requireManager(found.courseId(), user);
+        try {
+            return success(submissionResponse(submissions.review(submissionId, user.id(), request.manualScore(),
+                    request.finalScore(), request.comment())));
+        } catch (IllegalArgumentException invalid) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, invalid.getMessage(), invalid);
+        } catch (IllegalStateException conflict) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, conflict.getMessage(), conflict);
+        }
+    }
+
     @PostMapping("/homeworks")
     @ResponseStatus(HttpStatus.CREATED)
     public HomeworkService.HomeworkSummary create(@Valid @RequestBody CreateHomeworkRequest request,
             @RequestAttribute("assessment.currentUser") CurrentUser user, HttpServletRequest http) {
-        requireRequestId(http);
+        requestId(http);
         requireManager(request.courseId(), user);
         try {
             return homeworks.create(request.toCommand(), user.id());
@@ -107,10 +143,75 @@ public class HomeworkController {
         }
     }
 
+    @GetMapping("/homeworks")
+    public Map<String, Object> list(@RequestParam String courseId,
+            @RequestAttribute("assessment.currentUser") CurrentUser user) {
+        boolean manager = (user.hasRole("TEACHER") || user.hasRole("ASSISTANT"))
+                && coursePermissions.canManageCourse(courseId, user.id());
+        if (!manager && !membershipGuard.isActiveMember(courseId, user.id(), null)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "active course membership is required");
+        }
+        List<Map<String, Object>> records = homeworks.list(courseId, manager).stream()
+                .map(HomeworkController::homeworkResponse).toList();
+        Map<String, Object> page = new LinkedHashMap<>();
+        page.put("list", records);
+        page.put("total", records.size());
+        page.put("page", 1);
+        page.put("size", records.size());
+        return success(page);
+    }
+
+    @GetMapping("/homeworks/{homeworkId}")
+    public Map<String, Object> detail(@PathVariable long homeworkId,
+            @RequestAttribute("assessment.currentUser") CurrentUser user) {
+        HomeworkService.HomeworkSummary homework;
+        try {
+            homework = homeworks.find(homeworkId);
+        } catch (NoSuchElementException missing) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "homework not found", missing);
+        }
+        boolean manager = (user.hasRole("TEACHER") || user.hasRole("ASSISTANT"))
+                && coursePermissions.canManageCourse(homework.courseId(), user.id());
+        if (!manager && !membershipGuard.isActiveMember(homework.courseId(), user.id(), null)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "active course membership is required");
+        }
+        if (!manager && "DRAFT".equals(homework.status())) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "homework not found");
+        }
+        return success(homeworkResponse(homework));
+    }
+
+    @GetMapping("/homeworks/{homeworkId}/my-submissions")
+    public Map<String, Object> mySubmissions(@PathVariable long homeworkId,
+            @RequestAttribute("assessment.currentUser") CurrentUser user) {
+        if (!user.hasRole("STUDENT")) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "student role is required");
+        HomeworkService.HomeworkSummary homework = homeworks.find(homeworkId);
+        if (!membershipGuard.isActiveMember(homework.courseId(), user.id(), null)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "active course membership is required");
+        }
+        return success(submissions.listForHomework(homeworkId, user.id()).stream()
+                .map(HomeworkController::submissionResponse).toList());
+    }
+
+    @GetMapping("/homeworks/{homeworkId}/submissions")
+    public Map<String, Object> managerSubmissions(@PathVariable long homeworkId,
+            @RequestAttribute("assessment.currentUser") CurrentUser user) {
+        HomeworkService.HomeworkSummary homework = homeworks.find(homeworkId);
+        requireManager(homework.courseId(), user);
+        List<Map<String, Object>> records = submissions.listForManager(homeworkId).stream()
+                .map(HomeworkController::submissionResponse).toList();
+        Map<String, Object> page = new LinkedHashMap<>();
+        page.put("list", records);
+        page.put("total", records.size());
+        page.put("page", 1);
+        page.put("size", records.size());
+        return success(page);
+    }
+
     @PutMapping("/homeworks/{homeworkId}/publish")
     public HomeworkService.HomeworkSummary publish(@PathVariable long homeworkId,
             @RequestAttribute("assessment.currentUser") CurrentUser user, HttpServletRequest http) {
-        String requestId = requireRequestId(http);
+        String requestId = requestId(http);
         HomeworkService.HomeworkSummary homework;
         try {
             homework = homeworks.find(homeworkId);
@@ -130,7 +231,7 @@ public class HomeworkController {
     @PutMapping("/homeworks/{homeworkId}/scores/publish")
     public Map<String, Object> publishScores(@PathVariable long homeworkId,
             @RequestAttribute("assessment.currentUser") CurrentUser user, HttpServletRequest http) {
-        String requestId = requireRequestId(http);
+        String requestId = requestId(http);
         HomeworkService.HomeworkSummary homework;
         try {
             homework = homeworks.find(homeworkId);
@@ -150,17 +251,6 @@ public class HomeworkController {
         if (!managerRole || !coursePermissions.canManageCourse(courseId, user.id())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "course management permission is required");
         }
-    }
-
-    private static String requireRequestId(HttpServletRequest request) {
-        String requestId = request.getHeader("X-Request-Id");
-        if (requestId == null || requestId.isBlank()) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "X-Request-Id is required");
-        try {
-            UUID.fromString(requestId);
-        } catch (IllegalArgumentException invalid) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "X-Request-Id must be a UUID", invalid);
-        }
-        return requestId;
     }
 
     private static String requestId(HttpServletRequest request) {
@@ -186,12 +276,13 @@ public class HomeworkController {
                                         @NotBlank String type, @NotNull Instant deadline,
                                         @NotNull @DecimalMin(value = "0", inclusive = false) BigDecimal totalScore,
                                         boolean allowResubmit, boolean allowLateSubmit,
-                                        @NotEmpty List<@NotBlank String> languages,
-                                        @NotEmpty List<@Valid TestCaseRequest> testCases) {
+                                        List<@NotBlank String> languages,
+                                        List<@Valid TestCaseRequest> testCases) {
         HomeworkService.CreateHomeworkCommand toCommand() {
             return new HomeworkService.CreateHomeworkCommand(courseId, title, description == null ? "" : description,
-                    type, deadline, totalScore, allowResubmit, allowLateSubmit, languages,
-                    testCases.stream().map(TestCaseRequest::toCommand).toList());
+                    type, deadline, totalScore, allowResubmit, allowLateSubmit,
+                    languages == null ? List.of() : languages,
+                    testCases == null ? List.of() : testCases.stream().map(TestCaseRequest::toCommand).toList());
         }
     }
 
@@ -203,6 +294,66 @@ public class HomeworkController {
         }
     }
 
-    public record SubmitHomeworkRequest(@JsonAlias({"code", "codeText"}) @NotBlank String codeText,
-                                        @NotBlank String language) { }
+    public record SubmitHomeworkRequest(@JsonAlias({"code", "codeText"}) String codeText,
+                                        String language, String answerText) { }
+
+    public record ReviewHomeworkRequest(@NotNull @DecimalMin(value = "0") BigDecimal manualScore,
+                                        @NotNull @DecimalMin(value = "0") BigDecimal finalScore,
+                                        String comment) { }
+
+    private static Map<String, Object> submissionResponse(HomeworkSubmissionService.SubmissionView submission) {
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("submissionId", submission.publicSubmissionId());
+        data.put("homeworkId", submission.homeworkId());
+        data.put("studentId", numericIfPossible(submission.studentId()));
+        data.put("submitType", submission.submitType());
+        data.put("answerText", submission.answerText());
+        data.put("answerJson", submission.answerJson());
+        data.put("language", submission.language().isBlank() ? null : submission.language());
+        data.put("submitStatus", submission.submitStatus());
+        data.put("evaluationStatus", submission.evaluationStatus());
+        data.put("reviewStatus", submission.reviewStatus());
+        data.put("autoScore", submission.autoScore());
+        data.put("manualScore", submission.manualScore());
+        data.put("finalScore", submission.finalScore());
+        data.put("comment", submission.comment());
+        data.put("version", submission.version());
+        data.put("final", submission.finalSubmission());
+        data.put("submittedAt", submission.submittedAt());
+        return data;
+    }
+
+    private static Object numericIfPossible(String value) {
+        try { return Long.parseLong(value); }
+        catch (NumberFormatException ignored) { return value; }
+    }
+
+    private static Map<String, Object> homeworkResponse(HomeworkService.HomeworkSummary homework) {
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("id", homework.id());
+        data.put("courseId", numericIfPossible(homework.courseId()));
+        data.put("chapterId", null);
+        data.put("title", homework.title());
+        data.put("description", homework.description());
+        data.put("type", homework.type());
+        data.put("status", homework.status());
+        data.put("totalScore", homework.totalScore());
+        data.put("deadline", homework.deadline());
+        data.put("allowResubmit", homework.allowResubmit());
+        data.put("allowLateSubmit", homework.allowLateSubmit());
+        data.put("showEvaluationBeforePublish", true);
+        data.put("judgeConfigId", null);
+        data.put("createdBy", null);
+        data.put("publishedAt", homework.publishedAt());
+        data.put("deleted", false);
+        data.put("createdAt", null);
+        data.put("updatedAt", null);
+        data.put("languageLimitJson", homework.languages().isEmpty() ? null : "[\"" + String.join("\",\"", homework.languages()) + "\"]");
+        data.put("timeLimitMs", homework.type().equals("CODE") ? 1_000 : null);
+        data.put("memoryLimitKb", homework.type().equals("CODE") ? 65_536 : null);
+        data.put("outputCompareMode", homework.type().equals("CODE") ? "EXACT" : null);
+        data.put("questions", List.of());
+        data.put("testCases", List.of());
+        return data;
+    }
 }

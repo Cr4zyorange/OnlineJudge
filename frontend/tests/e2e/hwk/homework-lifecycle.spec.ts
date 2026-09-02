@@ -346,9 +346,16 @@ async function authorizationHeaders(page: Page) {
 
 async function apiData<T>(response: APIResponse): Promise<T> {
   expect(response.ok(), `${response.url()} returned ${response.status()}`).toBe(true);
-  const body = await response.json() as ApiEnvelope<T>;
+  const body = await response.json() as ApiEnvelope<T> | T;
+  if (!isApiEnvelope<T>(body)) {
+    return body;
+  }
   expect(body.code).toBe('0');
   return body.data;
+}
+
+function isApiEnvelope<T>(body: ApiEnvelope<T> | T): body is ApiEnvelope<T> {
+  return typeof body === 'object' && body !== null && 'code' in body && 'data' in body;
 }
 
 async function waitForSubmissionTerminal(
