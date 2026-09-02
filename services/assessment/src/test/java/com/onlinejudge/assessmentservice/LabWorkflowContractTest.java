@@ -70,6 +70,7 @@ class LabWorkflowContractTest {
         jdbc.update("DELETE FROM assessment_lab_report");
         jdbc.update("DELETE FROM assessment_lab_evaluation_result");
         jdbc.update("DELETE FROM assessment_lab_testcase");
+        jdbc.update("DELETE FROM assessment_lab_submission_source_file");
         jdbc.update("DELETE FROM assessment_lab_submission");
         jdbc.update("DELETE FROM assessment_lab_experiment");
         jdbc.update("DELETE FROM evaluation_task");
@@ -179,6 +180,48 @@ class LabWorkflowContractTest {
 
         org.assertj.core.api.Assertions.assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM assessment_lab_submission", Integer.class)).isEqualTo(1);
         org.assertj.core.api.Assertions.assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM evaluation_task", Integer.class)).isEqualTo(1);
+    }
+
+    @Test
+    void sourceFileMetadataAndDownloadAreTeacherOnly() throws Exception {
+        String teacherToken = TestJwtFactory.userToken(KEY, "lab-workflow-kid", "teacher-314", List.of("TEACHER"));
+        String studentToken = TestJwtFactory.userToken(KEY, "lab-workflow-kid", "student-source-314", List.of("STUDENT"));
+        jdbc.update("INSERT INTO assessment_course_member_projection (course_id, user_id, membership_status, member_version) VALUES ('course-314', 'student-source-314', 'ACTIVE', 1)");
+        mockMvc.perform(post("/api/v1/courses/{courseId}/labs", "course-314")
+                        .header("Authorization", "Bearer " + teacherToken).header("X-Request-Id", "source-create-314")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"source-lab-314\",\"description\":\"source file lifecycle\",\"deadline\":\"2030-01-01T12:00:00Z\",\"maxScore\":100,\"allowedLanguages\":[\"python\"],\"autoEvaluate\":false,\"evaluationMode\":\"MANUAL\"}"))
+                .andExpect(status().isCreated());
+        Long labId = jdbc.queryForObject("SELECT id FROM assessment_lab_experiment WHERE title = 'source-lab-314'", Long.class);
+        mockMvc.perform(post("/api/v1/labs/{labId}/publish", labId)
+                        .header("Authorization", "Bearer " + teacherToken).header("X-Request-Id", "source-publish-314"))
+                .andExpect(status().isOk());
+        byte[] source = "print('source-314')\n".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        mockMvc.perform(multipart("/api/v1/labs/{labId}/submissions", labId)
+                        .file(new org.springframework.mock.web.MockMultipartFile("file", "source-314.py", "text/x-python", source))
+                        .param("language", "python")
+                        .header("Authorization", "Bearer " + studentToken).header("X-Request-Id", "source-submit-314"))
+                .andExpect(status().isCreated());
+        String submissionId = jdbc.queryForObject("SELECT submission_id FROM assessment_lab_submission WHERE lab_id = ?", String.class, labId);
+
+        mockMvc.perform(get("/api/v1/labs/{labId}/submissions/{submissionId}", labId, submissionId)
+                        .header("Authorization", "Bearer " + teacherToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.hasFile").value(true))
+                .andExpect(jsonPath("$.sourceFile.originalFilename").value("source-314.py"))
+                .andExpect(jsonPath("$.sourceFile.contentType").value("text/x-python"))
+                .andExpect(jsonPath("$.sourceFile.fileSize").value(source.length))
+                .andExpect(jsonPath("$.sourceFile.downloadAvailable").value(true));
+
+        mockMvc.perform(get("/api/v1/labs/{labId}/submissions/{submissionId}/source/download", labId, submissionId)
+                        .header("Authorization", "Bearer " + studentToken))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(get("/api/v1/labs/{labId}/submissions/{submissionId}/source/download", labId, submissionId)
+                        .header("Authorization", "Bearer " + teacherToken))
+                .andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header().string("Content-Type", "text/x-python"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header().string("Content-Disposition", org.hamcrest.Matchers.containsString("source-314.py")))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.content().bytes(source));
     }
 
     @Test

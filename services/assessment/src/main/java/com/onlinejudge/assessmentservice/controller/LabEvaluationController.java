@@ -10,8 +10,13 @@ import com.onlinejudge.assessmentservice.service.LabExperimentService;
 import com.onlinejudge.assessmentservice.service.LabReportService;
 import com.onlinejudge.assessmentservice.service.CoursePermissionClient;
 import com.onlinejudge.assessmentservice.service.CourseMembershipGuard;
+import com.onlinejudge.assessmentservice.storage.PersistentSubmissionFileStore;
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -27,6 +32,8 @@ import java.util.Map;
 import java.util.List;
 import java.time.Instant;
 import java.math.RoundingMode;
+import java.nio.charset.StandardCharsets;
+import java.io.IOException;
 
 /** Read-only LAB result projection.  It deliberately never invokes a worker or evaluator. */
 @RestController
@@ -41,18 +48,19 @@ public class LabEvaluationController {
     private final SourceGradeRepository grades;
     private final AssessmentOutboxRepository outbox;
     private final LabReportService reports;
+    private final PersistentSubmissionFileStore files;
 
     public LabEvaluationController(LabExperimentService labs, EvaluationTaskRepository tasks,
             CourseMemberProjectionRepository courseMembers, CoursePermissionClient coursePermissions, JdbcTemplate jdbc) {
         this(labs, tasks, courseMembers, coursePermissions, jdbc, null, null,
-                new CourseMembershipGuard(courseMembers, coursePermissions), null);
+                new CourseMembershipGuard(courseMembers, coursePermissions), null, null);
     }
 
     @org.springframework.beans.factory.annotation.Autowired
     public LabEvaluationController(LabExperimentService labs, EvaluationTaskRepository tasks,
             CourseMemberProjectionRepository courseMembers, CoursePermissionClient coursePermissions, JdbcTemplate jdbc,
             SourceGradeRepository grades, AssessmentOutboxRepository outbox, CourseMembershipGuard membershipGuard,
-            LabReportService reports) {
+            LabReportService reports, PersistentSubmissionFileStore files) {
         this.labs = labs;
         this.tasks = tasks;
         this.courseMembers = courseMembers;
@@ -62,6 +70,7 @@ public class LabEvaluationController {
         this.grades = grades;
         this.outbox = outbox;
         this.reports = reports;
+        this.files = files;
     }
 
     @GetMapping("/{labId}/submissions/{submissionId}/result")
@@ -204,6 +213,10 @@ public class LabEvaluationController {
         if (!manager && !item.get("studentId").equals(user.id())) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "LAB submission access is restricted");
         if (!manager && !membershipGuard.isActiveMember(lab.courseId(), user.id(), requestId)) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "active course membership is required");
         boolean scoresVisible = manager || scoresPublished(lab);
+        if (Boolean.TRUE.equals(item.get("hasFile"))) {
+            sourceFile(labId, submissionId, lab.courseId(), item.get("studentId").toString()).ifPresent(source ->
+                    item.put("sourceFile", source.publicView(manager)));
+        }
         item.put("latestReport", latestReportForView(labId, submissionId, scoresVisible));
         if (!scoresVisible) {
             item.put("autoScore", null);
@@ -212,6 +225,59 @@ public class LabEvaluationController {
             item.put("isScoringBasis", false);
         }
         return item;
+    }
+
+    @GetMapping("/{labId}/submissions/{submissionId}/source/download")
+    public ResponseEntity<byte[]> downloadSubmissionSource(@PathVariable long labId, @PathVariable String submissionId,
+            @RequestAttribute("assessment.currentUser") CurrentUser user) {
+        if (!user.hasRole("TEACHER") && !user.hasRole("ADMIN")) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "LAB source download is restricted to course managers");
+        }
+        LabExperimentService.LabSummary lab = findLab(labId);
+        if (!canManage(lab, user)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "course management permission is required");
+        }
+        SourceFile source = sourceFile(labId, submissionId, lab.courseId(), null)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT, "LAB source metadata is unavailable"));
+        try {
+            byte[] content = files.read(source.storageKey());
+            if (content.length != source.fileSize()) {
+                throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "LAB source file is inconsistent");
+            }
+            MediaType contentType;
+            try { contentType = MediaType.parseMediaType(source.contentType()); }
+            catch (IllegalArgumentException invalid) { contentType = MediaType.APPLICATION_OCTET_STREAM; }
+            return ResponseEntity.ok()
+                    .contentType(contentType)
+                    .contentLength(content.length)
+                    .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment()
+                            .filename(source.originalFilename(), StandardCharsets.UTF_8).build().toString())
+                    .body(content);
+        } catch (IOException unavailable) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "LAB source file is unavailable", unavailable);
+        }
+    }
+
+    private java.util.Optional<SourceFile> sourceFile(long labId, String submissionId, String courseId, String uploaderId) {
+        String sql = """
+                SELECT submission_id, lab_id, course_id, uploader_id, storage_key, original_filename, content_type, file_size
+                  FROM assessment_lab_submission_source_file
+                 WHERE submission_id = ? AND lab_id = ? AND course_id = ? AND status = 'AVAILABLE'
+                """ + (uploaderId == null ? "" : " AND uploader_id = ?");
+        Object[] parameters = uploaderId == null
+                ? new Object[]{submissionId, labId, courseId}
+                : new Object[]{submissionId, labId, courseId, uploaderId};
+        return jdbc.query(sql, (rs, ignored) -> new SourceFile(
+                rs.getString("submission_id"), rs.getString("storage_key"), rs.getString("original_filename"),
+                rs.getString("content_type"), rs.getLong("file_size")), parameters).stream().findFirst();
+    }
+
+    private record SourceFile(String submissionId, String storageKey, String originalFilename,
+                              String contentType, long fileSize) {
+        Map<String, Object> publicView(boolean downloadAvailable) {
+            return Map.of("originalFilename", originalFilename, "contentType", contentType,
+                    "fileSize", fileSize, "downloadAvailable", downloadAvailable);
+        }
     }
 
     @GetMapping("/{labId}/results/{studentId}")
