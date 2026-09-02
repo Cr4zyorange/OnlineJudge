@@ -139,6 +139,10 @@ class DisposableEnvironmentScriptsTest(unittest.TestCase):
         # An interrupted run must retain a non-zero status; otherwise the EXIT
         # trap could publish an empty run as EXPERIMENT_READY.
         self.assertIn("trap 'exit 130' INT TERM", source)
+        # The real runner must work on a macOS host as well as Linux: its
+        # correlation id source cannot rely solely on /proc.
+        self.assertIn("new_request_id()", source)
+        self.assertIn("uuidgen | tr '[:upper:]' '[:lower:]'", source)
         # AC-319-04 requires database-backed diagnostic signals. Application
         # logs alone cannot prove projection catch-up or an active task lease.
         self.assertIn("capture_projection_and_lease_diagnostics", source)

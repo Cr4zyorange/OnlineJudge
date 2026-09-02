@@ -291,6 +291,14 @@ wait_for_rabbitmq_recovery() {
   return 1
 }
 
+new_request_id() {
+  if [[ -r /proc/sys/kernel/random/uuid ]]; then
+    cat /proc/sys/kernel/random/uuid
+  else
+    uuidgen | tr '[:upper:]' '[:lower:]'
+  fi
+}
+
 finish() {
   status=$?
   trap - EXIT INT TERM
@@ -370,7 +378,7 @@ while (( SECONDS < deadline )); do
     request_url="${request_urls[$request_url_index]}"
     authorization="${authorizations[$request_url_index % ${#authorizations[@]}]}"
     request_url_index=$(((request_url_index + 1) % ${#request_urls[@]}))
-    request_id="$(cat /proc/sys/kernel/random/uuid)"
+    request_id="$(new_request_id)"
     # Each worker writes exactly one request line with a single redirection so
     # concurrent subshells never interleave partial lines in the evidence file.
     # The gateway URL is an internal Kubernetes endpoint (typically a kubectl
