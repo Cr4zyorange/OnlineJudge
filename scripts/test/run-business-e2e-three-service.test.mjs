@@ -7,6 +7,8 @@ import {
   createGrdSummaryFixtureLabPayload,
   isSuccessfulSummary,
   normalizeBareLabCreateResponse,
+  normalizeBareLabScorePublicationResponse,
+  normalizeBareLabScoreResponse,
   normalizeBareLabSubmissionResponse,
   parseStudentGradeSummaryIdentifier,
   parsePositiveIdentifier,
@@ -72,6 +74,37 @@ test('normalizes only UUID-backed Assessment bare LAB submission responses', () 
   assert.throws(
     () => normalizeBareLabSubmissionResponse({ submissionId: 'not-a-uuid' }),
     /UUID submission id/i
+  );
+});
+
+test('normalizes a bare LAB score only when it confirms the submitted UUID and numeric final score', () => {
+  const submissionId = '571b37b3-1b3c-47d5-a692-04a21ef2db23';
+  assert.deepEqual(
+    normalizeBareLabScoreResponse({ submissionId, finalScore: 90 }, submissionId),
+    { data: { submissionId, finalScore: 90 } }
+  );
+  assert.throws(
+    () => normalizeBareLabScoreResponse({ submissionId, finalScore: '90' }, submissionId),
+    /numeric finalScore/i
+  );
+  assert.throws(
+    () => normalizeBareLabScoreResponse({ submissionId, finalScore: 90 }, 'd9e4c95b-95cf-4fc3-a62f-12e96fd4c7b1'),
+    /does not match/i
+  );
+});
+
+test('normalizes a bare LAB score publication only for the requested LAB and terminal status', () => {
+  assert.deepEqual(
+    normalizeBareLabScorePublicationResponse({ labId: 314, status: 'SCORE_PUBLISHED' }, 314),
+    { data: { id: 314, status: 'SCORE_PUBLISHED' } }
+  );
+  assert.throws(
+    () => normalizeBareLabScorePublicationResponse({ labId: 314, status: 'PUBLISHED' }, 314),
+    /SCORE_PUBLISHED/i
+  );
+  assert.throws(
+    () => normalizeBareLabScorePublicationResponse({ labId: 315, status: 'SCORE_PUBLISHED' }, 314),
+    /does not match/i
   );
 });
 

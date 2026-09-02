@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url';
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const frontendDir = join(repositoryRoot, 'frontend');
 const commandSuffix = process.platform === 'win32' ? '.cmd' : '';
+const UUID_PATTERN = /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i;
 
 export const e2eTargets = [
   'tests/e2e/auth',
@@ -92,10 +93,41 @@ export function normalizeBareLabCreateResponse(body) {
 
 export function normalizeBareLabSubmissionResponse(body) {
   const submissionId = String(body?.submissionId || '');
-  if (!/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(submissionId)) {
+  if (!UUID_PATTERN.test(submissionId)) {
     throw new Error('Assessment bare LAB submission response must contain a UUID submission id');
   }
   return { data: { submissionId } };
+}
+
+export function normalizeBareLabScoreResponse(body, expectedSubmissionId) {
+  const submissionId = String(body?.submissionId || '');
+  if (!UUID_PATTERN.test(submissionId) || !UUID_PATTERN.test(expectedSubmissionId || '')) {
+    throw new Error('Assessment bare LAB score response must contain a UUID submission id');
+  }
+  if (submissionId !== expectedSubmissionId) {
+    throw new Error('Assessment bare LAB score response submission id does not match the submitted LAB fixture');
+  }
+  if (typeof body?.finalScore !== 'number' || !Number.isFinite(body.finalScore)) {
+    throw new Error('Assessment bare LAB score response must contain a numeric finalScore');
+  }
+  return { data: { submissionId, finalScore: body.finalScore } };
+}
+
+export function normalizeBareLabScorePublicationResponse(body, expectedLabId) {
+  if (!Number.isSafeInteger(expectedLabId) || expectedLabId <= 0) {
+    throw new Error('requested LAB fixture id must be a positive numeric id');
+  }
+  const labId = Number(body?.id ?? body?.labId);
+  if (!Number.isSafeInteger(labId) || labId <= 0) {
+    throw new Error('Assessment bare LAB score publication response must contain a positive numeric id');
+  }
+  if (labId !== expectedLabId) {
+    throw new Error('Assessment bare LAB score publication response id does not match the requested LAB fixture');
+  }
+  if (body?.status !== 'SCORE_PUBLISHED') {
+    throw new Error('Assessment bare LAB score publication response must have SCORE_PUBLISHED status');
+  }
+  return { data: { id: labId, status: body.status } };
 }
 
 export function redact(value, secrets) {
@@ -254,7 +286,7 @@ async function bootstrapScenarioCourse(context, artifactDir) {
     body: sourceSubmission
   }, 'bootstrap submit GRD source LAB', normalizeBareLabSubmissionResponse);
   const fixtureSubmissionId = String(fixtureSubmission?.data?.submissionId || '');
-  if (!/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(fixtureSubmissionId)) {
+  if (!UUID_PATTERN.test(fixtureSubmissionId)) {
     throw new Error('GRD source LAB submission bootstrap response must contain a UUID submission id');
   }
   await requestEnvelope(context.baseUrl, `/api/v1/labs/${fixtureLabId}/submissions/${fixtureSubmissionId}/score`, {
@@ -266,12 +298,12 @@ async function bootstrapScenarioCourse(context, artifactDir) {
       comment: 'Issue #320 GRD fixture score',
       changeReason: 'Creates a published summary for the LRN adjustment closure.'
     })
-  }, 'bootstrap score GRD source LAB');
+  }, 'bootstrap score GRD source LAB', (body) => normalizeBareLabScoreResponse(body, fixtureSubmissionId));
   await requestEnvelope(context.baseUrl, `/api/v1/labs/${fixtureLabId}/release-scores`, {
     method: 'PUT',
     headers: teacherHeaders,
     body: '{}'
-  }, 'bootstrap release GRD source LAB scores');
+  }, 'bootstrap release GRD source LAB scores', (body) => normalizeBareLabScorePublicationResponse(body, fixtureLabId));
   await requestEnvelope(context.baseUrl, `/api/v1/courses/${courseId}/grade-items`, {
     method: 'POST',
     headers: teacherHeaders,
