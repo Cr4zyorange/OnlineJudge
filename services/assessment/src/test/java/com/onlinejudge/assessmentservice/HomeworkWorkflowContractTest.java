@@ -115,6 +115,48 @@ class HomeworkWorkflowContractTest {
     }
 
     @Test
+    void gatewayCompactRequestIdIsCanonicalizedForHomeworkOutboxCorrelation() throws Exception {
+        String teacherId = "teacher-gateway-" + UUID.randomUUID();
+        String title = "homework-gateway-" + UUID.randomUUID();
+        UUID gatewayRequestUuid = UUID.randomUUID();
+        String compactGatewayRequestId = gatewayRequestUuid.toString().replace("-", "");
+        String teacherToken = TestJwtFactory.userToken(KEY, "homework-workflow-kid", teacherId, List.of("TEACHER"));
+        jdbc.update("INSERT INTO assessment_course_member_projection (course_id, user_id, membership_status, member_version) VALUES ('course-315', ?, 'ACTIVE', 1)", teacherId);
+        when(coursePermissions.canManageCourse("course-315", teacherId)).thenReturn(true);
+
+        String created = mockMvc.perform(post("/api/v1/homeworks")
+                        .header("Authorization", "Bearer " + teacherToken)
+                        .header("X-Request-Id", compactGatewayRequestId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"courseId":"course-315","title":"%s","description":"gateway request id",
+                                 "type":"CODE","deadline":"%s","totalScore":100,"allowResubmit":true,
+                                 "allowLateSubmit":false,"languages":["python"],
+                                 "testCases":[{"input":"hello\\n","expectedOutput":"HELLO\\n","scoreWeight":100,"hidden":false,"sortOrder":1}]}
+                                """.formatted(title, Instant.parse("2030-01-01T12:00:00Z"))))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        long homeworkId = mapper.readTree(created).path("id").asLong();
+
+        mockMvc.perform(put("/api/v1/homeworks/{homeworkId}/publish", homeworkId)
+                        .header("Authorization", "Bearer " + teacherToken)
+                        .header("X-Request-Id", compactGatewayRequestId))
+                .andExpect(status().isOk());
+
+        String correlationId = jdbc.queryForObject("""
+                SELECT correlation_id FROM assessment_event_outbox
+                 WHERE event_type = 'assessment.homework.published.v2' AND aggregate_id = ?
+                """, String.class, Long.toString(homeworkId));
+        assertThat(correlationId).isEqualTo(gatewayRequestUuid.toString());
+        String payload = jdbc.queryForObject("""
+                SELECT payload_json FROM assessment_event_outbox
+                 WHERE event_type = 'assessment.homework.published.v2' AND aggregate_id = ?
+                """, String.class, Long.toString(homeworkId));
+        assertThat(mapper.readTree(payload).path("correlationId").asText())
+                .isEqualTo(gatewayRequestUuid.toString());
+    }
+
+    @Test
     void studentSubmissionPersistsHomeworkVersionAndDurableTaskInOneTransaction() throws Exception {
         String teacherId = "teacher-315-" + UUID.randomUUID();
         String studentId = "student-315-" + UUID.randomUUID();

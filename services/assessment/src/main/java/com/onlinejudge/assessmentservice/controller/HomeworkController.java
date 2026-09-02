@@ -257,8 +257,13 @@ public class HomeworkController {
         String requestId = request.getHeader("X-Request-Id");
         if (requestId == null || requestId.isBlank()) return UUID.randomUUID().toString();
         try {
-            UUID.fromString(requestId);
-            return requestId;
+            String candidate = requestId.trim();
+            if (candidate.matches("(?i)[0-9a-f]{32}")) {
+                candidate = candidate.substring(0, 8) + "-" + candidate.substring(8, 12) + "-"
+                        + candidate.substring(12, 16) + "-" + candidate.substring(16, 20) + "-"
+                        + candidate.substring(20);
+            }
+            return UUID.fromString(candidate).toString();
         } catch (IllegalArgumentException invalid) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "X-Request-Id must be a UUID", invalid);
         }
