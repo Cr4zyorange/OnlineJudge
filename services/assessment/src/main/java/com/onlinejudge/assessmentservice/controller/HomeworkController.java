@@ -271,7 +271,7 @@ public class HomeworkController {
 
     private static Map<String, Object> success(Object data) {
         Map<String, Object> response = new LinkedHashMap<>();
-        response.put("code", 0);
+        response.put("code", "0");
         response.put("message", "success");
         response.put("data", data);
         return response;

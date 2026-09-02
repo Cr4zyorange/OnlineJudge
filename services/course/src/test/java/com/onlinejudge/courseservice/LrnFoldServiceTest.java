@@ -109,6 +109,9 @@ class LrnFoldServiceTest {
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT title FROM lrn_learning_task WHERE user_id = 802", String.class))
                 .isEqualTo("Java collections homework");
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT title FROM lrn_notification WHERE user_id = 802", String.class))
+                .isEqualTo("homework published");
     }
 
     @Test

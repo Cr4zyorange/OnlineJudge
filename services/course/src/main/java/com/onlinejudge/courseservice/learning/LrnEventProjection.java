@@ -178,8 +178,9 @@ public class LrnEventProjection {
         if (receivers.isEmpty()) return;
         tasks.applyPublishedFact(courseId, sourceModule, taskType, title, deadline, actionUrl, sourceId, receivers);
         String content = "新的" + ("HWK".equals(sourceModule) ? "作业" : "实验") + "已发布：" + (title.isEmpty() ? "查看详情" : title);
+        String notificationTitle = "HWK".equals(sourceModule) ? "homework published" : (title.isEmpty() ? content : title);
         notifications.createForFact(eventId, eventTypeOf(sourceModule), notificationType, courseId, sourceModule,
-                sourceId, receivers, title.isEmpty() ? content : title, content, 1, actionUrl);
+                sourceId, receivers, notificationTitle, content, 1, actionUrl);
     }
 
     private void notifyCourse(String eventId, String notificationType, String sourceModule, JsonNode envelope,

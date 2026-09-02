@@ -195,18 +195,23 @@ class HomeworkWorkflowContractTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"codeText\":\"print('frontend')\",\"language\":\"python\"}"))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.code").value(0))
+                .andExpect(jsonPath("$.code").value("0"))
                 .andExpect(jsonPath("$.data.homeworkId").value(homeworkId))
                 .andExpect(jsonPath("$.data.submissionId").isNumber())
                 .andExpect(jsonPath("$.data.evaluationStatus").value("PENDING"))
                 .andReturn().getResponse().getContentAsString();
+        assertThat(mapper.readTree(submitted).path("code").isTextual()).isTrue();
+        assertThat(mapper.readTree(submitted).path("code").asText()).isEqualTo("0");
         long publicSubmissionId = publicSubmissionId(submitted);
-        mockMvc.perform(get("/api/v1/submissions/{submissionId}/evaluation", publicSubmissionId)
+        String evaluation = mockMvc.perform(get("/api/v1/submissions/{submissionId}/evaluation", publicSubmissionId)
                         .header("Authorization", "Bearer " + studentToken))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(0))
+                .andExpect(jsonPath("$.code").value("0"))
                 .andExpect(jsonPath("$.data.submissionId").value(publicSubmissionId))
-                .andExpect(jsonPath("$.data.taskState").value("PENDING"));
+                .andExpect(jsonPath("$.data.taskState").value("PENDING"))
+                .andReturn().getResponse().getContentAsString();
+        assertThat(mapper.readTree(evaluation).path("code").isTextual()).isTrue();
+        assertThat(mapper.readTree(evaluation).path("code").asText()).isEqualTo("0");
     }
 
     @Test
@@ -245,7 +250,7 @@ class HomeworkWorkflowContractTest {
                         .header("Authorization", "Bearer " + teacherToken)
                         .header("X-Request-Id", UUID.randomUUID().toString()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(0))
+                .andExpect(jsonPath("$.code").value("0"))
                 .andExpect(jsonPath("$.message").value("success"))
                 .andExpect(jsonPath("$.data.id").value(homeworkId))
                 .andExpect(jsonPath("$.data.status").value("SCORE_PUBLISHED"));
@@ -283,7 +288,7 @@ class HomeworkWorkflowContractTest {
                         .header("Authorization", "Bearer " + teacherToken)
                         .header("X-Request-Id", UUID.randomUUID().toString()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(0))
+                .andExpect(jsonPath("$.code").value("0"))
                 .andExpect(jsonPath("$.message").value("success"))
                 .andExpect(jsonPath("$.data.id").value(homeworkId))
                 .andExpect(jsonPath("$.data.status").value("SCORE_PUBLISHED"));
@@ -773,7 +778,7 @@ class HomeworkWorkflowContractTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"answerText\":\"a durable text answer\"}"))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.code").value(0))
+                .andExpect(jsonPath("$.code").value("0"))
                 .andExpect(jsonPath("$.data.submitType").value("TEXT"))
                 .andExpect(jsonPath("$.data.evaluationStatus").value("NONE"))
                 .andExpect(jsonPath("$.data.reviewStatus").value("UNREVIEWED"))
