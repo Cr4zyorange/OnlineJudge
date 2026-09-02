@@ -130,6 +130,7 @@ log_run bash "$checkout/scripts/test/verify-course-reproducible-build.sh" "$chec
 printf '\n$ mvn -B -ntp -f services/grade/pom.xml clean package\n' | tee -a "$log"
 (cd "$checkout" && run_mvn_retry mvn -B -ntp -f services/grade/pom.xml clean package)
 preserve_grade_reports
+log_run bash "$checkout/scripts/test/verify-grade-service-mysql-live.test.sh"
 log_run bash "$checkout/scripts/test/verify-grade-service-mysql-live.sh"
 
 # 编译门禁：主代码必须可编译。
