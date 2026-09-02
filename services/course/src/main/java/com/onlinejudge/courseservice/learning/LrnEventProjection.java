@@ -74,9 +74,9 @@ public class LrnEventProjection {
             case "assessment.lab.published.v2" ->
                     publishTask(eventId, "LAB", "EXPERIMENT", "TASK", "labId", envelope, correlationId, envelopeJson);
             case "assessment.evaluation.completed.v2" ->
-                    notifyCourse(eventId, "TASK", "HWK", envelope, "评测完成", correlationId, envelopeJson);
+                    notifyCourse(eventId, "TASK", "HWK", null, envelope, "评测完成", correlationId, envelopeJson);
             case "grade.published.v2" ->
-                    notifyCourse(eventId, "GRADE", "GRD", envelope, "成绩已发布", correlationId, envelopeJson);
+                    notifyCourse(eventId, "GRADE", "GRD", "publicationId", envelope, "成绩已发布", correlationId, envelopeJson);
             case "grade.review.processed.v2" -> notifyStudent(eventId, "GRADE", "GRD", payload);
             default -> {
                 // Retained in the inbox (idempotency) but no LRN projection is needed.
@@ -183,7 +183,7 @@ public class LrnEventProjection {
                 sourceId, receivers, notificationTitle, content, 1, actionUrl);
     }
 
-    private void notifyCourse(String eventId, String notificationType, String sourceModule, JsonNode envelope,
+    private void notifyCourse(String eventId, String notificationType, String sourceModule, String sourceIdField, JsonNode envelope,
                               String defaultTitle, String correlationId, String envelopeJson) {
         JsonNode payload = envelope.path("payload");
         long courseId = parseId(payload.path("courseId").asText());
@@ -194,7 +194,9 @@ public class LrnEventProjection {
         }
         List<Long> receivers = inbox.activeMemberUserIds(courseId);
         if (receivers.isEmpty()) return;
-        notifications.createForFact(eventId, eventTypeOf(sourceModule), notificationType, courseId, sourceModule, null,
+        long parsedSourceId = sourceIdField == null ? 0 : parseId(payload.path(sourceIdField).asText());
+        Long sourceId = parsedSourceId > 0 ? parsedSourceId : null;
+        notifications.createForFact(eventId, eventTypeOf(sourceModule), notificationType, courseId, sourceModule, sourceId,
                 receivers, defaultTitle, defaultTitle + "，请前往对应课程查看。", 1, "/learning/tasks");
     }
 

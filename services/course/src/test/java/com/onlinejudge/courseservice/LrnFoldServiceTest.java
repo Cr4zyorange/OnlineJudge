@@ -142,6 +142,18 @@ class LrnFoldServiceTest {
     }
 
     @Test
+    void publishedGradeFactKeepsItsCanonicalPublicationTarget() throws Exception {
+        String courseId = createCourseWithRosterWatermark("809", "810");
+
+        projection.consume(gradePublishedEnvelope(courseId));
+
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT source_id FROM lrn_notification
+                 WHERE user_id = 810 AND course_id = ? AND source_module = 'GRD'
+                """, Long.class, Long.parseLong(courseId))).isEqualTo(79L);
+    }
+
+    @Test
     void progressOverviewSuppliesConcreteContinueUrlsForCourseLabAndHomeworkRecords() throws Exception {
         String courseId = createCourseWithRosterWatermark("807", "808");
         long numericCourseId = Long.parseLong(courseId);
@@ -617,6 +629,27 @@ class LrnFoldServiceTest {
                     "deadline": "2026-09-06T16:00:00Z",
                     "receiverScope": "COURSE_ACTIVE_STUDENTS",
                     "publishedAt": "2026-08-30T09:15:30Z"
+                  }
+                }
+                """.formatted(courseId);
+    }
+
+    private String gradePublishedEnvelope(String courseId) {
+        return """
+                {
+                  "eventId": "8b6500e6-3be8-4898-b177-23aa4b86faea",
+                  "eventType": "grade.published.v2",
+                  "payloadVersion": 2,
+                  "aggregateType": "grade-publication",
+                  "aggregateId": "grade-publication-79",
+                  "aggregateVersion": 1,
+                  "occurredAt": "2026-08-30T09:15:30Z",
+                  "correlationId": "cb18b23c-21b3-403d-9bcb-305020f17027",
+                  "payload": {
+                    "courseId": "course-%s",
+                    "publicationId": "grade-publication-79",
+                    "publishedAt": "2026-08-30T09:15:30Z",
+                    "publicationVersion": 1
                   }
                 }
                 """.formatted(courseId);
