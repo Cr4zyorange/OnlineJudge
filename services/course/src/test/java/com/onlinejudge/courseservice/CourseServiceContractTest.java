@@ -1272,6 +1272,17 @@ class CourseServiceContractTest {
         };
     }
 
+    @Test
+    void courseListUsesTheFrontendPageListProperty() throws Exception {
+        createdCourse(userToken("101", List.of("TEACHER")), "Course list contract");
+
+        mockMvc.perform(get("/api/v1/courses")
+                        .header("Authorization", userToken("101", List.of("TEACHER")))
+                        .header("X-Request-Id", requestId()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.list[0].name").value("Course list contract"));
+    }
+
     private String createdCourse(String teacherToken, String name) throws Exception {
         String response = mockMvc.perform(post("/api/v1/courses")
                         .header("Authorization", teacherToken)

@@ -677,7 +677,10 @@ public class CourseService {
     public record HomeSummaryView(CourseView course, List<AnnouncementView> announcements, List<RecentTaskView> recentTasks) { }
     public record RecentTaskView(long taskId, String taskType, String title, long courseId, String courseName,
                                  String deadline, Integer progress, String status, String actionUrl) { }
-    public record CoursePage(List<CourseView> items, int page, int size, int total) { }
+    public record CoursePage(List<CourseView> items, int page, int size, int total) {
+        @com.fasterxml.jackson.annotation.JsonProperty("list")
+        public List<CourseView> list() { return items; }
+    }
     public record MemberView(String userId, String role, String status, long memberVersion, String joinMethod) { }
     public record ChapterView(long id, long courseId, String title, Long parentId, int sortOrder, String objective, boolean visible, int chapterType) { }
     public record ResourceView(long id, long courseId, Long chapterId, String title, String url, String type, String visibility,
