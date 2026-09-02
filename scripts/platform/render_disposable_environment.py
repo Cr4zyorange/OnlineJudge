@@ -136,10 +136,13 @@ def workload_environment(workload: dict[str, Any], git_sha: str) -> dict[str, st
     elif name == "course-service":
         environment.update(
             {
+                "COURSE_DATASOURCE_URL": "jdbc:mysql://mysql:3306/oj_course?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC&allowPublicKeyRetrieval=true&useSSL=false",
+                "COURSE_DATABASE_DRIVER": "com.mysql.cj.jdbc.Driver",
                 "COURSE_DATABASE_HOST": "mysql",
                 "COURSE_DATABASE_PORT": "3306",
                 "COURSE_DATABASE_NAME": DATABASE_NAME["course"],
                 "COURSE_DATABASE_USER": RUNTIME_ACCOUNT["course"],
+                "SPRING_SQL_INIT_MODE": "never",
                 "IDENTITY_JWKS_URI": "http://identity-service:8081/.well-known/jwks.json",
                 "RABBITMQ_HOST": "rabbitmq",
                 "RABBITMQ_PORT": "5672",
@@ -150,10 +153,13 @@ def workload_environment(workload: dict[str, Any], git_sha: str) -> dict[str, st
     elif name in {"assessment-api", "assessment-worker"}:
         environment.update(
             {
+                "ASSESSMENT_DATASOURCE_URL": "jdbc:mysql://mysql:3306/oj_assessment?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC&allowPublicKeyRetrieval=true&useSSL=false",
+                "ASSESSMENT_DATABASE_DRIVER": "com.mysql.cj.jdbc.Driver",
                 "ASSESSMENT_DATABASE_HOST": "mysql",
                 "ASSESSMENT_DATABASE_PORT": "3306",
                 "ASSESSMENT_DATABASE_NAME": DATABASE_NAME["assessment"],
                 "ASSESSMENT_DATABASE_USER": RUNTIME_ACCOUNT["assessment"],
+                "SPRING_SQL_INIT_MODE": "never",
                 "IDENTITY_JWKS_URI": "http://identity-service:8081/.well-known/jwks.json",
                 "ASSESSMENT_COURSE_AUTHORIZATION_URI": "http://course-service:8082/internal/v2/courses/{courseId}/authorizations/{userId}",
                 "ASSESSMENT_COURSE_SERVICE_AUTHORIZATION": "${ASSESSMENT_SERVICE_IDENTITY:?ASSESSMENT_SERVICE_IDENTITY is required}",

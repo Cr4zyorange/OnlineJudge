@@ -204,6 +204,19 @@ class DisposableEnvironmentRendererTest(unittest.TestCase):
 
         self.assertIn("      assessment-migrations:\n        condition: service_completed_successfully", worker)
 
+    def test_course_and_assessment_runtime_use_the_migrated_mysql_schemas(self) -> None:
+        compose, _ = self.render()
+
+        course = compose[compose.index("\n  course-service:") : compose.index("\n  assessment-api:")]
+        assessment = compose[compose.index("\n  assessment-api:") : compose.index("\n  grade-service:")]
+
+        self.assertIn('COURSE_DATASOURCE_URL: "jdbc:mysql://mysql:3306/oj_course?', course)
+        self.assertIn('COURSE_DATABASE_DRIVER: "com.mysql.cj.jdbc.Driver"', course)
+        self.assertIn('SPRING_SQL_INIT_MODE: "never"', course)
+        self.assertIn('ASSESSMENT_DATASOURCE_URL: "jdbc:mysql://mysql:3306/oj_assessment?', assessment)
+        self.assertIn('ASSESSMENT_DATABASE_DRIVER: "com.mysql.cj.jdbc.Driver"', assessment)
+        self.assertIn('SPRING_SQL_INIT_MODE: "never"', assessment)
+
     def test_frontend_legacy_backend_upstream_resolves_to_the_gateway_in_both_targets(self) -> None:
         compose, kubernetes = self.render()
         frontend = compose[compose.index("\n  frontend:") : compose.index("\n  rabbitmq:")]
