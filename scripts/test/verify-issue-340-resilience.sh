@@ -121,6 +121,9 @@ PY
 run_id="$(date -u +%Y%m%dT%H%M%SZ)-$$"
 if [[ -z "$output_dir" ]]; then output_dir="$repo_root/output/issue-340/$tested_head_sha/$run_id"; fi
 mkdir -p "$output_dir/scenarios"
+# Child recovery scripts retain raw assertions at an absolute path so the
+# evidence directory can be uploaded regardless of the caller's cwd.
+output_dir="$(CDPATH= cd -- "$output_dir" && pwd)"
 started_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
 mapfile -t matrix_ids < <(python3 - "$matrix" <<'PY'
@@ -476,8 +479,10 @@ PY
     # consumer/inbox duplicate path is exercised rather than mocked.
     compose_exec rabbitmq sh -ec '
       rabbitmqadmin --username "$RABBITMQ_DEFAULT_USER" --password "$RABBITMQ_DEFAULT_PASS" \
-        publish exchange=onlinejudge.events.v2 \
-        routing_key=onlinejudge.assessment.source-grade.changed.v2 payload="$1" --non-interactive
+        --non-interactive publish message \
+        --exchange onlinejudge.events.v2 \
+        --routing-key onlinejudge.assessment.source-grade.changed.v2 \
+        --payload "$1"
     ' sh "$payload"
   }
 
