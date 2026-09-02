@@ -401,9 +401,7 @@ function futureLocalDateTime() {
 }
 
 function localDateTimeFromNow(offset: number) {
-  const deadline = new Date(Date.now() + offset);
-  const offsetMs = deadline.getTimezoneOffset() * 60 * 1000;
-  return new Date(deadline.getTime() - offsetMs).toISOString().slice(0, 19);
+  return new Date(Date.now() + offset).toISOString();
 }
 
 async function createAndPublishHomework(
