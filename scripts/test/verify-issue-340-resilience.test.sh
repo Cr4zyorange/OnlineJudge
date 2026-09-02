@@ -87,6 +87,16 @@ grep -Fq -- 'sourceGradeOutboxStateBefore=' "$runner" \
   || fail 'runner must record the source outbox state before relay recovery'
 grep -Fq -- 'source_outbox_state_before" == PENDING' "$runner" \
   || fail 'runner must assert the source outbox is pending before relay recovery'
+python3 - "$runner" <<'PY'
+from pathlib import Path
+import sys
+
+text = Path(sys.argv[1]).read_text(encoding="utf-8")
+fixture = text[text.index("grade_down_source_fixture()") : text.index("identity_dir=")]
+grade_start = fixture.index('"${compose[@]}" start grade-service')
+worker_start = fixture.index('"${compose[@]}" start assessment-worker')
+assert grade_start < worker_start, "Grade consumer must be ready before Assessment relay starts"
+PY
 grep -Fq -- 'duplicateDecision' "$runner" \
   || fail 'runner must prove duplicate delivery is a no-op'
 grep -Fq -- 'cached-jwt-query' "$runner" \

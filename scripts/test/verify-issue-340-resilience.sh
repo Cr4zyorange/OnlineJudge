@@ -520,8 +520,11 @@ PY
     occurred_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
     source_payload="$(printf '{\"eventId\":\"%s\",\"eventType\":\"assessment.source-grade.changed.v2\",\"payloadVersion\":2,\"aggregateType\":\"assessment-source-grade\",\"aggregateId\":\"%s\",\"aggregateVersion\":1,\"occurredAt\":\"%s\",\"correlationId\":\"%s\",\"payload\":{\"courseId\":\"%s\",\"sourceType\":\"LAB\",\"sourceId\":\"%s\",\"studentId\":\"%s\",\"score\":88.00,\"fullScore\":100.00,\"status\":\"SCORED\",\"sourceVersion\":1}}' \
       "$source_event_id" "$aggregate_id" "$occurred_at" "$correlation_id" "$course_id" "$source_id" "$student_id")"
-    # Pause only the relay worker while the Grade outage is active.  This
+    # Pause only the relay worker while the Grade outage is active. This
     # leaves the Assessment-owned transaction visibly PENDING before recovery.
+    # Keep the worker stopped until Grade has recreated its durable consumer
+    # queue; otherwise a mandatory publish during the outage is returned before
+    # the queue binding exists and the recovery assertion becomes timing-sensitive.
     if "${compose[@]}" stop assessment-worker >"$dir/worker-stop.log" 2>&1; then
       if db_exec oj_assessment "START TRANSACTION; INSERT INTO assessment_source_grade (source_type, source_id, course_id, student_id, score, full_score, status, source_version, updated_at) VALUES ('LAB', '$source_id', '$course_id', '$student_id', 88.00, 100.00, 'SCORED', 1, UTC_TIMESTAMP()); INSERT INTO assessment_event_outbox (event_id, event_type, payload_version, aggregate_type, aggregate_id, aggregate_version, occurred_at, correlation_id, payload_json, state, created_at) VALUES ('$source_event_id', 'assessment.source-grade.changed.v2', 2, 'assessment-source-grade', '$aggregate_id', 1, UTC_TIMESTAMP(), '$correlation_id', '$source_payload', 'PENDING', UTC_TIMESTAMP()); COMMIT;" >"$dir/source-fixture.log" 2>&1; then
         source_fact_count="$(db_exec oj_assessment "SELECT COUNT(*) FROM assessment_source_grade WHERE source_type='LAB' AND source_id='$source_id' AND student_id='$student_id';" 2>/dev/null || printf '0')"
@@ -529,13 +532,17 @@ PY
         source_grade_revision="$(db_exec oj_assessment "SELECT source_version FROM assessment_source_grade WHERE source_type='LAB' AND source_id='$source_id' AND student_id='$student_id';" 2>/dev/null || printf '0')"
         if [[ "$source_fact_count" == 1 && "$source_outbox_state_before" == PENDING && "$source_grade_revision" == 1 ]]; then fixture_status=PASS; fi
       fi
-      if "${compose[@]}" start assessment-worker >"$dir/worker-start.log" 2>&1; then worker_started=1; fi
     fi
 
     "${compose[@]}" start grade-service >"$dir/start.log" 2>&1 || true
     recovery_started=$SECONDS
     if wait_healthy grade-service; then recovery_state=healthy; else recovery_state=timeout; fi
     recovery_seconds=$((SECONDS - recovery_started))
+    # Start the relay only after Grade's real consumer has declared its queue
+    # and binding, making delivery of the same persisted event deterministic.
+    if [[ "$recovery_state" == healthy ]]; then
+      if "${compose[@]}" start assessment-worker >"$dir/worker-start.log" 2>&1; then worker_started=1; fi
+    fi
     if [[ "$worker_started" == 1 ]]; then wait_healthy assessment-worker || worker_started=0; fi
     if [[ "$recovery_state" == healthy && "$fixture_status" == PASS ]]; then
       if wait_for_db_value 'Grade inbox status' APPLIED oj_grade "SELECT processing_status FROM grade_event_inbox WHERE event_id='$source_event_id';"; then
