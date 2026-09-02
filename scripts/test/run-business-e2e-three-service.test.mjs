@@ -5,6 +5,7 @@ import test from 'node:test';
 
 import {
   isSuccessfulSummary,
+  parseStudentGradeSummaryIdentifier,
   parsePositiveIdentifier,
   redact,
   validateCleanup,
@@ -15,6 +16,21 @@ import {
 test('accepts only a positive numeric identifier from a bootstrap API envelope', () => {
   assert.equal(parsePositiveIdentifier({ data: { id: '42' } }, 'course'), 42);
   assert.throws(() => parsePositiveIdentifier({ data: { id: 0 } }, 'course'), /course.*positive/i);
+});
+
+test('selects the bootstrapped student course-grade summary rather than a legacy fixture id', () => {
+  assert.equal(parseStudentGradeSummaryIdentifier({
+    data: {
+      records: [
+        { studentId: 7, summary: { id: 101 } },
+        { studentId: 8, summary: { id: '102' } }
+      ]
+    }
+  }, 8), 102);
+  assert.throws(
+    () => parseStudentGradeSummaryIdentifier({ data: { records: [] } }, 8),
+    /student.*summary.*positive/i
+  );
 });
 
 test('rejects a context that is not a nine-workload loopback platform', () => {

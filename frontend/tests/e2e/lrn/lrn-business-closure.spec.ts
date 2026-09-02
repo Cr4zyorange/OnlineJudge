@@ -3,7 +3,7 @@ import { expect, test } from '../fixtures';
 import { verifyLrnDisposableProof } from './disposable-proof';
 
 const DEMO_COURSE_ID = Number(process.env.E2E_COURSE_ID || 9501);
-const DEMO_GRADE_SUMMARY_ID = 950421;
+const DEMO_GRADE_SUMMARY_ID = Number(process.env.E2E_GRADE_SUMMARY_ID || 950421);
 const hasDisposableProof = verifyLrnDisposableProof();
 
 test.describe.configure({ timeout: 60_000 });

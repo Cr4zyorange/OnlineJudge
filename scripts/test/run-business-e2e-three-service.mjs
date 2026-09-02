@@ -52,6 +52,19 @@ export function parsePositiveIdentifier(envelope, label) {
   return id;
 }
 
+export function parseStudentGradeSummaryIdentifier(envelope, studentId) {
+  if (!Number.isSafeInteger(studentId) || studentId <= 0) {
+    throw new Error('student bootstrap response must contain a positive numeric id');
+  }
+  const summaryId = Number(envelope?.data?.records?.find((record) => (
+    Number(record?.studentId) === studentId
+  ))?.summary?.id);
+  if (!Number.isSafeInteger(summaryId) || summaryId <= 0) {
+    throw new Error('student course-grade summary bootstrap response must contain a positive numeric id');
+  }
+  return summaryId;
+}
+
 export function redact(value, secrets) {
   return secrets.reduce((result, secret) => {
     if (!secret) {
@@ -143,6 +156,10 @@ async function bootstrapScenarioCourse(context, artifactDir) {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ account: 'student001', password: 'Student001@pass' })
   }, 'bootstrap student login');
+  const studentId = Number(studentLogin?.data?.user?.id);
+  if (!Number.isSafeInteger(studentId) || studentId <= 0) {
+    throw new Error('bootstrap student login must contain a positive numeric user id');
+  }
   const teacherHeaders = {
     authorization: `Bearer ${teacherLogin.data.token}`,
     'content-type': 'application/json',
@@ -174,8 +191,107 @@ async function bootstrapScenarioCourse(context, artifactDir) {
     body: JSON.stringify({ title: 'Issue #320 运行期章节', sortOrder: 1, visible: true, chapterType: 1 })
   }, 'bootstrap scenario chapter');
   const chapterId = parsePositiveIdentifier(chapter, 'chapter');
-  await writeFile(join(artifactDir, 'scenario-bootstrap.json'), `${JSON.stringify({ courseId, chapterId }, null, 2)}\n`, 'utf8');
-  return { courseId, chapterId };
+
+  const fixtureLab = await requestEnvelope(context.baseUrl, `/api/v1/courses/${courseId}/labs`, {
+    method: 'POST',
+    headers: teacherHeaders,
+    body: JSON.stringify({
+      title: 'Issue #320 GRD 总评运行期基线',
+      description: 'Creates a published, adjustable course-grade summary for the LRN closure scenario.',
+      deadline: '2030-12-31T23:59:00',
+      maxScore: 100,
+      attachmentIds: [],
+      allowedLanguages: 'python',
+      evaluationMode: 'MANUAL',
+      autoEvaluate: false,
+      reportRequired: false,
+      timeLimitMs: 1_000,
+      memoryLimitKb: 65_536,
+      testcases: []
+    })
+  }, 'bootstrap GRD source LAB');
+  const fixtureLabId = parsePositiveIdentifier(fixtureLab, 'GRD source LAB');
+  await requestEnvelope(context.baseUrl, `/api/v1/labs/${fixtureLabId}/publish`, {
+    method: 'POST',
+    headers: teacherHeaders,
+    body: '{}'
+  }, 'bootstrap publish GRD source LAB');
+  const sourceSubmission = new FormData();
+  sourceSubmission.set('code', 'print("Issue #320 GRD fixture")');
+  sourceSubmission.set('language', 'python');
+  const fixtureSubmission = await requestEnvelope(context.baseUrl, `/api/v1/labs/${fixtureLabId}/submissions`, {
+    method: 'POST',
+    headers: {
+      authorization: `Bearer ${studentLogin.data.token}`,
+      'x-request-id': `issue320-bootstrap-source-submit-${Date.now()}`
+    },
+    body: sourceSubmission
+  }, 'bootstrap submit GRD source LAB');
+  const fixtureSubmissionId = String(fixtureSubmission?.data?.submissionId || '');
+  if (!/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(fixtureSubmissionId)) {
+    throw new Error('GRD source LAB submission bootstrap response must contain a UUID submission id');
+  }
+  await requestEnvelope(context.baseUrl, `/api/v1/labs/${fixtureLabId}/submissions/${fixtureSubmissionId}/score`, {
+    method: 'POST',
+    headers: teacherHeaders,
+    body: JSON.stringify({
+      manualScore: 90,
+      finalScore: 90,
+      comment: 'Issue #320 GRD fixture score',
+      changeReason: 'Creates a published summary for the LRN adjustment closure.'
+    })
+  }, 'bootstrap score GRD source LAB');
+  await requestEnvelope(context.baseUrl, `/api/v1/labs/${fixtureLabId}/release-scores`, {
+    method: 'PUT',
+    headers: teacherHeaders,
+    body: '{}'
+  }, 'bootstrap release GRD source LAB scores');
+  await requestEnvelope(context.baseUrl, `/api/v1/courses/${courseId}/grade-items`, {
+    method: 'POST',
+    headers: teacherHeaders,
+    body: JSON.stringify({
+      name: 'Issue #320 GRD 总评基线 LAB',
+      sourceType: 'LAB',
+      sourceId: fixtureLabId,
+      fullScore: 100,
+      weight: 1,
+      includedInFinal: true,
+      sortOrder: 1
+    })
+  }, 'bootstrap GRD source grade item');
+
+  let gradeSummaryId;
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    await requestEnvelope(context.baseUrl, `/api/v1/courses/${courseId}/grades/sync`, {
+      method: 'POST',
+      headers: teacherHeaders,
+      body: '{}'
+    }, 'bootstrap sync GRD source score');
+    const gradeTable = await requestEnvelope(context.baseUrl, `/api/v1/courses/${courseId}/grades?page=1&size=20`, {
+      headers: teacherHeaders
+    }, 'bootstrap query GRD course grades');
+    const studentSummary = gradeTable?.data?.records?.find((record) => Number(record?.studentId) === studentId)?.summary;
+    if (studentSummary?.finalStatus === 'CALCULATED') {
+      gradeSummaryId = parseStudentGradeSummaryIdentifier(gradeTable, studentId);
+      break;
+    }
+    await new Promise((resolveDelay) => setTimeout(resolveDelay, 250));
+  }
+  if (!gradeSummaryId) {
+    throw new Error('GRD source score did not produce a calculated student course-grade summary within 5 seconds');
+  }
+  const publication = await requestEnvelope(context.baseUrl, `/api/v1/courses/${courseId}/grades/publish`, {
+    method: 'POST',
+    headers: teacherHeaders,
+    body: JSON.stringify({ publishScope: 'PARTIAL_STUDENTS', studentIds: [studentId], gradeItemIds: [] })
+  }, 'bootstrap publish GRD course grade');
+  if (Number(publication?.data?.publishedCount) !== 1) {
+    throw new Error('bootstrap GRD publication must publish exactly the student course-grade summary');
+  }
+
+  const scenario = { courseId, chapterId, gradeSummaryId };
+  await writeFile(join(artifactDir, 'scenario-bootstrap.json'), `${JSON.stringify(scenario, null, 2)}\n`, 'utf8');
+  return scenario;
 }
 
 async function runInsidePlatform() {
@@ -222,6 +338,7 @@ async function runInsidePlatform() {
           E2E_ADMIN_PASSWORD: 'Admin001@pass',
           E2E_COURSE_ID: String(scenario.courseId),
           E2E_CHAPTER_ID: String(scenario.chapterId),
+          E2E_GRADE_SUMMARY_ID: String(scenario.gradeSummaryId),
           E2E_THREE_SERVICE_PROOF_FILE: proofPath,
           E2E_THREE_SERVICE_TOKEN: token,
           PLAYWRIGHT_JUNIT_OUTPUT_FILE: junitPath
