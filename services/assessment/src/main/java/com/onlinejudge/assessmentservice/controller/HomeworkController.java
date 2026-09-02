@@ -82,6 +82,8 @@ public class HomeworkController {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "homework not found", missing);
         } catch (IllegalArgumentException invalid) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, invalid.getMessage(), invalid);
+        } catch (HomeworkSubmissionService.DeadlineExceededException deadlineExceeded) {
+            throw new HomeworkClientException(HttpStatus.CONFLICT, "HWK_4004", deadlineExceeded.getMessage());
         } catch (IllegalStateException conflict) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, conflict.getMessage(), conflict);
         } catch (UncheckedIOException unavailable) {

@@ -370,7 +370,9 @@ public class HomeworkSubmissionService {
 
     private void validateOpenAndResubmission(HomeworkRule homework, String studentId, Instant now) {
         if (!"PUBLISHED".equals(homework.status())) throw new IllegalStateException("homework is not open for submission");
-        if (now.isAfter(homework.deadline()) && !homework.allowLateSubmit()) throw new IllegalStateException("homework deadline has passed");
+        if (now.isAfter(homework.deadline()) && !homework.allowLateSubmit()) {
+            throw new DeadlineExceededException();
+        }
         int existing = jdbc.queryForObject("""
                 SELECT COUNT(*) FROM assessment_homework_submission
                  WHERE homework_id = ? AND student_id = ? AND is_final = TRUE
@@ -414,6 +416,11 @@ public class HomeworkSubmissionService {
 
     public record AttachmentUpload(String fileId, String originalFilename, String contentType, long fileSize,
                                    Instant expiresAt, Instant uploadedAt) { }
+
+    /** Kept distinct from ordinary conflicts so the HTTP boundary can preserve HWK_4004. */
+    public static final class DeadlineExceededException extends IllegalStateException {
+        public DeadlineExceededException() { super("homework deadline has passed"); }
+    }
 
     public record SubmittedHomework(String submissionId, String taskId, long publicSubmissionId, long homeworkId, int version,
                                     String submitStatus, String evaluationStatus, Instant submittedAt) { }
