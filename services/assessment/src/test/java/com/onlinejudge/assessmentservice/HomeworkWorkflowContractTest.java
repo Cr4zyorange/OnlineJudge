@@ -29,6 +29,7 @@ import java.math.BigDecimal;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -64,7 +65,9 @@ class HomeworkWorkflowContractTest {
         jdbc.update("DELETE FROM assessment_source_grade_snapshot");
         jdbc.update("DELETE FROM assessment_source_grade");
         jdbc.update("DELETE FROM evaluation_task");
+        jdbc.update("DELETE FROM assessment_homework_attachment");
         jdbc.update("DELETE FROM assessment_homework_submission");
+        jdbc.update("DELETE FROM assessment_homework_question");
         jdbc.update("DELETE FROM assessment_submission");
         jdbc.update("DELETE FROM assessment_homework_testcase");
         jdbc.update("DELETE FROM assessment_homework");
@@ -112,6 +115,136 @@ class HomeworkWorkflowContractTest {
         assertThat(event.path("payload").has("recipientUserIds")).isFalse();
         assertThat(jdbc.queryForObject("SELECT state FROM assessment_event_outbox WHERE aggregate_id = ?", String.class,
                 Long.toString(homeworkId))).isEqualTo("PENDING");
+    }
+
+    @Test
+    void objectiveHomeworkPreservesTheTeacherKeyAndScoresTheStudentAnswerWithoutLeakingIt() throws Exception {
+        String teacherId = "teacher-objective-" + UUID.randomUUID();
+        String studentId = "student-objective-" + UUID.randomUUID();
+        String teacherToken = TestJwtFactory.userToken(KEY, "homework-workflow-kid", teacherId, List.of("TEACHER"));
+        String studentToken = TestJwtFactory.userToken(KEY, "homework-workflow-kid", studentId, List.of("STUDENT"));
+        jdbc.update("INSERT INTO assessment_course_member_projection (course_id, user_id, membership_status, member_version) VALUES ('9501', ?, 'ACTIVE', 1)", teacherId);
+        jdbc.update("INSERT INTO assessment_course_member_projection (course_id, user_id, membership_status, member_version) VALUES ('9501', ?, 'ACTIVE', 1)", studentId);
+        when(coursePermissions.canManageCourse("9501", teacherId)).thenReturn(true);
+
+        String created = mockMvc.perform(post("/api/v1/homeworks")
+                        .header("Authorization", "Bearer " + teacherToken)
+                        .header("X-Request-Id", UUID.randomUUID().toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"courseId":9501,"title":"objective browser contract","description":"browser payload",
+                                 "type":"OBJECTIVE","deadline":"2030-01-01T12:00:00Z","totalScore":100,"allowResubmit":true,
+                                 "allowLateSubmit":false,"questions":[{"questionType":"SINGLE_CHOICE","stem":"1 + 1 = ?","optionsJson":"[\\"1\\",\\"2\\"]","answerJson":"[\\"2\\"]","score":100,"sortOrder":1}],"testCases":[]}
+                                """))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        long homeworkId = mapper.readTree(created).path("id").asLong();
+        mockMvc.perform(put("/api/v1/homeworks/{homeworkId}/publish", homeworkId)
+                        .header("Authorization", "Bearer " + teacherToken).header("X-Request-Id", UUID.randomUUID().toString()))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/v1/homeworks/{homeworkId}", homeworkId).header("Authorization", "Bearer " + studentToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.questions[0].answerJson").doesNotExist());
+        mockMvc.perform(post("/api/v1/homeworks/{homeworkId}/submissions", homeworkId)
+                        .header("Authorization", "Bearer " + studentToken).header("X-Request-Id", UUID.randomUUID().toString())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"answerJson\":\"{\\\"q1\\\":[\\\"2\\\"]}\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.submitType").value("OBJECTIVE"))
+                .andExpect(jsonPath("$.data.evaluationStatus").value("ACCEPTED"))
+                .andExpect(jsonPath("$.data.autoScore").value(100));
+    }
+
+    @Test
+    void codeHomeworkAcceptsTheFrontendLanguageAndTestcasePayload() throws Exception {
+        String teacherId = "teacher-code-browser-" + UUID.randomUUID();
+        String studentId = "student-code-browser-" + UUID.randomUUID();
+        String teacherToken = TestJwtFactory.userToken(KEY, "homework-workflow-kid", teacherId, List.of("TEACHER"));
+        String studentToken = TestJwtFactory.userToken(KEY, "homework-workflow-kid", studentId, List.of("STUDENT"));
+        jdbc.update("INSERT INTO assessment_course_member_projection (course_id, user_id, membership_status, member_version) VALUES ('9501', ?, 'ACTIVE', 1)", teacherId);
+        jdbc.update("INSERT INTO assessment_course_member_projection (course_id, user_id, membership_status, member_version) VALUES ('9501', ?, 'ACTIVE', 1)", studentId);
+        when(coursePermissions.canManageCourse("9501", teacherId)).thenReturn(true);
+
+        String created = mockMvc.perform(post("/api/v1/homeworks")
+                        .header("Authorization", "Bearer " + teacherToken).header("X-Request-Id", UUID.randomUUID().toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"courseId":9501,"title":"code browser contract","description":"browser payload",
+                                 "type":"CODE","deadline":"2030-01-01T12:00:00Z","totalScore":100,"allowResubmit":true,
+                                 "allowLateSubmit":false,"languageLimitJson":"[\\"python\\"]",
+                                 "testCases":[{"inputData":"1 2","expectedOutput":"3","scoreWeight":100,"hidden":false,"sortOrder":1}]}
+                                """))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        long homeworkId = mapper.readTree(created).path("id").asLong();
+        mockMvc.perform(put("/api/v1/homeworks/{homeworkId}/publish", homeworkId)
+                        .header("Authorization", "Bearer " + teacherToken).header("X-Request-Id", UUID.randomUUID().toString()))
+                .andExpect(status().isOk());
+        mockMvc.perform(post("/api/v1/homeworks/{homeworkId}/submissions", homeworkId)
+                        .header("Authorization", "Bearer " + studentToken).header("X-Request-Id", UUID.randomUUID().toString())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"codeText\":\"print(3)\",\"language\":\"python\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.submitType").value("CODE"))
+                .andExpect(jsonPath("$.data.evaluationStatus").value("PENDING"));
+    }
+
+    @Test
+    void fileHomeworkRejectsDisguisedPdfThenBindsTheStudentOwnedTextAttachment() throws Exception {
+        String teacherId = "teacher-file-browser-" + UUID.randomUUID();
+        String studentId = "student-file-browser-" + UUID.randomUUID();
+        String teacherToken = TestJwtFactory.userToken(KEY, "homework-workflow-kid", teacherId, List.of("TEACHER"));
+        String studentToken = TestJwtFactory.userToken(KEY, "homework-workflow-kid", studentId, List.of("STUDENT"));
+        jdbc.update("INSERT INTO assessment_course_member_projection (course_id, user_id, membership_status, member_version) VALUES ('9501', ?, 'ACTIVE', 1)", teacherId);
+        jdbc.update("INSERT INTO assessment_course_member_projection (course_id, user_id, membership_status, member_version) VALUES ('9501', ?, 'ACTIVE', 1)", studentId);
+        when(coursePermissions.canManageCourse("9501", teacherId)).thenReturn(true);
+
+        String created = mockMvc.perform(post("/api/v1/homeworks")
+                        .header("Authorization", "Bearer " + teacherToken).header("X-Request-Id", UUID.randomUUID().toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"courseId":9501,"title":"file browser contract","description":"browser payload",
+                                 "type":"FILE","deadline":"2030-01-01T12:00:00Z","totalScore":100,"allowResubmit":true,
+                                 "allowLateSubmit":false,"questions":[],"testCases":[]}
+                                """))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        long homeworkId = mapper.readTree(created).path("id").asLong();
+        mockMvc.perform(put("/api/v1/homeworks/{homeworkId}/publish", homeworkId)
+                        .header("Authorization", "Bearer " + teacherToken).header("X-Request-Id", UUID.randomUUID().toString()))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(multipart("/api/v1/homeworks/{homeworkId}/attachments", homeworkId)
+                        .file(new org.springframework.mock.web.MockMultipartFile("file", "disguised-answer.pdf", "application/pdf",
+                                "not-a-pdf".getBytes(java.nio.charset.StandardCharsets.UTF_8)))
+                        .header("Authorization", "Bearer " + studentToken)
+                        .characterEncoding("UTF-8"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("HWK_4005"));
+
+        String uploaded = mockMvc.perform(multipart("/api/v1/homeworks/{homeworkId}/attachments", homeworkId)
+                        .file(new org.springframework.mock.web.MockMultipartFile("file", "answer.txt", "text/plain",
+                                "durable file answer".getBytes(java.nio.charset.StandardCharsets.UTF_8)))
+                        .header("Authorization", "Bearer " + studentToken)
+                        .characterEncoding("UTF-8"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.status").value("UPLOADED"))
+                .andExpect(jsonPath("$.data.uploadedAt").exists())
+                .andReturn().getResponse().getContentAsString();
+        String fileId = mapper.readTree(uploaded).path("data").path("fileId").asText();
+
+        String submitted = mockMvc.perform(post("/api/v1/homeworks/{homeworkId}/submissions", homeworkId)
+                        .header("Authorization", "Bearer " + studentToken).header("X-Request-Id", UUID.randomUUID().toString())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"fileIds\":[\"" + fileId + "\"]}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.submitType").value("FILE"))
+                .andExpect(jsonPath("$.data.evaluationStatus").value("NONE"))
+                .andReturn().getResponse().getContentAsString();
+        long publicSubmissionId = publicSubmissionId(submitted);
+        assertThat(publicSubmissionId).isPositive();
+        assertThat(jdbc.queryForObject("SELECT status FROM assessment_homework_attachment WHERE file_id = ?", String.class, fileId))
+                .isEqualTo("SUBMITTED");
+        assertThat(jdbc.queryForObject("SELECT submission_id IS NOT NULL FROM assessment_homework_attachment WHERE file_id = ?", Boolean.class, fileId))
+                .isTrue();
     }
 
     @Test

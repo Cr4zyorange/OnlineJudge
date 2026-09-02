@@ -72,6 +72,14 @@ public class HomeworkService {
                     """, homeworkId, testCase.input(), testCase.expectedOutput(), testCase.scoreWeight(),
                     testCase.hidden(), testCase.sortOrder());
         }
+        for (QuestionCommand question : command.questions()) {
+            jdbc.update("""
+                    INSERT INTO assessment_homework_question
+                        (homework_id, question_type, stem, options_json, answer_json, score, sort_order)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """, homeworkId, question.questionType(), question.stem(), question.optionsJson(),
+                    question.answerJson(), question.score(), question.sortOrder());
+        }
         return find(homeworkId);
     }
 
@@ -204,7 +212,8 @@ public class HomeworkService {
 
     public record CreateHomeworkCommand(String courseId, String title, String description, String type, Instant deadline,
                                         BigDecimal totalScore, boolean allowResubmit, boolean allowLateSubmit,
-                                        List<String> languages, List<TestCaseCommand> testCases) {
+                                        List<String> languages, List<TestCaseCommand> testCases,
+                                        List<QuestionCommand> questions) {
         void validate() {
             if (courseId == null || courseId.isBlank() || title == null || title.isBlank() || title.trim().length() > 100) {
                 throw new IllegalArgumentException("courseId and a 1-100 character title are required");
@@ -213,7 +222,7 @@ public class HomeworkService {
                 throw new IllegalArgumentException("homework type must be TEXT, OBJECTIVE, FILE or CODE");
             }
             if (deadline == null || totalScore == null || totalScore.signum() <= 0) throw new IllegalArgumentException("deadline and positive totalScore are required");
-            if (languages == null || testCases == null) throw new IllegalArgumentException("languages and testCases must be arrays");
+            if (languages == null || testCases == null || questions == null) throw new IllegalArgumentException("languages, testCases and questions must be arrays");
             if ("CODE".equals(type)) {
                 if (languages.isEmpty() || languages.stream().anyMatch(value -> value == null || value.isBlank())) {
                     throw new IllegalArgumentException("at least one language is required");
@@ -224,8 +233,39 @@ public class HomeworkService {
             } else if (!languages.isEmpty() || !testCases.isEmpty()) {
                 throw new IllegalArgumentException("only code homework accepts languages and testCases");
             }
+            if ("OBJECTIVE".equals(type)) {
+                if (questions.isEmpty()) throw new IllegalArgumentException("objective homework requires at least one question");
+                BigDecimal configured = questions.stream().map(QuestionCommand::score).reduce(BigDecimal.ZERO, BigDecimal::add);
+                if (configured.compareTo(totalScore) != 0) throw new IllegalArgumentException("question scores must equal totalScore");
+            } else if (!questions.isEmpty()) {
+                throw new IllegalArgumentException("only objective homework accepts questions");
+            }
         }
     }
+
+    public record QuestionCommand(String questionType, String stem, String optionsJson, String answerJson,
+                                  BigDecimal score, int sortOrder) {
+        public QuestionCommand {
+            if (questionType == null || questionType.isBlank() || stem == null || stem.isBlank()
+                    || optionsJson == null || answerJson == null || score == null || score.signum() <= 0 || sortOrder < 1) {
+                throw new IllegalArgumentException("objective question type, stem, options, answer, positive score and sortOrder are required");
+            }
+        }
+    }
+
+    public List<QuestionSummary> questions(long homeworkId) {
+        return jdbc.query("""
+                SELECT question_type, stem, options_json, answer_json, score, sort_order
+                  FROM assessment_homework_question
+                 WHERE homework_id = ?
+                 ORDER BY sort_order, id
+                """, (rs, ignored) -> new QuestionSummary(rs.getString("question_type"), rs.getString("stem"),
+                rs.getString("options_json"), rs.getString("answer_json"), rs.getBigDecimal("score"),
+                rs.getInt("sort_order")), homeworkId);
+    }
+
+    public record QuestionSummary(String questionType, String stem, String optionsJson, String answerJson,
+                                  BigDecimal score, int sortOrder) { }
 
     public record TestCaseCommand(String input, String expectedOutput, BigDecimal scoreWeight, boolean hidden, int sortOrder) {
         public TestCaseCommand {
