@@ -117,6 +117,11 @@ done
 curl -fsS --connect-timeout 1 --max-time 2 "$gateway/health/live" >/dev/null \
   || fail "gateway did not become ready within 20 seconds"
 
+body="$(request GET /health/startup 200)"
+[[ "$body" == *'"status":"UP"'* ]] || fail "gateway startup probe contract is unstable: $body"
+body="$(request GET /health/ready 200)"
+[[ "$body" == *'"status":"UP"'* ]] || fail "gateway readiness probe contract is unstable: $body"
+
 assert_service /api/v1/auth/login identity
 jwks_headers="$runtime_dir/jwks.headers"
 jwks_body="$runtime_dir/jwks.json"
@@ -127,6 +132,9 @@ grep -Eqi '^Cache-Control:' "$jwks_headers" || fail "JWKS response lost Cache-Co
 assert_service /api/v1/courses course
 assert_service /api/v1/homeworks assessment
 assert_service /api/v1/grades grade
+submissions_body="$(request POST /api/v1/submissions 200 --data '{}')"
+[[ "$submissions_body" == *'"service":"assessment"'* && "$submissions_body" == *'"path":"/api/v1/submissions"'* ]] \
+  || fail "POST /api/v1/submissions reached the wrong service or path: $submissions_body"
 assert_service '/api/v1/learning/tasks?page=2&size=20' course
 assert_service /api/v1/notifications course
 assert_service / frontend
