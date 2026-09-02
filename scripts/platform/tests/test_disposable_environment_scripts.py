@@ -85,6 +85,13 @@ class DisposableEnvironmentScriptsTest(unittest.TestCase):
         self.assertIn("collect_diagnostics startup-failure", source)
         self.assertIn("json.loads(line)", source)
 
+    def test_run_command_has_argv_safe_e2e_hook_and_context(self) -> None:
+        source = self.assert_help(RUN)
+        self.assertIn("--after-ready", source)
+        self.assertIn("three-service-context.json", source)
+        self.assertIn('"${after_ready_command[@]}"', source)
+        self.assertNotIn('eval "$after_ready', source)
+
     def test_rollback_command_requires_an_immutable_artifact_manifest(self) -> None:
         source = self.assert_help(ROLLBACK)
         self.assertIn("artifact-manifest.json", source)

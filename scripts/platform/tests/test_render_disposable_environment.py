@@ -126,6 +126,11 @@ class DisposableEnvironmentRendererTest(unittest.TestCase):
         self.assertNotIn("assessment-password", compose)
         self.assertNotIn("root-password", kubernetes)
 
+    def test_gateway_is_loopback_only_and_e2e_seed_is_opt_in(self) -> None:
+        compose, _ = self.render()
+        self.assertIn('127.0.0.1:${GATEWAY_HTTP_PORT:-18080}:8080', compose)
+        self.assertIn('IDENTITY_SEED_DATA_ENABLED: "${IDENTITY_SEED_DATA_ENABLED:-false}"', compose)
+
     def test_compose_shell_jobs_pass_the_script_as_the_entrypoint_argument(self) -> None:
         compose, _ = self.render()
 
