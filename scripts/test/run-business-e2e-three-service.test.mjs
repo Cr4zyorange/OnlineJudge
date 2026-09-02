@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import test from 'node:test';
 
 import {
@@ -43,4 +45,16 @@ test('requires the three representative evidence groups', () => {
 
 test('rejects cleanup records that leave project resources behind', () => {
   assert.throws(() => validateCleanup({ containers: ['oj318-x'] }), /resources remain/i);
+});
+
+test('renders the Course authorization endpoint used by Assessment', () => {
+  const renderer = readFileSync(
+    resolve(import.meta.dirname, '../platform/render_disposable_environment.py'),
+    'utf8'
+  );
+
+  assert.match(
+    renderer,
+    /ASSESSMENT_COURSE_AUTHORIZATION_URI.*\/internal\/v2\/courses\/\{courseId\}\/authorizations\/\{userId\}/
+  );
 });

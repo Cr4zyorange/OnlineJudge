@@ -155,7 +155,7 @@ def workload_environment(workload: dict[str, Any], git_sha: str) -> dict[str, st
                 "ASSESSMENT_DATABASE_NAME": DATABASE_NAME["assessment"],
                 "ASSESSMENT_DATABASE_USER": RUNTIME_ACCOUNT["assessment"],
                 "IDENTITY_JWKS_URI": "http://identity-service:8081/.well-known/jwks.json",
-                "ASSESSMENT_COURSE_AUTHORIZATION_URI": "http://course-service:8082/internal/v2/courses/{courseId}/members/{userId}/authorization",
+                "ASSESSMENT_COURSE_AUTHORIZATION_URI": "http://course-service:8082/internal/v2/courses/{courseId}/authorizations/{userId}",
                 "ASSESSMENT_COURSE_SERVICE_AUTHORIZATION": "${ASSESSMENT_SERVICE_IDENTITY:?ASSESSMENT_SERVICE_IDENTITY is required}",
                 "ASSESSMENT_RABBIT_HOST": "rabbitmq",
                 "ASSESSMENT_RABBIT_USERNAME": "onlinejudge",
