@@ -58,6 +58,11 @@ Round 7 复审两项 FAIL 及其处置：
 
 ## 复核命令
 
+> 文件名约定：信号文件内部指到的 `raw/*.log` 是运行机上的本地产物名；入库时
+> 仓库全局忽略 `*.log`，一律已改名为同路径 `.txt`（如
+> `raw/assessment-outbox-lease-timeline.log` → 本目录
+> `raw/assessment-outbox-lease-timeline.txt`）。
+
 ```sh
 export KUBECONFIG=<issue319 kubeconfig>
 # AC-319-03 故障窗口
