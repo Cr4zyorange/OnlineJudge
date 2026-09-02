@@ -489,7 +489,7 @@ function buildPayload(): LabExperimentPayload {
     chapterId: form.chapterId ? Number(form.chapterId) : null,
     title: form.title.trim(),
     description: form.description.trim(),
-    deadline: form.deadline.length === 16 ? `${form.deadline}:00` : form.deadline,
+    deadline: toUtcInstant(form.deadline),
     maxScore: Number(form.maxScore),
     attachmentIds: [...selectedResourceIds.value],
     allowedLanguages: selectedLanguages.value.length > 0 ? selectedLanguages.value.join(',') : null,
@@ -500,6 +500,11 @@ function buildPayload(): LabExperimentPayload {
     memoryLimitKb: Number(form.memoryLimitKb),
     testcases: form.evaluationMode === 'MANUAL' ? [] : completeTestcases.value.map(toTestcasePayload)
   };
+}
+
+function toUtcInstant(value: string) {
+  const localDateTime = value.length === 16 ? `${value}:00` : value;
+  return new Date(localDateTime).toISOString();
 }
 
 function toTestcasePayload(testcase: TestcaseDraft, index: number): LabTestcasePayload {

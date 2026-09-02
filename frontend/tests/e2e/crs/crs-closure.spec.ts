@@ -135,7 +135,7 @@ test.describe('@crs CRS 主流程闭环', () => {
     await page.goto('/courses');
     const afterApproval = await page.evaluate(async ({ courseId }) => {
       const token = window.localStorage.getItem('onlinejudge.authToken');
-      return fetch(`/api/v1/courses/${courseId}/permissions/${window.localStorage.getItem('onlinejudge.userId')}`, {
+      return fetch(`/api/v1/courses/${courseId}`, {
         headers: { Authorization: `Bearer ${token}` }
       }).then(async (res) => res.json());
     }, { courseId: created.reviewId });

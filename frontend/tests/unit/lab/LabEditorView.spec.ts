@@ -63,6 +63,7 @@ describe('LabEditorView', () => {
       chapterId: 8,
       title: '容器评测实验',
       description: '完成容器输入输出评测。',
+      deadline: new Date('2026-08-25T23:59').toISOString(),
       attachmentIds: [10],
       allowedLanguages: 'python',
       evaluationMode: 'MIXED',

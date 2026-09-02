@@ -74,7 +74,7 @@ describe('HomeworkEditorView', () => {
       courseId: 101,
       title: '文本作业草稿',
       type: 'TEXT',
-      deadline: '2026-08-25T23:59:00',
+      deadline: new Date('2026-08-25T23:59').toISOString(),
       totalScore: 100,
       questions: [],
       testCases: [],

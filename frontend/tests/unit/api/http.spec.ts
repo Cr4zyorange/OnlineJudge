@@ -167,6 +167,25 @@ describe('shared API request client', () => {
     await expect(request('/api/v1/forbidden')).rejects.toThrow('无权限访问');
   });
 
+  it('preserves a direct service error code and message without a data field', async () => {
+    writeAuthStorage('onlinejudge.authToken', 'session-token');
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
+      ok: false,
+      status: 400,
+      json: async () => ({
+        code: 'HWK_4000',
+        message: 'request fields are invalid',
+        requestId: 'e2e-request',
+        retryable: false
+      })
+    } as Response);
+
+    await expect(request('/api/v1/homeworks')).rejects.toMatchObject({
+      code: 'HWK_4000',
+      message: 'request fields are invalid'
+    });
+  });
+
   it('reports plain-text server errors without leaking json parse failures', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
       ok: false,

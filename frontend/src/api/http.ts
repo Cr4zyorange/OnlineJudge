@@ -35,7 +35,7 @@ export class ApiError extends Error {
 interface ApiResponse<T> {
   code: string | number;
   message: string;
-  data: T;
+  data?: T;
 }
 
 type AuthContextProvider = () => AuthContext | null;
@@ -158,7 +158,7 @@ function apiError(response: Response, body: unknown) {
 }
 
 function isApiResponse(body: unknown): body is ApiResponse<unknown> {
-  return typeof body === 'object' && body !== null && 'code' in body && 'data' in body;
+  return typeof body === 'object' && body !== null && 'code' in body && 'message' in body;
 }
 
 async function readApiResponse(response: Response): Promise<unknown> {
