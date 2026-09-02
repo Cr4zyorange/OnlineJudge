@@ -107,7 +107,7 @@ test.describe('@grd GRD real source lifecycle', () => {
     const labId = lab.id;
     await ok(await request.post(`/api/v1/labs/${labId}/publish`, { headers: teacherHeaders }), 'publish LAB task');
 
-    const labSubmission = await ok<{ submissionId: number }>(await request.post(`/api/v1/labs/${labId}/submissions`, {
+    const labSubmission = await ok<{ submissionId: string }>(await request.post(`/api/v1/labs/${labId}/submissions`, {
       headers: studentHeaders,
       multipart: {
         code: 'print("GRD E2E")',

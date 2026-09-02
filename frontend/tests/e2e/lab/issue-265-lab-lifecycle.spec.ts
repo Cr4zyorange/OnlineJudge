@@ -4,9 +4,9 @@ import { test, expect } from '../fixtures';
 const COURSE_ID = Number(process.env.E2E_COURSE_ID || 9501);
 const SOURCE_NAME = 'issue-265-source.py';
 const REPORT_NAME = 'issue-265-report.pdf';
-const lifecycleState: { labId: number; submissionId: number } = {
+const lifecycleState: { labId: number; submissionId: string } = {
   labId: 0,
-  submissionId: 0
+  submissionId: ''
 };
 
 test.describe.configure({ mode: 'serial' });
@@ -64,9 +64,9 @@ test('teacher and student complete the LAB publish, submission, review, release,
   await page.getByTestId('submit-lab-button').click();
   const submissionResponse = await submissionResponsePromise;
   expect(submissionResponse.ok()).toBe(true);
-  const submissionPayload = await apiData<{ submissionId: number }>(submissionResponse);
+  const submissionPayload = await apiData<{ submissionId: string }>(submissionResponse);
   const submissionId = submissionPayload.submissionId;
-  expect(submissionId).toBeGreaterThan(0);
+  expect(submissionId).toMatch(/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i);
   lifecycleState.labId = labId;
   lifecycleState.submissionId = submissionId;
   await expect(page.getByRole('status')).toContainText('提交成功');
@@ -141,7 +141,7 @@ test('teacher and student complete the LAB publish, submission, review, release,
 test('student download permissions and teacher download failures remain observable', async ({ page, loginAs, logout }) => {
   const { labId, submissionId } = lifecycleState;
   expect(labId).toBeGreaterThan(0);
-  expect(submissionId).toBeGreaterThan(0);
+  expect(submissionId).toMatch(/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i);
 
   await loginAs('student');
   // loginAs verifies credentials only; enter the authenticated shell before using its logout control.

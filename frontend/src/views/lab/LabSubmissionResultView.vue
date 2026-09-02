@@ -290,6 +290,7 @@ import type {
   LabScoreSummary,
   LabSubmissionDetail,
   LabSubmissionHistoryItem,
+  LabSubmissionId,
   LabSubmissionResult,
   LabSubmissionSummary
 } from '../../types/lab';
@@ -307,7 +308,7 @@ import {
 const props = defineProps<{
   courseId: number;
   labId: number;
-  submissionId?: number;
+  submissionId?: LabSubmissionId;
 }>();
 
 type LabEvaluationStatus = LabSubmissionSummary['evaluationStatus'];
@@ -519,7 +520,7 @@ async function loadLatestResult(generation: number) {
 
 async function loadHistoricResult(
   generation: number,
-  selectedSubmissionId: number,
+  selectedSubmissionId: LabSubmissionId,
   labStatus: LabExperimentStatus
 ) {
   const [loadedSubmission, loadedEvaluation] = await Promise.all([
@@ -672,7 +673,7 @@ function applyEvaluationResult(loadedEvaluation: LabSubmissionResult) {
 }
 
 async function requestEvaluationWithWatchdog(
-  selectedSubmissionId: number,
+  selectedSubmissionId: LabSubmissionId,
   requestGeneration: number,
   timeoutMs: number,
   timeoutMessage: string
@@ -717,7 +718,8 @@ function selectLatestSubmission(history: LabSubmissionHistoryItem[]) {
     const latestDifference = Number(right.isLatest) - Number(left.isLatest);
     const versionDifference = right.version - left.version;
     const timeDifference = timestamp(right.submittedAt) - timestamp(left.submittedAt);
-    return latestDifference || versionDifference || timeDifference || right.submissionId - left.submissionId;
+    return latestDifference || versionDifference || timeDifference
+      || String(right.submissionId).localeCompare(String(left.submissionId));
   })[0] ?? null;
 }
 
@@ -750,7 +752,7 @@ function validateAggregateResult(aggregate: LabResult, selected: LabSubmissionHi
 function validateHistoricResult(
   loadedSubmission: LabSubmissionDetail,
   loadedEvaluation: LabSubmissionResult,
-  selectedSubmissionId: number
+  selectedSubmissionId: LabSubmissionId
 ) {
   if (
     loadedSubmission.labId !== props.labId
@@ -762,7 +764,7 @@ function validateHistoricResult(
   }
 }
 
-function validateEvaluationResult(loadedEvaluation: LabSubmissionResult, selectedSubmissionId: number) {
+function validateEvaluationResult(loadedEvaluation: LabSubmissionResult, selectedSubmissionId: LabSubmissionId) {
   if (loadedEvaluation.submissionId !== selectedSubmissionId) {
     throw new Error('评测结果与当前提交不匹配。');
   }
@@ -777,7 +779,7 @@ function isCurrentGeneration(generation: number) {
   return !disposed && generation === loadGeneration;
 }
 
-function isCurrentEvaluationRequest(generation: number, selectedSubmissionId: number) {
+function isCurrentEvaluationRequest(generation: number, selectedSubmissionId: LabSubmissionId) {
   return !disposed
     && generation === evaluationRequestGeneration
     && submission.value?.submissionId === selectedSubmissionId;

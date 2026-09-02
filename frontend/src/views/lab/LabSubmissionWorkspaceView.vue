@@ -280,6 +280,7 @@ import { getTeacherLearningProgress } from '../../api/lrn/learningProgress';
 import type {
   LabSubmissionHistoryItem,
   LabSubmissionListFilters,
+  LabSubmissionId,
   LabSubmissionSummary
 } from '../../types/lab';
 
@@ -527,7 +528,7 @@ function buildFilterQuery() {
   return query;
 }
 
-function reviewRoute(submissionId: number) {
+function reviewRoute(submissionId: LabSubmissionId) {
   const query = buildFilterQuery();
   return {
     name: 'lab-submission-review',

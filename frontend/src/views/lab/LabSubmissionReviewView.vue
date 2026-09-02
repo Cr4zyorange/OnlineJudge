@@ -419,6 +419,7 @@ import type {
   LabReportScorePayload,
   LabScorePayload,
   LabSubmissionDetail,
+  LabSubmissionId,
   LabSubmissionResult
 } from '../../types/lab';
 import {
@@ -435,7 +436,7 @@ import {
 const props = defineProps<{
   courseId: number;
   labId: number;
-  submissionId: number;
+  submissionId: LabSubmissionId;
 }>();
 
 const submitStatusValues = new Set(['SUBMITTED', 'LATE', 'WITHDRAWN']);
@@ -933,7 +934,7 @@ function formatFileSize(size: number) {
   return `${size} B`;
 }
 
-function isCurrentSourceFileDownload(requestId: number, labId: number, submissionId: number) {
+function isCurrentSourceFileDownload(requestId: number, labId: number, submissionId: LabSubmissionId) {
   return requestId === sourceFileDownloadRequestId
     && props.labId === labId
     && props.submissionId === submissionId

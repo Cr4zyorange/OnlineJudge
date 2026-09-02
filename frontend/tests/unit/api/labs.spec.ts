@@ -43,7 +43,7 @@ describe('LAB API adapters', () => {
     expect(result).toBe(response);
   });
 
-  it('downloads a submission source through the controlled teacher blob endpoint', async () => {
+  it('preserves the Assessment UUID submission identifier for controlled source downloads', async () => {
     const response = {
       blob: new Blob(['print("source")'], { type: 'text/x-python' }),
       filename: 'source-v3.py'
@@ -54,11 +54,13 @@ describe('LAB API adapters', () => {
     const result = await (labApiModule as {
       downloadLabSubmissionSource: (
         labId: number,
-        submissionId: number
+        submissionId: string
       ) => Promise<typeof response>;
-    }).downloadLabSubmissionSource(13, 301);
+    }).downloadLabSubmissionSource(13, '0d25ce84-3a65-4dc8-8a82-7333f55c9143');
 
-    expect(requestBlob).toHaveBeenCalledWith('/api/v1/labs/13/submissions/301/source/download');
+    expect(requestBlob).toHaveBeenCalledWith(
+      '/api/v1/labs/13/submissions/0d25ce84-3a65-4dc8-8a82-7333f55c9143/source/download'
+    );
     expect(result).toBe(response);
   });
 

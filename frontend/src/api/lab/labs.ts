@@ -10,6 +10,7 @@ import type {
   LabSubmissionResult,
   LabSubmissionDetail,
   LabSubmissionHistoryItem,
+  LabSubmissionId,
   LabSubmissionListFilters,
   LabExperimentDetail,
   LabExperimentPayload,
@@ -137,7 +138,7 @@ export async function listLabSubmissions(
   return request<LabSubmissionHistoryItem[]>(`/api/v1/labs/${labId}/submissions${suffix}`);
 }
 
-export async function getLabSubmissionDetail(labId: number, submissionId: number): Promise<LabSubmissionDetail> {
+export async function getLabSubmissionDetail(labId: number, submissionId: LabSubmissionId): Promise<LabSubmissionDetail> {
   return request<LabSubmissionDetail>(`/api/v1/labs/${labId}/submissions/${submissionId}`);
 }
 
@@ -161,7 +162,7 @@ export function downloadLabReport(labId: number, reportId: number) {
   return requestBlob(`/api/v1/labs/${labId}/reports/${reportId}/download`);
 }
 
-export function downloadLabSubmissionSource(labId: number, submissionId: number) {
+export function downloadLabSubmissionSource(labId: number, submissionId: LabSubmissionId) {
   return requestBlob(`/api/v1/labs/${labId}/submissions/${submissionId}/source/download`);
 }
 
@@ -178,7 +179,7 @@ export async function scoreLabReport(
 
 export async function scoreLabSubmission(
   labId: number,
-  submissionId: number,
+  submissionId: LabSubmissionId,
   payload: LabScorePayload
 ): Promise<LabScoreSummary> {
   return request<LabScoreSummary>(`/api/v1/labs/${labId}/submissions/${submissionId}/score`, {
@@ -187,7 +188,7 @@ export async function scoreLabSubmission(
   });
 }
 
-export async function getLabSubmissionResult(labId: number, submissionId: number): Promise<LabSubmissionResult> {
+export async function getLabSubmissionResult(labId: number, submissionId: LabSubmissionId): Promise<LabSubmissionResult> {
   return request<LabSubmissionResult>(`/api/v1/labs/${labId}/submissions/${submissionId}/result`);
 }
 
@@ -199,7 +200,7 @@ export async function getLabStatistics(labId: number): Promise<LabStatistics> {
   return request<LabStatistics>(`/api/v1/labs/${labId}/statistics`);
 }
 
-export async function evaluateLabSubmission(labId: number, submissionId: number): Promise<LabSubmissionResult> {
+export async function evaluateLabSubmission(labId: number, submissionId: LabSubmissionId): Promise<LabSubmissionResult> {
   return request<LabSubmissionResult>(`/api/v1/labs/${labId}/submissions/${submissionId}/evaluate`, {
     method: 'POST'
   });

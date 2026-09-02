@@ -8,6 +8,13 @@ export type LabExperimentStatus =
 
 export type LabEvaluationMode = 'DOCKER_IO' | 'MIXED' | 'MANUAL';
 
+/**
+ * Assessment persists LAB submissions under UUIDs. Numeric values are accepted
+ * only for legacy local fixtures; live service values are opaque strings and
+ * must travel unchanged through routes and API calls.
+ */
+export type LabSubmissionId = string | number;
+
 export interface LabTestcase {
   id: number;
   labId: number;
@@ -77,13 +84,13 @@ export interface LabSubmissionPayload {
 }
 
 export interface LabReportUploadPayload {
-  submissionId?: number;
+  submissionId?: LabSubmissionId;
   reportFile: File;
 }
 
 export interface LabReportSummary {
   reportId: number;
-  submissionId: number | null;
+  submissionId: LabSubmissionId | null;
   fileName: string;
   fileType: 'PDF' | 'DOCX' | 'ZIP';
   fileSize: number;
@@ -110,7 +117,7 @@ export interface LabScorePayload {
 }
 
 export interface LabScoreSummary {
-  submissionId: number;
+  submissionId: LabSubmissionId;
   reportId: number | null;
   autoScore: number | null;
   reportScore: number | null;
@@ -123,7 +130,7 @@ export interface LabScoreSummary {
 }
 
 export interface LabSubmissionSummary {
-  submissionId: number;
+  submissionId: LabSubmissionId;
   labId: number;
   studentId: number;
   submitStatus: 'SUBMITTED' | 'LATE' | 'WITHDRAWN';
@@ -143,7 +150,7 @@ export interface LabSubmissionSummary {
 }
 
 export interface LabSubmissionHistoryItem {
-  submissionId: number;
+  submissionId: LabSubmissionId;
   labId: number;
   studentId: number;
   language: string;
@@ -185,7 +192,7 @@ export interface LabEvaluationCaseResult {
 }
 
 export interface LabSubmissionResult {
-  submissionId: number;
+  submissionId: LabSubmissionId;
   evaluationStatus: LabSubmissionSummary['evaluationStatus'];
   score: number;
   passedCases: number;

@@ -109,7 +109,7 @@ test.describe('@lrn NFR-LN-01 and NFR-LN-02', () => {
 
     const labId = await createLab(request, teacherHeaders, courseId, marker);
     await ok(await request.post(`/api/v1/labs/${labId}/publish`, { headers: teacherHeaders }), 'publish LAB notification source');
-    const labSubmission = await ok<{ submissionId: number }>(await request.post(`/api/v1/labs/${labId}/submissions`, {
+    const labSubmission = await ok<{ submissionId: string }>(await request.post(`/api/v1/labs/${labId}/submissions`, {
       headers: studentHeaders,
       multipart: {
         code: 'print("Issue 295")',

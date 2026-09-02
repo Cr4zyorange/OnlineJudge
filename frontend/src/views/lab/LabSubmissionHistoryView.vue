@@ -242,7 +242,8 @@ import SummaryStrip, { type SummaryStripItem } from '../../components/foundation
 import type {
   LabExperimentDetail,
   LabSubmissionDetail,
-  LabSubmissionHistoryItem
+  LabSubmissionHistoryItem,
+  LabSubmissionId
 } from '../../types/lab';
 import {
   formatLabDateTime,
@@ -266,7 +267,7 @@ const props = defineProps<{
 const experiment = ref<LabExperimentDetail | null>(null);
 const history = ref<LabSubmissionHistoryItem[]>([]);
 const detail = ref<LabSubmissionDetail | null>(null);
-const selectedSubmissionId = ref<number | null>(null);
+const selectedSubmissionId = ref<LabSubmissionId | null>(null);
 const experimentLoading = ref(false);
 const loading = ref(false);
 const detailLoading = ref(false);
@@ -435,7 +436,7 @@ async function loadHistory() {
   }
 }
 
-async function openDetail(submissionId: number) {
+async function openDetail(submissionId: LabSubmissionId) {
   const context = contextVersion;
   const request = ++detailRequestVersion;
   const labId = props.labId;
@@ -484,7 +485,7 @@ function isCurrentRequest(context: number, request: number, latestRequest: numbe
   return context === contextVersion && request === latestRequest;
 }
 
-function isCurrentDetailRequest(context: number, request: number, submissionId: number) {
+function isCurrentDetailRequest(context: number, request: number, submissionId: LabSubmissionId) {
   return isCurrentRequest(context, request, detailRequestVersion)
     && selectedSubmissionId.value === submissionId;
 }

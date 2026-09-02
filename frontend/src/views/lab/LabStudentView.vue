@@ -420,6 +420,7 @@ import type {
   LabScoreSummary,
   LabSubmissionDetail,
   LabSubmissionHistoryItem,
+  LabSubmissionId,
   LabSubmissionResult,
   LabSubmissionSummary
 } from '../../types/lab';
@@ -825,7 +826,7 @@ async function submitReport() {
 }
 
 async function refreshLatestEvaluationResult(
-  submissionId: number,
+  submissionId: LabSubmissionId,
   generation = loadGeneration,
   pollStartedAt = Date.now()
 ) {
@@ -1037,7 +1038,7 @@ function validateStudentLabResult(
   result: Awaited<ReturnType<typeof getLabResult>>,
   labId: number,
   studentId: number,
-  submissionId: number
+  submissionId: LabSubmissionId
 ) {
   if (currentUser.value?.id !== studentId
     || result.labId !== labId
@@ -1230,7 +1231,7 @@ function isCurrentSubmission(generation: number, editorGeneration: number, labId
 function isCurrentReportRequest(generation: number, editorGeneration: number, labId: number) {
   return isCurrentLoad(generation, labId) && editorGeneration === reportGeneration && mode.value === 'submit';
 }
-function isCurrentEvaluationRequest(generation: number, submissionId: number, requestGeneration: number) {
+function isCurrentEvaluationRequest(generation: number, submissionId: LabSubmissionId, requestGeneration: number) {
   return isCurrentLoad(generation)
     && requestGeneration === evaluationRequestGeneration
     && latestSubmission.value?.submissionId === submissionId;
