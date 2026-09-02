@@ -8,6 +8,7 @@ import type {
   CourseAnnouncement,
   AnnouncementPayload,
   CourseHomeSummary,
+  CourseMemberPage,
   CoursePayload,
   CoursePermission,
   CourseResource,
@@ -56,9 +57,16 @@ export function joinCourse(courseId: number, payload?: CourseJoinPayload) {
   });
 }
 
-export function listCourseMembers(courseId: number, status?: CourseMember['status']) {
+export async function listCourseMembers(courseId: number, status?: CourseMember['status']): Promise<CourseMember[]> {
   const params = status ? `?status=${status}` : '';
-  return request<CourseMember[]>(`/api/v1/courses/${courseId}/members${params}`);
+  const page = await request<CourseMember[] | CourseMemberPage>(`/api/v1/courses/${courseId}/members${params}`);
+  if (Array.isArray(page)) {
+    return page;
+  }
+  if (Array.isArray(page.items)) {
+    return page.items;
+  }
+  throw new Error('课程成员列表响应格式无效');
 }
 
 export function updateCourseMember(courseId: number, userId: number, payload: Pick<CourseMember, 'status'> & Partial<Pick<CourseMember, 'role'>>) {

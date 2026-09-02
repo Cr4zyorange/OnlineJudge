@@ -302,7 +302,7 @@ async function loadPage() {
     return;
   }
 
-  if (statisticsResult.value.labId !== targetLabId || statisticsResult.value.courseId !== targetCourseId) {
+  if (statisticsResult.value.labId !== targetLabId || Number(statisticsResult.value.courseId) !== targetCourseId) {
     errorMessage.value = '实验统计归属与当前页面不一致，请重新加载。';
     loading.value = false;
     return;

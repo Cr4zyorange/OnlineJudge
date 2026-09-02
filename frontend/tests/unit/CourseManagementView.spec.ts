@@ -134,6 +134,51 @@ describe('CourseManagementView', () => {
     expect(wrapper.get('[data-testid="course-detail-page"] h1').text()).toBe('软件工程基础');
   });
 
+  it('keeps the teacher management actions visible when the documented member endpoint returns its paged envelope', async () => {
+    window.history.replaceState({}, '', '/courses/1');
+    const page = {
+      code: '0',
+      message: 'success',
+      data: { list: [course], total: 1, page: 0, size: 20 }
+    };
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === '/api/v1/courses/1') {
+        return { ok: true, json: async () => ({ code: '0', message: 'success', data: course }) };
+      }
+      if (url.includes('/home-summary')) {
+        return { ok: true, json: async () => homeSummary(course) };
+      }
+      if (url.includes('/members')) {
+        return {
+          ok: true,
+          json: async () => ({
+            code: '0',
+            message: 'success',
+            data: { items: [{ userId: 101, role: 'TEACHER', status: 'ACTIVE' }], page: 0, size: 50, total: 1 }
+          })
+        };
+      }
+      if (url.includes('/chapters') || url.includes('/resources')) {
+        return { ok: true, json: async () => ({ code: '0', message: 'success', data: [] }) };
+      }
+      return { ok: true, json: async () => page };
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const wrapper = mount(CourseManagementView);
+    await flushPromises();
+
+    expect(wrapper.find('[data-testid="course-detail-page"]').exists()).toBe(true);
+    await vi.waitFor(() => expect(wrapper.get('[data-testid="course-detail-page"]').text()).toContain('教师 101'));
+    expect(wrapper.get('[data-testid="course-detail-page"]').text()).not.toContain('课程成员列表响应格式无效');
+    expect(wrapper.get('[data-testid="course-detail-page"]').findAll('button').map((button) => button.text())).toEqual(expect.arrayContaining([
+      expect.stringContaining('管理章节'),
+      expect.stringContaining('管理资源'),
+      expect.stringContaining('管理公告')
+    ]));
+  });
+
   it('delegates course entry to Vue Router when mounted in the routed application', async () => {
     const page = {
       code: '0',

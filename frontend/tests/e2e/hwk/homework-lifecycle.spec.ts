@@ -203,15 +203,18 @@ test.describe('@hwk HWK 真实业务闭环', () => {
     await expect(page.getByTestId('published-review')).toContainText('最终得分 88');
     await expect(page.getByTestId('published-review')).toContainText(reviewComment);
 
-    const scorePublishedNotifications = await apiData<NotificationPage>(await request.get(
-      '/api/v1/notifications?page=1&size=100',
-      { headers: await authorizationHeaders(page) }
-    ));
-    expect(scorePublishedNotifications.records).toContainEqual(expect.objectContaining({
-      sourceModule: 'HWK',
-      sourceId: homeworkId,
-      title: 'homework score published'
-    }));
+    const notificationHeaders = await authorizationHeaders(page);
+    await expect.poll(async () => {
+      const notifications = await apiData<NotificationPage>(await request.get(
+        '/api/v1/notifications?page=1&size=100',
+        { headers: notificationHeaders }
+      ));
+      return notifications.records.some((notification) => (
+        notification.sourceModule === 'HWK'
+          && notification.sourceId === homeworkId
+          && notification.title === 'homework score published'
+      ));
+    }, { intervals: [100, 250, 500, 1_000], timeout: 15_000 }).toBe(true);
   });
 
   test('多类型提交验证代码后台评测并覆盖附件异常、过期、越权与重评', async ({

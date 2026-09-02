@@ -120,6 +120,21 @@ describe('LabStatisticsView', () => {
     ]));
   });
 
+  it('renders statistics when Assessment serializes the matching course ID as a string', async () => {
+    vi.mocked(labApi.getLabDetail).mockResolvedValueOnce(lab);
+    vi.mocked(labApi.getLabStatistics).mockResolvedValueOnce({
+      ...statistics,
+      courseId: '101' as unknown as number
+    });
+    vi.mocked(learningProgressApi.getTeacherLearningProgress).mockResolvedValueOnce(courseProgress);
+
+    const wrapper = mountView();
+    await flushPromises();
+
+    expect(wrapper.find('[role="alert"]').exists()).toBe(false);
+    expect(wrapper.get('[data-testid="summary-submitted"]').text()).toContain('18');
+  });
+
   it('keeps the statistics usable when student names cannot be synchronized', async () => {
     vi.mocked(labApi.getLabDetail).mockResolvedValueOnce(lab);
     vi.mocked(labApi.getLabStatistics).mockResolvedValueOnce({
