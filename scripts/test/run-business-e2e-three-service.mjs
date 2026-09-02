@@ -82,6 +82,14 @@ export function createGrdSummaryFixtureLabPayload() {
   };
 }
 
+export function normalizeBareLabCreateResponse(body) {
+  const labId = Number(body?.id ?? body?.labId);
+  if (!Number.isSafeInteger(labId) || labId <= 0) {
+    throw new Error('Assessment bare LAB create response must contain a positive numeric id');
+  }
+  return { data: { id: labId } };
+}
+
 export function redact(value, secrets) {
   return secrets.reduce((result, secret) => {
     if (!secret) {
@@ -153,13 +161,19 @@ async function writePrivateFile(path, content) {
   }
 }
 
-async function requestEnvelope(baseUrl, path, options, label) {
+async function requestEnvelope(baseUrl, path, options, label, normalizeBareSuccess) {
   const response = await fetch(new URL(path, `${baseUrl}/`), options);
   const body = await response.json().catch(() => null);
-  if (!response.ok || body?.code !== '0') {
+  if (!response.ok || (body?.code !== undefined && body.code !== '0')) {
     throw new Error(`${label}: HTTP ${response.status} ${JSON.stringify(body)}`);
   }
-  return body;
+  if (body?.code === '0') {
+    return body;
+  }
+  if (normalizeBareSuccess) {
+    return normalizeBareSuccess(body);
+  }
+  throw new Error(`${label}: HTTP ${response.status} ${JSON.stringify(body)}`);
 }
 
 async function bootstrapScenarioCourse(context, artifactDir) {
@@ -213,7 +227,7 @@ async function bootstrapScenarioCourse(context, artifactDir) {
     method: 'POST',
     headers: teacherHeaders,
     body: JSON.stringify(createGrdSummaryFixtureLabPayload())
-  }, 'bootstrap GRD source LAB');
+  }, 'bootstrap GRD source LAB', normalizeBareLabCreateResponse);
   const fixtureLabId = parsePositiveIdentifier(fixtureLab, 'GRD source LAB');
   await requestEnvelope(context.baseUrl, `/api/v1/labs/${fixtureLabId}/publish`, {
     method: 'POST',

@@ -6,6 +6,7 @@ import test from 'node:test';
 import {
   createGrdSummaryFixtureLabPayload,
   isSuccessfulSummary,
+  normalizeBareLabCreateResponse,
   parseStudentGradeSummaryIdentifier,
   parsePositiveIdentifier,
   redact,
@@ -42,6 +43,12 @@ test('builds the GRD source LAB fixture with an RFC 3339 deadline required by As
   assert.equal(payload.evaluationMode, 'MANUAL');
   assert.equal(payload.autoEvaluate, false);
   assert.deepEqual(payload.testcases, []);
+});
+
+test('normalizes Assessment bare 201 LAB creation responses into the bootstrap envelope', () => {
+  const normalized = normalizeBareLabCreateResponse({ labId: 314, id: 314, status: 'DRAFT' });
+  assert.deepEqual(normalized, { data: { id: 314 } });
+  assert.throws(() => normalizeBareLabCreateResponse({ labId: 0 }), /LAB.*positive/i);
 });
 
 test('rejects a context that is not a nine-workload loopback platform', () => {
