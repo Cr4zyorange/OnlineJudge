@@ -79,8 +79,12 @@ cleanup() {
     if ! "${compose[@]}" down --volumes --remove-orphans > "$output_dir/cleanup-command.log" 2>&1; then
       cleanup_status=1
     fi
-    mapfile -t cleanup_containers < <("${compose[@]}" ps --all --format '{{.Name}}' 2>/dev/null || true)
-    mapfile -t cleanup_volumes < <(docker volume ls --quiet --filter "label=com.docker.compose.project=$project_name" 2>/dev/null || true)
+    while IFS= read -r cleanup_container; do
+      [[ -n "$cleanup_container" ]] && cleanup_containers+=("$cleanup_container")
+    done < <("${compose[@]}" ps --all --format '{{.Name}}' 2>/dev/null || true)
+    while IFS= read -r cleanup_volume; do
+      [[ -n "$cleanup_volume" ]] && cleanup_volumes+=("$cleanup_volume")
+    done < <(docker volume ls --quiet --filter "label=com.docker.compose.project=$project_name" 2>/dev/null || true)
     if ((${#cleanup_containers[@]} || ${#cleanup_volumes[@]})); then
       cleanup_status=1
     fi
@@ -229,10 +233,16 @@ with open(sys.argv[1], "w", encoding="utf-8") as output:
     output.write("\n")
 PY
 if ((${#after_ready_command[@]})); then
-  E2E_BASE_URL="$base_url" \
-  E2E_THREE_SERVICE_CONTEXT_FILE="$context_file" \
-  E2E_THREE_SERVICE_PROJECT="$project_name" \
-    "${after_ready_command[@]}"
+  if E2E_BASE_URL="$base_url" \
+    E2E_THREE_SERVICE_CONTEXT_FILE="$context_file" \
+    E2E_THREE_SERVICE_PROJECT="$project_name" \
+      "${after_ready_command[@]}"; then
+    collect_diagnostics after-ready-success
+  else
+    after_ready_status=$?
+    collect_diagnostics after-ready-failure
+    exit "$after_ready_status"
+  fi
 fi
 
 ready_count="$(python3 - "$output_dir/compose-ps-success.json" <<'PY'

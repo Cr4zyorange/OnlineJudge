@@ -92,6 +92,19 @@ class DisposableEnvironmentScriptsTest(unittest.TestCase):
         self.assertIn('"${after_ready_command[@]}"', source)
         self.assertNotIn('eval "$after_ready', source)
 
+    def test_run_command_cleanup_works_with_macos_bash_and_records_remaining_resources(self) -> None:
+        source = self.assert_help(RUN)
+        self.assertNotIn("mapfile -t cleanup_", source)
+        self.assertIn("while IFS= read -r cleanup_container; do", source)
+        self.assertIn("while IFS= read -r cleanup_volume; do", source)
+        self.assertIn("cleanup-summary.json", source)
+
+    def test_run_command_collects_post_hook_diagnostics_before_propagating_failure(self) -> None:
+        source = self.assert_help(RUN)
+        self.assertIn("collect_diagnostics after-ready-success", source)
+        self.assertIn("collect_diagnostics after-ready-failure", source)
+        self.assertIn("exit \"$after_ready_status\"", source)
+
     def test_rollback_command_requires_an_immutable_artifact_manifest(self) -> None:
         source = self.assert_help(ROLLBACK)
         self.assertIn("artifact-manifest.json", source)
