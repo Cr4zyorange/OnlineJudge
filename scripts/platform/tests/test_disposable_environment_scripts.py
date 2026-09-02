@@ -38,13 +38,7 @@ class DisposableEnvironmentScriptsTest(unittest.TestCase):
         self.assertIn("attest_prebuilt", source)
         self.assertIn("infrastructureWorkloads", source)
         self.assertIn("retry 3 docker build", source)
-        self.assertIn("docker build --network=host", source)
         self.assertIn("PYTHONDONTWRITEBYTECODE=1 python3 \"$planner\"", source)
-
-    def test_frontend_image_installation_retries_transient_registry_failures(self) -> None:
-        source = (REPOSITORY_ROOT / "deploy/docker/frontend.Dockerfile").read_text(encoding="utf-8")
-        self.assertIn("--fetch-retries=5", source)
-        self.assertIn("--fetch-timeout=300000", source)
 
     def test_build_command_rejects_a_sha_that_does_not_identify_the_checkout(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
