@@ -99,6 +99,8 @@ assert grade_start < worker_start, "Grade consumer must be ready before Assessme
 PY
 grep -Fq -- 'duplicateDecision' "$runner" \
   || fail 'runner must prove duplicate delivery is a no-op'
+grep -Fq -- 'sourceTransport=real-rabbitmq' "$runner" \
+  || fail 'runner must record that source recovery used the real RabbitMQ consumer'
 grep -Fq -- 'cached-jwt-query' "$runner" \
   || fail 'runner must exercise a protected read with the pre-obtained JWT'
 grep -Fq -- 'OJ314_RAW_LOG_PATH' "$repo_root/scripts/test/verify-issue-314-recovery-disposable.sh" \

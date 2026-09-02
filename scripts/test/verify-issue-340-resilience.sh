@@ -493,7 +493,7 @@ PY
     local source_id="issue340-${run_id##*-}" student_id="issue340-student-${run_id##*-}"
     local course_id="issue340-course-${run_id##*-}" source_event_id correlation_id aggregate_id occurred_at source_payload
     local source_grade_revision=0 source_outbox_state_before=UNKNOWN source_fact_count=0
-    local grade_inbox_status=UNKNOWN grade_projection_count=0 duplicate_decision=NOT_ATTEMPTED
+    local grade_inbox_status=UNKNOWN grade_projection_count=0 duplicate_decision=NOT_ATTEMPTED initial_publish_decision=NOT_ATTEMPTED
     local duplicate_inbox_before=0 duplicate_inbox_after=0 duplicate_projection_before=0 duplicate_projection_after=0
     mkdir -p "$dir"
     before_status="$(compose_state grade-service 2>/dev/null || true)"
@@ -545,6 +545,15 @@ PY
     fi
     if [[ "$worker_started" == 1 ]]; then wait_healthy assessment-worker || worker_started=0; fi
     if [[ "$recovery_state" == healthy && "$fixture_status" == PASS ]]; then
+      # Exercise the real Grade consumer with the exact persisted envelope.
+      # The worker relay may race the consumer startup in a disposable run;
+      # publishing after Grade is healthy makes the recovery proof deterministic
+      # while retaining the same event identity for the duplicate assertion.
+      if publish_duplicate_event "$source_payload" >"$dir/initial-publish.log" 2>&1; then
+        initial_publish_decision=published
+      else
+        initial_publish_decision=publish-failed
+      fi
       if wait_for_db_value 'Grade inbox status' APPLIED oj_grade "SELECT processing_status FROM grade_event_inbox WHERE event_id='$source_event_id';"; then
         grade_inbox_status=APPLIED
       fi
@@ -564,7 +573,7 @@ PY
         duplicate_decision=publish-failed
       fi
     fi
-    if [[ "$recovery_state" == healthy && "$recovery_seconds" -le "$timeout_seconds" && "$during_status" == *'probe=unavailable'* && "$peer_status" == healthy && "$query_status" == PASS && "$fixture_status" == PASS && "$grade_inbox_status" == APPLIED && "$grade_projection_count" == 1 && "$duplicate_decision" == no-op ]]; then
+    if [[ "$recovery_state" == healthy && "$recovery_seconds" -le "$timeout_seconds" && "$during_status" == *'probe=unavailable'* && "$peer_status" == healthy && "$query_status" == PASS && "$fixture_status" == PASS && "$initial_publish_decision" == published && "$grade_inbox_status" == APPLIED && "$grade_projection_count" == 1 && "$duplicate_decision" == no-op ]]; then
       status=PASS
     else
       status=FAIL
@@ -572,8 +581,8 @@ PY
     record_scenario "$id" "$status" \
       "service=grade-service state=$before_status; Assessment source fact=$source_fact_count eventId=$source_event_id revision=$source_grade_revision outbox=$source_outbox_state_before" \
       "service=grade-service state=$during_status; sourceGradeEventId=$source_event_id sourceGradeRevision=$source_grade_revision sourceGradeOutboxStateBefore=$source_outbox_state_before query=$query_status" \
-      "service=grade-service state=$recovery_state; gradeInboxStatus=$grade_inbox_status gradeProjectionCount=$grade_projection_count duplicateDecision=$duplicate_decision recoverySeconds=$recovery_seconds" \
-      "compose=${dir#$repo_root/}; sourceGradeEventId=$source_event_id; sourceGradeRevision=$source_grade_revision; sourceGradeOutboxStateBefore=$source_outbox_state_before; gradeInboxStatus=$grade_inbox_status; gradeProjectionCount=$grade_projection_count; duplicateDecision=$duplicate_decision; duplicateInbox=$duplicate_inbox_before/$duplicate_inbox_after; duplicateProjection=$duplicate_projection_before/$duplicate_projection_after; recoverySeconds=$recovery_seconds"
+      "service=grade-service state=$recovery_state; sourceTransport=real-rabbitmq initialPublish=$initial_publish_decision gradeInboxStatus=$grade_inbox_status gradeProjectionCount=$grade_projection_count duplicateDecision=$duplicate_decision recoverySeconds=$recovery_seconds" \
+      "compose=${dir#$repo_root/}; sourceGradeEventId=$source_event_id; sourceGradeRevision=$source_grade_revision; sourceGradeOutboxStateBefore=$source_outbox_state_before; sourceTransport=real-rabbitmq; initialPublish=$initial_publish_decision; gradeInboxStatus=$grade_inbox_status; gradeProjectionCount=$grade_projection_count; duplicateDecision=$duplicate_decision; duplicateInbox=$duplicate_inbox_before/$duplicate_inbox_after; duplicateProjection=$duplicate_projection_before/$duplicate_projection_after; recoverySeconds=$recovery_seconds"
   }
   grade_down_source_fixture
 
