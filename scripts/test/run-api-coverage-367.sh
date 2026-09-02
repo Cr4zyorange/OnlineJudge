@@ -65,18 +65,22 @@ fail() {
   exit 1
 }
 
-printf '\n=== 1/5 inventory + mapping ===\n' | tee "$artifact_dir/coverage.log"
+printf '\n=== 1/6 inventory + mapping ===\n' | tee "$artifact_dir/coverage.log"
 node "$repo_root/tests/api/api-coverage.mjs" all 2>&1 | tee -a "$artifact_dir/coverage.log"
 unmapped="$(node -e 'const r=require(process.argv[1]); process.stdout.write(String(r.totals.unmapped))' "$repo_root/tests/api/coverage-report.json")"
 total="$(node -e 'const r=require(process.argv[1]); process.stdout.write(String(r.totals.endpoints))' "$repo_root/tests/api/coverage-report.json")"
 [[ "$unmapped" == "0" ]] || fail "unmapped endpoints = $unmapped"
 record "coverage" "PASS" "endpoints=$total unmapped=$unmapped"
 
-printf '\n=== 2/5 gateway static route ownership ===\n' | tee -a "$artifact_dir/coverage.log"
+printf '\n=== 2/6 mapping regression self-test ===\n' | tee -a "$artifact_dir/coverage.log"
+node "$repo_root/tests/api/api-coverage.test.mjs" 2>&1 | tee -a "$artifact_dir/coverage.log"
+record "mapping-regression" "PASS" "shared paths distinct; gateway mappings executed only"
+
+printf '\n=== 3/6 gateway static route ownership ===\n' | tee -a "$artifact_dir/coverage.log"
 node "$repo_root/tests/api/api-coverage.mjs" gateway-static 2>&1 | tee -a "$artifact_dir/coverage.log"
 record "gateway-static" "PASS" "route ownership verified against gateway.conf.template"
 
-printf '\n=== 3/5 service test suites ===\n' | tee -a "$artifact_dir/coverage.log"
+printf '\n=== 4/6 service test suites ===\n' | tee -a "$artifact_dir/coverage.log"
 > "$service_summary"
 run_suite() {
   local service="$1"
@@ -119,7 +123,7 @@ else
 fi
 run_suite grade "$repo_root/services/grade/pom.xml"
 
-printf '\n=== 4/5 gateway runtime smoke (disposable) ===\n' | tee -a "$artifact_dir/coverage.log"
+printf '\n=== 5/6 gateway runtime smoke (disposable) ===\n' | tee -a "$artifact_dir/coverage.log"
 if docker info >/dev/null 2>&1; then
   bash "$repo_root/scripts/gateway/tests/gateway-runtime.test.sh" 2>&1 | tee "$gateway_runtime_log"
   record "gateway-runtime" "PASS" "disposable four-upstream runtime smoke passed"
@@ -128,7 +132,7 @@ else
   record "gateway-runtime" "BLOCKED" "Docker engine unavailable; static route ownership passed"
 fi
 
-printf '\n=== 5/5 summary ===\n' | tee -a "$artifact_dir/coverage.log"
+printf '\n=== 6/6 summary ===\n' | tee -a "$artifact_dir/coverage.log"
 node -e '
   const fs = require("fs");
   const summary = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));

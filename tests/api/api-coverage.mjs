@@ -249,13 +249,23 @@ function extractInventory() {
     });
   }
 
+  // Service-dimension keys: identical method+path routes in different services
+  // (e.g. Assessment/Grade/Gateway GET /health/ready) must never merge.
   const byKey = new Map();
   for (const endpoint of endpoints) {
-    const key = `${endpoint.method} ${endpoint.path}`;
+    const key = `${endpoint.service}|${endpoint.method} ${endpoint.path}`;
     if (!byKey.has(key)) byKey.set(key, []);
     byKey.get(key).push(endpoint);
   }
-  const unique = [...byKey.values()].map((group) => group[0]);
+  const unique = [...byKey.values()].map((group) => {
+    const first = group[0];
+    if (group.length > 1) {
+      const controllers = [...new Set(group.map((entry) => entry.controller))];
+      first.notes = `${group.length} handler mappings: ${controllers.join(", ")}`;
+      first.controller = controllers.join(", ");
+    }
+    return first;
+  });
   unique.sort((a, b) => a.service.localeCompare(b.service) || a.path.localeCompare(b.path) || a.method.localeCompare(b.method));
   unique.forEach((endpoint, index) => {
     endpoint.id = `API-${endpoint.service.toUpperCase()}-${String(index + 1).padStart(3, "0")}`;
@@ -382,7 +392,7 @@ function pathLiteralMatches(endpointPath, literal) {
 }
 
 function scanTests(endpoints) {
-  const mapping = new Map(); // "method path" -> [{file, method, line}]
+  const mapping = new Map(); // "service|method path" -> [{file, method, line}]
   for (const [service, config] of Object.entries(SERVICES)) {
     for (const file of walk(config.testDir)) {
       const source = readFileSync(file, "utf8");
@@ -434,7 +444,7 @@ function scanTests(endpoints) {
           }
         }
         for (const endpoint of serviceEndpoints) {
-          const key = `${endpoint.method} ${endpoint.path}`;
+          const key = `${endpoint.service}|${endpoint.method} ${endpoint.path}`;
           const matched = calls.some(({ verb, literal }) =>
             (endpoint.method === "ANY" || endpoint.method === verb) &&
             pathLiteralMatches(endpoint.path, literal.split("?")[0])
@@ -457,22 +467,38 @@ function scanTests(endpoints) {
       }
     }
   }
-  // Gateway endpoints map to the gateway runtime test plus render/verify scripts.
-  const gatewayTest = {
-    file: "scripts/gateway/tests/gateway-runtime.test.sh",
-    method: "gateway-runtime.test",
-    line: 1,
-  };
-  const gatewayConfigTest = {
-    file: "scripts/gateway/tests/kind-gateway-config.test.sh",
-    method: "kind-gateway-config.test",
-    line: 1,
+  // Gateway endpoints map only to requests the runtime smoke actually sends.
+  // Evidence is per endpoint; kind-gateway-config.test.sh performs no HTTP
+  // requests and is therefore never an executed API test mapping.
+  const gatewayRuntimePath = join(root, "scripts/gateway/tests/gateway-runtime.test.sh");
+  const gatewayRunnerPath = join(root, "scripts/test/run-api-coverage-367.sh");
+  const gatewayRuntimeSource = readFileSync(gatewayRuntimePath, "utf8");
+  const gatewayRunnerSource = readFileSync(gatewayRunnerPath, "utf8");
+  const gatewayEvidence = {
+    "GET /health/startup": ["request GET /health/startup 200"],
+    "GET /health/live": ["$gateway/health/live"],
+    "GET /health/ready": ["request GET /health/ready 200"],
+    "ANY /internal/v2/*": ["request GET /internal/v2/source-grades 404"],
+    "ANY /api/*": ["request GET /api/v1/unknown 404"],
+    "ANY /gateway-error/413": ["request POST /api/v1/auth/oversize 413"],
+    "ANY /gateway-error/429": ["429", "rate-limit"],
+    "ANY /gateway-error/502": ["request POST /api/v1/homeworks/unavailable 502"],
+    "ANY /gateway-error/503": ["request GET /api/v1/grades/controlled-unavailable 503"],
+    "ANY /gateway-error/504": ["request GET /api/v1/notifications/slow 504"],
   };
   for (const endpoint of endpoints.filter((e) => e.service === "gateway")) {
-    const key = `${endpoint.method} ${endpoint.path}`;
+    const key = `${endpoint.service}|${endpoint.method} ${endpoint.path}`;
+    const evidence = gatewayEvidence[`${endpoint.method} ${endpoint.path}`] || [];
+    const executed = evidence.length > 0
+        && evidence.every((token) => gatewayRuntimeSource.includes(token))
+        && gatewayRunnerSource.includes("scripts/gateway/tests/gateway-runtime.test.sh");
+    if (!executed) continue;
     if (!mapping.has(key)) mapping.set(key, []);
-    mapping.get(key).push(gatewayTest);
-    mapping.get(key).push(gatewayConfigTest);
+    mapping.get(key).push({
+      file: "scripts/gateway/tests/gateway-runtime.test.sh",
+      method: "gateway-runtime.test",
+      line: gatewayRuntimeSource.split(/\r?\n/).findIndex((line) => evidence.some((token) => line.includes(token))) + 1,
+    });
   }
   return mapping;
 }
@@ -501,14 +527,14 @@ function run(subcommand) {
     const { mapping } = JSON.parse(readFileSync(mappingPath, "utf8"));
     const unmapped = [];
     for (const endpoint of endpoints) {
-      const key = `${endpoint.method} ${endpoint.path}`;
+      const key = `${endpoint.service}|${endpoint.method} ${endpoint.path}`;
       if (!mapping[key] || mapping[key].length === 0) unmapped.push(endpoint);
     }
     const byService = {};
     for (const endpoint of endpoints) {
       byService[endpoint.service] = byService[endpoint.service] || { total: 0, mapped: 0, unmapped: 0 };
       byService[endpoint.service].total += 1;
-      const key = `${endpoint.method} ${endpoint.path}`;
+      const key = `${endpoint.service}|${endpoint.method} ${endpoint.path}`;
       if (mapping[key] && mapping[key].length) byService[endpoint.service].mapped += 1;
       else byService[endpoint.service].unmapped += 1;
     }

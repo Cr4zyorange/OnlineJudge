@@ -1,8 +1,8 @@
 {
-  "generatedAt": "2026-09-02T06:12:40.559Z",
+  "generatedAt": "2026-09-02T07:23:43.963Z",
   "totals": {
-    "endpoints": 122,
-    "mapped": 122,
+    "endpoints": 124,
+    "mapped": 124,
     "unmapped": 0
   },
   "byService": {
@@ -17,13 +17,13 @@
       "unmapped": 0
     },
     "gateway": {
-      "total": 9,
-      "mapped": 9,
+      "total": 10,
+      "mapped": 10,
       "unmapped": 0
     },
     "grade": {
-      "total": 21,
-      "mapped": 21,
+      "total": 22,
+      "mapped": 22,
       "unmapped": 0
     },
     "identity": {

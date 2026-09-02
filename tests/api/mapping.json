@@ -1,7 +1,7 @@
 {
-  "generatedAt": "2026-09-02T06:12:40.553Z",
+  "generatedAt": "2026-09-02T07:23:43.931Z",
   "mapping": {
-    "GET /api/v1/admin/permissions": [
+    "identity|GET /api/v1/admin/permissions": [
       {
         "file": "services/identity/src/test/java/com/onlinejudge/auth/AdminPermissionsApiTest.java",
         "method": "adminCanListAllPermissionCodesThroughHttpApi",
@@ -13,14 +13,14 @@
         "line": 113
       }
     ],
-    "GET /api/v1/admin/users": [
+    "identity|GET /api/v1/admin/users": [
       {
         "file": "services/identity/src/test/java/com/onlinejudge/auth/AdminPermissionsApiTest.java",
         "method": "adminCanListUsersThroughHttpApiAndResponseHidesPasswordFields",
         "line": 69
       }
     ],
-    "GET /api/v1/admin/roles": [
+    "identity|GET /api/v1/admin/roles": [
       {
         "file": "services/identity/src/test/java/com/onlinejudge/auth/AdminPermissionsApiTest.java",
         "method": "adminCanCreateRoleThroughHttpApiAndRoleListIncludesIt",
@@ -42,14 +42,14 @@
         "line": 342
       }
     ],
-    "POST /api/v1/admin/roles": [
+    "identity|POST /api/v1/admin/roles": [
       {
         "file": "services/identity/src/test/java/com/onlinejudge/auth/AdminPermissionsApiTest.java",
         "method": "adminCanCreateRoleThroughHttpApiAndRoleListIncludesIt",
         "line": 88
       }
     ],
-    "PUT /api/v1/admin/roles/{roleId}/permissions": [
+    "identity|PUT /api/v1/admin/roles/{roleId}/permissions": [
       {
         "file": "services/identity/src/test/java/com/onlinejudge/auth/AuthAdminControllerTest.java",
         "method": "adminAssignsUserRolesAndRolePermissionsWithAuditLogs",
@@ -61,21 +61,21 @@
         "line": 194
       }
     ],
-    "PUT /api/v1/admin/users/{userId}/roles": [
+    "identity|PUT /api/v1/admin/users/{userId}/roles": [
       {
         "file": "services/identity/src/test/java/com/onlinejudge/auth/AuthAdminControllerTest.java",
         "method": "adminAssignsUserRolesAndRolePermissionsWithAuditLogs",
         "line": 66
       }
     ],
-    "GET /api/v1/admin/audit-logs": [
+    "identity|GET /api/v1/admin/audit-logs": [
       {
         "file": "services/identity/src/test/java/com/onlinejudge/auth/AuthAdminControllerTest.java",
         "method": "adminQueriesAuditLogsWithOperationResultOperatorAndTimeFilters",
         "line": 107
       }
     ],
-    "POST /api/v1/auth/login": [
+    "identity|POST /api/v1/auth/login": [
       {
         "file": "services/identity/src/test/java/com/onlinejudge/auth/AuthAdminControllerTest.java",
         "method": "adminQueriesAuditLogsWithOperationResultOperatorAndTimeFilters",
@@ -137,14 +137,14 @@
         "line": 38
       }
     ],
-    "PUT /api/v1/admin/users/{userId}/status": [
+    "identity|PUT /api/v1/admin/users/{userId}/status": [
       {
         "file": "services/identity/src/test/java/com/onlinejudge/auth/AuthAdminControllerTest.java",
         "method": "adminDisablingAccountRevokesExistingSessionsAndReportsAccountStatusError",
         "line": 211
       }
     ],
-    "GET /api/v1/users/me": [
+    "identity|GET /api/v1/users/me": [
       {
         "file": "services/identity/src/test/java/com/onlinejudge/auth/AuthAdminControllerTest.java",
         "method": "adminDisablingAccountRevokesExistingSessionsAndReportsAccountStatusError",
@@ -176,7 +176,7 @@
         "line": 489
       }
     ],
-    "POST /api/v1/admin/users": [
+    "identity|POST /api/v1/admin/users": [
       {
         "file": "services/identity/src/test/java/com/onlinejudge/auth/AuthAdminControllerTest.java",
         "method": "adminCreateUserRollsBackWhenRoleIdDoesNotExist",
@@ -188,7 +188,7 @@
         "line": 263
       }
     ],
-    "PUT /api/v1/admin/roles": [
+    "identity|PUT /api/v1/admin/roles": [
       {
         "file": "services/identity/src/test/java/com/onlinejudge/auth/AuthAdminControllerTest.java",
         "method": "adminUpdatesRoleThroughDocumentedCollectionEndpoint",
@@ -200,7 +200,7 @@
         "line": 321
       }
     ],
-    "GET /api/v1/auth/me": [
+    "identity|GET /api/v1/auth/me": [
       {
         "file": "services/identity/src/test/java/com/onlinejudge/auth/AuthAdminControllerTest.java",
         "method": "disablingRoleAdvancesEveryAffectedSecurityVersionAndInvalidatesOldJwtOffline",
@@ -242,7 +242,7 @@
         "line": 111
       }
     ],
-    "POST /api/v1/auth/logout": [
+    "identity|POST /api/v1/auth/logout": [
       {
         "file": "services/identity/src/test/java/com/onlinejudge/auth/AuthControllerTest.java",
         "method": "userRegistersLogsInReadsCurrentUserAndLogoutRevokesToken",
@@ -269,7 +269,7 @@
         "line": 55
       }
     ],
-    "POST /api/v1/auth/register": [
+    "identity|POST /api/v1/auth/register": [
       {
         "file": "services/identity/src/test/java/com/onlinejudge/auth/AuthControllerTest.java",
         "method": "userRegistersLogsInReadsCurrentUserAndLogoutRevokesToken",
@@ -291,7 +291,7 @@
         "line": 349
       }
     ],
-    "POST /api/v1/auth/check-permission": [
+    "identity|POST /api/v1/auth/check-permission": [
       {
         "file": "services/identity/src/test/java/com/onlinejudge/auth/AuthControllerTest.java",
         "method": "checkPermissionAllowsCurrentUserPermission",
@@ -308,7 +308,7 @@
         "line": 326
       }
     ],
-    "PUT /api/v1/users/me": [
+    "identity|PUT /api/v1/users/me": [
       {
         "file": "services/identity/src/test/java/com/onlinejudge/auth/AuthControllerTest.java",
         "method": "malformedAuthJsonReturnsSafeValidationErrorWithoutInternalDetails",
@@ -325,7 +325,7 @@
         "line": 428
       }
     ],
-    "PUT /api/v1/users/me/password": [
+    "identity|PUT /api/v1/users/me/password": [
       {
         "file": "services/identity/src/test/java/com/onlinejudge/auth/AuthControllerTest.java",
         "method": "malformedAuthJsonReturnsSafeValidationErrorWithoutInternalDetails",
@@ -342,14 +342,14 @@
         "line": 88
       }
     ],
-    "GET /.well-known/jwks.json": [
+    "identity|GET /.well-known/jwks.json": [
       {
         "file": "services/identity/src/test/java/com/onlinejudge/auth/IdentityJwtContractTest.java",
         "method": "publishesPublicSigningKeysAtTheStandardJwksEndpoint",
         "line": 86
       }
     ],
-    "POST /internal/v2/service-tokens": [
+    "identity|POST /internal/v2/service-tokens": [
       {
         "file": "services/identity/src/test/java/com/onlinejudge/auth/ServiceTokenControllerTest.java",
         "method": "returnsTheCanonicalErrorShapeForMalformedServiceTokenRequests",
@@ -361,7 +361,7 @@
         "line": 120
       }
     ],
-    "GET /api/v1/system/readiness": [
+    "identity|GET /api/v1/system/readiness": [
       {
         "file": "services/identity/src/test/java/com/onlinejudge/authservice/AuthReadinessFailureTest.java",
         "method": "readinessFailsSafelyWhenDatabaseIsUnavailable",
@@ -373,21 +373,21 @@
         "line": 25
       }
     ],
-    "GET /api/v1/system/health": [
+    "identity|GET /api/v1/system/health": [
       {
         "file": "services/identity/src/test/java/com/onlinejudge/authservice/AuthSystemControllerTest.java",
         "method": "exposesMinimalHealthReadinessAndVersion",
         "line": 25
       }
     ],
-    "GET /api/v1/system/version": [
+    "identity|GET /api/v1/system/version": [
       {
         "file": "services/identity/src/test/java/com/onlinejudge/authservice/AuthSystemControllerTest.java",
         "method": "exposesMinimalHealthReadinessAndVersion",
         "line": 25
       }
     ],
-    "POST /api/v1/courses/{courseId}/join": [
+    "course|POST /api/v1/courses/{courseId}/join": [
       {
         "file": "services/course/src/test/java/com/onlinejudge/courseservice/CourseApiCoverageTest.java",
         "method": "membersAndStudentsEndpointsReturnRoleScopedRoster",
@@ -464,7 +464,7 @@
         "line": 356
       }
     ],
-    "GET /api/v1/courses/{courseId}/members": [
+    "course|GET /api/v1/courses/{courseId}/members": [
       {
         "file": "services/course/src/test/java/com/onlinejudge/courseservice/CourseApiCoverageTest.java",
         "method": "membersAndStudentsEndpointsReturnRoleScopedRoster",
@@ -476,63 +476,63 @@
         "line": 123
       }
     ],
-    "GET /api/v1/courses/{courseId}/students": [
+    "course|GET /api/v1/courses/{courseId}/students": [
       {
         "file": "services/course/src/test/java/com/onlinejudge/courseservice/CourseApiCoverageTest.java",
         "method": "membersAndStudentsEndpointsReturnRoleScopedRoster",
         "line": 90
       }
     ],
-    "GET /api/v1/learning/progress/teacher": [
+    "course|GET /api/v1/learning/progress/teacher": [
       {
         "file": "services/course/src/test/java/com/onlinejudge/courseservice/CourseApiCoverageTest.java",
         "method": "learningTasksAndTeacherProgressEndpointsFollowCourseMemberContract",
         "line": 131
       }
     ],
-    "GET /api/v1/learning/tasks": [
+    "course|GET /api/v1/learning/tasks": [
       {
         "file": "services/course/src/test/java/com/onlinejudge/courseservice/CourseApiCoverageTest.java",
         "method": "learningTasksAndTeacherProgressEndpointsFollowCourseMemberContract",
         "line": 131
       }
     ],
-    "GET /api/v1/notifications": [
+    "course|GET /api/v1/notifications": [
       {
         "file": "services/course/src/test/java/com/onlinejudge/courseservice/CourseApiCoverageTest.java",
         "method": "notificationsListReadAndDeleteEndpointsReturnMutationResults",
         "line": 151
       }
     ],
-    "DELETE /api/v1/notifications/{notificationId}": [
+    "course|DELETE /api/v1/notifications/{notificationId}": [
       {
         "file": "services/course/src/test/java/com/onlinejudge/courseservice/CourseApiCoverageTest.java",
         "method": "notificationsListReadAndDeleteEndpointsReturnMutationResults",
         "line": 151
       }
     ],
-    "PUT /api/v1/notifications/read": [
+    "course|PUT /api/v1/notifications/read": [
       {
         "file": "services/course/src/test/java/com/onlinejudge/courseservice/CourseApiCoverageTest.java",
         "method": "notificationsListReadAndDeleteEndpointsReturnMutationResults",
         "line": 151
       }
     ],
-    "GET /api/v1/reminder-rules": [
+    "course|GET /api/v1/reminder-rules": [
       {
         "file": "services/course/src/test/java/com/onlinejudge/courseservice/CourseApiCoverageTest.java",
         "method": "reminderRulesEndpointReturnsStoredOverview",
         "line": 185
       }
     ],
-    "GET /version": [
+    "course|GET /version": [
       {
         "file": "services/course/src/test/java/com/onlinejudge/courseservice/CourseApiCoverageTest.java",
         "method": "versionEndpointIsPublicAndIdentifiesCourseService",
         "line": 197
       }
     ],
-    "POST /api/v1/courses": [
+    "course|POST /api/v1/courses": [
       {
         "file": "services/course/src/test/java/com/onlinejudge/courseservice/CourseServiceContractTest.java",
         "method": "bearerTeacherCreatesCourseAndTransactionalMembershipFactsWhileLearningIsUnavailable",
@@ -589,7 +589,7 @@
         "line": 356
       }
     ],
-    "GET /api/v1/courses": [
+    "course|GET /api/v1/courses": [
       {
         "file": "services/course/src/test/java/com/onlinejudge/courseservice/CourseServiceContractTest.java",
         "method": "expiredBearerTokenFailsClosedAsSessionExpired",
@@ -601,21 +601,21 @@
         "line": 393
       }
     ],
-    "GET /api/v1/courses/{courseId}": [
+    "course|GET /api/v1/courses/{courseId}": [
       {
         "file": "services/course/src/test/java/com/onlinejudge/courseservice/CourseServiceContractTest.java",
         "method": "unknownCourseDetailReturnsCourseNotFoundForAuthenticatedUser",
         "line": 254
       }
     ],
-    "GET /internal/v2/courses/{courseId}/authorizations/{userId}": [
+    "course|GET /internal/v2/courses/{courseId}/authorizations/{userId}": [
       {
         "file": "services/course/src/test/java/com/onlinejudge/courseservice/CourseServiceContractTest.java",
         "method": "internalV2AuthorizationUsesAudienceBoundServiceJwtAndReturnsCanonicalPage",
         "line": 263
       }
     ],
-    "GET /internal/v2/courses/{courseId}/members": [
+    "course|GET /internal/v2/courses/{courseId}/members": [
       {
         "file": "services/course/src/test/java/com/onlinejudge/courseservice/CourseServiceContractTest.java",
         "method": "internalV2AuthorizationUsesAudienceBoundServiceJwtAndReturnsCanonicalPage",
@@ -632,7 +632,7 @@
         "line": 1156
       }
     ],
-    "PUT /api/v1/courses/{courseId}/members/{userId}": [
+    "course|PUT /api/v1/courses/{courseId}/members/{userId}": [
       {
         "file": "services/course/src/test/java/com/onlinejudge/courseservice/CourseServiceContractTest.java",
         "method": "membershipChangePublishesPerMemberAndCompleteRosterWatermarkInTheSameCourseTransaction",
@@ -664,7 +664,7 @@
         "line": 1054
       }
     ],
-    "GET /api/v1/courses/{courseId}/announcements": [
+    "course|GET /api/v1/courses/{courseId}/announcements": [
       {
         "file": "services/course/src/test/java/com/onlinejudge/courseservice/CourseServiceContractTest.java",
         "method": "inviteEnrollmentLeaveHiddenChaptersAndAnnouncementsFollowCoursePermissions",
@@ -676,7 +676,7 @@
         "line": 718
       }
     ],
-    "POST /api/v1/courses/{courseId}/announcements": [
+    "course|POST /api/v1/courses/{courseId}/announcements": [
       {
         "file": "services/course/src/test/java/com/onlinejudge/courseservice/CourseServiceContractTest.java",
         "method": "inviteEnrollmentLeaveHiddenChaptersAndAnnouncementsFollowCoursePermissions",
@@ -693,21 +693,21 @@
         "line": 718
       }
     ],
-    "DELETE /api/v1/courses/{courseId}/announcements/{announcementId}": [
+    "course|DELETE /api/v1/courses/{courseId}/announcements/{announcementId}": [
       {
         "file": "services/course/src/test/java/com/onlinejudge/courseservice/CourseServiceContractTest.java",
         "method": "inviteEnrollmentLeaveHiddenChaptersAndAnnouncementsFollowCoursePermissions",
         "line": 393
       }
     ],
-    "PUT /api/v1/courses/{courseId}/announcements/{announcementId}": [
+    "course|PUT /api/v1/courses/{courseId}/announcements/{announcementId}": [
       {
         "file": "services/course/src/test/java/com/onlinejudge/courseservice/CourseServiceContractTest.java",
         "method": "inviteEnrollmentLeaveHiddenChaptersAndAnnouncementsFollowCoursePermissions",
         "line": 393
       }
     ],
-    "GET /api/v1/courses/{courseId}/chapters": [
+    "course|GET /api/v1/courses/{courseId}/chapters": [
       {
         "file": "services/course/src/test/java/com/onlinejudge/courseservice/CourseServiceContractTest.java",
         "method": "inviteEnrollmentLeaveHiddenChaptersAndAnnouncementsFollowCoursePermissions",
@@ -719,7 +719,7 @@
         "line": 718
       }
     ],
-    "POST /api/v1/courses/{courseId}/chapters": [
+    "course|POST /api/v1/courses/{courseId}/chapters": [
       {
         "file": "services/course/src/test/java/com/onlinejudge/courseservice/CourseServiceContractTest.java",
         "method": "inviteEnrollmentLeaveHiddenChaptersAndAnnouncementsFollowCoursePermissions",
@@ -751,7 +751,7 @@
         "line": 1054
       }
     ],
-    "POST /api/v1/courses/{courseId}/leave": [
+    "course|POST /api/v1/courses/{courseId}/leave": [
       {
         "file": "services/course/src/test/java/com/onlinejudge/courseservice/CourseServiceContractTest.java",
         "method": "inviteEnrollmentLeaveHiddenChaptersAndAnnouncementsFollowCoursePermissions",
@@ -763,7 +763,7 @@
         "line": 765
       }
     ],
-    "DELETE /api/v1/courses/{courseId}": [
+    "course|DELETE /api/v1/courses/{courseId}": [
       {
         "file": "services/course/src/test/java/com/onlinejudge/courseservice/CourseServiceContractTest.java",
         "method": "courseChapterAndResourceMutationApisRequireCourseManagerAndArchiveClosesEnrollment",
@@ -780,7 +780,7 @@
         "line": 765
       }
     ],
-    "PUT /api/v1/courses/{courseId}": [
+    "course|PUT /api/v1/courses/{courseId}": [
       {
         "file": "services/course/src/test/java/com/onlinejudge/courseservice/CourseServiceContractTest.java",
         "method": "courseChapterAndResourceMutationApisRequireCourseManagerAndArchiveClosesEnrollment",
@@ -802,14 +802,14 @@
         "line": 1026
       }
     ],
-    "DELETE /api/v1/courses/{courseId}/chapters/{chapterId}": [
+    "course|DELETE /api/v1/courses/{courseId}/chapters/{chapterId}": [
       {
         "file": "services/course/src/test/java/com/onlinejudge/courseservice/CourseServiceContractTest.java",
         "method": "courseChapterAndResourceMutationApisRequireCourseManagerAndArchiveClosesEnrollment",
         "line": 471
       }
     ],
-    "PUT /api/v1/courses/{courseId}/chapters/{chapterId}": [
+    "course|PUT /api/v1/courses/{courseId}/chapters/{chapterId}": [
       {
         "file": "services/course/src/test/java/com/onlinejudge/courseservice/CourseServiceContractTest.java",
         "method": "courseChapterAndResourceMutationApisRequireCourseManagerAndArchiveClosesEnrollment",
@@ -821,7 +821,7 @@
         "line": 978
       }
     ],
-    "POST /api/v1/courses/{courseId}/resources": [
+    "course|POST /api/v1/courses/{courseId}/resources": [
       {
         "file": "services/course/src/test/java/com/onlinejudge/courseservice/CourseServiceContractTest.java",
         "method": "courseChapterAndResourceMutationApisRequireCourseManagerAndArchiveClosesEnrollment",
@@ -858,7 +858,7 @@
         "line": 1088
       }
     ],
-    "DELETE /api/v1/courses/{courseId}/resources/{resourceId}": [
+    "course|DELETE /api/v1/courses/{courseId}/resources/{resourceId}": [
       {
         "file": "services/course/src/test/java/com/onlinejudge/courseservice/CourseServiceContractTest.java",
         "method": "courseChapterAndResourceMutationApisRequireCourseManagerAndArchiveClosesEnrollment",
@@ -875,7 +875,7 @@
         "line": 1088
       }
     ],
-    "PUT /api/v1/courses/{courseId}/resources/{resourceId}": [
+    "course|PUT /api/v1/courses/{courseId}/resources/{resourceId}": [
       {
         "file": "services/course/src/test/java/com/onlinejudge/courseservice/CourseServiceContractTest.java",
         "method": "courseChapterAndResourceMutationApisRequireCourseManagerAndArchiveClosesEnrollment",
@@ -887,7 +887,7 @@
         "line": 533
       }
     ],
-    "GET /api/v1/courses/{courseId}/resources/{resourceId}/download": [
+    "course|GET /api/v1/courses/{courseId}/resources/{resourceId}/download": [
       {
         "file": "services/course/src/test/java/com/onlinejudge/courseservice/CourseServiceContractTest.java",
         "method": "courseChapterAndResourceMutationApisRequireCourseManagerAndArchiveClosesEnrollment",
@@ -909,14 +909,14 @@
         "line": 956
       }
     ],
-    "GET /api/v1/courses/{courseId}/resources": [
+    "course|GET /api/v1/courses/{courseId}/resources": [
       {
         "file": "services/course/src/test/java/com/onlinejudge/courseservice/CourseServiceContractTest.java",
         "method": "assistantCanManageVersionedFileResourceWhileMemberDownloadsAndLogicalDeleteHidesIt",
         "line": 533
       }
     ],
-    "GET /api/v1/courses/{courseId}/home-summary": [
+    "course|GET /api/v1/courses/{courseId}/home-summary": [
       {
         "file": "services/course/src/test/java/com/onlinejudge/courseservice/CourseServiceContractTest.java",
         "method": "memberHomeSummaryReturnsCourseAnnouncementsAndLocalRecentTasksFromTheFoldedProjection",
@@ -938,7 +938,7 @@
         "line": 707
       }
     ],
-    "DELETE /api/v1/courses/{courseId}/members/{userId}": [
+    "course|DELETE /api/v1/courses/{courseId}/members/{userId}": [
       {
         "file": "services/course/src/test/java/com/onlinejudge/courseservice/CourseServiceContractTest.java",
         "method": "archivedAndClosedCoursesRejectMemberMutationsAndLeaveWhileStayingReadable",
@@ -950,77 +950,77 @@
         "line": 879
       }
     ],
-    "POST /api/v1/notifications/events": [
+    "course|POST /api/v1/notifications/events": [
       {
         "file": "services/course/src/test/java/com/onlinejudge/courseservice/LrnFoldServiceTest.java",
         "method": "notificationEventEntryIsIdempotentByEventKey",
         "line": 323
       }
     ],
-    "GET /api/v1/learning/progress": [
+    "course|GET /api/v1/learning/progress": [
       {
         "file": "services/course/src/test/java/com/onlinejudge/courseservice/LrnFoldServiceTest.java",
         "method": "learningProgressRecordTaskAndReminderApisRoundTrip",
         "line": 356
       }
     ],
-    "POST /api/v1/learning/progress": [
+    "course|POST /api/v1/learning/progress": [
       {
         "file": "services/course/src/test/java/com/onlinejudge/courseservice/LrnFoldServiceTest.java",
         "method": "learningProgressRecordTaskAndReminderApisRoundTrip",
         "line": 356
       }
     ],
-    "POST /api/v1/learning/records": [
+    "course|POST /api/v1/learning/records": [
       {
         "file": "services/course/src/test/java/com/onlinejudge/courseservice/LrnFoldServiceTest.java",
         "method": "learningProgressRecordTaskAndReminderApisRoundTrip",
         "line": 356
       }
     ],
-    "GET /api/v1/learning/statistics": [
+    "course|GET /api/v1/learning/statistics": [
       {
         "file": "services/course/src/test/java/com/onlinejudge/courseservice/LrnFoldServiceTest.java",
         "method": "learningProgressRecordTaskAndReminderApisRoundTrip",
         "line": 356
       }
     ],
-    "PUT /api/v1/reminder-rules": [
+    "course|PUT /api/v1/reminder-rules": [
       {
         "file": "services/course/src/test/java/com/onlinejudge/courseservice/LrnFoldServiceTest.java",
         "method": "learningProgressRecordTaskAndReminderApisRoundTrip",
         "line": 356
       }
     ],
-    "GET /internal/v2/learning/tasks/recent": [
+    "course|GET /internal/v2/learning/tasks/recent": [
       {
         "file": "services/course/src/test/java/com/onlinejudge/courseservice/LrnFoldServiceTest.java",
         "method": "internalLearningTasksAndReconciliationRequestsFollowTheFrozenContract",
         "line": 413
       }
     ],
-    "POST /internal/v2/notifications/reconciliation-requests": [
+    "course|POST /internal/v2/notifications/reconciliation-requests": [
       {
         "file": "services/course/src/test/java/com/onlinejudge/courseservice/LrnFoldServiceTest.java",
         "method": "internalLearningTasksAndReconciliationRequestsFollowTheFrozenContract",
         "line": 413
       }
     ],
-    "GET /health/ready": [
+    "assessment|GET /health/ready": [
       {
         "file": "services/assessment/src/test/java/com/onlinejudge/assessmentservice/AssessmentApiCoverageTest.java",
         "method": "readinessProbeReportsUpWhenDatabaseAnswers",
         "line": 69
       }
     ],
-    "POST /api/v1/evaluations/{taskId}/replay": [
+    "assessment|POST /api/v1/evaluations/{taskId}/replay": [
       {
         "file": "services/assessment/src/test/java/com/onlinejudge/assessmentservice/AssessmentApiCoverageTest.java",
         "method": "evaluationReplayRequiresRequestIdAndActiveTeacherMembership",
         "line": 76
       }
     ],
-    "GET /api/v1/evaluations/{taskId}": [
+    "assessment|GET /api/v1/evaluations/{taskId}": [
       {
         "file": "services/assessment/src/test/java/com/onlinejudge/assessmentservice/AssessmentLifecycleContractTest.java",
         "method": "submissionCreatesDurableTaskAndResultGetHasNoWorkerSideEffect",
@@ -1032,7 +1032,7 @@
         "line": 73
       }
     ],
-    "POST /api/v1/labs/{sourceId}/submissions": [
+    "assessment|POST /api/v1/labs/{sourceId}/submissions": [
       {
         "file": "services/assessment/src/test/java/com/onlinejudge/assessmentservice/AssessmentLifecycleContractTest.java",
         "method": "labEndpointPersistsUploadedBytesAndKeepsEvaluationReadsPassive",
@@ -1129,7 +1129,7 @@
         "line": 970
       }
     ],
-    "POST /api/v1/homeworks/{homeworkId}/submissions": [
+    "assessment|POST /api/v1/homeworks/{homeworkId}/submissions": [
       {
         "file": "services/assessment/src/test/java/com/onlinejudge/assessmentservice/AssessmentLifecycleContractTest.java",
         "method": "legacyHomeworkUploadCannotBypassHomeworkRulesAndDurableBusinessSubmission",
@@ -1201,7 +1201,7 @@
         "line": 490
       }
     ],
-    "POST /api/v1/submissions": [
+    "assessment|POST /api/v1/submissions": [
       {
         "file": "services/assessment/src/test/java/com/onlinejudge/assessmentservice/AssessmentLifecycleContractTest.java",
         "method": "genericSubmissionEndpointCannotBypassCanonicalHomeworkRules",
@@ -1223,7 +1223,7 @@
         "line": 54
       }
     ],
-    "POST /api/v1/homeworks": [
+    "assessment|POST /api/v1/homeworks": [
       {
         "file": "services/assessment/src/test/java/com/onlinejudge/assessmentservice/HomeworkWorkflowContractTest.java",
         "method": "teacherPublishesHomeworkAndCommitsCanonicalOutboxInTheSameLocalTransaction",
@@ -1240,7 +1240,7 @@
         "line": 490
       }
     ],
-    "PUT /api/v1/homeworks/{homeworkId}/publish": [
+    "assessment|PUT /api/v1/homeworks/{homeworkId}/publish": [
       {
         "file": "services/assessment/src/test/java/com/onlinejudge/assessmentservice/HomeworkWorkflowContractTest.java",
         "method": "teacherPublishesHomeworkAndCommitsCanonicalOutboxInTheSameLocalTransaction",
@@ -1267,7 +1267,7 @@
         "line": 490
       }
     ],
-    "GET /api/v1/submissions/{submissionId}/evaluation": [
+    "assessment|GET /api/v1/submissions/{submissionId}/evaluation": [
       {
         "file": "services/assessment/src/test/java/com/onlinejudge/assessmentservice/HomeworkWorkflowContractTest.java",
         "method": "frontendCodeTextSubmissionNeedsNoRequestIdAndReceivesTheStandardSuccessEnvelope",
@@ -1299,7 +1299,7 @@
         "line": 548
       }
     ],
-    "PUT /api/v1/homeworks/{homeworkId}/scores/publish": [
+    "assessment|PUT /api/v1/homeworks/{homeworkId}/scores/publish": [
       {
         "file": "services/assessment/src/test/java/com/onlinejudge/assessmentservice/HomeworkWorkflowContractTest.java",
         "method": "workerCompletionDefersHomeworkSourceGradeUntilTeacherPublishesScores",
@@ -1321,7 +1321,7 @@
         "line": 633
       }
     ],
-    "POST /api/v1/submissions/{submissionId}/reevaluate": [
+    "assessment|POST /api/v1/submissions/{submissionId}/reevaluate": [
       {
         "file": "services/assessment/src/test/java/com/onlinejudge/assessmentservice/HomeworkWorkflowContractTest.java",
         "method": "authorizedTeacherCanReplayOnlyATerminalFailedHomeworkEvaluation",
@@ -1353,14 +1353,14 @@
         "line": 664
       }
     ],
-    "GET /api/v1/courses/{courseId}/labs": [
+    "assessment|GET /api/v1/courses/{courseId}/labs": [
       {
         "file": "services/assessment/src/test/java/com/onlinejudge/assessmentservice/LabWorkflowContractTest.java",
         "method": "teacherCanCreateAndPublishALabBeforeStudentsCanSubmit",
         "line": 83
       }
     ],
-    "POST /api/v1/courses/{courseId}/labs": [
+    "assessment|POST /api/v1/courses/{courseId}/labs": [
       {
         "file": "services/assessment/src/test/java/com/onlinejudge/assessmentservice/LabWorkflowContractTest.java",
         "method": "teacherCanCreateAndPublishALabBeforeStudentsCanSubmit",
@@ -1482,7 +1482,7 @@
         "line": 970
       }
     ],
-    "POST /api/v1/labs/{labId}/publish": [
+    "assessment|POST /api/v1/labs/{labId}/publish": [
       {
         "file": "services/assessment/src/test/java/com/onlinejudge/assessmentservice/LabWorkflowContractTest.java",
         "method": "teacherCanCreateAndPublishALabBeforeStudentsCanSubmit",
@@ -1579,7 +1579,7 @@
         "line": 970
       }
     ],
-    "PUT /api/v1/labs/{labId}/release-scores": [
+    "assessment|PUT /api/v1/labs/{labId}/release-scores": [
       {
         "file": "services/assessment/src/test/java/com/onlinejudge/assessmentservice/LabWorkflowContractTest.java",
         "method": "manualLabSubmissionIsRecordedWithoutCreatingAnEvaluationTask",
@@ -1626,7 +1626,7 @@
         "line": 930
       }
     ],
-    "GET /api/v1/labs/{labId}/results/{studentId}": [
+    "assessment|GET /api/v1/labs/{labId}/results/{studentId}": [
       {
         "file": "services/assessment/src/test/java/com/onlinejudge/assessmentservice/LabWorkflowContractTest.java",
         "method": "manualLabSubmissionIsRecordedWithoutCreatingAnEvaluationTask",
@@ -1653,7 +1653,7 @@
         "line": 833
       }
     ],
-    "POST /api/v1/labs/{labId}/submissions/{submissionId}/evaluate": [
+    "assessment|POST /api/v1/labs/{labId}/submissions/{submissionId}/evaluate": [
       {
         "file": "services/assessment/src/test/java/com/onlinejudge/assessmentservice/LabWorkflowContractTest.java",
         "method": "manualLabSubmissionIsRecordedWithoutCreatingAnEvaluationTask",
@@ -1675,7 +1675,7 @@
         "line": 970
       }
     ],
-    "POST /api/v1/labs/{labId}/submissions/{submissionId}/score": [
+    "assessment|POST /api/v1/labs/{labId}/submissions/{submissionId}/score": [
       {
         "file": "services/assessment/src/test/java/com/onlinejudge/assessmentservice/LabWorkflowContractTest.java",
         "method": "manualLabSubmissionIsRecordedWithoutCreatingAnEvaluationTask",
@@ -1707,7 +1707,7 @@
         "line": 930
       }
     ],
-    "GET /api/v1/labs/{labId}": [
+    "assessment|GET /api/v1/labs/{labId}": [
       {
         "file": "services/assessment/src/test/java/com/onlinejudge/assessmentservice/LabWorkflowContractTest.java",
         "method": "hiddenLabTestcasesAreOmittedFromStudentDetail",
@@ -1719,7 +1719,7 @@
         "line": 602
       }
     ],
-    "GET /api/v1/labs/{labId}/submissions/{submissionId}/result": [
+    "assessment|GET /api/v1/labs/{labId}/submissions/{submissionId}/result": [
       {
         "file": "services/assessment/src/test/java/com/onlinejudge/assessmentservice/LabWorkflowContractTest.java",
         "method": "completedLabTaskPublishesVersionedSourceGradeAndStudentCanReadThePassiveResult",
@@ -1731,42 +1731,42 @@
         "line": 448
       }
     ],
-    "PUT /api/v1/labs/{labId}": [
+    "assessment|PUT /api/v1/labs/{labId}": [
       {
         "file": "services/assessment/src/test/java/com/onlinejudge/assessmentservice/LabWorkflowContractTest.java",
         "method": "teacherCanManageLabLifecycleAndReadSubmissionHistory",
         "line": 602
       }
     ],
-    "POST /api/v1/labs/{labId}/close": [
+    "assessment|POST /api/v1/labs/{labId}/close": [
       {
         "file": "services/assessment/src/test/java/com/onlinejudge/assessmentservice/LabWorkflowContractTest.java",
         "method": "teacherCanManageLabLifecycleAndReadSubmissionHistory",
         "line": 602
       }
     ],
-    "DELETE /api/v1/labs/{labId}": [
+    "assessment|DELETE /api/v1/labs/{labId}": [
       {
         "file": "services/assessment/src/test/java/com/onlinejudge/assessmentservice/LabWorkflowContractTest.java",
         "method": "teacherCanDeleteOnlyDraftLab",
         "line": 645
       }
     ],
-    "GET /api/v1/labs/{labId}/submissions": [
+    "assessment|GET /api/v1/labs/{labId}/submissions": [
       {
         "file": "services/assessment/src/test/java/com/onlinejudge/assessmentservice/LabWorkflowContractTest.java",
         "method": "submissionHistoryIsScopedToStudentAndTeacherCanReadAllVersions",
         "line": 661
       }
     ],
-    "GET /api/v1/labs/{labId}/submissions/{submissionId}": [
+    "assessment|GET /api/v1/labs/{labId}/submissions/{submissionId}": [
       {
         "file": "services/assessment/src/test/java/com/onlinejudge/assessmentservice/LabWorkflowContractTest.java",
         "method": "submissionHistoryIsScopedToStudentAndTeacherCanReadAllVersions",
         "line": 661
       }
     ],
-    "GET /api/v1/labs/{labId}/statistics": [
+    "assessment|GET /api/v1/labs/{labId}/statistics": [
       {
         "file": "services/assessment/src/test/java/com/onlinejudge/assessmentservice/LabWorkflowContractTest.java",
         "method": "teacherScorePersistsFinalScoreAndPublishesSourceGrade",
@@ -1778,7 +1778,7 @@
         "line": 833
       }
     ],
-    "GET /internal/v2/source-grades": [
+    "assessment|GET /internal/v2/source-grades": [
       {
         "file": "services/assessment/src/test/java/com/onlinejudge/assessmentservice/SourceGradeRebuildApiTest.java",
         "method": "gradeServiceCanReadStablePaginatedSourceFactsButUserBearerCannot",
@@ -1795,7 +1795,7 @@
         "line": 100
       }
     ],
-    "GET /api/v1/courses/{courseId}/grade-items": [
+    "grade|GET /api/v1/courses/{courseId}/grade-items": [
       {
         "file": "services/grade/src/test/java/com/onlinejudge/gradeservice/GradeApiAuthenticationTest.java",
         "method": "rejectsMissingBearerAndResolvesAValidIdentityTokenForExistingGrdRoutes",
@@ -1812,14 +1812,14 @@
         "line": 321
       }
     ],
-    "POST /api/v1/courses/{courseId}/grade-items": [
+    "grade|POST /api/v1/courses/{courseId}/grade-items": [
       {
         "file": "services/grade/src/test/java/com/onlinejudge/gradeservice/GradeApiContractTest.java",
         "method": "gradeItemCreateListUpdateDeleteAndValidateEndpointsRoundTrip",
         "line": 97
       }
     ],
-    "POST /api/v1/courses/{courseId}/grade-rules/validate": [
+    "grade|POST /api/v1/courses/{courseId}/grade-rules/validate": [
       {
         "file": "services/grade/src/test/java/com/onlinejudge/gradeservice/GradeApiContractTest.java",
         "method": "gradeItemCreateListUpdateDeleteAndValidateEndpointsRoundTrip",
@@ -1831,21 +1831,21 @@
         "line": 327
       }
     ],
-    "DELETE /api/v1/grade-items/{gradeItemId}": [
+    "grade|DELETE /api/v1/grade-items/{gradeItemId}": [
       {
         "file": "services/grade/src/test/java/com/onlinejudge/gradeservice/GradeApiContractTest.java",
         "method": "gradeItemCreateListUpdateDeleteAndValidateEndpointsRoundTrip",
         "line": 97
       }
     ],
-    "PUT /api/v1/grade-items/{gradeItemId}": [
+    "grade|PUT /api/v1/grade-items/{gradeItemId}": [
       {
         "file": "services/grade/src/test/java/com/onlinejudge/gradeservice/GradeApiContractTest.java",
         "method": "gradeItemCreateListUpdateDeleteAndValidateEndpointsRoundTrip",
         "line": 97
       }
     ],
-    "GET /api/v1/courses/{courseId}/grades": [
+    "grade|GET /api/v1/courses/{courseId}/grades": [
       {
         "file": "services/grade/src/test/java/com/onlinejudge/gradeservice/GradeApiContractTest.java",
         "method": "sourceGradeSyncRecalculateAndGradeTableEndpointsWorkFromProjection",
@@ -1857,21 +1857,21 @@
         "line": 213
       }
     ],
-    "POST /api/v1/courses/{courseId}/grades/recalculate": [
+    "grade|POST /api/v1/courses/{courseId}/grades/recalculate": [
       {
         "file": "services/grade/src/test/java/com/onlinejudge/gradeservice/GradeApiContractTest.java",
         "method": "sourceGradeSyncRecalculateAndGradeTableEndpointsWorkFromProjection",
         "line": 140
       }
     ],
-    "GET /api/v1/courses/{courseId}/grades/students/{studentId}": [
+    "grade|GET /api/v1/courses/{courseId}/grades/students/{studentId}": [
       {
         "file": "services/grade/src/test/java/com/onlinejudge/gradeservice/GradeApiContractTest.java",
         "method": "sourceGradeSyncRecalculateAndGradeTableEndpointsWorkFromProjection",
         "line": 140
       }
     ],
-    "POST /api/v1/courses/{courseId}/grades/sync": [
+    "grade|POST /api/v1/courses/{courseId}/grades/sync": [
       {
         "file": "services/grade/src/test/java/com/onlinejudge/gradeservice/GradeApiContractTest.java",
         "method": "sourceGradeSyncRecalculateAndGradeTableEndpointsWorkFromProjection",
@@ -1893,14 +1893,14 @@
         "line": 357
       }
     ],
-    "GET /api/v1/courses/{courseId}/grade-publish-records": [
+    "grade|GET /api/v1/courses/{courseId}/grade-publish-records": [
       {
         "file": "services/grade/src/test/java/com/onlinejudge/gradeservice/GradeApiContractTest.java",
         "method": "publishPublishRecordsAndMyGradesEndpointsReturnPublishedState",
         "line": 178
       }
     ],
-    "POST /api/v1/courses/{courseId}/grades/publish": [
+    "grade|POST /api/v1/courses/{courseId}/grades/publish": [
       {
         "file": "services/grade/src/test/java/com/onlinejudge/gradeservice/GradeApiContractTest.java",
         "method": "publishPublishRecordsAndMyGradesEndpointsReturnPublishedState",
@@ -1922,28 +1922,28 @@
         "line": 357
       }
     ],
-    "GET /api/v1/courses/{courseId}/my-grades": [
+    "grade|GET /api/v1/courses/{courseId}/my-grades": [
       {
         "file": "services/grade/src/test/java/com/onlinejudge/gradeservice/GradeApiContractTest.java",
         "method": "publishPublishRecordsAndMyGradesEndpointsReturnPublishedState",
         "line": 178
       }
     ],
-    "PUT /api/v1/course-grade-summaries/{summaryId}/adjust": [
+    "grade|PUT /api/v1/course-grade-summaries/{summaryId}/adjust": [
       {
         "file": "services/grade/src/test/java/com/onlinejudge/gradeservice/GradeApiContractTest.java",
         "method": "adjustGradeRecordAndCourseFinalScoreWriteChangeLogs",
         "line": 213
       }
     ],
-    "GET /api/v1/courses/{courseId}/grade-change-logs": [
+    "grade|GET /api/v1/courses/{courseId}/grade-change-logs": [
       {
         "file": "services/grade/src/test/java/com/onlinejudge/gradeservice/GradeApiContractTest.java",
         "method": "adjustGradeRecordAndCourseFinalScoreWriteChangeLogs",
         "line": 213
       }
     ],
-    "PUT /api/v1/grade-records/{recordId}/adjust": [
+    "grade|PUT /api/v1/grade-records/{recordId}/adjust": [
       {
         "file": "services/grade/src/test/java/com/onlinejudge/gradeservice/GradeApiContractTest.java",
         "method": "adjustGradeRecordAndCourseFinalScoreWriteChangeLogs",
@@ -1955,154 +1955,123 @@
         "line": 342
       }
     ],
-    "GET /api/v1/courses/{courseId}/grade-analysis": [
+    "grade|GET /api/v1/courses/{courseId}/grade-analysis": [
       {
         "file": "services/grade/src/test/java/com/onlinejudge/gradeservice/GradeApiContractTest.java",
         "method": "gradeAnalysisAndCompletionEndpointsReturnSnapshotCounts",
         "line": 247
       }
     ],
-    "GET /api/v1/courses/{courseId}/grade-items/{gradeItemId}/completion": [
+    "grade|GET /api/v1/courses/{courseId}/grade-items/{gradeItemId}/completion": [
       {
         "file": "services/grade/src/test/java/com/onlinejudge/gradeservice/GradeApiContractTest.java",
         "method": "gradeAnalysisAndCompletionEndpointsReturnSnapshotCounts",
         "line": 247
       }
     ],
-    "GET /api/v1/courses/{courseId}/grade-review-requests": [
+    "grade|GET /api/v1/courses/{courseId}/grade-review-requests": [
       {
         "file": "services/grade/src/test/java/com/onlinejudge/gradeservice/GradeApiContractTest.java",
         "method": "gradeReviewSubmitListAndProcessEndpointsRoundTrip",
         "line": 265
       }
     ],
-    "POST /api/v1/courses/{courseId}/grade-review-requests": [
+    "grade|POST /api/v1/courses/{courseId}/grade-review-requests": [
       {
         "file": "services/grade/src/test/java/com/onlinejudge/gradeservice/GradeApiContractTest.java",
         "method": "gradeReviewSubmitListAndProcessEndpointsRoundTrip",
         "line": 265
       }
     ],
-    "GET /api/v1/courses/{courseId}/my-grade-review-requests": [
+    "grade|GET /api/v1/courses/{courseId}/my-grade-review-requests": [
       {
         "file": "services/grade/src/test/java/com/onlinejudge/gradeservice/GradeApiContractTest.java",
         "method": "gradeReviewSubmitListAndProcessEndpointsRoundTrip",
         "line": 265
       }
     ],
-    "PUT /api/v1/grade-review-requests/{requestId}/process": [
+    "grade|PUT /api/v1/grade-review-requests/{requestId}/process": [
       {
         "file": "services/grade/src/test/java/com/onlinejudge/gradeservice/GradeApiContractTest.java",
         "method": "gradeReviewSubmitListAndProcessEndpointsRoundTrip",
         "line": 265
       }
     ],
-    "ANY /api/*": [
+    "grade|GET /health/ready": [
       {
-        "file": "scripts/gateway/tests/gateway-runtime.test.sh",
-        "method": "gateway-runtime.test",
-        "line": 1
-      },
-      {
-        "file": "scripts/gateway/tests/kind-gateway-config.test.sh",
-        "method": "kind-gateway-config.test",
-        "line": 1
+        "file": "services/grade/src/test/java/com/onlinejudge/gradeservice/GradeApiContractTest.java",
+        "method": "readinessProbeReportsUp",
+        "line": 314
       }
     ],
-    "ANY /gateway-error/413": [
+    "gateway|ANY /api/*": [
       {
         "file": "scripts/gateway/tests/gateway-runtime.test.sh",
         "method": "gateway-runtime.test",
-        "line": 1
-      },
-      {
-        "file": "scripts/gateway/tests/kind-gateway-config.test.sh",
-        "method": "kind-gateway-config.test",
-        "line": 1
+        "line": 187
       }
     ],
-    "ANY /gateway-error/429": [
+    "gateway|ANY /gateway-error/413": [
       {
         "file": "scripts/gateway/tests/gateway-runtime.test.sh",
         "method": "gateway-runtime.test",
-        "line": 1
-      },
-      {
-        "file": "scripts/gateway/tests/kind-gateway-config.test.sh",
-        "method": "kind-gateway-config.test",
-        "line": 1
+        "line": 204
       }
     ],
-    "ANY /gateway-error/502": [
+    "gateway|ANY /gateway-error/429": [
       {
         "file": "scripts/gateway/tests/gateway-runtime.test.sh",
         "method": "gateway-runtime.test",
-        "line": 1
-      },
-      {
-        "file": "scripts/gateway/tests/kind-gateway-config.test.sh",
-        "method": "kind-gateway-config.test",
-        "line": 1
+        "line": 254
       }
     ],
-    "ANY /gateway-error/503": [
+    "gateway|ANY /gateway-error/502": [
       {
         "file": "scripts/gateway/tests/gateway-runtime.test.sh",
         "method": "gateway-runtime.test",
-        "line": 1
-      },
-      {
-        "file": "scripts/gateway/tests/kind-gateway-config.test.sh",
-        "method": "kind-gateway-config.test",
-        "line": 1
+        "line": 208
       }
     ],
-    "ANY /gateway-error/504": [
+    "gateway|ANY /gateway-error/503": [
       {
         "file": "scripts/gateway/tests/gateway-runtime.test.sh",
         "method": "gateway-runtime.test",
-        "line": 1
-      },
-      {
-        "file": "scripts/gateway/tests/kind-gateway-config.test.sh",
-        "method": "kind-gateway-config.test",
-        "line": 1
+        "line": 213
       }
     ],
-    "GET /health/live": [
+    "gateway|ANY /gateway-error/504": [
       {
         "file": "scripts/gateway/tests/gateway-runtime.test.sh",
         "method": "gateway-runtime.test",
-        "line": 1
-      },
-      {
-        "file": "scripts/gateway/tests/kind-gateway-config.test.sh",
-        "method": "kind-gateway-config.test",
-        "line": 1
+        "line": 215
       }
     ],
-    "GET /health/startup": [
+    "gateway|GET /health/live": [
       {
         "file": "scripts/gateway/tests/gateway-runtime.test.sh",
         "method": "gateway-runtime.test",
-        "line": 1
-      },
-      {
-        "file": "scripts/gateway/tests/kind-gateway-config.test.sh",
-        "method": "kind-gateway-config.test",
-        "line": 1
+        "line": 110
       }
     ],
-    "ANY /internal/v2/*": [
+    "gateway|GET /health/ready": [
       {
         "file": "scripts/gateway/tests/gateway-runtime.test.sh",
         "method": "gateway-runtime.test",
-        "line": 1
-      },
+        "line": 122
+      }
+    ],
+    "gateway|GET /health/startup": [
       {
-        "file": "scripts/gateway/tests/kind-gateway-config.test.sh",
-        "method": "kind-gateway-config.test",
-        "line": 1
+        "file": "scripts/gateway/tests/gateway-runtime.test.sh",
+        "method": "gateway-runtime.test",
+        "line": 120
+      }
+    ],
+    "gateway|ANY /internal/v2/*": [
+      {
+        "file": "scripts/gateway/tests/gateway-runtime.test.sh",
+        "method": "gateway-runtime.test",
+        "line": 185
       }
     ]
   }

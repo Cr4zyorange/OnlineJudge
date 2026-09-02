@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-02T06:12:40.486Z",
+  "generatedAt": "2026-09-02T07:23:42.425Z",
   "gatewayRoutes": [
     {
       "modifier": "=",
@@ -754,7 +754,8 @@
       "auth": "USER",
       "controller": "services/course/src/main/java/com/onlinejudge/courseservice/controller/CourseController.java",
       "gatewayUpstream": "course-service",
-      "gatewayExposed": true
+      "gatewayExposed": true,
+      "notes": "2 handler mappings: services/course/src/main/java/com/onlinejudge/courseservice/controller/CourseController.java"
     },
     {
       "id": "API-COURSE-049",
@@ -1046,6 +1047,17 @@
     {
       "id": "API-GATEWAY-077",
       "method": "GET",
+      "path": "/health/ready",
+      "service": "gateway",
+      "auth": "PUBLIC",
+      "controller": "deploy/gateway/gateway.conf.template",
+      "gatewayUpstream": "gateway",
+      "gatewayExposed": true,
+      "description": "Gateway readiness (nginx static 200)"
+    },
+    {
+      "id": "API-GATEWAY-078",
+      "method": "GET",
       "path": "/health/startup",
       "service": "gateway",
       "auth": "PUBLIC",
@@ -1055,7 +1067,7 @@
       "description": "Gateway liveness (nginx static 200)"
     },
     {
-      "id": "API-GATEWAY-078",
+      "id": "API-GATEWAY-079",
       "method": "ANY",
       "path": "/internal/v2/*",
       "service": "gateway",
@@ -1066,7 +1078,7 @@
       "description": "Gateway rejects internal v2 traffic with GATEWAY_404"
     },
     {
-      "id": "API-GRADE-079",
+      "id": "API-GRADE-080",
       "method": "PUT",
       "path": "/api/v1/course-grade-summaries/{summaryId}/adjust",
       "service": "grade",
@@ -1076,7 +1088,7 @@
       "gatewayExposed": true
     },
     {
-      "id": "API-GRADE-080",
+      "id": "API-GRADE-081",
       "method": "GET",
       "path": "/api/v1/courses/{courseId}/grade-analysis",
       "service": "grade",
@@ -1086,7 +1098,7 @@
       "gatewayExposed": true
     },
     {
-      "id": "API-GRADE-081",
+      "id": "API-GRADE-082",
       "method": "GET",
       "path": "/api/v1/courses/{courseId}/grade-change-logs",
       "service": "grade",
@@ -1096,18 +1108,8 @@
       "gatewayExposed": true
     },
     {
-      "id": "API-GRADE-082",
-      "method": "GET",
-      "path": "/api/v1/courses/{courseId}/grade-items",
-      "service": "grade",
-      "auth": "USER",
-      "controller": "backend/src/main/java/com/onlinejudge/grd/controller/GradeItemController.java",
-      "gatewayUpstream": "grade-service",
-      "gatewayExposed": true
-    },
-    {
       "id": "API-GRADE-083",
-      "method": "POST",
+      "method": "GET",
       "path": "/api/v1/courses/{courseId}/grade-items",
       "service": "grade",
       "auth": "USER",
@@ -1117,6 +1119,16 @@
     },
     {
       "id": "API-GRADE-084",
+      "method": "POST",
+      "path": "/api/v1/courses/{courseId}/grade-items",
+      "service": "grade",
+      "auth": "USER",
+      "controller": "backend/src/main/java/com/onlinejudge/grd/controller/GradeItemController.java",
+      "gatewayUpstream": "grade-service",
+      "gatewayExposed": true
+    },
+    {
+      "id": "API-GRADE-085",
       "method": "GET",
       "path": "/api/v1/courses/{courseId}/grade-items/{gradeItemId}/completion",
       "service": "grade",
@@ -1126,7 +1138,7 @@
       "gatewayExposed": true
     },
     {
-      "id": "API-GRADE-085",
+      "id": "API-GRADE-086",
       "method": "GET",
       "path": "/api/v1/courses/{courseId}/grade-publish-records",
       "service": "grade",
@@ -1136,18 +1148,8 @@
       "gatewayExposed": true
     },
     {
-      "id": "API-GRADE-086",
-      "method": "GET",
-      "path": "/api/v1/courses/{courseId}/grade-review-requests",
-      "service": "grade",
-      "auth": "USER",
-      "controller": "backend/src/main/java/com/onlinejudge/grd/controller/GradeReviewController.java",
-      "gatewayUpstream": "grade-service",
-      "gatewayExposed": true
-    },
-    {
       "id": "API-GRADE-087",
-      "method": "POST",
+      "method": "GET",
       "path": "/api/v1/courses/{courseId}/grade-review-requests",
       "service": "grade",
       "auth": "USER",
@@ -1158,6 +1160,16 @@
     {
       "id": "API-GRADE-088",
       "method": "POST",
+      "path": "/api/v1/courses/{courseId}/grade-review-requests",
+      "service": "grade",
+      "auth": "USER",
+      "controller": "backend/src/main/java/com/onlinejudge/grd/controller/GradeReviewController.java",
+      "gatewayUpstream": "grade-service",
+      "gatewayExposed": true
+    },
+    {
+      "id": "API-GRADE-089",
+      "method": "POST",
       "path": "/api/v1/courses/{courseId}/grade-rules/validate",
       "service": "grade",
       "auth": "USER",
@@ -1166,7 +1178,7 @@
       "gatewayExposed": true
     },
     {
-      "id": "API-GRADE-089",
+      "id": "API-GRADE-090",
       "method": "GET",
       "path": "/api/v1/courses/{courseId}/grades",
       "service": "grade",
@@ -1176,7 +1188,7 @@
       "gatewayExposed": true
     },
     {
-      "id": "API-GRADE-090",
+      "id": "API-GRADE-091",
       "method": "POST",
       "path": "/api/v1/courses/{courseId}/grades/publish",
       "service": "grade",
@@ -1186,7 +1198,7 @@
       "gatewayExposed": true
     },
     {
-      "id": "API-GRADE-091",
+      "id": "API-GRADE-092",
       "method": "POST",
       "path": "/api/v1/courses/{courseId}/grades/recalculate",
       "service": "grade",
@@ -1196,7 +1208,7 @@
       "gatewayExposed": true
     },
     {
-      "id": "API-GRADE-092",
+      "id": "API-GRADE-093",
       "method": "GET",
       "path": "/api/v1/courses/{courseId}/grades/students/{studentId}",
       "service": "grade",
@@ -1206,7 +1218,7 @@
       "gatewayExposed": true
     },
     {
-      "id": "API-GRADE-093",
+      "id": "API-GRADE-094",
       "method": "POST",
       "path": "/api/v1/courses/{courseId}/grades/sync",
       "service": "grade",
@@ -1216,7 +1228,7 @@
       "gatewayExposed": true
     },
     {
-      "id": "API-GRADE-094",
+      "id": "API-GRADE-095",
       "method": "GET",
       "path": "/api/v1/courses/{courseId}/my-grade-review-requests",
       "service": "grade",
@@ -1226,7 +1238,7 @@
       "gatewayExposed": true
     },
     {
-      "id": "API-GRADE-095",
+      "id": "API-GRADE-096",
       "method": "GET",
       "path": "/api/v1/courses/{courseId}/my-grades",
       "service": "grade",
@@ -1236,18 +1248,8 @@
       "gatewayExposed": true
     },
     {
-      "id": "API-GRADE-096",
-      "method": "DELETE",
-      "path": "/api/v1/grade-items/{gradeItemId}",
-      "service": "grade",
-      "auth": "USER",
-      "controller": "backend/src/main/java/com/onlinejudge/grd/controller/GradeItemController.java",
-      "gatewayUpstream": "grade-service",
-      "gatewayExposed": true
-    },
-    {
       "id": "API-GRADE-097",
-      "method": "PUT",
+      "method": "DELETE",
       "path": "/api/v1/grade-items/{gradeItemId}",
       "service": "grade",
       "auth": "USER",
@@ -1258,6 +1260,16 @@
     {
       "id": "API-GRADE-098",
       "method": "PUT",
+      "path": "/api/v1/grade-items/{gradeItemId}",
+      "service": "grade",
+      "auth": "USER",
+      "controller": "backend/src/main/java/com/onlinejudge/grd/controller/GradeItemController.java",
+      "gatewayUpstream": "grade-service",
+      "gatewayExposed": true
+    },
+    {
+      "id": "API-GRADE-099",
+      "method": "PUT",
       "path": "/api/v1/grade-records/{recordId}/adjust",
       "service": "grade",
       "auth": "USER",
@@ -1266,7 +1278,7 @@
       "gatewayExposed": true
     },
     {
-      "id": "API-GRADE-099",
+      "id": "API-GRADE-100",
       "method": "PUT",
       "path": "/api/v1/grade-review-requests/{requestId}/process",
       "service": "grade",
@@ -1276,7 +1288,17 @@
       "gatewayExposed": true
     },
     {
-      "id": "API-IDENTITY-100",
+      "id": "API-GRADE-101",
+      "method": "GET",
+      "path": "/health/ready",
+      "service": "grade",
+      "auth": "PUBLIC",
+      "controller": "services/grade/src/main/java/com/onlinejudge/gradeservice/controller/ReadinessController.java",
+      "gatewayUpstream": "grade-service",
+      "gatewayExposed": false
+    },
+    {
+      "id": "API-IDENTITY-102",
       "method": "GET",
       "path": "/.well-known/jwks.json",
       "service": "identity",
@@ -1286,7 +1308,7 @@
       "gatewayExposed": true
     },
     {
-      "id": "API-IDENTITY-101",
+      "id": "API-IDENTITY-103",
       "method": "GET",
       "path": "/api/v1/admin/audit-logs",
       "service": "identity",
@@ -1296,7 +1318,7 @@
       "gatewayExposed": true
     },
     {
-      "id": "API-IDENTITY-102",
+      "id": "API-IDENTITY-104",
       "method": "GET",
       "path": "/api/v1/admin/permissions",
       "service": "identity",
@@ -1306,28 +1328,8 @@
       "gatewayExposed": true
     },
     {
-      "id": "API-IDENTITY-103",
-      "method": "GET",
-      "path": "/api/v1/admin/roles",
-      "service": "identity",
-      "auth": "USER",
-      "controller": "services/identity/src/main/java/com/onlinejudge/auth/controller/AuthAdminController.java",
-      "gatewayUpstream": "identity-service",
-      "gatewayExposed": true
-    },
-    {
-      "id": "API-IDENTITY-104",
-      "method": "POST",
-      "path": "/api/v1/admin/roles",
-      "service": "identity",
-      "auth": "USER",
-      "controller": "services/identity/src/main/java/com/onlinejudge/auth/controller/AuthAdminController.java",
-      "gatewayUpstream": "identity-service",
-      "gatewayExposed": true
-    },
-    {
       "id": "API-IDENTITY-105",
-      "method": "PUT",
+      "method": "GET",
       "path": "/api/v1/admin/roles",
       "service": "identity",
       "auth": "USER",
@@ -1337,6 +1339,26 @@
     },
     {
       "id": "API-IDENTITY-106",
+      "method": "POST",
+      "path": "/api/v1/admin/roles",
+      "service": "identity",
+      "auth": "USER",
+      "controller": "services/identity/src/main/java/com/onlinejudge/auth/controller/AuthAdminController.java",
+      "gatewayUpstream": "identity-service",
+      "gatewayExposed": true
+    },
+    {
+      "id": "API-IDENTITY-107",
+      "method": "PUT",
+      "path": "/api/v1/admin/roles",
+      "service": "identity",
+      "auth": "USER",
+      "controller": "services/identity/src/main/java/com/onlinejudge/auth/controller/AuthAdminController.java",
+      "gatewayUpstream": "identity-service",
+      "gatewayExposed": true
+    },
+    {
+      "id": "API-IDENTITY-108",
       "method": "PUT",
       "path": "/api/v1/admin/roles/{roleId}/permissions",
       "service": "identity",
@@ -1346,7 +1368,7 @@
       "gatewayExposed": true
     },
     {
-      "id": "API-IDENTITY-107",
+      "id": "API-IDENTITY-109",
       "method": "GET",
       "path": "/api/v1/admin/users",
       "service": "identity",
@@ -1356,7 +1378,7 @@
       "gatewayExposed": true
     },
     {
-      "id": "API-IDENTITY-108",
+      "id": "API-IDENTITY-110",
       "method": "POST",
       "path": "/api/v1/admin/users",
       "service": "identity",
@@ -1366,7 +1388,7 @@
       "gatewayExposed": true
     },
     {
-      "id": "API-IDENTITY-109",
+      "id": "API-IDENTITY-111",
       "method": "PUT",
       "path": "/api/v1/admin/users/{userId}/roles",
       "service": "identity",
@@ -1376,7 +1398,7 @@
       "gatewayExposed": true
     },
     {
-      "id": "API-IDENTITY-110",
+      "id": "API-IDENTITY-112",
       "method": "PUT",
       "path": "/api/v1/admin/users/{userId}/status",
       "service": "identity",
@@ -1386,7 +1408,7 @@
       "gatewayExposed": true
     },
     {
-      "id": "API-IDENTITY-111",
+      "id": "API-IDENTITY-113",
       "method": "POST",
       "path": "/api/v1/auth/check-permission",
       "service": "identity",
@@ -1396,7 +1418,7 @@
       "gatewayExposed": true
     },
     {
-      "id": "API-IDENTITY-112",
+      "id": "API-IDENTITY-114",
       "method": "POST",
       "path": "/api/v1/auth/login",
       "service": "identity",
@@ -1406,7 +1428,7 @@
       "gatewayExposed": true
     },
     {
-      "id": "API-IDENTITY-113",
+      "id": "API-IDENTITY-115",
       "method": "POST",
       "path": "/api/v1/auth/logout",
       "service": "identity",
@@ -1416,7 +1438,7 @@
       "gatewayExposed": true
     },
     {
-      "id": "API-IDENTITY-114",
+      "id": "API-IDENTITY-116",
       "method": "GET",
       "path": "/api/v1/auth/me",
       "service": "identity",
@@ -1426,7 +1448,7 @@
       "gatewayExposed": true
     },
     {
-      "id": "API-IDENTITY-115",
+      "id": "API-IDENTITY-117",
       "method": "POST",
       "path": "/api/v1/auth/register",
       "service": "identity",
@@ -1436,7 +1458,7 @@
       "gatewayExposed": true
     },
     {
-      "id": "API-IDENTITY-116",
+      "id": "API-IDENTITY-118",
       "method": "GET",
       "path": "/api/v1/system/health",
       "service": "identity",
@@ -1446,7 +1468,7 @@
       "gatewayExposed": false
     },
     {
-      "id": "API-IDENTITY-117",
+      "id": "API-IDENTITY-119",
       "method": "GET",
       "path": "/api/v1/system/readiness",
       "service": "identity",
@@ -1456,7 +1478,7 @@
       "gatewayExposed": false
     },
     {
-      "id": "API-IDENTITY-118",
+      "id": "API-IDENTITY-120",
       "method": "GET",
       "path": "/api/v1/system/version",
       "service": "identity",
@@ -1466,7 +1488,7 @@
       "gatewayExposed": false
     },
     {
-      "id": "API-IDENTITY-119",
+      "id": "API-IDENTITY-121",
       "method": "GET",
       "path": "/api/v1/users/me",
       "service": "identity",
@@ -1476,7 +1498,7 @@
       "gatewayExposed": true
     },
     {
-      "id": "API-IDENTITY-120",
+      "id": "API-IDENTITY-122",
       "method": "PUT",
       "path": "/api/v1/users/me",
       "service": "identity",
@@ -1486,7 +1508,7 @@
       "gatewayExposed": true
     },
     {
-      "id": "API-IDENTITY-121",
+      "id": "API-IDENTITY-123",
       "method": "PUT",
       "path": "/api/v1/users/me/password",
       "service": "identity",
@@ -1496,7 +1518,7 @@
       "gatewayExposed": true
     },
     {
-      "id": "API-IDENTITY-122",
+      "id": "API-IDENTITY-124",
       "method": "POST",
       "path": "/internal/v2/service-tokens",
       "service": "identity",

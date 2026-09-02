@@ -22,34 +22,38 @@ Identity、Course、Assessment、Grade 四个服务与 Gateway 暴露的全部�
 
 | 文件 | 内容 |
 | --- | --- |
-| `inventory.json` | 122 个接口：HTTP 方法、路径、服务归属、鉴权分类（PUBLIC/USER/SERVICE）、Controller 文件、Gateway 上游、是否经 Gateway 暴露 |
-| `mapping.json` | `方法 + 路径 -> 测试文件 -> @Test 方法名`（只统计 `@Test` 方法体，避免工具方法误映射；按请求动词匹配） |
-| `coverage-report.json` | 精确总数、已映射数、未映射数（122 / 122 / 0）与按服务分布 |
+| `inventory.json` | 124 个接口：HTTP 方法、路径、服务归属（键为 `服务|方法 路径`，跨服务同路径不合并）、鉴权分类（PUBLIC/USER/SERVICE）、Controller 文件、Gateway 上游、是否经 Gateway 暴露 |
+| `mapping.json` | `服务|方法 路径 -> 测试文件 -> @Test 方法名`（只统计 `@Test` 方法体，避免工具方法误映射；按请求动词匹配；Gateway 端点只映射 runtime 脚本真实发出的请求） |
+| `coverage-report.json` | 精确总数、已映射数、未映射数（124 / 124 / 0）与按服务分布 |
 | `api-coverage.mjs` | 提取/映射/覆盖率/静态 Gateway 路由校验工具 |
+| `api-coverage.test.mjs` | 回归自测：共享路径不被合并、Gateway 映射必须真实执行 |
 | `README.md` | 本说明 |
 
 ## 复现命令
 
 ```bash
 node tests/api/api-coverage.mjs all            # 重建 inventory/mapping/coverage
+node tests/api/api-coverage.test.mjs           # 回归自测（共享路径/真实执行）
 node tests/api/api-coverage.mjs gateway-static # 静态 Gateway 路由归属校验
 bash scripts/test/run-api-coverage-367.sh      # 一键 runner（JDK 21/24 + 四服务套件 + Gateway smoke）
 ```
 
-## 接口总数（2026-09-02 执行）
+## 接口总数（2026-09-02 复审后）
 
 | 服务 | 接口数 | 已映射 | 未映射 |
 | --- | ---: | ---: | ---: |
 | identity | 23 | 23 | 0 |
 | course | 42 | 42 | 0 |
 | assessment | 27 | 27 | 0 |
-| grade | 21 | 21 | 0 |
-| gateway | 9 | 9 | 0 |
-| **合计** | **122** | **122** | **0** |
+| grade | 22 | 22 | 0 |
+| gateway | 10 | 10 | 0 |
+| **合计** | **124** | **124** | **0** |
 
 > 说明：`/internal/v2/*` 服务契约与 `/version`、`/health/ready` 等服务端口探针属于
 > 服务直连面；Gateway 对 `/internal/v2/*` 统一返回 `GATEWAY_404`，静态校验将其
-> 单独建模，不与公开 Gateway 路由混淆。
+> 单独建模，不与公开 Gateway 路由混淆。`GET /health/ready` 在 assessment、grade、
+> gateway 各自独立计数；Course `POST /api/v1/courses/{courseId}/resources` 的
+> JSON/multipart 两个 handler 属同一服务内同一路由，合并为一个接口并记录 notes。
 
 ## 测试映射原则
 
