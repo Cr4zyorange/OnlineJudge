@@ -7,17 +7,20 @@ repo_root="$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"
 namespace="onlinejudge-platform"
 gateway_url=""
 request_url=""
+authorization_file=""
+request_method="GET"
+request_body_file=""
 output_dir=""
 duration_seconds=180
 concurrency=8
 sample_seconds=5
 scale_timeout_seconds=420
-rabbitmq_outage=0
+rabbitmq_outage=1
 rabbitmq_original_replicas=""
 
 usage() {
   cat <<'USAGE'
-Usage: scripts/platform/run_hpa_observability_experiment.sh --gateway-url URL --request-url URL [options]
+Usage: scripts/platform/run_hpa_observability_experiment.sh --gateway-url URL --request-url URL --authorization-file FILE [options]
 
 Runs the #319 HPA experiment against a ready #318 Kubernetes environment.
 --request-url must be a pre-provisioned, authenticated Assessment business-chain
@@ -30,11 +33,13 @@ Options:
   --namespace NAME          Kubernetes namespace (default: onlinejudge-platform)
   --gateway-url URL         Gateway base URL used for correlation diagnostics
   --request-url URL         Full Assessment business-chain request URL
+  --authorization-file FILE File containing one Authorization header value
+  --request-method METHOD   HTTP method (default: GET)
+  --request-body-file FILE  Optional request body file; never copied to evidence
   --duration-seconds N      Load duration (default: 180)
   --concurrency N           Parallel curl workers (default: 8)
   --sample-seconds N        HPA/resource sampling interval (default: 5)
   --scale-timeout-seconds N Maximum wait for each scale transition (default: 420)
-  --inject-rabbitmq-outage  Prove RabbitMQ is noncritical to API readiness
   --output-dir DIR          Evidence directory (default: output/issue-319/<sha>/<utc>)
 USAGE
 }
@@ -44,24 +49,31 @@ while (($#)); do
     --namespace) namespace="${2:?--namespace requires a value}"; shift 2 ;;
     --gateway-url) gateway_url="${2:?--gateway-url requires a value}"; shift 2 ;;
     --request-url) request_url="${2:?--request-url requires a value}"; shift 2 ;;
+    --authorization-file) authorization_file="${2:?--authorization-file requires a value}"; shift 2 ;;
+    --request-method) request_method="${2:?--request-method requires a value}"; shift 2 ;;
+    --request-body-file) request_body_file="${2:?--request-body-file requires a value}"; shift 2 ;;
     --duration-seconds) duration_seconds="${2:?--duration-seconds requires a value}"; shift 2 ;;
     --concurrency) concurrency="${2:?--concurrency requires a value}"; shift 2 ;;
     --sample-seconds) sample_seconds="${2:?--sample-seconds requires a value}"; shift 2 ;;
     --scale-timeout-seconds) scale_timeout_seconds="${2:?--scale-timeout-seconds requires a value}"; shift 2 ;;
-    --inject-rabbitmq-outage) rabbitmq_outage=1; shift ;;
     --output-dir) output_dir="${2:?--output-dir requires a value}"; shift 2 ;;
     --help|-h) usage; exit 0 ;;
     *) printf 'run-hpa-observability-experiment: unknown argument: %s\n' "$1" >&2; usage >&2; exit 2 ;;
   esac
 done
 
-[[ -n "$gateway_url" && -n "$request_url" ]] || { usage >&2; exit 2; }
+[[ -n "$gateway_url" && -n "$request_url" && -n "$authorization_file" ]] || { usage >&2; exit 2; }
 [[ "$request_url" == "$gateway_url"* ]] || { printf 'run-hpa-observability-experiment: request URL must use the supplied gateway URL\n' >&2; exit 2; }
+[[ -r "$authorization_file" ]] || { printf 'run-hpa-observability-experiment: authorization file is not readable\n' >&2; exit 2; }
+[[ -z "$request_body_file" || -r "$request_body_file" ]] || { printf 'run-hpa-observability-experiment: request body file is not readable\n' >&2; exit 2; }
+[[ "$request_method" =~ ^[A-Z]+$ ]] || { printf 'run-hpa-observability-experiment: request method must be uppercase letters\n' >&2; exit 2; }
 [[ "$duration_seconds" =~ ^[1-9][0-9]*$ && "$concurrency" =~ ^[1-9][0-9]*$ && "$sample_seconds" =~ ^[1-9][0-9]*$ && "$scale_timeout_seconds" =~ ^[1-9][0-9]*$ ]] || {
   printf 'run-hpa-observability-experiment: duration, concurrency and sample interval must be positive integers\n' >&2; exit 2;
 }
 command -v kubectl >/dev/null 2>&1 || { printf 'run-hpa-observability-experiment: kubectl is required\n' >&2; exit 2; }
 command -v curl >/dev/null 2>&1 || { printf 'run-hpa-observability-experiment: curl is required\n' >&2; exit 2; }
+IFS= read -r authorization < "$authorization_file" || true
+[[ -n "$authorization" ]] || { printf 'run-hpa-observability-experiment: authorization file is empty\n' >&2; exit 2; }
 
 head_sha="$(git -C "$repo_root" rev-parse HEAD)"
 base_sha="$(git -C "$repo_root" merge-base HEAD origin/dev 2>/dev/null || git -C "$repo_root" rev-parse HEAD)"
@@ -158,7 +170,9 @@ while (( SECONDS < deadline )); do
   request_pids=()
   for _ in $(seq 1 "$concurrency"); do
     request_id="$(cat /proc/sys/kernel/random/uuid)"
-    ( printf '%s %s ' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$request_id"; curl --silent --show-error --output /dev/null --write-out '%{http_code} %{time_total}\n' --header "X-Request-Id: $request_id" "$request_url" ) >> "$output_dir/raw/requests.tsv" 2>> "$output_dir/raw/curl-errors.log" &
+    ( curl_arguments=(--silent --show-error --output /dev/null --write-out '%{http_code} %{time_total}\n' --request "$request_method" --header "Authorization: $authorization" --header "X-Request-Id: $request_id");
+      if [[ -n "$request_body_file" ]]; then curl_arguments+=(--header 'Content-Type: application/json' --data-binary "@$request_body_file"); fi;
+      printf '%s %s ' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$request_id"; curl "${curl_arguments[@]}" "$request_url" ) >> "$output_dir/raw/requests.tsv" 2>> "$output_dir/raw/curl-errors.log" &
     request_pids+=("$!")
   done
   for request_pid in "${request_pids[@]}"; do wait "$request_pid" || true; done
