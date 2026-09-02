@@ -610,6 +610,40 @@ def kube_workload(workload: dict[str, Any], git_sha: str, namespace: str) -> str
     return "\n---\n".join(["\n".join(lines), "\n".join(service)])
 
 
+def kube_assessment_hpa(namespace: str) -> str:
+    """The #319 HPA belongs beside the rendered Assessment API Deployment."""
+
+    return "\n".join(
+        [
+            "apiVersion: autoscaling/v2",
+            "kind: HorizontalPodAutoscaler",
+            "metadata:",
+            "  name: assessment-api",
+            "  namespace: " + namespace,
+            "  labels:",
+            "    app.kubernetes.io/part-of: onlinejudge-platform",
+            "    delivery.onlinejudge.io/owner-issue: \"319\"",
+            "spec:",
+            "  scaleTargetRef:",
+            "    apiVersion: apps/v1",
+            "    kind: Deployment",
+            "    name: assessment-api",
+            "  minReplicas: 1",
+            "  maxReplicas: 3",
+            "  behavior:",
+            "    scaleDown:",
+            "      stabilizationWindowSeconds: 300",
+            "  metrics:",
+            "    - type: Resource",
+            "      resource:",
+            "        name: cpu",
+            "        target:",
+            "          type: Utilization",
+            "          averageUtilization: 60",
+        ]
+    )
+
+
 def kube_migration_job(job: dict[str, Any], namespace: str) -> str:
     schema = job["schema"]
     command = f"exec /workspace/migrate-service.sh --schema {schema}"
@@ -716,6 +750,7 @@ def render_kubernetes(manifest: dict[str, Any], git_sha: str, namespace: str) ->
 
     documents = [kube_namespace(namespace), kube_frontend_proxy_config(namespace)]
     documents.extend(kube_workload(workload, git_sha, namespace) for workload in manifest["workloads"])
+    documents.append(kube_assessment_hpa(namespace))
     documents.append(kube_runtime_account_init(namespace))
     documents.extend(kube_migration_job(job, namespace).replace("${GIT_SHA}", git_sha) for job in manifest["migrationJobs"])
     return (
@@ -754,6 +789,7 @@ def render_kubernetes_stages(manifest: dict[str, Any], git_sha: str, namespace: 
         [
             kube_frontend_proxy_config(namespace),
             *(kube_workload(workload, git_sha, namespace) for workload in applications),
+            kube_assessment_hpa(namespace),
         ]
     )
     stages["80-gateway.yaml"] = kube_workload(gateway, git_sha, namespace)
