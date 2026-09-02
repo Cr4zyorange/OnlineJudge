@@ -60,3 +60,24 @@ Available 并恢复（`rabbitmq-outage.log`）；运行结束诊断显示 2,270 
 evaluation_task 与关联 outbox/网关日志（`backlog-diagnostics.txt`、
 `correlation-example.txt`）。失败试运行（死锁/断言 bug/假 READY）均保留证据目录并
 在 NOTES.md 记录原因。
+
+## Round 6 — 2026-09-02（复审 Rework：可复现重跑、证据入库与范围冻结）
+
+针对 Round 5 送审的 REQUEST_CHANGES 三项阻塞逐项处置。复审头：`3bbb6aa7`
+（本记录所在提交）。
+
+| 编号 | 阻塞点 | 处置 |
+| --- | --- | --- |
+| R6-01 | AC-319-05：正式运行 metadata 声明 head=deployment=`da6fd3f8`，但决定实验能否通过的 runner 修复直到 `5d547072` 才提交，PASS 只能来自未记录的 dirty working tree，无法从声明 SHA 复现。 | 1) `e2265d7d`：runner 的 `deploymentVersion` 改从被测 deployment 的 GIT_SHA 读取（40-hex 校验，缺失即失败），与 `headSha`/`runnerSha`（执行实验的干净提交）分开记录，测试同步断言二者不得同源。2) 从 tracked 文件干净的提交 `81030437`（包含最终 runner）重跑实验：EXPERIMENT_READY，HPA 1→2→1，41,540 读请求全 2xx、零错误、P95 17.7ms。3) SHA 三元组分开登记：deployment=`da6fd3f8`、runner/tested=`81030437`、证据提交=`3bbb6aa7`（本提交链）。旧目录 `Issue-319-HPA实验证据-20260902T080519Z/` 标注 SUPERSEDED 保留为过程记录。 |
+| R6-02 | AC-319-03/04：正文引用的 `hpa-transition.log`、`rabbitmq-outage.log`、Gateway/Assessment/Grade 诊断日志、`hwk-submit-stream-*.log` 因全局 `*.log` 忽略未入库；`correlation-example.txt` 的 DB 映射段为空。 | 全部原始证据改以 `.txt` 随 PR 提交（`3bbb6aa7`，7.7MB 原始输出，含 0 字节 curl-errors 以证明无传输错误）。correlation 链补全为可复核闭环：HWK 佐证流逐条记录 X-Request-Id 与响应 submissionId → 网关 access log 行 → `assessment_homework_submission`（public_id=submissionId）→ `evaluation_task`（submission_id 关联）。注意：HWK 写路径 `evaluation_task.origin_request_id` 由异步评测触发器生成，不等于网关 X-Request-Id，Round 5 的空段正是沿该列查询所致；正确关联键与复核 SQL 已写入新目录 NOTES.md。积压侧新增停载后收敛采样（PENDING 4603→4436 单调下降）。 |
+| R6-03 | 范围冻结：PR 混入 `deploy/docker/frontend.Dockerfile` 与全局 `build_workload_images.sh` 的 #318/交付构建链变更（host network 构建、npm 重试参数）。 | `569d6318` 将两文件恢复为 origin/dev 状态并移除钉住该行为的测试断言；变更完整保留在独立分支 `fix/318-image-build-network-retries`（cherry-pick 自原提交），另行开 issue/PR 归口。被测环境的镜像仍由含该变更的提交构建（deploymentVersion 如实记录为 `da6fd3f8`），不影响实验有效性。 |
+| R6-04 | `git diff --check` 因证据表格尾随空格失败。 | `81030437` 清理已提交 raw 输出中的 kubectl 尾随空格；当前 `git diff --check origin/dev...HEAD` 干净。 |
+
+复审重跑期间的失败运行（保留，AC-319-05）：`output/issue-319/81030437.../20260902T090111Z/`
+—— 主负载误用 9 身份轮询，而 24 个评测任务同属 student001，35,927 请求 403（归属
+校验），runner 断言按设计失败并如实输出 EXPERIMENT_FAILURE。教训固化：同一批任务
+的读负载必须单身份；同时实证了 runner 非 2xx 失败路径不再误报 READY。
+
+Round 6 验证：`python3 -m unittest discover -s scripts/platform/tests` 52/52 通过；
+实验契约校验 PASS；`git diff --check` 干净；44,680→41,540 的 requests.tsv 可独立
+解析（41540×200、0 错误、P95 0.017664s）。
