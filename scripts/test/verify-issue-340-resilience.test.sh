@@ -61,6 +61,10 @@ grep -Fq -- 'outbox' "$runner" || fail 'runner must record outbox evidence'
 grep -Fq -- 'inbox' "$runner" || fail 'runner must record inbox evidence'
 grep -Fq -- 'DLQ' "$runner" || fail 'runner must record DLQ evidence'
 grep -Fq -- 'ASSESSMENT_DATABASE_PASSWORD' "$runner" || fail 'runner must redact database secrets'
+grep -Fq -- '/api/v1/courses/1/grade-items' "$runner" \
+  || fail 'assessment outage must probe an independent Grade read route'
+grep -Fq -- 'service_outage assessment-api-down' "$runner" \
+  || fail 'runner must include the assessment outage scenario'
 if grep -Eq 'printf .*PASSWORD|printf .*TOKEN|printf .*SECRET|echo .*PASSWORD' "$runner"; then
   fail 'runner must never print secret values'
 fi

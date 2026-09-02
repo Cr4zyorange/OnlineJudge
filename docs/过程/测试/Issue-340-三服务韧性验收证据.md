@@ -53,6 +53,8 @@ bash scripts/test/verify-issue-340-resilience.sh --bootstrap-318 --output-dir ci
 RESILIENCE_MATRIX_PASS issue=#340 scenarios=7 passed=7 execution=live sha=<sha> report=<path>
 ```
 
+Assessment 停机场景的独立 Grade 查询探针使用 `GET /api/v1/courses/1/grade-items`。该接口只读取 Grade 本地成绩项并执行课程权限判断，不会读取 Assessment 来源成绩；因此不会把 Grade 对 Assessment 的正常来源依赖误报成服务停机故障。Course 查询仍使用 `GET /api/v1/courses`，提交目标使用 Assessment 的写入路径，三者的状态与数据库计数分别记录。
+
 本工作树当前主机的 Docker Desktop 未向 WSL 集成（`docker info` 返回 “Docker could not be found in this WSL 2 distro”），因此本地没有伪造 `execution=live` 结果；真实停机证据以 Actions artifact 为准。运行失败或缺少 Docker 时，脚本退出非零，不会把 BLOCKED 误判为 PASS。
 
 ## 边界披露

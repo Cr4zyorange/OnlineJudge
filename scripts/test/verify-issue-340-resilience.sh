@@ -437,7 +437,7 @@ PY
       "compose=${dir#$repo_root/}; command=stop/start $service; query=$query_status; $query_evidence"
   }
   service_outage assessment-api-down assessment-api 8083 /health/ready course-service 8082 /actuator/health/readiness oj_assessment assessment_submission \
-    /api/v1/homeworks/0/submissions POST '{"code":"issue-340-probe","language":"python"}' /api/v1/courses /api/v1/courses/1/my-grades
+    /api/v1/homeworks/0/submissions POST '{"code":"issue-340-probe","language":"python"}' /api/v1/courses /api/v1/courses/1/grade-items
   service_outage grade-down grade-service 8084 /health/ready course-service 8082 /actuator/health/readiness oj_grade grade_source_projection \
     /api/v1/courses/1/my-grades GET '' /api/v1/courses /api/v1/evaluations/issue340-missing
 

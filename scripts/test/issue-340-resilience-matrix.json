@@ -27,8 +27,8 @@
       "command": "docker compose stop assessment-api; curl gateway/api/v1/submissions; docker compose start assessment-api",
       "assertions": {
         "before": "Assessment readiness is healthy and Course/Grade readiness is healthy",
-        "during": "Assessment API is stopped; new submission is unavailable while Course/Grade read probes remain healthy",
-        "recovery": "Assessment API readiness returns healthy and the historical read probes still have no write side effect"
+        "during": "Assessment API is stopped; new submission is unavailable while independent Course and Grade read probes remain healthy",
+        "recovery": "Assessment API readiness returns healthy and the independent read probes still have no write side effect"
       },
       "evidence": ["composeStatus", "submissionStatus", "courseReadStatus", "gradeReadStatus", "dbWriteDelta"]
     },
