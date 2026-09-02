@@ -193,6 +193,17 @@ class DisposableEnvironmentRendererTest(unittest.TestCase):
         self.assertNotIn("name: gateway", stages["70-applications.yaml"])
         self.assertIn("name: gateway", stages["80-gateway.yaml"])
 
+    def test_assessment_api_stage_declares_the_issue_319_cpu_hpa(self) -> None:
+        stages = self.render_stages()
+
+        applications = stages["70-applications.yaml"]
+        self.assertIn("kind: HorizontalPodAutoscaler", applications)
+        self.assertIn("name: assessment-api", applications)
+        self.assertIn("minReplicas: 1", applications)
+        self.assertIn("maxReplicas: 3", applications)
+        self.assertIn("averageUtilization: 60", applications)
+        self.assertIn("stabilizationWindowSeconds: 300", applications)
+
     def test_assessment_worker_waits_for_the_shared_assessment_schema_migration(self) -> None:
         compose, _ = self.render()
         worker = compose[compose.index("\n  assessment-worker:") : compose.index("\n  grade-service:")]

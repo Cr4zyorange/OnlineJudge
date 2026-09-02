@@ -18,6 +18,7 @@ RUN = REPOSITORY_ROOT / "scripts/platform/run_disposable_environment.sh"
 ROLLBACK = REPOSITORY_ROOT / "scripts/platform/rollback_disposable_environment.sh"
 KUBERNETES_DEPLOY = REPOSITORY_ROOT / "scripts/platform/deploy_kubernetes_disposable_environment.sh"
 CI_DELIVERY = REPOSITORY_ROOT / "scripts/ci/disposable-delivery.sh"
+HPA_EXPERIMENT = REPOSITORY_ROOT / "scripts/platform/run_hpa_observability_experiment.sh"
 CI_WORKFLOW = REPOSITORY_ROOT / ".github/workflows/ci.yml"
 
 
@@ -72,6 +73,18 @@ class DisposableEnvironmentScriptsTest(unittest.TestCase):
         self.assertIn("ENVIRONMENT_READY", source)
         self.assertIn("collect_diagnostics startup-failure", source)
         self.assertIn("json.loads(line)", source)
+
+    def test_hpa_experiment_captures_scale_timeline_and_diagnostics_on_success_or_failure(self) -> None:
+        source = self.assert_help(HPA_EXPERIMENT)
+        self.assertIn("--gateway-url", source)
+        self.assertIn("top pod", source)
+        self.assertIn("get hpa", source)
+        self.assertIn("request_latency_p95", source)
+        self.assertIn("rabbitmq_queue_backlog", source)
+        self.assertIn("assessment_outbox_pending_and_lease", source)
+        self.assertIn("grade_projection_watermark", source)
+        self.assertIn("EXPERIMENT_FAILURE", source)
+        self.assertIn("EXPERIMENT_READY", source)
 
     def test_rollback_command_requires_an_immutable_artifact_manifest(self) -> None:
         source = self.assert_help(ROLLBACK)
