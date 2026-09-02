@@ -1,3 +1,4 @@
+import type { Response } from '@playwright/test';
 import { test, expect } from '../fixtures';
 
 const COURSE_ID = Number(process.env.E2E_COURSE_ID || 9501);
@@ -63,8 +64,8 @@ test('teacher and student complete the LAB publish, submission, review, release,
   await page.getByTestId('submit-lab-button').click();
   const submissionResponse = await submissionResponsePromise;
   expect(submissionResponse.ok()).toBe(true);
-  const submissionPayload = await submissionResponse.json() as { data: { submissionId: number } };
-  const submissionId = submissionPayload.data.submissionId;
+  const submissionPayload = await apiData<{ submissionId: number }>(submissionResponse);
+  const submissionId = submissionPayload.submissionId;
   expect(submissionId).toBeGreaterThan(0);
   lifecycleState.labId = labId;
   lifecycleState.submissionId = submissionId;
@@ -288,3 +289,14 @@ test('teacher syncs the released LAB source score into GRD', async ({ page, logi
   expect(labRecord?.gradeStatus).toBe('SCORED');
   await logout();
 });
+
+async function apiData<T>(response: Response) {
+  const body = await response.json() as ApiEnvelope<T> | T;
+  return isApiEnvelope(body) ? body.data : body;
+}
+
+type ApiEnvelope<T> = { code: string; message: string; data: T };
+
+function isApiEnvelope<T>(body: ApiEnvelope<T> | T): body is ApiEnvelope<T> {
+  return typeof body === 'object' && body !== null && 'code' in body && 'data' in body;
+}
