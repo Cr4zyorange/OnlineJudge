@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { getLabDetail } from '../../../src/api/lab/labs';
 import { request, requestBlob } from '../../../src/api/http';
+import type { LabExperimentDetail } from '../../../src/types/lab';
 
 vi.mock('../../../src/api/http', () => ({
   configureAuthContext: vi.fn(),
@@ -7,9 +9,22 @@ vi.mock('../../../src/api/http', () => ({
   requestBlob: vi.fn()
 }));
 
-describe('lab api blob downloads', () => {
+describe('LAB API adapters', () => {
   beforeEach(() => {
     vi.resetAllMocks();
+  });
+
+  it('normalizes an Assessment service course ID before exposing experiment detail to views', async () => {
+    vi.mocked(request).mockResolvedValue({
+      id: 7,
+      courseId: '101',
+      title: '容器评测实验'
+    } as unknown as LabExperimentDetail);
+
+    await expect(getLabDetail(7)).resolves.toEqual(expect.objectContaining({
+      id: 7,
+      courseId: 101
+    }));
   });
 
   it('downloads lab reports through the authenticated blob request helper', async () => {

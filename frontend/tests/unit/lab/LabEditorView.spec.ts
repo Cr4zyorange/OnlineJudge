@@ -107,6 +107,17 @@ describe('LabEditorView', () => {
     expect(wrapper.get('[role="status"]').text()).toContain('草稿已更新');
   });
 
+  it('accepts a detail course ID serialized as a string by the Assessment service', async () => {
+    vi.mocked(labApi.getLabDetail).mockResolvedValue(detail({
+      courseId: '101' as unknown as number
+    }));
+    const wrapper = mountEditor({ courseId: 101, labId: 7 });
+    await flushPromises();
+
+    expect(wrapper.find('[data-state="error"]').exists()).toBe(false);
+    expect((wrapper.get('[name="title"]').element as HTMLInputElement).value).toBe('原实验');
+  });
+
   it('keeps invalid input visible and blocks the request with an actionable summary', async () => {
     const wrapper = mountEditor({ courseId: 101 });
     await flushPromises();

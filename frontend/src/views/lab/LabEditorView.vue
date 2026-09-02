@@ -364,7 +364,7 @@ async function loadEditor() {
       props.labId === undefined ? Promise.resolve(null) : getLabDetail(props.labId)
     ]);
     if (generation !== editorGeneration) return;
-    if (detailResult && (detailResult.courseId !== props.courseId || detailResult.id !== props.labId)) {
+    if (detailResult && (Number(detailResult.courseId) !== props.courseId || detailResult.id !== props.labId)) {
       throw new Error('实验与当前课程不匹配，请返回实验管理重新进入。');
     }
     chapters.value = chapterResult;

@@ -44,7 +44,7 @@ test.describe('@lrn #269 notification read-on-open', () => {
 
     await loginAs('student');
     const studentHeaders = await authHeaders(page);
-    const beforeOpen = await notificationPage(page, studentHeaders);
+    const beforeOpen = await waitForLabNotification(page, studentHeaders, lab.id);
     const notice = findNotice(beforeOpen, lab.id);
     expect(notice.isRead).toBe(false);
     const beforeUnreadNotificationIds = new Set(beforeOpen.records
@@ -105,6 +105,15 @@ test.describe('@lrn #269 notification read-on-open', () => {
 
 async function notificationPage(page: Page, headers: Record<string, string>) {
   return apiData<NotificationPage>(await page.request.get('/api/v1/notifications?size=100', { headers }));
+}
+
+async function waitForLabNotification(page: Page, headers: Record<string, string>, labId: number) {
+  let latest: NotificationPage | undefined;
+  await expect.poll(async () => {
+    latest = await notificationPage(page, headers);
+    return latest.records.some((record) => record.sourceModule === 'LAB' && record.sourceId === labId);
+  }, { intervals: [100, 250, 500, 1_000], timeout: 10_000 }).toBe(true);
+  return latest!;
 }
 
 async function apiData<T>(response: APIResponse) {
