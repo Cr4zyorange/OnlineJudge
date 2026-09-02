@@ -2,7 +2,7 @@
 
 ## 当前状态
 
-压测计划、逻辑数据集、原始请求采集、Docker 资源采样、完整性校验和报告聚合工具已经具备。#318 已发布 `ENVIRONMENT_READY` 并合入 `dev`。2026-09-02 曾在同一台机器执行 18 轮，但该窗口的三服务 JWKS 启动快照为空，且负载脚本没有逐轮受保护 API 预检；它是保留的失败证据，不是可验收的性能结论，见 [20260902T0958Z](results/20260902T0958Z/report/comparison.md)。
+压测计划、逻辑数据集、原始请求采集、Docker 资源采样、完整性校验和报告聚合工具已经具备。#318 已发布 `ENVIRONMENT_READY` 并合入 `dev`。当前唯一可验收的正式窗口是 [20260902-225234](results/20260902-225234/evidence/README.md)：它在同一台机器完成 `3 API × 2 架构 × 3 轮 = 18` 个完整样本，全部请求成功，且逐个 Course 预检响应均断言 API 可见总数 `data.total == 105`。较早的 `20260902T0958Z` 窗口三服务 JWKS 启动快照为空且没有逐轮受保护 API 预检；它保留为失败证据，不是可验收的性能结论，见 [20260902T0958Z](results/20260902T0958Z/report/comparison.md)。
 
 正式计数逐轮证明了以下条件；缺任意一项时工具会拒绝聚合：
 
@@ -137,8 +137,8 @@ node scripts/perf/issue-307.mjs aggregate \
 
 | 验收项 | 当前证据 | 状态 |
 | --- | --- | --- |
-| AC-307-01 同机、同数据、同脚本、同负载、可比资源 | 旧窗口已有机器指纹、数据集 SHA、formal-window 和硬限制证据；修正后需在新窗口重验 | 待重测 |
-| AC-307-02 3 API × 2 架构 × 3 轮 | 旧 `raw-manifest.json` 有 18 个无损压缩样本；新正式轮必须重新收集 | 待重测 |
-| AC-307-03 无 HPA/E2E/故障/压力污染 | 旧窗口污染项为 false；新窗口仍须逐轮证明 | 待重测 |
-| AC-307-04 P95/吞吐/错误率/CPU/内存 | 旧报告记录指标但因 API 失败不可验收；新窗口必须重新生成 | 待重测 |
-| AC-307-05 有限解释且不宣称未测结论 | 旧报告保留为失败证据；新报告必须沿用该解释边界 | 待重测 |
+| AC-307-01 同机、同数据、同脚本、同负载、可比资源 | [20260902-225234 evidence](results/20260902-225234/evidence/README.md) 记录同一机器指纹、同一数据集 SHA、相同 10 学生/1 s 节流负载及两侧精确 4 CPU / 6144 MiB；[combined count](results/20260902-225234/evidence/combined-raw-count.json) 证明全部 6 个 Course 轮次的 API 可见总数为 105 | PASS |
+| AC-307-02 3 API × 2 架构 × 3 轮 | [combined count](results/20260902-225234/evidence/combined-raw-count.json) 记录 18 个有效轮次、0 个无效轮次、21,582 个正式请求；[raw manifest](results/20260902-225234/raw/raw-manifest.json) 记录全部 18 份无损压缩原始样本 | PASS |
+| AC-307-03 无 HPA/E2E/故障/压力污染 | [evidence](results/20260902-225234/evidence/README.md) 和逐轮 formal-window 证明三服务先以 9/9 容器独占运行、完全清理后单体以 3/3 容器独占运行；每个资源样本复核独占状态，最终关停证明为零 | PASS |
+| AC-307-04 P95/吞吐/错误率/CPU/内存 | [comparison.md](results/20260902-225234/report/comparison.md) 和 [rounds.csv](results/20260902-225234/report/rounds.csv) 包含所有 18 轮的 P95、吞吐、0 错误率、CPU 与内存，以及无挑轮聚合 | PASS |
+| AC-307-05 有限解释且不宣称未测结论 | [evidence README](results/20260902-225234/evidence/README.md) 将约 9.915 r/s 限定为 10 学生/1 s 节流结果，明确 CPU/内存拓扑观察和有限的 gateway/service hop 推测，并拒绝未测因果结论 | PASS |
