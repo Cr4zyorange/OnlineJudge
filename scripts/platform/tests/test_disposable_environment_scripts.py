@@ -97,6 +97,9 @@ class DisposableEnvironmentScriptsTest(unittest.TestCase):
         self.assertNotIn("mapfile -t cleanup_", source)
         self.assertIn("while IFS= read -r cleanup_container; do", source)
         self.assertIn("while IFS= read -r cleanup_volume; do", source)
+        self.assertIn('cleanup_arguments=("$output_dir/cleanup-summary.json" "$project_name" "$cleanup_status")', source)
+        self.assertIn('cleanup_arguments+=(--)', source)
+        self.assertNotIn('"${cleanup_containers[@]}" -- "${cleanup_volumes[@]}"', source)
         self.assertIn("cleanup-summary.json", source)
 
     def test_run_command_collects_post_hook_diagnostics_before_propagating_failure(self) -> None:

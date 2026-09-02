@@ -88,7 +88,11 @@ cleanup() {
     if ((${#cleanup_containers[@]} || ${#cleanup_volumes[@]})); then
       cleanup_status=1
     fi
-    python3 - "$output_dir/cleanup-summary.json" "$project_name" "$cleanup_status" "${cleanup_containers[@]}" -- "${cleanup_volumes[@]}" <<'PY'
+    cleanup_arguments=("$output_dir/cleanup-summary.json" "$project_name" "$cleanup_status")
+    if ((${#cleanup_containers[@]})); then cleanup_arguments+=("${cleanup_containers[@]}"); fi
+    cleanup_arguments+=(--)
+    if ((${#cleanup_volumes[@]})); then cleanup_arguments+=("${cleanup_volumes[@]}"); fi
+    python3 - "${cleanup_arguments[@]}" <<'PY'
 import json
 import sys
 
