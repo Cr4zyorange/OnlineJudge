@@ -281,6 +281,7 @@ import PageHeader from '../../components/foundation/PageHeader.vue';
 import PageState from '../../components/foundation/PageState.vue';
 import StatusBadge, { type StatusBadgeTone } from '../../components/foundation/StatusBadge.vue';
 import SummaryStrip, { type SummaryStripItem } from '../../components/foundation/SummaryStrip.vue';
+import { labStudentIdsMatch } from '../../types/lab';
 import type {
   LabEvaluationCaseResult,
   LabExperimentDetail,
@@ -292,7 +293,8 @@ import type {
   LabSubmissionHistoryItem,
   LabSubmissionId,
   LabSubmissionResult,
-  LabSubmissionSummary
+  LabSubmissionSummary,
+  LabStudentId
 } from '../../types/lab';
 import {
   formatLabDateTime,
@@ -723,9 +725,9 @@ function selectLatestSubmission(history: LabSubmissionHistoryItem[]) {
   })[0] ?? null;
 }
 
-function validateLatestHistory(history: LabSubmissionHistoryItem[], studentId: number) {
-  if (currentUser.value?.id !== studentId
-    || history.some((item) => item.labId !== props.labId || item.studentId !== studentId)) {
+function validateLatestHistory(history: LabSubmissionHistoryItem[], studentId: LabStudentId) {
+  if (!labStudentIdsMatch(currentUser.value?.id, studentId)
+    || history.some((item) => item.labId !== props.labId || !labStudentIdsMatch(item.studentId, studentId))) {
     throw new Error('提交历史与当前实验或学生不匹配，请重新加载。');
   }
 }
@@ -739,9 +741,9 @@ function validateLab(loadedLab: LabExperimentDetail) {
 function validateAggregateResult(aggregate: LabResult, selected: LabSubmissionHistoryItem) {
   if (
     aggregate.labId !== props.labId
-    || aggregate.studentId !== selected.studentId
+    || !labStudentIdsMatch(aggregate.studentId, selected.studentId)
     || aggregate.submission.labId !== props.labId
-    || aggregate.submission.studentId !== selected.studentId
+    || !labStudentIdsMatch(aggregate.submission.studentId, selected.studentId)
     || aggregate.submission.submissionId !== selected.submissionId
     || aggregate.evaluationResult.submissionId !== selected.submissionId
   ) {
@@ -757,7 +759,7 @@ function validateHistoricResult(
   if (
     loadedSubmission.labId !== props.labId
     || loadedSubmission.submissionId !== selectedSubmissionId
-    || loadedSubmission.studentId !== currentUser.value?.id
+    || !labStudentIdsMatch(loadedSubmission.studentId, currentUser.value?.id)
     || loadedEvaluation.submissionId !== selectedSubmissionId
   ) {
     throw new Error('返回的实验结果与当前提交不匹配。');

@@ -65,7 +65,7 @@ public class LabSubmissionService {
             if (autoEvaluation) {
                 tasks.insert(taskId, submissionId, "LAB", Long.toString(lab.labId()), lab.courseId(), command.studentId(), command.originRequestId(), now);
             }
-            return new SubmittedLabSubmission(submissionId, taskId, lab.labId(), version, "SUBMITTED", evaluationStatus, now);
+            return new SubmittedLabSubmission(submissionId, taskId, lab.labId(), command.studentId(), version, "SUBMITTED", evaluationStatus, now);
         } catch (RuntimeException | java.io.IOException failed) {
             if (stored != null) {
                 try { files.delete(stored.storageKey()); }
@@ -115,6 +115,6 @@ public class LabSubmissionService {
             if (originRequestId == null || originRequestId.isBlank() || originRequestId.length() > 80) throw new IllegalArgumentException("origin request id is required");
         }
     }
-    public record SubmittedLabSubmission(String submissionId, String taskId, long labId, int version,
+    public record SubmittedLabSubmission(String submissionId, String taskId, long labId, String studentId, int version,
                                          String submitStatus, String evaluationStatus, Instant submittedAt) { }
 }

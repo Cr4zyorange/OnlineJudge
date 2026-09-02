@@ -172,6 +172,7 @@ class LabWorkflowContractTest {
                         .param("language", "python")
                         .header("Authorization", "Bearer " + studentToken).header("X-Request-Id", "lab-submit-314"))
                 .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.studentId").value("student-314"))
                 .andExpect(jsonPath("$.evaluationStatus").value("PENDING"))
                 .andExpect(jsonPath("$.version").value(1));
 

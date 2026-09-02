@@ -281,7 +281,8 @@ import type {
   LabSubmissionHistoryItem,
   LabSubmissionListFilters,
   LabSubmissionId,
-  LabSubmissionSummary
+  LabSubmissionSummary,
+  LabStudentId
 } from '../../types/lab';
 
 const props = defineProps<{
@@ -323,7 +324,7 @@ const filters = reactive<FilterForm>({
 const submissions = ref<LabSubmissionHistoryItem[]>([]);
 const labTitle = ref('');
 const courseName = ref('');
-const studentNames = ref<Record<number, string>>({});
+const studentNames = ref<Record<string, string>>({});
 const labContextLoading = ref(false);
 const studentNamesLoading = ref(false);
 const queueLoading = ref(false);
@@ -435,7 +436,7 @@ async function loadStudentNames() {
     }
     courseName.value = progress.courseName.trim();
     studentNames.value = Object.fromEntries(progress.students
-      .map((student) => [student.studentId, student.studentName.trim()] as const)
+      .map((student) => [String(student.studentId), student.studentName.trim()] as const)
       .filter(([, name]) => name.length > 0));
   } catch (error) {
     if (requestId !== studentNamesRequestId) {
@@ -599,8 +600,8 @@ function evaluationStatusClass(status: EvaluationStatus) {
   return 'status-pill--danger';
 }
 
-function studentDisplayName(studentId: number) {
-  return studentNames.value[studentId] || '学生姓名暂不可用';
+function studentDisplayName(studentId: LabStudentId) {
+  return studentNames.value[String(studentId)] || '学生姓名暂不可用';
 }
 
 function languageLabel(language: string) {

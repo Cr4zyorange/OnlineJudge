@@ -413,6 +413,7 @@ import {
   scoreLabSubmission
 } from '../../api/lab/labs';
 import { getTeacherLearningProgress } from '../../api/lrn/learningProgress';
+import { labStudentIdsMatch } from '../../types/lab';
 import type {
   LabExperimentDetail,
   LabReportSummary,
@@ -573,7 +574,7 @@ async function loadPage() {
     const selectedStudentId = submissionResult.status === 'fulfilled'
       ? submissionResult.value.studentId
       : null;
-    const matchedStudent = progressResult.value.students.find((item) => item.studentId === selectedStudentId);
+    const matchedStudent = progressResult.value.students.find((item) => labStudentIdsMatch(item.studentId, selectedStudentId));
     studentName.value = matchedStudent?.studentName.trim() || '学生姓名暂不可用';
     if (!matchedStudent?.studentName.trim() && selectedStudentId !== null) {
       studentNameWarning.value = '课程名单中未找到该提交对应的学生姓名';

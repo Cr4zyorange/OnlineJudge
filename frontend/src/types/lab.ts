@@ -15,6 +15,26 @@ export type LabEvaluationMode = 'DOCKER_IO' | 'MIXED' | 'MANUAL';
  */
 export type LabSubmissionId = string | number;
 
+/** Assessment receives identity user IDs as JWT strings, while older UI fixtures use numbers. */
+export type LabStudentId = string | number;
+
+/**
+ * Identity exposes legacy numeric user IDs in the browser, while Assessment
+ * authorizes and persists the JWT subject as text. Compare the canonical text
+ * representation so a verified submission is not rejected only by transport
+ * encoding, without coercing opaque IDs to numbers.
+ */
+export function labStudentIdsMatch(
+  left: LabStudentId | null | undefined,
+  right: LabStudentId | null | undefined
+) {
+  return left !== null
+    && left !== undefined
+    && right !== null
+    && right !== undefined
+    && String(left) === String(right);
+}
+
 export interface LabTestcase {
   id: number;
   labId: number;
@@ -132,7 +152,7 @@ export interface LabScoreSummary {
 export interface LabSubmissionSummary {
   submissionId: LabSubmissionId;
   labId: number;
-  studentId: number;
+  studentId: LabStudentId;
   submitStatus: 'SUBMITTED' | 'LATE' | 'WITHDRAWN';
   evaluationStatus:
     | 'NONE'
@@ -152,7 +172,7 @@ export interface LabSubmissionSummary {
 export interface LabSubmissionHistoryItem {
   submissionId: LabSubmissionId;
   labId: number;
-  studentId: number;
+  studentId: LabStudentId;
   language: string;
   submitStatus: LabSubmissionSummary['submitStatus'];
   evaluationStatus: LabSubmissionSummary['evaluationStatus'];
@@ -204,7 +224,7 @@ export interface LabSubmissionResult {
 }
 
 export interface LabSubmissionListFilters {
-  studentId?: number;
+  studentId?: LabStudentId;
   submitStatus?: LabSubmissionSummary['submitStatus'];
   evaluationStatus?: LabSubmissionSummary['evaluationStatus'];
   overdue?: boolean;
@@ -212,7 +232,7 @@ export interface LabSubmissionListFilters {
 
 export interface LabResult {
   labId: number;
-  studentId: number;
+  studentId: LabStudentId;
   status: LabExperimentStatus;
   submission: LabSubmissionDetail;
   evaluationResult: LabSubmissionResult;
@@ -232,7 +252,7 @@ export interface LabStatistics {
   evaluationCompletionRate: number;
   averageScore: number | null;
   lateSubmissionCount: number;
-  unsubmittedStudentIds: number[];
+  unsubmittedStudentIds: LabStudentId[];
   scoreDistribution: Record<string, number>;
   generatedAt: string;
 }

@@ -147,7 +147,7 @@ describe('LabStudentView', () => {
     vi.mocked(labApi.submitLab).mockResolvedValueOnce({
       submissionId: 99,
       labId: 7,
-      studentId: 601,
+      studentId: '601',
       submitStatus: 'SUBMITTED',
       evaluationStatus: 'PENDING',
       autoScore: null,

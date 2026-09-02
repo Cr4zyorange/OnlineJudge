@@ -239,6 +239,7 @@ import PageHeader from '../../components/foundation/PageHeader.vue';
 import PageState from '../../components/foundation/PageState.vue';
 import StatusBadge from '../../components/foundation/StatusBadge.vue';
 import SummaryStrip, { type SummaryStripItem } from '../../components/foundation/SummaryStrip.vue';
+import { labStudentIdsMatch } from '../../types/lab';
 import type {
   LabExperimentDetail,
   LabSubmissionDetail,
@@ -413,8 +414,8 @@ async function loadHistory() {
     if (!isCurrentRequest(context, request, historyRequestVersion)) {
       return;
     }
-    if (currentUser.value?.id !== studentId
-      || result.some((item) => item.labId !== labId || item.studentId !== studentId)) {
+    if (!labStudentIdsMatch(currentUser.value?.id, studentId)
+      || result.some((item) => item.labId !== labId || !labStudentIdsMatch(item.studentId, studentId))) {
       throw new Error('提交历史与当前实验或学生不匹配，请重新加载。');
     }
     history.value = result.slice().sort(compareSubmissions);
@@ -454,8 +455,8 @@ async function openDetail(submissionId: LabSubmissionId) {
       || result.submissionId !== submissionId
       || studentId === undefined
       || studentId === null
-      || currentUser.value?.id !== studentId
-      || result.studentId !== studentId) {
+      || !labStudentIdsMatch(currentUser.value?.id, studentId)
+      || !labStudentIdsMatch(result.studentId, studentId)) {
       throw new Error('提交内容与所选版本不匹配，请重新加载。');
     }
     detail.value = result;

@@ -414,6 +414,7 @@ import PageState from '../../components/foundation/PageState.vue';
 import StatusBadge from '../../components/foundation/StatusBadge.vue';
 import SummaryStrip, { type SummaryStripItem } from '../../components/foundation/SummaryStrip.vue';
 import LabStudentAttachments from './LabStudentAttachments.vue';
+import { labStudentIdsMatch } from '../../types/lab';
 import type {
   LabExperimentDetail,
   LabReportSummary,
@@ -422,7 +423,8 @@ import type {
   LabSubmissionHistoryItem,
   LabSubmissionId,
   LabSubmissionResult,
-  LabSubmissionSummary
+  LabSubmissionSummary,
+  LabStudentId
 } from '../../types/lab';
 import {
   formatLabDateTime,
@@ -887,12 +889,12 @@ async function refreshLatestEvaluationResult(
 }
 
 async function refreshStudentLabResult(
-  studentId: number,
+  studentId: LabStudentId,
   generation = loadGeneration,
   historyRequest?: number
 ) {
   const requestedLabId = props.labId;
-  if (currentUser.value?.id !== studentId) return;
+  if (!labStudentIdsMatch(currentUser.value?.id, studentId)) return;
   if (historyRequest !== undefined
     && !isCurrentHistoryRequest(generation, historyRequest, requestedLabId)) return;
   try {
@@ -1017,10 +1019,10 @@ function selectLatestSubmission(history: LabSubmissionHistoryItem[] | null | und
 function validateSubmissionHistory(
   history: LabSubmissionHistoryItem[],
   labId: number,
-  studentId: number
+  studentId: LabStudentId
 ) {
-  if (currentUser.value?.id !== studentId
-    || history.some((item) => item.labId !== labId || item.studentId !== studentId)) {
+  if (!labStudentIdsMatch(currentUser.value?.id, studentId)
+    || history.some((item) => item.labId !== labId || !labStudentIdsMatch(item.studentId, studentId))) {
     throw new Error('提交历史与当前实验或学生不匹配，请重新加载。');
   }
 }
@@ -1029,7 +1031,7 @@ function validateConfirmedSubmission(submitted: LabSubmissionSummary, labId: num
   const studentId = currentUser.value?.id;
   if (studentId === undefined || studentId === null
     || submitted.labId !== labId
-    || submitted.studentId !== studentId) {
+    || !labStudentIdsMatch(submitted.studentId, studentId)) {
     throw new Error('提交回执与当前实验或学生不匹配，请核对提交历史。');
   }
 }
@@ -1037,14 +1039,14 @@ function validateConfirmedSubmission(submitted: LabSubmissionSummary, labId: num
 function validateStudentLabResult(
   result: Awaited<ReturnType<typeof getLabResult>>,
   labId: number,
-  studentId: number,
+  studentId: LabStudentId,
   submissionId: LabSubmissionId
 ) {
-  if (currentUser.value?.id !== studentId
+  if (!labStudentIdsMatch(currentUser.value?.id, studentId)
     || result.labId !== labId
-    || result.studentId !== studentId
+    || !labStudentIdsMatch(result.studentId, studentId)
     || result.submission.labId !== labId
-    || result.submission.studentId !== studentId
+    || !labStudentIdsMatch(result.submission.studentId, studentId)
     || result.submission.submissionId !== submissionId
     || result.evaluationResult.submissionId !== submissionId) {
     throw new Error('返回的实验结果与当前提交不匹配。');
