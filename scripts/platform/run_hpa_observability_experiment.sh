@@ -11,6 +11,7 @@ output_dir=""
 duration_seconds=180
 concurrency=8
 sample_seconds=5
+scale_timeout_seconds=420
 rabbitmq_outage=0
 rabbitmq_original_replicas=""
 
@@ -32,6 +33,7 @@ Options:
   --duration-seconds N      Load duration (default: 180)
   --concurrency N           Parallel curl workers (default: 8)
   --sample-seconds N        HPA/resource sampling interval (default: 5)
+  --scale-timeout-seconds N Maximum wait for each scale transition (default: 420)
   --inject-rabbitmq-outage  Prove RabbitMQ is noncritical to API readiness
   --output-dir DIR          Evidence directory (default: output/issue-319/<sha>/<utc>)
 USAGE
@@ -45,6 +47,7 @@ while (($#)); do
     --duration-seconds) duration_seconds="${2:?--duration-seconds requires a value}"; shift 2 ;;
     --concurrency) concurrency="${2:?--concurrency requires a value}"; shift 2 ;;
     --sample-seconds) sample_seconds="${2:?--sample-seconds requires a value}"; shift 2 ;;
+    --scale-timeout-seconds) scale_timeout_seconds="${2:?--scale-timeout-seconds requires a value}"; shift 2 ;;
     --inject-rabbitmq-outage) rabbitmq_outage=1; shift ;;
     --output-dir) output_dir="${2:?--output-dir requires a value}"; shift 2 ;;
     --help|-h) usage; exit 0 ;;
@@ -54,7 +57,7 @@ done
 
 [[ -n "$gateway_url" && -n "$request_url" ]] || { usage >&2; exit 2; }
 [[ "$request_url" == "$gateway_url"* ]] || { printf 'run-hpa-observability-experiment: request URL must use the supplied gateway URL\n' >&2; exit 2; }
-[[ "$duration_seconds" =~ ^[1-9][0-9]*$ && "$concurrency" =~ ^[1-9][0-9]*$ && "$sample_seconds" =~ ^[1-9][0-9]*$ ]] || {
+[[ "$duration_seconds" =~ ^[1-9][0-9]*$ && "$concurrency" =~ ^[1-9][0-9]*$ && "$sample_seconds" =~ ^[1-9][0-9]*$ && "$scale_timeout_seconds" =~ ^[1-9][0-9]*$ ]] || {
   printf 'run-hpa-observability-experiment: duration, concurrency and sample interval must be positive integers\n' >&2; exit 2;
 }
 command -v kubectl >/dev/null 2>&1 || { printf 'run-hpa-observability-experiment: kubectl is required\n' >&2; exit 2; }
@@ -75,6 +78,24 @@ capture_diagnostics() {
   kubectl -n "$namespace" logs deployment/assessment-api --all-containers --tail=-1 > "$output_dir/raw/assessment_outbox_pending_and_lease.log" 2>&1 || true
   kubectl -n "$namespace" logs deployment/grade-service --all-containers --tail=-1 > "$output_dir/raw/grade_projection_watermark.log" 2>&1 || true
   kubectl -n "$namespace" exec statefulset/rabbitmq -- rabbitmqctl list_queues name messages_ready messages_unacknowledged > "$output_dir/raw/rabbitmq_queue_backlog.txt" 2>&1 || true
+}
+
+wait_for_replicas() {
+  local comparison="$1" baseline="$2" transition="$3" deadline current
+  deadline=$((SECONDS + scale_timeout_seconds))
+  while (( SECONDS < deadline )); do
+    current="$(kubectl -n "$namespace" get deployment/assessment-api -o jsonpath='{.status.replicas}' 2>> "$output_dir/raw/hpa-transition.log" || true)"
+    if [[ "$current" =~ ^[0-9]+$ ]] && {
+      [[ "$comparison" == "-gt" ]] && (( current > baseline )) ||
+      [[ "$comparison" == "-le" ]] && (( current <= baseline ));
+    }; then
+      printf '%s replicas=%s baseline=%s\n' "$transition" "$current" "$baseline" >> "$output_dir/raw/hpa-transition.log"
+      return 0
+    fi
+    sleep "$sample_seconds"
+  done
+  printf '%s did not reach expected replica count relative to baseline=%s within %ss\n' "$transition" "$baseline" "$scale_timeout_seconds" >&2
+  return 1
 }
 
 finish() {
@@ -111,6 +132,8 @@ trap finish EXIT
 
 kubectl -n "$namespace" get hpa assessment-api >/dev/null
 kubectl -n "$namespace" top pod -l app.kubernetes.io/name=assessment-api >/dev/null
+baseline_replicas="$(kubectl -n "$namespace" get deployment/assessment-api -o jsonpath='{.status.replicas}')"
+[[ "$baseline_replicas" =~ ^[1-9][0-9]*$ ]] || { printf 'assessment-api has no baseline replicas\n' >&2; exit 1; }
 started_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 if (( rabbitmq_outage )); then
   rabbitmq_original_replicas="$(kubectl -n "$namespace" get statefulset/rabbitmq -o jsonpath='{.spec.replicas}')"
@@ -149,3 +172,5 @@ rows = pathlib.Path(sys.argv[1]).read_text(encoding="utf-8").splitlines()
 if not rows or any(len(row.split()) != 4 or not (200 <= int(row.split()[2]) < 300) for row in rows):
     raise SystemExit("Assessment business-chain load contained no successful requests or at least one non-2xx response")
 PY
+wait_for_replicas -gt "$baseline_replicas" "scaled up"
+wait_for_replicas -le "$baseline_replicas" "scaled down"
