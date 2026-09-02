@@ -83,6 +83,10 @@ class DisposableEnvironmentScriptsTest(unittest.TestCase):
         self.assertIn("rabbitmq_queue_backlog", source)
         self.assertIn("assessment_outbox_pending_and_lease", source)
         self.assertIn("grade_projection_watermark", source)
+        self.assertIn('"finishedAtUtc"', source)
+        self.assertIn("request_id", source)
+        self.assertIn("--inject-rabbitmq-outage", source)
+        self.assertIn("kubectl -n \"$namespace\" scale statefulset/rabbitmq", source)
         self.assertIn("EXPERIMENT_FAILURE", source)
         self.assertIn("EXPERIMENT_READY", source)
 
