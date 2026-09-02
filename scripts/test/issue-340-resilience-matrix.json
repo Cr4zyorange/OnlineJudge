@@ -52,7 +52,7 @@
         "during": "Grade service is stopped; Assessment source fact remains readable and no duplicate fact is written",
         "recovery": "Grade readiness returns healthy and the same event identity is projected exactly once"
       },
-      "evidence": ["composeStatus", "sourceGradeEventId", "sourceGradeRevision", "gradeProjectionCount", "recoverySeconds"]
+      "evidence": ["composeStatus", "sourceGradeEventId", "sourceGradeRevision", "sourceGradeOutboxState", "gradeInboxStatus", "gradeProjectionCount", "duplicateDecision", "recoverySeconds"]
     },
     {
       "id": "rabbitmq-down",
@@ -74,7 +74,7 @@
         "during": "Identity is stopped; an existing JWT remains locally verifiable while a new login/refresh probe fails",
         "recovery": "Identity JWKS refresh succeeds and the cached-key request path still performs no business write"
       },
-      "evidence": ["kid", "jwtMode", "identityStatus", "cachedVerification", "newLoginStatus", "recoverySeconds"]
+      "evidence": ["kid", "jwtMode", "identityStatus", "cachedVerification", "protectedReadStatus", "newLoginStatus", "recoverySeconds"]
     },
     {
       "id": "duplicate-gap-dlq",

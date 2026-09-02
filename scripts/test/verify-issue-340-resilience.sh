@@ -262,13 +262,15 @@ else
   fi
 
   recovery_log="$output_dir/worker-rabbit-recovery.log"
-  if bash "$repo_root/scripts/test/verify-issue-314-recovery-disposable.sh" >"$recovery_log" 2>&1; then
+  recovery_raw_log="$output_dir/worker-rabbit-recovery-raw.log"
+  if OJ314_KEEP_RAW_LOG=1 OJ314_RAW_LOG_PATH="$recovery_raw_log" \
+    bash "$repo_root/scripts/test/verify-issue-314-recovery-disposable.sh" >"$recovery_log" 2>&1; then
     for id in worker-kill rabbitmq-down; do
-      record_scenario "$id" PASS "the disposable database contained persisted task/outbox facts" "the worker or RabbitMQ was stopped in the live lease/publish window" "replacement generation and broker delivery converged without duplicate facts" "disposable=${recovery_log#$repo_root/}\n$(redacted_tail "$recovery_log")"
+      record_scenario "$id" PASS "the disposable database contained persisted task/outbox facts" "the worker or RabbitMQ was stopped in the live lease/publish window" "replacement generation and broker delivery converged without duplicate facts" "disposable=${recovery_log#$repo_root/}; rawAssertions=${recovery_raw_log#$repo_root/}\n$(redacted_tail "$recovery_log")\n$(redacted_tail "$recovery_raw_log")"
     done
   else
     for id in worker-kill rabbitmq-down; do
-      record_scenario "$id" FAIL "the disposable recovery fixture was attempted" "the worker/Rabbit fault could not be completed" "recovery was not proven" "disposable=${recovery_log#$repo_root/}\n$(redacted_tail "$recovery_log")"
+      record_scenario "$id" FAIL "the disposable recovery fixture was attempted" "the worker/Rabbit fault could not be completed" "recovery was not proven" "disposable=${recovery_log#$repo_root/}; rawAssertions=${recovery_raw_log#$repo_root/}\n$(redacted_tail "$recovery_log")\n$(redacted_tail "$recovery_raw_log")"
     done
   fi
 
@@ -286,18 +288,25 @@ else
   query_username="issue340-${run_id##*-}"
   query_password="Issue340-${run_id##*-}-pass"
   prepare_query_token() {
-    local register_body login_body register_code login_code
+    local register_body login_body register_code login_code login_response_file
     register_body="{\"username\":\"$query_username\",\"password\":\"$query_password\",\"userType\":\"STUDENT\",\"displayName\":\"Issue 340 probe\"}"
     register_code="$(curl --silent --show-error --output "$output_dir/query-register.json" --write-out '%{http_code}' \
       --max-time 15 -X POST "$base_url/api/v1/auth/register" -H 'Content-Type: application/json' \
       -H 'X-Request-Id: issue340-register' --data "$register_body" 2>"$output_dir/query-register.error" || printf '000')"
     [[ "$register_code" =~ ^2[0-9][0-9]$ ]] || return 1
     login_body="{\"account\":\"$query_username\",\"password\":\"$query_password\"}"
-    login_code="$(curl --silent --show-error --output "$output_dir/query-login.json" --write-out '%{http_code}' \
+    # The login response is authentication material, so keep it outside the
+    # evidence directory and upload only a whitelist of non-sensitive facts.
+    login_response_file="$(mktemp "${TMPDIR:-/tmp}/issue340-login.XXXXXX.json")"
+    login_code="$(curl --silent --show-error --output "$login_response_file" --write-out '%{http_code}' \
       --max-time 15 -X POST "$base_url/api/v1/auth/login" -H 'Content-Type: application/json' \
       -H 'X-Request-Id: issue340-login' --data "$login_body" 2>"$output_dir/query-login.error" || printf '000')"
-    [[ "$login_code" =~ ^2[0-9][0-9]$ ]] || return 1
-    query_token="$(python3 - "$output_dir/query-login.json" <<'PY'
+    if [[ ! "$login_code" =~ ^2[0-9][0-9]$ ]]; then
+      printf '{"httpStatus":%s,"tokenPresent":false}\n' "$login_code" > "$output_dir/query-login-meta.json"
+      rm -f "$login_response_file"
+      return 1
+    fi
+    if ! query_token="$(python3 - "$login_response_file" <<'PY'
 import json
 import sys
 payload = json.load(open(sys.argv[1], encoding="utf-8"))
@@ -306,7 +315,13 @@ if not isinstance(token, str) or not token:
     raise SystemExit(1)
 print(token)
 PY
-)"
+)"; then
+      rm -f "$login_response_file"
+      return 1
+    fi
+    printf '{"httpStatus":%s,"tokenPresent":true,"tokenLength":%s}\n' \
+      "$login_code" "${#query_token}" > "$output_dir/query-login-meta.json"
+    rm -f "$login_response_file"
     [[ -n "$query_token" ]]
   }
   query_api() {
@@ -396,6 +411,11 @@ PY
     compose_exec mysql sh -ec 'mysql --protocol=tcp -uroot -p"$MYSQL_ROOT_PASSWORD" -N -e "$1"' sh \
       "SELECT COUNT(*) FROM ${schema}.${table};"
   }
+  db_exec() {
+    local schema="$1" statement="$2"
+    compose_exec mysql sh -ec 'mysql --protocol=tcp -uroot -p"$MYSQL_ROOT_PASSWORD" --database="$1" --batch --skip-column-names --raw -e "$2"' sh \
+      "$schema" "$statement"
+  }
   service_outage() {
     local id="$1" service="$2" service_port="$3" service_path="$4"
     local peer_service="$5" peer_port="$6" peer_path="$7" schema="$8" table="$9"
@@ -438,28 +458,140 @@ PY
   }
   service_outage assessment-api-down assessment-api 8083 /health/ready course-service 8082 /actuator/health/readiness oj_assessment assessment_submission \
     /api/v1/homeworks/0/submissions POST '{"code":"issue-340-probe","language":"python"}' /api/v1/courses /api/v1/courses/1/grade-items
-  service_outage grade-down grade-service 8084 /health/ready course-service 8082 /actuator/health/readiness oj_grade grade_source_projection \
-    /api/v1/courses/1/my-grades GET '' /api/v1/courses /api/v1/evaluations/issue340-missing
+
+  wait_for_db_value() {
+    local description="$1" expected="$2" schema="$3" query="$4" actual='' deadline=$((SECONDS + timeout_seconds))
+    while (( SECONDS < deadline )); do
+      actual="$(db_exec "$schema" "$query" 2>/dev/null || true)"
+      [[ "$actual" == "$expected" ]] && return 0
+      sleep 2
+    done
+    printf '%s expected=%s actual=%s\n' "$description" "$expected" "${actual:-<empty>}" >&2
+    return 1
+  }
+
+  publish_duplicate_event() {
+    local payload="$1"
+    # Publish the exact same envelope through the real broker so Grade's
+    # consumer/inbox duplicate path is exercised rather than mocked.
+    compose_exec rabbitmq sh -ec '
+      rabbitmqadmin --username "$RABBITMQ_DEFAULT_USER" --password "$RABBITMQ_DEFAULT_PASS" \
+        publish exchange=onlinejudge.events.v2 \
+        routing_key=onlinejudge.assessment.source-grade.changed.v2 payload="$1" --non-interactive
+    ' sh "$payload"
+  }
+
+  grade_down_source_fixture() {
+    local id=grade-down dir="$(scenario_dir grade-down)"
+    local before_status during_status recovery_state recovery_seconds
+    local peer_status query_status=FAIL fixture_status=FAIL worker_started=0
+    local source_id="issue340-${run_id##*-}" student_id="issue340-student-${run_id##*-}"
+    local course_id="issue340-course-${run_id##*-}" source_event_id correlation_id aggregate_id occurred_at source_payload
+    local source_grade_revision=0 source_outbox_state_before=UNKNOWN source_fact_count=0
+    local grade_inbox_status=UNKNOWN grade_projection_count=0 duplicate_decision=NOT_ATTEMPTED
+    local duplicate_inbox_before=0 duplicate_inbox_after=0 duplicate_projection_before=0 duplicate_projection_after=0
+    mkdir -p "$dir"
+    before_status="$(compose_state grade-service 2>/dev/null || true)"
+    compose_probe grade-service 8084 /health/ready "$dir/before-health" || true
+    printf '%s\n' "$before_status" > "$dir/compose-before"
+    if ! "${compose[@]}" stop grade-service >"$dir/stop.log" 2>&1; then
+      record_scenario "$id" FAIL "service state was $before_status" "stop command failed" "service was not restarted" "compose=${dir#$repo_root/}"
+      return
+    fi
+    during_status="$(compose_state grade-service 2>/dev/null || true)"
+    if compose_probe grade-service 8084 /health/ready "$dir/during-health"; then
+      during_status="$during_status; probe=unexpectedly-healthy"
+    else
+      during_status="$during_status; probe=unavailable"
+    fi
+    if compose_probe course-service 8082 /actuator/health/readiness "$dir/peer-health"; then peer_status=healthy; else peer_status=unavailable; fi
+    if query_side_effect_probe "$id" "$dir" /api/v1/courses/1/my-grades GET '' /api/v1/courses /api/v1/evaluations/issue340-missing; then
+      query_status=PASS
+    fi
+
+    source_event_id="$(python3 -c 'import uuid; print(uuid.uuid4())')"
+    correlation_id="$(python3 -c 'import uuid; print(uuid.uuid4())')"
+    aggregate_id="LAB:${source_id}:${student_id}"
+    occurred_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    source_payload="$(printf '{\"eventId\":\"%s\",\"eventType\":\"assessment.source-grade.changed.v2\",\"payloadVersion\":2,\"aggregateType\":\"assessment-source-grade\",\"aggregateId\":\"%s\",\"aggregateVersion\":1,\"occurredAt\":\"%s\",\"correlationId\":\"%s\",\"payload\":{\"courseId\":\"%s\",\"sourceType\":\"LAB\",\"sourceId\":\"%s\",\"studentId\":\"%s\",\"score\":88.00,\"fullScore\":100.00,\"status\":\"SCORED\",\"sourceVersion\":1}}' \
+      "$source_event_id" "$aggregate_id" "$occurred_at" "$correlation_id" "$course_id" "$source_id" "$student_id")"
+    # Pause only the relay worker while the Grade outage is active.  This
+    # leaves the Assessment-owned transaction visibly PENDING before recovery.
+    if "${compose[@]}" stop assessment-worker >"$dir/worker-stop.log" 2>&1; then
+      if db_exec oj_assessment "START TRANSACTION; INSERT INTO assessment_source_grade (source_type, source_id, course_id, student_id, score, full_score, status, source_version, updated_at) VALUES ('LAB', '$source_id', '$course_id', '$student_id', 88.00, 100.00, 'SCORED', 1, UTC_TIMESTAMP()); INSERT INTO assessment_event_outbox (event_id, event_type, payload_version, aggregate_type, aggregate_id, aggregate_version, occurred_at, correlation_id, payload_json, state, created_at) VALUES ('$source_event_id', 'assessment.source-grade.changed.v2', 2, 'assessment-source-grade', '$aggregate_id', 1, UTC_TIMESTAMP(), '$correlation_id', '$source_payload', 'PENDING', UTC_TIMESTAMP()); COMMIT;" >"$dir/source-fixture.log" 2>&1; then
+        source_fact_count="$(db_exec oj_assessment "SELECT COUNT(*) FROM assessment_source_grade WHERE source_type='LAB' AND source_id='$source_id' AND student_id='$student_id';" 2>/dev/null || printf '0')"
+        source_outbox_state_before="$(db_exec oj_assessment "SELECT state FROM assessment_event_outbox WHERE event_id='$source_event_id';" 2>/dev/null || printf 'UNKNOWN')"
+        source_grade_revision="$(db_exec oj_assessment "SELECT source_version FROM assessment_source_grade WHERE source_type='LAB' AND source_id='$source_id' AND student_id='$student_id';" 2>/dev/null || printf '0')"
+        if [[ "$source_fact_count" == 1 && "$source_outbox_state_before" == PENDING && "$source_grade_revision" == 1 ]]; then fixture_status=PASS; fi
+      fi
+      if "${compose[@]}" start assessment-worker >"$dir/worker-start.log" 2>&1; then worker_started=1; fi
+    fi
+
+    "${compose[@]}" start grade-service >"$dir/start.log" 2>&1 || true
+    recovery_started=$SECONDS
+    if wait_healthy grade-service; then recovery_state=healthy; else recovery_state=timeout; fi
+    recovery_seconds=$((SECONDS - recovery_started))
+    if [[ "$worker_started" == 1 ]]; then wait_healthy assessment-worker || worker_started=0; fi
+    if [[ "$recovery_state" == healthy && "$fixture_status" == PASS ]]; then
+      if wait_for_db_value 'Grade inbox status' APPLIED oj_grade "SELECT processing_status FROM grade_event_inbox WHERE event_id='$source_event_id';"; then
+        grade_inbox_status=APPLIED
+      fi
+      grade_projection_count="$(db_exec oj_grade "SELECT COUNT(*) FROM grade_source_projection WHERE aggregate_id='$aggregate_id' AND source_version=1;" 2>/dev/null || printf '0')"
+      duplicate_inbox_before="$(db_exec oj_grade "SELECT COUNT(*) FROM grade_event_inbox WHERE event_id='$source_event_id';" 2>/dev/null || printf '0')"
+      duplicate_projection_before="$(db_exec oj_grade "SELECT COUNT(*) FROM grade_source_projection WHERE aggregate_id='$aggregate_id';" 2>/dev/null || printf '0')"
+      if publish_duplicate_event "$source_payload" >"$dir/duplicate-publish.log" 2>&1; then
+        sleep 3
+        duplicate_inbox_after="$(db_exec oj_grade "SELECT COUNT(*) FROM grade_event_inbox WHERE event_id='$source_event_id';" 2>/dev/null || printf '0')"
+        duplicate_projection_after="$(db_exec oj_grade "SELECT COUNT(*) FROM grade_source_projection WHERE aggregate_id='$aggregate_id';" 2>/dev/null || printf '0')"
+        if [[ "$duplicate_inbox_before" == "$duplicate_inbox_after" && "$duplicate_projection_before" == "$duplicate_projection_after" ]]; then
+          duplicate_decision=no-op
+        else
+          duplicate_decision=changed
+        fi
+      else
+        duplicate_decision=publish-failed
+      fi
+    fi
+    if [[ "$recovery_state" == healthy && "$recovery_seconds" -le "$timeout_seconds" && "$during_status" == *'probe=unavailable'* && "$peer_status" == healthy && "$query_status" == PASS && "$fixture_status" == PASS && "$grade_inbox_status" == APPLIED && "$grade_projection_count" == 1 && "$duplicate_decision" == no-op ]]; then
+      status=PASS
+    else
+      status=FAIL
+    fi
+    record_scenario "$id" "$status" \
+      "service=grade-service state=$before_status; Assessment source fact=$source_fact_count eventId=$source_event_id revision=$source_grade_revision outbox=$source_outbox_state_before" \
+      "service=grade-service state=$during_status; sourceGradeEventId=$source_event_id sourceGradeRevision=$source_grade_revision sourceGradeOutboxStateBefore=$source_outbox_state_before query=$query_status" \
+      "service=grade-service state=$recovery_state; gradeInboxStatus=$grade_inbox_status gradeProjectionCount=$grade_projection_count duplicateDecision=$duplicate_decision recoverySeconds=$recovery_seconds" \
+      "compose=${dir#$repo_root/}; sourceGradeEventId=$source_event_id; sourceGradeRevision=$source_grade_revision; sourceGradeOutboxStateBefore=$source_outbox_state_before; gradeInboxStatus=$grade_inbox_status; gradeProjectionCount=$grade_projection_count; duplicateDecision=$duplicate_decision; duplicateInbox=$duplicate_inbox_before/$duplicate_inbox_after; duplicateProjection=$duplicate_projection_before/$duplicate_projection_after; recoverySeconds=$recovery_seconds"
+  }
+  grade_down_source_fixture
 
   identity_dir="$(scenario_dir identity-down)"
   mkdir -p "$identity_dir"
+  # Warm the real Course-side JWKS cache while Identity is online, then reuse
+  # this same JWT after Identity is stopped for the protected-read assertion.
+  cached_jwt_warm_status="$(query_api GET /api/v1/courses "$identity_dir/cache-warm-body")"
   identity_before="$(compose_state identity-service 2>/dev/null || true)"
   printf '%s\n' "$identity_before" > "$identity_dir/compose-before"
   if "${compose[@]}" stop identity-service >"$identity_dir/stop.log" 2>&1; then
     identity_during="$(compose_state identity-service 2>/dev/null || true)"
+    snapshot_domain_counts "$identity_dir/domain-before"
+    cached_query_status="$(query_api GET /api/v1/courses "$identity_dir/cached-jwt-query-body")"
     login_code="$(curl --silent --show-error --output "$identity_dir/login-body" --write-out '%{http_code}' \
       --max-time 10 -X POST "$base_url/api/v1/auth/login" -H 'Content-Type: application/json' \
       --data '{"account":"issue340-new-login","password":"invalid"}' 2>/dev/null || printf '000')"
+    snapshot_domain_counts "$identity_dir/domain-after"
+    identity_side_effects=PASS
+    if ! cmp -s "$identity_dir/domain-before" "$identity_dir/domain-after"; then identity_side_effects=FAIL; fi
     "${compose[@]}" start identity-service >"$identity_dir/start.log" 2>&1 || true
     identity_recovery_started=$SECONDS
     if wait_healthy identity-service; then identity_recovery=healthy; else identity_recovery=timeout; fi
     identity_recovery_seconds=$((SECONDS - identity_recovery_started))
-    [[ "$identity_recovery" == healthy && "$identity_recovery_seconds" -le "$timeout_seconds" && "$login_code" =~ ^(5[0-9][0-9]|000)$ ]] && identity_status=PASS || identity_status=FAIL
+    [[ "$identity_recovery" == healthy && "$identity_recovery_seconds" -le "$timeout_seconds" && "$cached_query_status" =~ ^2[0-9][0-9]$ && "$login_code" =~ ^(5[0-9][0-9]|000)$ && "$identity_side_effects" == PASS && "$cached_jwt_warm_status" =~ ^2[0-9][0-9]$ ]] && identity_status=PASS || identity_status=FAIL
     record_scenario identity-down "$identity_status" \
-      "identity-service state=$identity_before; JWKS cache test passed before stop" \
-      "identity-service state=$identity_during; new-login HTTP=$login_code; cachedVerification=covered-by-JwksCacheRefreshTest" \
+      "identity-service state=$identity_before; cache-warm HTTP=$cached_jwt_warm_status; JWKS cache was primed before stop" \
+      "identity-service state=$identity_during; cached-jwt-query HTTP=$cached_query_status; new-login HTTP=$login_code; protectedReadStatus=$cached_query_status" \
       "identity-service state=$identity_recovery; recoverySeconds=$identity_recovery_seconds" \
-      "compose=${identity_dir#$repo_root/}; loginStatus=$login_code; recoverySeconds=$identity_recovery_seconds"
+      "compose=${identity_dir#$repo_root/}; cachedVerification=$cached_query_status; protectedReadStatus=$cached_query_status; newLoginStatus=$login_code; domainWrites=$identity_side_effects; recoverySeconds=$identity_recovery_seconds"
   else
     record_scenario identity-down FAIL "identity-service state=$identity_before" "stop command failed" "service was not restarted" "compose=${identity_dir#$repo_root/}"
   fi

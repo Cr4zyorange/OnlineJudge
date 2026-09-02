@@ -44,6 +44,18 @@ for item in scenarios:
     assert item["evidence"], item
 covered = {ac for item in scenarios for ac in item["acs"]}
 assert covered == {"AC-340-01", "AC-340-02", "AC-340-03", "AC-340-04", "AC-340-05"}, covered
+grade_down = next(item for item in scenarios if item["id"] == "grade-down")
+assert {
+    "sourceGradeEventId",
+    "sourceGradeRevision",
+    "sourceGradeOutboxState",
+    "gradeInboxStatus",
+    "gradeProjectionCount",
+    "duplicateDecision",
+    "recoverySeconds",
+} <= set(grade_down["evidence"]), grade_down
+identity_down = next(item for item in scenarios if item["id"] == "identity-down")
+assert "protectedReadStatus" in identity_down["evidence"], identity_down
 PY
 
 grep -Fq -- '--contract-only' "$runner" || fail 'runner must expose --contract-only'
@@ -65,6 +77,26 @@ grep -Fq -- '/api/v1/courses/1/grade-items' "$runner" \
   || fail 'assessment outage must probe an independent Grade read route'
 grep -Fq -- 'service_outage assessment-api-down' "$runner" \
   || fail 'runner must include the assessment outage scenario'
+grep -Fq -- 'query-login-meta' "$runner" || fail 'runner must store only safe login metadata'
+if grep -Fq -- '--output "$output_dir/query-login.json"' "$runner"; then
+  fail 'runner must never upload the raw login response containing a bearer token'
+fi
+grep -Fq -- 'grade_down_source_fixture' "$runner" \
+  || fail 'runner must seed an Assessment source fact/outbox during Grade outage'
+grep -Fq -- 'sourceGradeOutboxStateBefore=' "$runner" \
+  || fail 'runner must record the source outbox state before relay recovery'
+grep -Fq -- 'source_outbox_state_before" == PENDING' "$runner" \
+  || fail 'runner must assert the source outbox is pending before relay recovery'
+grep -Fq -- 'duplicateDecision' "$runner" \
+  || fail 'runner must prove duplicate delivery is a no-op'
+grep -Fq -- 'cached-jwt-query' "$runner" \
+  || fail 'runner must exercise a protected read with the pre-obtained JWT'
+grep -Fq -- 'OJ314_RAW_LOG_PATH' "$repo_root/scripts/test/verify-issue-314-recovery-disposable.sh" \
+  || fail 'disposable recovery must expose a retained raw log path'
+grep -Fq -- 'OJ314_KEEP_RAW_LOG' "$repo_root/scripts/test/verify-issue-314-recovery-disposable.sh" \
+  || fail 'disposable recovery must retain raw assertions for the resilience report'
+grep -Fq -- 'stale completion' "$repo_root/scripts/test/verify-issue-314-recovery-disposable.sh" \
+  || fail 'disposable recovery must execute stale completion fencing'
 if grep -Eq 'printf .*PASSWORD|printf .*TOKEN|printf .*SECRET|echo .*PASSWORD' "$runner"; then
   fail 'runner must never print secret values'
 fi
