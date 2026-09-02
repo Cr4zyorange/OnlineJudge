@@ -80,6 +80,12 @@ server {
         proxy_pass http://__IDENTITY_UPSTREAM__;
     }
 
+    location = /api/v1/system/health {
+        limit_req zone=read_limit burst=60 nodelay;
+        include /etc/nginx/includes/proxy-request-headers.conf;
+        proxy_pass http://__IDENTITY_UPSTREAM__;
+    }
+
     location = /api/v1/users/me {
         limit_req zone=read_limit burst=60 nodelay;
         include /etc/nginx/includes/proxy-request-headers.conf;

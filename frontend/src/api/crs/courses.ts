@@ -18,7 +18,7 @@ import type {
 export type CourseScope = 'all' | 'mine' | 'managed' | 'archived';
 
 export function listCourses(keyword = '', scope: CourseScope = 'all') {
-  const params = new URLSearchParams({ page: '1', size: '20', scope });
+  const params = new URLSearchParams({ page: '0', size: '20', scope });
   if (keyword.trim()) {
     params.set('keyword', keyword.trim());
   }

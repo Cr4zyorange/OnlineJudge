@@ -367,7 +367,7 @@ describe('CourseManagementView', () => {
     await mineButton!.trigger('click');
     await flushPromises();
 
-    expect(fetchMock).toHaveBeenCalledWith('/api/v1/courses?page=1&size=20&scope=mine', expect.objectContaining({ method: 'GET' }));
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/courses?page=0&size=20&scope=mine', expect.objectContaining({ method: 'GET' }));
     expect(wrapper.text()).toContain('我的课程示例');
   });
 
@@ -929,7 +929,7 @@ describe('CourseManagementView', () => {
 
     expect(wrapper.text()).toContain('申请已提交');
     const refreshedAllCourses = fetchMock.mock.calls.filter(([url, init]) =>
-      url === '/api/v1/courses?page=1&size=20&scope=all' && init?.method === 'GET'
+      url === '/api/v1/courses?page=0&size=20&scope=all' && init?.method === 'GET'
     );
     expect(refreshedAllCourses.length).toBeGreaterThan(1);
   });

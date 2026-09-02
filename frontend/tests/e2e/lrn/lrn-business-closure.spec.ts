@@ -259,7 +259,7 @@ function homeworkPayload(title: string) {
 function futureDeadline() {
   const date = new Date();
   date.setUTCDate(date.getUTCDate() + 30);
-  return date.toISOString().replace(/\.\d{3}Z$/, '');
+  return date.toISOString();
 }
 
 async function authHeaders(page: Page) {

@@ -123,6 +123,7 @@ body="$(request GET /health/ready 200)"
 [[ "$body" == *'"status":"UP"'* ]] || fail "gateway readiness probe contract is unstable: $body"
 
 assert_service /api/v1/auth/login identity
+assert_service /api/v1/system/health identity
 jwks_headers="$runtime_dir/jwks.headers"
 jwks_body="$runtime_dir/jwks.json"
 jwks_status="$(curl -sS --connect-timeout 3 --max-time 8 -D "$jwks_headers" -o "$jwks_body" -w '%{http_code}' "$gateway/.well-known/jwks.json")"

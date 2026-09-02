@@ -80,8 +80,8 @@ test.describe('@crs CRS 主流程闭环', () => {
       }).then((res) => res.json());
       return { inviteId: invite.data.id, reviewId: review.data.id };
     });
-    expect(created.inviteId).toBeGreaterThan(0);
-    expect(created.reviewId).toBeGreaterThan(0);
+    expect(Number(created.inviteId)).toBeGreaterThan(0);
+    expect(Number(created.reviewId)).toBeGreaterThan(0);
 
     await page.getByRole('button', { name: /退出/ }).click();
     await expect(page).toHaveURL(/\/login(?:\?.*)?$/);

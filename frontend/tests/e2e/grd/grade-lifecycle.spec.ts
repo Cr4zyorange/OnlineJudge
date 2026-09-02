@@ -406,5 +406,5 @@ function bearer(token: string) {
 }
 
 function localDateTimeAfterDays(days: number) {
-  return new Date(Date.now() + days * 24 * 60 * 60 * 1_000).toISOString().slice(0, 19);
+  return new Date(Date.now() + days * 24 * 60 * 60 * 1_000).toISOString();
 }
