@@ -69,6 +69,7 @@ public class LrnEventProjection {
             case "course.member.changed.v2" -> memberChanged(eventId, payload, correlationId);
             case "course.membership.snapshot.v2" -> membershipSnapshot(payload);
             case "course.announcement.published.v2" -> announcementPublished(eventId, payload);
+            case "assessment.source-grade.changed.v2" -> sourceGradePublished(eventId, payload);
             case "assessment.homework.published.v2" ->
                     publishTask(eventId, "HWK", "HOMEWORK", "TASK", "homeworkId", envelope, correlationId, envelopeJson);
             case "assessment.lab.published.v2" ->
@@ -160,6 +161,28 @@ public class LrnEventProjection {
         List<Long> receivers = inbox.activeMemberUserIds(courseId);
         notifications.createForFact(eventId, "course.announcement.published.v2", "TEACHER_ANNOUNCEMENT", courseId,
                 "CRS", announcementId, receivers, title, content, 1, "/courses/" + courseId);
+    }
+
+    /**
+     * A SCORED source-grade fact is the existing cross-service completion fact
+     * for a student-visible LAB/HWK score.  Keep recipient resolution tied to
+     * the event's student rather than broadening it to the entire course.
+     */
+    private void sourceGradePublished(String eventId, JsonNode payload) {
+        String sourceModule = payload.path("sourceType").asText("");
+        if (!"SCORED".equals(payload.path("status").asText())
+                || !("HWK".equals(sourceModule) || "LAB".equals(sourceModule))) {
+            return;
+        }
+        long courseId = parseId(payload.path("courseId").asText());
+        long sourceId = parseId(payload.path("sourceId").asText());
+        long studentId = parseId(payload.path("studentId").asText());
+        if (courseId <= 0 || sourceId <= 0 || studentId <= 0) return;
+        String title = "HWK".equals(sourceModule) ? "homework score published" : "lab score published";
+        String content = "HWK".equals(sourceModule) ? "作业成绩已发布，请查看反馈。" : "实验成绩已发布，请查看反馈。";
+        notifications.createForFact(eventId, "assessment.source-grade.changed.v2", "GRADE", courseId,
+                sourceModule, sourceId, List.of(studentId), title, content, 1,
+                taskActionUrl(sourceModule, courseId, sourceId));
     }
 
     private void publishTask(String eventId, String sourceModule, String taskType, String notificationType,
