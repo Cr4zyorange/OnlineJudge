@@ -66,6 +66,13 @@ lease 字段。runner 现会查询全部任务，避免只查看 RUNNING 行而�
 
 在 kind 集群（#318 环境 9 workloads 就绪）执行真实实验后确认：
 
+- Round 7 的互补活跃租约证据：`docs/过程/测试/Issue-319-HPA实验证据-20260902T121501Z/`
+  由提交 `9045592` 的 runner 运行，记录了每秒采样的真实 `RUNNING` 任务
+  `lease_owner/lease_until/heartbeat_at`（102 个样本）；同时验证 HPA 从 1 扩到 2、
+  36,140 条 Assessment 请求全为 2xx，RabbitMQ `readyReplicas=0` 且 endpoints 为空时
+  Assessment 的 10 个可用性采样均为 1。该轮 Grade 投影仍为 0，原因是 Sandbox worker
+  对该批事件均写入 SYSTEM_ERROR；它用于补强活跃租约事实，当前 Grade 结论以本文开头
+  `T130421Z` 的真实事件恢复和水印数据为准。
 - Round 6 历史证据：`docs/过程/测试/Issue-319-HPA实验证据-20260902T090959Z/`（EXPERIMENT_READY，
   Round 6 从包含最终 runner 的干净提交 `81030437` 重跑；deployment/runner/证据提交
   SHA 分开记录）：HPA 在真实读负载下从 1 扩到 2、负载结束后缩回 1；41,540 个

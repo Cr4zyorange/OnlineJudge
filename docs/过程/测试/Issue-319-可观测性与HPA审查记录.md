@@ -81,3 +81,28 @@ evaluation_task 与关联 outbox/网关日志（`backlog-diagnostics.txt`、
 Round 6 验证：`python3 -m unittest discover -s scripts/platform/tests` 52/52 通过；
 实验契约校验 PASS；`git diff --check` 干净；44,680→41,540 的 requests.tsv 可独立
 解析（41540×200、0 错误、P95 0.017664s）。
+
+## Round 7 — 2026-09-02（复审 Round 6 rework：故障窗口与诊断信号）
+
+owner 复审（head=`f5e5d82b`）：Round 6 的 AC-319-05 SHA 溯源、独立交付边界、
+`git diff --check` 三项 PASS；两项 FAIL 打回：
+
+| 编号 | FAIL 点 | 处置 |
+| --- | --- | --- |
+| R7-01 | AC-319-03：rabbitmq-outage 证据只有 scale 接受、对已就绪 deployment 立即返回的 rollout status、恢复 scale 三行；runner 未等 RabbitMQ 真正不可用，availableReplicas 未写入证据 → 无法复核故障窗口内未被级联摘流。 | `90455922`：runner 故障阶段改为——缩容后轮询等待 **readyReplicas=0 且 service endpoints 为空**并输出"rabbitmq confirmed unavailable"确认行；在已验证的故障窗口内（30s）以 3s 间隔采样 assessment-api availableReplicas/readyReplicas/serviceEndpoints（本轮 10 个采样全部 availableReplicas=1）；恢复后等待 **readyReplicas 回到原值且 endpoints 重新填充**并输出"rabbitmq restored"确认行；rollout status 移除。 |
+| R7-02 | AC-319-04：grade_projection_watermark.txt 只是 Grade 全量应用日志（仅启动与 RabbitMQ 断连/重连），无投影 version/lag/cursor 水位；Assessment 证据无任何 lease 值——文件名不能替代所需诊断信号。 | `90455922`：两个信号文件改为数据库原始值转储——`assessment_outbox_pending_and_lease`（outbox 状态分布、事件类型×状态、任务状态分布、活跃租约原始值 lease_owner/lease_until/heartbeat_at、60s 内租约生命周期行）；`grade_projection_watermark`（水印表原始行/行数、投影行数、grade inbox/outbox/deferred、assessment source grade 行数）。新增 1s 级 `assessment-outbox-lease-timeline`（负载期 102 个采样，1 个采样捕获真实 RUNNING 租约：lease_owner=assessment-worker@assessment-worker-67ccf846b6-7mc8d、lease_until=12:17:38Z、heartbeat_at=12:17:08Z）；应用日志改名为 `assessment-api-applog`/`grade-service-applog` 仅作上下文。 |
+
+Round 7 重跑（干净提交 `9045592`，tracked 树无改动）：EXPERIMENT_READY；
+HPA 1→2→1（`scaled up replicas=2 baseline=1` / `scaled down replicas=1
+baseline=1`）；36,140 读请求全 2xx、零错误、P95 23.3ms；HWK 双流佐证全 201；
+证据提交=`6345a3bf`，正式目录
+`docs/过程/测试/Issue-319-HPA实验证据-20260902T121501Z/`。SHA 三元组：
+deployment=`da6fd3f8`、runner/tested=`9045592`、证据提交=`6345a3bf`。
+`...T090959Z/` 目录标注 SUPERSEDED（其 SHA 溯源与 correlation 链结论仍有效）。
+
+诊断信号的环境事实（原始数据可证）：本一次性环境无评测沙箱，全部 evaluation
+以 SYSTEM_ERROR 终态结束，worker 从不产生 grade 消费的
+`assessment.source-grade.changed.v2` 事件（outbox 事件类型分布中该类型为 0 条，
+`grade.source-grades.v2` 队列深度 0，grade_event_inbox/outbox 0 行）→ grade
+投影水印为 0 行是该环境的真实状态，非采集缺失；每项数值均可在集群内复核
+（复核 SQL 见证据目录 NOTES.md）。

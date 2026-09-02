@@ -1,5 +1,12 @@
 # #319 正式 HPA 扩缩容实验运行说明（EXPERIMENT_READY，复审重跑）
 
+> **SUPERSEDED（Round 7 复审）**：Round 7 复审认定本目录的 AC-319-03 证据
+> 不能证明真实故障窗口（rollout status 对已就绪 deployment 立即返回）、
+> AC-319-04 的两个信号文件只是应用日志而非其名所承诺的数据库信号。正式证据
+> 以 `Issue-319-HPA实验证据-20260902T121501Z/` 为准（verified outage window
+> + 数据库原始值诊断）。本目录保留为过程记录；其中 AC-319-05 SHA 溯源
+> （复审 PASS 项）与本目录的 correlation 链结论仍然有效。
+
 - runId: 20260902T090959Z
 - baseSha（与 origin/dev 的 merge-base）: `65e578b26c4daa5db4b2dd9c0dc99d5678fbc11b`
 - runnerSha / headSha（执行本实验的干净提交，工作区 tracked 文件无改动）: `81030437301d80a41e45a102bd5fe380f9859132`

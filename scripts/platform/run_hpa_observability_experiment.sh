@@ -48,6 +48,7 @@ Options:
                            Minimum continuous confirmed RabbitMQ outage window
                            while Assessment availability is sampled (default: 15)
   --output-dir DIR          Evidence directory (default: output/issue-319/<sha>/<utc>)
+
 USAGE
 }
 
@@ -98,6 +99,7 @@ if [[ -z "$output_dir" ]]; then output_dir="$repo_root/output/issue-319/$head_sh
 mkdir -p "$output_dir/raw"
 
 sampler_pid=""
+lease_sampler_pid=""
 started_at=""
 mysql_query() {
   local database="$1" statement="$2"
@@ -163,13 +165,29 @@ capture_projection_and_lease_diagnostics() {
   } > "$output_dir/raw/grade_projection_watermark.txt" 2>&1
 }
 
+capture_lease_timeline_sample() {
+  {
+    printf '=== %s ===\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    mysql_query oj_assessment "
+      SELECT COUNT(*) AS outbox_pending
+        FROM assessment_event_outbox
+       WHERE state = 'PENDING';
+      SELECT id, state, attempt, lease_owner, lease_until, heartbeat_at
+        FROM evaluation_task
+       WHERE lease_until > UTC_TIMESTAMP()
+       ORDER BY lease_until DESC
+       LIMIT 10;
+    "
+  } >> "$output_dir/raw/assessment-outbox-lease-timeline.txt" 2>&1
+}
+
 capture_diagnostics() {
   kubectl -n "$namespace" get hpa assessment-api -o yaml > "$output_dir/raw/hpa.yaml" 2>&1 || true
   kubectl -n "$namespace" get pods -l app.kubernetes.io/name=assessment-api -o wide > "$output_dir/raw/pods.txt" 2>&1 || true
   kubectl -n "$namespace" top pod -l app.kubernetes.io/name=assessment-api > "$output_dir/raw/resourceUsage.txt" 2>&1 || true
   kubectl -n "$namespace" logs deployment/gateway --all-containers --tail=-1 > "$output_dir/raw/gateway_request_correlation.txt" 2>&1 || true
-  kubectl -n "$namespace" logs deployment/assessment-api --all-containers --tail=-1 > "$output_dir/raw/assessment-service.txt" 2>&1 || true
-  kubectl -n "$namespace" logs deployment/grade-service --all-containers --tail=-1 > "$output_dir/raw/grade-service.txt" 2>&1 || true
+  kubectl -n "$namespace" logs deployment/assessment-api --all-containers --tail=-1 > "$output_dir/raw/assessment-api-applog.txt" 2>&1 || true
+  kubectl -n "$namespace" logs deployment/grade-service --all-containers --tail=-1 > "$output_dir/raw/grade-service-applog.txt" 2>&1 || true
   kubectl -n "$namespace" exec statefulset/rabbitmq -- rabbitmqctl list_queues name messages_ready messages_unacknowledged > "$output_dir/raw/rabbitmq_queue_backlog.txt" 2>&1 || true
   capture_projection_and_lease_diagnostics
 }
@@ -227,6 +245,7 @@ record_rabbitmq_outage_snapshot() {
     kubectl -n "$namespace" get statefulset/rabbitmq -o yaml
     kubectl -n "$namespace" get pods -l app.kubernetes.io/name=rabbitmq -o wide
     kubectl -n "$namespace" get endpoints/rabbitmq -o yaml
+    kubectl -n "$namespace" get endpoints assessment-api -o yaml
     kubectl -n "$namespace" get deployment/assessment-api -o yaml | redact_bearer_values
   } >> "$output_dir/raw/rabbitmq-outage.txt" 2>&1
   [[ "$available_replicas" =~ ^[1-9][0-9]*$ && "$ready_replicas_assessment" =~ ^[1-9][0-9]*$ ]]
@@ -244,6 +263,7 @@ wait_for_rabbitmq_outage() {
         printf 'assessment availability during RabbitMQ outage fell below one ready replica\n' >&2
         return 1
       }
+      printf 'rabbitmq confirmed unavailable: readyReplicas=0 pods=0 endpoints=0\n' >> "$output_dir/raw/rabbitmq-outage.txt"
       return 0
     fi
     record_rabbitmq_outage_snapshot "waiting-for-outage" "$ready_replicas" "$pod_count" "$endpoint_count" || {
@@ -287,6 +307,7 @@ wait_for_rabbitmq_recovery() {
         printf 'assessment availability during RabbitMQ recovery fell below one ready replica\n' >&2
         return 1
       }
+      printf 'rabbitmq restored: readyReplicas=%s pods=%s endpoints=%s\n' "$ready_replicas" "$pod_count" "$endpoint_count" >> "$output_dir/raw/rabbitmq-outage.txt"
       return 0
     fi
     record_rabbitmq_outage_snapshot "waiting-for-recovery" "$ready_replicas" "$pod_count" "$endpoint_count" || {
@@ -310,9 +331,10 @@ new_request_id() {
 finish() {
   status=$?
   trap - EXIT INT TERM
-  if [[ -n "$sampler_pid" ]]; then kill "$sampler_pid" 2>/dev/null || true; fi
+  if [[ -n "$sampler_pid" ]]; then kill "$sampler_pid" 2>/dev/null || true; wait "$sampler_pid" 2>/dev/null || true; fi
+  if [[ -n "$lease_sampler_pid" ]]; then kill "$lease_sampler_pid" 2>/dev/null || true; wait "$lease_sampler_pid" 2>/dev/null || true; fi
   if (( rabbitmq_outage )) && [[ -n "$rabbitmq_original_replicas" ]]; then
-    kubectl -n "$namespace" scale statefulset/rabbitmq --replicas="$rabbitmq_original_replicas" >> "$output_dir/raw/rabbitmq-restore.log" 2>&1 || true
+    kubectl -n "$namespace" scale statefulset/rabbitmq --replicas="$rabbitmq_original_replicas" >> "$output_dir/raw/rabbitmq-restore.txt" 2>&1 || true
   fi
   if ! capture_diagnostics; then
     printf 'required Assessment lease or Grade projection diagnostics could not be captured\n' >&2
@@ -378,6 +400,14 @@ fi
     sleep "$sample_seconds"
   done ) & sampler_pid=$!
 
+# Lease/outbox signal sampled at 1s cadence during the load: worker leases are
+# short-lived (sub-second on a failing sandbox), so coarse sampling misses the
+# raw lease_owner/lease_until/heartbeat_at values.
+( while :; do
+    capture_lease_timeline_sample
+    sleep 1
+  done ) & lease_sampler_pid=$!
+
 deadline=$((SECONDS + duration_seconds))
 request_url_index=0
 while (( SECONDS < deadline )); do
@@ -403,6 +433,9 @@ done
 kill "$sampler_pid" 2>/dev/null || true
 wait "$sampler_pid" 2>/dev/null || true
 sampler_pid=""
+kill "$lease_sampler_pid" 2>/dev/null || true
+wait "$lease_sampler_pid" 2>/dev/null || true
+lease_sampler_pid=""
 python3 - "$output_dir/raw/requests.tsv" <<'PY'
 import pathlib, sys
 rows = pathlib.Path(sys.argv[1]).read_text(encoding="utf-8").splitlines()
