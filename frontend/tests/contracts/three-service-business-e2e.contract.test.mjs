@@ -40,5 +40,6 @@ test('business E2E injects the isolated sandbox proxy as a test dependency witho
   assert.match(sandboxRunner, /com\.docker\.compose\.project/);
   assert.match(sandboxRunner, /--network-alias assessment-sandbox-docker-proxy/);
   assert.match(sandboxRunner, /\/var\/run\/docker\.sock:\/var\/run\/docker\.sock:ro/);
+  assert.match(sandboxRunner, /docker pull python:3\.12-alpine/);
   assert.match(sandboxRunner, /docker rm -f/);
 });

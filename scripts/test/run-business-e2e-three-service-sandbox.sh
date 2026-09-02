@@ -36,6 +36,10 @@ cleanup() {
 }
 trap cleanup EXIT
 
+# Container creation does not pull a missing image through the narrowed socket
+# proxy. The Issue #320 LAB scenario executes Python, so materialize that
+# untrusted runtime before exposing the proxy to the worker.
+docker pull python:3.12-alpine > "$artifact_dir/sandbox-python-runtime-pull.log" 2>&1
 docker pull tecnativa/docker-socket-proxy:0.1.2 > "$artifact_dir/sandbox-proxy-pull.log" 2>&1
 docker run --detach --name "$proxy_name" \
   --label "io.onlinejudge.issue320.project=$project_name" \
