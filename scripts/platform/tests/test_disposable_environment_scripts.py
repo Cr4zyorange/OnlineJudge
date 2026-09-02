@@ -38,6 +38,7 @@ class DisposableEnvironmentScriptsTest(unittest.TestCase):
         self.assertIn("attest_prebuilt", source)
         self.assertIn("infrastructureWorkloads", source)
         self.assertIn("retry 3 docker build", source)
+        self.assertIn("docker build --network=host", source)
         self.assertIn("PYTHONDONTWRITEBYTECODE=1 python3 \"$planner\"", source)
 
     def test_frontend_image_installation_retries_transient_registry_failures(self) -> None:
