@@ -2,6 +2,7 @@ package com.onlinejudge.courseservice;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.onlinejudge.courseservice.learning.LrnEventProjection;
+import com.onlinejudge.courseservice.learning.LrnProgressService;
 import com.onlinejudge.courseservice.security.TestJwtFactory;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -47,6 +48,9 @@ class LrnFoldServiceTest {
 
     @Autowired
     private LrnEventProjection projection;
+
+    @Autowired
+    private LrnProgressService progress;
 
     @DynamicPropertySource
     static void properties(DynamicPropertyRegistry registry) {
@@ -105,6 +109,57 @@ class LrnFoldServiceTest {
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT title FROM lrn_learning_task WHERE user_id = 802", String.class))
                 .isEqualTo("Java collections homework");
+    }
+
+    @Test
+    void publishedLabAndHomeworkFactsKeepTheirConcreteCourseTargets() throws Exception {
+        String courseId = createCourseWithRosterWatermark("805", "806");
+
+        projection.consume(homeworkEnvelope(courseId));
+        projection.consume(labEnvelope(courseId));
+
+        String homeworkActionUrl = "/courses/" + courseId + "/homeworks/77";
+        String labActionUrl = "/courses/" + courseId + "/labs/78";
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT action_url FROM lrn_learning_task
+                 WHERE user_id = 806 AND course_id = ? AND source_module = 'HWK' AND source_id = 77
+                """, String.class, Long.parseLong(courseId))).isEqualTo(homeworkActionUrl);
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT action_url FROM lrn_notification
+                 WHERE user_id = 806 AND course_id = ? AND source_module = 'HWK' AND source_id = 77
+                """, String.class, Long.parseLong(courseId))).isEqualTo(homeworkActionUrl);
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT action_url FROM lrn_learning_task
+                 WHERE user_id = 806 AND course_id = ? AND source_module = 'LAB' AND source_id = 78
+                """, String.class, Long.parseLong(courseId))).isEqualTo(labActionUrl);
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT action_url FROM lrn_notification
+                 WHERE user_id = 806 AND course_id = ? AND source_module = 'LAB' AND source_id = 78
+                """, String.class, Long.parseLong(courseId))).isEqualTo(labActionUrl);
+    }
+
+    @Test
+    void progressOverviewSuppliesConcreteContinueUrlsForCourseLabAndHomeworkRecords() throws Exception {
+        String courseId = createCourseWithRosterWatermark("807", "808");
+        long numericCourseId = Long.parseLong(courseId);
+
+        LrnProgressService.LearningProgressItem courseRecord = progress.save(808,
+                new LrnProgressService.LearningProgressSaveRequest(numericCourseId, null, "CRS", 11L,
+                        20, "课程目录"));
+        LrnProgressService.LearningProgressItem labRecord = progress.save(808,
+                new LrnProgressService.LearningProgressSaveRequest(numericCourseId, null, "LAB", 78L,
+                        45, "LAB 断点"));
+        LrnProgressService.LearningProgressItem homeworkRecord = progress.save(808,
+                new LrnProgressService.LearningProgressSaveRequest(numericCourseId, null, "HWK", 77L,
+                        65, "HWK 断点"));
+
+        assertThat(courseRecord.continueUrl()).isEqualTo("/courses/" + courseId);
+        assertThat(labRecord.continueUrl()).isEqualTo("/courses/" + courseId + "/labs/78");
+        assertThat(homeworkRecord.continueUrl()).isEqualTo("/courses/" + courseId + "/homeworks/77");
+
+        LrnProgressService.LearningCourseProgress overview = progress.overview(808, numericCourseId).courses().getFirst();
+        assertThat(overview.continueUrl()).isEqualTo("/courses/" + courseId + "/homeworks/77");
+        assertThat(overview.continueLearning().continueUrl()).isEqualTo(overview.continueUrl());
     }
 
     @Test
@@ -533,6 +588,29 @@ class LrnFoldServiceTest {
                     "courseId": "course-%s",
                     "homeworkId": "homework-77",
                     "title": "Java collections homework",
+                    "deadline": "2026-09-06T16:00:00Z",
+                    "receiverScope": "COURSE_ACTIVE_STUDENTS",
+                    "publishedAt": "2026-08-30T09:15:30Z"
+                  }
+                }
+                """.formatted(courseId);
+    }
+
+    private String labEnvelope(String courseId) {
+        return """
+                {
+                  "eventId": "7f6500e6-3be8-4898-b177-23aa4b86faea",
+                  "eventType": "assessment.lab.published.v2",
+                  "payloadVersion": 2,
+                  "aggregateType": "assessment-lab",
+                  "aggregateId": "lab-78",
+                  "aggregateVersion": 4,
+                  "occurredAt": "2026-08-30T09:15:30Z",
+                  "correlationId": "ca18b23c-21b3-403d-9bcb-305020f17027",
+                  "payload": {
+                    "courseId": "course-%s",
+                    "labId": "lab-78",
+                    "title": "Java collections lab",
                     "deadline": "2026-09-06T16:00:00Z",
                     "receiverScope": "COURSE_ACTIVE_STUDENTS",
                     "publishedAt": "2026-08-30T09:15:30Z"

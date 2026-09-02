@@ -173,7 +173,7 @@ public class LrnEventProjection {
         }
         String title = payload.path("title").asText("").trim();
         LocalDateTime deadline = parseTime(payload.path("deadline").asText(null));
-        String actionUrl = "/learning/tasks";
+        String actionUrl = taskActionUrl(sourceModule, courseId, sourceId);
         List<Long> receivers = inbox.activeMemberUserIds(courseId);
         if (receivers.isEmpty()) return;
         tasks.applyPublishedFact(courseId, sourceModule, taskType, title, deadline, actionUrl, sourceId, receivers);
@@ -220,6 +220,14 @@ public class LrnEventProjection {
             case "LAB" -> "assessment.lab.published.v2";
             case "GRD" -> "grade.published.v2";
             default -> "assessment.homework.published.v2";
+        };
+    }
+
+    private String taskActionUrl(String sourceModule, long courseId, long sourceId) {
+        return switch (sourceModule) {
+            case "LAB" -> "/courses/" + courseId + "/labs/" + sourceId;
+            case "HWK" -> "/courses/" + courseId + "/homeworks/" + sourceId;
+            default -> "/learning/tasks";
         };
     }
 
