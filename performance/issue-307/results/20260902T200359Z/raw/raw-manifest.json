@@ -1,0 +1,134 @@
+{
+  "schemaVersion": 1,
+  "issue": 307,
+  "archiveFormat": "gzip",
+  "entryCount": 18,
+  "entries": [
+    {
+      "file": "monolith/course-list/round-1.json.gz",
+      "uncompressedBytes": 207394,
+      "compressedBytes": 41504,
+      "uncompressedSha256": "77a070bd30d9bb1d7c69b755b625fbaa413c77617b2594cb45217a62867428fc",
+      "compressedSha256": "439861940d9dd6fdeef59ffbf8ed333de9531347323a36adbe678c269b334b02"
+    },
+    {
+      "file": "monolith/course-list/round-2.json.gz",
+      "uncompressedBytes": 207307,
+      "compressedBytes": 41430,
+      "uncompressedSha256": "8ef19986f5ba4bad8b43fd5cb6cf3b0273b8ae312f760421030ae1b23ef8403c",
+      "compressedSha256": "09dc7fda1f635ade668a8d3524e7f15831b292d7cca0ab63455a3675fc2025af"
+    },
+    {
+      "file": "monolith/course-list/round-3.json.gz",
+      "uncompressedBytes": 208093,
+      "compressedBytes": 41623,
+      "uncompressedSha256": "860e7a364d681b721712c28cbb9a8c7db4041331b4b4ece20f875eebd6bbdd4b",
+      "compressedSha256": "f3bb93f17234996b7e254face4c353963318a4be875606c62b0d137876aa2253"
+    },
+    {
+      "file": "monolith/homework-submission/round-1.json.gz",
+      "uncompressedBytes": 206882,
+      "compressedBytes": 41608,
+      "uncompressedSha256": "81954af0f1f041fc7f918edfd7b927e9e41c92773159ae783e16909201c31949",
+      "compressedSha256": "219aab52df708b53db76a872c54ebb5acb4e5d6baa95e9243cc5876aa9db6ce3"
+    },
+    {
+      "file": "monolith/homework-submission/round-2.json.gz",
+      "uncompressedBytes": 207880,
+      "compressedBytes": 41800,
+      "uncompressedSha256": "260b1b4af4fd6706ca98fe32e32642945d688ed88e1c72d8a418d18bf6a8061c",
+      "compressedSha256": "bef3eed83f8c8dc132d89ca3775eb40f01de27c7a97b45cf28dae0f9705bd335"
+    },
+    {
+      "file": "monolith/homework-submission/round-3.json.gz",
+      "uncompressedBytes": 207559,
+      "compressedBytes": 41470,
+      "uncompressedSha256": "35bdcdc08716b998b1dce73c6a0e71f456a9728b1fd6bdbba3d92ff4b45c379b",
+      "compressedSha256": "24f8a798b939f83093d398e98a7c28e4967240dfcc4eae3bdf2fc1f413bf0916"
+    },
+    {
+      "file": "monolith/my-grades/round-1.json.gz",
+      "uncompressedBytes": 207985,
+      "compressedBytes": 41314,
+      "uncompressedSha256": "eb56971ab5ca1bcda96583faa9650210d2e98933c3ba71c037705fa071613e3d",
+      "compressedSha256": "7a28855021ce149427c6c48001662ac5aa95ec7782b40096d0fb2945daafb32a"
+    },
+    {
+      "file": "monolith/my-grades/round-2.json.gz",
+      "uncompressedBytes": 207927,
+      "compressedBytes": 41436,
+      "uncompressedSha256": "218fcad9506d6abf2a075ed32526d1e6a6ce8803ab9680bcb4920f8eb864ba6d",
+      "compressedSha256": "3361c1da1cd94fc9222ede57ebf47c59a0e5a6d157955cffdbacba279a0080a6"
+    },
+    {
+      "file": "monolith/my-grades/round-3.json.gz",
+      "uncompressedBytes": 208357,
+      "compressedBytes": 41409,
+      "uncompressedSha256": "5c33c5cd209458d6af4bd8428ae285b4d017d2065c5cc872d999241c4a3f0224",
+      "compressedSha256": "d9537ec0e5510f8b5a0273425adf50980aee55015573a2bffc9b4d1d2bf45e55"
+    },
+    {
+      "file": "three-service/course-list/round-1.json.gz",
+      "uncompressedBytes": 241448,
+      "compressedBytes": 43277,
+      "uncompressedSha256": "63ac7d909b21ff02dda4e9efccad01658e40269a7c7c496a6d68c1348d3731ee",
+      "compressedSha256": "b9350f46edbecd4356dfc5b6de013c8e5ffaa1a8635ed63b12bc4d4613145946"
+    },
+    {
+      "file": "three-service/course-list/round-2.json.gz",
+      "uncompressedBytes": 241500,
+      "compressedBytes": 43277,
+      "uncompressedSha256": "5ca3638e5a506690e5fc0b0f23ac1fdd35c512de13e87ae2faf7ca853ad6029e",
+      "compressedSha256": "5af7abe1e891355160c2aeb26b753a56dcf4aff6be7e1207784996ecb982b097"
+    },
+    {
+      "file": "three-service/course-list/round-3.json.gz",
+      "uncompressedBytes": 241408,
+      "compressedBytes": 43132,
+      "uncompressedSha256": "59b0d2a265c784ae32581f9da4c8cff89c2e047057f9917dc053850c76b1afbb",
+      "compressedSha256": "67d0ba132714618479ce3f4d321b55751134d650f7298694bc3f70071e7ec7d3"
+    },
+    {
+      "file": "three-service/homework-submission/round-1.json.gz",
+      "uncompressedBytes": 241217,
+      "compressedBytes": 43689,
+      "uncompressedSha256": "2f78a6f0ab537076cfadebe77f5f1cb7550ccdf048953cd41a6e58b98c1d4e09",
+      "compressedSha256": "950ef856ca04176a3dcc563e314ed5beae1425c63a6d80dac4fee3b9f6e324e5"
+    },
+    {
+      "file": "three-service/homework-submission/round-2.json.gz",
+      "uncompressedBytes": 241257,
+      "compressedBytes": 43540,
+      "uncompressedSha256": "f2709d1df0bc342a6236984346afc1e5d7684200d2e1ba964a07ec8c4d60b5ee",
+      "compressedSha256": "403c9bfd72ce3c41841c49909c3553a559e2c312a8b524eea1dda1858abdc367"
+    },
+    {
+      "file": "three-service/homework-submission/round-3.json.gz",
+      "uncompressedBytes": 241186,
+      "compressedBytes": 43481,
+      "uncompressedSha256": "48144640c900c9caab1c2f0121f0a056c5f1ba6c85f8930ac1800b97785cfae4",
+      "compressedSha256": "4df973c2db9a28730cc1628c714acaae753a15dd9b9515fc4221884eb4ce3f48"
+    },
+    {
+      "file": "three-service/my-grades/round-1.json.gz",
+      "uncompressedBytes": 241081,
+      "compressedBytes": 43647,
+      "uncompressedSha256": "521ba7d7a57b2917e672f767b9bb688d6199e96eb9cefccb9a97a796740341f2",
+      "compressedSha256": "4d849e8bf46f7a4208422a2998ab9538fade7bc383ce17daffbcd4f7c811b25b"
+    },
+    {
+      "file": "three-service/my-grades/round-2.json.gz",
+      "uncompressedBytes": 241148,
+      "compressedBytes": 43465,
+      "uncompressedSha256": "52b36b0d6cc4c3f31e1a4ab0adf01a45c47bbda5ecfb7f5fac76c6d746ae1b3e",
+      "compressedSha256": "783aff6a8422b33bab6c4523545451f3e660a3e3252924652cc262b9bb6cec45"
+    },
+    {
+      "file": "three-service/my-grades/round-3.json.gz",
+      "uncompressedBytes": 241139,
+      "compressedBytes": 43505,
+      "uncompressedSha256": "3e7ecf325e68efddc8e5de2924aada5721377764d531f95d8b05262f1eae7384",
+      "compressedSha256": "88a458b76a37c499ca6ce931e2a86fd5290ec3566a7bd3431acb034d857cea72"
+    }
+  ]
+}

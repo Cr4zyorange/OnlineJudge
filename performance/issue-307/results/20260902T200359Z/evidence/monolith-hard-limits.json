@@ -1,0 +1,827 @@
+[
+    {
+        "Id": "bd3842510a3c3d3ad47c69d8ceb349739aed3aed7efd5397aac10c80a03d01e6",
+        "Created": "2026-09-02T20:30:24.11242038Z",
+        "Path": "docker-entrypoint.sh",
+        "Args": [
+            "--character-set-server=utf8mb4",
+            "--collation-server=utf8mb4_unicode_ci"
+        ],
+        "State": {
+            "Status": "running",
+            "Running": true,
+            "Paused": false,
+            "Restarting": false,
+            "OOMKilled": false,
+            "Dead": false,
+            "Pid": 49621,
+            "ExitCode": 0,
+            "Error": "",
+            "StartedAt": "2026-09-02T20:30:24.345851088Z",
+            "FinishedAt": "0001-01-01T00:00:00Z",
+            "Health": {
+                "Status": "healthy",
+                "FailingStreak": 0,
+                "Log": [
+                    {
+                        "Start": "2026-09-02T20:30:29.443251674Z",
+                        "End": "2026-09-02T20:30:29.483155508Z",
+                        "ExitCode": 1,
+                        "Output": "mysqladmin: [Warning] Using a password on the command line interface can be insecure.\n"
+                    },
+                    {
+                        "Start": "2026-09-02T20:30:34.488918677Z",
+                        "End": "2026-09-02T20:30:34.542840593Z",
+                        "ExitCode": 0,
+                        "Output": "mysqladmin: [Warning] Using a password on the command line interface can be insecure.\nmysqld is alive\n"
+                    },
+                    {
+                        "Start": "2026-09-02T20:30:44.553004417Z",
+                        "End": "2026-09-02T20:30:44.605139959Z",
+                        "ExitCode": 0,
+                        "Output": "mysqladmin: [Warning] Using a password on the command line interface can be insecure.\nmysqld is alive\n"
+                    },
+                    {
+                        "Start": "2026-09-02T20:30:54.610617505Z",
+                        "End": "2026-09-02T20:30:54.667328422Z",
+                        "ExitCode": 0,
+                        "Output": "mysqladmin: [Warning] Using a password on the command line interface can be insecure.\nmysqld is alive\n"
+                    }
+                ]
+            }
+        },
+        "Image": "sha256:5e7e005a680e75d935984d3d9390990d2a709b3ed67e92708e9e6747f1f754c9",
+        "ResolvConfPath": "/var/lib/docker/containers/bd3842510a3c3d3ad47c69d8ceb349739aed3aed7efd5397aac10c80a03d01e6/resolv.conf",
+        "HostnamePath": "/var/lib/docker/containers/bd3842510a3c3d3ad47c69d8ceb349739aed3aed7efd5397aac10c80a03d01e6/hostname",
+        "HostsPath": "/var/lib/docker/containers/bd3842510a3c3d3ad47c69d8ceb349739aed3aed7efd5397aac10c80a03d01e6/hosts",
+        "LogPath": "/var/lib/docker/containers/bd3842510a3c3d3ad47c69d8ceb349739aed3aed7efd5397aac10c80a03d01e6/bd3842510a3c3d3ad47c69d8ceb349739aed3aed7efd5397aac10c80a03d01e6-json.log",
+        "Name": "/onlinejudge-mysql",
+        "RestartCount": 0,
+        "Driver": "overlay2",
+        "Platform": "linux",
+        "MountLabel": "",
+        "ProcessLabel": "",
+        "AppArmorProfile": "",
+        "ExecIDs": null,
+        "HostConfig": {
+            "Binds": [
+                "oj307-monolith-200359_mysql-data:/var/lib/mysql:rw",
+                "/host_mnt/private/tmp/oj307-monolith.najSTm/database/mysql/compose-schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro"
+            ],
+            "ContainerIDFile": "",
+            "LogConfig": {
+                "Type": "json-file",
+                "Config": {}
+            },
+            "NetworkMode": "oj307-monolith-200359_default",
+            "PortBindings": {},
+            "RestartPolicy": {
+                "Name": "no",
+                "MaximumRetryCount": 0
+            },
+            "AutoRemove": false,
+            "VolumeDriver": "",
+            "VolumesFrom": null,
+            "ConsoleSize": [
+                0,
+                0
+            ],
+            "CapAdd": null,
+            "CapDrop": null,
+            "CgroupnsMode": "private",
+            "Dns": null,
+            "DnsOptions": null,
+            "DnsSearch": null,
+            "ExtraHosts": [],
+            "GroupAdd": null,
+            "IpcMode": "private",
+            "Cgroup": "",
+            "Links": null,
+            "OomScoreAdj": 0,
+            "PidMode": "",
+            "Privileged": false,
+            "PublishAllPorts": false,
+            "ReadonlyRootfs": false,
+            "SecurityOpt": null,
+            "UTSMode": "",
+            "UsernsMode": "",
+            "ShmSize": 67108864,
+            "Runtime": "runc",
+            "Isolation": "",
+            "CpuShares": 0,
+            "Memory": 1610612736,
+            "NanoCpus": 1000000000,
+            "CgroupParent": "",
+            "BlkioWeight": 0,
+            "BlkioWeightDevice": null,
+            "BlkioDeviceReadBps": null,
+            "BlkioDeviceWriteBps": null,
+            "BlkioDeviceReadIOps": null,
+            "BlkioDeviceWriteIOps": null,
+            "CpuPeriod": 0,
+            "CpuQuota": 0,
+            "CpuRealtimePeriod": 0,
+            "CpuRealtimeRuntime": 0,
+            "CpusetCpus": "",
+            "CpusetMems": "",
+            "Devices": null,
+            "DeviceCgroupRules": null,
+            "DeviceRequests": null,
+            "MemoryReservation": 0,
+            "MemorySwap": 3221225472,
+            "MemorySwappiness": null,
+            "OomKillDisable": null,
+            "PidsLimit": null,
+            "Ulimits": null,
+            "CpuCount": 0,
+            "CpuPercent": 0,
+            "IOMaximumIOps": 0,
+            "IOMaximumBandwidth": 0,
+            "MaskedPaths": [
+                "/proc/acpi",
+                "/proc/asound",
+                "/proc/interrupts",
+                "/proc/kcore",
+                "/proc/keys",
+                "/proc/latency_stats",
+                "/proc/sched_debug",
+                "/proc/scsi",
+                "/proc/timer_list",
+                "/proc/timer_stats",
+                "/sys/devices/virtual/powercap",
+                "/sys/firmware"
+            ],
+            "ReadonlyPaths": [
+                "/proc/bus",
+                "/proc/fs",
+                "/proc/irq",
+                "/proc/sys",
+                "/proc/sysrq-trigger"
+            ]
+        },
+        "GraphDriver": {
+            "Data": {
+                "ID": "bd3842510a3c3d3ad47c69d8ceb349739aed3aed7efd5397aac10c80a03d01e6",
+                "LowerDir": "/var/lib/docker/overlay2/19567ec78145a1cd005163b5557328a10f07c1b09ce3566e15cf7af946cf1376-init/diff:/var/lib/docker/overlay2/b527dbf3d64034304fadb3a5fef6a3b25cef7e840b6e6e4166293976c8ee62db/diff:/var/lib/docker/overlay2/02d104d32338ab9be70f26cf53aedb7df5c23de36ed6a7b3e072e24d8536ee82/diff:/var/lib/docker/overlay2/8583be27ecd2381cdeb3f4e2c0683edcfb94c012df0996cb8f82fc8edca24fb9/diff:/var/lib/docker/overlay2/02498e8c5a01c9acd86a2c4d1b5a7f1f0130b279d1fe68662fa9923f4460f1c3/diff:/var/lib/docker/overlay2/7cc87ee2f2d1d97e60a527ff9f8de2b8d39437742cd2e825efe3c574907da98d/diff:/var/lib/docker/overlay2/f78ed99bf0b59fcba840f0c837d5e71713a76d167702dbebceed3bb47273bb97/diff:/var/lib/docker/overlay2/c2522b6d6c82ab8d4db60126682954e4214550c64e5bcdac52748ba085bfe788/diff:/var/lib/docker/overlay2/35f7a3f8234fced285ff9ebbf32d0b667bbe275fcae89d6fa574a03b0bc775ba/diff:/var/lib/docker/overlay2/59d7380178a1d554b37f75a7cd5f17363f79d7948e34ddc7ea022dc89dc4b574/diff:/var/lib/docker/overlay2/4dcff4e8fe627c4a6064af59ae49f8e0769bf36e4cb71998b7f917832ff61ea8/diff",
+                "MergedDir": "/var/lib/docker/overlay2/19567ec78145a1cd005163b5557328a10f07c1b09ce3566e15cf7af946cf1376/merged",
+                "UpperDir": "/var/lib/docker/overlay2/19567ec78145a1cd005163b5557328a10f07c1b09ce3566e15cf7af946cf1376/diff",
+                "WorkDir": "/var/lib/docker/overlay2/19567ec78145a1cd005163b5557328a10f07c1b09ce3566e15cf7af946cf1376/work"
+            },
+            "Name": "overlay2"
+        },
+        "Mounts": [
+            {
+                "Type": "bind",
+                "Source": "/host_mnt/private/tmp/oj307-monolith.najSTm/database/mysql/compose-schema.sql",
+                "Destination": "/docker-entrypoint-initdb.d/01-schema.sql",
+                "Mode": "ro",
+                "RW": false,
+                "Propagation": "rprivate"
+            },
+            {
+                "Type": "volume",
+                "Name": "oj307-monolith-200359_mysql-data",
+                "Source": "/var/lib/docker/volumes/oj307-monolith-200359_mysql-data/_data",
+                "Destination": "/var/lib/mysql",
+                "Driver": "local",
+                "Mode": "rw",
+                "RW": true,
+                "Propagation": ""
+            }
+        ],
+        "Config": {
+            "Hostname": "bd3842510a3c",
+            "Domainname": "",
+            "User": "",
+            "AttachStdin": false,
+            "AttachStdout": true,
+            "AttachStderr": true,
+            "ExposedPorts": {
+                "3306/tcp": {},
+                "33060/tcp": {}
+            },
+            "Tty": false,
+            "OpenStdin": false,
+            "StdinOnce": false,
+            "Env": [
+                "MYSQL_DATABASE=onlinejudge",
+                "MYSQL_USER=onlinejudge",
+                "MYSQL_PASSWORD=onlinejudge",
+                "MYSQL_ROOT_PASSWORD=root",
+                "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+                "GOSU_VERSION=1.19",
+                "MYSQL_MAJOR=8.4",
+                "MYSQL_VERSION=8.4.11-1.el9",
+                "MYSQL_SHELL_VERSION=8.4.10-1.el9"
+            ],
+            "Cmd": [
+                "--character-set-server=utf8mb4",
+                "--collation-server=utf8mb4_unicode_ci"
+            ],
+            "Healthcheck": {
+                "Test": [
+                    "CMD-SHELL",
+                    "mysqladmin ping -h 127.0.0.1 -uroot -p$MYSQL_ROOT_PASSWORD --silent"
+                ],
+                "Interval": 10000000000,
+                "Timeout": 5000000000,
+                "StartPeriod": 20000000000,
+                "Retries": 12
+            },
+            "Image": "mysql:8.4",
+            "Volumes": {
+                "/var/lib/mysql": {}
+            },
+            "WorkingDir": "/",
+            "Entrypoint": [
+                "docker-entrypoint.sh"
+            ],
+            "Labels": {
+                "com.docker.compose.config-hash": "8d1160b5da0de6e79f46c297545f926ba6adc3c586ea0c51c0c1a7d50a1a720b",
+                "com.docker.compose.container-number": "1",
+                "com.docker.compose.depends_on": "",
+                "com.docker.compose.image": "sha256:5e7e005a680e75d935984d3d9390990d2a709b3ed67e92708e9e6747f1f754c9",
+                "com.docker.compose.oneoff": "False",
+                "com.docker.compose.project": "oj307-monolith-200359",
+                "com.docker.compose.project.config_files": "/private/tmp/oj307-monolith.najSTm/deploy/docker/compose.yml,/private/tmp/oj307-perf.Vwbe8B/performance/issue-307/results/20260902T200359Z/evidence/monolith-resource-policy.yml",
+                "com.docker.compose.project.working_dir": "/private/tmp/oj307-monolith.najSTm/deploy/docker",
+                "com.docker.compose.service": "mysql",
+                "com.docker.compose.version": "5.4.0"
+            }
+        },
+        "NetworkSettings": {
+            "SandboxID": "7d89985f1b28407e4ce2ef10f5d82bb18bd1907cd59be545eff27ad450cd4ebc",
+            "SandboxKey": "/var/run/docker/netns/7d89985f1b28",
+            "Ports": {
+                "3306/tcp": null,
+                "33060/tcp": null
+            },
+            "Networks": {
+                "oj307-monolith-200359_default": {
+                    "IPAMConfig": null,
+                    "Links": null,
+                    "Aliases": [
+                        "onlinejudge-mysql",
+                        "mysql"
+                    ],
+                    "DriverOpts": null,
+                    "GwPriority": 0,
+                    "NetworkID": "1251b9a7aea4b7ea611fb7910a941c57df46696493646fbfbe62ddd403ba7397",
+                    "EndpointID": "60705d58c4c9af7ba32f8bee9b9b0f1cc90c128e90ba220bbc1c76210053f638",
+                    "Gateway": "192.168.32.1",
+                    "IPAddress": "192.168.32.2",
+                    "MacAddress": "f2:7d:0d:9c:d6:fa",
+                    "IPPrefixLen": 20,
+                    "IPv6Gateway": "",
+                    "GlobalIPv6Address": "",
+                    "GlobalIPv6PrefixLen": 0,
+                    "DNSNames": [
+                        "onlinejudge-mysql",
+                        "mysql",
+                        "bd3842510a3c"
+                    ]
+                }
+            }
+        }
+    },
+    {
+        "Id": "f5f1d353b87025ffe41f0faaef80200f48fd3f911d0df0b8584645cd764f1da3",
+        "Created": "2026-09-02T20:30:24.233160213Z",
+        "Path": "java",
+        "Args": [
+            "-jar",
+            "/opt/onlinejudge/app.jar",
+            "--spring.config.additional-location=classpath:/application-compose.properties"
+        ],
+        "State": {
+            "Status": "running",
+            "Running": true,
+            "Paused": false,
+            "Restarting": false,
+            "OOMKilled": false,
+            "Dead": false,
+            "Pid": 50048,
+            "ExitCode": 0,
+            "Error": "",
+            "StartedAt": "2026-09-02T20:30:34.971701719Z",
+            "FinishedAt": "0001-01-01T00:00:00Z",
+            "Health": {
+                "Status": "healthy",
+                "FailingStreak": 0,
+                "Log": [
+                    {
+                        "Start": "2026-09-02T20:30:40.031046554Z",
+                        "End": "2026-09-02T20:30:40.138374554Z",
+                        "ExitCode": 0,
+                        "Output": ""
+                    },
+                    {
+                        "Start": "2026-09-02T20:30:50.14679117Z",
+                        "End": "2026-09-02T20:30:50.199554045Z",
+                        "ExitCode": 0,
+                        "Output": ""
+                    },
+                    {
+                        "Start": "2026-09-02T20:31:00.201124466Z",
+                        "End": "2026-09-02T20:31:00.229896675Z",
+                        "ExitCode": 0,
+                        "Output": ""
+                    }
+                ]
+            }
+        },
+        "Image": "sha256:715d6a1f6a30ddc231f93d015dcd7e1187abc8a1b25c18dfc4113eb9ecb3be42",
+        "ResolvConfPath": "/var/lib/docker/containers/f5f1d353b87025ffe41f0faaef80200f48fd3f911d0df0b8584645cd764f1da3/resolv.conf",
+        "HostnamePath": "/var/lib/docker/containers/f5f1d353b87025ffe41f0faaef80200f48fd3f911d0df0b8584645cd764f1da3/hostname",
+        "HostsPath": "/var/lib/docker/containers/f5f1d353b87025ffe41f0faaef80200f48fd3f911d0df0b8584645cd764f1da3/hosts",
+        "LogPath": "/var/lib/docker/containers/f5f1d353b87025ffe41f0faaef80200f48fd3f911d0df0b8584645cd764f1da3/f5f1d353b87025ffe41f0faaef80200f48fd3f911d0df0b8584645cd764f1da3-json.log",
+        "Name": "/onlinejudge-backend",
+        "RestartCount": 0,
+        "Driver": "overlay2",
+        "Platform": "linux",
+        "MountLabel": "",
+        "ProcessLabel": "",
+        "AppArmorProfile": "",
+        "ExecIDs": null,
+        "HostConfig": {
+            "Binds": [
+                "oj307-monolith-200359_app-data:/opt/onlinejudge/data:rw"
+            ],
+            "ContainerIDFile": "",
+            "LogConfig": {
+                "Type": "json-file",
+                "Config": {}
+            },
+            "NetworkMode": "oj307-monolith-200359_default",
+            "PortBindings": {},
+            "RestartPolicy": {
+                "Name": "no",
+                "MaximumRetryCount": 0
+            },
+            "AutoRemove": false,
+            "VolumeDriver": "",
+            "VolumesFrom": null,
+            "ConsoleSize": [
+                0,
+                0
+            ],
+            "CapAdd": null,
+            "CapDrop": null,
+            "CgroupnsMode": "private",
+            "Dns": null,
+            "DnsOptions": null,
+            "DnsSearch": null,
+            "ExtraHosts": [],
+            "GroupAdd": null,
+            "IpcMode": "private",
+            "Cgroup": "",
+            "Links": null,
+            "OomScoreAdj": 0,
+            "PidMode": "",
+            "Privileged": false,
+            "PublishAllPorts": false,
+            "ReadonlyRootfs": false,
+            "SecurityOpt": null,
+            "UTSMode": "",
+            "UsernsMode": "",
+            "ShmSize": 67108864,
+            "Runtime": "runc",
+            "Isolation": "",
+            "CpuShares": 0,
+            "Memory": 4294967296,
+            "NanoCpus": 2500000000,
+            "CgroupParent": "",
+            "BlkioWeight": 0,
+            "BlkioWeightDevice": null,
+            "BlkioDeviceReadBps": null,
+            "BlkioDeviceWriteBps": null,
+            "BlkioDeviceReadIOps": null,
+            "BlkioDeviceWriteIOps": null,
+            "CpuPeriod": 0,
+            "CpuQuota": 0,
+            "CpuRealtimePeriod": 0,
+            "CpuRealtimeRuntime": 0,
+            "CpusetCpus": "",
+            "CpusetMems": "",
+            "Devices": null,
+            "DeviceCgroupRules": null,
+            "DeviceRequests": null,
+            "MemoryReservation": 0,
+            "MemorySwap": 8589934592,
+            "MemorySwappiness": null,
+            "OomKillDisable": null,
+            "PidsLimit": null,
+            "Ulimits": null,
+            "CpuCount": 0,
+            "CpuPercent": 0,
+            "IOMaximumIOps": 0,
+            "IOMaximumBandwidth": 0,
+            "MaskedPaths": [
+                "/proc/acpi",
+                "/proc/asound",
+                "/proc/interrupts",
+                "/proc/kcore",
+                "/proc/keys",
+                "/proc/latency_stats",
+                "/proc/sched_debug",
+                "/proc/scsi",
+                "/proc/timer_list",
+                "/proc/timer_stats",
+                "/sys/devices/virtual/powercap",
+                "/sys/firmware"
+            ],
+            "ReadonlyPaths": [
+                "/proc/bus",
+                "/proc/fs",
+                "/proc/irq",
+                "/proc/sys",
+                "/proc/sysrq-trigger"
+            ]
+        },
+        "GraphDriver": {
+            "Data": {
+                "ID": "f5f1d353b87025ffe41f0faaef80200f48fd3f911d0df0b8584645cd764f1da3",
+                "LowerDir": "/var/lib/docker/overlay2/1964603642f99b47feb2fbde036a6221aed8acb7a4ce570a7f08c29c901f40bb-init/diff:/var/lib/docker/overlay2/2j6dhupd04ewx4stqeky25xez/diff:/var/lib/docker/overlay2/oprn1odz80dwz8w305vfnflve/diff:/var/lib/docker/overlay2/q8xnt1cum91zwn9gf3z73kwma/diff:/var/lib/docker/overlay2/qcz44sl603jezpnqsdmmacksp/diff:/var/lib/docker/overlay2/85977c5dc6a4a165057be5a46fea870b4b977e1db79cb8a14e8a1fb2a51de539/diff:/var/lib/docker/overlay2/8cb47c0daeab2a8436442fcc403466d01ca374a75b4ec65dbcf4fc5dab2370f4/diff:/var/lib/docker/overlay2/68ee4aa9cc01ec63e7f81c1aa2499627be54a7eb336d06bf3c5f0291a5fef640/diff:/var/lib/docker/overlay2/1382ec292206b85c01600528f1eb87a02ef6aca4b9f3c3895ea6365f006bd3df/diff:/var/lib/docker/overlay2/6b6e18e97a356436b2f83acdde3f060d6cabdc45c7da527b10f307299efc43ae/diff:/var/lib/docker/overlay2/d913715dfd4850f465ab704fa45f4cc374c0d8932ca20848a0332798d313c51c/diff",
+                "MergedDir": "/var/lib/docker/overlay2/1964603642f99b47feb2fbde036a6221aed8acb7a4ce570a7f08c29c901f40bb/merged",
+                "UpperDir": "/var/lib/docker/overlay2/1964603642f99b47feb2fbde036a6221aed8acb7a4ce570a7f08c29c901f40bb/diff",
+                "WorkDir": "/var/lib/docker/overlay2/1964603642f99b47feb2fbde036a6221aed8acb7a4ce570a7f08c29c901f40bb/work"
+            },
+            "Name": "overlay2"
+        },
+        "Mounts": [
+            {
+                "Type": "volume",
+                "Name": "oj307-monolith-200359_app-data",
+                "Source": "/var/lib/docker/volumes/oj307-monolith-200359_app-data/_data",
+                "Destination": "/opt/onlinejudge/data",
+                "Driver": "local",
+                "Mode": "rw",
+                "RW": true,
+                "Propagation": ""
+            }
+        ],
+        "Config": {
+            "Hostname": "f5f1d353b870",
+            "Domainname": "",
+            "User": "",
+            "AttachStdin": false,
+            "AttachStdout": true,
+            "AttachStderr": true,
+            "ExposedPorts": {
+                "8080/tcp": {}
+            },
+            "Tty": false,
+            "OpenStdin": false,
+            "StdinOnce": false,
+            "Env": [
+                "ONLINEJUDGE_NOTIFICATIONS_INTERNAL_TOKEN=",
+                "ONLINEJUDGE_DEMO_DATA_ENABLED=true",
+                "MYSQL_PORT=3306",
+                "MYSQL_PASSWORD=onlinejudge",
+                "MYSQL_HOST=mysql",
+                "MYSQL_USER=onlinejudge",
+                "ONLINEJUDGE_EVALUATION_SANDBOX_MODE=fake",
+                "MYSQL_DATABASE=onlinejudge",
+                "PATH=/opt/java/openjdk/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+                "JAVA_HOME=/opt/java/openjdk",
+                "LANG=en_US.UTF-8",
+                "LANGUAGE=en_US:en",
+                "LC_ALL=en_US.UTF-8",
+                "JAVA_VERSION=jdk-21.0.12+8"
+            ],
+            "Cmd": null,
+            "Healthcheck": {
+                "Test": [
+                    "CMD-SHELL",
+                    "wget -qO- http://127.0.0.1:8080/api/v1/system/health | grep -q '\"status\":\"UP\"'"
+                ],
+                "Interval": 10000000000,
+                "Timeout": 5000000000,
+                "StartPeriod": 30000000000,
+                "Retries": 12
+            },
+            "Image": "oj307-monolith-200359-backend",
+            "Volumes": null,
+            "WorkingDir": "/opt/onlinejudge",
+            "Entrypoint": [
+                "java",
+                "-jar",
+                "/opt/onlinejudge/app.jar",
+                "--spring.config.additional-location=classpath:/application-compose.properties"
+            ],
+            "Labels": {
+                "com.docker.compose.config-hash": "4afba6b899bc89342c64d58c628cffdd0b8adb2e8a0865b30e82de8bd2589592",
+                "com.docker.compose.container-number": "1",
+                "com.docker.compose.depends_on": "mysql:service_healthy:false",
+                "com.docker.compose.image": "sha256:715d6a1f6a30ddc231f93d015dcd7e1187abc8a1b25c18dfc4113eb9ecb3be42",
+                "com.docker.compose.oneoff": "False",
+                "com.docker.compose.project": "oj307-monolith-200359",
+                "com.docker.compose.project.config_files": "/private/tmp/oj307-monolith.najSTm/deploy/docker/compose.yml,/private/tmp/oj307-perf.Vwbe8B/performance/issue-307/results/20260902T200359Z/evidence/monolith-resource-policy.yml",
+                "com.docker.compose.project.working_dir": "/private/tmp/oj307-monolith.najSTm/deploy/docker",
+                "com.docker.compose.service": "backend",
+                "com.docker.compose.version": "5.4.0",
+                "org.opencontainers.image.created": "2026-08-17T09:04:34.463771+00:00",
+                "org.opencontainers.image.description": "The Ubuntu container image maintained by Canonical\n\nUbuntu is a Debian-based Linux operating system that runs from the desktop to the cloud, to all your internet connected things.\nIt is the world's most popular operating system across public clouds and OpenStack clouds.\nIt is the number one platform for containers; from Docker to Kubernetes to LXD, Ubuntu can run your containers at scale.\nFast, secure and simple, Ubuntu powers millions of PCs worldwide.\n",
+                "org.opencontainers.image.title": "ubuntu",
+                "org.opencontainers.image.version": "26.04"
+            }
+        },
+        "NetworkSettings": {
+            "SandboxID": "cccac8691b1fc28d75daf8acac027a626567d672d9df6bdf6a1d9f1d0c25f6ff",
+            "SandboxKey": "/var/run/docker/netns/cccac8691b1f",
+            "Ports": {
+                "8080/tcp": null
+            },
+            "Networks": {
+                "oj307-monolith-200359_default": {
+                    "IPAMConfig": null,
+                    "Links": null,
+                    "Aliases": [
+                        "onlinejudge-backend",
+                        "backend"
+                    ],
+                    "DriverOpts": null,
+                    "GwPriority": 0,
+                    "NetworkID": "1251b9a7aea4b7ea611fb7910a941c57df46696493646fbfbe62ddd403ba7397",
+                    "EndpointID": "e457eaf7cfb798f5351a29b0d21673197a154808d22523ff6fd7cd0708c23969",
+                    "Gateway": "192.168.32.1",
+                    "IPAddress": "192.168.32.3",
+                    "MacAddress": "4a:a1:ea:d9:9d:39",
+                    "IPPrefixLen": 20,
+                    "IPv6Gateway": "",
+                    "GlobalIPv6Address": "",
+                    "GlobalIPv6PrefixLen": 0,
+                    "DNSNames": [
+                        "onlinejudge-backend",
+                        "backend",
+                        "f5f1d353b870"
+                    ]
+                }
+            }
+        }
+    },
+    {
+        "Id": "38b415832e4ebf4607b2312d04ad69c62abc9a71fd082e6717f767accd45b01e",
+        "Created": "2026-09-02T20:30:24.262459088Z",
+        "Path": "/docker-entrypoint.sh",
+        "Args": [
+            "nginx",
+            "-g",
+            "daemon off;"
+        ],
+        "State": {
+            "Status": "running",
+            "Running": true,
+            "Paused": false,
+            "Restarting": false,
+            "OOMKilled": false,
+            "Dead": false,
+            "Pid": 50173,
+            "ExitCode": 0,
+            "Error": "",
+            "StartedAt": "2026-09-02T20:30:40.568989471Z",
+            "FinishedAt": "0001-01-01T00:00:00Z",
+            "Health": {
+                "Status": "healthy",
+                "FailingStreak": 0,
+                "Log": [
+                    {
+                        "Start": "2026-09-02T20:30:45.654255459Z",
+                        "End": "2026-09-02T20:30:45.709743834Z",
+                        "ExitCode": 0,
+                        "Output": ""
+                    },
+                    {
+                        "Start": "2026-09-02T20:30:55.720732547Z",
+                        "End": "2026-09-02T20:30:55.759864464Z",
+                        "ExitCode": 0,
+                        "Output": ""
+                    }
+                ]
+            }
+        },
+        "Image": "sha256:b5bcb6c277cfabeaf769552eb3c812f082f2af8fb0a417f2b68bb270443f6df8",
+        "ResolvConfPath": "/var/lib/docker/containers/38b415832e4ebf4607b2312d04ad69c62abc9a71fd082e6717f767accd45b01e/resolv.conf",
+        "HostnamePath": "/var/lib/docker/containers/38b415832e4ebf4607b2312d04ad69c62abc9a71fd082e6717f767accd45b01e/hostname",
+        "HostsPath": "/var/lib/docker/containers/38b415832e4ebf4607b2312d04ad69c62abc9a71fd082e6717f767accd45b01e/hosts",
+        "LogPath": "/var/lib/docker/containers/38b415832e4ebf4607b2312d04ad69c62abc9a71fd082e6717f767accd45b01e/38b415832e4ebf4607b2312d04ad69c62abc9a71fd082e6717f767accd45b01e-json.log",
+        "Name": "/onlinejudge-frontend",
+        "RestartCount": 0,
+        "Driver": "overlay2",
+        "Platform": "linux",
+        "MountLabel": "",
+        "ProcessLabel": "",
+        "AppArmorProfile": "",
+        "ExecIDs": null,
+        "HostConfig": {
+            "Binds": null,
+            "ContainerIDFile": "",
+            "LogConfig": {
+                "Type": "json-file",
+                "Config": {}
+            },
+            "NetworkMode": "oj307-monolith-200359_default",
+            "PortBindings": {
+                "80/tcp": [
+                    {
+                        "HostIp": "",
+                        "HostPort": "18080"
+                    }
+                ]
+            },
+            "RestartPolicy": {
+                "Name": "no",
+                "MaximumRetryCount": 0
+            },
+            "AutoRemove": false,
+            "VolumeDriver": "",
+            "VolumesFrom": null,
+            "ConsoleSize": [
+                0,
+                0
+            ],
+            "CapAdd": null,
+            "CapDrop": null,
+            "CgroupnsMode": "private",
+            "Dns": null,
+            "DnsOptions": null,
+            "DnsSearch": null,
+            "ExtraHosts": [],
+            "GroupAdd": null,
+            "IpcMode": "private",
+            "Cgroup": "",
+            "Links": null,
+            "OomScoreAdj": 0,
+            "PidMode": "",
+            "Privileged": false,
+            "PublishAllPorts": false,
+            "ReadonlyRootfs": false,
+            "SecurityOpt": null,
+            "UTSMode": "",
+            "UsernsMode": "",
+            "ShmSize": 67108864,
+            "Runtime": "runc",
+            "Isolation": "",
+            "CpuShares": 0,
+            "Memory": 536870912,
+            "NanoCpus": 500000000,
+            "CgroupParent": "",
+            "BlkioWeight": 0,
+            "BlkioWeightDevice": null,
+            "BlkioDeviceReadBps": null,
+            "BlkioDeviceWriteBps": null,
+            "BlkioDeviceReadIOps": null,
+            "BlkioDeviceWriteIOps": null,
+            "CpuPeriod": 0,
+            "CpuQuota": 0,
+            "CpuRealtimePeriod": 0,
+            "CpuRealtimeRuntime": 0,
+            "CpusetCpus": "",
+            "CpusetMems": "",
+            "Devices": null,
+            "DeviceCgroupRules": null,
+            "DeviceRequests": null,
+            "MemoryReservation": 0,
+            "MemorySwap": 1073741824,
+            "MemorySwappiness": null,
+            "OomKillDisable": null,
+            "PidsLimit": null,
+            "Ulimits": null,
+            "CpuCount": 0,
+            "CpuPercent": 0,
+            "IOMaximumIOps": 0,
+            "IOMaximumBandwidth": 0,
+            "MaskedPaths": [
+                "/proc/acpi",
+                "/proc/asound",
+                "/proc/interrupts",
+                "/proc/kcore",
+                "/proc/keys",
+                "/proc/latency_stats",
+                "/proc/sched_debug",
+                "/proc/scsi",
+                "/proc/timer_list",
+                "/proc/timer_stats",
+                "/sys/devices/virtual/powercap",
+                "/sys/firmware"
+            ],
+            "ReadonlyPaths": [
+                "/proc/bus",
+                "/proc/fs",
+                "/proc/irq",
+                "/proc/sys",
+                "/proc/sysrq-trigger"
+            ]
+        },
+        "GraphDriver": {
+            "Data": {
+                "ID": "38b415832e4ebf4607b2312d04ad69c62abc9a71fd082e6717f767accd45b01e",
+                "LowerDir": "/var/lib/docker/overlay2/8bd11a9343befdfde287095b77e0d1fe8e0eff3b3215dd1df96de4d96d2d2845-init/diff:/var/lib/docker/overlay2/zc9rl0oe6c77o2s3yvwn2tqqh/diff:/var/lib/docker/overlay2/yof8x9het6gphvacqm0bng3iv/diff:/var/lib/docker/overlay2/d4b35fedb9bb8e5709961a7abc1874bf80b751710ec1a760d91d11a82d46b984/diff:/var/lib/docker/overlay2/47c53988441533ae0532214636bd12d77d4f30a09b91c0d01b182037f39f81d6/diff:/var/lib/docker/overlay2/381e29e5550f3a535e8ea15bcccb360c82e6c4c404065ba10d09c13262794fb8/diff:/var/lib/docker/overlay2/f8c071f0adc1016156081ecab1c4c2bd45707f719aaf5afb89a636e96c55b464/diff:/var/lib/docker/overlay2/c3eb284ca7e3c90863169ad5f170da5fde691e3643c92a87bb9a335742eac050/diff:/var/lib/docker/overlay2/cf0127122f3def5670c996424ba98295569a678cbe248ac79bbe702bb632dcab/diff:/var/lib/docker/overlay2/4e6264d22ff2e493ed400f8cad226e4f2035e8ea3b336ba6ba6e85352041374d/diff:/var/lib/docker/overlay2/dcfba2415c9811899ca71c9debbf9c1e7fba7c66a376cb9797b56e6c1d53d72c/diff",
+                "MergedDir": "/var/lib/docker/overlay2/8bd11a9343befdfde287095b77e0d1fe8e0eff3b3215dd1df96de4d96d2d2845/merged",
+                "UpperDir": "/var/lib/docker/overlay2/8bd11a9343befdfde287095b77e0d1fe8e0eff3b3215dd1df96de4d96d2d2845/diff",
+                "WorkDir": "/var/lib/docker/overlay2/8bd11a9343befdfde287095b77e0d1fe8e0eff3b3215dd1df96de4d96d2d2845/work"
+            },
+            "Name": "overlay2"
+        },
+        "Mounts": [],
+        "Config": {
+            "Hostname": "38b415832e4e",
+            "Domainname": "",
+            "User": "",
+            "AttachStdin": false,
+            "AttachStdout": true,
+            "AttachStderr": true,
+            "ExposedPorts": {
+                "80/tcp": {}
+            },
+            "Tty": false,
+            "OpenStdin": false,
+            "StdinOnce": false,
+            "Env": [
+                "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+                "NGINX_VERSION=1.27.5",
+                "PKG_RELEASE=1",
+                "DYNPKG_RELEASE=1",
+                "NJS_VERSION=0.8.10",
+                "NJS_RELEASE=1"
+            ],
+            "Cmd": [
+                "nginx",
+                "-g",
+                "daemon off;"
+            ],
+            "Healthcheck": {
+                "Test": [
+                    "CMD-SHELL",
+                    "wget -qO- http://127.0.0.1/ | grep -q '\u003c!doctype html\u003e'"
+                ],
+                "Interval": 10000000000,
+                "Timeout": 5000000000,
+                "StartPeriod": 10000000000,
+                "Retries": 12
+            },
+            "Image": "oj307-monolith-200359-frontend",
+            "Volumes": null,
+            "WorkingDir": "/",
+            "Entrypoint": [
+                "/docker-entrypoint.sh"
+            ],
+            "Labels": {
+                "com.docker.compose.config-hash": "f7c18c7c7c2b9f8e311ab4cce58a301a95f22ce6bb03c76320e8b30758563611",
+                "com.docker.compose.container-number": "1",
+                "com.docker.compose.depends_on": "backend:service_healthy:false",
+                "com.docker.compose.image": "sha256:b5bcb6c277cfabeaf769552eb3c812f082f2af8fb0a417f2b68bb270443f6df8",
+                "com.docker.compose.oneoff": "False",
+                "com.docker.compose.project": "oj307-monolith-200359",
+                "com.docker.compose.project.config_files": "/private/tmp/oj307-monolith.najSTm/deploy/docker/compose.yml,/private/tmp/oj307-perf.Vwbe8B/performance/issue-307/results/20260902T200359Z/evidence/monolith-resource-policy.yml",
+                "com.docker.compose.project.working_dir": "/private/tmp/oj307-monolith.najSTm/deploy/docker",
+                "com.docker.compose.service": "frontend",
+                "com.docker.compose.version": "5.4.0",
+                "maintainer": "NGINX Docker Maintainers \u003cdocker-maint@nginx.com\u003e"
+            },
+            "StopSignal": "SIGQUIT"
+        },
+        "NetworkSettings": {
+            "SandboxID": "672a53700e978cf592deee72e9b28ad58933e9774601b5b22abf147bef6e0094",
+            "SandboxKey": "/var/run/docker/netns/672a53700e97",
+            "Ports": {
+                "80/tcp": [
+                    {
+                        "HostIp": "0.0.0.0",
+                        "HostPort": "18080"
+                    },
+                    {
+                        "HostIp": "::",
+                        "HostPort": "18080"
+                    }
+                ]
+            },
+            "Networks": {
+                "oj307-monolith-200359_default": {
+                    "IPAMConfig": null,
+                    "Links": null,
+                    "Aliases": [
+                        "onlinejudge-frontend",
+                        "frontend"
+                    ],
+                    "DriverOpts": null,
+                    "GwPriority": 0,
+                    "NetworkID": "1251b9a7aea4b7ea611fb7910a941c57df46696493646fbfbe62ddd403ba7397",
+                    "EndpointID": "bd695a27569faa64dc60cc887a091f4882e0bffa5b3929b85c1798d77d33be17",
+                    "Gateway": "192.168.32.1",
+                    "IPAddress": "192.168.32.4",
+                    "MacAddress": "a6:6b:a0:a6:5d:5d",
+                    "IPPrefixLen": 20,
+                    "IPv6Gateway": "",
+                    "GlobalIPv6Address": "",
+                    "GlobalIPv6PrefixLen": 0,
+                    "DNSNames": [
+                        "onlinejudge-frontend",
+                        "frontend",
+                        "38b415832e4e"
+                    ]
+                }
+            }
+        }
+    }
+]

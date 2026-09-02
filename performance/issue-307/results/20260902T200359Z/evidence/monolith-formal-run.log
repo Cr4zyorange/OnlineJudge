@@ -1,0 +1,85 @@
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+DATASET_READY architecture=monolith project=oj307-monolith-200359 users=101 courses=105 members=101 homeworks=1 summaries=100 grade-records=300 submissions=0
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+DATASET_READY architecture=monolith project=oj307-monolith-200359 users=101 courses=105 members=101 homeworks=1 summaries=100 grade-records=300 submissions=0
+PREFLIGHT_VALID scenario=course-list requests=10 successful=10 success-rate=100%
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+DATASET_READY architecture=monolith project=oj307-monolith-200359 users=101 courses=105 members=101 homeworks=1 summaries=100 grade-records=300 submissions=0
+FORMAL_WINDOW_RECORDED architecture=monolith project=oj307-monolith-200359 output=/private/tmp/oj307-perf.Vwbe8B/performance/issue-307/results/20260902T200359Z/formal/monolith/course-list-round-1.json
+ROUND_RECORDED architecture=monolith scenario=course-list round=1 requests=1199 output=/private/tmp/oj307-perf.Vwbe8B/performance/issue-307/results/20260902T200359Z/raw/monolith/course-list/round-1.json
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+DATASET_READY architecture=monolith project=oj307-monolith-200359 users=101 courses=105 members=101 homeworks=1 summaries=100 grade-records=300 submissions=0
+PREFLIGHT_VALID scenario=course-list requests=10 successful=10 success-rate=100%
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+DATASET_READY architecture=monolith project=oj307-monolith-200359 users=101 courses=105 members=101 homeworks=1 summaries=100 grade-records=300 submissions=0
+FORMAL_WINDOW_RECORDED architecture=monolith project=oj307-monolith-200359 output=/private/tmp/oj307-perf.Vwbe8B/performance/issue-307/results/20260902T200359Z/formal/monolith/course-list-round-2.json
+ROUND_RECORDED architecture=monolith scenario=course-list round=2 requests=1199 output=/private/tmp/oj307-perf.Vwbe8B/performance/issue-307/results/20260902T200359Z/raw/monolith/course-list/round-2.json
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+DATASET_READY architecture=monolith project=oj307-monolith-200359 users=101 courses=105 members=101 homeworks=1 summaries=100 grade-records=300 submissions=0
+PREFLIGHT_VALID scenario=course-list requests=10 successful=10 success-rate=100%
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+DATASET_READY architecture=monolith project=oj307-monolith-200359 users=101 courses=105 members=101 homeworks=1 summaries=100 grade-records=300 submissions=0
+FORMAL_WINDOW_RECORDED architecture=monolith project=oj307-monolith-200359 output=/private/tmp/oj307-perf.Vwbe8B/performance/issue-307/results/20260902T200359Z/formal/monolith/course-list-round-3.json
+ROUND_RECORDED architecture=monolith scenario=course-list round=3 requests=1199 output=/private/tmp/oj307-perf.Vwbe8B/performance/issue-307/results/20260902T200359Z/raw/monolith/course-list/round-3.json
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+DATASET_READY architecture=monolith project=oj307-monolith-200359 users=101 courses=105 members=101 homeworks=1 summaries=100 grade-records=300 submissions=0
+PREFLIGHT_VALID scenario=homework-submission requests=10 successful=10 success-rate=100%
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+DATASET_READY architecture=monolith project=oj307-monolith-200359 users=101 courses=105 members=101 homeworks=1 summaries=100 grade-records=300 submissions=0
+FORMAL_WINDOW_RECORDED architecture=monolith project=oj307-monolith-200359 output=/private/tmp/oj307-perf.Vwbe8B/performance/issue-307/results/20260902T200359Z/formal/monolith/homework-submission-round-1.json
+ROUND_RECORDED architecture=monolith scenario=homework-submission round=1 requests=1199 output=/private/tmp/oj307-perf.Vwbe8B/performance/issue-307/results/20260902T200359Z/raw/monolith/homework-submission/round-1.json
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+DATASET_READY architecture=monolith project=oj307-monolith-200359 users=101 courses=105 members=101 homeworks=1 summaries=100 grade-records=300 submissions=0
+PREFLIGHT_VALID scenario=homework-submission requests=10 successful=10 success-rate=100%
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+DATASET_READY architecture=monolith project=oj307-monolith-200359 users=101 courses=105 members=101 homeworks=1 summaries=100 grade-records=300 submissions=0
+FORMAL_WINDOW_RECORDED architecture=monolith project=oj307-monolith-200359 output=/private/tmp/oj307-perf.Vwbe8B/performance/issue-307/results/20260902T200359Z/formal/monolith/homework-submission-round-2.json
+ROUND_RECORDED architecture=monolith scenario=homework-submission round=2 requests=1199 output=/private/tmp/oj307-perf.Vwbe8B/performance/issue-307/results/20260902T200359Z/raw/monolith/homework-submission/round-2.json
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+DATASET_READY architecture=monolith project=oj307-monolith-200359 users=101 courses=105 members=101 homeworks=1 summaries=100 grade-records=300 submissions=0
+PREFLIGHT_VALID scenario=homework-submission requests=10 successful=10 success-rate=100%
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+DATASET_READY architecture=monolith project=oj307-monolith-200359 users=101 courses=105 members=101 homeworks=1 summaries=100 grade-records=300 submissions=0
+FORMAL_WINDOW_RECORDED architecture=monolith project=oj307-monolith-200359 output=/private/tmp/oj307-perf.Vwbe8B/performance/issue-307/results/20260902T200359Z/formal/monolith/homework-submission-round-3.json
+ROUND_RECORDED architecture=monolith scenario=homework-submission round=3 requests=1199 output=/private/tmp/oj307-perf.Vwbe8B/performance/issue-307/results/20260902T200359Z/raw/monolith/homework-submission/round-3.json
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+DATASET_READY architecture=monolith project=oj307-monolith-200359 users=101 courses=105 members=101 homeworks=1 summaries=100 grade-records=300 submissions=0
+PREFLIGHT_VALID scenario=my-grades requests=10 successful=10 success-rate=100%
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+DATASET_READY architecture=monolith project=oj307-monolith-200359 users=101 courses=105 members=101 homeworks=1 summaries=100 grade-records=300 submissions=0
+FORMAL_WINDOW_RECORDED architecture=monolith project=oj307-monolith-200359 output=/private/tmp/oj307-perf.Vwbe8B/performance/issue-307/results/20260902T200359Z/formal/monolith/my-grades-round-1.json
+ROUND_RECORDED architecture=monolith scenario=my-grades round=1 requests=1199 output=/private/tmp/oj307-perf.Vwbe8B/performance/issue-307/results/20260902T200359Z/raw/monolith/my-grades/round-1.json
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+DATASET_READY architecture=monolith project=oj307-monolith-200359 users=101 courses=105 members=101 homeworks=1 summaries=100 grade-records=300 submissions=0
+PREFLIGHT_VALID scenario=my-grades requests=10 successful=10 success-rate=100%
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+DATASET_READY architecture=monolith project=oj307-monolith-200359 users=101 courses=105 members=101 homeworks=1 summaries=100 grade-records=300 submissions=0
+FORMAL_WINDOW_RECORDED architecture=monolith project=oj307-monolith-200359 output=/private/tmp/oj307-perf.Vwbe8B/performance/issue-307/results/20260902T200359Z/formal/monolith/my-grades-round-2.json
+ROUND_RECORDED architecture=monolith scenario=my-grades round=2 requests=1199 output=/private/tmp/oj307-perf.Vwbe8B/performance/issue-307/results/20260902T200359Z/raw/monolith/my-grades/round-2.json
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+DATASET_READY architecture=monolith project=oj307-monolith-200359 users=101 courses=105 members=101 homeworks=1 summaries=100 grade-records=300 submissions=0
+PREFLIGHT_VALID scenario=my-grades requests=10 successful=10 success-rate=100%
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+DATASET_READY architecture=monolith project=oj307-monolith-200359 users=101 courses=105 members=101 homeworks=1 summaries=100 grade-records=300 submissions=0
+FORMAL_WINDOW_RECORDED architecture=monolith project=oj307-monolith-200359 output=/private/tmp/oj307-perf.Vwbe8B/performance/issue-307/results/20260902T200359Z/formal/monolith/my-grades-round-3.json
+ROUND_RECORDED architecture=monolith scenario=my-grades round=3 requests=1199 output=/private/tmp/oj307-perf.Vwbe8B/performance/issue-307/results/20260902T200359Z/raw/monolith/my-grades/round-3.json
+FORMAL_ARCHITECTURE_COMPLETE architecture=monolith project=oj307-monolith-200359 output=/private/tmp/oj307-perf.Vwbe8B/performance/issue-307/results/20260902T200359Z
