@@ -109,6 +109,8 @@ grep -Fq -- 'wait_for_grade_consumer' "$runner" \
   || fail 'runner must verify the Grade source queue has an active consumer before releasing the relay'
 grep -Fq -- 'grade_consumer_state' "$runner" \
   || fail 'runner must retain the observed Grade consumer topology state'
+grep -Fq -- 'gradeDlqMessages' "$runner" \
+  || fail 'runner must retain the Grade dead-letter count when a source event is not projected'
 python3 - "$repo_root/deploy/platform/workloads.json" <<'PY'
 import json
 import sys
