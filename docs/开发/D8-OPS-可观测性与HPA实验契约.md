@@ -32,7 +32,10 @@ python3 scripts/platform/validate_observability_experiment.py \
 bash scripts/platform/run_hpa_observability_experiment.sh \
   --namespace onlinejudge-platform \
   --gateway-url http://<gateway-address> \
-  --request-url http://<gateway-address>/<authenticated-assessment-business-chain>
+  --request-url http://<gateway-address>/<authenticated-assessment-business-chain> \
+  --authorization-file <受限读取的授权头文件> \
+  --request-method POST \
+  --request-body-file <受限读取的Assessment请求体文件>
 ```
 
-实验入口会在 `output/issue-319/<sha>/<utc>/` 保留 HPA/Pod/资源时间线、每次请求的原始耗时和状态、Gateway/Assessment/Grade 日志及 RabbitMQ queue 计数；无论成功或失败均输出证据目录。`kubectl top` 不可用会失败关闭，不能把无 Metrics API 的运行称为扩缩容实验。
+授权头与请求体都只从调用方受限文件读取，不复制到证据目录或命令行输出。每次实验固定先受控摘除并恢复 RabbitMQ，确认 Assessment API 仍有 Available 副本；随后必须观察到 HPA 相对基线扩容并在负载结束后缩容。实验入口会在 `output/issue-319/<sha>/<utc>/` 保留 HPA/Pod/资源时间线、每次请求的原始耗时和状态、Gateway/Assessment/Grade 日志及 RabbitMQ queue 计数；无论成功或失败均输出证据目录。`kubectl top` 不可用会失败关闭，不能把无 Metrics API 的运行称为扩缩容实验。
