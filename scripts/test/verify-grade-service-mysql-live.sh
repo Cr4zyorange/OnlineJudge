@@ -42,7 +42,7 @@ docker run --detach --rm --name "$mysql_name" \
 
 for attempt in $(seq 1 90); do
   if docker exec "$mysql_name" mysql \
-      --protocol=socket --user=root --password="$mysql_root_password" \
+      --protocol=tcp --host=127.0.0.1 --user=root --password="$mysql_root_password" \
       --execute='SELECT 1' >/dev/null 2>&1; then
     break
   fi
@@ -55,17 +55,17 @@ done
 
 mysql_file() {
   docker exec -i "$mysql_name" mysql \
-    --protocol=socket --user=root --password="$mysql_root_password" "$database_name" < "$1"
+    --protocol=tcp --host=127.0.0.1 --user=root --password="$mysql_root_password" "$database_name" < "$1"
 }
 
 mysql_file "$repo_root/database/migrations/grade/V20260901_01__grade_service_schema.sql"
 mysql_file "$repo_root/database/migrations/grade/V20260901_02__complete_grade_runtime.sql"
 docker exec "$mysql_name" mysql \
-  --protocol=socket --user=root --password="$mysql_root_password" \
+  --protocol=tcp --host=127.0.0.1 --user=root --password="$mysql_root_password" \
   --execute="CREATE USER 'oj_grade_rw'@'%' IDENTIFIED BY '$grade_password'; GRANT SELECT, INSERT, UPDATE, DELETE ON oj_grade.* TO 'oj_grade_rw'@'%'; FLUSH PRIVILEGES;"
 
 table_count="$(docker exec "$mysql_name" mysql --batch --skip-column-names \
-  --protocol=socket --user=root --password="$mysql_root_password" "$database_name" \
+  --protocol=tcp --host=127.0.0.1 --user=root --password="$mysql_root_password" "$database_name" \
   --execute="SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE();")"
 [[ "$table_count" == "18" ]] || {
   echo "grade-mysql-live: expected 18 migrated tables, got $table_count" >&2
