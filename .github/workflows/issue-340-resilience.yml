@@ -82,5 +82,8 @@ jobs:
             ci-artifacts/issue-340/scenarios/*/query-status
             ci-artifacts/issue-340/scenarios/*/domain-before
             ci-artifacts/issue-340/scenarios/*/domain-after
+            ci-artifacts/issue-340/scenarios/grade-down/grade-service-log
+            ci-artifacts/issue-340/scenarios/grade-down/rabbitmq-queues.log
+            ci-artifacts/issue-340/scenarios/grade-down/rabbitmq-bindings.log
           if-no-files-found: warn
           retention-days: 14

@@ -534,6 +534,35 @@ PY
     ' sh "$payload"
   }
 
+  capture_grade_diagnostics() {
+    local dir="$1"
+    compose_exec rabbitmq rabbitmqctl list_queues name messages messages_unacknowledged consumers -q \
+      >"$dir/rabbitmq-queues.log" 2>&1 || true
+    compose_exec rabbitmq rabbitmqctl list_bindings source_name destination_name routing_key -q \
+      >"$dir/rabbitmq-bindings.log" 2>&1 || true
+    "${compose[@]}" logs --no-color --tail 240 grade-service \
+      >"$dir/grade-service-log.raw" 2>&1 || true
+    python3 - "$dir/grade-service-log.raw" "$dir/grade-service-log" <<'PY'
+import re
+import sys
+from pathlib import Path
+
+source, target = map(Path, sys.argv[1:])
+redactions = (
+    (re.compile(r"(?i)(authorization:\s*bearer\s+)[A-Za-z0-9._~+/-]+"), r"\1[REDACTED]"),
+    (re.compile(r"(?i)((?:password|token|secret|cookie|private[_-]?key)\s*[=:]\s*)[^\s,;]+"), r"\1[REDACTED]"),
+)
+lines = []
+for line in source.read_text(encoding="utf-8", errors="replace").splitlines():
+    if any(marker in line for marker in ("SourceGrade", "source-grade", "grade_event_inbox", "invalid assessment", "SQLException", "ERROR")):
+        for pattern, replacement in redactions:
+            line = pattern.sub(replacement, line)
+        lines.append(line)
+target.write_text("\n".join(lines[-120:]) + ("\n" if lines else ""), encoding="utf-8")
+PY
+    rm -f "$dir/grade-service-log.raw"
+  }
+
   wait_for_grade_queue_idle() {
     local deadline=$((SECONDS + timeout_seconds)) queue_counts
     while (( SECONDS < deadline )); do
@@ -641,6 +670,7 @@ PY
         source_fact_count="$(db_exec oj_assessment "SELECT COUNT(*) FROM assessment_source_grade WHERE source_type='LAB' AND source_id='$source_id' AND student_id='$student_id';" 2>/dev/null || printf '0')"
         source_outbox_state_before="$(db_exec oj_assessment "SELECT state FROM assessment_event_outbox WHERE event_id='$source_event_id';" 2>/dev/null || printf 'UNKNOWN')"
         source_grade_revision="$(db_exec oj_assessment "SELECT source_version FROM assessment_source_grade WHERE source_type='LAB' AND source_id='$source_id' AND student_id='$student_id';" 2>/dev/null || printf '0')"
+        source_payload="$(db_exec oj_assessment "SELECT payload_json FROM assessment_event_outbox WHERE event_id='$source_event_id';" 2>/dev/null || printf '%s' "$source_payload")"
         if [[ "$source_fact_count" == 1 && "$source_outbox_state_before" == PENDING && "$source_grade_revision" == 1 ]]; then fixture_status=PASS; fi
       fi
     fi
@@ -681,6 +711,7 @@ PY
         grade_inbox_status=APPLIED
       else
         initial_publish_decision=publish-failed
+        capture_grade_diagnostics "$dir"
       fi
       grade_projection_count="$(db_exec oj_grade "SELECT COUNT(*) FROM grade_source_projection WHERE aggregate_id='$aggregate_id' AND source_version=1;" 2>/dev/null || printf '0')"
       duplicate_inbox_before="$(db_exec oj_grade "SELECT COUNT(*) FROM grade_event_inbox WHERE event_id='$source_event_id';" 2>/dev/null || printf '0')"
