@@ -97,10 +97,10 @@ all_live="$(docker ps --format '{{.ID}}' | wc -l | tr -d ' ')"
 }
 
 mkdir -p "$output_dir/raw/$architecture" "$output_dir/formal/$architecture" "$output_dir/preflight/$architecture"
-initial_login_reset_args=(--architecture "$architecture" --action reset --mysql-container "$mysql_container" --project "$project")
-if [[ -n "$assessment_container" ]]; then initial_login_reset_args+=(--assessment-container "$assessment_container"); fi
-initial_login_reset_log="$output_dir/formal/$architecture/initial-login-reset.log"
-bash "$dataset_script" "${initial_login_reset_args[@]}" | tee "$initial_login_reset_log"
+initial_login_load_args=(--architecture "$architecture" --action load --mysql-container "$mysql_container" --project "$project")
+if [[ -n "$assessment_container" ]]; then initial_login_load_args+=(--assessment-container "$assessment_container"); fi
+initial_login_load_log="$output_dir/formal/$architecture/initial-login-load.log"
+bash "$dataset_script" "${initial_login_load_args[@]}" | tee "$initial_login_load_log"
 curl --fail --silent --show-error "$base_url$readiness_path" >/dev/null
 
 benchmark_tokens=()

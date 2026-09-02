@@ -35,8 +35,9 @@ test("formal runner documents per-round reset and exclusive Docker-window checks
   assert.match(source, /randomUUID/);
   assert.match(source, /from_scenario/);
   assert.match(source, /scenario_list/);
-  const initialDatasetReset = source.indexOf("initial-login-reset.log");
+  const initialDatasetLoad = source.indexOf("initial-login-load.log");
   const benchmarkTokenLogin = source.indexOf("benchmark_tokens=()");
-  assert.ok(initialDatasetReset >= 0, "a fresh runtime must be seeded before benchmark login");
-  assert.ok(initialDatasetReset < benchmarkTokenLogin, "dataset seeding must precede benchmark login");
+  assert.ok(initialDatasetLoad >= 0, "a fresh runtime must be seeded before benchmark login");
+  assert.ok(initialDatasetLoad < benchmarkTokenLogin, "dataset seeding must precede benchmark login");
+  assert.match(source, /initial_login_load_args=\(--architecture "\$architecture" --action load/);
 });
