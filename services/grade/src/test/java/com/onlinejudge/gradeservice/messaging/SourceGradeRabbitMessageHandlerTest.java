@@ -6,22 +6,43 @@ import org.junit.jupiter.api.Test;
 
 import java.nio.charset.StandardCharsets;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.argThat;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
 
 class SourceGradeRabbitMessageHandlerTest {
-    private final SourceGradeProjectionService projection = mock(SourceGradeProjectionService.class);
+    private SourceGradeChangedEnvelope applied;
+    private final SourceGradeProjectionService projection = new SourceGradeProjectionService(null) {
+        @Override
+        public ApplyResult apply(SourceGradeChangedEnvelope event) {
+            applied = event;
+            return new ApplyResult("APPLIED");
+        }
+    };
     private final SourceGradeRabbitMessageHandler handler = new SourceGradeRabbitMessageHandler(new ObjectMapper(), projection);
 
     @Test
     void parsesAndAppliesOnlyTheFrozenV2SourceGradeFact() {
         handler.handle(canonical().getBytes(StandardCharsets.UTF_8));
 
-        verify(projection).apply(argThat(event -> event.aggregateId().equals("LAB:71:11") && event.sourceVersion() == 1));
+        assertThat(applied.aggregateId()).isEqualTo("LAB:71:11");
+        assertThat(applied.sourceVersion()).isEqualTo(1);
         assertThatThrownBy(() -> handler.handle(canonical().replace("\"payloadVersion\":2", "\"payloadVersion\":1")
                 .getBytes(StandardCharsets.UTF_8))).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void propagatesProjectionFailuresSoTheConsumerCanRequeueThemInsteadOfDeadLetteringAsInvalidJson() {
+        SourceGradeProjectionService unavailableProjection = new SourceGradeProjectionService(null) {
+            @Override
+            public ApplyResult apply(SourceGradeChangedEnvelope event) {
+                throw new IllegalStateException("temporary projection storage outage");
+            }
+        };
+        SourceGradeRabbitMessageHandler unavailableHandler = new SourceGradeRabbitMessageHandler(new ObjectMapper(), unavailableProjection);
+
+        assertThatThrownBy(() -> unavailableHandler.handle(canonical().getBytes(StandardCharsets.UTF_8)))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("temporary projection storage outage");
     }
 
     private static String canonical() {

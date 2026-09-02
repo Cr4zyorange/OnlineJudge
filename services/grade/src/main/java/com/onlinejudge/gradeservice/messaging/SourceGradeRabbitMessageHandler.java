@@ -15,12 +15,16 @@ public class SourceGradeRabbitMessageHandler {
     }
 
     public SourceGradeProjectionService.ApplyResult handle(byte[] body) {
+        SourceGradeChangedEnvelope event;
         try {
-            return projection.apply(SourceGradeChangedEnvelope.parse(json.readTree(body)));
+            event = SourceGradeChangedEnvelope.parse(json.readTree(body));
         } catch (IllegalArgumentException invalid) {
             throw invalid;
         } catch (Exception malformed) {
             throw new IllegalArgumentException("invalid assessment.source-grade.changed.v2 JSON", malformed);
         }
+        // Projection failures are retryable infrastructure/business failures,
+        // not malformed wire facts. Let the AMQP consumer requeue them.
+        return projection.apply(event);
     }
 }
