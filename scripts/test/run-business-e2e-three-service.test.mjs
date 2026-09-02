@@ -5,6 +5,7 @@ import test from 'node:test';
 
 import {
   createGrdSummaryFixtureLabPayload,
+  createBootstrapRequestId,
   isSuccessfulSummary,
   normalizeBareLabCreateResponse,
   normalizeBareLabScorePublicationResponse,
@@ -21,6 +22,13 @@ import {
 test('accepts only a positive numeric identifier from a bootstrap API envelope', () => {
   assert.equal(parsePositiveIdentifier({ data: { id: '42' } }, 'course'), 42);
   assert.throws(() => parsePositiveIdentifier({ data: { id: 0 } }, 'course'), /course.*positive/i);
+});
+
+test('generates UUID correlation ids accepted by the Grade source-event consumer', () => {
+  assert.match(
+    createBootstrapRequestId(),
+    /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i
+  );
 });
 
 test('selects the bootstrapped student course-grade summary rather than a legacy fixture id', () => {

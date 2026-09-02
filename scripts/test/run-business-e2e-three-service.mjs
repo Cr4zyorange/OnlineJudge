@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { randomBytes } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { chmod, mkdir, readFile, writeFile } from 'node:fs/promises';
@@ -22,6 +22,10 @@ export const e2eTargets = [
   'tests/e2e/lrn/notification-read-on-open.spec.ts',
   'tests/e2e/shared'
 ];
+
+export function createBootstrapRequestId() {
+  return randomUUID();
+}
 
 export function validateContext(context) {
   const hasNineWorkloads = context?.workloads === 9;
@@ -234,7 +238,7 @@ async function bootstrapScenarioCourse(context, artifactDir) {
   const teacherHeaders = {
     authorization: `Bearer ${teacherLogin.data.token}`,
     'content-type': 'application/json',
-    'x-request-id': `issue320-bootstrap-${Date.now()}`
+    'x-request-id': createBootstrapRequestId()
   };
   const course = await requestEnvelope(context.baseUrl, '/api/v1/courses', {
     method: 'POST',
@@ -252,7 +256,7 @@ async function bootstrapScenarioCourse(context, artifactDir) {
     headers: {
       authorization: `Bearer ${studentLogin.data.token}`,
       'content-type': 'application/json',
-      'x-request-id': `issue320-bootstrap-join-${Date.now()}`
+      'x-request-id': createBootstrapRequestId()
     },
     body: '{}'
   }, 'bootstrap student course membership');
@@ -281,7 +285,7 @@ async function bootstrapScenarioCourse(context, artifactDir) {
     method: 'POST',
     headers: {
       authorization: `Bearer ${studentLogin.data.token}`,
-      'x-request-id': `issue320-bootstrap-source-submit-${Date.now()}`
+      'x-request-id': createBootstrapRequestId()
     },
     body: sourceSubmission
   }, 'bootstrap submit GRD source LAB', normalizeBareLabSubmissionResponse);
