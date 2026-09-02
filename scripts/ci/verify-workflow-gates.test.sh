@@ -101,6 +101,7 @@ cp "$target_checkout/$workflow_rel" "$mutations_dir/continue-on-error.yml"
 cp "$target_checkout/$workflow_rel" "$mutations_dir/permissions.yml"
 cp "$target_checkout/$workflow_rel" "$mutations_dir/unpinned-action.yml"
 cp "$target_checkout/$workflow_rel" "$mutations_dir/delivery-always.yml"
+cp "$target_checkout/$workflow_rel" "$mutations_dir/delivery-job-always.yml"
 cp "$target_checkout/$workflow_rel" "$mutations_dir/missing-timeout.yml"
 cp "$target_checkout/$workflow_rel" "$mutations_dir/missing-needs.yml"
 cp "$target_checkout/$workflow_rel" "$mutations_dir/missing-concurrency.yml"
@@ -132,22 +133,27 @@ mutate "$mutations_dir/unpinned-action.yml" \
 mutate "$mutations_dir/delivery-always.yml" \
   's#^        run: bash scripts/ci/disposable-delivery.sh --checkout "$GITHUB_WORKSPACE"#        if: always()\n        run: bash scripts/ci/disposable-delivery.sh --checkout "$GITHUB_WORKSPACE"#'
 
-# 4e. Every job needs an explicit timeout.
+# 4e. Job-level always() would execute delivery after a failed or cancelled
+#     dependency, so it must be rejected independently of evidence steps.
+mutate "$mutations_dir/delivery-job-always.yml" \
+  's#^    needs: \[validate-workflows, backend-gate, frontend-gate, contracts-gate, browser-e2e-gate\]$#&\n    if: always()#'
+
+# 4f. Every job needs an explicit timeout.
 mutate "$mutations_dir/missing-timeout.yml" '/^    timeout-minutes: 30$/d'
 
-# 4f. Delivery must explicitly need every quality gate.
+# 4g. Delivery must explicitly need every quality gate.
 mutate "$mutations_dir/missing-needs.yml" \
   '/^    needs: \[validate-workflows, backend-gate, frontend-gate, contracts-gate, browser-e2e-gate\]$/d'
 
-# 4g. Concurrency guard against stale status must exist.
+# 4h. Concurrency guard against stale status must exist.
 mutate "$mutations_dir/missing-concurrency.yml" \
   's/^concurrency:$/# concurrency disabled by mutation/'
 
-# 4h. New commits must cancel stale runs on the same ref.
+# 4i. New commits must cancel stale runs on the same ref.
 mutate "$mutations_dir/cancel-in-progress.yml" \
   's#^  cancel-in-progress: true#  cancel-in-progress: false#'
 
-# 4i. Gate jobs must call the repository canonical scripts.
+# 4j. Gate jobs must call the repository canonical scripts.
 mutate "$mutations_dir/inline-commands.yml" \
   's#^        run: bash scripts/ci/backend-verify.sh "$GITHUB_WORKSPACE"#        run: mvn -B test#'
 
@@ -155,6 +161,7 @@ expect_checker_reject continue-on-error "continue-on-error"
 expect_checker_reject permissions "permissions"
 expect_checker_reject unpinned-action "pinned"
 expect_checker_reject delivery-always "if: always()"
+expect_checker_reject delivery-job-always "job-level always"
 expect_checker_reject missing-timeout "timeout"
 expect_checker_reject missing-needs "needs"
 expect_checker_reject missing-concurrency "concurrency"
