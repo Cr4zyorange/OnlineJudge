@@ -19,6 +19,10 @@ ROLLBACK = REPOSITORY_ROOT / "scripts/platform/rollback_disposable_environment.s
 KUBERNETES_DEPLOY = REPOSITORY_ROOT / "scripts/platform/deploy_kubernetes_disposable_environment.sh"
 CI_DELIVERY = REPOSITORY_ROOT / "scripts/ci/disposable-delivery.sh"
 HPA_EXPERIMENT = REPOSITORY_ROOT / "scripts/platform/run_hpa_observability_experiment.sh"
+GRADE_MYSQL_LIVE = REPOSITORY_ROOT / "scripts/test/verify-grade-service-mysql-live.sh"
+GRADE_SOURCE_PROJECTION_STATUS_MIGRATION = (
+    REPOSITORY_ROOT / "database/migrations/grade/V20260902_03__allow_legacy_projection_status_null.sql"
+)
 CI_WORKFLOW = REPOSITORY_ROOT / ".github/workflows/ci.yml"
 
 
@@ -149,6 +153,14 @@ class DisposableEnvironmentScriptsTest(unittest.TestCase):
         self.assertIn("grade_source_projection_watermark", source)
         self.assertIn("evaluation_task", source)
         self.assertIn("lease_owner", source)
+
+    def test_grade_mysql_runtime_migration_keeps_the_legacy_projection_status_compatible(self) -> None:
+        source = GRADE_MYSQL_LIVE.read_text(encoding="utf-8")
+        self.assertIn("V20260902_03__allow_legacy_projection_status_null.sql", source)
+        self.assertIn("projection_status_nullable", source)
+
+        migration = GRADE_SOURCE_PROJECTION_STATUS_MIGRATION.read_text(encoding="utf-8")
+        self.assertIn("MODIFY status VARCHAR(32) NULL", migration)
 
     def test_rollback_command_requires_an_immutable_artifact_manifest(self) -> None:
         source = self.assert_help(ROLLBACK)
