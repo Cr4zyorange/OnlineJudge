@@ -97,13 +97,12 @@ while IFS=$'\t' read -r image digest; do
     printf 'rollback-disposable-environment: digest mismatch for %s\n' "$image" >&2
     exit 1
   }
-done < <("$python_bin" - "$artifact_manifest" <<'PY'
+done < <("$python_bin" -c '
 import json
 import sys
 for artifact in json.load(open(sys.argv[1], encoding="utf-8"))["artifacts"]:
     print(artifact["image"] + "\t" + artifact["digest"])
-PY
- | tr -d '\r')
+' "$artifact_manifest" | tr -d '\r')
 
 compose_file="$output_dir/compose.yml"
 kubernetes_file="$output_dir/platform.yaml"
