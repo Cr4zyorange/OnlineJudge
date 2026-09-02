@@ -105,6 +105,11 @@ grep -Fq -- 'duplicateDecision' "$runner" \
   || fail 'runner must prove duplicate delivery is a no-op'
 grep -Fq -- 'sourceTransport=real-rabbitmq' "$runner" \
   || fail 'runner must record that source recovery used the real RabbitMQ consumer'
+grep -Fq -- 'max_wait="${5:-$timeout_seconds}"' "$runner" \
+  || fail 'runner must initialize the optional database wait bound'
+if grep -Fq -- 'max_wait="${5:-$timeout_seconds}" actual=' "$runner"; then
+  fail 'runner must not calculate a deadline in the same local declaration as max_wait under set -u'
+fi
 grep -Fq -- 'cached-jwt-query' "$runner" \
   || fail 'runner must exercise a protected read with the pre-obtained JWT'
 grep -Fq -- 'identity-refresh' "$runner" \

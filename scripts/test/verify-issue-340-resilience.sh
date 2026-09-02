@@ -509,7 +509,7 @@ PY
     /api/v1/homeworks/0/submissions POST '{"code":"issue-340-probe","language":"python"}' /api/v1/courses /api/v1/courses/1/grade-items
 
   wait_for_db_value() {
-    local description="$1" expected="$2" schema="$3" query="$4" actual='' max_wait deadline
+    local description="$1" expected="$2" schema="$3" query="$4" max_wait actual='' deadline
     max_wait="${5:-$timeout_seconds}"
     deadline=$((SECONDS + max_wait))
     while (( SECONDS < deadline )); do
