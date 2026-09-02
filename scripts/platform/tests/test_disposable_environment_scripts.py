@@ -21,9 +21,33 @@ CI_DELIVERY = REPOSITORY_ROOT / "scripts/ci/disposable-delivery.sh"
 CI_WORKFLOW = REPOSITORY_ROOT / ".github/workflows/ci.yml"
 
 
+def bash_executable() -> str:
+    if os.name != "nt":
+        return "bash"
+    for candidate in (
+        Path("C:/Program Files/Git/bin/bash.exe"),
+        Path("C:/Program Files/Git/usr/bin/bash.exe"),
+    ):
+        if candidate.is_file():
+            return str(candidate)
+    return "bash"
+
+
+def shell_path(path: Path) -> str:
+    resolved = str(path.resolve())
+    if os.name == "nt":
+        normalized = resolved.replace("\\", "/")
+        return f"/{normalized[0].lower()}{normalized[2:]}"
+    return resolved
+
+
+BASH = bash_executable()
+PYTHON_BIN = shell_path(Path(sys.executable))
+
+
 class DisposableEnvironmentScriptsTest(unittest.TestCase):
     def assert_help(self, script: Path) -> str:
-        result = subprocess.run(["bash", str(script), "--help"], capture_output=True, text=True, check=False)
+        result = subprocess.run([BASH, shell_path(script), "--help"], capture_output=True, text=True, check=False)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("Usage:", result.stdout)
         return script.read_text()
@@ -37,7 +61,9 @@ class DisposableEnvironmentScriptsTest(unittest.TestCase):
         self.assertIn("attest_prebuilt", source)
         self.assertIn("infrastructureWorkloads", source)
         self.assertIn("retry 3 docker build", source)
-        self.assertIn("PYTHONDONTWRITEBYTECODE=1 python3 \"$planner\"", source)
+        self.assertIn('"$java_home/bin/java" -version', source)
+        self.assertIn('python_bin="${PYTHON_BIN:-python3}"', source)
+        self.assertIn('PYTHONDONTWRITEBYTECODE=1 "$python_bin" "$planner"', source)
 
     def test_build_command_rejects_a_sha_that_does_not_identify_the_checkout(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -46,8 +72,8 @@ class DisposableEnvironmentScriptsTest(unittest.TestCase):
             fake_docker.chmod(0o755)
             result = subprocess.run(
                 [
-                    "bash",
-                    str(BUILD),
+                    BASH,
+                    shell_path(BUILD),
                     "--git-sha",
                     "0" * 40,
                     "--skip-tests",
@@ -55,7 +81,7 @@ class DisposableEnvironmentScriptsTest(unittest.TestCase):
                     str(Path(directory) / "artifacts"),
                 ],
                 cwd=REPOSITORY_ROOT,
-                env={"PATH": f"{directory}:{Path('/usr/bin')}:{Path('/bin')}"},
+                env={"PATH": f"{shell_path(Path(directory))}:/usr/bin:/bin"},
                 capture_output=True,
                 text=True,
                 check=False,
@@ -72,6 +98,7 @@ class DisposableEnvironmentScriptsTest(unittest.TestCase):
         self.assertIn("ENVIRONMENT_READY", source)
         self.assertIn("collect_diagnostics startup-failure", source)
         self.assertIn("json.loads(line)", source)
+        self.assertIn('python_bin="${PYTHON_BIN:-python3}"', source)
 
     def test_rollback_command_requires_an_immutable_artifact_manifest(self) -> None:
         source = self.assert_help(ROLLBACK)
@@ -81,6 +108,7 @@ class DisposableEnvironmentScriptsTest(unittest.TestCase):
         self.assertIn("expected_images", source)
         self.assertIn('artifact.get("image") != expected_images[workload]', source)
         self.assertIn('show "$from_sha:deploy/platform/workloads.json"', source)
+        self.assertIn('python_bin="${PYTHON_BIN:-python3}"', source)
 
     def test_rollback_rejects_a_manifest_with_missing_artifact_records_before_docker_runs(self) -> None:
         git_sha = subprocess.run(
@@ -99,8 +127,8 @@ class DisposableEnvironmentScriptsTest(unittest.TestCase):
             env_file.write_text("MYSQL_ROOT_PASSWORD=not-a-secret-value\n", encoding="utf-8")
             result = subprocess.run(
                 [
-                    "bash",
-                    str(ROLLBACK),
+                    BASH,
+                    shell_path(ROLLBACK),
                     "--from-sha",
                     git_sha,
                     "--artifact-manifest",
@@ -113,6 +141,7 @@ class DisposableEnvironmentScriptsTest(unittest.TestCase):
                     str(root / "out"),
                 ],
                 cwd=REPOSITORY_ROOT,
+                env={**os.environ, "PYTHON_BIN": PYTHON_BIN},
                 capture_output=True,
                 text=True,
                 check=False,
@@ -168,7 +197,7 @@ class DisposableEnvironmentScriptsTest(unittest.TestCase):
             fake_docker = root / "docker"
             fake_docker.write_text(
                 "#!/usr/bin/env sh\n"
-                f"printf '%s\\n' \"$*\" >> {docker_calls}\n"
+                f"printf '%s\\n' \"$*\" >> {shell_path(docker_calls)}\n"
                 "if [ \"$1\" = image ]; then printf '%s\\n' sha256:" + "a" * 64 + "; fi\n"
                 "exit 0\n",
                 encoding="utf-8",
@@ -176,8 +205,8 @@ class DisposableEnvironmentScriptsTest(unittest.TestCase):
             fake_docker.chmod(0o755)
             result = subprocess.run(
                 [
-                    "bash",
-                    str(ROLLBACK),
+                    BASH,
+                    shell_path(ROLLBACK),
                     "--from-sha",
                     git_sha,
                     "--artifact-manifest",
@@ -190,7 +219,7 @@ class DisposableEnvironmentScriptsTest(unittest.TestCase):
                     str(root / "out"),
                 ],
                 cwd=REPOSITORY_ROOT,
-                env={**os.environ, "PATH": f"{root}:{os.environ['PATH']}"},
+                env={**os.environ, "PATH": f"{shell_path(root)}:{os.environ['PATH']}", "PYTHON_BIN": PYTHON_BIN},
                 capture_output=True,
                 text=True,
                 check=False,
@@ -211,7 +240,7 @@ class DisposableEnvironmentScriptsTest(unittest.TestCase):
             fake_kubectl = root / "kubectl"
             fake_kubectl.write_text(
                 "#!/usr/bin/env sh\n"
-                f"printf '%s\\n' \"$*\" >> {commands}\n"
+                f"printf '%s\\n' \"$*\" >> {shell_path(commands)}\n"
                 "case \"$*\" in\n"
                 "  *\"wait --for=condition=complete job/identity-migrations\"*) exit 1 ;;\n"
                 "esac\n"
@@ -221,8 +250,8 @@ class DisposableEnvironmentScriptsTest(unittest.TestCase):
             fake_kubectl.chmod(0o755)
             result = subprocess.run(
                 [
-                    "bash",
-                    str(KUBERNETES_DEPLOY),
+                    BASH,
+                    shell_path(KUBERNETES_DEPLOY),
                     "--git-sha",
                     git_sha,
                     "--namespace",
@@ -232,8 +261,9 @@ class DisposableEnvironmentScriptsTest(unittest.TestCase):
                 ],
                 cwd=REPOSITORY_ROOT,
                 env={
-                    "KUBECTL_BIN": str(fake_kubectl),
-                    "PATH": f"{Path(sys.executable).parent}:/usr/bin:/bin",
+                    "KUBECTL_BIN": shell_path(fake_kubectl),
+                    "PATH": f"{shell_path(Path(sys.executable).parent)}:/usr/bin:/bin",
+                    "PYTHON_BIN": PYTHON_BIN,
                 },
                 capture_output=True,
                 text=True,
@@ -257,10 +287,10 @@ class DisposableEnvironmentScriptsTest(unittest.TestCase):
             output = Path(directory) / "delivery"
             result = subprocess.run(
                 [
-                    "bash",
-                    str(CI_DELIVERY),
+                    BASH,
+                    shell_path(CI_DELIVERY),
                     "--checkout",
-                    str(REPOSITORY_ROOT),
+                    shell_path(REPOSITORY_ROOT),
                     "--git-sha",
                     git_sha,
                     "--changed-path",
@@ -270,6 +300,7 @@ class DisposableEnvironmentScriptsTest(unittest.TestCase):
                     "--dry-run",
                 ],
                 cwd=REPOSITORY_ROOT,
+                env={**os.environ, "PYTHON_BIN": PYTHON_BIN},
                 capture_output=True,
                 text=True,
                 check=False,
@@ -289,10 +320,10 @@ class DisposableEnvironmentScriptsTest(unittest.TestCase):
             output = Path(directory) / "delivery"
             result = subprocess.run(
                 [
-                    "bash",
-                    str(CI_DELIVERY),
+                    BASH,
+                    shell_path(CI_DELIVERY),
                     "--checkout",
-                    str(REPOSITORY_ROOT),
+                    shell_path(REPOSITORY_ROOT),
                     "--git-sha",
                     git_sha,
                     "--output-dir",
@@ -300,6 +331,7 @@ class DisposableEnvironmentScriptsTest(unittest.TestCase):
                     "--dry-run",
                 ],
                 cwd=REPOSITORY_ROOT,
+                env={**os.environ, "PYTHON_BIN": PYTHON_BIN},
                 capture_output=True,
                 text=True,
                 check=False,

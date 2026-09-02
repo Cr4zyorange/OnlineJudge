@@ -58,7 +58,8 @@ require() {
 }
 
 require docker
-require python3
+python_bin="${PYTHON_BIN:-python3}"
+require "$python_bin"
 docker info >/dev/null
 docker scout sbom --help >/dev/null
 
@@ -86,7 +87,7 @@ fi
   printf 'build-workload-images: OJ318_JAVA_HOME must point to a Java 21 runtime\n' >&2
   exit 2
 }
-java_version="$($java_home/bin/java -version 2>&1 | sed -n '1s/.*version "\([0-9][0-9]*\).*/\1/p')"
+java_version="$("$java_home/bin/java" -version 2>&1 | sed -n '1s/.*version "\([0-9][0-9]*\).*/\1/p')"
 [[ "$java_version" == "21" ]] || {
   printf 'build-workload-images: Java 21 is required, got %s\n' "${java_version:-unknown}" >&2
   exit 2
@@ -98,7 +99,7 @@ for (( changed_path_index=0; changed_path_index<changed_path_count; changed_path
   changed_path="${changed_paths[$changed_path_index]}"
   planner_arguments+=(--changed-path "$changed_path")
 done
-PYTHONDONTWRITEBYTECODE=1 python3 "$planner" "${planner_arguments[@]}" > "$plan"
+PYTHONDONTWRITEBYTECODE=1 "$python_bin" "$planner" "${planner_arguments[@]}" > "$plan"
 
 run_tests() {
   local module
@@ -145,7 +146,7 @@ attest_prebuilt() {
 
 while IFS=$'\t' read -r workload dockerfile image; do
   build_one "$workload" "$dockerfile" "$image"
-done < <(python3 -c '
+done < <("$python_bin" -c '
 import json, sys
 plan = json.load(open(sys.argv[1], encoding="utf-8"))
 for build in plan["builds"]:
@@ -156,14 +157,14 @@ build_one "platform-migration-runner" "deploy/platform/migration-runner.Dockerfi
 
 while IFS=$'\t' read -r workload image; do
   attest_prebuilt "$workload" "$image"
-done < <(python3 -c '
+done < <("$python_bin" -c '
 import json, sys
 plan = json.load(open(sys.argv[1], encoding="utf-8"))
 for workload in plan["releaseTemplate"]["infrastructureWorkloads"]:
     print("\t".join((workload["workload"], workload["image"])))
 ' "$plan")
 
-python3 - "$records" "$git_sha" "$output_dir/artifact-manifest.json" <<'PY'
+"$python_bin" - "$records" "$git_sha" "$output_dir/artifact-manifest.json" <<'PY'
 import csv
 import json
 import sys

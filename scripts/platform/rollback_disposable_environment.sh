@@ -41,13 +41,15 @@ done
   exit 2
 }
 if [[ -z "$output_dir" ]]; then output_dir="$repo_root/output/issue-318/$from_sha/rollback-$(date -u +%Y%m%dT%H%M%SZ)"; fi
+python_bin="${PYTHON_BIN:-python3}"
+command -v "$python_bin" >/dev/null 2>&1 || { printf 'rollback-disposable-environment: %s is required\n' "$python_bin" >&2; exit 2; }
 mkdir -p "$output_dir"
 schema_snapshot="$output_dir/workload-manifest.schema.json"
 manifest_snapshot="$output_dir/workloads.json"
 git -C "$repo_root" show "$from_sha:deploy/platform/workload-manifest.schema.json" > "$schema_snapshot"
 git -C "$repo_root" show "$from_sha:deploy/platform/workloads.json" > "$manifest_snapshot"
 
-python3 - "$artifact_manifest" "$from_sha" "$manifest_snapshot" <<'PY'
+"$python_bin" - "$artifact_manifest" "$from_sha" "$manifest_snapshot" <<'PY'
 import json
 import re
 import sys
@@ -95,7 +97,7 @@ while IFS=$'\t' read -r image digest; do
     printf 'rollback-disposable-environment: digest mismatch for %s\n' "$image" >&2
     exit 1
   }
-done < <(python3 - "$artifact_manifest" <<'PY'
+done < <("$python_bin" - "$artifact_manifest" <<'PY'
 import json
 import sys
 for artifact in json.load(open(sys.argv[1], encoding="utf-8"))["artifacts"]:
@@ -105,6 +107,6 @@ PY
 
 compose_file="$output_dir/compose.yml"
 kubernetes_file="$output_dir/platform.yaml"
-python3 "$renderer" --schema "$schema_snapshot" --manifest "$manifest_snapshot" --git-sha "$from_sha" --compose-output "$compose_file" --kubernetes-output "$kubernetes_file" --repository-root "$repo_root"
+"$python_bin" "$renderer" --schema "$schema_snapshot" --manifest "$manifest_snapshot" --git-sha "$from_sha" --compose-output "$compose_file" --kubernetes-output "$kubernetes_file" --repository-root "$repo_root"
 docker compose --project-name "$project_name" --env-file "$env_file" --file "$compose_file" up --wait --wait-timeout 300 --force-recreate
 printf 'ROLLBACK_READY issue=#318 sha=%s project=%s compose=%s\n' "$from_sha" "$project_name" "$compose_file"

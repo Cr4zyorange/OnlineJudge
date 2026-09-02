@@ -50,6 +50,8 @@ if [[ -n "$failure_mode" && "$failure_mode" != "migration" && "$failure_mode" !=
 fi
 command -v docker >/dev/null 2>&1 || { printf 'run-disposable-environment: docker is required\n' >&2; exit 2; }
 command -v openssl >/dev/null 2>&1 || { printf 'run-disposable-environment: openssl is required\n' >&2; exit 2; }
+python_bin="${PYTHON_BIN:-python3}"
+command -v "$python_bin" >/dev/null 2>&1 || { printf 'run-disposable-environment: %s is required\n' "$python_bin" >&2; exit 2; }
 docker info >/dev/null
 
 run_id="$(date -u +%Y%m%dT%H%M%SZ)-$$"
@@ -92,7 +94,7 @@ umask 077
   printf 'GRADE_SERVICE_IDENTITY=issue318-grade\n'
 } > "$runtime_env"
 
-PYTHONDONTWRITEBYTECODE=1 python3 "$renderer" --schema "$schema" --manifest "$manifest" --git-sha "$git_sha" --compose-output "$compose_file" --kubernetes-output "$kubernetes_file" --repository-root "$repo_root"
+PYTHONDONTWRITEBYTECODE=1 "$python_bin" "$renderer" --schema "$schema" --manifest "$manifest" --git-sha "$git_sha" --compose-output "$compose_file" --kubernetes-output "$kubernetes_file" --repository-root "$repo_root"
 if (( ! skip_build )); then
   build_arguments=(--git-sha "$git_sha" --output-dir "$output_dir/artifacts")
   if (( skip_tests )); then build_arguments+=(--skip-tests); fi
@@ -145,7 +147,7 @@ curl --fail --silent --show-error --header 'X-Request-Id: issue318-disposable' "
 "${compose[@]}" exec -T grade-service wget -qO- http://127.0.0.1:8084/actuator/info > "$output_dir/grade-version.json"
 collect_diagnostics success
 
-ready_count="$(python3 - "$output_dir/compose-ps-success.json" <<'PY'
+ready_count="$("$python_bin" - "$output_dir/compose-ps-success.json" <<'PY'
 import json
 import sys
 payload = open(sys.argv[1], encoding="utf-8").read().strip()
