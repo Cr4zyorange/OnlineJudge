@@ -123,6 +123,22 @@ class DisposableEnvironmentScriptsTest(unittest.TestCase):
         self.assertIn("EXPERIMENT_FAILURE", source)
         self.assertIn("EXPERIMENT_READY", source)
 
+    def test_hpa_experiment_proves_the_rabbitmq_outage_window_and_records_projection_leases(self) -> None:
+        source = self.assert_help(HPA_EXPERIMENT)
+        # AC-319-03 requires an actual non-ready RabbitMQ window, rather than
+        # only an accepted scale command or an already-ready rollout status.
+        self.assertIn("wait_for_rabbitmq_outage", source)
+        self.assertIn("rabbitmq_outage_window_seconds=15", source)
+        self.assertIn("readyReplicas", source)
+        self.assertIn("endpoints/rabbitmq", source)
+        self.assertIn("assessment availability during RabbitMQ outage", source)
+        # AC-319-04 requires database-backed diagnostic signals. Application
+        # logs alone cannot prove projection catch-up or an active task lease.
+        self.assertIn("capture_projection_and_lease_diagnostics", source)
+        self.assertIn("grade_source_projection_watermark", source)
+        self.assertIn("evaluation_task", source)
+        self.assertIn("lease_owner", source)
+
     def test_rollback_command_requires_an_immutable_artifact_manifest(self) -> None:
         source = self.assert_help(ROLLBACK)
         self.assertIn("artifact-manifest.json", source)
