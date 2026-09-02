@@ -8,7 +8,9 @@ import java.nio.charset.StandardCharsets;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.verify;
 
 class SourceGradeRabbitMessageHandlerTest {
@@ -22,6 +24,15 @@ class SourceGradeRabbitMessageHandlerTest {
         verify(projection).apply(argThat(event -> event.aggregateId().equals("LAB:71:11") && event.sourceVersion() == 1));
         assertThatThrownBy(() -> handler.handle(canonical().replace("\"payloadVersion\":2", "\"payloadVersion\":1")
                 .getBytes(StandardCharsets.UTF_8))).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void keepsProjectionFailuresRetryableInsteadOfMisclassifyingThemAsInvalidJson() {
+        when(projection.apply(any())).thenThrow(new IllegalStateException("projection database is temporarily unavailable"));
+
+        assertThatThrownBy(() -> handler.handle(canonical().getBytes(StandardCharsets.UTF_8)))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("projection database is temporarily unavailable");
     }
 
     private static String canonical() {
