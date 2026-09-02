@@ -153,6 +153,11 @@ class DisposableEnvironmentScriptsTest(unittest.TestCase):
         self.assertIn("grade_source_projection_watermark", source)
         self.assertIn("evaluation_task", source)
         self.assertIn("lease_owner", source)
+        # Terminal tasks retain the last real lease fields too.  Restricting
+        # diagnostics to RUNNING rows can make a completed experiment look as
+        # though it had never exercised the worker lease protocol.
+        self.assertIn("ORDER BY updated_at DESC, id", source)
+        self.assertNotIn("WHERE lease_owner IS NOT NULL OR state = 'RUNNING'", source)
 
     def test_grade_mysql_runtime_migration_keeps_the_legacy_projection_status_compatible(self) -> None:
         source = GRADE_MYSQL_LIVE.read_text(encoding="utf-8")
