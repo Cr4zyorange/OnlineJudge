@@ -126,6 +126,7 @@ contracts_needs="$(needs_of "$workflow_file" contracts-gate)"
 browser_e2e_needs="$(needs_of "$workflow_file" browser-e2e-gate)"
 delivery_needs="$(needs_of "$workflow_file" delivery)"
 delivery_norm="$(normalized_needs "$delivery_needs")"
+delivery_section="$(job_section "$workflow_file" delivery)"
 
 run_check "validate-workflows has no needs" test -z "$validate_needs"
 run_check "backend-gate needs validate-workflows" test "$backend_needs" = "validate-workflows"
@@ -133,6 +134,11 @@ run_check "frontend-gate needs validate-workflows" test "$frontend_needs" = "val
 run_check "contracts-gate needs validate-workflows" test "$contracts_needs" = "validate-workflows"
 run_check "browser-e2e-gate needs compile, frontend, and contract gates" test "$browser_e2e_needs" = "backend-gate,frontend-gate,contracts-gate"
 run_check "delivery needs every quality gate" test "$delivery_norm" = "backend-gate,browser-e2e-gate,contracts-gate,frontend-gate,validate-workflows"
+# GitHub Actions adds a default success() condition to jobs.  Any explicit
+# delivery job `if` could replace it (for example failure()), allowing delivery
+# after a required quality gate fails, so delivery must not declare one at all.
+run_check "delivery has no job-level if condition" bash -c \
+  '! grep -Eq "^    if:" <<< "$1"' _ "$delivery_section"
 for job in "${required_jobs[@]}"; do
   job_needs="$(needs_of "$workflow_file" "$job")"
   if [[ ",$job_needs," == *",delivery,"* ]]; then
@@ -182,21 +188,27 @@ for job in "${required_jobs[@]}"; do
     'grep -Eq "^    timeout-minutes: [0-9]+$" <<< "$1"' _ "$section"
 done
 
-# 9. if: always() 只允许用于证据/诊断步骤；交付执行本身一律禁止。
+# 9. Job 级 always() 会覆盖 needs 的失败/取消语义，因此一律禁止；
+#    step 级 always() 只允许用于证据/诊断步骤。
+run_check "no job-level always() conditions" bash -c \
+  '! grep -Eq "^    if: .*always\\(\\)" "$1"' _ "$workflow_file"
+
 while IFS= read -r line_number; do
-  step_start="$((line_number - 3))"
-  step_end="$((line_number + 3))"
-  block="$(sed -n "${step_start},${step_end}p" "$workflow_file")"
-  if grep -Fq 'actions/upload-artifact@' <<< "$block"; then
-    continue
-  fi
-  if grep -Eq '^      - name: .*(Upload|Summarize|Collect|Evidence|Diagnostic)' <<< "$block"; then
+  # Restrict attribution to the current job's steps.  Job-level conditions are
+  # checked above; a symmetric window can otherwise see an evidence step in a
+  # preceding job and approve an unconditional build/deploy step.
+  step_header="$(sed -n "1,${line_number}p" "$workflow_file" | awk '
+    /^  [A-Za-z0-9_-]+:$/ { in_steps=0; header=""; next }
+    /^    steps:$/ { in_steps=1; next }
+    in_steps && /^      - name: / { header=$0 }
+    END { print header }
+  ')"
+  if grep -Eq '^      - name: .*(Upload|Summarize|Collect|Evidence|Diagnostic)' <<< "$step_header"; then
     continue
   fi
   fail_check "if: always() only allowed on evidence/diagnostic steps (line $line_number)"
-done < <(grep -nF 'if: always()' "$workflow_file" | cut -d: -f1 || true)
+done < <(grep -nE '^        if: .*always\(\)' "$workflow_file" | cut -d: -f1 || true)
 
-delivery_section="$(job_section "$workflow_file" delivery)"
 run_check "delivery calls the disposable executor after the checkpoint" bash -c \
   'grep -Fq "scripts/ci/delivery-checkpoint.sh" <<< "$1" \
     && grep -Fq "scripts/ci/disposable-delivery.sh" <<< "$1"' _ "$delivery_section"

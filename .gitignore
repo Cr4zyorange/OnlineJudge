@@ -92,6 +92,9 @@ ci-artifacts/
 # Disposable #318 image, rollout and rollback evidence is generated locally.
 output/issue-318/
 
+# Issue #367 API coverage raw run evidence is generated locally.
+output/issue-367/
+
 # Python delivery helpers import each other as scripts.
 __pycache__/
 
