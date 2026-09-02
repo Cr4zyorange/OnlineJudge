@@ -3,11 +3,17 @@ import test from 'node:test';
 
 import {
   isSuccessfulSummary,
+  parsePositiveIdentifier,
   redact,
   validateCleanup,
   validateContext,
   validateEvidenceManifest
 } from './run-business-e2e-three-service.mjs';
+
+test('accepts only a positive numeric identifier from a bootstrap API envelope', () => {
+  assert.equal(parsePositiveIdentifier({ data: { id: '42' } }, 'course'), 42);
+  assert.throws(() => parsePositiveIdentifier({ data: { id: 0 } }, 'course'), /course.*positive/i);
+});
 
 test('rejects a context that is not a nine-workload loopback platform', () => {
   assert.throws(

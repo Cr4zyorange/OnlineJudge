@@ -44,6 +44,14 @@ export function isSuccessfulSummary(summary) {
     && summary.skipped === 0;
 }
 
+export function parsePositiveIdentifier(envelope, label) {
+  const id = Number(envelope?.data?.id);
+  if (!Number.isSafeInteger(id) || id <= 0) {
+    throw new Error(`${label} bootstrap response must contain a positive numeric id`);
+  }
+  return id;
+}
+
 export function redact(value, secrets) {
   return secrets.reduce((result, secret) => {
     if (!secret) {
@@ -115,6 +123,61 @@ async function writePrivateFile(path, content) {
   }
 }
 
+async function requestEnvelope(baseUrl, path, options, label) {
+  const response = await fetch(new URL(path, `${baseUrl}/`), options);
+  const body = await response.json().catch(() => null);
+  if (!response.ok || body?.code !== '0') {
+    throw new Error(`${label}: HTTP ${response.status} ${JSON.stringify(body)}`);
+  }
+  return body;
+}
+
+async function bootstrapScenarioCourse(context, artifactDir) {
+  const teacherLogin = await requestEnvelope(context.baseUrl, '/api/v1/auth/login', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ account: 'teacher001', password: 'Teacher001@pass' })
+  }, 'bootstrap teacher login');
+  const studentLogin = await requestEnvelope(context.baseUrl, '/api/v1/auth/login', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ account: 'student001', password: 'Student001@pass' })
+  }, 'bootstrap student login');
+  const teacherHeaders = {
+    authorization: `Bearer ${teacherLogin.data.token}`,
+    'content-type': 'application/json',
+    'x-request-id': `issue320-bootstrap-${Date.now()}`
+  };
+  const course = await requestEnvelope(context.baseUrl, '/api/v1/courses', {
+    method: 'POST',
+    headers: teacherHeaders,
+    body: JSON.stringify({
+      name: '数据结构全流程演示课',
+      description: 'Issue #320 disposable browser scenario fixture',
+      enrollmentMode: 'PUBLIC',
+      maxStudents: 100
+    })
+  }, 'bootstrap scenario course');
+  const courseId = parsePositiveIdentifier(course, 'course');
+  await requestEnvelope(context.baseUrl, `/api/v1/courses/${courseId}/join`, {
+    method: 'POST',
+    headers: {
+      authorization: `Bearer ${studentLogin.data.token}`,
+      'content-type': 'application/json',
+      'x-request-id': `issue320-bootstrap-join-${Date.now()}`
+    },
+    body: '{}'
+  }, 'bootstrap student course membership');
+  const chapter = await requestEnvelope(context.baseUrl, `/api/v1/courses/${courseId}/chapters`, {
+    method: 'POST',
+    headers: teacherHeaders,
+    body: JSON.stringify({ title: 'Issue #320 运行期章节', sortOrder: 1, visible: true, chapterType: 1 })
+  }, 'bootstrap scenario chapter');
+  const chapterId = parsePositiveIdentifier(chapter, 'chapter');
+  await writeFile(join(artifactDir, 'scenario-bootstrap.json'), `${JSON.stringify({ courseId, chapterId }, null, 2)}\n`, 'utf8');
+  return { courseId, chapterId };
+}
+
 async function runInsidePlatform() {
   const contextPath = process.env.E2E_THREE_SERVICE_CONTEXT_FILE?.trim();
   if (!contextPath) {
@@ -143,6 +206,8 @@ async function runInsidePlatform() {
       evidenceDir: artifactDir
     }, null, 2)}\n`);
 
+    const scenario = await bootstrapScenarioCourse(context, artifactDir);
+
     try {
       await run(`npm${commandSuffix}`, ['run', 'test:e2e', '--', ...e2eTargets, '--workers=1'], {
         cwd: frontendDir,
@@ -155,6 +220,8 @@ async function runInsidePlatform() {
           E2E_STUDENT_PASSWORD: 'Student001@pass',
           E2E_ADMIN_ACCOUNT: 'admin001',
           E2E_ADMIN_PASSWORD: 'Admin001@pass',
+          E2E_COURSE_ID: String(scenario.courseId),
+          E2E_CHAPTER_ID: String(scenario.chapterId),
           E2E_THREE_SERVICE_PROOF_FILE: proofPath,
           E2E_THREE_SERVICE_TOKEN: token,
           PLAYWRIGHT_JUNIT_OUTPUT_FILE: junitPath

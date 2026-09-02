@@ -1,7 +1,8 @@
 import type { APIRequestContext, APIResponse, Page } from '@playwright/test';
 import { expect, test } from '../fixtures';
 
-const COURSE_ID = 9501;
+const COURSE_ID = Number(process.env.E2E_COURSE_ID || 9501);
+const CHAPTER_ID = Number(process.env.E2E_CHAPTER_ID || 950101);
 
 interface ApiEnvelope<T> {
   code: string;
@@ -84,7 +85,7 @@ test.describe('@hwk HWK 真实业务闭环', () => {
     await page.getByTestId('save-homework').click();
 
     await expect(page.getByText('草稿已保存，可返回作业管理继续发布。')).toBeVisible();
-    await expect(page).toHaveURL(/\/courses\/9501\/homeworks\/\d+\/edit$/);
+    await expect(page).toHaveURL(new RegExp(`/courses/${COURSE_ID}/homeworks/\\d+/edit$`));
     const homeworkId = Number(page.url().match(/\/homeworks\/(\d+)\/edit$/)?.[1]);
     expect(homeworkId).toBeGreaterThan(0);
 
@@ -401,7 +402,7 @@ async function createAndPublishHomework(
 function basePayload(title: string, type: 'TEXT' | 'OBJECTIVE' | 'CODE' | 'FILE', deadline = localDateTimeFromNow(86_400_000)) {
   return {
     courseId: COURSE_ID,
-    chapterId: 950101,
+    chapterId: CHAPTER_ID,
     title,
     description: `E2E ${type} homework`,
     type,

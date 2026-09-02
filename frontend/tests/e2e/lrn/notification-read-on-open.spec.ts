@@ -2,7 +2,7 @@ import type { APIResponse, Page } from '@playwright/test';
 import { expect, test } from '../fixtures';
 import { verifyLrnDisposableProof } from './disposable-proof';
 
-const DEMO_COURSE_ID = 9501;
+const DEMO_COURSE_ID = Number(process.env.E2E_COURSE_ID || 9501);
 const hasDisposableProof = verifyLrnDisposableProof();
 
 test.describe.configure({ timeout: 60_000 });
@@ -131,9 +131,9 @@ function labPayload(title: string) {
     deadline: futureDeadline(),
     maxScore: 100,
     attachmentIds: [],
-    allowedLanguages: 'java,python',
-    evaluationMode: 'DOCKER_IO',
-    autoEvaluate: true,
+    allowedLanguages: 'python',
+    evaluationMode: 'MANUAL',
+    autoEvaluate: false,
     reportRequired: false,
     timeLimitMs: 60000,
     memoryLimitKb: 262144,

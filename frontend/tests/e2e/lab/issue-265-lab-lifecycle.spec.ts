@@ -1,6 +1,6 @@
 import { test, expect } from '../fixtures';
 
-const COURSE_ID = 9501;
+const COURSE_ID = Number(process.env.E2E_COURSE_ID || 9501);
 const SOURCE_NAME = 'issue-265-source.py';
 const REPORT_NAME = 'issue-265-report.pdf';
 const lifecycleState: { labId: number; submissionId: number } = {
@@ -33,7 +33,7 @@ test('teacher and student complete the LAB publish, submission, review, release,
   await page.getByRole('button', { name: '保存草稿' }).click();
   await expect(page.getByRole('status')).toContainText('草稿已保存');
 
-  const labId = Number(page.url().match(/\/courses\/9501\/labs\/(\d+)\/edit/)?.[1]);
+  const labId = Number(page.url().match(new RegExp(`/courses/${COURSE_ID}/labs/(\\d+)/edit`))?.[1]);
   expect(labId).toBeGreaterThan(0);
 
   await page.goto(`/courses/${COURSE_ID}/labs/manage`);
