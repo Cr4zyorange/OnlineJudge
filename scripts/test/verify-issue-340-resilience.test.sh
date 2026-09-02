@@ -105,6 +105,20 @@ grep -Fq -- 'duplicateDecision' "$runner" \
   || fail 'runner must prove duplicate delivery is a no-op'
 grep -Fq -- 'sourceTransport=real-rabbitmq' "$runner" \
   || fail 'runner must record that source recovery used the real RabbitMQ consumer'
+grep -Fq -- 'wait_for_grade_consumer' "$runner" \
+  || fail 'runner must verify the Grade source queue has an active consumer before releasing the relay'
+grep -Fq -- 'grade_consumer_state' "$runner" \
+  || fail 'runner must retain the observed Grade consumer topology state'
+python3 - "$repo_root/deploy/platform/workloads.json" <<'PY'
+import json
+import sys
+
+workloads = json.load(open(sys.argv[1], encoding="utf-8"))["workloads"]
+grade = next(item for item in workloads if item["name"] == "grade-service")
+assert "rabbitmq" in grade["dependsOn"], grade
+for phase in ("startup", "liveness", "readiness"):
+    assert "rabbitmq" in grade["health"][phase]["requiredDependencies"], grade
+PY
 grep -Fq -- 'max_wait="${5:-$timeout_seconds}"' "$runner" \
   || fail 'runner must initialize the optional database wait bound'
 if grep -Fq -- 'max_wait="${5:-$timeout_seconds}" actual=' "$runner"; then

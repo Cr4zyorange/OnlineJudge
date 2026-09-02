@@ -545,6 +545,22 @@ PY
     return 1
   }
 
+  wait_for_grade_consumer() {
+    local deadline=$((SECONDS + timeout_seconds)) consumer_count=0
+    grade_consumer_state=TIMEOUT
+    while (( SECONDS < deadline )); do
+      consumer_count="$(compose_exec rabbitmq rabbitmqctl list_consumers -q 2>/dev/null \
+        | awk '$1 == "grade.source-grades.v2" { count++ } END { print count + 0 }')"
+      if [[ "$consumer_count" =~ ^[1-9][0-9]*$ ]]; then
+        grade_consumer_state="ACTIVE($consumer_count)"
+        return 0
+      fi
+      sleep 2
+    done
+    grade_consumer_state="TIMEOUT(${consumer_count:-0})"
+    return 1
+  }
+
   build_source_grade_payload() {
     python3 - "$@" <<'PY'
 import json
@@ -583,7 +599,7 @@ PY
     local course_id="issue340-course-${run_id##*-}" source_event_id correlation_id aggregate_id occurred_at source_payload
     local source_grade_revision=0 source_outbox_state_before=UNKNOWN source_outbox_state_after=UNKNOWN source_fact_count=0
     local grade_inbox_status=UNKNOWN grade_projection_count=0 duplicate_decision=NOT_ATTEMPTED
-    local initial_publish_decision=NOT_ATTEMPTED duplicate_delivery=NOT_CONFIRMED
+    local initial_publish_decision=NOT_ATTEMPTED duplicate_delivery=NOT_CONFIRMED grade_consumer_state=NOT_CHECKED
     local duplicate_inbox_before=0 duplicate_inbox_after=0 duplicate_projection_before=0 duplicate_projection_after=0
     mkdir -p "$dir"
     before_status="$(compose_state grade-service 2>/dev/null || true)"
@@ -640,7 +656,7 @@ PY
     fi
     # Start the relay only after Grade's real consumer has declared its queue
     # and binding, making delivery of the same persisted event deterministic.
-    if [[ "$recovery_state" == healthy* ]]; then
+    if [[ "$recovery_state" == healthy* ]] && wait_for_grade_consumer; then
       if "${compose[@]}" start assessment-worker >"$dir/worker-start.log" 2>&1; then worker_started=1; fi
     fi
     if [[ "$worker_started" == 1 ]]; then wait_healthy assessment-worker || worker_started=0; fi
@@ -688,8 +704,8 @@ PY
     record_scenario "$id" "$status" \
       "service=grade-service state=$before_status; Assessment source fact=$source_fact_count eventId=$source_event_id revision=$source_grade_revision outbox=$source_outbox_state_before" \
       "service=grade-service state=$during_status; sourceGradeEventId=$source_event_id sourceGradeRevision=$source_grade_revision sourceGradeOutboxStateBefore=$source_outbox_state_before query=$query_status" \
-      "service=grade-service state=$recovery_state; sourceTransport=real-rabbitmq sourceGradeOutboxStateAfter=$source_outbox_state_after initialPublish=$initial_publish_decision gradeInboxStatus=$grade_inbox_status gradeProjectionCount=$grade_projection_count duplicateDelivery=$duplicate_delivery duplicateDecision=$duplicate_decision recoverySeconds=$recovery_seconds" \
-      "compose=${dir#$repo_root/}; sourceGradeEventId=$source_event_id; sourceGradeRevision=$source_grade_revision; sourceGradeOutboxStateBefore=$source_outbox_state_before; sourceGradeOutboxStateAfter=$source_outbox_state_after; sourceTransport=real-rabbitmq; initialPublish=$initial_publish_decision; gradeInboxStatus=$grade_inbox_status; gradeProjectionCount=$grade_projection_count; duplicateDelivery=$duplicate_delivery; duplicateDecision=$duplicate_decision; duplicateInbox=$duplicate_inbox_before/$duplicate_inbox_after; duplicateProjection=$duplicate_projection_before/$duplicate_projection_after; recoverySeconds=$recovery_seconds"
+      "service=grade-service state=$recovery_state; gradeConsumer=$grade_consumer_state sourceTransport=real-rabbitmq sourceGradeOutboxStateAfter=$source_outbox_state_after initialPublish=$initial_publish_decision gradeInboxStatus=$grade_inbox_status gradeProjectionCount=$grade_projection_count duplicateDelivery=$duplicate_delivery duplicateDecision=$duplicate_decision recoverySeconds=$recovery_seconds" \
+      "compose=${dir#$repo_root/}; sourceGradeEventId=$source_event_id; sourceGradeRevision=$source_grade_revision; sourceGradeOutboxStateBefore=$source_outbox_state_before; sourceGradeOutboxStateAfter=$source_outbox_state_after; gradeConsumer=$grade_consumer_state; sourceTransport=real-rabbitmq; initialPublish=$initial_publish_decision; gradeInboxStatus=$grade_inbox_status; gradeProjectionCount=$grade_projection_count; duplicateDelivery=$duplicate_delivery; duplicateDecision=$duplicate_decision; duplicateInbox=$duplicate_inbox_before/$duplicate_inbox_after; duplicateProjection=$duplicate_projection_before/$duplicate_projection_after; recoverySeconds=$recovery_seconds"
   }
   grade_down_source_fixture
 
