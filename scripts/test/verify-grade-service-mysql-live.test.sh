@@ -46,12 +46,12 @@ awk '
   }
 
   END {
-    if (root_invocations != 4) {
-      printf "grade-mysql-live-contract: expected 4 root/admin/migration queries, found %d\n", root_invocations > "/dev/stderr"
+    if (root_invocations != 5) {
+      printf "grade-mysql-live-contract: expected 5 root/admin/migration queries, found %d\n", root_invocations > "/dev/stderr"
       failures++
     }
     exit failures != 0
   }
 ' "$runner"
 
-echo "grade-mysql-live-contract: PASS root/admin/migration queries=4 protocol=tcp host=127.0.0.1"
+echo "grade-mysql-live-contract: PASS root/admin/migration queries=5 protocol=tcp host=127.0.0.1"
