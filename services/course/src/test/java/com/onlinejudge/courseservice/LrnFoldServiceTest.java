@@ -154,6 +154,20 @@ class LrnFoldServiceTest {
     }
 
     @Test
+    void processedGradeReviewKeepsItsCanonicalReviewTargetAndTitle() throws Exception {
+        String courseId = createCourseWithRosterWatermark("811", "812");
+
+        projection.consume(gradeReviewProcessedEnvelope(courseId));
+
+        assertThat(jdbcTemplate.queryForMap("""
+                SELECT source_id, title FROM lrn_notification
+                 WHERE user_id = 812 AND course_id = ? AND source_module = 'GRD'
+                """, Long.parseLong(courseId)))
+                .containsEntry("source_id", 83L)
+                .containsEntry("title", "成绩复核已处理");
+    }
+
+    @Test
     void progressOverviewSuppliesConcreteContinueUrlsForCourseLabAndHomeworkRecords() throws Exception {
         String courseId = createCourseWithRosterWatermark("807", "808");
         long numericCourseId = Long.parseLong(courseId);
@@ -650,6 +664,29 @@ class LrnFoldServiceTest {
                     "publicationId": "grade-publication-79",
                     "publishedAt": "2026-08-30T09:15:30Z",
                     "publicationVersion": 1
+                  }
+                }
+                """.formatted(courseId);
+    }
+
+    private String gradeReviewProcessedEnvelope(String courseId) {
+        return """
+                {
+                  "eventId": "83b6500e-3be8-4898-b177-23aa4b86faea",
+                  "eventType": "grade.review.processed.v2",
+                  "payloadVersion": 2,
+                  "aggregateType": "grade-review",
+                  "aggregateId": "grade-review-83",
+                  "aggregateVersion": 1,
+                  "occurredAt": "2026-08-30T09:15:30Z",
+                  "correlationId": "db18b23c-21b3-403d-9bcb-305020f17027",
+                  "payload": {
+                    "courseId": "course-%s",
+                    "reviewRequestId": "grade-review-83",
+                    "studentId": "812",
+                    "reviewStatus": "REJECTED",
+                    "resultVersion": 1,
+                    "processedAt": "2026-08-30T09:15:30Z"
                   }
                 }
                 """.formatted(courseId);

@@ -77,7 +77,8 @@ public class LrnEventProjection {
                     notifyCourse(eventId, "TASK", "HWK", null, envelope, "评测完成", correlationId, envelopeJson);
             case "grade.published.v2" ->
                     notifyCourse(eventId, "GRADE", "GRD", "publicationId", envelope, "成绩已发布", correlationId, envelopeJson);
-            case "grade.review.processed.v2" -> notifyStudent(eventId, "GRADE", "GRD", payload);
+            case "grade.review.processed.v2" ->
+                    notifyStudent(eventId, "GRADE", "GRD", "reviewRequestId", payload);
             default -> {
                 // Retained in the inbox (idempotency) but no LRN projection is needed.
             }
@@ -209,13 +210,16 @@ public class LrnEventProjection {
         inbox.recordGap(courseId, 0, eventId, correlationId);
     }
 
-    private void notifyStudent(String eventId, String notificationType, String sourceModule, JsonNode payload) {
+    private void notifyStudent(String eventId, String notificationType, String sourceModule,
+                               String sourceIdField, JsonNode payload) {
         long courseId = parseId(payload.path("courseId").asText());
         long studentId = parseId(payload.path("studentId").asText());
         if (courseId <= 0 || studentId <= 0) return;
         String reviewStatus = payload.path("reviewStatus").asText("PROCESSED");
-        notifications.createForFact(eventId, eventTypeOf(sourceModule), notificationType, courseId, sourceModule, null,
-                List.of(studentId), "成绩复核结果", "您的成绩复核申请已处理（" + reviewStatus + "）。", 1, "/learning/tasks");
+        long parsedSourceId = parseId(payload.path(sourceIdField).asText());
+        Long sourceId = parsedSourceId > 0 ? parsedSourceId : null;
+        notifications.createForFact(eventId, "grade.review.processed.v2", notificationType, courseId, sourceModule, sourceId,
+                List.of(studentId), "成绩复核已处理", "您的成绩复核申请已处理（" + reviewStatus + "）。", 1, "/learning/tasks");
     }
 
     private String eventTypeOf(String sourceModule) {
