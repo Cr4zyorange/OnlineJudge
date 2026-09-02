@@ -86,6 +86,8 @@ if [[ "$side" == "consumer" || "$side" == "all" ]]; then
       --manifest deploy/platform/workloads.json
     log_run env PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v \
       scripts.platform.tests.test_validate_workload_manifest
+    log_run env PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v \
+      scripts.platform.tests.test_plan_delivery
   )
 fi
 

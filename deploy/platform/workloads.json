@@ -68,9 +68,9 @@
       },
       "ports": [{"name": "http", "containerPort": 8081, "protocol": "TCP", "external": false}],
       "health": {
-        "startup": {"kind": "http", "target": "/actuator/health/readiness", "requiredDependencies": ["mysql"]},
-        "liveness": {"kind": "http", "target": "/actuator/health/liveness", "requiredDependencies": []},
-        "readiness": {"kind": "http", "target": "/actuator/health/readiness", "requiredDependencies": ["mysql"]}
+        "startup": {"kind": "http", "target": "/api/v1/system/health", "requiredDependencies": []},
+        "liveness": {"kind": "http", "target": "/api/v1/system/health", "requiredDependencies": []},
+        "readiness": {"kind": "http", "target": "/api/v1/system/readiness", "requiredDependencies": ["mysql"]}
       },
       "dependsOn": ["mysql"],
       "migrationJob": "identity-migrations",
@@ -126,9 +126,9 @@
       },
       "ports": [{"name": "http", "containerPort": 8083, "protocol": "TCP", "external": false}],
       "health": {
-        "startup": {"kind": "http", "target": "/actuator/health/readiness", "requiredDependencies": ["mysql"]},
-        "liveness": {"kind": "http", "target": "/actuator/health/liveness", "requiredDependencies": []},
-        "readiness": {"kind": "http", "target": "/actuator/health/readiness", "requiredDependencies": ["mysql"]}
+        "startup": {"kind": "http", "target": "/health/ready", "requiredDependencies": ["mysql"]},
+        "liveness": {"kind": "http", "target": "/health/ready", "requiredDependencies": ["mysql"]},
+        "readiness": {"kind": "http", "target": "/health/ready", "requiredDependencies": ["mysql"]}
       },
       "dependsOn": ["mysql"],
       "migrationJob": "assessment-migrations",
@@ -161,7 +161,7 @@
         "readiness": {"kind": "process", "target": "lease-and-consumer-ready", "requiredDependencies": ["mysql", "rabbitmq"]}
       },
       "dependsOn": ["mysql", "rabbitmq"],
-      "migrationJob": null,
+      "migrationJob": "assessment-migrations",
       "configuration": ["ASSESSMENT_WORKER_CONCURRENCY", "MYSQL_HOST", "MYSQL_PORT", "ASSESSMENT_DATABASE_NAME", "ASSESSMENT_DATABASE_USER", "RABBITMQ_HOST", "RABBITMQ_PORT", "EVALUATION_SANDBOX_MODE"],
       "secrets": [
         {"key": "ASSESSMENT_DATABASE_PASSWORD", "injectedAs": "runtime-secret", "redact": true, "imageBuild": "forbidden"},
@@ -185,9 +185,9 @@
       },
       "ports": [{"name": "http", "containerPort": 8084, "protocol": "TCP", "external": false}],
       "health": {
-        "startup": {"kind": "http", "target": "/actuator/health/readiness", "requiredDependencies": ["mysql"]},
-        "liveness": {"kind": "http", "target": "/actuator/health/liveness", "requiredDependencies": []},
-        "readiness": {"kind": "http", "target": "/actuator/health/readiness", "requiredDependencies": ["mysql"]}
+        "startup": {"kind": "http", "target": "/health/ready", "requiredDependencies": ["mysql"]},
+        "liveness": {"kind": "http", "target": "/health/ready", "requiredDependencies": ["mysql"]},
+        "readiness": {"kind": "http", "target": "/health/ready", "requiredDependencies": ["mysql"]}
       },
       "dependsOn": ["mysql"],
       "migrationJob": "grade-migrations",

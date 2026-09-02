@@ -2,10 +2,10 @@ package com.onlinejudge.assessmentservice.controller;
 
 import com.fasterxml.jackson.annotation.JsonAlias;
 import com.onlinejudge.assessmentservice.security.CurrentUser;
+import com.onlinejudge.assessmentservice.service.CourseMembershipGuard;
 import com.onlinejudge.assessmentservice.service.CoursePermissionClient;
 import com.onlinejudge.assessmentservice.service.HomeworkService;
 import com.onlinejudge.assessmentservice.service.HomeworkSubmissionService;
-import com.onlinejudge.assessmentservice.persistence.CourseMemberProjectionRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMin;
@@ -37,14 +37,14 @@ import java.util.Map;
 public class HomeworkController {
     private final HomeworkService homeworks;
     private final CoursePermissionClient coursePermissions;
-    private final CourseMemberProjectionRepository courseMembers;
+    private final CourseMembershipGuard membershipGuard;
     private final HomeworkSubmissionService submissions;
 
     public HomeworkController(HomeworkService homeworks, CoursePermissionClient coursePermissions,
-            CourseMemberProjectionRepository courseMembers, HomeworkSubmissionService submissions) {
+            CourseMembershipGuard membershipGuard, HomeworkSubmissionService submissions) {
         this.homeworks = homeworks;
         this.coursePermissions = coursePermissions;
-        this.courseMembers = courseMembers;
+        this.membershipGuard = membershipGuard;
         this.submissions = submissions;
     }
 
@@ -53,7 +53,7 @@ public class HomeworkController {
     public Map<String, Object> submit(@PathVariable long homeworkId,
             @Valid @RequestBody SubmitHomeworkRequest request,
             @RequestAttribute("assessment.currentUser") CurrentUser user, HttpServletRequest http) {
-        requestId(http);
+        String requestId = requestId(http);
         if (!user.hasRole("STUDENT")) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "student role is required");
         HomeworkService.HomeworkSummary homework;
         try {
@@ -61,7 +61,7 @@ public class HomeworkController {
         } catch (NoSuchElementException missing) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "homework not found", missing);
         }
-        if (!courseMembers.isActive(homework.courseId(), user.id())) {
+        if (!membershipGuard.isActiveMember(homework.courseId(), user.id(), requestId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "active course student membership is required");
         }
         try {

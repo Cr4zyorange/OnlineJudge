@@ -1,0 +1,261 @@
+map $http_x_request_id $gateway_request_id {
+    default $request_id;
+    "~^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" $http_x_request_id;
+}
+
+limit_req_zone $binary_remote_addr zone=identity_limit:10m rate=5r/s;
+limit_req_zone $binary_remote_addr zone=read_limit:10m rate=30r/s;
+limit_req_zone $binary_remote_addr zone=write_limit:10m rate=10r/s;
+
+server {
+    listen 8080;
+    server_name _;
+
+    client_max_body_size 10m;
+    proxy_http_version 1.1;
+    proxy_connect_timeout 5s;
+    proxy_read_timeout 60s;
+    proxy_send_timeout 60s;
+    proxy_next_upstream off;
+    proxy_intercept_errors on;
+    limit_req_status 429;
+
+    add_header X-Request-Id $gateway_request_id always;
+    error_page 413 = @gateway_payload_too_large;
+    error_page 429 = @gateway_rate_limited;
+    error_page 502 = @gateway_bad_gateway;
+    error_page 503 = @gateway_unavailable;
+    error_page 504 = @gateway_timeout;
+
+    location = /health/startup {
+        default_type application/json;
+        return 200 '{"status":"UP"}';
+    }
+
+    location = /health/live {
+        default_type application/json;
+        return 200 '{"status":"UP"}';
+    }
+
+    location = /health/ready {
+        default_type application/json;
+        return 200 '{"status":"UP"}';
+    }
+
+    location ^~ /internal/v2/ {
+        default_type application/json;
+        return 404 '{"code":"GATEWAY_404","message":"Route not found","requestId":"$gateway_request_id","retryable":false}';
+    }
+
+    location = /.well-known/jwks.json {
+        limit_req zone=identity_limit burst=10 nodelay;
+        include /etc/nginx/includes/proxy-request-headers.conf;
+        proxy_pass http://__IDENTITY_UPSTREAM__;
+    }
+
+    location ~ ^/api/v1/courses/[0-9]+/(labs|homeworks)(/|$) {
+        limit_req zone=write_limit burst=20 nodelay;
+        client_max_body_size 55m;
+        proxy_read_timeout 300s;
+        proxy_send_timeout 300s;
+        include /etc/nginx/includes/proxy-request-headers.conf;
+        proxy_pass http://__ASSESSMENT_UPSTREAM__;
+    }
+
+    location ~ ^/api/v1/courses/[0-9]+/(grades|grade-items|grade-rules|grade-publish-records|grade-change-logs|my-grades|grade-analysis|grade-review-requests|my-grade-review-requests)(/|$) {
+        limit_req zone=read_limit burst=60 nodelay;
+        include /etc/nginx/includes/proxy-request-headers.conf;
+        proxy_pass http://__GRADE_UPSTREAM__;
+    }
+
+    location = /api/v1/auth {
+        limit_req zone=identity_limit burst=10 nodelay;
+        include /etc/nginx/includes/proxy-request-headers.conf;
+        proxy_pass http://__IDENTITY_UPSTREAM__;
+    }
+
+    location ^~ /api/v1/auth/ {
+        limit_req zone=identity_limit burst=10 nodelay;
+        include /etc/nginx/includes/proxy-request-headers.conf;
+        proxy_pass http://__IDENTITY_UPSTREAM__;
+    }
+
+    location = /api/v1/users/me {
+        limit_req zone=read_limit burst=60 nodelay;
+        include /etc/nginx/includes/proxy-request-headers.conf;
+        proxy_pass http://__IDENTITY_UPSTREAM__;
+    }
+
+    location ^~ /api/v1/users/me/ {
+        limit_req zone=read_limit burst=60 nodelay;
+        include /etc/nginx/includes/proxy-request-headers.conf;
+        proxy_pass http://__IDENTITY_UPSTREAM__;
+    }
+
+    location ^~ /api/v1/admin/ {
+        limit_req zone=write_limit burst=20 nodelay;
+        include /etc/nginx/includes/proxy-request-headers.conf;
+        proxy_pass http://__IDENTITY_UPSTREAM__;
+    }
+
+    location ^~ /api/v1/labs/ {
+        limit_req zone=write_limit burst=20 nodelay;
+        client_max_body_size 55m;
+        proxy_read_timeout 300s;
+        proxy_send_timeout 300s;
+        include /etc/nginx/includes/proxy-request-headers.conf;
+        proxy_pass http://__ASSESSMENT_UPSTREAM__;
+    }
+
+    location = /api/v1/homeworks {
+        limit_req zone=write_limit burst=20 nodelay;
+        client_max_body_size 55m;
+        proxy_read_timeout 300s;
+        proxy_send_timeout 300s;
+        include /etc/nginx/includes/proxy-request-headers.conf;
+        proxy_pass http://__ASSESSMENT_UPSTREAM__;
+    }
+
+    location ^~ /api/v1/homeworks/ {
+        limit_req zone=write_limit burst=20 nodelay;
+        client_max_body_size 55m;
+        proxy_read_timeout 300s;
+        proxy_send_timeout 300s;
+        include /etc/nginx/includes/proxy-request-headers.conf;
+        proxy_pass http://__ASSESSMENT_UPSTREAM__;
+    }
+
+    location ^~ /api/v1/submissions/ {
+        limit_req zone=write_limit burst=20 nodelay;
+        client_max_body_size 55m;
+        proxy_read_timeout 300s;
+        proxy_send_timeout 300s;
+        include /etc/nginx/includes/proxy-request-headers.conf;
+        proxy_pass http://__ASSESSMENT_UPSTREAM__;
+    }
+
+    location ^~ /api/v1/evaluations/ {
+        limit_req zone=read_limit burst=60 nodelay;
+        include /etc/nginx/includes/proxy-request-headers.conf;
+        proxy_pass http://__ASSESSMENT_UPSTREAM__;
+    }
+
+    location = /api/v1/grades {
+        limit_req zone=read_limit burst=60 nodelay;
+        include /etc/nginx/includes/proxy-request-headers.conf;
+        proxy_pass http://__GRADE_UPSTREAM__;
+    }
+
+    location ^~ /api/v1/grades/ {
+        limit_req zone=read_limit burst=60 nodelay;
+        include /etc/nginx/includes/proxy-request-headers.conf;
+        proxy_pass http://__GRADE_UPSTREAM__;
+    }
+
+    location ^~ /api/v1/grade-items/ {
+        limit_req zone=read_limit burst=60 nodelay;
+        include /etc/nginx/includes/proxy-request-headers.conf;
+        proxy_pass http://__GRADE_UPSTREAM__;
+    }
+
+    location ^~ /api/v1/grade-records/ {
+        limit_req zone=read_limit burst=60 nodelay;
+        include /etc/nginx/includes/proxy-request-headers.conf;
+        proxy_pass http://__GRADE_UPSTREAM__;
+    }
+
+    location ^~ /api/v1/course-grade-summaries/ {
+        limit_req zone=read_limit burst=60 nodelay;
+        include /etc/nginx/includes/proxy-request-headers.conf;
+        proxy_pass http://__GRADE_UPSTREAM__;
+    }
+
+    location ^~ /api/v1/grade-review-requests/ {
+        limit_req zone=write_limit burst=20 nodelay;
+        include /etc/nginx/includes/proxy-request-headers.conf;
+        proxy_pass http://__GRADE_UPSTREAM__;
+    }
+
+    location ^~ /api/v1/learning/ {
+        limit_req zone=read_limit burst=60 nodelay;
+        include /etc/nginx/includes/proxy-request-headers.conf;
+        proxy_pass http://__COURSE_UPSTREAM__;
+    }
+
+    location = /api/v1/notifications {
+        limit_req zone=read_limit burst=60 nodelay;
+        include /etc/nginx/includes/proxy-request-headers.conf;
+        proxy_pass http://__COURSE_UPSTREAM__;
+    }
+
+    location ^~ /api/v1/notifications/ {
+        limit_req zone=write_limit burst=20 nodelay;
+        include /etc/nginx/includes/proxy-request-headers.conf;
+        proxy_pass http://__COURSE_UPSTREAM__;
+    }
+
+    location = /api/v1/reminder-rules {
+        limit_req zone=write_limit burst=20 nodelay;
+        include /etc/nginx/includes/proxy-request-headers.conf;
+        proxy_pass http://__COURSE_UPSTREAM__;
+    }
+
+    location ^~ /api/v1/reminder-rules/ {
+        limit_req zone=write_limit burst=20 nodelay;
+        include /etc/nginx/includes/proxy-request-headers.conf;
+        proxy_pass http://__COURSE_UPSTREAM__;
+    }
+
+    location ^~ /api/v1/chapters/ {
+        limit_req zone=read_limit burst=60 nodelay;
+        include /etc/nginx/includes/proxy-request-headers.conf;
+        proxy_pass http://__COURSE_UPSTREAM__;
+    }
+
+    location = /api/v1/courses {
+        limit_req zone=read_limit burst=60 nodelay;
+        include /etc/nginx/includes/proxy-request-headers.conf;
+        proxy_pass http://__COURSE_UPSTREAM__;
+    }
+
+    location /api/v1/courses/ {
+        limit_req zone=read_limit burst=60 nodelay;
+        include /etc/nginx/includes/proxy-request-headers.conf;
+        proxy_pass http://__COURSE_UPSTREAM__;
+    }
+
+    location ^~ /api/ {
+        default_type application/json;
+        return 404 '{"code":"GATEWAY_404","message":"Route not found","requestId":"$gateway_request_id","retryable":false}';
+    }
+
+    location / {
+        include /etc/nginx/includes/proxy-request-headers.conf;
+        proxy_pass http://frontend:80;
+    }
+
+    location @gateway_payload_too_large {
+        default_type application/json;
+        return 413 '{"code":"GATEWAY_413","message":"Request body too large","requestId":"$gateway_request_id","retryable":false}';
+    }
+
+    location @gateway_rate_limited {
+        default_type application/json;
+        return 429 '{"code":"GATEWAY_429","message":"Too many requests","requestId":"$gateway_request_id","retryable":true}';
+    }
+
+    location @gateway_bad_gateway {
+        default_type application/json;
+        return 502 '{"code":"GATEWAY_502","message":"Downstream service unavailable","requestId":"$gateway_request_id","retryable":true}';
+    }
+
+    location @gateway_unavailable {
+        default_type application/json;
+        return 503 '{"code":"GATEWAY_503","message":"Service unavailable","requestId":"$gateway_request_id","retryable":true}';
+    }
+
+    location @gateway_timeout {
+        default_type application/json;
+        return 504 '{"code":"GATEWAY_504","message":"Downstream service timeout","requestId":"$gateway_request_id","retryable":true}';
+    }
+}

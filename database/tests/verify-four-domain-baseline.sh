@@ -7,17 +7,22 @@ password="oj306-root-$RANDOM"
 cleanup() { docker rm -f "$name" >/dev/null 2>&1 || true; }
 trap cleanup EXIT
 docker run -d --name "$name" --mount "type=bind,src=$root,dst=/workspace,readonly" -e "MYSQL_ROOT_PASSWORD=$password" mysql:8.4 >/dev/null
+mysql_root() {
+  docker exec -i "$name" mysql --protocol=TCP --host=127.0.0.1 --port=3306 -uroot "-p$password" "$@"
+}
 for _ in $(seq 1 60); do
-  if docker exec "$name" mysql -uroot "-p$password" -e 'SELECT 1' >/dev/null 2>&1; then break; fi
+  if mysql_root -e 'SELECT 1' >/dev/null 2>&1; then break; fi
   sleep 1
 done
-docker exec "$name" mysql -uroot "-p$password" -e 'SELECT 1' >/dev/null
+mysql_root -e 'SELECT 1' >/dev/null
 
-# Root administration runs over the container-local socket. The four workload
-# account checks below deliberately use TCP, so the test still exercises their
-# real host grants rather than a privileged local-authentication shortcut.
-sql() { docker exec -i "$name" mysql -uroot "-p$password" "$@"; }
-run_file() { docker exec -i "$name" mysql -uroot "-p$password" "$1" < "$2"; }
+# Use the same TCP path for readiness and root administration.  GitHub hosted
+# runners can expose a container process before its Unix socket exists; TCP
+# avoids accepting a transient socket state that the following migration query
+# cannot reuse.  The four workload-account checks below also stay on TCP, so
+# they exercise real host grants rather than local-authentication shortcuts.
+sql() { mysql_root "$@"; }
+run_file() { mysql_root "$1" < "$2"; }
 lrn_tables=(
   lrn_learning_task lrn_learning_progress lrn_learning_record
   lrn_notification lrn_notification_status_log

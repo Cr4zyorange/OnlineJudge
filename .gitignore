@@ -89,6 +89,12 @@ temp/
 # CI quality gate evidence
 ci-artifacts/
 
+# Disposable #318 image, rollout and rollback evidence is generated locally.
+output/issue-318/
+
+# Python delivery helpers import each other as scripts.
+__pycache__/
+
 # Application runtime data
 uploads/
 storage/

@@ -5,7 +5,7 @@ set -euo pipefail
 repo_root="$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"
 checkout="${1:-$repo_root}"
 workflow_file="${2:-$checkout/.github/workflows/ci.yml}"
-required_jobs=(validate-workflows backend-gate frontend-gate contracts-gate delivery)
+required_jobs=(validate-workflows backend-gate frontend-gate contracts-gate browser-e2e-gate delivery)
 
 # bash 3.2（macOS 默认）不支持关联数组，改用 case 函数维护 Action 固定版本表。
 action_sha_of() {
@@ -123,6 +123,7 @@ validate_needs="$(needs_of "$workflow_file" validate-workflows)"
 backend_needs="$(needs_of "$workflow_file" backend-gate)"
 frontend_needs="$(needs_of "$workflow_file" frontend-gate)"
 contracts_needs="$(needs_of "$workflow_file" contracts-gate)"
+browser_e2e_needs="$(needs_of "$workflow_file" browser-e2e-gate)"
 delivery_needs="$(needs_of "$workflow_file" delivery)"
 delivery_norm="$(normalized_needs "$delivery_needs")"
 
@@ -130,7 +131,8 @@ run_check "validate-workflows has no needs" test -z "$validate_needs"
 run_check "backend-gate needs validate-workflows" test "$backend_needs" = "validate-workflows"
 run_check "frontend-gate needs validate-workflows" test "$frontend_needs" = "validate-workflows"
 run_check "contracts-gate needs validate-workflows" test "$contracts_needs" = "validate-workflows"
-run_check "delivery needs every quality gate" test "$delivery_norm" = "backend-gate,contracts-gate,frontend-gate,validate-workflows"
+run_check "browser-e2e-gate needs compile, frontend, and contract gates" test "$browser_e2e_needs" = "backend-gate,frontend-gate,contracts-gate"
+run_check "delivery needs every quality gate" test "$delivery_norm" = "backend-gate,browser-e2e-gate,contracts-gate,frontend-gate,validate-workflows"
 for job in "${required_jobs[@]}"; do
   job_needs="$(needs_of "$workflow_file" "$job")"
   if [[ ",$job_needs," == *",delivery,"* ]]; then
@@ -146,6 +148,7 @@ job_script_of() {
     backend-gate) printf '%s' scripts/ci/backend-verify.sh ;;
     frontend-gate) printf '%s' scripts/ci/frontend-verify.sh ;;
     contracts-gate) printf '%s' scripts/ci/contract-verify.sh ;;
+    browser-e2e-gate) printf '%s' scripts/ci/browser-e2e-verify.sh ;;
     delivery) printf '%s' scripts/ci/delivery-checkpoint.sh ;;
   esac
 }
@@ -179,7 +182,7 @@ for job in "${required_jobs[@]}"; do
     'grep -Eq "^    timeout-minutes: [0-9]+$" <<< "$1"' _ "$section"
 done
 
-# 9. if: always() 只允许用于证据/诊断步骤；delivery 一律禁止。
+# 9. if: always() 只允许用于证据/诊断步骤；交付执行本身一律禁止。
 while IFS= read -r line_number; do
   step_start="$((line_number - 3))"
   step_end="$((line_number + 3))"
@@ -194,8 +197,16 @@ while IFS= read -r line_number; do
 done < <(grep -nF 'if: always()' "$workflow_file" | cut -d: -f1 || true)
 
 delivery_section="$(job_section "$workflow_file" delivery)"
-run_check "delivery steps never use if: always()" bash -c \
-  '! grep -Fq "if: always()" <<< "$1"' _ "$delivery_section"
+run_check "delivery calls the disposable executor after the checkpoint" bash -c \
+  'grep -Fq "scripts/ci/delivery-checkpoint.sh" <<< "$1" \
+    && grep -Fq "scripts/ci/disposable-delivery.sh" <<< "$1"' _ "$delivery_section"
+run_check "delivery installs checksum-verified Docker Scout before SBOM generation" bash -c \
+  'grep -Fq "docker-scout_1.24.0_linux_amd64.tar.gz" <<< "$1" \
+    && grep -Fq "f4e2814bd61040365153d5b964b144cb2dc6ee536a68b5bac4cadf00fc0ec34b" <<< "$1" \
+    && grep -Fq "sha256sum --check --status" <<< "$1" \
+    && grep -Fq "cli-plugins/docker-scout" <<< "$1" \
+    && grep -Fq "docker scout version" <<< "$1"' _ "$delivery_section"
+run_check "disposable delivery executor exists" test -x "$checkout/scripts/ci/disposable-delivery.sh"
 
 # 10. 第三方 Action 必须固定到受控 SHA 与版本注释。
 uses_seen=0
@@ -217,7 +228,7 @@ done < <(grep -E '^[[:space:]]*uses: ' "$workflow_file" || true)
 run_check "third-party action pinning was exercised" test "$uses_seen" -gt 0
 
 # 11. 每个门禁作业的上传步骤必须在失败时仍保留证据。
-for job in validate-workflows backend-gate frontend-gate contracts-gate; do
+for job in validate-workflows backend-gate frontend-gate contracts-gate browser-e2e-gate; do
   section="$(job_section "$workflow_file" "$job")"
   run_check "$job uploads evidence on failure" bash -c \
     'grep -Fq "if: always()" <<< "$1" \

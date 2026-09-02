@@ -71,4 +71,7 @@ fi
 (cd "$frontend_dir" && log_run npm run test:e2e:contract) 2>&1 | tee "$artifact_dir/runner-contracts.txt"
 (cd "$frontend_dir" && log_run npm run test:e2e:verify-failure)
 
+# 真实业务 E2E 的命令、隔离环境与 CI 依赖链不可退化为仅运行器契约。
+log_run node "$checkout/scripts/test/verify-e2e-ci-integration.test.mjs"
+
 printf 'frontend-verify: PASS (ci + Mermaid render + typecheck + unit + build + runner contracts)\n' | tee -a "$log"

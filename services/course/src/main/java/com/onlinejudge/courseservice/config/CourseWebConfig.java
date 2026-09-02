@@ -19,7 +19,10 @@ public class CourseWebConfig implements WebMvcConfigurer {
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
         registry.addInterceptor(new RequestIdInterceptor()).addPathPatterns("/api/v1/**", "/internal/v2/**");
-        registry.addInterceptor(new UserInterceptor(authentication)).addPathPatterns("/api/v1/courses/**");
+        registry.addInterceptor(new UserInterceptor(authentication))
+                .addPathPatterns("/api/v1/courses/**", "/api/v1/learning/**", "/api/v1/notifications/**",
+                        "/api/v1/reminder-rules/**")
+                .excludePathPatterns("/api/v1/notifications/events");
         registry.addInterceptor(new InternalInterceptor(authentication)).addPathPatterns("/internal/v2/**");
     }
 
@@ -53,8 +56,17 @@ public class CourseWebConfig implements WebMvcConfigurer {
         InternalInterceptor(CourseAuthentication authentication) { this.authentication = authentication; }
         @Override
         public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
-            String requiredScope = request.getRequestURI().endsWith("/members")
-                    ? "course.members.read" : "course.authorizations.read";
+            String uri = request.getRequestURI();
+            String requiredScope;
+            if (uri.contains("/learning/tasks/recent")) {
+                requiredScope = "learning.tasks.read";
+            } else if (uri.contains("/notifications/reconciliation-requests")) {
+                requiredScope = "notification-reconciliation";
+            } else if (uri.endsWith("/members")) {
+                requiredScope = "course.members.read";
+            } else {
+                requiredScope = "course.authorizations.read";
+            }
             request.setAttribute("course.servicePrincipal", authentication.service(request, requiredScope));
             return true;
         }

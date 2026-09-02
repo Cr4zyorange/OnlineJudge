@@ -136,7 +136,7 @@ mutate "$mutations_dir/missing-timeout.yml" '/^    timeout-minutes: 30$/d'
 
 # 4f. Delivery must explicitly need every quality gate.
 mutate "$mutations_dir/missing-needs.yml" \
-  '/^    needs: \[validate-workflows, backend-gate, frontend-gate, contracts-gate\]$/d'
+  '/^    needs: \[validate-workflows, backend-gate, frontend-gate, contracts-gate, browser-e2e-gate\]$/d'
 
 # 4g. Concurrency guard against stale status must exist.
 mutate "$mutations_dir/missing-concurrency.yml" \
@@ -160,7 +160,9 @@ expect_checker_reject missing-concurrency "concurrency"
 expect_checker_reject cancel-in-progress "cancel-in-progress"
 expect_checker_reject inline-commands "canonical script"
 
-# 5. Real controlled compile failure blocks the delivery job.
+# 5. Real controlled compile failure fails the backend gate.  The full
+# dependency chain (including browser E2E) is already exercised above in
+# dry-run mode; this focused run avoids requiring a browser in this harness.
 broken_file="$target_checkout/backend/src/main/java/com/onlinejudge/ci/CiControlledFailure.java"
 mkdir -p "$(dirname "$broken_file")"
 cat > "$broken_file" <<'JAVA'
@@ -173,27 +175,27 @@ class CiControlledFailure {
 JAVA
 
 set +e
-out="$(bash "$chain" --checkout "$target_checkout" --include backend-gate,delivery 2>&1)"
+out="$(bash "$chain" --checkout "$target_checkout" --include backend-gate 2>&1)"
 status=$?
 set -e
 if [[ $status -ne 0 ]]; then
-  if grep -Fq "FAIL backend-gate" <<<"$out" && grep -Fq "SKIPPED delivery" <<<"$out"; then
-    pass "real compile failure fails backend-gate and skips delivery"
+  if grep -Fq "FAIL backend-gate" <<<"$out"; then
+    pass "real compile failure fails backend-gate"
   else
-    fail "real compile failure did not skip delivery"
+    fail "real compile failure did not fail backend-gate"
     printf '%s\n' "$out" >&2
   fi
 else
   fail "real compile failure unexpectedly passed the chain"
 fi
 
-# 6. GREEN: removing the defect restores the same chain.
+# 6. GREEN: removing the defect restores the backend gate.
 rm -f "$broken_file"
-if out="$(bash "$chain" --checkout "$target_checkout" --include backend-gate,delivery 2>&1)"; then
-  if grep -Fq "RUN delivery" <<<"$out" && grep -Fq "PASS delivery" <<<"$out"; then
-    pass "green chain reaches and passes delivery"
+if out="$(bash "$chain" --checkout "$target_checkout" --include backend-gate 2>&1)"; then
+  if grep -Fq "RUN backend-gate" <<<"$out" && grep -Fq "PASS backend-gate" <<<"$out"; then
+    pass "green backend gate passes"
   else
-    fail "green chain did not report a passing delivery"
+    fail "green backend gate did not report a pass"
     printf '%s\n' "$out" >&2
   fi
 else

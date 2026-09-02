@@ -9,7 +9,7 @@ spring:
   sql:
     init:
       mode: always
-      schema-locations: classpath:schema-course.sql,classpath:schema-course-event-inbox.sql
+      schema-locations: classpath:schema-course.sql,classpath:schema-course-event-inbox.sql,classpath:schema-course-lrn.sql
   servlet:
     multipart:
       max-file-size: 50MB
@@ -47,6 +47,7 @@ course:
     password: ${RABBITMQ_PASSWORD:}
     exchange: ${RABBITMQ_EXCHANGE:onlinejudge.events.v2}
     identity-security-version-queue: ${COURSE_IDENTITY_SECURITY_VERSION_QUEUE:course.identity-security-version.v2}
+    learning-facts-queue: ${COURSE_LEARNING_FACTS_QUEUE:course.learning-facts.v2}
   learning:
     base-url: ${COURSE_LEARNING_BASE_URL:}
     timeout-ms: ${COURSE_LEARNING_TIMEOUT_MS:800}
@@ -60,3 +61,11 @@ course:
     mtls-truststore-type: ${COURSE_LEARNING_MTLS_TRUSTSTORE_TYPE:PKCS12}
   storage:
     root: ${COURSE_STORAGE_ROOT:${java.io.tmpdir}/onlinejudge-course}
+
+app:
+  version: ${APP_VERSION:0.1.0-SNAPSHOT}
+  revision: ${GIT_SHA:unknown}
+
+onlinejudge:
+  notifications:
+    internal-token: ${NOTIFICATIONS_INTERNAL_TOKEN:}

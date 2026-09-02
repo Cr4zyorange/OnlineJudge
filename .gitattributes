@@ -5,6 +5,12 @@ database/**/*.sql text eol=lf
 # force LF so the documented acceptance command passes on Windows checkouts too.
 .github/workflows/*.yml text eol=lf
 
+# The renderer runs under Linux/Git Bash and compares its output byte-for-byte
+# with the image default, so gateway source and generated defaults use LF.
+deploy/nginx/*.conf text eol=lf
+deploy/nginx/*.template text eol=lf
+deploy/nginx/*.env text eol=lf
+
 # Preserve Docker/Compose console captures as test evidence with a repository-stable
 # line ending so their documented SHA-256 values are directly reproducible.
 output/issue-265/*.log text eol=lf -whitespace
@@ -12,3 +18,4 @@ output/test/issue-262/raw/*.log text eol=lf -whitespace
 
 # #307 hashes the frozen performance dataset byte-for-byte.
 performance/issue-307/*.json text eol=lf
+output/test/issue-317/logs/*.log text eol=lf -whitespace

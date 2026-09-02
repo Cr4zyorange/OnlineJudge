@@ -41,6 +41,15 @@ public class HttpCoursePermissionClient implements CoursePermissionClient {
 
     @Override
     public boolean canManageCourse(String courseId, String userId, String requestId) {
+        return authorize(courseId, userId, requestId, "MANAGE");
+    }
+
+    @Override
+    public boolean canViewCourse(String courseId, String userId, String requestId) {
+        return authorize(courseId, userId, requestId, "VIEW");
+    }
+
+    private boolean authorize(String courseId, String userId, String requestId, String action) {
         if (authorizationUri.isBlank() || serviceAuthorization.isBlank() || courseId == null || userId == null) {
             throw new CourseAuthorizationUnavailableException("CRS authorization is not configured");
         }
@@ -50,7 +59,7 @@ public class HttpCoursePermissionClient implements CoursePermissionClient {
         try {
             String path = authorizationUri.replace("{courseId}", encode(courseId)).replace("{userId}", encode(userId));
             String separator = path.contains("?") ? "&" : "?";
-            HttpRequest request = HttpRequest.newBuilder(URI.create(path + separator + "action=MANAGE"))
+            HttpRequest request = HttpRequest.newBuilder(URI.create(path + separator + "action=" + action))
                     .timeout(timeout)
                     .header("Accept", "application/json")
                     .header("X-Request-Id", requestId)
@@ -70,7 +79,7 @@ public class HttpCoursePermissionClient implements CoursePermissionClient {
             }
             if (!courseId.equals(decision.path("courseId").asText())
                     || !userId.equals(decision.path("userId").asText())
-                    || !"MANAGE".equals(decision.path("action").asText())
+                    || !action.equals(decision.path("action").asText())
                     || decision.path("memberVersion").asLong(0) < 1) {
                 return false;
             }

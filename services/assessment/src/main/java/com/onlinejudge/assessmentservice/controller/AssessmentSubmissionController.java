@@ -3,6 +3,7 @@ package com.onlinejudge.assessmentservice.controller;
 import com.onlinejudge.assessmentservice.persistence.CourseMemberProjectionRepository;
 import com.onlinejudge.assessmentservice.security.CurrentUser;
 import com.onlinejudge.assessmentservice.service.AssessmentSubmissionService;
+import com.onlinejudge.assessmentservice.service.CourseMembershipGuard;
 import com.onlinejudge.assessmentservice.service.LabExperimentService;
 import com.onlinejudge.assessmentservice.service.LabSubmissionService;
 import com.onlinejudge.assessmentservice.storage.PersistentSubmissionFileStore;
@@ -23,11 +24,11 @@ import org.springframework.web.server.ResponseStatusException;
 @RestController
 @RequestMapping("/api/v1")
 public class AssessmentSubmissionController {
-    private final AssessmentSubmissionService submissions; private final CourseMemberProjectionRepository courseMembers; private final PersistentSubmissionFileStore files;
+    private final AssessmentSubmissionService submissions; private final CourseMemberProjectionRepository courseMembers; private final CourseMembershipGuard membershipGuard; private final PersistentSubmissionFileStore files;
     private final LabExperimentService labs; private final LabSubmissionService labSubmissions;
     public AssessmentSubmissionController(AssessmentSubmissionService submissions, CourseMemberProjectionRepository courseMembers,
-            PersistentSubmissionFileStore files, LabExperimentService labs, LabSubmissionService labSubmissions) {
-        this.submissions = submissions; this.courseMembers = courseMembers; this.files = files; this.labs = labs; this.labSubmissions = labSubmissions;
+            CourseMembershipGuard membershipGuard, PersistentSubmissionFileStore files, LabExperimentService labs, LabSubmissionService labSubmissions) {
+        this.submissions = submissions; this.courseMembers = courseMembers; this.membershipGuard = membershipGuard; this.files = files; this.labs = labs; this.labSubmissions = labSubmissions;
     }
     @PostMapping("/submissions")
     @org.springframework.web.bind.annotation.ResponseStatus(HttpStatus.CREATED)
@@ -51,7 +52,7 @@ public class AssessmentSubmissionController {
         LabExperimentService.LabSummary lab;
         try { lab = labs.find(sourceId); }
         catch (java.util.NoSuchElementException missing) { throw new ResponseStatusException(HttpStatus.NOT_FOUND, "LAB does not exist", missing); }
-        if (!user.hasRole("STUDENT") || !courseMembers.isActive(lab.courseId(), user.id())) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "active course student membership is required");
+        if (!user.hasRole("STUDENT") || !membershipGuard.isActiveMember(lab.courseId(), user.id(), http.getHeader("X-Request-Id"))) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "active course student membership is required");
         boolean hasFile = file != null && !file.isEmpty();
         boolean hasCode = code != null && !code.isBlank();
         if (!hasFile && !hasCode) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "submission code or file is required");
