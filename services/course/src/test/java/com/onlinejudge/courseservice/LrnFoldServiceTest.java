@@ -168,6 +168,25 @@ class LrnFoldServiceTest {
     }
 
     @Test
+    void publishedHomeworkSourceScoreNotifiesOnlyItsStudentWithTheHomeworkTarget() throws Exception {
+        String courseId = createCourseWithRosterWatermark("813", "814");
+
+        projection.consume(homeworkSourceGradeEnvelope(courseId, "814"));
+
+        assertThat(jdbcTemplate.queryForMap("""
+                SELECT source_module, source_id, title, action_url
+                  FROM lrn_notification
+                 WHERE user_id = 814 AND course_id = ?
+                """, Long.parseLong(courseId)))
+                .containsEntry("source_module", "HWK")
+                .containsEntry("source_id", 77L)
+                .containsEntry("title", "homework score published")
+                .containsEntry("action_url", "/courses/" + courseId + "/homeworks/77");
+        assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM lrn_notification WHERE user_id = 813", Integer.class))
+                .isZero();
+    }
+
+    @Test
     void progressOverviewSuppliesConcreteContinueUrlsForCourseLabAndHomeworkRecords() throws Exception {
         String courseId = createCourseWithRosterWatermark("807", "808");
         long numericCourseId = Long.parseLong(courseId);
@@ -646,6 +665,31 @@ class LrnFoldServiceTest {
                   }
                 }
                 """.formatted(courseId);
+    }
+
+    private String homeworkSourceGradeEnvelope(String courseId, String studentId) {
+        return """
+                {
+                  "eventId": "7d6500e6-3be8-4898-b177-23aa4b86faea",
+                  "eventType": "assessment.source-grade.changed.v2",
+                  "payloadVersion": 2,
+                  "aggregateType": "assessment-source-grade",
+                  "aggregateId": "HWK:homework-77:%s",
+                  "aggregateVersion": 1,
+                  "occurredAt": "2026-08-30T09:15:30Z",
+                  "correlationId": "dc18b23c-21b3-403d-9bcb-305020f17027",
+                  "payload": {
+                    "courseId": "course-%s",
+                    "sourceType": "HWK",
+                    "sourceId": "homework-77",
+                    "studentId": "%s",
+                    "score": 88,
+                    "fullScore": 100,
+                    "status": "SCORED",
+                    "sourceVersion": 1
+                  }
+                }
+                """.formatted(studentId, courseId, studentId);
     }
 
     private String gradePublishedEnvelope(String courseId) {
