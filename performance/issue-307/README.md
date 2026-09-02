@@ -20,8 +20,9 @@
 | --- | --- |
 | 单体 tag | `monolith-start` |
 | 单体 commit | `78715f21288782a2c7ef1d9c23f933c46569b108` |
-| 三服务执行 commit | `b1121cf89e15731e3e8246a4abb2cb055d326d3b` |
+| 三服务执行 commit | `84e017dd466e330cea723441979842d0633c14eb` |
 | 三服务业务内容基线 | `84e017dd466e330cea723441979842d0633c14eb` |
+| 压测工具分支 | `test/307-monolith-three-service-perf` |
 | 数据集 | `performance/issue-307/dataset.json` |
 | 数据集 SHA-256 | `733338e1ba51a64b693b60678eeacaa78a0597f7e2034bba6dc2b09e067885c6` |
 | 并发 | 10，不超过 SRS 的 20 并发业务请求边界 |

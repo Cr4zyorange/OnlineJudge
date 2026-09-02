@@ -15,6 +15,7 @@ import argparse
 import fnmatch
 import json
 import re
+import subprocess
 import sys
 from collections.abc import Iterable
 from pathlib import Path
@@ -80,6 +81,28 @@ MICROSERVICE_V2_SHARED_SERVICE_CONTRACT_INPUTS = (
 
 class ManifestValidationError(ValueError):
     """An actionable declaration error that must block consumption."""
+
+
+def checked_in_executable(path: Path) -> bool:
+    """Accept POSIX executable bits, or the Git index mode on Windows checkouts."""
+
+    if not path.is_file():
+        return False
+    if path.stat().st_mode & 0o111:
+        return True
+    try:
+        relative_path = path.relative_to(REPOSITORY_ROOT).as_posix()
+    except ValueError:
+        return False
+    result = subprocess.run(
+        ["git", "-C", str(REPOSITORY_ROOT), "ls-files", "--stage", "--", relative_path],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    return result.returncode == 0 and any(
+        line.startswith("100755 ") for line in result.stdout.splitlines()
+    )
 
 
 def load_json(path: Path, role: str) -> dict[str, Any]:
@@ -482,7 +505,7 @@ def validate_migration_jobs(manifest: dict[str, Any], workload_by_name: dict[str
                 f"{location} must use the checked-in migration runner '{expected_command}'"
             )
         runner = REPOSITORY_ROOT / "database/mysql/migrate-service.sh"
-        if not runner.is_file() or runner.stat().st_mode & 0o111 == 0:
+        if not checked_in_executable(runner):
             raise ManifestValidationError(
                 f"{location} migration runner must exist and be executable: {runner.relative_to(REPOSITORY_ROOT)}"
             )

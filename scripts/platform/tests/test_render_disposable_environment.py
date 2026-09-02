@@ -47,7 +47,7 @@ class DisposableEnvironmentRendererTest(unittest.TestCase):
                 text=True,
             )
             self.assertEqual(result.returncode, 0, result.stderr)
-            return compose.read_text(), kubernetes.read_text()
+            return compose.read_text(encoding="utf-8"), kubernetes.read_text(encoding="utf-8")
 
     def render_stages(self) -> dict[str, str]:
         with tempfile.TemporaryDirectory() as directory:
@@ -78,7 +78,7 @@ class DisposableEnvironmentRendererTest(unittest.TestCase):
                 text=True,
             )
             self.assertEqual(result.returncode, 0, result.stderr)
-            return {path.name: path.read_text() for path in stages.glob("*.yaml")}
+            return {path.name: path.read_text(encoding="utf-8") for path in stages.glob("*.yaml")}
 
     def test_rendered_targets_preserve_all_manifest_workloads_and_migration_order(self) -> None:
         compose, kubernetes = self.render()
@@ -244,7 +244,11 @@ class DisposableEnvironmentRendererTest(unittest.TestCase):
                 os.umask(previous_umask)
 
             self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertEqual((output / "frontend-disposable.conf").stat().st_mode & 0o777, 0o644)
+            mode = (output / "frontend-disposable.conf").stat().st_mode & 0o777
+            if os.name == "nt":
+                self.assertTrue(mode & 0o444)
+            else:
+                self.assertEqual(mode, 0o644)
 
     def test_invalid_sha_does_not_emit_an_environment_definition(self) -> None:
         result = subprocess.run(

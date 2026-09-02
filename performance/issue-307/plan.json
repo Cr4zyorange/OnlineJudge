@@ -7,8 +7,8 @@
       "sha": "78715f21288782a2c7ef1d9c23f933c46569b108"
     },
     "threeService": {
-      "ref": "test/307-monolith-three-service-perf",
-      "sha": "b1121cf89e15731e3e8246a4abb2cb055d326d3b",
+      "ref": "origin/dev",
+      "sha": "84e017dd466e330cea723441979842d0633c14eb",
       "contentSha": "84e017dd466e330cea723441979842d0633c14eb"
     }
   },
