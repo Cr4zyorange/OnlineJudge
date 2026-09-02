@@ -24,6 +24,7 @@ test("formal runner documents per-round reset and exclusive Docker-window checks
   assert.match(source, /minimumSuccessRatePercent/);
   assert.match(source, /preflight_minimum_success_rate/);
   assert.match(source, /validate-preflight/);
+  assert.match(source, /preflight-evidence/);
   assert.match(source, /responses\/student-/);
   assert.match(source, /preflight-reset/);
   assert.match(source, /readiness_path/);

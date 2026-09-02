@@ -223,6 +223,7 @@ for scenario in "${scenario_list[@]}"; do
       --expected-live-containers "$expected_live" --observed-live-containers "$all_live" \
       --docker-daemon-ready true
     node "$runner" run --plan "$plan" --formal-window "$formal_window" \
+      --preflight-evidence "$preflight_dir/summary.json" \
       --architecture "$architecture" --scenario "$scenario" --round "$round" \
       --output "$output_dir/raw/$architecture/$scenario/round-$round.json"
   done

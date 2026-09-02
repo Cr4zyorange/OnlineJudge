@@ -106,6 +106,13 @@ export function validatePlan(plan) {
     "preflight minimumSuccessRatePercent must be 100 for formal counting",
   );
 
+  const measurement = plan.measurement;
+  invariant(measurement && typeof measurement === "object", "measurement configuration is required");
+  invariant(
+    Number.isFinite(measurement.minimumSuccessRatePercent) && measurement.minimumSuccessRatePercent === 100,
+    "measurement minimumSuccessRatePercent must be 100 for formal counting",
+  );
+
   invariant(
     Array.isArray(plan.scenarios) && plan.scenarios.length >= 2 && plan.scenarios.length <= 3,
     "plan must define 2 to 3 representative scenarios",
@@ -263,6 +270,79 @@ function assertFormalWindow(raw) {
   );
 }
 
+function assertBusinessSuccess(raw, scenario, minimumSuccessRatePercent) {
+  invariant(Array.isArray(raw.requests) && raw.requests.length > 0, "raw round has no request samples");
+  const expectedStatuses = scenario.expectedStatuses;
+  let successful = 0;
+  for (const request of raw.requests) {
+    const status = Number(request.status);
+    const expected = expectedStatuses.includes(status);
+    invariant(
+      request.ok === expected,
+      `${raw.architecture}/${raw.scenario}/round-${raw.round} has a request status/ok mismatch`,
+    );
+    successful += Number(expected);
+  }
+  const successRatePercent = round((successful / raw.requests.length) * 100);
+  invariant(
+    successRatePercent >= minimumSuccessRatePercent,
+    `${raw.architecture}/${raw.scenario}/round-${raw.round} measured success rate ${successRatePercent}% is below required ${minimumSuccessRatePercent}%`,
+  );
+}
+
+function assertPreflightEvidence(raw, plan, scenario) {
+  const preflight = raw.preflight;
+  const key = `${raw.architecture}/${raw.scenario}/round-${raw.round}`;
+  invariant(preflight && typeof preflight === "object", `${key} lacks preflight evidence`);
+  invariant(preflight.scenario === scenario.id, `${key} preflight scenario does not match the measured scenario`);
+  invariant(
+    Array.isArray(preflight.expectedStatuses) &&
+      preflight.expectedStatuses.length === scenario.expectedStatuses.length &&
+      preflight.expectedStatuses.every((status) => scenario.expectedStatuses.includes(status)),
+    `${key} preflight expected statuses do not match the scenario contract`,
+  );
+  invariant(
+    preflight.minimumSuccessRatePercent === plan.preflight.minimumSuccessRatePercent,
+    `${key} preflight success-rate gate does not match the frozen plan`,
+  );
+  const expectedRequestCount = plan.load.concurrency * plan.preflight.requestsPerVirtualStudent;
+  invariant(
+    Array.isArray(preflight.responses) && preflight.responses.length === expectedRequestCount,
+    `${key} preflight does not cover every virtual student and attempt`,
+  );
+  const seen = new Set();
+  let successful = 0;
+  for (const response of preflight.responses) {
+    invariant(
+      Number.isInteger(response.student) && response.student >= 1 && response.student <= plan.load.concurrency,
+      `${key} preflight has an invalid virtual student`,
+    );
+    invariant(
+      Number.isInteger(response.attempt) && response.attempt >= 1 && response.attempt <= plan.preflight.requestsPerVirtualStudent,
+      `${key} preflight has an invalid attempt`,
+    );
+    invariant(
+      typeof response.responseFile === "string" && response.responseFile.length > 0,
+      `${key} preflight response file is missing`,
+    );
+    const responseKey = `${response.student}:${response.attempt}`;
+    invariant(!seen.has(responseKey), `${key} preflight has a duplicate virtual student/attempt`);
+    seen.add(responseKey);
+    successful += Number(scenario.expectedStatuses.includes(response.status));
+  }
+  const successRatePercent = round((successful / preflight.responses.length) * 100);
+  invariant(
+    preflight.requestCount === preflight.responses.length &&
+      preflight.successfulRequestCount === successful &&
+      preflight.successRatePercent === successRatePercent,
+    `${key} preflight summary does not match its response records`,
+  );
+  invariant(
+    successRatePercent >= plan.preflight.minimumSuccessRatePercent,
+    `${key} preflight success rate ${successRatePercent}% is below required ${plan.preflight.minimumSuccessRatePercent}%`,
+  );
+}
+
 function percentDelta(current, baseline) {
   if (baseline === 0) {
     return null;
@@ -295,6 +375,9 @@ export function aggregateComparison(plan, rawRounds) {
     assertFormalWindow(raw);
 
     const architecture = plan.architectures.find(({ id }) => id === raw.architecture);
+    const scenario = plan.scenarios.find(({ id }) => id === raw.scenario);
+    assertPreflightEvidence(raw, plan, scenario);
+    assertBusinessSuccess(raw, scenario, plan.measurement.minimumSuccessRatePercent);
     const expectedSha = plan.baselines[architecture.baseline].sha;
     invariant(raw.baselineSha === expectedSha, `${key} baseline SHA does not match the frozen plan`);
     invariant(raw.datasetSha256 === plan.environment.datasetSha256, `${key} does not use the same dataset`);
@@ -389,6 +472,7 @@ export function aggregateComparison(plan, rawRounds) {
     machineFingerprint: sharedMachine,
     datasetSha256: plan.environment.datasetSha256,
     baselines: plan.baselines,
+    measurement: plan.measurement,
     units: {
       latency: "ms",
       throughput: "requests/second",

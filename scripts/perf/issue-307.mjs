@@ -141,6 +141,21 @@ async function runCommand(options) {
     typeof formalWindow.resourcePolicyEvidence === "string" && formalWindow.resourcePolicyEvidence.length > 0,
     "formal window must record resourcePolicyEvidence",
   );
+  const preflight = summarizePreflight(await readJson(requiredOption(options, "preflight-evidence")));
+  invariant(preflight.scenario === scenario.id, "preflight scenario must match the measured scenario");
+  invariant(
+    preflight.expectedStatuses.length === scenario.expectedStatuses.length &&
+      preflight.expectedStatuses.every((status) => scenario.expectedStatuses.includes(status)),
+    "preflight expected statuses must match the measured scenario contract",
+  );
+  invariant(
+    preflight.minimumSuccessRatePercent === plan.preflight.minimumSuccessRatePercent,
+    "preflight success-rate gate must match the frozen plan",
+  );
+  invariant(
+    preflight.requestCount === plan.load.concurrency * plan.preflight.requestsPerVirtualStudent,
+    "preflight must cover every virtual student and configured attempt",
+  );
 
   const containers = requiredEnvironment(architecture.containersEnv)
     .split(",")
@@ -178,6 +193,7 @@ async function runCommand(options) {
       requestTimeoutMs: plan.load.requestTimeoutMs,
     },
     formalWindow,
+    preflight,
     startedAt,
     completedAt: new Date().toISOString(),
     ...measured,

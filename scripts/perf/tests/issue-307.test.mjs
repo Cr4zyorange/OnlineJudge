@@ -41,6 +41,9 @@ function validPlan() {
       requestsPerVirtualStudent: 1,
       minimumSuccessRatePercent: 100,
     },
+    measurement: {
+      minimumSuccessRatePercent: 100,
+    },
     scenarios: [
       {
         id: "course-list",
@@ -84,8 +87,9 @@ function validPlan() {
   };
 }
 
-function rawRound({ architecture, scenario, round, contaminated = false, machine = "machine-a" }) {
+function rawRound({ architecture, scenario, round, contaminated = false, machine = "machine-a", failed = false }) {
   const baselineSha = architecture === "monolith" ? MONOLITH_SHA : THREE_SERVICE_SHA;
+  const expectedStatuses = scenario === "homework-submission" ? [200, 201, 202] : [200];
   return {
     schemaVersion: 1,
     issue: 307,
@@ -114,11 +118,25 @@ function rawRound({ architecture, scenario, round, contaminated = false, machine
       datasetRestoreEvidence: "snapshot=dataset-v1 round-reset=verified",
       resourcePolicyEvidence: "cpu=4 memory=6144MiB limits=verified",
     },
+    preflight: {
+      scenario,
+      expectedStatuses,
+      minimumSuccessRatePercent: 100,
+      responses: Array.from({ length: 10 }, (_, index) => ({
+        student: index + 1,
+        attempt: 1,
+        status: scenario === "homework-submission" ? 201 : 200,
+        responseFile: `responses/student-${String(index + 1).padStart(3, "0")}-attempt-1.json`,
+      })),
+      requestCount: 10,
+      successfulRequestCount: 10,
+      successRatePercent: 100,
+    },
     measuredDurationMs: 1000,
     requests: [
       { durationMs: 10, status: 200, ok: true },
       { durationMs: 20, status: 200, ok: true },
-      { durationMs: 30, status: 500, ok: false },
+      { durationMs: 30, status: failed ? 500 : 200, ok: !failed },
       { durationMs: 40, status: 200, ok: true },
     ],
     resourceSamples: [
@@ -146,6 +164,10 @@ test("AC-307 plan freezes two baselines, two-to-three representative APIs and at
   const weakPreflight = validPlan();
   weakPreflight.preflight.minimumSuccessRatePercent = 99;
   assert.throws(() => validatePlan(weakPreflight), /100/i);
+
+  const weakMeasurement = validPlan();
+  weakMeasurement.measurement.minimumSuccessRatePercent = 99;
+  assert.throws(() => validatePlan(weakMeasurement), /100/i);
 
   const readOnly = validPlan();
   readOnly.scenarios = readOnly.scenarios.filter((scenario) => scenario.category !== "write");
@@ -180,9 +202,9 @@ test("aggregate keeps every round and reports P95, throughput, errors, CPU and m
   });
   assert.equal(result.rounds[0].p95Ms, 40);
   assert.equal(result.rounds[0].throughputRequestsPerSecond, 4);
-  assert.equal(result.rounds[0].successfulRequestCount, 3);
-  assert.equal(result.rounds[0].successfulThroughputRequestsPerSecond, 3);
-  assert.equal(result.rounds[0].errorRatePercent, 25);
+  assert.equal(result.rounds[0].successfulRequestCount, 4);
+  assert.equal(result.rounds[0].successfulThroughputRequestsPerSecond, 4);
+  assert.equal(result.rounds[0].errorRatePercent, 0);
   assert.equal(result.rounds[0].cpuAveragePercent, 20);
   assert.equal(result.rounds[0].memoryMaxMiB, 140);
 });
@@ -215,6 +237,14 @@ test("aggregate rejects cherry-picked, contaminated or incomparable evidence", (
   const missingReset = structuredClone(complete);
   missingReset[0].formalWindow.datasetRestoreEvidence = null;
   assert.throws(() => aggregateComparison(plan, missingReset), /dataset.*restore/i);
+
+  const businessFailure = structuredClone(complete);
+  businessFailure[0] = rawRound({ architecture: "monolith", scenario: "course-list", round: 1, failed: true });
+  assert.throws(() => aggregateComparison(plan, businessFailure), /success rate.*100/i);
+
+  const missingPreflightEvidence = structuredClone(complete);
+  delete missingPreflightEvidence[0].preflight;
+  assert.throws(() => aggregateComparison(plan, missingPreflightEvidence), /preflight/i);
 });
 
 test("docker stats parser exposes aggregateable CPU and memory values", () => {

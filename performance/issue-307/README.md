@@ -11,6 +11,7 @@
 - 正式窗口独占；关闭 HPA、E2E、故障注入和其他压力任务。
 - 每轮开始前恢复同一数据库与文件快照。
 - 两种架构使用相同总资源预算、相同脚本、相同负载和同一逻辑数据集。
+- 每个正式样本的 HTTP 状态必须完全符合场景契约；计划冻结的正式业务成功率下限为 100%。
 
 工具会拒绝缺少上述证据、环境受污染、轮次不完整、机器/数据/负载不同或资源不可比的样本。
 
@@ -20,15 +21,15 @@
 | --- | --- |
 | 单体 tag | `monolith-start` |
 | 单体 commit | `78715f21288782a2c7ef1d9c23f933c46569b108` |
-| 三服务执行 commit | `bb4d83ee7a0891490869960370670a2dd03e9962` |
-| 三服务业务内容基线 | `bb4d83ee7a0891490869960370670a2dd03e9962` |
+| 三服务执行 commit | `c66686ff0e011f5ee63e3908683f01afd4f83ebc` |
+| 三服务业务内容基线 | `c66686ff0e011f5ee63e3908683f01afd4f83ebc` |
 | 压测工具分支 | `test/307-monolith-three-service-perf` |
 | 数据集 | `performance/issue-307/dataset.json` |
 | 数据集 SHA-256 | `733338e1ba51a64b693b60678eeacaa78a0597f7e2034bba6dc2b09e067885c6` |
 | 并发 | 10，不超过 SRS 的 20 并发业务请求边界 |
 | 到达节流 | 每个虚拟学生最小请求间隔 1000 ms；10 个学生错峰发起，保持在 D7 写入限流 10 r/s 内，不删除、绕过或抬高网关限流 |
 | 网关口径 | 使用 `deploy/gateway/gateway.conf.template` 的原始 `read_limit=30r/s`、`write_limit=10r/s` 与原始 burst；没有 benchmark-only 限流配置，两种架构均运行同一脚本、同一节流和同一负载 |
-| 受保护 API 预检 | 每轮、每个场景先以将进入测量窗口的 10 个已种子学生逐一请求；`summary.json` 记录逐学生状态和响应文件，成功率必须为 100%，否则脚本非零退出且不写该轮性能样本 |
+| 受保护 API 预检与正式成功率 | 每轮、每个场景先以将进入测量窗口的 10 个已种子学生逐一请求；`summary.json` 记录逐学生状态和响应文件，成功率必须为 100%，否则脚本非零退出且不写该轮性能样本；聚合器还会拒绝任何一个正式样本低于 100% 的窗口 |
 | 每轮 | 30 秒预热 + 120 秒正式采样 |
 | 轮次 | 每个接口、每种架构 3 轮，共 18 轮 |
 | 资源预算 | 两种架构总计均为 4 CPU / 6144 MiB |
@@ -91,6 +92,7 @@ OJ_PERF_HOMEWORK_BODY
 node scripts/perf/issue-307.mjs run \
   --plan performance/issue-307/plan.json \
   --formal-window <本轮正式窗口证据.json> \
+  --preflight-evidence <本轮逐学生预检摘要.json> \
   --architecture monolith \
   --scenario course-list \
   --round 1 \
@@ -123,7 +125,7 @@ node scripts/perf/issue-307.mjs aggregate \
   --output-dir performance/issue-307/results/<window>/report
 ```
 
-指标单位固定为延迟 `ms`、总请求吞吐 `requests/second`、成功请求吞吐 `requests/second`、错误率 `%`、CPU `%`、内存 `MiB`。报告只陈述观测差异；当错误率非零时，总请求吞吐和 P95 包含快速失败，不能作为成功业务容量结论，必须查看成功请求吞吐。进程数、网络跳数、序列化、连接池和缓存只能在有对应证据时作为解释，不能自动写成因果结论。
+指标单位固定为延迟 `ms`、总请求吞吐 `requests/second`、成功请求吞吐 `requests/second`、错误率 `%`、CPU `%`、内存 `MiB`。正式聚合要求每轮业务成功率为 `100%`；任何非零错误率都不会生成可验收报告。报告只陈述观测差异；进程数、网络跳数、序列化、连接池和缓存只能在有对应证据时作为解释，不能自动写成因果结论。
 
 ## 2026-09-02 失败窗口（不得作为验收结论）
 

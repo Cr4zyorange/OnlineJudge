@@ -8,8 +8,8 @@
     },
     "threeService": {
       "ref": "origin/dev",
-      "sha": "bb4d83ee7a0891490869960370670a2dd03e9962",
-      "contentSha": "bb4d83ee7a0891490869960370670a2dd03e9962"
+      "sha": "c66686ff0e011f5ee63e3908683f01afd4f83ebc",
+      "contentSha": "c66686ff0e011f5ee63e3908683f01afd4f83ebc"
     }
   },
   "environment": {
@@ -34,6 +34,9 @@
   },
   "preflight": {
     "requestsPerVirtualStudent": 1,
+    "minimumSuccessRatePercent": 100
+  },
+  "measurement": {
     "minimumSuccessRatePercent": 100
   },
   "scenarios": [
