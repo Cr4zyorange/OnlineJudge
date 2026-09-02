@@ -1,0 +1,2 @@
+NAME                             READY   STATUS    RESTARTS   AGE   IP            NODE                         NOMINATED NODE   READINESS GATES
+assessment-api-bdf6946cb-vqxc9   1/1     Running   0          13m   10.244.0.39   oj319-rework-control-plane   <none>           <none>

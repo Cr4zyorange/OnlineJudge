@@ -1,0 +1,2302 @@
+statefulset.apps/rabbitmq scaled
+Warning: v1 Endpoints is deprecated in v1.33+; use discovery.k8s.io/v1 EndpointSlice
+2026-09-02T13:04:21Z phase=waiting-for-outage rabbitmq.readyReplicas=1 rabbitmq.pods=1 rabbitmq.endpoints=0 assessment.availableReplicas=1 assessment.readyReplicas=1
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"apps/v1","kind":"StatefulSet","metadata":{"annotations":{},"labels":{"app.kubernetes.io/name":"rabbitmq","app.kubernetes.io/part-of":"onlinejudge-platform","app.kubernetes.io/version":"bb4d83ee7a0891490869960370670a2dd03e9962"},"name":"rabbitmq","namespace":"issue319-rework"},"spec":{"replicas":1,"selector":{"matchLabels":{"app.kubernetes.io/name":"rabbitmq"}},"serviceName":"rabbitmq","template":{"metadata":{"labels":{"app.kubernetes.io/name":"rabbitmq"}},"spec":{"containers":[{"env":[{"name":"RABBITMQ_DEFAULT_PASS","valueFrom":{"secretKeyRef":{"key":"RABBITMQ_PASSWORD","name":"onlinejudge-platform-runtime"}}},{"name":"RABBITMQ_DEFAULT_USER","value":"onlinejudge"}],"image":"rabbitmq:4.1-management","imagePullPolicy":"IfNotPresent","livenessProbe":{"exec":{"command":["sh","-ec","rabbitmq-diagnostics -q ping"]},"failureThreshold":24,"periodSeconds":5,"timeoutSeconds":3},"name":"rabbitmq","ports":[{"containerPort":5672,"name":"amqp"}],"readinessProbe":{"exec":{"command":["sh","-ec","rabbitmq-diagnostics -q check_running"]},"failureThreshold":24,"periodSeconds":5,"timeoutSeconds":3},"resources":{"limits":{"cpu":"1000m","memory":"1Gi"},"requests":{"cpu":"200m","memory":"256Mi"}},"startupProbe":{"exec":{"command":["sh","-ec","rabbitmq-diagnostics -q ping"]},"failureThreshold":24,"periodSeconds":5,"timeoutSeconds":3}}]}}}}
+  creationTimestamp: "2026-09-02T12:02:48Z"
+  generation: 12
+  labels:
+    app.kubernetes.io/name: rabbitmq
+    app.kubernetes.io/part-of: onlinejudge-platform
+    app.kubernetes.io/version: bb4d83ee7a0891490869960370670a2dd03e9962
+  name: rabbitmq
+  namespace: issue319-rework
+  resourceVersion: "7523"
+  uid: c393df12-525a-4556-9f50-749829e5a568
+spec:
+  persistentVolumeClaimRetentionPolicy:
+    whenDeleted: Retain
+    whenScaled: Retain
+  podManagementPolicy: OrderedReady
+  replicas: 0
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: rabbitmq
+  serviceName: rabbitmq
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: rabbitmq
+    spec:
+      containers:
+      - env:
+        - name: RABBITMQ_DEFAULT_PASS
+          valueFrom:
+            secretKeyRef:
+              key: RABBITMQ_PASSWORD
+              name: onlinejudge-platform-runtime
+        - name: RABBITMQ_DEFAULT_USER
+          value: onlinejudge
+        image: rabbitmq:4.1-management
+        imagePullPolicy: IfNotPresent
+        livenessProbe:
+          exec:
+            command:
+            - sh
+            - -ec
+            - rabbitmq-diagnostics -q ping
+          failureThreshold: 24
+          periodSeconds: 5
+          successThreshold: 1
+          timeoutSeconds: 3
+        name: rabbitmq
+        ports:
+        - containerPort: 5672
+          name: amqp
+          protocol: TCP
+        readinessProbe:
+          exec:
+            command:
+            - sh
+            - -ec
+            - rabbitmq-diagnostics -q check_running
+          failureThreshold: 24
+          periodSeconds: 5
+          successThreshold: 1
+          timeoutSeconds: 3
+        resources:
+          limits:
+            cpu: "1"
+            memory: 1Gi
+          requests:
+            cpu: 200m
+            memory: 256Mi
+        startupProbe:
+          exec:
+            command:
+            - sh
+            - -ec
+            - rabbitmq-diagnostics -q ping
+          failureThreshold: 24
+          periodSeconds: 5
+          successThreshold: 1
+          timeoutSeconds: 3
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
+  updateStrategy:
+    rollingUpdate:
+      partition: 0
+    type: RollingUpdate
+status:
+  availableReplicas: 1
+  collisionCount: 0
+  currentRevision: rabbitmq-fcd5646db
+  observedGeneration: 12
+  readyReplicas: 1
+  replicas: 1
+  updateRevision: rabbitmq-fcd5646db
+NAME         READY   STATUS        RESTARTS   AGE   IP            NODE                         NOMINATED NODE   READINESS GATES
+rabbitmq-0   1/1     Terminating   0          14m   10.244.0.36   oj319-rework-control-plane   <none>           <none>
+Warning: v1 Endpoints is deprecated in v1.33+; use discovery.k8s.io/v1 EndpointSlice
+apiVersion: v1
+kind: Endpoints
+metadata:
+  creationTimestamp: "2026-09-02T12:02:48Z"
+  labels:
+    endpoints.kubernetes.io/managed-by: endpoint-controller
+  name: rabbitmq
+  namespace: issue319-rework
+  resourceVersion: "7520"
+  uid: 7cf30ab7-3a39-428f-9e31-d7d60f35301d
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    deployment.kubernetes.io/revision: "7"
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"apps/v1","kind":"Deployment","metadata":{"annotations":{},"labels":{"app.kubernetes.io/name":"assessment-api","app.kubernetes.io/part-of":"onlinejudge-platform","app.kubernetes.io/version":"bb4d83ee7a0891490869960370670a2dd03e9962"},"name":"assessment-api","namespace":"issue319-rework"},"spec":{"replicas":1,"selector":{"matchLabels":{"app.kubernetes.io/name":"assessment-api"}},"template":{"metadata":{"labels":{"app.kubernetes.io/name":"assessment-api"}},"spec":{"containers":[{"env":[{"name":"ASSESSMENT_COURSE_AUTHORIZATION_URI","value":"http://course-service:8082/internal/v2/courses/{courseId}/members/{userId}/authorization"},{"name":"ASSESSMENT_COURSE_SERVICE_AUTHORIZATION","valueFrom":{"secretKeyRef":{"key":"ASSESSMENT_SERVICE_IDENTITY","name":"onlinejudge-platform-runtime"}}},{"name":"ASSESSMENT_DATABASE_HOST","value":"mysql"},{"name":"ASSESSMENT_DATABASE_NAME","value":"oj_assessment"},{"name":"ASSESSMENT_DATABASE_PASSWORD","valueFrom":{"secretKeyRef":{"key":"ASSESSMENT_DATABASE_PASSWORD","name":"onlinejudge-platform-runtime"}}},{"name":"ASSESSMENT_DATABASE_PORT","value":"3306"},{"name":"ASSESSMENT_DATABASE_USER","value":"oj_assessment_rw"},{"name":"ASSESSMENT_RABBIT_ENABLED","value":"false"},{"name":"ASSESSMENT_RABBIT_HOST","value":"rabbitmq"},{"name":"ASSESSMENT_RABBIT_RELAY_ENABLED","value":"false"},{"name":"ASSESSMENT_RABBIT_USERNAME","value":"onlinejudge"},{"name":"ASSESSMENT_SERVICE_IDENTITY","valueFrom":{"secretKeyRef":{"key":"ASSESSMENT_SERVICE_IDENTITY","name":"onlinejudge-platform-runtime"}}},{"name":"ASSESSMENT_STORAGE_ROOT","value":"/var/lib/onlinejudge-assessment"},{"name":"GIT_SHA","value":"bb4d83ee7a0891490869960370670a2dd03e9962"},{"name":"IDENTITY_JWKS_TRUST_BUNDLE","valueFrom":{"secretKeyRef":{"key":"IDENTITY_JWKS_TRUST_BUNDLE","name":"onlinejudge-platform-runtime","optional":true}}},{"name":"IDENTITY_JWKS_URI","value":"http://identity-service:8081/.well-known/jwks.json"},{"name":"IDENTITY_JWT_AUDIENCE","value":"onlinejudge.api"},{"name":"IDENTITY_JWT_ISSUER","value":"onlinejudge.identity.v2"},{"name":"ISSUE318_FAIL_READINESS","value":"0"},{"name":"RABBITMQ_PASSWORD","valueFrom":{"secretKeyRef":{"key":"RABBITMQ_PASSWORD","name":"onlinejudge-platform-runtime"}}}],"image":"onlinejudge/assessment-api:bb4d83ee7a0891490869960370670a2dd03e9962","imagePullPolicy":"IfNotPresent","livenessProbe":{"failureThreshold":24,"httpGet":{"path":"/health/ready","port":8083},"periodSeconds":5,"timeoutSeconds":3},"name":"assessment-api","ports":[{"containerPort":8083,"name":"http"}],"readinessProbe":{"failureThreshold":24,"httpGet":{"path":"/health/ready","port":8083},"periodSeconds":5,"timeoutSeconds":3},"resources":{"limits":{"cpu":"1500m","memory":"2Gi"},"requests":{"cpu":"300m","memory":"512Mi"}},"startupProbe":{"failureThreshold":24,"httpGet":{"path":"/health/ready","port":8083},"periodSeconds":5,"timeoutSeconds":3}}]}}}}
+  creationTimestamp: "2026-09-02T12:03:10Z"
+  generation: 14
+  labels:
+    app.kubernetes.io/name: assessment-api
+    app.kubernetes.io/part-of: onlinejudge-platform
+    app.kubernetes.io/version: bb4d83ee7a0891490869960370670a2dd03e9962
+  name: assessment-api
+  namespace: issue319-rework
+  resourceVersion: "7023"
+  uid: cd801c3a-fa4a-416e-a5f9-87241f527903
+spec:
+  progressDeadlineSeconds: 600
+  replicas: 1
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: assessment-api
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: assessment-api
+    spec:
+      containers:
+      - env:
+        - name: ASSESSMENT_COURSE_AUTHORIZATION_URI
+          value: http://course-service:8082/internal/v2/courses/{courseId}/authorizations/{userId}
+        - name: ASSESSMENT_COURSE_SERVICE_AUTHORIZATION
+          value: <redacted>
+        - name: ASSESSMENT_DATABASE_HOST
+          value: mysql
+        - name: ASSESSMENT_DATABASE_NAME
+          value: oj_assessment
+        - name: ASSESSMENT_DATABASE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: ASSESSMENT_DATABASE_PASSWORD
+              name: onlinejudge-platform-runtime
+        - name: ASSESSMENT_DATABASE_PORT
+          value: "3306"
+        - name: ASSESSMENT_DATABASE_USER
+          value: oj_assessment_rw
+        - name: ASSESSMENT_RABBIT_ENABLED
+          value: "false"
+        - name: ASSESSMENT_RABBIT_HOST
+          value: rabbitmq
+        - name: ASSESSMENT_RABBIT_RELAY_ENABLED
+          value: "false"
+        - name: ASSESSMENT_RABBIT_USERNAME
+          value: onlinejudge
+        - name: ASSESSMENT_SERVICE_IDENTITY
+          valueFrom:
+            secretKeyRef:
+              key: ASSESSMENT_SERVICE_IDENTITY
+              name: onlinejudge-platform-runtime
+        - name: ASSESSMENT_STORAGE_ROOT
+          value: /var/lib/onlinejudge-assessment
+        - name: GIT_SHA
+          value: bb4d83ee7a0891490869960370670a2dd03e9962
+        - name: IDENTITY_JWKS_TRUST_BUNDLE
+          valueFrom:
+            secretKeyRef:
+              key: IDENTITY_JWKS_TRUST_BUNDLE
+              name: onlinejudge-platform-runtime
+              optional: true
+        - name: IDENTITY_JWKS_URI
+          value: http://identity-service:8081/.well-known/jwks.json
+        - name: IDENTITY_JWT_AUDIENCE
+          value: onlinejudge.api
+        - name: IDENTITY_JWT_ISSUER
+          value: onlinejudge.identity.v2
+        - name: ISSUE318_FAIL_READINESS
+          value: "0"
+        - name: RABBITMQ_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: RABBITMQ_PASSWORD
+              name: onlinejudge-platform-runtime
+        - name: ASSESSMENT_DATASOURCE_URL
+          value: jdbc:mysql://mysql:3306/oj_assessment?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC&allowPublicKeyRetrieval=true&useSSL=false
+        - name: ASSESSMENT_DATABASE_DRIVER
+          value: com.mysql.cj.jdbc.Driver
+        - name: ASSESSMENT_RABBIT_PORT
+          value: "5672"
+        - name: SPRING_SQL_INIT_MODE
+          value: never
+        image: onlinejudge/assessment-api:bb4d83ee7a0891490869960370670a2dd03e9962
+        imagePullPolicy: IfNotPresent
+        livenessProbe:
+          failureThreshold: 24
+          httpGet:
+            path: /health/ready
+            port: 8083
+            scheme: HTTP
+          periodSeconds: 5
+          successThreshold: 1
+          timeoutSeconds: 3
+        name: assessment-api
+        ports:
+        - containerPort: 8083
+          name: http
+          protocol: TCP
+        readinessProbe:
+          failureThreshold: 24
+          httpGet:
+            path: /health/ready
+            port: 8083
+            scheme: HTTP
+          periodSeconds: 5
+          successThreshold: 1
+          timeoutSeconds: 3
+        resources:
+          limits:
+            cpu: 1500m
+            memory: 2Gi
+          requests:
+            cpu: 300m
+            memory: 512Mi
+        startupProbe:
+          failureThreshold: 24
+          httpGet:
+            path: /health/ready
+            port: 8083
+            scheme: HTTP
+          periodSeconds: 5
+          successThreshold: 1
+          timeoutSeconds: 3
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
+status:
+  availableReplicas: 1
+  conditions:
+  - lastTransitionTime: "2026-09-02T12:50:39Z"
+    lastUpdateTime: "2026-09-02T12:50:39Z"
+    message: Deployment has minimum availability.
+    reason: MinimumReplicasAvailable
+    status: "True"
+    type: Available
+  - lastTransitionTime: "2026-09-02T12:03:10Z"
+    lastUpdateTime: "2026-09-02T12:59:38Z"
+    message: ReplicaSet "assessment-api-bdf6946cb" has successfully progressed.
+    reason: NewReplicaSetAvailable
+    status: "True"
+    type: Progressing
+  observedGeneration: 14
+  readyReplicas: 1
+  replicas: 1
+  terminatingReplicas: 0
+  updatedReplicas: 1
+Warning: v1 Endpoints is deprecated in v1.33+; use discovery.k8s.io/v1 EndpointSlice
+2026-09-02T13:04:27Z phase=confirmed-outage rabbitmq.readyReplicas=0 rabbitmq.pods=0 rabbitmq.endpoints=0 assessment.availableReplicas=1 assessment.readyReplicas=1
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"apps/v1","kind":"StatefulSet","metadata":{"annotations":{},"labels":{"app.kubernetes.io/name":"rabbitmq","app.kubernetes.io/part-of":"onlinejudge-platform","app.kubernetes.io/version":"bb4d83ee7a0891490869960370670a2dd03e9962"},"name":"rabbitmq","namespace":"issue319-rework"},"spec":{"replicas":1,"selector":{"matchLabels":{"app.kubernetes.io/name":"rabbitmq"}},"serviceName":"rabbitmq","template":{"metadata":{"labels":{"app.kubernetes.io/name":"rabbitmq"}},"spec":{"containers":[{"env":[{"name":"RABBITMQ_DEFAULT_PASS","valueFrom":{"secretKeyRef":{"key":"RABBITMQ_PASSWORD","name":"onlinejudge-platform-runtime"}}},{"name":"RABBITMQ_DEFAULT_USER","value":"onlinejudge"}],"image":"rabbitmq:4.1-management","imagePullPolicy":"IfNotPresent","livenessProbe":{"exec":{"command":["sh","-ec","rabbitmq-diagnostics -q ping"]},"failureThreshold":24,"periodSeconds":5,"timeoutSeconds":3},"name":"rabbitmq","ports":[{"containerPort":5672,"name":"amqp"}],"readinessProbe":{"exec":{"command":["sh","-ec","rabbitmq-diagnostics -q check_running"]},"failureThreshold":24,"periodSeconds":5,"timeoutSeconds":3},"resources":{"limits":{"cpu":"1000m","memory":"1Gi"},"requests":{"cpu":"200m","memory":"256Mi"}},"startupProbe":{"exec":{"command":["sh","-ec","rabbitmq-diagnostics -q ping"]},"failureThreshold":24,"periodSeconds":5,"timeoutSeconds":3}}]}}}}
+  creationTimestamp: "2026-09-02T12:02:48Z"
+  generation: 12
+  labels:
+    app.kubernetes.io/name: rabbitmq
+    app.kubernetes.io/part-of: onlinejudge-platform
+    app.kubernetes.io/version: bb4d83ee7a0891490869960370670a2dd03e9962
+  name: rabbitmq
+  namespace: issue319-rework
+  resourceVersion: "7535"
+  uid: c393df12-525a-4556-9f50-749829e5a568
+spec:
+  persistentVolumeClaimRetentionPolicy:
+    whenDeleted: Retain
+    whenScaled: Retain
+  podManagementPolicy: OrderedReady
+  replicas: 0
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: rabbitmq
+  serviceName: rabbitmq
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: rabbitmq
+    spec:
+      containers:
+      - env:
+        - name: RABBITMQ_DEFAULT_PASS
+          valueFrom:
+            secretKeyRef:
+              key: RABBITMQ_PASSWORD
+              name: onlinejudge-platform-runtime
+        - name: RABBITMQ_DEFAULT_USER
+          value: onlinejudge
+        image: rabbitmq:4.1-management
+        imagePullPolicy: IfNotPresent
+        livenessProbe:
+          exec:
+            command:
+            - sh
+            - -ec
+            - rabbitmq-diagnostics -q ping
+          failureThreshold: 24
+          periodSeconds: 5
+          successThreshold: 1
+          timeoutSeconds: 3
+        name: rabbitmq
+        ports:
+        - containerPort: 5672
+          name: amqp
+          protocol: TCP
+        readinessProbe:
+          exec:
+            command:
+            - sh
+            - -ec
+            - rabbitmq-diagnostics -q check_running
+          failureThreshold: 24
+          periodSeconds: 5
+          successThreshold: 1
+          timeoutSeconds: 3
+        resources:
+          limits:
+            cpu: "1"
+            memory: 1Gi
+          requests:
+            cpu: 200m
+            memory: 256Mi
+        startupProbe:
+          exec:
+            command:
+            - sh
+            - -ec
+            - rabbitmq-diagnostics -q ping
+          failureThreshold: 24
+          periodSeconds: 5
+          successThreshold: 1
+          timeoutSeconds: 3
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
+  updateStrategy:
+    rollingUpdate:
+      partition: 0
+    type: RollingUpdate
+status:
+  availableReplicas: 0
+  collisionCount: 0
+  currentRevision: rabbitmq-fcd5646db
+  observedGeneration: 12
+  replicas: 0
+  updateRevision: rabbitmq-fcd5646db
+No resources found in issue319-rework namespace.
+Warning: v1 Endpoints is deprecated in v1.33+; use discovery.k8s.io/v1 EndpointSlice
+apiVersion: v1
+kind: Endpoints
+metadata:
+  creationTimestamp: "2026-09-02T12:02:48Z"
+  labels:
+    endpoints.kubernetes.io/managed-by: endpoint-controller
+  name: rabbitmq
+  namespace: issue319-rework
+  resourceVersion: "7520"
+  uid: 7cf30ab7-3a39-428f-9e31-d7d60f35301d
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    deployment.kubernetes.io/revision: "7"
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"apps/v1","kind":"Deployment","metadata":{"annotations":{},"labels":{"app.kubernetes.io/name":"assessment-api","app.kubernetes.io/part-of":"onlinejudge-platform","app.kubernetes.io/version":"bb4d83ee7a0891490869960370670a2dd03e9962"},"name":"assessment-api","namespace":"issue319-rework"},"spec":{"replicas":1,"selector":{"matchLabels":{"app.kubernetes.io/name":"assessment-api"}},"template":{"metadata":{"labels":{"app.kubernetes.io/name":"assessment-api"}},"spec":{"containers":[{"env":[{"name":"ASSESSMENT_COURSE_AUTHORIZATION_URI","value":"http://course-service:8082/internal/v2/courses/{courseId}/members/{userId}/authorization"},{"name":"ASSESSMENT_COURSE_SERVICE_AUTHORIZATION","valueFrom":{"secretKeyRef":{"key":"ASSESSMENT_SERVICE_IDENTITY","name":"onlinejudge-platform-runtime"}}},{"name":"ASSESSMENT_DATABASE_HOST","value":"mysql"},{"name":"ASSESSMENT_DATABASE_NAME","value":"oj_assessment"},{"name":"ASSESSMENT_DATABASE_PASSWORD","valueFrom":{"secretKeyRef":{"key":"ASSESSMENT_DATABASE_PASSWORD","name":"onlinejudge-platform-runtime"}}},{"name":"ASSESSMENT_DATABASE_PORT","value":"3306"},{"name":"ASSESSMENT_DATABASE_USER","value":"oj_assessment_rw"},{"name":"ASSESSMENT_RABBIT_ENABLED","value":"false"},{"name":"ASSESSMENT_RABBIT_HOST","value":"rabbitmq"},{"name":"ASSESSMENT_RABBIT_RELAY_ENABLED","value":"false"},{"name":"ASSESSMENT_RABBIT_USERNAME","value":"onlinejudge"},{"name":"ASSESSMENT_SERVICE_IDENTITY","valueFrom":{"secretKeyRef":{"key":"ASSESSMENT_SERVICE_IDENTITY","name":"onlinejudge-platform-runtime"}}},{"name":"ASSESSMENT_STORAGE_ROOT","value":"/var/lib/onlinejudge-assessment"},{"name":"GIT_SHA","value":"bb4d83ee7a0891490869960370670a2dd03e9962"},{"name":"IDENTITY_JWKS_TRUST_BUNDLE","valueFrom":{"secretKeyRef":{"key":"IDENTITY_JWKS_TRUST_BUNDLE","name":"onlinejudge-platform-runtime","optional":true}}},{"name":"IDENTITY_JWKS_URI","value":"http://identity-service:8081/.well-known/jwks.json"},{"name":"IDENTITY_JWT_AUDIENCE","value":"onlinejudge.api"},{"name":"IDENTITY_JWT_ISSUER","value":"onlinejudge.identity.v2"},{"name":"ISSUE318_FAIL_READINESS","value":"0"},{"name":"RABBITMQ_PASSWORD","valueFrom":{"secretKeyRef":{"key":"RABBITMQ_PASSWORD","name":"onlinejudge-platform-runtime"}}}],"image":"onlinejudge/assessment-api:bb4d83ee7a0891490869960370670a2dd03e9962","imagePullPolicy":"IfNotPresent","livenessProbe":{"failureThreshold":24,"httpGet":{"path":"/health/ready","port":8083},"periodSeconds":5,"timeoutSeconds":3},"name":"assessment-api","ports":[{"containerPort":8083,"name":"http"}],"readinessProbe":{"failureThreshold":24,"httpGet":{"path":"/health/ready","port":8083},"periodSeconds":5,"timeoutSeconds":3},"resources":{"limits":{"cpu":"1500m","memory":"2Gi"},"requests":{"cpu":"300m","memory":"512Mi"}},"startupProbe":{"failureThreshold":24,"httpGet":{"path":"/health/ready","port":8083},"periodSeconds":5,"timeoutSeconds":3}}]}}}}
+  creationTimestamp: "2026-09-02T12:03:10Z"
+  generation: 14
+  labels:
+    app.kubernetes.io/name: assessment-api
+    app.kubernetes.io/part-of: onlinejudge-platform
+    app.kubernetes.io/version: bb4d83ee7a0891490869960370670a2dd03e9962
+  name: assessment-api
+  namespace: issue319-rework
+  resourceVersion: "7023"
+  uid: cd801c3a-fa4a-416e-a5f9-87241f527903
+spec:
+  progressDeadlineSeconds: 600
+  replicas: 1
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: assessment-api
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: assessment-api
+    spec:
+      containers:
+      - env:
+        - name: ASSESSMENT_COURSE_AUTHORIZATION_URI
+          value: http://course-service:8082/internal/v2/courses/{courseId}/authorizations/{userId}
+        - name: ASSESSMENT_COURSE_SERVICE_AUTHORIZATION
+          value: <redacted>
+        - name: ASSESSMENT_DATABASE_HOST
+          value: mysql
+        - name: ASSESSMENT_DATABASE_NAME
+          value: oj_assessment
+        - name: ASSESSMENT_DATABASE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: ASSESSMENT_DATABASE_PASSWORD
+              name: onlinejudge-platform-runtime
+        - name: ASSESSMENT_DATABASE_PORT
+          value: "3306"
+        - name: ASSESSMENT_DATABASE_USER
+          value: oj_assessment_rw
+        - name: ASSESSMENT_RABBIT_ENABLED
+          value: "false"
+        - name: ASSESSMENT_RABBIT_HOST
+          value: rabbitmq
+        - name: ASSESSMENT_RABBIT_RELAY_ENABLED
+          value: "false"
+        - name: ASSESSMENT_RABBIT_USERNAME
+          value: onlinejudge
+        - name: ASSESSMENT_SERVICE_IDENTITY
+          valueFrom:
+            secretKeyRef:
+              key: ASSESSMENT_SERVICE_IDENTITY
+              name: onlinejudge-platform-runtime
+        - name: ASSESSMENT_STORAGE_ROOT
+          value: /var/lib/onlinejudge-assessment
+        - name: GIT_SHA
+          value: bb4d83ee7a0891490869960370670a2dd03e9962
+        - name: IDENTITY_JWKS_TRUST_BUNDLE
+          valueFrom:
+            secretKeyRef:
+              key: IDENTITY_JWKS_TRUST_BUNDLE
+              name: onlinejudge-platform-runtime
+              optional: true
+        - name: IDENTITY_JWKS_URI
+          value: http://identity-service:8081/.well-known/jwks.json
+        - name: IDENTITY_JWT_AUDIENCE
+          value: onlinejudge.api
+        - name: IDENTITY_JWT_ISSUER
+          value: onlinejudge.identity.v2
+        - name: ISSUE318_FAIL_READINESS
+          value: "0"
+        - name: RABBITMQ_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: RABBITMQ_PASSWORD
+              name: onlinejudge-platform-runtime
+        - name: ASSESSMENT_DATASOURCE_URL
+          value: jdbc:mysql://mysql:3306/oj_assessment?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC&allowPublicKeyRetrieval=true&useSSL=false
+        - name: ASSESSMENT_DATABASE_DRIVER
+          value: com.mysql.cj.jdbc.Driver
+        - name: ASSESSMENT_RABBIT_PORT
+          value: "5672"
+        - name: SPRING_SQL_INIT_MODE
+          value: never
+        image: onlinejudge/assessment-api:bb4d83ee7a0891490869960370670a2dd03e9962
+        imagePullPolicy: IfNotPresent
+        livenessProbe:
+          failureThreshold: 24
+          httpGet:
+            path: /health/ready
+            port: 8083
+            scheme: HTTP
+          periodSeconds: 5
+          successThreshold: 1
+          timeoutSeconds: 3
+        name: assessment-api
+        ports:
+        - containerPort: 8083
+          name: http
+          protocol: TCP
+        readinessProbe:
+          failureThreshold: 24
+          httpGet:
+            path: /health/ready
+            port: 8083
+            scheme: HTTP
+          periodSeconds: 5
+          successThreshold: 1
+          timeoutSeconds: 3
+        resources:
+          limits:
+            cpu: 1500m
+            memory: 2Gi
+          requests:
+            cpu: 300m
+            memory: 512Mi
+        startupProbe:
+          failureThreshold: 24
+          httpGet:
+            path: /health/ready
+            port: 8083
+            scheme: HTTP
+          periodSeconds: 5
+          successThreshold: 1
+          timeoutSeconds: 3
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
+status:
+  availableReplicas: 1
+  conditions:
+  - lastTransitionTime: "2026-09-02T12:50:39Z"
+    lastUpdateTime: "2026-09-02T12:50:39Z"
+    message: Deployment has minimum availability.
+    reason: MinimumReplicasAvailable
+    status: "True"
+    type: Available
+  - lastTransitionTime: "2026-09-02T12:03:10Z"
+    lastUpdateTime: "2026-09-02T12:59:38Z"
+    message: ReplicaSet "assessment-api-bdf6946cb" has successfully progressed.
+    reason: NewReplicaSetAvailable
+    status: "True"
+    type: Progressing
+  observedGeneration: 14
+  readyReplicas: 1
+  replicas: 1
+  terminatingReplicas: 0
+  updatedReplicas: 1
+Warning: v1 Endpoints is deprecated in v1.33+; use discovery.k8s.io/v1 EndpointSlice
+2026-09-02T13:04:27Z phase=outage-window rabbitmq.readyReplicas=0 rabbitmq.pods=0 rabbitmq.endpoints=0 assessment.availableReplicas=1 assessment.readyReplicas=1
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"apps/v1","kind":"StatefulSet","metadata":{"annotations":{},"labels":{"app.kubernetes.io/name":"rabbitmq","app.kubernetes.io/part-of":"onlinejudge-platform","app.kubernetes.io/version":"bb4d83ee7a0891490869960370670a2dd03e9962"},"name":"rabbitmq","namespace":"issue319-rework"},"spec":{"replicas":1,"selector":{"matchLabels":{"app.kubernetes.io/name":"rabbitmq"}},"serviceName":"rabbitmq","template":{"metadata":{"labels":{"app.kubernetes.io/name":"rabbitmq"}},"spec":{"containers":[{"env":[{"name":"RABBITMQ_DEFAULT_PASS","valueFrom":{"secretKeyRef":{"key":"RABBITMQ_PASSWORD","name":"onlinejudge-platform-runtime"}}},{"name":"RABBITMQ_DEFAULT_USER","value":"onlinejudge"}],"image":"rabbitmq:4.1-management","imagePullPolicy":"IfNotPresent","livenessProbe":{"exec":{"command":["sh","-ec","rabbitmq-diagnostics -q ping"]},"failureThreshold":24,"periodSeconds":5,"timeoutSeconds":3},"name":"rabbitmq","ports":[{"containerPort":5672,"name":"amqp"}],"readinessProbe":{"exec":{"command":["sh","-ec","rabbitmq-diagnostics -q check_running"]},"failureThreshold":24,"periodSeconds":5,"timeoutSeconds":3},"resources":{"limits":{"cpu":"1000m","memory":"1Gi"},"requests":{"cpu":"200m","memory":"256Mi"}},"startupProbe":{"exec":{"command":["sh","-ec","rabbitmq-diagnostics -q ping"]},"failureThreshold":24,"periodSeconds":5,"timeoutSeconds":3}}]}}}}
+  creationTimestamp: "2026-09-02T12:02:48Z"
+  generation: 12
+  labels:
+    app.kubernetes.io/name: rabbitmq
+    app.kubernetes.io/part-of: onlinejudge-platform
+    app.kubernetes.io/version: bb4d83ee7a0891490869960370670a2dd03e9962
+  name: rabbitmq
+  namespace: issue319-rework
+  resourceVersion: "7535"
+  uid: c393df12-525a-4556-9f50-749829e5a568
+spec:
+  persistentVolumeClaimRetentionPolicy:
+    whenDeleted: Retain
+    whenScaled: Retain
+  podManagementPolicy: OrderedReady
+  replicas: 0
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: rabbitmq
+  serviceName: rabbitmq
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: rabbitmq
+    spec:
+      containers:
+      - env:
+        - name: RABBITMQ_DEFAULT_PASS
+          valueFrom:
+            secretKeyRef:
+              key: RABBITMQ_PASSWORD
+              name: onlinejudge-platform-runtime
+        - name: RABBITMQ_DEFAULT_USER
+          value: onlinejudge
+        image: rabbitmq:4.1-management
+        imagePullPolicy: IfNotPresent
+        livenessProbe:
+          exec:
+            command:
+            - sh
+            - -ec
+            - rabbitmq-diagnostics -q ping
+          failureThreshold: 24
+          periodSeconds: 5
+          successThreshold: 1
+          timeoutSeconds: 3
+        name: rabbitmq
+        ports:
+        - containerPort: 5672
+          name: amqp
+          protocol: TCP
+        readinessProbe:
+          exec:
+            command:
+            - sh
+            - -ec
+            - rabbitmq-diagnostics -q check_running
+          failureThreshold: 24
+          periodSeconds: 5
+          successThreshold: 1
+          timeoutSeconds: 3
+        resources:
+          limits:
+            cpu: "1"
+            memory: 1Gi
+          requests:
+            cpu: 200m
+            memory: 256Mi
+        startupProbe:
+          exec:
+            command:
+            - sh
+            - -ec
+            - rabbitmq-diagnostics -q ping
+          failureThreshold: 24
+          periodSeconds: 5
+          successThreshold: 1
+          timeoutSeconds: 3
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
+  updateStrategy:
+    rollingUpdate:
+      partition: 0
+    type: RollingUpdate
+status:
+  availableReplicas: 0
+  collisionCount: 0
+  currentRevision: rabbitmq-fcd5646db
+  observedGeneration: 12
+  replicas: 0
+  updateRevision: rabbitmq-fcd5646db
+No resources found in issue319-rework namespace.
+Warning: v1 Endpoints is deprecated in v1.33+; use discovery.k8s.io/v1 EndpointSlice
+apiVersion: v1
+kind: Endpoints
+metadata:
+  creationTimestamp: "2026-09-02T12:02:48Z"
+  labels:
+    endpoints.kubernetes.io/managed-by: endpoint-controller
+  name: rabbitmq
+  namespace: issue319-rework
+  resourceVersion: "7520"
+  uid: 7cf30ab7-3a39-428f-9e31-d7d60f35301d
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    deployment.kubernetes.io/revision: "7"
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"apps/v1","kind":"Deployment","metadata":{"annotations":{},"labels":{"app.kubernetes.io/name":"assessment-api","app.kubernetes.io/part-of":"onlinejudge-platform","app.kubernetes.io/version":"bb4d83ee7a0891490869960370670a2dd03e9962"},"name":"assessment-api","namespace":"issue319-rework"},"spec":{"replicas":1,"selector":{"matchLabels":{"app.kubernetes.io/name":"assessment-api"}},"template":{"metadata":{"labels":{"app.kubernetes.io/name":"assessment-api"}},"spec":{"containers":[{"env":[{"name":"ASSESSMENT_COURSE_AUTHORIZATION_URI","value":"http://course-service:8082/internal/v2/courses/{courseId}/members/{userId}/authorization"},{"name":"ASSESSMENT_COURSE_SERVICE_AUTHORIZATION","valueFrom":{"secretKeyRef":{"key":"ASSESSMENT_SERVICE_IDENTITY","name":"onlinejudge-platform-runtime"}}},{"name":"ASSESSMENT_DATABASE_HOST","value":"mysql"},{"name":"ASSESSMENT_DATABASE_NAME","value":"oj_assessment"},{"name":"ASSESSMENT_DATABASE_PASSWORD","valueFrom":{"secretKeyRef":{"key":"ASSESSMENT_DATABASE_PASSWORD","name":"onlinejudge-platform-runtime"}}},{"name":"ASSESSMENT_DATABASE_PORT","value":"3306"},{"name":"ASSESSMENT_DATABASE_USER","value":"oj_assessment_rw"},{"name":"ASSESSMENT_RABBIT_ENABLED","value":"false"},{"name":"ASSESSMENT_RABBIT_HOST","value":"rabbitmq"},{"name":"ASSESSMENT_RABBIT_RELAY_ENABLED","value":"false"},{"name":"ASSESSMENT_RABBIT_USERNAME","value":"onlinejudge"},{"name":"ASSESSMENT_SERVICE_IDENTITY","valueFrom":{"secretKeyRef":{"key":"ASSESSMENT_SERVICE_IDENTITY","name":"onlinejudge-platform-runtime"}}},{"name":"ASSESSMENT_STORAGE_ROOT","value":"/var/lib/onlinejudge-assessment"},{"name":"GIT_SHA","value":"bb4d83ee7a0891490869960370670a2dd03e9962"},{"name":"IDENTITY_JWKS_TRUST_BUNDLE","valueFrom":{"secretKeyRef":{"key":"IDENTITY_JWKS_TRUST_BUNDLE","name":"onlinejudge-platform-runtime","optional":true}}},{"name":"IDENTITY_JWKS_URI","value":"http://identity-service:8081/.well-known/jwks.json"},{"name":"IDENTITY_JWT_AUDIENCE","value":"onlinejudge.api"},{"name":"IDENTITY_JWT_ISSUER","value":"onlinejudge.identity.v2"},{"name":"ISSUE318_FAIL_READINESS","value":"0"},{"name":"RABBITMQ_PASSWORD","valueFrom":{"secretKeyRef":{"key":"RABBITMQ_PASSWORD","name":"onlinejudge-platform-runtime"}}}],"image":"onlinejudge/assessment-api:bb4d83ee7a0891490869960370670a2dd03e9962","imagePullPolicy":"IfNotPresent","livenessProbe":{"failureThreshold":24,"httpGet":{"path":"/health/ready","port":8083},"periodSeconds":5,"timeoutSeconds":3},"name":"assessment-api","ports":[{"containerPort":8083,"name":"http"}],"readinessProbe":{"failureThreshold":24,"httpGet":{"path":"/health/ready","port":8083},"periodSeconds":5,"timeoutSeconds":3},"resources":{"limits":{"cpu":"1500m","memory":"2Gi"},"requests":{"cpu":"300m","memory":"512Mi"}},"startupProbe":{"failureThreshold":24,"httpGet":{"path":"/health/ready","port":8083},"periodSeconds":5,"timeoutSeconds":3}}]}}}}
+  creationTimestamp: "2026-09-02T12:03:10Z"
+  generation: 14
+  labels:
+    app.kubernetes.io/name: assessment-api
+    app.kubernetes.io/part-of: onlinejudge-platform
+    app.kubernetes.io/version: bb4d83ee7a0891490869960370670a2dd03e9962
+  name: assessment-api
+  namespace: issue319-rework
+  resourceVersion: "7023"
+  uid: cd801c3a-fa4a-416e-a5f9-87241f527903
+spec:
+  progressDeadlineSeconds: 600
+  replicas: 1
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: assessment-api
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: assessment-api
+    spec:
+      containers:
+      - env:
+        - name: ASSESSMENT_COURSE_AUTHORIZATION_URI
+          value: http://course-service:8082/internal/v2/courses/{courseId}/authorizations/{userId}
+        - name: ASSESSMENT_COURSE_SERVICE_AUTHORIZATION
+          value: <redacted>
+        - name: ASSESSMENT_DATABASE_HOST
+          value: mysql
+        - name: ASSESSMENT_DATABASE_NAME
+          value: oj_assessment
+        - name: ASSESSMENT_DATABASE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: ASSESSMENT_DATABASE_PASSWORD
+              name: onlinejudge-platform-runtime
+        - name: ASSESSMENT_DATABASE_PORT
+          value: "3306"
+        - name: ASSESSMENT_DATABASE_USER
+          value: oj_assessment_rw
+        - name: ASSESSMENT_RABBIT_ENABLED
+          value: "false"
+        - name: ASSESSMENT_RABBIT_HOST
+          value: rabbitmq
+        - name: ASSESSMENT_RABBIT_RELAY_ENABLED
+          value: "false"
+        - name: ASSESSMENT_RABBIT_USERNAME
+          value: onlinejudge
+        - name: ASSESSMENT_SERVICE_IDENTITY
+          valueFrom:
+            secretKeyRef:
+              key: ASSESSMENT_SERVICE_IDENTITY
+              name: onlinejudge-platform-runtime
+        - name: ASSESSMENT_STORAGE_ROOT
+          value: /var/lib/onlinejudge-assessment
+        - name: GIT_SHA
+          value: bb4d83ee7a0891490869960370670a2dd03e9962
+        - name: IDENTITY_JWKS_TRUST_BUNDLE
+          valueFrom:
+            secretKeyRef:
+              key: IDENTITY_JWKS_TRUST_BUNDLE
+              name: onlinejudge-platform-runtime
+              optional: true
+        - name: IDENTITY_JWKS_URI
+          value: http://identity-service:8081/.well-known/jwks.json
+        - name: IDENTITY_JWT_AUDIENCE
+          value: onlinejudge.api
+        - name: IDENTITY_JWT_ISSUER
+          value: onlinejudge.identity.v2
+        - name: ISSUE318_FAIL_READINESS
+          value: "0"
+        - name: RABBITMQ_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: RABBITMQ_PASSWORD
+              name: onlinejudge-platform-runtime
+        - name: ASSESSMENT_DATASOURCE_URL
+          value: jdbc:mysql://mysql:3306/oj_assessment?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC&allowPublicKeyRetrieval=true&useSSL=false
+        - name: ASSESSMENT_DATABASE_DRIVER
+          value: com.mysql.cj.jdbc.Driver
+        - name: ASSESSMENT_RABBIT_PORT
+          value: "5672"
+        - name: SPRING_SQL_INIT_MODE
+          value: never
+        image: onlinejudge/assessment-api:bb4d83ee7a0891490869960370670a2dd03e9962
+        imagePullPolicy: IfNotPresent
+        livenessProbe:
+          failureThreshold: 24
+          httpGet:
+            path: /health/ready
+            port: 8083
+            scheme: HTTP
+          periodSeconds: 5
+          successThreshold: 1
+          timeoutSeconds: 3
+        name: assessment-api
+        ports:
+        - containerPort: 8083
+          name: http
+          protocol: TCP
+        readinessProbe:
+          failureThreshold: 24
+          httpGet:
+            path: /health/ready
+            port: 8083
+            scheme: HTTP
+          periodSeconds: 5
+          successThreshold: 1
+          timeoutSeconds: 3
+        resources:
+          limits:
+            cpu: 1500m
+            memory: 2Gi
+          requests:
+            cpu: 300m
+            memory: 512Mi
+        startupProbe:
+          failureThreshold: 24
+          httpGet:
+            path: /health/ready
+            port: 8083
+            scheme: HTTP
+          periodSeconds: 5
+          successThreshold: 1
+          timeoutSeconds: 3
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
+status:
+  availableReplicas: 1
+  conditions:
+  - lastTransitionTime: "2026-09-02T12:50:39Z"
+    lastUpdateTime: "2026-09-02T12:50:39Z"
+    message: Deployment has minimum availability.
+    reason: MinimumReplicasAvailable
+    status: "True"
+    type: Available
+  - lastTransitionTime: "2026-09-02T12:03:10Z"
+    lastUpdateTime: "2026-09-02T12:59:38Z"
+    message: ReplicaSet "assessment-api-bdf6946cb" has successfully progressed.
+    reason: NewReplicaSetAvailable
+    status: "True"
+    type: Progressing
+  observedGeneration: 14
+  readyReplicas: 1
+  replicas: 1
+  terminatingReplicas: 0
+  updatedReplicas: 1
+Warning: v1 Endpoints is deprecated in v1.33+; use discovery.k8s.io/v1 EndpointSlice
+2026-09-02T13:04:33Z phase=outage-window rabbitmq.readyReplicas=0 rabbitmq.pods=0 rabbitmq.endpoints=0 assessment.availableReplicas=1 assessment.readyReplicas=1
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"apps/v1","kind":"StatefulSet","metadata":{"annotations":{},"labels":{"app.kubernetes.io/name":"rabbitmq","app.kubernetes.io/part-of":"onlinejudge-platform","app.kubernetes.io/version":"bb4d83ee7a0891490869960370670a2dd03e9962"},"name":"rabbitmq","namespace":"issue319-rework"},"spec":{"replicas":1,"selector":{"matchLabels":{"app.kubernetes.io/name":"rabbitmq"}},"serviceName":"rabbitmq","template":{"metadata":{"labels":{"app.kubernetes.io/name":"rabbitmq"}},"spec":{"containers":[{"env":[{"name":"RABBITMQ_DEFAULT_PASS","valueFrom":{"secretKeyRef":{"key":"RABBITMQ_PASSWORD","name":"onlinejudge-platform-runtime"}}},{"name":"RABBITMQ_DEFAULT_USER","value":"onlinejudge"}],"image":"rabbitmq:4.1-management","imagePullPolicy":"IfNotPresent","livenessProbe":{"exec":{"command":["sh","-ec","rabbitmq-diagnostics -q ping"]},"failureThreshold":24,"periodSeconds":5,"timeoutSeconds":3},"name":"rabbitmq","ports":[{"containerPort":5672,"name":"amqp"}],"readinessProbe":{"exec":{"command":["sh","-ec","rabbitmq-diagnostics -q check_running"]},"failureThreshold":24,"periodSeconds":5,"timeoutSeconds":3},"resources":{"limits":{"cpu":"1000m","memory":"1Gi"},"requests":{"cpu":"200m","memory":"256Mi"}},"startupProbe":{"exec":{"command":["sh","-ec","rabbitmq-diagnostics -q ping"]},"failureThreshold":24,"periodSeconds":5,"timeoutSeconds":3}}]}}}}
+  creationTimestamp: "2026-09-02T12:02:48Z"
+  generation: 12
+  labels:
+    app.kubernetes.io/name: rabbitmq
+    app.kubernetes.io/part-of: onlinejudge-platform
+    app.kubernetes.io/version: bb4d83ee7a0891490869960370670a2dd03e9962
+  name: rabbitmq
+  namespace: issue319-rework
+  resourceVersion: "7535"
+  uid: c393df12-525a-4556-9f50-749829e5a568
+spec:
+  persistentVolumeClaimRetentionPolicy:
+    whenDeleted: Retain
+    whenScaled: Retain
+  podManagementPolicy: OrderedReady
+  replicas: 0
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: rabbitmq
+  serviceName: rabbitmq
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: rabbitmq
+    spec:
+      containers:
+      - env:
+        - name: RABBITMQ_DEFAULT_PASS
+          valueFrom:
+            secretKeyRef:
+              key: RABBITMQ_PASSWORD
+              name: onlinejudge-platform-runtime
+        - name: RABBITMQ_DEFAULT_USER
+          value: onlinejudge
+        image: rabbitmq:4.1-management
+        imagePullPolicy: IfNotPresent
+        livenessProbe:
+          exec:
+            command:
+            - sh
+            - -ec
+            - rabbitmq-diagnostics -q ping
+          failureThreshold: 24
+          periodSeconds: 5
+          successThreshold: 1
+          timeoutSeconds: 3
+        name: rabbitmq
+        ports:
+        - containerPort: 5672
+          name: amqp
+          protocol: TCP
+        readinessProbe:
+          exec:
+            command:
+            - sh
+            - -ec
+            - rabbitmq-diagnostics -q check_running
+          failureThreshold: 24
+          periodSeconds: 5
+          successThreshold: 1
+          timeoutSeconds: 3
+        resources:
+          limits:
+            cpu: "1"
+            memory: 1Gi
+          requests:
+            cpu: 200m
+            memory: 256Mi
+        startupProbe:
+          exec:
+            command:
+            - sh
+            - -ec
+            - rabbitmq-diagnostics -q ping
+          failureThreshold: 24
+          periodSeconds: 5
+          successThreshold: 1
+          timeoutSeconds: 3
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
+  updateStrategy:
+    rollingUpdate:
+      partition: 0
+    type: RollingUpdate
+status:
+  availableReplicas: 0
+  collisionCount: 0
+  currentRevision: rabbitmq-fcd5646db
+  observedGeneration: 12
+  replicas: 0
+  updateRevision: rabbitmq-fcd5646db
+No resources found in issue319-rework namespace.
+Warning: v1 Endpoints is deprecated in v1.33+; use discovery.k8s.io/v1 EndpointSlice
+apiVersion: v1
+kind: Endpoints
+metadata:
+  creationTimestamp: "2026-09-02T12:02:48Z"
+  labels:
+    endpoints.kubernetes.io/managed-by: endpoint-controller
+  name: rabbitmq
+  namespace: issue319-rework
+  resourceVersion: "7520"
+  uid: 7cf30ab7-3a39-428f-9e31-d7d60f35301d
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    deployment.kubernetes.io/revision: "7"
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"apps/v1","kind":"Deployment","metadata":{"annotations":{},"labels":{"app.kubernetes.io/name":"assessment-api","app.kubernetes.io/part-of":"onlinejudge-platform","app.kubernetes.io/version":"bb4d83ee7a0891490869960370670a2dd03e9962"},"name":"assessment-api","namespace":"issue319-rework"},"spec":{"replicas":1,"selector":{"matchLabels":{"app.kubernetes.io/name":"assessment-api"}},"template":{"metadata":{"labels":{"app.kubernetes.io/name":"assessment-api"}},"spec":{"containers":[{"env":[{"name":"ASSESSMENT_COURSE_AUTHORIZATION_URI","value":"http://course-service:8082/internal/v2/courses/{courseId}/members/{userId}/authorization"},{"name":"ASSESSMENT_COURSE_SERVICE_AUTHORIZATION","valueFrom":{"secretKeyRef":{"key":"ASSESSMENT_SERVICE_IDENTITY","name":"onlinejudge-platform-runtime"}}},{"name":"ASSESSMENT_DATABASE_HOST","value":"mysql"},{"name":"ASSESSMENT_DATABASE_NAME","value":"oj_assessment"},{"name":"ASSESSMENT_DATABASE_PASSWORD","valueFrom":{"secretKeyRef":{"key":"ASSESSMENT_DATABASE_PASSWORD","name":"onlinejudge-platform-runtime"}}},{"name":"ASSESSMENT_DATABASE_PORT","value":"3306"},{"name":"ASSESSMENT_DATABASE_USER","value":"oj_assessment_rw"},{"name":"ASSESSMENT_RABBIT_ENABLED","value":"false"},{"name":"ASSESSMENT_RABBIT_HOST","value":"rabbitmq"},{"name":"ASSESSMENT_RABBIT_RELAY_ENABLED","value":"false"},{"name":"ASSESSMENT_RABBIT_USERNAME","value":"onlinejudge"},{"name":"ASSESSMENT_SERVICE_IDENTITY","valueFrom":{"secretKeyRef":{"key":"ASSESSMENT_SERVICE_IDENTITY","name":"onlinejudge-platform-runtime"}}},{"name":"ASSESSMENT_STORAGE_ROOT","value":"/var/lib/onlinejudge-assessment"},{"name":"GIT_SHA","value":"bb4d83ee7a0891490869960370670a2dd03e9962"},{"name":"IDENTITY_JWKS_TRUST_BUNDLE","valueFrom":{"secretKeyRef":{"key":"IDENTITY_JWKS_TRUST_BUNDLE","name":"onlinejudge-platform-runtime","optional":true}}},{"name":"IDENTITY_JWKS_URI","value":"http://identity-service:8081/.well-known/jwks.json"},{"name":"IDENTITY_JWT_AUDIENCE","value":"onlinejudge.api"},{"name":"IDENTITY_JWT_ISSUER","value":"onlinejudge.identity.v2"},{"name":"ISSUE318_FAIL_READINESS","value":"0"},{"name":"RABBITMQ_PASSWORD","valueFrom":{"secretKeyRef":{"key":"RABBITMQ_PASSWORD","name":"onlinejudge-platform-runtime"}}}],"image":"onlinejudge/assessment-api:bb4d83ee7a0891490869960370670a2dd03e9962","imagePullPolicy":"IfNotPresent","livenessProbe":{"failureThreshold":24,"httpGet":{"path":"/health/ready","port":8083},"periodSeconds":5,"timeoutSeconds":3},"name":"assessment-api","ports":[{"containerPort":8083,"name":"http"}],"readinessProbe":{"failureThreshold":24,"httpGet":{"path":"/health/ready","port":8083},"periodSeconds":5,"timeoutSeconds":3},"resources":{"limits":{"cpu":"1500m","memory":"2Gi"},"requests":{"cpu":"300m","memory":"512Mi"}},"startupProbe":{"failureThreshold":24,"httpGet":{"path":"/health/ready","port":8083},"periodSeconds":5,"timeoutSeconds":3}}]}}}}
+  creationTimestamp: "2026-09-02T12:03:10Z"
+  generation: 14
+  labels:
+    app.kubernetes.io/name: assessment-api
+    app.kubernetes.io/part-of: onlinejudge-platform
+    app.kubernetes.io/version: bb4d83ee7a0891490869960370670a2dd03e9962
+  name: assessment-api
+  namespace: issue319-rework
+  resourceVersion: "7023"
+  uid: cd801c3a-fa4a-416e-a5f9-87241f527903
+spec:
+  progressDeadlineSeconds: 600
+  replicas: 1
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: assessment-api
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: assessment-api
+    spec:
+      containers:
+      - env:
+        - name: ASSESSMENT_COURSE_AUTHORIZATION_URI
+          value: http://course-service:8082/internal/v2/courses/{courseId}/authorizations/{userId}
+        - name: ASSESSMENT_COURSE_SERVICE_AUTHORIZATION
+          value: <redacted>
+        - name: ASSESSMENT_DATABASE_HOST
+          value: mysql
+        - name: ASSESSMENT_DATABASE_NAME
+          value: oj_assessment
+        - name: ASSESSMENT_DATABASE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: ASSESSMENT_DATABASE_PASSWORD
+              name: onlinejudge-platform-runtime
+        - name: ASSESSMENT_DATABASE_PORT
+          value: "3306"
+        - name: ASSESSMENT_DATABASE_USER
+          value: oj_assessment_rw
+        - name: ASSESSMENT_RABBIT_ENABLED
+          value: "false"
+        - name: ASSESSMENT_RABBIT_HOST
+          value: rabbitmq
+        - name: ASSESSMENT_RABBIT_RELAY_ENABLED
+          value: "false"
+        - name: ASSESSMENT_RABBIT_USERNAME
+          value: onlinejudge
+        - name: ASSESSMENT_SERVICE_IDENTITY
+          valueFrom:
+            secretKeyRef:
+              key: ASSESSMENT_SERVICE_IDENTITY
+              name: onlinejudge-platform-runtime
+        - name: ASSESSMENT_STORAGE_ROOT
+          value: /var/lib/onlinejudge-assessment
+        - name: GIT_SHA
+          value: bb4d83ee7a0891490869960370670a2dd03e9962
+        - name: IDENTITY_JWKS_TRUST_BUNDLE
+          valueFrom:
+            secretKeyRef:
+              key: IDENTITY_JWKS_TRUST_BUNDLE
+              name: onlinejudge-platform-runtime
+              optional: true
+        - name: IDENTITY_JWKS_URI
+          value: http://identity-service:8081/.well-known/jwks.json
+        - name: IDENTITY_JWT_AUDIENCE
+          value: onlinejudge.api
+        - name: IDENTITY_JWT_ISSUER
+          value: onlinejudge.identity.v2
+        - name: ISSUE318_FAIL_READINESS
+          value: "0"
+        - name: RABBITMQ_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: RABBITMQ_PASSWORD
+              name: onlinejudge-platform-runtime
+        - name: ASSESSMENT_DATASOURCE_URL
+          value: jdbc:mysql://mysql:3306/oj_assessment?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC&allowPublicKeyRetrieval=true&useSSL=false
+        - name: ASSESSMENT_DATABASE_DRIVER
+          value: com.mysql.cj.jdbc.Driver
+        - name: ASSESSMENT_RABBIT_PORT
+          value: "5672"
+        - name: SPRING_SQL_INIT_MODE
+          value: never
+        image: onlinejudge/assessment-api:bb4d83ee7a0891490869960370670a2dd03e9962
+        imagePullPolicy: IfNotPresent
+        livenessProbe:
+          failureThreshold: 24
+          httpGet:
+            path: /health/ready
+            port: 8083
+            scheme: HTTP
+          periodSeconds: 5
+          successThreshold: 1
+          timeoutSeconds: 3
+        name: assessment-api
+        ports:
+        - containerPort: 8083
+          name: http
+          protocol: TCP
+        readinessProbe:
+          failureThreshold: 24
+          httpGet:
+            path: /health/ready
+            port: 8083
+            scheme: HTTP
+          periodSeconds: 5
+          successThreshold: 1
+          timeoutSeconds: 3
+        resources:
+          limits:
+            cpu: 1500m
+            memory: 2Gi
+          requests:
+            cpu: 300m
+            memory: 512Mi
+        startupProbe:
+          failureThreshold: 24
+          httpGet:
+            path: /health/ready
+            port: 8083
+            scheme: HTTP
+          periodSeconds: 5
+          successThreshold: 1
+          timeoutSeconds: 3
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
+status:
+  availableReplicas: 1
+  conditions:
+  - lastTransitionTime: "2026-09-02T12:50:39Z"
+    lastUpdateTime: "2026-09-02T12:50:39Z"
+    message: Deployment has minimum availability.
+    reason: MinimumReplicasAvailable
+    status: "True"
+    type: Available
+  - lastTransitionTime: "2026-09-02T12:03:10Z"
+    lastUpdateTime: "2026-09-02T12:59:38Z"
+    message: ReplicaSet "assessment-api-bdf6946cb" has successfully progressed.
+    reason: NewReplicaSetAvailable
+    status: "True"
+    type: Progressing
+  observedGeneration: 14
+  readyReplicas: 1
+  replicas: 1
+  terminatingReplicas: 0
+  updatedReplicas: 1
+Warning: v1 Endpoints is deprecated in v1.33+; use discovery.k8s.io/v1 EndpointSlice
+2026-09-02T13:04:38Z phase=outage-window rabbitmq.readyReplicas=0 rabbitmq.pods=0 rabbitmq.endpoints=0 assessment.availableReplicas=1 assessment.readyReplicas=1
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"apps/v1","kind":"StatefulSet","metadata":{"annotations":{},"labels":{"app.kubernetes.io/name":"rabbitmq","app.kubernetes.io/part-of":"onlinejudge-platform","app.kubernetes.io/version":"bb4d83ee7a0891490869960370670a2dd03e9962"},"name":"rabbitmq","namespace":"issue319-rework"},"spec":{"replicas":1,"selector":{"matchLabels":{"app.kubernetes.io/name":"rabbitmq"}},"serviceName":"rabbitmq","template":{"metadata":{"labels":{"app.kubernetes.io/name":"rabbitmq"}},"spec":{"containers":[{"env":[{"name":"RABBITMQ_DEFAULT_PASS","valueFrom":{"secretKeyRef":{"key":"RABBITMQ_PASSWORD","name":"onlinejudge-platform-runtime"}}},{"name":"RABBITMQ_DEFAULT_USER","value":"onlinejudge"}],"image":"rabbitmq:4.1-management","imagePullPolicy":"IfNotPresent","livenessProbe":{"exec":{"command":["sh","-ec","rabbitmq-diagnostics -q ping"]},"failureThreshold":24,"periodSeconds":5,"timeoutSeconds":3},"name":"rabbitmq","ports":[{"containerPort":5672,"name":"amqp"}],"readinessProbe":{"exec":{"command":["sh","-ec","rabbitmq-diagnostics -q check_running"]},"failureThreshold":24,"periodSeconds":5,"timeoutSeconds":3},"resources":{"limits":{"cpu":"1000m","memory":"1Gi"},"requests":{"cpu":"200m","memory":"256Mi"}},"startupProbe":{"exec":{"command":["sh","-ec","rabbitmq-diagnostics -q ping"]},"failureThreshold":24,"periodSeconds":5,"timeoutSeconds":3}}]}}}}
+  creationTimestamp: "2026-09-02T12:02:48Z"
+  generation: 12
+  labels:
+    app.kubernetes.io/name: rabbitmq
+    app.kubernetes.io/part-of: onlinejudge-platform
+    app.kubernetes.io/version: bb4d83ee7a0891490869960370670a2dd03e9962
+  name: rabbitmq
+  namespace: issue319-rework
+  resourceVersion: "7535"
+  uid: c393df12-525a-4556-9f50-749829e5a568
+spec:
+  persistentVolumeClaimRetentionPolicy:
+    whenDeleted: Retain
+    whenScaled: Retain
+  podManagementPolicy: OrderedReady
+  replicas: 0
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: rabbitmq
+  serviceName: rabbitmq
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: rabbitmq
+    spec:
+      containers:
+      - env:
+        - name: RABBITMQ_DEFAULT_PASS
+          valueFrom:
+            secretKeyRef:
+              key: RABBITMQ_PASSWORD
+              name: onlinejudge-platform-runtime
+        - name: RABBITMQ_DEFAULT_USER
+          value: onlinejudge
+        image: rabbitmq:4.1-management
+        imagePullPolicy: IfNotPresent
+        livenessProbe:
+          exec:
+            command:
+            - sh
+            - -ec
+            - rabbitmq-diagnostics -q ping
+          failureThreshold: 24
+          periodSeconds: 5
+          successThreshold: 1
+          timeoutSeconds: 3
+        name: rabbitmq
+        ports:
+        - containerPort: 5672
+          name: amqp
+          protocol: TCP
+        readinessProbe:
+          exec:
+            command:
+            - sh
+            - -ec
+            - rabbitmq-diagnostics -q check_running
+          failureThreshold: 24
+          periodSeconds: 5
+          successThreshold: 1
+          timeoutSeconds: 3
+        resources:
+          limits:
+            cpu: "1"
+            memory: 1Gi
+          requests:
+            cpu: 200m
+            memory: 256Mi
+        startupProbe:
+          exec:
+            command:
+            - sh
+            - -ec
+            - rabbitmq-diagnostics -q ping
+          failureThreshold: 24
+          periodSeconds: 5
+          successThreshold: 1
+          timeoutSeconds: 3
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
+  updateStrategy:
+    rollingUpdate:
+      partition: 0
+    type: RollingUpdate
+status:
+  availableReplicas: 0
+  collisionCount: 0
+  currentRevision: rabbitmq-fcd5646db
+  observedGeneration: 12
+  replicas: 0
+  updateRevision: rabbitmq-fcd5646db
+No resources found in issue319-rework namespace.
+Warning: v1 Endpoints is deprecated in v1.33+; use discovery.k8s.io/v1 EndpointSlice
+apiVersion: v1
+kind: Endpoints
+metadata:
+  creationTimestamp: "2026-09-02T12:02:48Z"
+  labels:
+    endpoints.kubernetes.io/managed-by: endpoint-controller
+  name: rabbitmq
+  namespace: issue319-rework
+  resourceVersion: "7520"
+  uid: 7cf30ab7-3a39-428f-9e31-d7d60f35301d
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    deployment.kubernetes.io/revision: "7"
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"apps/v1","kind":"Deployment","metadata":{"annotations":{},"labels":{"app.kubernetes.io/name":"assessment-api","app.kubernetes.io/part-of":"onlinejudge-platform","app.kubernetes.io/version":"bb4d83ee7a0891490869960370670a2dd03e9962"},"name":"assessment-api","namespace":"issue319-rework"},"spec":{"replicas":1,"selector":{"matchLabels":{"app.kubernetes.io/name":"assessment-api"}},"template":{"metadata":{"labels":{"app.kubernetes.io/name":"assessment-api"}},"spec":{"containers":[{"env":[{"name":"ASSESSMENT_COURSE_AUTHORIZATION_URI","value":"http://course-service:8082/internal/v2/courses/{courseId}/members/{userId}/authorization"},{"name":"ASSESSMENT_COURSE_SERVICE_AUTHORIZATION","valueFrom":{"secretKeyRef":{"key":"ASSESSMENT_SERVICE_IDENTITY","name":"onlinejudge-platform-runtime"}}},{"name":"ASSESSMENT_DATABASE_HOST","value":"mysql"},{"name":"ASSESSMENT_DATABASE_NAME","value":"oj_assessment"},{"name":"ASSESSMENT_DATABASE_PASSWORD","valueFrom":{"secretKeyRef":{"key":"ASSESSMENT_DATABASE_PASSWORD","name":"onlinejudge-platform-runtime"}}},{"name":"ASSESSMENT_DATABASE_PORT","value":"3306"},{"name":"ASSESSMENT_DATABASE_USER","value":"oj_assessment_rw"},{"name":"ASSESSMENT_RABBIT_ENABLED","value":"false"},{"name":"ASSESSMENT_RABBIT_HOST","value":"rabbitmq"},{"name":"ASSESSMENT_RABBIT_RELAY_ENABLED","value":"false"},{"name":"ASSESSMENT_RABBIT_USERNAME","value":"onlinejudge"},{"name":"ASSESSMENT_SERVICE_IDENTITY","valueFrom":{"secretKeyRef":{"key":"ASSESSMENT_SERVICE_IDENTITY","name":"onlinejudge-platform-runtime"}}},{"name":"ASSESSMENT_STORAGE_ROOT","value":"/var/lib/onlinejudge-assessment"},{"name":"GIT_SHA","value":"bb4d83ee7a0891490869960370670a2dd03e9962"},{"name":"IDENTITY_JWKS_TRUST_BUNDLE","valueFrom":{"secretKeyRef":{"key":"IDENTITY_JWKS_TRUST_BUNDLE","name":"onlinejudge-platform-runtime","optional":true}}},{"name":"IDENTITY_JWKS_URI","value":"http://identity-service:8081/.well-known/jwks.json"},{"name":"IDENTITY_JWT_AUDIENCE","value":"onlinejudge.api"},{"name":"IDENTITY_JWT_ISSUER","value":"onlinejudge.identity.v2"},{"name":"ISSUE318_FAIL_READINESS","value":"0"},{"name":"RABBITMQ_PASSWORD","valueFrom":{"secretKeyRef":{"key":"RABBITMQ_PASSWORD","name":"onlinejudge-platform-runtime"}}}],"image":"onlinejudge/assessment-api:bb4d83ee7a0891490869960370670a2dd03e9962","imagePullPolicy":"IfNotPresent","livenessProbe":{"failureThreshold":24,"httpGet":{"path":"/health/ready","port":8083},"periodSeconds":5,"timeoutSeconds":3},"name":"assessment-api","ports":[{"containerPort":8083,"name":"http"}],"readinessProbe":{"failureThreshold":24,"httpGet":{"path":"/health/ready","port":8083},"periodSeconds":5,"timeoutSeconds":3},"resources":{"limits":{"cpu":"1500m","memory":"2Gi"},"requests":{"cpu":"300m","memory":"512Mi"}},"startupProbe":{"failureThreshold":24,"httpGet":{"path":"/health/ready","port":8083},"periodSeconds":5,"timeoutSeconds":3}}]}}}}
+  creationTimestamp: "2026-09-02T12:03:10Z"
+  generation: 14
+  labels:
+    app.kubernetes.io/name: assessment-api
+    app.kubernetes.io/part-of: onlinejudge-platform
+    app.kubernetes.io/version: bb4d83ee7a0891490869960370670a2dd03e9962
+  name: assessment-api
+  namespace: issue319-rework
+  resourceVersion: "7023"
+  uid: cd801c3a-fa4a-416e-a5f9-87241f527903
+spec:
+  progressDeadlineSeconds: 600
+  replicas: 1
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: assessment-api
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: assessment-api
+    spec:
+      containers:
+      - env:
+        - name: ASSESSMENT_COURSE_AUTHORIZATION_URI
+          value: http://course-service:8082/internal/v2/courses/{courseId}/authorizations/{userId}
+        - name: ASSESSMENT_COURSE_SERVICE_AUTHORIZATION
+          value: <redacted>
+        - name: ASSESSMENT_DATABASE_HOST
+          value: mysql
+        - name: ASSESSMENT_DATABASE_NAME
+          value: oj_assessment
+        - name: ASSESSMENT_DATABASE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: ASSESSMENT_DATABASE_PASSWORD
+              name: onlinejudge-platform-runtime
+        - name: ASSESSMENT_DATABASE_PORT
+          value: "3306"
+        - name: ASSESSMENT_DATABASE_USER
+          value: oj_assessment_rw
+        - name: ASSESSMENT_RABBIT_ENABLED
+          value: "false"
+        - name: ASSESSMENT_RABBIT_HOST
+          value: rabbitmq
+        - name: ASSESSMENT_RABBIT_RELAY_ENABLED
+          value: "false"
+        - name: ASSESSMENT_RABBIT_USERNAME
+          value: onlinejudge
+        - name: ASSESSMENT_SERVICE_IDENTITY
+          valueFrom:
+            secretKeyRef:
+              key: ASSESSMENT_SERVICE_IDENTITY
+              name: onlinejudge-platform-runtime
+        - name: ASSESSMENT_STORAGE_ROOT
+          value: /var/lib/onlinejudge-assessment
+        - name: GIT_SHA
+          value: bb4d83ee7a0891490869960370670a2dd03e9962
+        - name: IDENTITY_JWKS_TRUST_BUNDLE
+          valueFrom:
+            secretKeyRef:
+              key: IDENTITY_JWKS_TRUST_BUNDLE
+              name: onlinejudge-platform-runtime
+              optional: true
+        - name: IDENTITY_JWKS_URI
+          value: http://identity-service:8081/.well-known/jwks.json
+        - name: IDENTITY_JWT_AUDIENCE
+          value: onlinejudge.api
+        - name: IDENTITY_JWT_ISSUER
+          value: onlinejudge.identity.v2
+        - name: ISSUE318_FAIL_READINESS
+          value: "0"
+        - name: RABBITMQ_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: RABBITMQ_PASSWORD
+              name: onlinejudge-platform-runtime
+        - name: ASSESSMENT_DATASOURCE_URL
+          value: jdbc:mysql://mysql:3306/oj_assessment?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC&allowPublicKeyRetrieval=true&useSSL=false
+        - name: ASSESSMENT_DATABASE_DRIVER
+          value: com.mysql.cj.jdbc.Driver
+        - name: ASSESSMENT_RABBIT_PORT
+          value: "5672"
+        - name: SPRING_SQL_INIT_MODE
+          value: never
+        image: onlinejudge/assessment-api:bb4d83ee7a0891490869960370670a2dd03e9962
+        imagePullPolicy: IfNotPresent
+        livenessProbe:
+          failureThreshold: 24
+          httpGet:
+            path: /health/ready
+            port: 8083
+            scheme: HTTP
+          periodSeconds: 5
+          successThreshold: 1
+          timeoutSeconds: 3
+        name: assessment-api
+        ports:
+        - containerPort: 8083
+          name: http
+          protocol: TCP
+        readinessProbe:
+          failureThreshold: 24
+          httpGet:
+            path: /health/ready
+            port: 8083
+            scheme: HTTP
+          periodSeconds: 5
+          successThreshold: 1
+          timeoutSeconds: 3
+        resources:
+          limits:
+            cpu: 1500m
+            memory: 2Gi
+          requests:
+            cpu: 300m
+            memory: 512Mi
+        startupProbe:
+          failureThreshold: 24
+          httpGet:
+            path: /health/ready
+            port: 8083
+            scheme: HTTP
+          periodSeconds: 5
+          successThreshold: 1
+          timeoutSeconds: 3
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
+status:
+  availableReplicas: 1
+  conditions:
+  - lastTransitionTime: "2026-09-02T12:50:39Z"
+    lastUpdateTime: "2026-09-02T12:50:39Z"
+    message: Deployment has minimum availability.
+    reason: MinimumReplicasAvailable
+    status: "True"
+    type: Available
+  - lastTransitionTime: "2026-09-02T12:03:10Z"
+    lastUpdateTime: "2026-09-02T12:59:38Z"
+    message: ReplicaSet "assessment-api-bdf6946cb" has successfully progressed.
+    reason: NewReplicaSetAvailable
+    status: "True"
+    type: Progressing
+  observedGeneration: 14
+  readyReplicas: 1
+  replicas: 1
+  terminatingReplicas: 0
+  updatedReplicas: 1
+statefulset.apps/rabbitmq scaled
+Warning: v1 Endpoints is deprecated in v1.33+; use discovery.k8s.io/v1 EndpointSlice
+2026-09-02T13:04:43Z phase=waiting-for-recovery rabbitmq.readyReplicas=0 rabbitmq.pods=1 rabbitmq.endpoints=0 assessment.availableReplicas=1 assessment.readyReplicas=1
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"apps/v1","kind":"StatefulSet","metadata":{"annotations":{},"labels":{"app.kubernetes.io/name":"rabbitmq","app.kubernetes.io/part-of":"onlinejudge-platform","app.kubernetes.io/version":"bb4d83ee7a0891490869960370670a2dd03e9962"},"name":"rabbitmq","namespace":"issue319-rework"},"spec":{"replicas":1,"selector":{"matchLabels":{"app.kubernetes.io/name":"rabbitmq"}},"serviceName":"rabbitmq","template":{"metadata":{"labels":{"app.kubernetes.io/name":"rabbitmq"}},"spec":{"containers":[{"env":[{"name":"RABBITMQ_DEFAULT_PASS","valueFrom":{"secretKeyRef":{"key":"RABBITMQ_PASSWORD","name":"onlinejudge-platform-runtime"}}},{"name":"RABBITMQ_DEFAULT_USER","value":"onlinejudge"}],"image":"rabbitmq:4.1-management","imagePullPolicy":"IfNotPresent","livenessProbe":{"exec":{"command":["sh","-ec","rabbitmq-diagnostics -q ping"]},"failureThreshold":24,"periodSeconds":5,"timeoutSeconds":3},"name":"rabbitmq","ports":[{"containerPort":5672,"name":"amqp"}],"readinessProbe":{"exec":{"command":["sh","-ec","rabbitmq-diagnostics -q check_running"]},"failureThreshold":24,"periodSeconds":5,"timeoutSeconds":3},"resources":{"limits":{"cpu":"1000m","memory":"1Gi"},"requests":{"cpu":"200m","memory":"256Mi"}},"startupProbe":{"exec":{"command":["sh","-ec","rabbitmq-diagnostics -q ping"]},"failureThreshold":24,"periodSeconds":5,"timeoutSeconds":3}}]}}}}
+  creationTimestamp: "2026-09-02T12:02:48Z"
+  generation: 13
+  labels:
+    app.kubernetes.io/name: rabbitmq
+    app.kubernetes.io/part-of: onlinejudge-platform
+    app.kubernetes.io/version: bb4d83ee7a0891490869960370670a2dd03e9962
+  name: rabbitmq
+  namespace: issue319-rework
+  resourceVersion: "7576"
+  uid: c393df12-525a-4556-9f50-749829e5a568
+spec:
+  persistentVolumeClaimRetentionPolicy:
+    whenDeleted: Retain
+    whenScaled: Retain
+  podManagementPolicy: OrderedReady
+  replicas: 1
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: rabbitmq
+  serviceName: rabbitmq
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: rabbitmq
+    spec:
+      containers:
+      - env:
+        - name: RABBITMQ_DEFAULT_PASS
+          valueFrom:
+            secretKeyRef:
+              key: RABBITMQ_PASSWORD
+              name: onlinejudge-platform-runtime
+        - name: RABBITMQ_DEFAULT_USER
+          value: onlinejudge
+        image: rabbitmq:4.1-management
+        imagePullPolicy: IfNotPresent
+        livenessProbe:
+          exec:
+            command:
+            - sh
+            - -ec
+            - rabbitmq-diagnostics -q ping
+          failureThreshold: 24
+          periodSeconds: 5
+          successThreshold: 1
+          timeoutSeconds: 3
+        name: rabbitmq
+        ports:
+        - containerPort: 5672
+          name: amqp
+          protocol: TCP
+        readinessProbe:
+          exec:
+            command:
+            - sh
+            - -ec
+            - rabbitmq-diagnostics -q check_running
+          failureThreshold: 24
+          periodSeconds: 5
+          successThreshold: 1
+          timeoutSeconds: 3
+        resources:
+          limits:
+            cpu: "1"
+            memory: 1Gi
+          requests:
+            cpu: 200m
+            memory: 256Mi
+        startupProbe:
+          exec:
+            command:
+            - sh
+            - -ec
+            - rabbitmq-diagnostics -q ping
+          failureThreshold: 24
+          periodSeconds: 5
+          successThreshold: 1
+          timeoutSeconds: 3
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
+  updateStrategy:
+    rollingUpdate:
+      partition: 0
+    type: RollingUpdate
+status:
+  availableReplicas: 0
+  collisionCount: 0
+  currentReplicas: 1
+  currentRevision: rabbitmq-fcd5646db
+  observedGeneration: 13
+  replicas: 1
+  updateRevision: rabbitmq-fcd5646db
+  updatedReplicas: 1
+NAME         READY   STATUS              RESTARTS   AGE   IP       NODE                         NOMINATED NODE   READINESS GATES
+rabbitmq-0   0/1     ContainerCreating   0          0s    <none>   oj319-rework-control-plane   <none>           <none>
+Warning: v1 Endpoints is deprecated in v1.33+; use discovery.k8s.io/v1 EndpointSlice
+apiVersion: v1
+kind: Endpoints
+metadata:
+  creationTimestamp: "2026-09-02T12:02:48Z"
+  labels:
+    endpoints.kubernetes.io/managed-by: endpoint-controller
+  name: rabbitmq
+  namespace: issue319-rework
+  resourceVersion: "7520"
+  uid: 7cf30ab7-3a39-428f-9e31-d7d60f35301d
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    deployment.kubernetes.io/revision: "7"
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"apps/v1","kind":"Deployment","metadata":{"annotations":{},"labels":{"app.kubernetes.io/name":"assessment-api","app.kubernetes.io/part-of":"onlinejudge-platform","app.kubernetes.io/version":"bb4d83ee7a0891490869960370670a2dd03e9962"},"name":"assessment-api","namespace":"issue319-rework"},"spec":{"replicas":1,"selector":{"matchLabels":{"app.kubernetes.io/name":"assessment-api"}},"template":{"metadata":{"labels":{"app.kubernetes.io/name":"assessment-api"}},"spec":{"containers":[{"env":[{"name":"ASSESSMENT_COURSE_AUTHORIZATION_URI","value":"http://course-service:8082/internal/v2/courses/{courseId}/members/{userId}/authorization"},{"name":"ASSESSMENT_COURSE_SERVICE_AUTHORIZATION","valueFrom":{"secretKeyRef":{"key":"ASSESSMENT_SERVICE_IDENTITY","name":"onlinejudge-platform-runtime"}}},{"name":"ASSESSMENT_DATABASE_HOST","value":"mysql"},{"name":"ASSESSMENT_DATABASE_NAME","value":"oj_assessment"},{"name":"ASSESSMENT_DATABASE_PASSWORD","valueFrom":{"secretKeyRef":{"key":"ASSESSMENT_DATABASE_PASSWORD","name":"onlinejudge-platform-runtime"}}},{"name":"ASSESSMENT_DATABASE_PORT","value":"3306"},{"name":"ASSESSMENT_DATABASE_USER","value":"oj_assessment_rw"},{"name":"ASSESSMENT_RABBIT_ENABLED","value":"false"},{"name":"ASSESSMENT_RABBIT_HOST","value":"rabbitmq"},{"name":"ASSESSMENT_RABBIT_RELAY_ENABLED","value":"false"},{"name":"ASSESSMENT_RABBIT_USERNAME","value":"onlinejudge"},{"name":"ASSESSMENT_SERVICE_IDENTITY","valueFrom":{"secretKeyRef":{"key":"ASSESSMENT_SERVICE_IDENTITY","name":"onlinejudge-platform-runtime"}}},{"name":"ASSESSMENT_STORAGE_ROOT","value":"/var/lib/onlinejudge-assessment"},{"name":"GIT_SHA","value":"bb4d83ee7a0891490869960370670a2dd03e9962"},{"name":"IDENTITY_JWKS_TRUST_BUNDLE","valueFrom":{"secretKeyRef":{"key":"IDENTITY_JWKS_TRUST_BUNDLE","name":"onlinejudge-platform-runtime","optional":true}}},{"name":"IDENTITY_JWKS_URI","value":"http://identity-service:8081/.well-known/jwks.json"},{"name":"IDENTITY_JWT_AUDIENCE","value":"onlinejudge.api"},{"name":"IDENTITY_JWT_ISSUER","value":"onlinejudge.identity.v2"},{"name":"ISSUE318_FAIL_READINESS","value":"0"},{"name":"RABBITMQ_PASSWORD","valueFrom":{"secretKeyRef":{"key":"RABBITMQ_PASSWORD","name":"onlinejudge-platform-runtime"}}}],"image":"onlinejudge/assessment-api:bb4d83ee7a0891490869960370670a2dd03e9962","imagePullPolicy":"IfNotPresent","livenessProbe":{"failureThreshold":24,"httpGet":{"path":"/health/ready","port":8083},"periodSeconds":5,"timeoutSeconds":3},"name":"assessment-api","ports":[{"containerPort":8083,"name":"http"}],"readinessProbe":{"failureThreshold":24,"httpGet":{"path":"/health/ready","port":8083},"periodSeconds":5,"timeoutSeconds":3},"resources":{"limits":{"cpu":"1500m","memory":"2Gi"},"requests":{"cpu":"300m","memory":"512Mi"}},"startupProbe":{"failureThreshold":24,"httpGet":{"path":"/health/ready","port":8083},"periodSeconds":5,"timeoutSeconds":3}}]}}}}
+  creationTimestamp: "2026-09-02T12:03:10Z"
+  generation: 14
+  labels:
+    app.kubernetes.io/name: assessment-api
+    app.kubernetes.io/part-of: onlinejudge-platform
+    app.kubernetes.io/version: bb4d83ee7a0891490869960370670a2dd03e9962
+  name: assessment-api
+  namespace: issue319-rework
+  resourceVersion: "7023"
+  uid: cd801c3a-fa4a-416e-a5f9-87241f527903
+spec:
+  progressDeadlineSeconds: 600
+  replicas: 1
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: assessment-api
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: assessment-api
+    spec:
+      containers:
+      - env:
+        - name: ASSESSMENT_COURSE_AUTHORIZATION_URI
+          value: http://course-service:8082/internal/v2/courses/{courseId}/authorizations/{userId}
+        - name: ASSESSMENT_COURSE_SERVICE_AUTHORIZATION
+          value: <redacted>
+        - name: ASSESSMENT_DATABASE_HOST
+          value: mysql
+        - name: ASSESSMENT_DATABASE_NAME
+          value: oj_assessment
+        - name: ASSESSMENT_DATABASE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: ASSESSMENT_DATABASE_PASSWORD
+              name: onlinejudge-platform-runtime
+        - name: ASSESSMENT_DATABASE_PORT
+          value: "3306"
+        - name: ASSESSMENT_DATABASE_USER
+          value: oj_assessment_rw
+        - name: ASSESSMENT_RABBIT_ENABLED
+          value: "false"
+        - name: ASSESSMENT_RABBIT_HOST
+          value: rabbitmq
+        - name: ASSESSMENT_RABBIT_RELAY_ENABLED
+          value: "false"
+        - name: ASSESSMENT_RABBIT_USERNAME
+          value: onlinejudge
+        - name: ASSESSMENT_SERVICE_IDENTITY
+          valueFrom:
+            secretKeyRef:
+              key: ASSESSMENT_SERVICE_IDENTITY
+              name: onlinejudge-platform-runtime
+        - name: ASSESSMENT_STORAGE_ROOT
+          value: /var/lib/onlinejudge-assessment
+        - name: GIT_SHA
+          value: bb4d83ee7a0891490869960370670a2dd03e9962
+        - name: IDENTITY_JWKS_TRUST_BUNDLE
+          valueFrom:
+            secretKeyRef:
+              key: IDENTITY_JWKS_TRUST_BUNDLE
+              name: onlinejudge-platform-runtime
+              optional: true
+        - name: IDENTITY_JWKS_URI
+          value: http://identity-service:8081/.well-known/jwks.json
+        - name: IDENTITY_JWT_AUDIENCE
+          value: onlinejudge.api
+        - name: IDENTITY_JWT_ISSUER
+          value: onlinejudge.identity.v2
+        - name: ISSUE318_FAIL_READINESS
+          value: "0"
+        - name: RABBITMQ_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: RABBITMQ_PASSWORD
+              name: onlinejudge-platform-runtime
+        - name: ASSESSMENT_DATASOURCE_URL
+          value: jdbc:mysql://mysql:3306/oj_assessment?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC&allowPublicKeyRetrieval=true&useSSL=false
+        - name: ASSESSMENT_DATABASE_DRIVER
+          value: com.mysql.cj.jdbc.Driver
+        - name: ASSESSMENT_RABBIT_PORT
+          value: "5672"
+        - name: SPRING_SQL_INIT_MODE
+          value: never
+        image: onlinejudge/assessment-api:bb4d83ee7a0891490869960370670a2dd03e9962
+        imagePullPolicy: IfNotPresent
+        livenessProbe:
+          failureThreshold: 24
+          httpGet:
+            path: /health/ready
+            port: 8083
+            scheme: HTTP
+          periodSeconds: 5
+          successThreshold: 1
+          timeoutSeconds: 3
+        name: assessment-api
+        ports:
+        - containerPort: 8083
+          name: http
+          protocol: TCP
+        readinessProbe:
+          failureThreshold: 24
+          httpGet:
+            path: /health/ready
+            port: 8083
+            scheme: HTTP
+          periodSeconds: 5
+          successThreshold: 1
+          timeoutSeconds: 3
+        resources:
+          limits:
+            cpu: 1500m
+            memory: 2Gi
+          requests:
+            cpu: 300m
+            memory: 512Mi
+        startupProbe:
+          failureThreshold: 24
+          httpGet:
+            path: /health/ready
+            port: 8083
+            scheme: HTTP
+          periodSeconds: 5
+          successThreshold: 1
+          timeoutSeconds: 3
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
+status:
+  availableReplicas: 1
+  conditions:
+  - lastTransitionTime: "2026-09-02T12:50:39Z"
+    lastUpdateTime: "2026-09-02T12:50:39Z"
+    message: Deployment has minimum availability.
+    reason: MinimumReplicasAvailable
+    status: "True"
+    type: Available
+  - lastTransitionTime: "2026-09-02T12:03:10Z"
+    lastUpdateTime: "2026-09-02T12:59:38Z"
+    message: ReplicaSet "assessment-api-bdf6946cb" has successfully progressed.
+    reason: NewReplicaSetAvailable
+    status: "True"
+    type: Progressing
+  observedGeneration: 14
+  readyReplicas: 1
+  replicas: 1
+  terminatingReplicas: 0
+  updatedReplicas: 1
+Warning: v1 Endpoints is deprecated in v1.33+; use discovery.k8s.io/v1 EndpointSlice
+2026-09-02T13:04:49Z phase=waiting-for-recovery rabbitmq.readyReplicas=0 rabbitmq.pods=1 rabbitmq.endpoints=0 assessment.availableReplicas=1 assessment.readyReplicas=1
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"apps/v1","kind":"StatefulSet","metadata":{"annotations":{},"labels":{"app.kubernetes.io/name":"rabbitmq","app.kubernetes.io/part-of":"onlinejudge-platform","app.kubernetes.io/version":"bb4d83ee7a0891490869960370670a2dd03e9962"},"name":"rabbitmq","namespace":"issue319-rework"},"spec":{"replicas":1,"selector":{"matchLabels":{"app.kubernetes.io/name":"rabbitmq"}},"serviceName":"rabbitmq","template":{"metadata":{"labels":{"app.kubernetes.io/name":"rabbitmq"}},"spec":{"containers":[{"env":[{"name":"RABBITMQ_DEFAULT_PASS","valueFrom":{"secretKeyRef":{"key":"RABBITMQ_PASSWORD","name":"onlinejudge-platform-runtime"}}},{"name":"RABBITMQ_DEFAULT_USER","value":"onlinejudge"}],"image":"rabbitmq:4.1-management","imagePullPolicy":"IfNotPresent","livenessProbe":{"exec":{"command":["sh","-ec","rabbitmq-diagnostics -q ping"]},"failureThreshold":24,"periodSeconds":5,"timeoutSeconds":3},"name":"rabbitmq","ports":[{"containerPort":5672,"name":"amqp"}],"readinessProbe":{"exec":{"command":["sh","-ec","rabbitmq-diagnostics -q check_running"]},"failureThreshold":24,"periodSeconds":5,"timeoutSeconds":3},"resources":{"limits":{"cpu":"1000m","memory":"1Gi"},"requests":{"cpu":"200m","memory":"256Mi"}},"startupProbe":{"exec":{"command":["sh","-ec","rabbitmq-diagnostics -q ping"]},"failureThreshold":24,"periodSeconds":5,"timeoutSeconds":3}}]}}}}
+  creationTimestamp: "2026-09-02T12:02:48Z"
+  generation: 13
+  labels:
+    app.kubernetes.io/name: rabbitmq
+    app.kubernetes.io/part-of: onlinejudge-platform
+    app.kubernetes.io/version: bb4d83ee7a0891490869960370670a2dd03e9962
+  name: rabbitmq
+  namespace: issue319-rework
+  resourceVersion: "7576"
+  uid: c393df12-525a-4556-9f50-749829e5a568
+spec:
+  persistentVolumeClaimRetentionPolicy:
+    whenDeleted: Retain
+    whenScaled: Retain
+  podManagementPolicy: OrderedReady
+  replicas: 1
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: rabbitmq
+  serviceName: rabbitmq
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: rabbitmq
+    spec:
+      containers:
+      - env:
+        - name: RABBITMQ_DEFAULT_PASS
+          valueFrom:
+            secretKeyRef:
+              key: RABBITMQ_PASSWORD
+              name: onlinejudge-platform-runtime
+        - name: RABBITMQ_DEFAULT_USER
+          value: onlinejudge
+        image: rabbitmq:4.1-management
+        imagePullPolicy: IfNotPresent
+        livenessProbe:
+          exec:
+            command:
+            - sh
+            - -ec
+            - rabbitmq-diagnostics -q ping
+          failureThreshold: 24
+          periodSeconds: 5
+          successThreshold: 1
+          timeoutSeconds: 3
+        name: rabbitmq
+        ports:
+        - containerPort: 5672
+          name: amqp
+          protocol: TCP
+        readinessProbe:
+          exec:
+            command:
+            - sh
+            - -ec
+            - rabbitmq-diagnostics -q check_running
+          failureThreshold: 24
+          periodSeconds: 5
+          successThreshold: 1
+          timeoutSeconds: 3
+        resources:
+          limits:
+            cpu: "1"
+            memory: 1Gi
+          requests:
+            cpu: 200m
+            memory: 256Mi
+        startupProbe:
+          exec:
+            command:
+            - sh
+            - -ec
+            - rabbitmq-diagnostics -q ping
+          failureThreshold: 24
+          periodSeconds: 5
+          successThreshold: 1
+          timeoutSeconds: 3
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
+  updateStrategy:
+    rollingUpdate:
+      partition: 0
+    type: RollingUpdate
+status:
+  availableReplicas: 0
+  collisionCount: 0
+  currentReplicas: 1
+  currentRevision: rabbitmq-fcd5646db
+  observedGeneration: 13
+  replicas: 1
+  updateRevision: rabbitmq-fcd5646db
+  updatedReplicas: 1
+NAME         READY   STATUS    RESTARTS   AGE   IP            NODE                         NOMINATED NODE   READINESS GATES
+rabbitmq-0   0/1     Running   0          6s    10.244.0.42   oj319-rework-control-plane   <none>           <none>
+Warning: v1 Endpoints is deprecated in v1.33+; use discovery.k8s.io/v1 EndpointSlice
+apiVersion: v1
+kind: Endpoints
+metadata:
+  annotations:
+    endpoints.kubernetes.io/last-change-trigger-time: "2026-09-02T13:04:43Z"
+  creationTimestamp: "2026-09-02T12:02:48Z"
+  labels:
+    endpoints.kubernetes.io/managed-by: endpoint-controller
+  name: rabbitmq
+  namespace: issue319-rework
+  resourceVersion: "7584"
+  uid: 7cf30ab7-3a39-428f-9e31-d7d60f35301d
+subsets:
+- notReadyAddresses:
+  - hostname: rabbitmq-0
+    ip: 10.244.0.42
+    nodeName: oj319-rework-control-plane
+    targetRef:
+      kind: Pod
+      name: rabbitmq-0
+      namespace: issue319-rework
+      uid: 563b6578-59e4-439c-a3ed-901f235b7091
+  ports:
+  - name: amqp
+    port: 5672
+    protocol: TCP
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    deployment.kubernetes.io/revision: "7"
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"apps/v1","kind":"Deployment","metadata":{"annotations":{},"labels":{"app.kubernetes.io/name":"assessment-api","app.kubernetes.io/part-of":"onlinejudge-platform","app.kubernetes.io/version":"bb4d83ee7a0891490869960370670a2dd03e9962"},"name":"assessment-api","namespace":"issue319-rework"},"spec":{"replicas":1,"selector":{"matchLabels":{"app.kubernetes.io/name":"assessment-api"}},"template":{"metadata":{"labels":{"app.kubernetes.io/name":"assessment-api"}},"spec":{"containers":[{"env":[{"name":"ASSESSMENT_COURSE_AUTHORIZATION_URI","value":"http://course-service:8082/internal/v2/courses/{courseId}/members/{userId}/authorization"},{"name":"ASSESSMENT_COURSE_SERVICE_AUTHORIZATION","valueFrom":{"secretKeyRef":{"key":"ASSESSMENT_SERVICE_IDENTITY","name":"onlinejudge-platform-runtime"}}},{"name":"ASSESSMENT_DATABASE_HOST","value":"mysql"},{"name":"ASSESSMENT_DATABASE_NAME","value":"oj_assessment"},{"name":"ASSESSMENT_DATABASE_PASSWORD","valueFrom":{"secretKeyRef":{"key":"ASSESSMENT_DATABASE_PASSWORD","name":"onlinejudge-platform-runtime"}}},{"name":"ASSESSMENT_DATABASE_PORT","value":"3306"},{"name":"ASSESSMENT_DATABASE_USER","value":"oj_assessment_rw"},{"name":"ASSESSMENT_RABBIT_ENABLED","value":"false"},{"name":"ASSESSMENT_RABBIT_HOST","value":"rabbitmq"},{"name":"ASSESSMENT_RABBIT_RELAY_ENABLED","value":"false"},{"name":"ASSESSMENT_RABBIT_USERNAME","value":"onlinejudge"},{"name":"ASSESSMENT_SERVICE_IDENTITY","valueFrom":{"secretKeyRef":{"key":"ASSESSMENT_SERVICE_IDENTITY","name":"onlinejudge-platform-runtime"}}},{"name":"ASSESSMENT_STORAGE_ROOT","value":"/var/lib/onlinejudge-assessment"},{"name":"GIT_SHA","value":"bb4d83ee7a0891490869960370670a2dd03e9962"},{"name":"IDENTITY_JWKS_TRUST_BUNDLE","valueFrom":{"secretKeyRef":{"key":"IDENTITY_JWKS_TRUST_BUNDLE","name":"onlinejudge-platform-runtime","optional":true}}},{"name":"IDENTITY_JWKS_URI","value":"http://identity-service:8081/.well-known/jwks.json"},{"name":"IDENTITY_JWT_AUDIENCE","value":"onlinejudge.api"},{"name":"IDENTITY_JWT_ISSUER","value":"onlinejudge.identity.v2"},{"name":"ISSUE318_FAIL_READINESS","value":"0"},{"name":"RABBITMQ_PASSWORD","valueFrom":{"secretKeyRef":{"key":"RABBITMQ_PASSWORD","name":"onlinejudge-platform-runtime"}}}],"image":"onlinejudge/assessment-api:bb4d83ee7a0891490869960370670a2dd03e9962","imagePullPolicy":"IfNotPresent","livenessProbe":{"failureThreshold":24,"httpGet":{"path":"/health/ready","port":8083},"periodSeconds":5,"timeoutSeconds":3},"name":"assessment-api","ports":[{"containerPort":8083,"name":"http"}],"readinessProbe":{"failureThreshold":24,"httpGet":{"path":"/health/ready","port":8083},"periodSeconds":5,"timeoutSeconds":3},"resources":{"limits":{"cpu":"1500m","memory":"2Gi"},"requests":{"cpu":"300m","memory":"512Mi"}},"startupProbe":{"failureThreshold":24,"httpGet":{"path":"/health/ready","port":8083},"periodSeconds":5,"timeoutSeconds":3}}]}}}}
+  creationTimestamp: "2026-09-02T12:03:10Z"
+  generation: 14
+  labels:
+    app.kubernetes.io/name: assessment-api
+    app.kubernetes.io/part-of: onlinejudge-platform
+    app.kubernetes.io/version: bb4d83ee7a0891490869960370670a2dd03e9962
+  name: assessment-api
+  namespace: issue319-rework
+  resourceVersion: "7023"
+  uid: cd801c3a-fa4a-416e-a5f9-87241f527903
+spec:
+  progressDeadlineSeconds: 600
+  replicas: 1
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: assessment-api
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: assessment-api
+    spec:
+      containers:
+      - env:
+        - name: ASSESSMENT_COURSE_AUTHORIZATION_URI
+          value: http://course-service:8082/internal/v2/courses/{courseId}/authorizations/{userId}
+        - name: ASSESSMENT_COURSE_SERVICE_AUTHORIZATION
+          value: <redacted>
+        - name: ASSESSMENT_DATABASE_HOST
+          value: mysql
+        - name: ASSESSMENT_DATABASE_NAME
+          value: oj_assessment
+        - name: ASSESSMENT_DATABASE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: ASSESSMENT_DATABASE_PASSWORD
+              name: onlinejudge-platform-runtime
+        - name: ASSESSMENT_DATABASE_PORT
+          value: "3306"
+        - name: ASSESSMENT_DATABASE_USER
+          value: oj_assessment_rw
+        - name: ASSESSMENT_RABBIT_ENABLED
+          value: "false"
+        - name: ASSESSMENT_RABBIT_HOST
+          value: rabbitmq
+        - name: ASSESSMENT_RABBIT_RELAY_ENABLED
+          value: "false"
+        - name: ASSESSMENT_RABBIT_USERNAME
+          value: onlinejudge
+        - name: ASSESSMENT_SERVICE_IDENTITY
+          valueFrom:
+            secretKeyRef:
+              key: ASSESSMENT_SERVICE_IDENTITY
+              name: onlinejudge-platform-runtime
+        - name: ASSESSMENT_STORAGE_ROOT
+          value: /var/lib/onlinejudge-assessment
+        - name: GIT_SHA
+          value: bb4d83ee7a0891490869960370670a2dd03e9962
+        - name: IDENTITY_JWKS_TRUST_BUNDLE
+          valueFrom:
+            secretKeyRef:
+              key: IDENTITY_JWKS_TRUST_BUNDLE
+              name: onlinejudge-platform-runtime
+              optional: true
+        - name: IDENTITY_JWKS_URI
+          value: http://identity-service:8081/.well-known/jwks.json
+        - name: IDENTITY_JWT_AUDIENCE
+          value: onlinejudge.api
+        - name: IDENTITY_JWT_ISSUER
+          value: onlinejudge.identity.v2
+        - name: ISSUE318_FAIL_READINESS
+          value: "0"
+        - name: RABBITMQ_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: RABBITMQ_PASSWORD
+              name: onlinejudge-platform-runtime
+        - name: ASSESSMENT_DATASOURCE_URL
+          value: jdbc:mysql://mysql:3306/oj_assessment?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC&allowPublicKeyRetrieval=true&useSSL=false
+        - name: ASSESSMENT_DATABASE_DRIVER
+          value: com.mysql.cj.jdbc.Driver
+        - name: ASSESSMENT_RABBIT_PORT
+          value: "5672"
+        - name: SPRING_SQL_INIT_MODE
+          value: never
+        image: onlinejudge/assessment-api:bb4d83ee7a0891490869960370670a2dd03e9962
+        imagePullPolicy: IfNotPresent
+        livenessProbe:
+          failureThreshold: 24
+          httpGet:
+            path: /health/ready
+            port: 8083
+            scheme: HTTP
+          periodSeconds: 5
+          successThreshold: 1
+          timeoutSeconds: 3
+        name: assessment-api
+        ports:
+        - containerPort: 8083
+          name: http
+          protocol: TCP
+        readinessProbe:
+          failureThreshold: 24
+          httpGet:
+            path: /health/ready
+            port: 8083
+            scheme: HTTP
+          periodSeconds: 5
+          successThreshold: 1
+          timeoutSeconds: 3
+        resources:
+          limits:
+            cpu: 1500m
+            memory: 2Gi
+          requests:
+            cpu: 300m
+            memory: 512Mi
+        startupProbe:
+          failureThreshold: 24
+          httpGet:
+            path: /health/ready
+            port: 8083
+            scheme: HTTP
+          periodSeconds: 5
+          successThreshold: 1
+          timeoutSeconds: 3
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
+status:
+  availableReplicas: 1
+  conditions:
+  - lastTransitionTime: "2026-09-02T12:50:39Z"
+    lastUpdateTime: "2026-09-02T12:50:39Z"
+    message: Deployment has minimum availability.
+    reason: MinimumReplicasAvailable
+    status: "True"
+    type: Available
+  - lastTransitionTime: "2026-09-02T12:03:10Z"
+    lastUpdateTime: "2026-09-02T12:59:38Z"
+    message: ReplicaSet "assessment-api-bdf6946cb" has successfully progressed.
+    reason: NewReplicaSetAvailable
+    status: "True"
+    type: Progressing
+  observedGeneration: 14
+  readyReplicas: 1
+  replicas: 1
+  terminatingReplicas: 0
+  updatedReplicas: 1
+Warning: v1 Endpoints is deprecated in v1.33+; use discovery.k8s.io/v1 EndpointSlice
+2026-09-02T13:04:54Z phase=recovered rabbitmq.readyReplicas=1 rabbitmq.pods=1 rabbitmq.endpoints=1 assessment.availableReplicas=1 assessment.readyReplicas=1
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"apps/v1","kind":"StatefulSet","metadata":{"annotations":{},"labels":{"app.kubernetes.io/name":"rabbitmq","app.kubernetes.io/part-of":"onlinejudge-platform","app.kubernetes.io/version":"bb4d83ee7a0891490869960370670a2dd03e9962"},"name":"rabbitmq","namespace":"issue319-rework"},"spec":{"replicas":1,"selector":{"matchLabels":{"app.kubernetes.io/name":"rabbitmq"}},"serviceName":"rabbitmq","template":{"metadata":{"labels":{"app.kubernetes.io/name":"rabbitmq"}},"spec":{"containers":[{"env":[{"name":"RABBITMQ_DEFAULT_PASS","valueFrom":{"secretKeyRef":{"key":"RABBITMQ_PASSWORD","name":"onlinejudge-platform-runtime"}}},{"name":"RABBITMQ_DEFAULT_USER","value":"onlinejudge"}],"image":"rabbitmq:4.1-management","imagePullPolicy":"IfNotPresent","livenessProbe":{"exec":{"command":["sh","-ec","rabbitmq-diagnostics -q ping"]},"failureThreshold":24,"periodSeconds":5,"timeoutSeconds":3},"name":"rabbitmq","ports":[{"containerPort":5672,"name":"amqp"}],"readinessProbe":{"exec":{"command":["sh","-ec","rabbitmq-diagnostics -q check_running"]},"failureThreshold":24,"periodSeconds":5,"timeoutSeconds":3},"resources":{"limits":{"cpu":"1000m","memory":"1Gi"},"requests":{"cpu":"200m","memory":"256Mi"}},"startupProbe":{"exec":{"command":["sh","-ec","rabbitmq-diagnostics -q ping"]},"failureThreshold":24,"periodSeconds":5,"timeoutSeconds":3}}]}}}}
+  creationTimestamp: "2026-09-02T12:02:48Z"
+  generation: 13
+  labels:
+    app.kubernetes.io/name: rabbitmq
+    app.kubernetes.io/part-of: onlinejudge-platform
+    app.kubernetes.io/version: bb4d83ee7a0891490869960370670a2dd03e9962
+  name: rabbitmq
+  namespace: issue319-rework
+  resourceVersion: "7605"
+  uid: c393df12-525a-4556-9f50-749829e5a568
+spec:
+  persistentVolumeClaimRetentionPolicy:
+    whenDeleted: Retain
+    whenScaled: Retain
+  podManagementPolicy: OrderedReady
+  replicas: 1
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: rabbitmq
+  serviceName: rabbitmq
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: rabbitmq
+    spec:
+      containers:
+      - env:
+        - name: RABBITMQ_DEFAULT_PASS
+          valueFrom:
+            secretKeyRef:
+              key: RABBITMQ_PASSWORD
+              name: onlinejudge-platform-runtime
+        - name: RABBITMQ_DEFAULT_USER
+          value: onlinejudge
+        image: rabbitmq:4.1-management
+        imagePullPolicy: IfNotPresent
+        livenessProbe:
+          exec:
+            command:
+            - sh
+            - -ec
+            - rabbitmq-diagnostics -q ping
+          failureThreshold: 24
+          periodSeconds: 5
+          successThreshold: 1
+          timeoutSeconds: 3
+        name: rabbitmq
+        ports:
+        - containerPort: 5672
+          name: amqp
+          protocol: TCP
+        readinessProbe:
+          exec:
+            command:
+            - sh
+            - -ec
+            - rabbitmq-diagnostics -q check_running
+          failureThreshold: 24
+          periodSeconds: 5
+          successThreshold: 1
+          timeoutSeconds: 3
+        resources:
+          limits:
+            cpu: "1"
+            memory: 1Gi
+          requests:
+            cpu: 200m
+            memory: 256Mi
+        startupProbe:
+          exec:
+            command:
+            - sh
+            - -ec
+            - rabbitmq-diagnostics -q ping
+          failureThreshold: 24
+          periodSeconds: 5
+          successThreshold: 1
+          timeoutSeconds: 3
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
+  updateStrategy:
+    rollingUpdate:
+      partition: 0
+    type: RollingUpdate
+status:
+  availableReplicas: 1
+  collisionCount: 0
+  currentReplicas: 1
+  currentRevision: rabbitmq-fcd5646db
+  observedGeneration: 13
+  readyReplicas: 1
+  replicas: 1
+  updateRevision: rabbitmq-fcd5646db
+  updatedReplicas: 1
+NAME         READY   STATUS    RESTARTS   AGE   IP            NODE                         NOMINATED NODE   READINESS GATES
+rabbitmq-0   1/1     Running   0          11s   10.244.0.42   oj319-rework-control-plane   <none>           <none>
+Warning: v1 Endpoints is deprecated in v1.33+; use discovery.k8s.io/v1 EndpointSlice
+apiVersion: v1
+kind: Endpoints
+metadata:
+  annotations:
+    endpoints.kubernetes.io/last-change-trigger-time: "2026-09-02T13:04:50Z"
+  creationTimestamp: "2026-09-02T12:02:48Z"
+  labels:
+    endpoints.kubernetes.io/managed-by: endpoint-controller
+  name: rabbitmq
+  namespace: issue319-rework
+  resourceVersion: "7604"
+  uid: 7cf30ab7-3a39-428f-9e31-d7d60f35301d
+subsets:
+- addresses:
+  - hostname: rabbitmq-0
+    ip: 10.244.0.42
+    nodeName: oj319-rework-control-plane
+    targetRef:
+      kind: Pod
+      name: rabbitmq-0
+      namespace: issue319-rework
+      uid: 563b6578-59e4-439c-a3ed-901f235b7091
+  ports:
+  - name: amqp
+    port: 5672
+    protocol: TCP
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    deployment.kubernetes.io/revision: "7"
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"apps/v1","kind":"Deployment","metadata":{"annotations":{},"labels":{"app.kubernetes.io/name":"assessment-api","app.kubernetes.io/part-of":"onlinejudge-platform","app.kubernetes.io/version":"bb4d83ee7a0891490869960370670a2dd03e9962"},"name":"assessment-api","namespace":"issue319-rework"},"spec":{"replicas":1,"selector":{"matchLabels":{"app.kubernetes.io/name":"assessment-api"}},"template":{"metadata":{"labels":{"app.kubernetes.io/name":"assessment-api"}},"spec":{"containers":[{"env":[{"name":"ASSESSMENT_COURSE_AUTHORIZATION_URI","value":"http://course-service:8082/internal/v2/courses/{courseId}/members/{userId}/authorization"},{"name":"ASSESSMENT_COURSE_SERVICE_AUTHORIZATION","valueFrom":{"secretKeyRef":{"key":"ASSESSMENT_SERVICE_IDENTITY","name":"onlinejudge-platform-runtime"}}},{"name":"ASSESSMENT_DATABASE_HOST","value":"mysql"},{"name":"ASSESSMENT_DATABASE_NAME","value":"oj_assessment"},{"name":"ASSESSMENT_DATABASE_PASSWORD","valueFrom":{"secretKeyRef":{"key":"ASSESSMENT_DATABASE_PASSWORD","name":"onlinejudge-platform-runtime"}}},{"name":"ASSESSMENT_DATABASE_PORT","value":"3306"},{"name":"ASSESSMENT_DATABASE_USER","value":"oj_assessment_rw"},{"name":"ASSESSMENT_RABBIT_ENABLED","value":"false"},{"name":"ASSESSMENT_RABBIT_HOST","value":"rabbitmq"},{"name":"ASSESSMENT_RABBIT_RELAY_ENABLED","value":"false"},{"name":"ASSESSMENT_RABBIT_USERNAME","value":"onlinejudge"},{"name":"ASSESSMENT_SERVICE_IDENTITY","valueFrom":{"secretKeyRef":{"key":"ASSESSMENT_SERVICE_IDENTITY","name":"onlinejudge-platform-runtime"}}},{"name":"ASSESSMENT_STORAGE_ROOT","value":"/var/lib/onlinejudge-assessment"},{"name":"GIT_SHA","value":"bb4d83ee7a0891490869960370670a2dd03e9962"},{"name":"IDENTITY_JWKS_TRUST_BUNDLE","valueFrom":{"secretKeyRef":{"key":"IDENTITY_JWKS_TRUST_BUNDLE","name":"onlinejudge-platform-runtime","optional":true}}},{"name":"IDENTITY_JWKS_URI","value":"http://identity-service:8081/.well-known/jwks.json"},{"name":"IDENTITY_JWT_AUDIENCE","value":"onlinejudge.api"},{"name":"IDENTITY_JWT_ISSUER","value":"onlinejudge.identity.v2"},{"name":"ISSUE318_FAIL_READINESS","value":"0"},{"name":"RABBITMQ_PASSWORD","valueFrom":{"secretKeyRef":{"key":"RABBITMQ_PASSWORD","name":"onlinejudge-platform-runtime"}}}],"image":"onlinejudge/assessment-api:bb4d83ee7a0891490869960370670a2dd03e9962","imagePullPolicy":"IfNotPresent","livenessProbe":{"failureThreshold":24,"httpGet":{"path":"/health/ready","port":8083},"periodSeconds":5,"timeoutSeconds":3},"name":"assessment-api","ports":[{"containerPort":8083,"name":"http"}],"readinessProbe":{"failureThreshold":24,"httpGet":{"path":"/health/ready","port":8083},"periodSeconds":5,"timeoutSeconds":3},"resources":{"limits":{"cpu":"1500m","memory":"2Gi"},"requests":{"cpu":"300m","memory":"512Mi"}},"startupProbe":{"failureThreshold":24,"httpGet":{"path":"/health/ready","port":8083},"periodSeconds":5,"timeoutSeconds":3}}]}}}}
+  creationTimestamp: "2026-09-02T12:03:10Z"
+  generation: 14
+  labels:
+    app.kubernetes.io/name: assessment-api
+    app.kubernetes.io/part-of: onlinejudge-platform
+    app.kubernetes.io/version: bb4d83ee7a0891490869960370670a2dd03e9962
+  name: assessment-api
+  namespace: issue319-rework
+  resourceVersion: "7023"
+  uid: cd801c3a-fa4a-416e-a5f9-87241f527903
+spec:
+  progressDeadlineSeconds: 600
+  replicas: 1
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: assessment-api
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: assessment-api
+    spec:
+      containers:
+      - env:
+        - name: ASSESSMENT_COURSE_AUTHORIZATION_URI
+          value: http://course-service:8082/internal/v2/courses/{courseId}/authorizations/{userId}
+        - name: ASSESSMENT_COURSE_SERVICE_AUTHORIZATION
+          value: <redacted>
+        - name: ASSESSMENT_DATABASE_HOST
+          value: mysql
+        - name: ASSESSMENT_DATABASE_NAME
+          value: oj_assessment
+        - name: ASSESSMENT_DATABASE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: ASSESSMENT_DATABASE_PASSWORD
+              name: onlinejudge-platform-runtime
+        - name: ASSESSMENT_DATABASE_PORT
+          value: "3306"
+        - name: ASSESSMENT_DATABASE_USER
+          value: oj_assessment_rw
+        - name: ASSESSMENT_RABBIT_ENABLED
+          value: "false"
+        - name: ASSESSMENT_RABBIT_HOST
+          value: rabbitmq
+        - name: ASSESSMENT_RABBIT_RELAY_ENABLED
+          value: "false"
+        - name: ASSESSMENT_RABBIT_USERNAME
+          value: onlinejudge
+        - name: ASSESSMENT_SERVICE_IDENTITY
+          valueFrom:
+            secretKeyRef:
+              key: ASSESSMENT_SERVICE_IDENTITY
+              name: onlinejudge-platform-runtime
+        - name: ASSESSMENT_STORAGE_ROOT
+          value: /var/lib/onlinejudge-assessment
+        - name: GIT_SHA
+          value: bb4d83ee7a0891490869960370670a2dd03e9962
+        - name: IDENTITY_JWKS_TRUST_BUNDLE
+          valueFrom:
+            secretKeyRef:
+              key: IDENTITY_JWKS_TRUST_BUNDLE
+              name: onlinejudge-platform-runtime
+              optional: true
+        - name: IDENTITY_JWKS_URI
+          value: http://identity-service:8081/.well-known/jwks.json
+        - name: IDENTITY_JWT_AUDIENCE
+          value: onlinejudge.api
+        - name: IDENTITY_JWT_ISSUER
+          value: onlinejudge.identity.v2
+        - name: ISSUE318_FAIL_READINESS
+          value: "0"
+        - name: RABBITMQ_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: RABBITMQ_PASSWORD
+              name: onlinejudge-platform-runtime
+        - name: ASSESSMENT_DATASOURCE_URL
+          value: jdbc:mysql://mysql:3306/oj_assessment?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC&allowPublicKeyRetrieval=true&useSSL=false
+        - name: ASSESSMENT_DATABASE_DRIVER
+          value: com.mysql.cj.jdbc.Driver
+        - name: ASSESSMENT_RABBIT_PORT
+          value: "5672"
+        - name: SPRING_SQL_INIT_MODE
+          value: never
+        image: onlinejudge/assessment-api:bb4d83ee7a0891490869960370670a2dd03e9962
+        imagePullPolicy: IfNotPresent
+        livenessProbe:
+          failureThreshold: 24
+          httpGet:
+            path: /health/ready
+            port: 8083
+            scheme: HTTP
+          periodSeconds: 5
+          successThreshold: 1
+          timeoutSeconds: 3
+        name: assessment-api
+        ports:
+        - containerPort: 8083
+          name: http
+          protocol: TCP
+        readinessProbe:
+          failureThreshold: 24
+          httpGet:
+            path: /health/ready
+            port: 8083
+            scheme: HTTP
+          periodSeconds: 5
+          successThreshold: 1
+          timeoutSeconds: 3
+        resources:
+          limits:
+            cpu: 1500m
+            memory: 2Gi
+          requests:
+            cpu: 300m
+            memory: 512Mi
+        startupProbe:
+          failureThreshold: 24
+          httpGet:
+            path: /health/ready
+            port: 8083
+            scheme: HTTP
+          periodSeconds: 5
+          successThreshold: 1
+          timeoutSeconds: 3
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
+status:
+  availableReplicas: 1
+  conditions:
+  - lastTransitionTime: "2026-09-02T12:50:39Z"
+    lastUpdateTime: "2026-09-02T12:50:39Z"
+    message: Deployment has minimum availability.
+    reason: MinimumReplicasAvailable
+    status: "True"
+    type: Available
+  - lastTransitionTime: "2026-09-02T12:03:10Z"
+    lastUpdateTime: "2026-09-02T12:59:38Z"
+    message: ReplicaSet "assessment-api-bdf6946cb" has successfully progressed.
+    reason: NewReplicaSetAvailable
+    status: "True"
+    type: Progressing
+  observedGeneration: 14
+  readyReplicas: 1
+  replicas: 1
+  terminatingReplicas: 0
+  updatedReplicas: 1
