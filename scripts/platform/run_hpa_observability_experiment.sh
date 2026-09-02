@@ -132,7 +132,10 @@ finish() {
     kubectl -n "$namespace" scale statefulset/rabbitmq --replicas="$rabbitmq_original_replicas" >> "$output_dir/raw/rabbitmq-restore.log" 2>&1 || true
   fi
   capture_diagnostics
-  python3 - "$output_dir/raw/requests.tsv" "$output_dir/load-summary.json" "$output_dir/metadata.json" "$started_at" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$base_sha" "$head_sha" "$namespace" "$gateway_url" "$(IFS=' '; echo "${request_urls[*]}")" <<'PY'
+  # deploymentVersion is read from the live workload, never from the git head:
+  # the environment under test may have been deployed from a different commit
+  # than the runner producing this evidence.
+  python3 - "$output_dir/raw/requests.tsv" "$output_dir/load-summary.json" "$output_dir/metadata.json" "$started_at" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$base_sha" "$head_sha" "$namespace" "$gateway_url" "$(IFS=' '; echo "${request_urls[*]}")" "$deployment_version" <<'PY'
 import json, pathlib, statistics, sys
 rows = []
 path = pathlib.Path(sys.argv[1])
@@ -145,7 +148,9 @@ p95 = latencies[max(0, (len(latencies) * 95 + 99) // 100 - 1)] if latencies else
 payload = {"requests": len(rows), "errors": sum(code < 200 or code >= 300 for _, code, _ in rows), "request_latency_avg": statistics.fmean(latencies) if latencies else None, "request_latency_p95": p95}
 payload["error_rate"] = payload["errors"] / payload["requests"] if payload["requests"] else None
 pathlib.Path(sys.argv[2]).write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
-metadata = {"baseSha": sys.argv[6], "headSha": sys.argv[7], "deploymentVersion": sys.argv[7], "environment": sys.argv[8], "startedAtUtc": sys.argv[4], "finishedAtUtc": sys.argv[5], "gatewayUrl": sys.argv[9], "requestUrls": sys.argv[10].split(" ")}
+metadata = {"baseSha": sys.argv[6], "headSha": sys.argv[7], "runnerSha": sys.argv[7], "deploymentVersion": sys.argv[11], "environment": sys.argv[8], "startedAtUtc": sys.argv[4], "finishedAtUtc": sys.argv[5], "gatewayUrl": sys.argv[9], "requestUrls": sys.argv[10].split(" ")}
+if not metadata["deploymentVersion"]:
+    raise SystemExit("deployment assessment-api does not expose a GIT_SHA env; cannot record deploymentVersion")
 pathlib.Path(sys.argv[3]).write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
 PY
   if (( status == 0 )); then
@@ -159,6 +164,11 @@ trap finish EXIT
 
 kubectl -n "$namespace" get hpa assessment-api >/dev/null
 kubectl -n "$namespace" top pod -l app.kubernetes.io/name=assessment-api >/dev/null
+# deploymentVersion is read from the live workload, never from the git head:
+# the environment under test may have been deployed from a different commit
+# than the runner producing this evidence.
+deployment_version="$(kubectl -n "$namespace" get deployment/assessment-api -o jsonpath='{.spec.template.spec.containers[0].env[?(@.name=="GIT_SHA")].value}')"
+[[ "$deployment_version" =~ ^[0-9a-f]{40}$ ]] || { printf 'deployment assessment-api does not expose a 40-hex GIT_SHA env; cannot record deploymentVersion\n' >&2; exit 1; }
 baseline_replicas="$(kubectl -n "$namespace" get deployment/assessment-api -o jsonpath='{.status.replicas}')"
 [[ "$baseline_replicas" =~ ^[1-9][0-9]*$ ]] || { printf 'assessment-api has no baseline replicas\n' >&2; exit 1; }
 started_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"

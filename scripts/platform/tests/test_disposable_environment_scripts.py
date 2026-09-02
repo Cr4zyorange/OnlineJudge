@@ -108,6 +108,12 @@ class DisposableEnvironmentScriptsTest(unittest.TestCase):
         # its own comparison instead.
         self.assertIn('[[ "$comparison" == "-gt" ]] && (( current > baseline ))', source)
         self.assertIn('[[ "$comparison" == "-le" ]] && (( current <= baseline ))', source)
+        # The committed runner SHA and the deployed image SHA must be recorded
+        # separately: a run is only reproducible when the evidence states which
+        # commit executed the experiment and which GIT_SHA was under test.
+        self.assertIn('GIT_SHA")].value', source)
+        self.assertIn('"deploymentVersion": sys.argv[11]', source)
+        self.assertNotIn('"deploymentVersion": sys.argv[7]', source)
         self.assertIn("EXPERIMENT_FAILURE", source)
         self.assertIn("EXPERIMENT_READY", source)
 
