@@ -1,0 +1,261 @@
+{
+  "schemaVersion": 1,
+  "issue": 307,
+  "rawCount": 18,
+  "invalid": 0,
+  "formalRequests": 21582,
+  "rows": [
+    {
+      "architecture": "monolith",
+      "scenario": "course-list",
+      "round": 1,
+      "requests": 1199,
+      "statusCounts": {
+        "200": 1199
+      },
+      "allOk": true,
+      "preflight": 100,
+      "apiVisibleCourseTotal": [
+        105
+      ],
+      "exclusive": true,
+      "samples": 41
+    },
+    {
+      "architecture": "monolith",
+      "scenario": "course-list",
+      "round": 2,
+      "requests": 1199,
+      "statusCounts": {
+        "200": 1199
+      },
+      "allOk": true,
+      "preflight": 100,
+      "apiVisibleCourseTotal": [
+        105
+      ],
+      "exclusive": true,
+      "samples": 44
+    },
+    {
+      "architecture": "monolith",
+      "scenario": "course-list",
+      "round": 3,
+      "requests": 1199,
+      "statusCounts": {
+        "200": 1199
+      },
+      "allOk": true,
+      "preflight": 100,
+      "apiVisibleCourseTotal": [
+        105
+      ],
+      "exclusive": true,
+      "samples": 42
+    },
+    {
+      "architecture": "monolith",
+      "scenario": "homework-submission",
+      "round": 1,
+      "requests": 1199,
+      "statusCounts": {
+        "201": 1199
+      },
+      "allOk": true,
+      "preflight": 100,
+      "exclusive": true,
+      "samples": 42
+    },
+    {
+      "architecture": "monolith",
+      "scenario": "homework-submission",
+      "round": 2,
+      "requests": 1199,
+      "statusCounts": {
+        "201": 1199
+      },
+      "allOk": true,
+      "preflight": 100,
+      "exclusive": true,
+      "samples": 42
+    },
+    {
+      "architecture": "monolith",
+      "scenario": "homework-submission",
+      "round": 3,
+      "requests": 1199,
+      "statusCounts": {
+        "201": 1199
+      },
+      "allOk": true,
+      "preflight": 100,
+      "exclusive": true,
+      "samples": 43
+    },
+    {
+      "architecture": "monolith",
+      "scenario": "my-grades",
+      "round": 1,
+      "requests": 1199,
+      "statusCounts": {
+        "200": 1199
+      },
+      "allOk": true,
+      "preflight": 100,
+      "exclusive": true,
+      "samples": 42
+    },
+    {
+      "architecture": "monolith",
+      "scenario": "my-grades",
+      "round": 2,
+      "requests": 1199,
+      "statusCounts": {
+        "200": 1199
+      },
+      "allOk": true,
+      "preflight": 100,
+      "exclusive": true,
+      "samples": 45
+    },
+    {
+      "architecture": "monolith",
+      "scenario": "my-grades",
+      "round": 3,
+      "requests": 1199,
+      "statusCounts": {
+        "200": 1199
+      },
+      "allOk": true,
+      "preflight": 100,
+      "exclusive": true,
+      "samples": 42
+    },
+    {
+      "architecture": "three-service",
+      "scenario": "course-list",
+      "round": 1,
+      "requests": 1199,
+      "statusCounts": {
+        "200": 1199
+      },
+      "allOk": true,
+      "preflight": 100,
+      "apiVisibleCourseTotal": [
+        105
+      ],
+      "exclusive": true,
+      "samples": 40
+    },
+    {
+      "architecture": "three-service",
+      "scenario": "course-list",
+      "round": 2,
+      "requests": 1199,
+      "statusCounts": {
+        "200": 1199
+      },
+      "allOk": true,
+      "preflight": 100,
+      "apiVisibleCourseTotal": [
+        105
+      ],
+      "exclusive": true,
+      "samples": 40
+    },
+    {
+      "architecture": "three-service",
+      "scenario": "course-list",
+      "round": 3,
+      "requests": 1199,
+      "statusCounts": {
+        "200": 1199
+      },
+      "allOk": true,
+      "preflight": 100,
+      "apiVisibleCourseTotal": [
+        105
+      ],
+      "exclusive": true,
+      "samples": 40
+    },
+    {
+      "architecture": "three-service",
+      "scenario": "homework-submission",
+      "round": 1,
+      "requests": 1199,
+      "statusCounts": {
+        "201": 1199
+      },
+      "allOk": true,
+      "preflight": 100,
+      "exclusive": true,
+      "samples": 40
+    },
+    {
+      "architecture": "three-service",
+      "scenario": "homework-submission",
+      "round": 2,
+      "requests": 1199,
+      "statusCounts": {
+        "201": 1199
+      },
+      "allOk": true,
+      "preflight": 100,
+      "exclusive": true,
+      "samples": 40
+    },
+    {
+      "architecture": "three-service",
+      "scenario": "homework-submission",
+      "round": 3,
+      "requests": 1199,
+      "statusCounts": {
+        "201": 1199
+      },
+      "allOk": true,
+      "preflight": 100,
+      "exclusive": true,
+      "samples": 40
+    },
+    {
+      "architecture": "three-service",
+      "scenario": "my-grades",
+      "round": 1,
+      "requests": 1199,
+      "statusCounts": {
+        "200": 1199
+      },
+      "allOk": true,
+      "preflight": 100,
+      "exclusive": true,
+      "samples": 40
+    },
+    {
+      "architecture": "three-service",
+      "scenario": "my-grades",
+      "round": 2,
+      "requests": 1199,
+      "statusCounts": {
+        "200": 1199
+      },
+      "allOk": true,
+      "preflight": 100,
+      "exclusive": true,
+      "samples": 40
+    },
+    {
+      "architecture": "three-service",
+      "scenario": "my-grades",
+      "round": 3,
+      "requests": 1199,
+      "statusCounts": {
+        "200": 1199
+      },
+      "allOk": true,
+      "preflight": 100,
+      "exclusive": true,
+      "samples": 40
+    }
+  ]
+}
