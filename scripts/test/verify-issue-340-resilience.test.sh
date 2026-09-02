@@ -151,6 +151,15 @@ if grep -Fq -- 'ci-artifacts/issue-340/**' "$repo_root/.github/workflows/issue-3
 fi
 grep -Fq -- 'worker-rabbit-recovery-evidence.log' "$repo_root/.github/workflows/issue-340-resilience.yml" \
   || fail 'workflow must upload the redacted worker recovery evidence extract'
+python3 - "$runner" <<'PY'
+from pathlib import Path
+import sys
+
+text = Path(sys.argv[1]).read_text(encoding="utf-8")
+scan = text[text.index('paths = [root / "report.json"') : text.index('patterns = {')]
+for name in ("grade-service-log", "rabbitmq-queues.log", "rabbitmq-bindings.log"):
+    assert name in scan, f"uploaded Grade diagnostic {name} is absent from the secret scan"
+PY
 if grep -Eq 'printf .*PASSWORD|printf .*TOKEN|printf .*SECRET|echo .*PASSWORD' "$runner"; then
   fail 'runner must never print secret values'
 fi

@@ -850,6 +850,7 @@ root = Path(sys.argv[1])
 paths = [root / "report.json", root / "query-login-meta.json", root / "worker-rabbit-recovery-evidence.log"]
 for scenario in (root / "scenarios").glob("*"):
     paths.extend(scenario / name for name in ("status", "before", "during", "recovery", "evidence", "compose-before", "query-status", "domain-before", "domain-after"))
+paths.extend(root / "scenarios" / "grade-down" / name for name in ("grade-service-log", "rabbitmq-queues.log", "rabbitmq-bindings.log"))
 patterns = {
     "bearer": re.compile(r"(?i)authorization\s*:\s*bearer\s+[A-Za-z0-9._~+/-]{20,}"),
     "jwt": re.compile(r"\beyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}\b"),
