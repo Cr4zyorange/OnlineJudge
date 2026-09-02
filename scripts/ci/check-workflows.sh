@@ -126,6 +126,7 @@ contracts_needs="$(needs_of "$workflow_file" contracts-gate)"
 browser_e2e_needs="$(needs_of "$workflow_file" browser-e2e-gate)"
 delivery_needs="$(needs_of "$workflow_file" delivery)"
 delivery_norm="$(normalized_needs "$delivery_needs")"
+delivery_section="$(job_section "$workflow_file" delivery)"
 
 run_check "validate-workflows has no needs" test -z "$validate_needs"
 run_check "backend-gate needs validate-workflows" test "$backend_needs" = "validate-workflows"
@@ -133,6 +134,11 @@ run_check "frontend-gate needs validate-workflows" test "$frontend_needs" = "val
 run_check "contracts-gate needs validate-workflows" test "$contracts_needs" = "validate-workflows"
 run_check "browser-e2e-gate needs compile, frontend, and contract gates" test "$browser_e2e_needs" = "backend-gate,frontend-gate,contracts-gate"
 run_check "delivery needs every quality gate" test "$delivery_norm" = "backend-gate,browser-e2e-gate,contracts-gate,frontend-gate,validate-workflows"
+# GitHub Actions adds a default success() condition to jobs.  Any explicit
+# delivery job `if` could replace it (for example failure()), allowing delivery
+# after a required quality gate fails, so delivery must not declare one at all.
+run_check "delivery has no job-level if condition" bash -c \
+  '! grep -Eq "^    if:" <<< "$1"' _ "$delivery_section"
 for job in "${required_jobs[@]}"; do
   job_needs="$(needs_of "$workflow_file" "$job")"
   if [[ ",$job_needs," == *",delivery,"* ]]; then
@@ -203,7 +209,6 @@ while IFS= read -r line_number; do
   fail_check "if: always() only allowed on evidence/diagnostic steps (line $line_number)"
 done < <(grep -nE '^        if: .*always\(\)' "$workflow_file" | cut -d: -f1 || true)
 
-delivery_section="$(job_section "$workflow_file" delivery)"
 run_check "delivery calls the disposable executor after the checkpoint" bash -c \
   'grep -Fq "scripts/ci/delivery-checkpoint.sh" <<< "$1" \
     && grep -Fq "scripts/ci/disposable-delivery.sh" <<< "$1"' _ "$delivery_section"
