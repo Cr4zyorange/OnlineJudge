@@ -2,7 +2,7 @@ nginx: the configuration file /etc/nginx/nginx.conf syntax is ok
 nginx: configuration file /etc/nginx/nginx.conf test is successful
 2026/09/02 05:47:28 [notice] 1#1: using the "epoll" event method
 2026/09/02 05:47:28 [notice] 1#1: nginx/1.27.5
-2026/09/02 05:47:28 [notice] 1#1: built by gcc 14.2.0 (Alpine 14.2.0) 
+2026/09/02 05:47:28 [notice] 1#1: built by gcc 14.2.0 (Alpine 14.2.0)
 2026/09/02 05:47:28 [notice] 1#1: OS: Linux 6.6.87.2-microsoft-standard-WSL2
 2026/09/02 05:47:28 [notice] 1#1: getrlimit(RLIMIT_NOFILE): 1073741816:1073741816
 2026/09/02 05:47:28 [notice] 1#1: start worker processes
