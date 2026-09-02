@@ -80,6 +80,12 @@ esac
 
 IFS=',' read -r -a container_list <<< "$containers"
 [[ "${#container_list[@]}" -eq "$expected_live" ]] || { printf 'issue-307-formal-run: container list does not match expected live count\n' >&2; exit 2; }
+mysql_container_service="$(docker inspect --format '{{ index .Config.Labels "com.docker.compose.service" }}' "$mysql_container")"
+[[ "$mysql_container_service" == mysql ]] || {
+  printf 'issue-307-formal-run: --mysql-container %s must be the expected mysql service, got %s\n' "$mysql_container" "$mysql_container_service" >&2
+  exit 2
+}
+normalized_container_list=()
 for container in "${container_list[@]}"; do
   [[ -n "$container" ]] || { printf 'issue-307-formal-run: empty container name\n' >&2; exit 2; }
   actual_project="$(docker inspect --format '{{ index .Config.Labels "com.docker.compose.project" }}' "$container")"
@@ -88,7 +94,10 @@ for container in "${container_list[@]}"; do
     printf 'issue-307-formal-run: %s is not a running container in %s\n' "$container" "$project" >&2
     exit 2
   }
+  normalized_container_list+=("$(docker inspect --format '{{.Id}}' "$container")")
 done
+container_list=("${normalized_container_list[@]}")
+containers="$(IFS=,; printf '%s' "${container_list[*]}")"
 project_live="$(docker ps --filter "label=com.docker.compose.project=$project" --format '{{.ID}}' | wc -l | tr -d ' ')"
 all_live="$(docker ps --format '{{.ID}}' | wc -l | tr -d ' ')"
 [[ "$project_live" == "$expected_live" && "$all_live" == "$expected_live" ]] || {

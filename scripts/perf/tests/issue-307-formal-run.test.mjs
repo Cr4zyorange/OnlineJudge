@@ -25,6 +25,10 @@ test("formal runner documents per-round reset and exclusive Docker-window checks
   assert.match(source, /preflight_minimum_success_rate/);
   assert.match(source, /expected_statuses=200,201,202/);
   assert.match(source, /validate-preflight/);
+  assert.match(source, /mysql_container_service/);
+  assert.match(source, /expected mysql service/);
+  assert.match(source, /normalized_container_list/);
+  assert.match(source, /--format '\{\{\.Id\}\}'/);
   assert.match(source, /preflight-evidence/);
   assert.match(source, /responses\/student-/);
   assert.match(source, /preflight-reset/);
