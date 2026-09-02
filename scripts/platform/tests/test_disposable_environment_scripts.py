@@ -99,6 +99,15 @@ class DisposableEnvironmentScriptsTest(unittest.TestCase):
         self.assertIn("--authorization-file", source)
         self.assertIn("--request-method", source)
         self.assertIn("--request-body-file", source)
+        self.assertIn("may be repeated", source)
+        self.assertIn("request_urls+=(", source)
+        self.assertIn("--noproxy", source)
+        # wait_for_replicas must branch on the comparison explicitly; a bare
+        # `A && B || C && D` chain parses left-associative and the -le branch
+        # would veto every successful scale-up, so each branch is guarded by
+        # its own comparison instead.
+        self.assertIn('[[ "$comparison" == "-gt" ]] && (( current > baseline ))', source)
+        self.assertIn('[[ "$comparison" == "-le" ]] && (( current <= baseline ))', source)
         self.assertIn("EXPERIMENT_FAILURE", source)
         self.assertIn("EXPERIMENT_READY", source)
 

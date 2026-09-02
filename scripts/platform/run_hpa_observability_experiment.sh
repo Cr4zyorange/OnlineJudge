@@ -6,8 +6,8 @@ set -Eeuo pipefail
 repo_root="$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"
 namespace="onlinejudge-platform"
 gateway_url=""
-request_url=""
-authorization_file=""
+request_urls=()
+authorization_files=()
 request_method="GET"
 request_body_file=""
 output_dir=""
@@ -23,17 +23,20 @@ usage() {
 Usage: scripts/platform/run_hpa_observability_experiment.sh --gateway-url URL --request-url URL --authorization-file FILE [options]
 
 Runs the #319 HPA experiment against a ready #318 Kubernetes environment.
---request-url must be a pre-provisioned, authenticated Assessment business-chain
-request that returns HTTP 2xx; it is intentionally explicit so this runner does
-not embed test credentials or manufacture business facts. Raw HPA, pod, CPU,
-memory, throughput, latency, error, log, queue and projection evidence is kept
-under --output-dir even when the experiment fails.
+--request-url may be repeated to spread the authenticated Assessment
+business-chain load across several pre-provisioned facts (for example distinct
+homework rows) instead of serializing every request on a single aggregate row
+lock. Each URL must return HTTP 2xx; it is intentionally explicit so this
+runner does not embed test credentials or manufacture business facts. Raw HPA,
+pod, CPU, memory, throughput, latency, error, log, queue and projection
+evidence is kept under --output-dir even when the experiment fails.
 
 Options:
   --namespace NAME          Kubernetes namespace (default: onlinejudge-platform)
   --gateway-url URL         Gateway base URL used for correlation diagnostics
-  --request-url URL         Full Assessment business-chain request URL
-  --authorization-file FILE File containing one Authorization header value
+  --request-url URL         Full Assessment business-chain request URL; repeatable
+  --authorization-file FILE  File containing one Authorization header value; repeatable (round-
+                           robin with the request URLs so load is spread across identities)
   --request-method METHOD   HTTP method (default: GET)
   --request-body-file FILE  Optional request body file; never copied to evidence
   --duration-seconds N      Load duration (default: 180)
@@ -48,8 +51,8 @@ while (($#)); do
   case "$1" in
     --namespace) namespace="${2:?--namespace requires a value}"; shift 2 ;;
     --gateway-url) gateway_url="${2:?--gateway-url requires a value}"; shift 2 ;;
-    --request-url) request_url="${2:?--request-url requires a value}"; shift 2 ;;
-    --authorization-file) authorization_file="${2:?--authorization-file requires a value}"; shift 2 ;;
+    --request-url) request_urls+=("${2:?--request-url requires a value}"); shift 2 ;;
+    --authorization-file) authorization_files+=("${2:?--authorization-file requires a value}"); shift 2 ;;
     --request-method) request_method="${2:?--request-method requires a value}"; shift 2 ;;
     --request-body-file) request_body_file="${2:?--request-body-file requires a value}"; shift 2 ;;
     --duration-seconds) duration_seconds="${2:?--duration-seconds requires a value}"; shift 2 ;;
@@ -62,9 +65,14 @@ while (($#)); do
   esac
 done
 
-[[ -n "$gateway_url" && -n "$request_url" && -n "$authorization_file" ]] || { usage >&2; exit 2; }
-[[ "$request_url" == "$gateway_url"* ]] || { printf 'run-hpa-observability-experiment: request URL must use the supplied gateway URL\n' >&2; exit 2; }
-[[ -r "$authorization_file" ]] || { printf 'run-hpa-observability-experiment: authorization file is not readable\n' >&2; exit 2; }
+(( ${#request_urls[@]} > 0 )) || { usage >&2; exit 2; }
+for request_url in "${request_urls[@]}"; do
+  [[ "$request_url" == "$gateway_url"* ]] || { printf 'run-hpa-observability-experiment: request URL must use the supplied gateway URL: %s\n' "$request_url" >&2; exit 2; }
+done
+(( ${#authorization_files[@]} > 0 )) || { usage >&2; exit 2; }
+for authorization_file in "${authorization_files[@]}"; do
+  [[ -r "$authorization_file" ]] || { printf 'run-hpa-observability-experiment: authorization file is not readable: %s\n' "$authorization_file" >&2; exit 2; }
+done
 [[ -z "$request_body_file" || -r "$request_body_file" ]] || { printf 'run-hpa-observability-experiment: request body file is not readable\n' >&2; exit 2; }
 [[ "$request_method" =~ ^[A-Z]+$ ]] || { printf 'run-hpa-observability-experiment: request method must be uppercase letters\n' >&2; exit 2; }
 [[ "$duration_seconds" =~ ^[1-9][0-9]*$ && "$concurrency" =~ ^[1-9][0-9]*$ && "$sample_seconds" =~ ^[1-9][0-9]*$ && "$scale_timeout_seconds" =~ ^[1-9][0-9]*$ ]] || {
@@ -72,8 +80,12 @@ done
 }
 command -v kubectl >/dev/null 2>&1 || { printf 'run-hpa-observability-experiment: kubectl is required\n' >&2; exit 2; }
 command -v curl >/dev/null 2>&1 || { printf 'run-hpa-observability-experiment: curl is required\n' >&2; exit 2; }
-IFS= read -r authorization < "$authorization_file" || true
-[[ -n "$authorization" ]] || { printf 'run-hpa-observability-experiment: authorization file is empty\n' >&2; exit 2; }
+authorizations=()
+for authorization_file in "${authorization_files[@]}"; do
+  IFS= read -r authorization < "$authorization_file" || true
+  [[ -n "$authorization" ]] || { printf 'run-hpa-observability-experiment: authorization file is empty: %s\n' "$authorization_file" >&2; exit 2; }
+  authorizations+=("$authorization")
+done
 
 head_sha="$(git -C "$repo_root" rev-parse HEAD)"
 base_sha="$(git -C "$repo_root" merge-base HEAD origin/dev 2>/dev/null || git -C "$repo_root" rev-parse HEAD)"
@@ -97,10 +109,13 @@ wait_for_replicas() {
   deadline=$((SECONDS + scale_timeout_seconds))
   while (( SECONDS < deadline )); do
     current="$(kubectl -n "$namespace" get deployment/assessment-api -o jsonpath='{.status.replicas}' 2>> "$output_dir/raw/hpa-transition.log" || true)"
-    if [[ "$current" =~ ^[0-9]+$ ]] && {
-      [[ "$comparison" == "-gt" ]] && (( current > baseline )) ||
-      [[ "$comparison" == "-le" ]] && (( current <= baseline ));
-    }; then
+    reached=0
+    if [[ "$current" =~ ^[0-9]+$ ]]; then
+      if [[ "$comparison" == "-gt" ]] && (( current > baseline )); then reached=1
+      elif [[ "$comparison" == "-le" ]] && (( current <= baseline )); then reached=1
+      fi
+    fi
+    if (( reached )); then
       printf '%s replicas=%s baseline=%s\n' "$transition" "$current" "$baseline" >> "$output_dir/raw/hpa-transition.log"
       return 0
     fi
@@ -117,7 +132,7 @@ finish() {
     kubectl -n "$namespace" scale statefulset/rabbitmq --replicas="$rabbitmq_original_replicas" >> "$output_dir/raw/rabbitmq-restore.log" 2>&1 || true
   fi
   capture_diagnostics
-  python3 - "$output_dir/raw/requests.tsv" "$output_dir/load-summary.json" "$output_dir/metadata.json" "$started_at" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$base_sha" "$head_sha" "$namespace" "$gateway_url" "$request_url" <<'PY'
+  python3 - "$output_dir/raw/requests.tsv" "$output_dir/load-summary.json" "$output_dir/metadata.json" "$started_at" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$base_sha" "$head_sha" "$namespace" "$gateway_url" "$(IFS=' '; echo "${request_urls[*]}")" <<'PY'
 import json, pathlib, statistics, sys
 rows = []
 path = pathlib.Path(sys.argv[1])
@@ -130,7 +145,7 @@ p95 = latencies[max(0, (len(latencies) * 95 + 99) // 100 - 1)] if latencies else
 payload = {"requests": len(rows), "errors": sum(code < 200 or code >= 300 for _, code, _ in rows), "request_latency_avg": statistics.fmean(latencies) if latencies else None, "request_latency_p95": p95}
 payload["error_rate"] = payload["errors"] / payload["requests"] if payload["requests"] else None
 pathlib.Path(sys.argv[2]).write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
-metadata = {"baseSha": sys.argv[6], "headSha": sys.argv[7], "deploymentVersion": sys.argv[7], "environment": sys.argv[8], "startedAtUtc": sys.argv[4], "finishedAtUtc": sys.argv[5], "gatewayUrl": sys.argv[9], "requestUrl": sys.argv[10]}
+metadata = {"baseSha": sys.argv[6], "headSha": sys.argv[7], "deploymentVersion": sys.argv[7], "environment": sys.argv[8], "startedAtUtc": sys.argv[4], "finishedAtUtc": sys.argv[5], "gatewayUrl": sys.argv[9], "requestUrls": sys.argv[10].split(" ")}
 pathlib.Path(sys.argv[3]).write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
 PY
   if (( status == 0 )); then
@@ -166,13 +181,23 @@ fi
   done ) & sampler_pid=$!
 
 deadline=$((SECONDS + duration_seconds))
+request_url_index=0
 while (( SECONDS < deadline )); do
   request_pids=()
   for _ in $(seq 1 "$concurrency"); do
+    request_url="${request_urls[$request_url_index]}"
+    authorization="${authorizations[$request_url_index % ${#authorizations[@]}]}"
+    request_url_index=$(((request_url_index + 1) % ${#request_urls[@]}))
     request_id="$(cat /proc/sys/kernel/random/uuid)"
-    ( curl_arguments=(--silent --show-error --output /dev/null --write-out '%{http_code} %{time_total}\n' --request "$request_method" --header "Authorization: $authorization" --header "X-Request-Id: $request_id");
+    # Each worker writes exactly one request line with a single redirection so
+    # concurrent subshells never interleave partial lines in the evidence file.
+    # The gateway URL is an internal Kubernetes endpoint (typically a kubectl
+    # port-forward); --noproxy keeps throughput and latency evidence from being
+    # distorted by a caller's HTTP(S)_PROXY environment.
+    ( curl_arguments=(--noproxy '*' --silent --show-error --output /dev/null --write-out '%{http_code} %{time_total}' --request "$request_method" --header "Authorization: $authorization" --header "X-Request-Id: $request_id");
       if [[ -n "$request_body_file" ]]; then curl_arguments+=(--header 'Content-Type: application/json' --data-binary "@$request_body_file"); fi;
-      printf '%s %s ' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$request_id"; curl "${curl_arguments[@]}" "$request_url" ) >> "$output_dir/raw/requests.tsv" 2>> "$output_dir/raw/curl-errors.log" &
+      line="$(curl "${curl_arguments[@]}" "$request_url" 2>> "$output_dir/raw/curl-errors.log")";
+      printf '%s %s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$request_id" "$line" >> "$output_dir/raw/requests.tsv" ) &
     request_pids+=("$!")
   done
   for request_pid in "${request_pids[@]}"; do wait "$request_pid" || true; done
