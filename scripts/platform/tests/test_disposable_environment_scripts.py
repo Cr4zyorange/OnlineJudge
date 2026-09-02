@@ -132,6 +132,13 @@ class DisposableEnvironmentScriptsTest(unittest.TestCase):
         self.assertIn("readyReplicas", source)
         self.assertIn("endpoints/rabbitmq", source)
         self.assertIn("assessment availability during RabbitMQ outage", source)
+        # Kubernetes omits status.readyReplicas entirely once a StatefulSet
+        # reaches zero.  The runner must normalize that empty jsonpath result
+        # before deciding whether the outage has actually begun.
+        self.assertIn('printf \'%s\\n\' "${ready_replicas:-0}"', source)
+        # An interrupted run must retain a non-zero status; otherwise the EXIT
+        # trap could publish an empty run as EXPERIMENT_READY.
+        self.assertIn("trap 'exit 130' INT TERM", source)
         # AC-319-04 requires database-backed diagnostic signals. Application
         # logs alone cannot prove projection catch-up or an active task lease.
         self.assertIn("capture_projection_and_lease_diagnostics", source)

@@ -188,7 +188,12 @@ wait_for_replicas() {
 }
 
 rabbitmq_ready_replicas() {
-  kubectl -n "$namespace" get statefulset/rabbitmq -o jsonpath='{.status.readyReplicas}' 2>> "$output_dir/raw/rabbitmq-outage.txt"
+  local ready_replicas
+  ready_replicas="$(kubectl -n "$namespace" get statefulset/rabbitmq -o jsonpath='{.status.readyReplicas}' 2>> "$output_dir/raw/rabbitmq-outage.txt")" || return 1
+  # Kubernetes removes this optional status field at zero rather than
+  # serialising the literal string "0".  Normalize it before all outage
+  # predicates so a real zero-replica window is observable.
+  printf '%s\n' "${ready_replicas:-0}"
 }
 
 rabbitmq_pod_count() {
@@ -288,6 +293,7 @@ wait_for_rabbitmq_recovery() {
 
 finish() {
   status=$?
+  trap - EXIT INT TERM
   if [[ -n "$sampler_pid" ]]; then kill "$sampler_pid" 2>/dev/null || true; fi
   if (( rabbitmq_outage )) && [[ -n "$rabbitmq_original_replicas" ]]; then
     kubectl -n "$namespace" scale statefulset/rabbitmq --replicas="$rabbitmq_original_replicas" >> "$output_dir/raw/rabbitmq-restore.log" 2>&1 || true
@@ -324,6 +330,7 @@ PY
   fi
   exit "$status"
 }
+trap 'exit 130' INT TERM
 trap finish EXIT
 
 kubectl -n "$namespace" get hpa assessment-api >/dev/null
