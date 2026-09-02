@@ -233,7 +233,7 @@ async function bootstrapScenarioCourse(context, artifactDir) {
     method: 'POST',
     headers: teacherHeaders,
     body: '{}'
-  }, 'bootstrap publish GRD source LAB');
+  }, 'bootstrap publish GRD source LAB', normalizeBareLabCreateResponse);
   const sourceSubmission = new FormData();
   sourceSubmission.set('code', 'print("Issue #320 GRD fixture")');
   sourceSubmission.set('language', 'python');

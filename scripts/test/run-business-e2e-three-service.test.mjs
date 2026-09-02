@@ -51,6 +51,17 @@ test('normalizes Assessment bare 201 LAB creation responses into the bootstrap e
   assert.throws(() => normalizeBareLabCreateResponse({ labId: 0 }), /LAB.*positive/i);
 });
 
+test('uses the strict bare LAB response normalizer when publishing the GRD fixture source', () => {
+  const runner = readFileSync(
+    resolve(import.meta.dirname, 'run-business-e2e-three-service.mjs'),
+    'utf8'
+  );
+  assert.match(
+    runner,
+    /\/api\/v1\/labs\/\$\{fixtureLabId\}\/publish[\s\S]{0,240}normalizeBareLabCreateResponse/
+  );
+});
+
 test('rejects a context that is not a nine-workload loopback platform', () => {
   assert.throws(
     () => validateContext({ workloads: 8, baseUrl: 'http://example.test' }),
