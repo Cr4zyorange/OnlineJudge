@@ -161,13 +161,18 @@ test.describe('@hwk HWK 真实业务闭环', () => {
       ));
       gradeItemId = gradeItem.id;
 
-      const syncResult = await apiData<GradeSyncResult>(await request.post(
-        `/api/v1/courses/${COURSE_ID}/grades/sync`,
-        { headers: teacherHeaders }
-      ));
-      expect(syncResult.affectedItemCount).toBeGreaterThan(0);
-      expect(syncResult.affectedStudentCount).toBeGreaterThan(0);
-      expect(syncResult.syncedCount).toBeGreaterThan(0);
+      let syncResult: GradeSyncResult | undefined;
+      await expect.poll(async () => {
+        syncResult = await apiData<GradeSyncResult>(await request.post(
+          `/api/v1/courses/${COURSE_ID}/grades/sync`,
+          { headers: teacherHeaders }
+        ));
+        return syncResult.syncedCount;
+      }, { intervals: [100, 250, 500, 1_000], timeout: 15_000 }).toBeGreaterThan(0);
+      const confirmedSync = syncResult!;
+      expect(confirmedSync.affectedItemCount).toBeGreaterThan(0);
+      expect(confirmedSync.affectedStudentCount).toBeGreaterThan(0);
+      expect(confirmedSync.syncedCount).toBeGreaterThan(0);
 
       const gradeTable = await apiData<CourseGradeTablePage>(await request.get(
         `/api/v1/courses/${COURSE_ID}/grades?gradeItemId=${gradeItemId}&page=1&size=100`,

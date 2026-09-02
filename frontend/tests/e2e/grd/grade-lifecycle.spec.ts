@@ -34,6 +34,14 @@ type GradeRow = {
   records: GradeRecord[];
 };
 
+type SourceProjectionSync = {
+  affectedItemCount: number;
+  affectedStudentCount: number;
+  syncedCount: number;
+  missingCount: number;
+  ungradedCount: number;
+};
+
 const DEMO_STUDENT = {
   account: process.env.E2E_STUDENT_ACCOUNT?.trim() || 'student001',
   password: process.env.E2E_STUDENT_PASSWORD || 'Student001@pass'
@@ -183,14 +191,7 @@ test.describe('@grd GRD real source lifecycle', () => {
       }
     }), 'create HWK grade item');
 
-    const firstSync = await ok<{
-      affectedItemCount: number;
-      affectedStudentCount: number;
-      syncedCount: number;
-      missingCount: number;
-      ungradedCount: number;
-    }>(await request.post(`/api/v1/courses/${courseId}/grades/sync`, { headers: teacherHeaders }), 'sync real sources');
-    expect(firstSync).toMatchObject({
+    const firstSync = await waitForSourceProjection(request, courseId, teacherHeaders, {
       affectedItemCount: 2,
       affectedStudentCount: 2,
       syncedCount: 2,
@@ -357,6 +358,23 @@ function verifyDisposableProof(): boolean {
   } catch {
     return false;
   }
+}
+
+async function waitForSourceProjection(
+  request: APIRequestContext,
+  courseId: number,
+  headers: Record<string, string>,
+  expected: SourceProjectionSync
+): Promise<SourceProjectionSync> {
+  let latest: SourceProjectionSync | undefined;
+  await expect.poll(async () => {
+    latest = await ok<SourceProjectionSync>(
+      await request.post(`/api/v1/courses/${courseId}/grades/sync`, { headers }),
+      'sync real sources after asynchronous projection'
+    );
+    return latest;
+  }, { intervals: [100, 250, 500, 1_000], timeout: 15_000 }).toMatchObject(expected);
+  return latest!;
 }
 
 async function registerStudent(request: APIRequestContext, marker: string): Promise<AuthSession> {
