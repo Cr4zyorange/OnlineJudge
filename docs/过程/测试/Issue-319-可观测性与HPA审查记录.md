@@ -63,8 +63,8 @@ evaluation_task 与关联 outbox/网关日志（`backlog-diagnostics.txt`、
 
 ## Round 6 — 2026-09-02（复审 Rework：可复现重跑、证据入库与范围冻结）
 
-针对 Round 5 送审的 REQUEST_CHANGES 三项阻塞逐项处置。复审头：`3bbb6aa7`
-（本记录所在提交）。
+针对 Round 5 送审的 REQUEST_CHANGES 三项阻塞逐项处置。证据提交：`3bbb6aa7`；
+其后的 `294edde` 仅清理证据文件的 EOF 空行与行尾空格，无内容变化。
 
 | 编号 | 阻塞点 | 处置 |
 | --- | --- | --- |
