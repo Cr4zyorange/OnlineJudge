@@ -12,6 +12,7 @@ function readRepositoryFile(path) {
 test('the disposable business E2E command runs every maintained browser scenario', () => {
   const packageJson = JSON.parse(readRepositoryFile('frontend/package.json'));
   const runner = readRepositoryFile('scripts/test/run-business-e2e-disposable.mjs');
+  const threeServiceRunner = readRepositoryFile('scripts/test/run-business-e2e-three-service.mjs');
   const verifier = readRepositoryFile('scripts/ci/browser-e2e-verify.sh');
 
   assert.equal(
@@ -28,14 +29,14 @@ test('the disposable business E2E command runs every maintained browser scenario
     'tests/e2e/lrn/notification-read-on-open.spec.ts',
     'tests/e2e/shared'
   ]) {
-    assert.match(runner, new RegExp(target.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+    assert.match(threeServiceRunner, new RegExp(target.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   }
-  assert.match(runner, /ONLINEJUDGE_EVALUATION_SANDBOX_MODE:\s*'fake'/);
-  assert.match(runner, /rabbitmq:4\.1-management/);
-  assert.match(runner, /ONLINEJUDGE_RELIABILITY_RABBITMQ_ENABLED:\s*'true'/);
-  assert.match(runner, /ONLINEJUDGE_RELIABILITY_PUBLISHER_ENABLED:\s*'true'/);
-  assert.match(runner, /E2E_GRD_DISPOSABLE_PROOF_FILE/);
-  assert.match(runner, /E2E_LRN_DISPOSABLE_PROOF_FILE/);
+  assert.match(runner, /run_disposable_environment\.sh/);
+  assert.match(runner, /--after-ready/);
+  assert.match(runner, /IDENTITY_SEED_DATA_ENABLED/);
+  assert.doesNotMatch(runner, /jdbc:h2/i);
+  assert.match(threeServiceRunner, /E2E_THREE_SERVICE_PROOF_FILE/);
+  assert.match(threeServiceRunner, /PLAYWRIGHT_JUNIT_OUTPUT_FILE/);
   assert.match(runner, /E2E_ARTIFACT_DIR/);
   assert.match(verifier, /npm ci --no-audit --no-fund/);
   assert.match(verifier, /playwright install/);

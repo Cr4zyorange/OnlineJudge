@@ -3,6 +3,7 @@ import { expect, test } from '@playwright/test';
 import { timingSafeEqual } from 'node:crypto';
 import { readFileSync, realpathSync, statSync } from 'node:fs';
 import { basename, dirname, isAbsolute, relative } from 'node:path';
+import { verifyThreeServiceDisposableProof } from '../three-service-disposable-proof';
 
 type ApiEnvelope<T> = {
   code: string;
@@ -43,7 +44,7 @@ const DEMO_TEACHER = {
   password: process.env.E2E_TEACHER_PASSWORD || 'Teacher001@pass'
 };
 
-const hasDisposableProof = verifyDisposableProof();
+const hasDisposableProof = verifyDisposableProof() || verifyThreeServiceDisposableProof();
 
 test.describe('@grd GRD real source lifecycle', () => {
   test.skip(
