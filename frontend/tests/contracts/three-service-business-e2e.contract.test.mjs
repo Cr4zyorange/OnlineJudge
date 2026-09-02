@@ -29,3 +29,16 @@ test('business E2E enters the disposable nine-workload platform rather than a mo
     assert.match(executionCore, new RegExp(target.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   }
 });
+
+test('business E2E injects the isolated sandbox proxy as a test dependency without adding a tenth workload', () => {
+  const entry = readRepositoryFile('scripts/test/run-business-e2e-disposable.mjs');
+  const sandboxRunner = readRepositoryFile('scripts/test/run-business-e2e-three-service-sandbox.sh');
+
+  assert.match(entry, /ASSESSMENT_SANDBOX_DOCKER_API_URI.*assessment-sandbox-docker-proxy:2375/);
+  assert.match(entry, /run-business-e2e-three-service-sandbox\.sh/);
+  assert.match(sandboxRunner, /E2E_THREE_SERVICE_PROJECT/);
+  assert.match(sandboxRunner, /com\.docker\.compose\.project/);
+  assert.match(sandboxRunner, /--network-alias assessment-sandbox-docker-proxy/);
+  assert.match(sandboxRunner, /\/var\/run\/docker\.sock:\/var\/run\/docker\.sock:ro/);
+  assert.match(sandboxRunner, /docker rm -f/);
+});

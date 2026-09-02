@@ -180,6 +180,9 @@ umask 077
   printf 'ASSESSMENT_WORKER_IDENTITY=issue318-worker\n'
   printf 'GRADE_COURSE_SERVICE_IDENTITY=%s\n' "$grade_course_identity"
   printf 'GRADE_ASSESSMENT_SERVICE_IDENTITY=%s\n' "$grade_assessment_identity"
+  if [[ -n "${ASSESSMENT_SANDBOX_DOCKER_API_URI:-}" ]]; then
+    printf 'ASSESSMENT_SANDBOX_DOCKER_API_URI=%s\n' "$ASSESSMENT_SANDBOX_DOCKER_API_URI"
+  fi
 } > "$runtime_env"
 runtime_env_ready=1
 

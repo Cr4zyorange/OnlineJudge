@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const platformRunner = join(repositoryRoot, 'scripts', 'platform', 'run_disposable_environment.sh');
 const threeServiceRunner = join(repositoryRoot, 'scripts', 'test', 'run-business-e2e-three-service.mjs');
+const sandboxRunner = join(repositoryRoot, 'scripts', 'test', 'run-business-e2e-three-service-sandbox.sh');
 const artifactDir = resolve(process.env.E2E_ARTIFACT_DIR
   || join(repositoryRoot, 'ci-artifacts', 'browser-e2e-gate'));
 
@@ -19,6 +20,10 @@ try {
   delete environment.E2E_BASE_URL;
   environment.GATEWAY_HTTP_PORT = String(port);
   environment.IDENTITY_SEED_DATA_ENABLED = 'true';
+  // The proxy is a disposable test-execution dependency, not a platform
+  // workload. The platform keeps its declared nine-workload inventory while
+  // the after-ready hook connects the proxy to this run's private network.
+  environment.ASSESSMENT_SANDBOX_DOCKER_API_URI = 'http://assessment-sandbox-docker-proxy:2375';
   environment.E2E_ARTIFACT_DIR = artifactDir;
 
   const bashCommand = resolveBashCommand();
@@ -27,7 +32,8 @@ try {
     toBashPath(platformRunner, bashCommand),
     '--git-sha', gitRevision(),
     '--output-dir', toBashPath(artifactDir, bashCommand),
-    '--after-ready', toBashPath(process.execPath, bashCommand), toBashPath(threeServiceRunner, bashCommand), '--inside-platform'
+    '--after-ready', toBashPath(sandboxRunner, bashCommand),
+    toBashPath(process.execPath, bashCommand), toBashPath(threeServiceRunner, bashCommand), '--inside-platform'
   ], environment);
   console.log('run-business-e2e-disposable: PASS; the disposable nine-workload platform was removed');
 } catch (error) {
