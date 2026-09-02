@@ -96,6 +96,13 @@ all_live="$(docker ps --format '{{.ID}}' | wc -l | tr -d ' ')"
   exit 2
 }
 
+mkdir -p "$output_dir/raw/$architecture" "$output_dir/formal/$architecture" "$output_dir/preflight/$architecture"
+initial_login_reset_args=(--architecture "$architecture" --action reset --mysql-container "$mysql_container" --project "$project")
+if [[ -n "$assessment_container" ]]; then initial_login_reset_args+=(--assessment-container "$assessment_container"); fi
+initial_login_reset_log="$output_dir/formal/$architecture/initial-login-reset.log"
+bash "$dataset_script" "${initial_login_reset_args[@]}" | tee "$initial_login_reset_log"
+curl --fail --silent --show-error "$base_url$readiness_path" >/dev/null
+
 benchmark_tokens=()
 for student_number in $(seq 1 "$virtual_students"); do
   student_account="$(printf 'perf307_student%03d' "$student_number")"
@@ -112,7 +119,6 @@ done
 token_json="$(node -e 'process.stdout.write(JSON.stringify(process.argv.slice(1)))' "${benchmark_tokens[@]}")"
 resource_sha="$(shasum -a 256 "$resource_policy_evidence" | awk '{print $1}')"
 environment_ready_signal='ENVIRONMENT_READY issue=#318 sha=2d6160fe570f60bba73922640cb8a58bdb692b97 endpoint=http://127.0.0.1:18080 workloads=9 migrations=4 evidence=https://github.com/Cr4zyorange/OnlineJudge/pull/363 actions=https://github.com/Cr4zyorange/OnlineJudge/actions/runs/33500641015'
-mkdir -p "$output_dir/raw/$architecture" "$output_dir/formal/$architecture" "$output_dir/preflight/$architecture"
 
 export OJ_PERF_COURSE_ID=3071001
 export OJ_PERF_HOMEWORK_ID=3072001
