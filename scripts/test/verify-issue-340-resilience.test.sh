@@ -111,6 +111,15 @@ grep -Fq -- 'grade_consumer_state' "$runner" \
   || fail 'runner must retain the observed Grade consumer topology state'
 grep -Fq -- 'gradeDlqMessages' "$runner" \
   || fail 'runner must retain the Grade dead-letter count when a source event is not projected'
+python3 - "$repo_root/services/grade/src/main/java/com/onlinejudge/gradeservice/messaging/SourceGradeRabbitConsumer.java" <<'PY'
+from pathlib import Path
+import sys
+
+text = Path(sys.argv[1]).read_text(encoding="utf-8")
+invalid = text[text.index('catch (IllegalArgumentException invalidEnvelope)') : text.index('catch (Exception temporaryFailure)')]
+assert 'log.warn' in invalid and 'invalidEnvelope.getMessage()' in invalid, invalid
+assert 'message.getBody' not in invalid and 'new String' not in invalid, invalid
+PY
 python3 - "$repo_root/deploy/platform/workloads.json" <<'PY'
 import json
 import sys
