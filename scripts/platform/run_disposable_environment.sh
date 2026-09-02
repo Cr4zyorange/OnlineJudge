@@ -109,7 +109,7 @@ trap cleanup EXIT
 
 random_secret() { openssl rand -hex 24; }
 identity_key="$(openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 2>/dev/null | openssl pkcs8 -topk8 -nocrypt -outform DER | base64 | tr -d '\n')"
-base64url() { base64 | tr -d '\n=' | tr '+/' '-_'; }
+base64url() { base64 | tr -d '\n=' | tr '+' '-' | tr '/' '_'; }
 mint_service_token() {
   local subject="$1" audience="$2"
   shift 2

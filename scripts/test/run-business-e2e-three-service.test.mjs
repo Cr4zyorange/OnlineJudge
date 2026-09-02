@@ -71,6 +71,7 @@ test('mints a scoped Course service JWT for Assessment in the disposable runtime
     /assessment_course_identity="\$\(mint_service_token assessment-api course course\.authorizations\.read\)"/
   );
   assert.match(runner, /ASSESSMENT_SERVICE_IDENTITY=%s\\n' "\$assessment_course_identity"/);
+  assert.match(runner, /tr '\+' '-' \| tr '\/' '_'/);
 });
 
 test('uses audience-specific Grade service identities in the disposable environment', () => {
