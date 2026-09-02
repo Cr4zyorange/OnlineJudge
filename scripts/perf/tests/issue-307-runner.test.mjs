@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import http from "node:http";
 import test from "node:test";
 
@@ -166,6 +167,14 @@ test("HTTP runner spaces each virtual student's requests at the configured inter
 
   assert.ok(result.requests.length >= 2, "the measured phase should issue more than one paced request");
   assert.ok(result.requests.length <= 4, "the interval must prevent an unbounded tight request loop");
+});
+
+test("formal measurement rechecks Docker exclusivity with every resource sample", () => {
+  const source = readFileSync(new URL("../issue-307.mjs", import.meta.url), "utf8");
+  assert.match(source, /assertExclusiveDockerContainers/);
+  assert.match(source, /sampleResources:\s*async\s*\(\)\s*=>\s*\{[\s\S]*assertExclusiveDockerContainers/);
+  const runnerSource = readFileSync(new URL("../issue-307-runner.mjs", import.meta.url), "utf8");
+  assert.match(runnerSource, /"ps", "--no-trunc", "--format", "\{\{\.ID\}\}"/);
 });
 
 test("reports include every required unit and avoid causal performance claims", () => {

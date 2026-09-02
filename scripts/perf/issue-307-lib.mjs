@@ -256,6 +256,11 @@ function assertFormalWindow(raw) {
     typeof window.resourcePolicyEvidence === "string" && window.resourcePolicyEvidence.length > 0,
     `${raw.architecture}/${raw.scenario}/round-${raw.round} lacks resource policy evidence`,
   );
+  invariant(
+    Array.isArray(raw.resourceSamples) && raw.resourceSamples.length > 0 &&
+      raw.resourceSamples.every(({ exclusiveWindow }) => exclusiveWindow === true),
+    `${raw.architecture}/${raw.scenario}/round-${raw.round} lacks continuous exclusive-window evidence`,
+  );
   const contaminants = [
     ["HPA", window.hpaEnabled],
     ["E2E", window.e2eRunning],

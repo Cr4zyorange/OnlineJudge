@@ -140,8 +140,8 @@ function rawRound({ architecture, scenario, round, contaminated = false, machine
       { durationMs: 40, status: 200, ok: true },
     ],
     resourceSamples: [
-      { atMs: 0, cpuPercent: 10, memoryMiB: 100 },
-      { atMs: 1000, cpuPercent: 30, memoryMiB: 140 },
+      { atMs: 0, cpuPercent: 10, memoryMiB: 100, exclusiveWindow: true },
+      { atMs: 1000, cpuPercent: 30, memoryMiB: 140, exclusiveWindow: true },
     ],
   };
 }

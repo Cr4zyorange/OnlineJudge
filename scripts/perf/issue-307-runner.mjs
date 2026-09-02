@@ -291,6 +291,18 @@ function runCommand(command, args) {
   });
 }
 
+export async function assertExclusiveDockerContainers(containers) {
+  invariant(Array.isArray(containers) && containers.length > 0, "at least one exclusive Docker container is required");
+  const expected = [...new Set(containers)].sort();
+  invariant(expected.length === containers.length, "exclusive Docker container list contains duplicates");
+  const live = (await runCommand("docker", ["ps", "--no-trunc", "--format", "{{.ID}}"])).split(/\r?\n/).filter(Boolean).sort();
+  invariant(
+    live.length === expected.length && live.every((container, index) => container === expected[index]),
+    `formal window is not exclusive: expected ${expected.length} benchmark containers, found ${live.length} running containers`,
+  );
+  return { expectedContainerCount: expected.length, observedContainerCount: live.length };
+}
+
 export async function sampleDockerResources(containers) {
   invariant(Array.isArray(containers) && containers.length > 0, "at least one Docker container is required");
   const output = await runCommand("docker", [

@@ -10,6 +10,7 @@ import { gunzipSync } from "node:zlib";
 
 import { aggregateComparison, machineFingerprint, validatePlan } from "./issue-307-lib.mjs";
 import {
+  assertExclusiveDockerContainers,
   renderCsvReport,
   renderMarkdownReport,
   runHttpLoadRound,
@@ -162,6 +163,7 @@ async function runCommand(options) {
     .map((value) => value.trim())
     .filter(Boolean);
   invariant(containers.length > 0, `${architecture.containersEnv} must contain at least one container`);
+  await assertExclusiveDockerContainers(containers);
   const fingerprint = machineFingerprint();
   const startedAt = new Date().toISOString();
   const measured = await runHttpLoadRound({
@@ -171,7 +173,14 @@ async function runCommand(options) {
     environment: process.env,
     load: plan.load,
     resourceSampleIntervalMs: plan.environment.resourceSampleIntervalMs,
-    sampleResources: () => sampleDockerResources(containers),
+    sampleResources: async () => {
+      const exclusivity = await assertExclusiveDockerContainers(containers);
+      return {
+        ...(await sampleDockerResources(containers)),
+        exclusiveWindow: true,
+        observedLiveContainers: exclusivity.observedContainerCount,
+      };
+    },
   });
   const baselineSha = plan.baselines[architecture.baseline].sha;
   const raw = {
