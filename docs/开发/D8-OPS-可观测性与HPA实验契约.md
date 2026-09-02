@@ -25,3 +25,14 @@ python3 scripts/platform/validate_observability_experiment.py \
 ```
 
 该验证只证明配置和证据契约；不将其表述为 AC-319-01 至 AC-319-05 的真实环境 GREEN。
+
+`#318` 的 Kubernetes 渲染器会把 `autoscaling/v2` Assessment API HPA 与其 Deployment 放在同一 applications stage。环境 Ready 后，使用一个已预置身份和业务事实、且返回 2xx 的 Assessment 业务链 URL 执行实验；该显式参数避免在仓库或证据中嵌入凭据：
+
+```sh
+bash scripts/platform/run_hpa_observability_experiment.sh \
+  --namespace onlinejudge-platform \
+  --gateway-url http://<gateway-address> \
+  --request-url http://<gateway-address>/<authenticated-assessment-business-chain>
+```
+
+实验入口会在 `output/issue-319/<sha>/<utc>/` 保留 HPA/Pod/资源时间线、每次请求的原始耗时和状态、Gateway/Assessment/Grade 日志及 RabbitMQ queue 计数；无论成功或失败均输出证据目录。`kubectl top` 不可用会失败关闭，不能把无 Metrics API 的运行称为扩缩容实验。
