@@ -7,6 +7,7 @@ import {
   createGrdSummaryFixtureLabPayload,
   isSuccessfulSummary,
   normalizeBareLabCreateResponse,
+  normalizeBareLabSubmissionResponse,
   parseStudentGradeSummaryIdentifier,
   parsePositiveIdentifier,
   redact,
@@ -59,6 +60,18 @@ test('uses the strict bare LAB response normalizer when publishing the GRD fixtu
   assert.match(
     runner,
     /\/api\/v1\/labs\/\$\{fixtureLabId\}\/publish[\s\S]{0,240}normalizeBareLabCreateResponse/
+  );
+});
+
+test('normalizes only UUID-backed Assessment bare LAB submission responses', () => {
+  const submissionId = '571b37b3-1b3c-47d5-a692-04a21ef2db23';
+  assert.deepEqual(
+    normalizeBareLabSubmissionResponse({ submissionId, status: 'SUBMITTED' }),
+    { data: { submissionId } }
+  );
+  assert.throws(
+    () => normalizeBareLabSubmissionResponse({ submissionId: 'not-a-uuid' }),
+    /UUID submission id/i
   );
 });
 

@@ -90,6 +90,14 @@ export function normalizeBareLabCreateResponse(body) {
   return { data: { id: labId } };
 }
 
+export function normalizeBareLabSubmissionResponse(body) {
+  const submissionId = String(body?.submissionId || '');
+  if (!/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(submissionId)) {
+    throw new Error('Assessment bare LAB submission response must contain a UUID submission id');
+  }
+  return { data: { submissionId } };
+}
+
 export function redact(value, secrets) {
   return secrets.reduce((result, secret) => {
     if (!secret) {
@@ -244,7 +252,7 @@ async function bootstrapScenarioCourse(context, artifactDir) {
       'x-request-id': `issue320-bootstrap-source-submit-${Date.now()}`
     },
     body: sourceSubmission
-  }, 'bootstrap submit GRD source LAB');
+  }, 'bootstrap submit GRD source LAB', normalizeBareLabSubmissionResponse);
   const fixtureSubmissionId = String(fixtureSubmission?.data?.submissionId || '');
   if (!/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(fixtureSubmissionId)) {
     throw new Error('GRD source LAB submission bootstrap response must contain a UUID submission id');
