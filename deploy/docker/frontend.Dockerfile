@@ -3,7 +3,10 @@ FROM node:22-alpine@sha256:c610fcdfb1d5b4740dd70c284ed3cb16bb857e0f7166196e36a55
 WORKDIR /workspace
 
 COPY frontend/package*.json ./
-RUN --mount=type=cache,target=/root/.npm npm ci
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci --no-audit --no-fund --fetch-retries=5 \
+      --fetch-retry-mintimeout=2000 --fetch-retry-maxtimeout=30000 \
+      --fetch-timeout=300000
 
 COPY frontend ./
 RUN npm run build
