@@ -1,0 +1,36 @@
+{
+  "generatedAt": "2026-09-02T06:12:40.559Z",
+  "totals": {
+    "endpoints": 122,
+    "mapped": 122,
+    "unmapped": 0
+  },
+  "byService": {
+    "assessment": {
+      "total": 27,
+      "mapped": 27,
+      "unmapped": 0
+    },
+    "course": {
+      "total": 42,
+      "mapped": 42,
+      "unmapped": 0
+    },
+    "gateway": {
+      "total": 9,
+      "mapped": 9,
+      "unmapped": 0
+    },
+    "grade": {
+      "total": 21,
+      "mapped": 21,
+      "unmapped": 0
+    },
+    "identity": {
+      "total": 23,
+      "mapped": 23,
+      "unmapped": 0
+    }
+  },
+  "unmapped": []
+}
