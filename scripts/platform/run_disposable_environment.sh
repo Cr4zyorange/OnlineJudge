@@ -65,6 +65,7 @@ mkdir -p "$output_dir"
 compose_file="$output_dir/compose.yml"
 kubernetes_file="$output_dir/platform.yaml"
 runtime_env="$(mktemp "${TMPDIR:-/tmp}/onlinejudge-issue318.XXXXXX")"
+runtime_env_ready=0
 project_name="oj318-${git_sha:0:12}-${run_id##*-}"
 compose=(docker compose --project-name "$project_name" --env-file "$runtime_env" --file "$compose_file")
 
@@ -76,17 +77,22 @@ cleanup() {
   if (( keep )); then
     printf 'DISPOSABLE_ENVIRONMENT_KEPT project=%s compose=%s\n' "$project_name" "$compose_file" >&2
   else
-    if ! "${compose[@]}" down --volumes --remove-orphans > "$output_dir/cleanup-command.log" 2>&1; then
-      cleanup_status=1
-    fi
-    while IFS= read -r cleanup_container; do
-      [[ -n "$cleanup_container" ]] && cleanup_containers+=("$cleanup_container")
-    done < <("${compose[@]}" ps --all --format '{{.Name}}' 2>/dev/null || true)
-    while IFS= read -r cleanup_volume; do
-      [[ -n "$cleanup_volume" ]] && cleanup_volumes+=("$cleanup_volume")
-    done < <(docker volume ls --quiet --filter "label=com.docker.compose.project=$project_name" 2>/dev/null || true)
-    if ((${#cleanup_containers[@]} || ${#cleanup_volumes[@]})); then
-      cleanup_status=1
+    # A build can fail before the disposable Compose credentials exist. No
+    # Compose command has run at that point, so do not turn its absent required
+    # variables into a misleading cleanup failure.
+    if (( runtime_env_ready )); then
+      if ! "${compose[@]}" down --volumes --remove-orphans > "$output_dir/cleanup-command.log" 2>&1; then
+        cleanup_status=1
+      fi
+      while IFS= read -r cleanup_container; do
+        [[ -n "$cleanup_container" ]] && cleanup_containers+=("$cleanup_container")
+      done < <("${compose[@]}" ps --all --format '{{.Name}}' 2>/dev/null || true)
+      while IFS= read -r cleanup_volume; do
+        [[ -n "$cleanup_volume" ]] && cleanup_volumes+=("$cleanup_volume")
+      done < <(docker volume ls --quiet --filter "label=com.docker.compose.project=$project_name" 2>/dev/null || true)
+      if ((${#cleanup_containers[@]} || ${#cleanup_volumes[@]})); then
+        cleanup_status=1
+      fi
     fi
     cleanup_arguments=("$output_dir/cleanup-summary.json" "$project_name" "$cleanup_status")
     if ((${#cleanup_containers[@]})); then cleanup_arguments+=("${cleanup_containers[@]}"); fi
@@ -175,6 +181,7 @@ umask 077
   printf 'GRADE_COURSE_SERVICE_IDENTITY=%s\n' "$grade_course_identity"
   printf 'GRADE_ASSESSMENT_SERVICE_IDENTITY=%s\n' "$grade_assessment_identity"
 } > "$runtime_env"
+runtime_env_ready=1
 
 collect_diagnostics() {
   local reason="$1"

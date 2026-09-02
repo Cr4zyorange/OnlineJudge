@@ -102,6 +102,12 @@ class DisposableEnvironmentScriptsTest(unittest.TestCase):
         self.assertNotIn('"${cleanup_containers[@]}" -- "${cleanup_volumes[@]}"', source)
         self.assertIn("cleanup-summary.json", source)
 
+    def test_run_command_does_not_report_a_cleanup_failure_before_runtime_env_exists(self) -> None:
+        source = self.assert_help(RUN)
+        self.assertIn('runtime_env_ready=0', source)
+        self.assertIn('runtime_env_ready=1', source)
+        self.assertIn('if (( runtime_env_ready )); then', source)
+
     def test_run_command_collects_post_hook_diagnostics_before_propagating_failure(self) -> None:
         source = self.assert_help(RUN)
         self.assertIn("collect_diagnostics after-ready-success", source)
