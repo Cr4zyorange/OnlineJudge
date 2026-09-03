@@ -1,0 +1,9 @@
+== listing checks on FINAL (autocrlf=false) archives ==
+final_gzip_integrity=PASS
+final: pax_header_entries=0 file_entries_excl_meta=5043 git_tracked=4170
+final: top_level=onlinejudge-final-977338f4 
+final_traversal=NONE
+monolith_gzip_integrity=PASS
+monolith: pax_header_entries=0 file_entries_excl_meta=1247 git_tracked=1038
+monolith: top_level=onlinejudge-monolith-start-78715f21 
+monolith_traversal=NONE

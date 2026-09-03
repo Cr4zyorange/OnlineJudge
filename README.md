@@ -166,7 +166,7 @@ docker compose -f deploy/docker/compose.yml down --volumes --remove-orphans
 - GitHub Secrets 和 Kubernetes Secret 只使用 `MYSQL_PASSWORD`、`MYSQL_ROOT_PASSWORD`、`ONLINEJUDGE_NOTIFICATIONS_INTERNAL_TOKEN` 三个键名，文档、日志和镜像都不得写入其值。
 - 完成交付时，backend liveness 为 `/api/v1/system/health`，数据库感知 readiness 为 `/api/v1/system/readiness`；Kind 验收还必须经 frontend 代理检查 readiness。
 
- #287、#289、#288（PR #303）、#290（PR #298）和 #292（PR #329）均已合入当前 `origin/dev@5cdbe8533991bb0c7cfbe23e08d81b78d47af483`。该 SHA 的目标仓库交付 run [33227922081](https://github.com/Cr4zyorange/OnlineJudge/actions/runs/33227922081) 已成功完成；它消费同一 SHA 的质量门禁、构建精确镜像、临时部署 Kind 并归档运行证据。未参与实现的人仍必须在干净 checkout 复演本地入口，并记录环境、完整 SHA、实际命令、服务/测试/资源数量、退出码和未经改写的输出。
+ #287、#289、#288（PR #303）、#290（PR #298）和 #292（PR #329）均已合入 `dev`。源码交付冻结于 `origin/dev@977338f414a8cb72df157b139c8546d870e8bf23`（2026-09-03T17:03:42+08:00）；历史 run 的成功/失败证据及其与精确 SHA 的对应关系，以 [submission/03_devops/ACTIONS-MANIFEST.md](submission/03_devops/ACTIONS-MANIFEST.md) 和 `submission/03_devops/evidence/` 为唯一正本，本 README 不复制会漂移的 run 链接。未参与实现的人仍必须在干净 checkout 复演本地入口，并记录环境、完整 SHA、实际命令、服务/测试/资源数量、退出码和未经改写的输出。
 
 本地完整 Kind 复演在完成镜像构建后执行。把 `D3_EVIDENCE_DIR` 放在 checkout 外部，避免在构建前制造未跟踪文件；无论 GREEN 或受控 RED 都必须删除临时集群。
 
@@ -189,6 +189,27 @@ bash scripts/ci/verify-workflow-gates.test.sh
 ```
 
 详细说明（作业链、版本固定、Action 固定、Secrets 声明与本地运行方式）见 [docs/开发/CI-质量门禁开发流程.md](docs/开发/CI-质量门禁开发流程.md)。
+
+## 源码交付冻结基线（#378）
+
+最终交付的源码在 checkout 外的 detached 干净 worktree 中冻结并审计：
+
+- 改造前：标签 `monolith-start`（annotated tag 对象 `515bd6bebd007b2c279ed8463eeb68d6cbd3bb4e`），指向 commit `78715f21288782a2c7ef1d9c23f933c46569b108`（2026-08-25T14:50:18+08:00，PR #260 合并）。
+- 改造后：`origin/dev@977338f414a8cb72df157b139c8546d870e8bf23`（tree `90acd5ca195b6e24e0ba90ba7db9ee9dfce05280`，2026-09-03T17:03:42+08:00，PR #383 合并）。冻结时 `git status --porcelain` 为空，monolith-start 为该 SHA 的祖先。
+- 两版本完整源码归档、全历史 `git bundle`、逐文件 SOURCE-MANIFEST 与 SHA-256 的索引见 [submission/01_source/INDEX.md](submission/01_source/INDEX.md)；归档实物体积约 1.7 GB，存放在 checkout 外的交付目录并随最终压缩包分发，仓库内只保留索引、清单、哈希与验证证据。
+
+### 环境与服务事实（与冻结 SHA 一致）
+
+| 项 | 值 |
+| --- | --- |
+| 后端运行时 / 构建 | Eclipse Temurin JRE 21（digest 固定）；构建用 `maven:3.9.9-eclipse-temurin-21` |
+| 前端构建 / 运行 | Node.js 22（`node:22-alpine`，digest 固定）+ Nginx 1.27 |
+| 数据库 / 消息中间件 | MySQL 8.4、RabbitMQ 4.1（`rabbitmq:4.1-management`） |
+| 对外端口 | 仅前端 `OJ_HTTP_PORT`（默认 `8088`）映射到宿主机；服务间经 Compose/Kubernetes 内部网络通信 |
+| 健康存活 | `GET /api/v1/system/health` |
+| 数据库就绪 | `GET /api/v1/system/readiness`（Identity，容器内 HTTPS 8080）；Course 服务 `https://127.0.0.1:8082/actuator/health/readiness` |
+| 版本核对 | `GET /api/v1/system/version` |
+| 演示账号 / 初始化数据 | 见上文「演示账号」与「MySQL 干净启动与保留数据升级」；种子与 DEV/CI 数据为 `database/seeds/dev-ci.sql` |
 
 ## 代码目录组织结构
 
