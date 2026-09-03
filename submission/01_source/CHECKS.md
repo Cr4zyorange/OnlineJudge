@@ -2,7 +2,7 @@
 
 计数口径：每项检查记 PASS / FAIL / BLOCKED；`total = pass + fail + blocked`。原始输出全部在本目录 `evidence/`。
 
-**总计：total=32，pass=32，fail=0，blocked=0。**
+**总计：total=34，pass=34，fail=0，blocked=0。**
 
 ## AC-SOURCE-01 冻结对象与时间可审计，候选值未冒充最终值 — PASS
 
@@ -20,6 +20,7 @@
 | --- | --- | --- |
 | gzip 完整性（两版） | PASS ×2 | `evidence/archive-listing-check.txt` |
 | 全量解压（`tar -xzf` 到 checkout 外短路径） | PASS ×2 | `evidence/archive-recheck.txt`、`evidence/archive-monolith-recheck.txt` |
+| 仓库内分卷交付：final 8 卷 + monolith 5 卷（90MB/卷，规避 GitHub 100MB 单文件限制），`cat` 合卷后 SHA-256 与原始归档一致（`dad14afa…`/`a47866ac…`） | PASS ×2 | `evidence/archive-parts-reassembly.txt`、`SHA256SUMS`（含逐卷哈希） |
 | 构建入口存在：`backend/pom.xml`、`services/{course,assessment,grade,identity}/pom.xml`、`frontend/package.json`+`package-lock.json`、`database/mysql/compose-schema.sql`、`database/seeds/dev-ci.sql`、`database/migrations/manifest.txt`（30 个迁移 SQL）、`deploy/docker/compose.yml`、两个 Dockerfile、`scripts/dev/start-dev.sh`、`scripts/docker/build-images.sh` | PASS（16 项 OK） | `evidence/archive-recheck.txt` [6] |
 | `services/gateway` 形态核对 | PASS（Nginx 形态：`Dockerfile`+`nginx.conf`+`entrypoint.sh`，无 pom.xml 属预期） | 同上 |
 | `frontend/package.json` JSON 语法（node 解析） | PASS | `evidence/archive-recheck.txt` [7] |

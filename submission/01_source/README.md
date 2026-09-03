@@ -15,7 +15,8 @@
 
 | 文件/目录 | 说明 |
 | --- | --- |
-| `INDEX.md` | 总索引：外部归档实物位置、哈希、验证结论汇总 |
+| `INDEX.md` | 总索引：归档分卷、外部实物位置、哈希、验证结论汇总 |
+| `archives/` | **两版源码归档本体（90MB 分卷共 13 卷）**：`cat` 合卷即得与原始归档逐字节一致的 tar.gz，合卷 SHA-256 见 INDEX 与 `evidence/archive-parts-reassembly.txt` |
 | `SOURCE-MANIFEST.md` | 清单说明；逐文件清单见两个 `.tsv`（mode/blob SHA/大小/路径） |
 | `source-manifest-final-977338f4.tsv` | FINAL 版 4170 个跟踪文件的逐文件清单 |
 | `source-manifest-monolith-start-78715f21.tsv` | monolith-start 版 1038 个跟踪文件的逐文件清单 |
@@ -25,17 +26,21 @@
 | `evidence/` | 冻结审计、归档命令、解压复算、哈希抽验、敏感信息扫描、bundle verify/clone 原始输出 |
 | `snapshots/` | `git-log-dev-full.txt`（1065 提交）、`refs-all.txt`（91 引用）、`tags.txt` |
 
-大体积归档实物（两版 tar.gz 共约 1.0 GB 与全历史 `git bundle` 约 0.8 GB）不进入 git 仓库，存放在 checkout 外的交付目录 `../d10-01_source-delivery/`，由总控 #321 随最终压缩包与云盘分发；其文件名、字节数与 SHA-256 固化在 `INDEX.md` 与 `evidence/artifact-sha256.txt`。
+两版源码归档本体已按 90MB 分卷随仓库交付（`archives/`，共 13 卷）；全历史 `git bundle`（约 0.8 GB）超过单文件限制，存放在 checkout 外的交付目录 `../d10-01_source-delivery/`，由总控 #321 随最终压缩包与云盘分发。各实物的文件名、字节数与 SHA-256 固化在 `INDEX.md` 与 `evidence/artifact-sha256.txt`。
 
 ## 快速复核
 
 ```bash
-# 1. 校验归档完整性（在交付目录内，对照 evidence/artifact-sha256.txt 中的哈希）
-sha256sum source-onlinejudge-final-*.tar.gz source-onlinejudge-monolith-start-*.tar.gz history-onlinejudge-all-20260903.bundle
-gzip -t source-onlinejudge-final-977338f4*.tar.gz
+# 0. 合卷得到两版归档本体（在本目录 archives/ 内）
+cat archives/source-onlinejudge-monolith-start-*.part-* > monolith-start.tar.gz
+cat archives/source-onlinejudge-final-*.part-* > final-977338f4.tar.gz
+
+# 1. 校验归档完整性（哈希值见 INDEX.md / evidence/artifact-sha256.txt）
+sha256sum monolith-start.tar.gz final-977338f4.tar.gz
+gzip -t final-977338f4.tar.gz
 
 # 2. 解压后回读（FINAL 应得 4170 个文件、726,533,045 字节）
-tar -xzf source-onlinejudge-final-977338f4*.tar.gz
+tar -xzf final-977338f4.tar.gz
 find onlinejudge-final-977338f4 -type f | wc -l
 
 # 3. 提交记录离线可读

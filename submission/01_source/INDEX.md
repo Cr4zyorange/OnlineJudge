@@ -3,9 +3,28 @@
 生成时间：2026-09-03（Asia/Shanghai，UTC+8）；冻结执行者：linkverb0510。
 冻结基线：`origin/dev@977338f414a8cb72df157b139c8546d870e8bf23`；改造前基线：`monolith-start` → `78715f21288782a2c7ef1d9c23f933c46569b108`。
 
-## 归档实物（checkout 外交付目录）
+## 归档实物
 
-位置：`<repo 父目录>/d10-01_source-delivery/`（开发机路径 `OJSE\d10-01_source-delivery\`）；由总控 #321 随最终压缩包与云盘分发。生成与复核命令见 `evidence/archive-commands.txt`。
+### 仓库内交付（本目录 `archives/`，90MB 分卷）
+
+两版全量源码归档本体以 90MB 分卷随仓库交付（规避 GitHub 单文件 100MB 限制），`cat` 顺序合卷后与原始归档字节一致（合卷 SHA-256 已复算核验，见 `evidence/archive-parts-reassembly.txt`）：
+
+| 归档 | 分卷 | 合卷后字节 | 合卷后 SHA-256 |
+| --- | --- | --- | --- |
+| `archives/source-onlinejudge-monolith-start-78715f21288782a2c7ef1d9c23f933c46569b108.tar.gz.part-00～04` | 5 卷 | 381,091,605 | `a47866ac3add09020a13af9547347045fafb3de78261e69bd5f1d6e0310f5492` |
+| `archives/source-onlinejudge-final-977338f414a8cb72df157b139c8546d870e8bf23.tar.gz.part-00～07` | 8 卷 | 667,008,167 | `dad14afad843b7f00ca0f1780c9be647cec4e44d3e3b525b9107664690d40847` |
+
+合卷与校验：
+
+```bash
+cat source-onlinejudge-monolith-start-*.tar.gz.part-* > monolith-start.tar.gz
+cat source-onlinejudge-final-*.tar.gz.part-* > final-977338f4.tar.gz
+# 对合卷文件执行 sha256sum，应得到上表哈希；随后按 README「快速复核」解压回读
+```
+
+### 仓库外补充（checkout 外交付目录）
+
+位置：`<repo 父目录>/d10-01_source-delivery/`（开发机路径 `OJSE\d10-01_source-delivery\`）；含同样两版归档的原始单文件与全历史 git bundle（约 0.8 GB，由总控 #321 随最终压缩包与云盘分发）。生成与复核命令见 `evidence/archive-commands.txt`。
 
 | 文件 | 字节 | SHA-256 | 内容 |
 | --- | --- | --- | --- |
