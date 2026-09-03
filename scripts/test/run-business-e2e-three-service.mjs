@@ -39,6 +39,12 @@ export function validateContext(context) {
   if (typeof context.evidenceDir !== 'string' || !context.evidenceDir.trim()) {
     throw new Error('three-service context must provide an evidence directory');
   }
+  if (typeof context.composeFile !== 'string' || !context.composeFile.trim()) {
+    throw new Error('three-service context must provide its Compose file for post-E2E runtime evidence');
+  }
+  if (typeof context.composeEnvFile !== 'string' || !context.composeEnvFile.trim()) {
+    throw new Error('three-service context must provide its Compose environment file for post-E2E runtime evidence');
+  }
   return context;
 }
 
@@ -410,11 +416,9 @@ async function writePrivateFile(path, content) {
 }
 
 async function captureRuntimeLogs(context, artifactDir) {
-  if (typeof context.composeFile !== 'string' || !context.composeFile.trim()) {
-    throw new Error('three-service context must provide its Compose file for post-E2E runtime evidence');
-  }
   const output = await capture('docker', [
-    'compose', '--project-name', context.projectName, '--file', context.composeFile, 'logs', '--no-color'
+    'compose', '--project-name', context.projectName, '--env-file', context.composeEnvFile,
+    '--file', context.composeFile, 'logs', '--no-color'
   ], { cwd: repositoryRoot, env: process.env });
   const rawLogPath = join(artifactDir, 'three-service-runtime-evidence.log');
   await writePrivateFile(rawLogPath, redact(output, [process.env.E2E_THREE_SERVICE_TOKEN || '']));

@@ -240,7 +240,7 @@ collect_diagnostics success
 
 base_url="http://127.0.0.1:${GATEWAY_HTTP_PORT:-18080}"
 context_file="$output_dir/three-service-context.json"
-"$python_bin" - "$context_file" "$git_sha" "$project_name" "$base_url" "$compose_file" "$output_dir" <<'PY'
+"$python_bin" - "$context_file" "$git_sha" "$project_name" "$base_url" "$compose_file" "$runtime_env" "$output_dir" <<'PY'
 import json
 import sys
 
@@ -250,7 +250,8 @@ with open(sys.argv[1], "w", encoding="utf-8") as output:
         "projectName": sys.argv[3],
         "baseUrl": sys.argv[4],
         "composeFile": sys.argv[5],
-        "evidenceDir": sys.argv[6],
+        "composeEnvFile": sys.argv[6],
+        "evidenceDir": sys.argv[7],
         "workloads": 9,
     }, output, indent=2)
     output.write("\n")

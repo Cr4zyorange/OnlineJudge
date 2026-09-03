@@ -125,6 +125,19 @@ test('rejects a context that is not a nine-workload loopback platform', () => {
   );
 });
 
+test('requires the disposable Compose environment file for post-E2E runtime evidence', () => {
+  assert.throws(
+    () => validateContext({
+      workloads: 9,
+      baseUrl: 'http://127.0.0.1:18080',
+      projectName: 'oj318-deadbeef-1',
+      evidenceDir: '/private/tmp/evidence',
+      composeFile: '/private/tmp/compose.yml'
+    }),
+    /Compose environment file/i
+  );
+});
+
 test('requires exactly 24 passed with no failed or skipped tests', () => {
   assert.equal(isSuccessfulSummary({ total: 24, passed: 24, failed: 0, skipped: 0 }), true);
   assert.equal(isSuccessfulSummary({ total: 24, passed: 23, failed: 0, skipped: 1 }), false);
