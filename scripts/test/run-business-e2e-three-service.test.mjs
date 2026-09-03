@@ -164,10 +164,10 @@ test('requires three independent browser-to-runtime representative evidence chai
       uiAssertion: { route: '/courses/418', selector: 'button[name="管理章节"]', expected: 'visible', screenshot: screenshot('auth'), junitCase: authCase }
     },
     {
-      group: 'ASSESSMENT-WORKER', proofId: 'task-519',
+      group: 'ASSESSMENT-WORKER', proofId: 'task-e640c4ad-6bd5-4ad4-b5f4-48c740f7df55',
       chain: {
         submit: { method: 'POST', path: '/api/v1/homeworks/418/submissions', status: 201, response: { submissionId: 419, evaluationStatus: 'PENDING' } },
-        finalRead: { method: 'GET', path: '/api/v1/submissions/419/evaluation', status: 200, response: { submissionId: 419, taskId: 519, taskState: 'SUCCEEDED', evaluationStatus: 'ACCEPTED', score: 100 } }
+        finalRead: { method: 'GET', path: '/api/v1/submissions/419/evaluation', status: 200, response: { submissionId: 419, taskId: 'e640c4ad-6bd5-4ad4-b5f4-48c740f7df55', taskState: 'SUCCEEDED', evaluationStatus: 'ACCEPTED', score: 100 } }
       },
       uiAssertion: { route: '/courses/418/homeworks/1/submissions/419/result', selector: '[data-testid="evaluation-score"]', expected: '100', screenshot: screenshot('worker'), junitCase: workerCase }
     },
@@ -183,8 +183,8 @@ test('requires three independent browser-to-runtime representative evidence chai
   const logs = [
     'gateway | "GET /api/v1/courses/418 HTTP/1.1" 200',
     'gateway | "GET /api/v1/submissions/419/evaluation HTTP/1.1" 200 early-poll',
-    'assessment | homework_submission_queued publicSubmissionId=419 submissionId=internal-419 taskId=519',
-    'assessment | assessment_worker_terminal taskId=519 submissionId=internal-419 sourceType=HWK taskState=SUCCEEDED evaluationStatus=ACCEPTED score=100',
+    'assessment | homework_submission_queued publicSubmissionId=419 submissionId=internal-419 taskId=e640c4ad-6bd5-4ad4-b5f4-48c740f7df55',
+    'assessment | assessment_worker_terminal taskId=e640c4ad-6bd5-4ad4-b5f4-48c740f7df55 submissionId=internal-419 sourceType=HWK taskState=SUCCEEDED evaluationStatus=ACCEPTED score=100',
     'gateway | "GET /api/v1/submissions/419/evaluation HTTP/1.1" 200',
     'gateway | "GET /api/v1/notifications?type=GRADE&size=100 HTTP/1.1" 200 early-poll',
     'course | lrn_notification_projected eventId=event-617 correlationId=correlation-617 sourceModule=GRD sourceId=617 notificationIds=[620]',
@@ -202,7 +202,7 @@ test('requires three independent browser-to-runtime representative evidence chai
   assert.match(manifest.representative[2].logExcerpt, /notifications\?type=GRADE/);
   assert.throws(() => buildRepresentativeEvidence({
     baseUrl: 'http://127.0.0.1:18080', logs, junit,
-    records: [...records.slice(0, 2), { ...records[2], proofId: 'task-519' }]
+    records: [...records.slice(0, 2), { ...records[2], proofId: 'task-e640c4ad-6bd5-4ad4-b5f4-48c740f7df55' }]
   }), /distinct/i);
   assert.throws(() => buildRepresentativeEvidence({
     baseUrl: 'http://127.0.0.1:18080', logs, junit,

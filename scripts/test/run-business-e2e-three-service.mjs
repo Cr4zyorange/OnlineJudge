@@ -182,6 +182,14 @@ function positiveIdentity(value, label) {
   return number;
 }
 
+function stableIdentity(value, label) {
+  const identity = String(value ?? '').trim();
+  if (!identity) {
+    throw new Error(`${label} must be a nonblank stable identity`);
+  }
+  return identity;
+}
+
 function findRuntimeLine(logs, label, needles) {
   const lines = logs.split(/\r?\n/);
   const offset = lines.findIndex((line) => needles.every((needle) => line.includes(needle)));
@@ -270,7 +278,7 @@ export function buildRepresentativeEvidence({ baseUrl, records, logs, junit }) {
   }
   const publicSubmissionId = positiveIdentity(workerSubmit.response.submissionId, 'ASSESSMENT-WORKER public submission id');
   const workerRead = requireOperation(worker, 'finalRead', 'GET', `/api/v1/submissions/${publicSubmissionId}/evaluation`);
-  const taskId = positiveIdentity(workerRead.response.taskId, 'ASSESSMENT-WORKER task id');
+  const taskId = stableIdentity(workerRead.response.taskId, 'ASSESSMENT-WORKER task id');
   if (worker?.proofId !== `task-${taskId}`
     || positiveIdentity(workerRead.response.submissionId, 'ASSESSMENT-WORKER final read submission id') !== publicSubmissionId
     || workerRead.response.taskState !== 'SUCCEEDED') {

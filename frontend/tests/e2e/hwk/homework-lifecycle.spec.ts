@@ -62,7 +62,7 @@ interface SubmissionRecord {
 
 interface EvaluationResult {
   submissionId: number;
-  taskId: number;
+  taskId: string;
   taskState: string;
   evaluationStatus: string;
   score: number | null;
@@ -297,7 +297,7 @@ test.describe('@hwk HWK 真实业务闭环', () => {
       evaluationStatus: 'ACCEPTED',
       score: 100
     });
-    expect(acceptedCodeEvaluation.taskId).toBeGreaterThan(0);
+    expect(acceptedCodeEvaluation.taskId).toMatch(/\S/);
     await page.goto(`/courses/${COURSE_ID}/homeworks/${code.id}/submissions/${acceptedCodeSubmission.submissionId}/result`);
     await expect(page.getByTestId('evaluation-score')).toContainText('100');
     const screenshot = await captureIssue320RepresentativeScreenshot(page, 'assessment-worker');
