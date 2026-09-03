@@ -1,8 +1,0 @@
-flowchart LR
-  SOURCES[CRS/LAB/HWK/GRD] -->|业务事件| LRN[LRN 通知服务]
-  LRN --> MEMBERS[CRS 成员过滤]
-  LRN --> IDEM{幂等键+用户唯一?}
-  IDEM -->|新事件| DB[(DB-LRN-04/05)]
-  IDEM -->|重复| SAME[返回 createdCount=0]
-  UI[UI-LRN-04 通知中心] -->|加载/刷新/可配置轮询| DB
-  UI --> TARGET[受控业务路由]

@@ -1,9 +1,0 @@
-sequenceDiagram
-  actor Student as 学生
-  participant System as OnlineJudgeForSE 系统边界
-  Student->>System: OP-GR-04 查询本人课程成绩
-  alt 本人成绩已发布
-    System-->>Student: 返回成绩项明细、加权结果、总评和发布时间
-  else 成绩未发布或学生非课程成员
-    System-->>Student: 返回未发布/无权限提示且不泄露分数
-  end

@@ -1,8 +1,0 @@
-flowchart LR
-  UI[UI-LRN-02 进度页] --> API[API-LRN-02/03]
-  API --> AUTH[AUTH 用户上下文]
-  API --> CRS[CRS 成员校验]
-  API --> LRN[LRN 进度服务]
-  LRN --> DB[(DB-LRN-02/03)]
-  UI --> TARGET[CRS/LAB/HWK 业务页]
-  OFFLINE[同用户本地队列] -->|恢复在线重放| API
