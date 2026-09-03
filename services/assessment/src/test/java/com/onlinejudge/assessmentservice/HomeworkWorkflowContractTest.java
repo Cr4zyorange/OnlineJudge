@@ -156,6 +156,88 @@ class HomeworkWorkflowContractTest {
     }
 
     @Test
+    void homeworkStatisticsDenyStudentsWithFrozenCodeAndAggregateTheActiveRosterForManagers() throws Exception {
+        String courseId = "course-statistics-320";
+        String teacherId = "320101";
+        String submittedStudentId = "320102";
+        String unsubmittedStudentId = "320103";
+        String teacherToken = TestJwtFactory.userToken(KEY, "homework-workflow-kid", teacherId, List.of("TEACHER"));
+        String studentToken = TestJwtFactory.userToken(KEY, "homework-workflow-kid", submittedStudentId, List.of("STUDENT"));
+        String nonManagingTeacherToken = TestJwtFactory.userToken(KEY, "homework-workflow-kid", "320104", List.of("TEACHER"));
+        jdbc.update("INSERT INTO assessment_course_member_projection (course_id, user_id, membership_status, member_version) VALUES (?, ?, 'ACTIVE', 1)", courseId, teacherId);
+        jdbc.update("INSERT INTO assessment_course_member_projection (course_id, user_id, membership_status, member_version) VALUES (?, ?, 'ACTIVE', 1)", courseId, submittedStudentId);
+        jdbc.update("INSERT INTO assessment_course_member_projection (course_id, user_id, membership_status, member_version) VALUES (?, ?, 'ACTIVE', 1)", courseId, unsubmittedStudentId);
+        when(coursePermissions.canManageCourse(courseId, teacherId)).thenReturn(true);
+
+        String created = mockMvc.perform(post("/api/v1/homeworks")
+                        .header("Authorization", "Bearer " + teacherToken)
+                        .header("X-Request-Id", UUID.randomUUID().toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"courseId":"%s","title":"statistics contract","description":"active roster aggregate",
+                                 "type":"OBJECTIVE","deadline":"2030-01-01T12:00:00Z","totalScore":100,"allowResubmit":true,
+                                 "allowLateSubmit":false,"questions":[{"questionType":"SINGLE_CHOICE","stem":"1 + 1 = ?","optionsJson":"[\\"1\\",\\"2\\"]","answerJson":"[\\"2\\"]","score":100,"sortOrder":1}],"testCases":[]}
+                                """.formatted(courseId)))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        long homeworkId = mapper.readTree(created).path("id").asLong();
+        mockMvc.perform(put("/api/v1/homeworks/{homeworkId}/publish", homeworkId)
+                        .header("Authorization", "Bearer " + teacherToken)
+                        .header("X-Request-Id", UUID.randomUUID().toString()))
+                .andExpect(status().isOk());
+        mockMvc.perform(post("/api/v1/homeworks/{homeworkId}/submissions", homeworkId)
+                        .header("Authorization", "Bearer " + studentToken)
+                        .header("X-Request-Id", UUID.randomUUID().toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"answerJson\":\"{\\\"q1\\\":[\\\"2\\\"]}\"}"))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(get("/api/v1/homeworks/{homeworkId}/statistics", homeworkId)
+                        .header("Authorization", "Bearer " + studentToken))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("HWK_4031"))
+                .andExpect(jsonPath("$.data").doesNotExist());
+        mockMvc.perform(get("/api/v1/homeworks/{homeworkId}/statistics", homeworkId)
+                        .header("Authorization", "Bearer " + nonManagingTeacherToken))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("HWK_4031"))
+                .andExpect(jsonPath("$.data").doesNotExist());
+
+        mockMvc.perform(get("/api/v1/homeworks/{homeworkId}/statistics", homeworkId)
+                        .param("page", "1").param("size", "1")
+                        .header("Authorization", "Bearer " + teacherToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"))
+                .andExpect(jsonPath("$.data.homeworkId").value(homeworkId))
+                .andExpect(jsonPath("$.data.courseId").value(courseId))
+                .andExpect(jsonPath("$.data.totalStudentCount").value(2))
+                .andExpect(jsonPath("$.data.submittedCount").value(1))
+                .andExpect(jsonPath("$.data.unsubmittedCount").value(1))
+                .andExpect(jsonPath("$.data.autoEvaluableCount").value(1))
+                .andExpect(jsonPath("$.data.pendingEvaluationCount").value(0))
+                .andExpect(jsonPath("$.data.evaluatedCount").value(1))
+                .andExpect(jsonPath("$.data.pendingReviewCount").value(0))
+                .andExpect(jsonPath("$.data.reviewedCount").value(1))
+                .andExpect(jsonPath("$.data.scoredCount").value(1))
+                .andExpect(jsonPath("$.data.averageScore").value(100))
+                .andExpect(jsonPath("$.data.maxScore").value(100))
+                .andExpect(jsonPath("$.data.minScore").value(100))
+                .andExpect(jsonPath("$.data.scoreDistribution['90-100']").value(1))
+                .andExpect(jsonPath("$.data.unsubmittedPage").value(1))
+                .andExpect(jsonPath("$.data.unsubmittedSize").value(1))
+                .andExpect(jsonPath("$.data.unsubmittedTotal").value(1))
+                .andExpect(jsonPath("$.data.unsubmittedStudentIds[0]").value(320103));
+        mockMvc.perform(get("/api/v1/homeworks/{homeworkId}/statistics", homeworkId)
+                        .param("page", Integer.toString(Integer.MAX_VALUE)).param("size", "100")
+                        .header("Authorization", "Bearer " + teacherToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.unsubmittedPage").value(Integer.MAX_VALUE))
+                .andExpect(jsonPath("$.data.unsubmittedSize").value(100))
+                .andExpect(jsonPath("$.data.unsubmittedTotal").value(1))
+                .andExpect(jsonPath("$.data.unsubmittedStudentIds").isEmpty());
+    }
+
+    @Test
     void codeHomeworkAcceptsTheFrontendLanguageAndTestcasePayload() throws Exception {
         String teacherId = "teacher-code-browser-" + UUID.randomUUID();
         String studentId = "student-code-browser-" + UUID.randomUUID();

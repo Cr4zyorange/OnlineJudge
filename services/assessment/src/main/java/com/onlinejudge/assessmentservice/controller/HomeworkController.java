@@ -7,6 +7,7 @@ import com.onlinejudge.assessmentservice.security.CurrentUser;
 import com.onlinejudge.assessmentservice.service.CourseMembershipGuard;
 import com.onlinejudge.assessmentservice.service.CoursePermissionClient;
 import com.onlinejudge.assessmentservice.service.HomeworkService;
+import com.onlinejudge.assessmentservice.service.HomeworkStatisticsService;
 import com.onlinejudge.assessmentservice.service.HomeworkSubmissionService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -46,13 +47,15 @@ public class HomeworkController {
     private final HomeworkService homeworks;
     private final CoursePermissionClient coursePermissions;
     private final CourseMembershipGuard membershipGuard;
+    private final HomeworkStatisticsService statistics;
     private final HomeworkSubmissionService submissions;
 
     public HomeworkController(HomeworkService homeworks, CoursePermissionClient coursePermissions,
-            CourseMembershipGuard membershipGuard, HomeworkSubmissionService submissions) {
+            CourseMembershipGuard membershipGuard, HomeworkStatisticsService statistics, HomeworkSubmissionService submissions) {
         this.homeworks = homeworks;
         this.coursePermissions = coursePermissions;
         this.membershipGuard = membershipGuard;
+        this.statistics = statistics;
         this.submissions = submissions;
     }
 
@@ -245,6 +248,24 @@ public class HomeworkController {
         return success(page);
     }
 
+    @GetMapping("/homeworks/{homeworkId}/statistics")
+    public Map<String, Object> statistics(@PathVariable long homeworkId,
+            @RequestParam(defaultValue = "1") int page, @RequestParam(defaultValue = "20") int size,
+            @RequestAttribute("assessment.currentUser") CurrentUser user) {
+        HomeworkService.HomeworkSummary homework;
+        try {
+            homework = homeworks.find(homeworkId);
+        } catch (NoSuchElementException missing) {
+            throw new HomeworkClientException(HttpStatus.NOT_FOUND, "HWK_4001", "homework not found");
+        }
+        requireStatisticsManager(homework.courseId(), user);
+        try {
+            return success(statistics.statistics(homework, page, size));
+        } catch (IllegalArgumentException invalid) {
+            throw new HomeworkClientException(HttpStatus.BAD_REQUEST, "HWK_4000", invalid.getMessage());
+        }
+    }
+
     @PutMapping("/homeworks/{homeworkId}/publish")
     public HomeworkService.HomeworkSummary publish(@PathVariable long homeworkId,
             @RequestAttribute("assessment.currentUser") CurrentUser user, HttpServletRequest http) {
@@ -287,6 +308,13 @@ public class HomeworkController {
         boolean managerRole = user.hasRole("TEACHER") || user.hasRole("ASSISTANT");
         if (!managerRole || !coursePermissions.canManageCourse(courseId, user.id())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "course management permission is required");
+        }
+    }
+
+    private void requireStatisticsManager(String courseId, CurrentUser user) {
+        boolean managerRole = user.hasRole("TEACHER") || user.hasRole("ASSISTANT");
+        if (!managerRole || !coursePermissions.canManageCourse(courseId, user.id())) {
+            throw new HomeworkClientException(HttpStatus.FORBIDDEN, "HWK_4031", "course management permission is required");
         }
     }
 
