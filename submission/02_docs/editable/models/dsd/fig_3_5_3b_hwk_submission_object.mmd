@@ -1,0 +1,62 @@
+sequenceDiagram
+  actor Student as 学生
+  participant View as HomeworkSubmissionView
+  participant Attachment as AttachmentController/Service
+  participant Submission as SubmissionController/Service
+  participant Permission as CoursePermissionClient
+  participant Storage as FileStorageService
+  participant AttachmentRepo as AttachmentRepository
+  participant SubmissionRepo as SubmissionRepository
+  participant EvaluationRepo as JdbcHomeworkEvaluationRepository
+  participant Worker as HomeworkEvaluationWorker
+  participant Recovery as HomeworkEvaluationRecovery
+  participant Evaluator as 共享 Evaluator
+  opt FILE 作业上传
+    Student->>View: 选择一个文件并上传
+    View->>Attachment: POST API-HWK-23
+    Attachment->>Permission: 校验成员、课程与作业
+    Permission-->>Attachment: 返回允许
+    Attachment->>Storage: 保存物理对象
+    Storage-->>Attachment: 返回存储结果
+    Attachment->>AttachmentRepo: 保存 UPLOADED/24h 元数据
+    AttachmentRepo-->>Attachment: 返回 fileId
+    Attachment-->>View: 返回 fileId 与安全元数据
+  end
+  Student->>View: 提交答案、代码或 fileId
+  View->>Submission: POST API-HWK-07
+  Submission->>Permission: 校验成员和作业访问
+  Permission-->>Submission: 返回允许
+  Submission->>SubmissionRepo: 校验截止/次数并保存新版本
+  Submission->>AttachmentRepo: UPLOADED 原子绑定为 BOUND
+  alt OBJECTIVE
+    Submission->>EvaluationRepo: 保存 OBJECTIVE_AUTO 终态与得分
+    Submission->>SubmissionRepo: 回写评测终态与分数
+  else CODE
+    Submission->>EvaluationRepo: 保存 CODE_JUDGE/PENDING 评测记录
+  else TEXT/FILE
+    Submission->>SubmissionRepo: 标记待人工批阅
+    SubmissionRepo-->>Submission: 返回待批阅状态
+  end
+  Submission-->>View: 返回提交回执与可见状态
+  Submission-->>Worker: AFTER_COMMIT 投递 HomeworkEvaluationTaskCreated
+  opt 首次派发遗漏、线程池拒绝或进程重启
+    Recovery->>EvaluationRepo: 定时读取 PENDING；启动重置遗留 RUNNING
+    EvaluationRepo-->>Recovery: 返回可恢复 CODE_JUDGE 任务
+    Recovery-->>Worker: 重新投递 HomeworkEvaluationTaskCreated
+  end
+  Worker->>EvaluationRepo: 条件更新 PENDING 为 RUNNING
+  EvaluationRepo-->>Worker: 返回认领结果
+  Worker->>Evaluator: 使用共享 EvaluationTask 执行 IO 评测
+  Evaluator-->>Worker: 返回 EvaluationResult
+  alt 评测正常完成
+    Worker->>EvaluationRepo: 回写评测终态与日志
+    Worker->>SubmissionRepo: 回写评测终态与分数
+  else Worker 或评测器异常
+    Worker->>EvaluationRepo: 回写 SYSTEM_ERROR
+    Worker->>SubmissionRepo: 保留提交并标记 SYSTEM_ERROR
+  end
+  View->>Submission: GET API-HWK-10/11 查询结果
+  Submission->>EvaluationRepo: 只读最新评测记录
+  EvaluationRepo-->>Submission: 返回 PENDING/RUNNING/终态
+  Submission-->>View: 返回可见结果
+  View-->>Student: 展示安全反馈与历史入口

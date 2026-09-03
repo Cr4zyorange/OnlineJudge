@@ -1,0 +1,21 @@
+sequenceDiagram
+  participant Student as 学生
+  participant Ctrl as CourseController
+  participant Svc as CourseService
+  participant Repo as CourseRepository
+  participant DB as MySQL 数据库
+  Student->>Ctrl: POST /api/v1/courses/{courseId}/join（携带邀请码）
+  Ctrl->>Svc: join(courseId, CourseJoinRequest(inviteCode), user)
+  Svc->>Repo: findById(courseId)
+  Repo->>DB: SELECT crs_course
+  DB-->>Repo: Course(enrollmentMode=INVITE, inviteCode)
+  alt 邀请码匹配
+    Svc->>Repo: findMember/insertMember(courseId, userId, STUDENT, ACTIVE, INVITE)
+    Repo->>DB: INSERT crs_course_member
+    DB-->>Repo: CourseMember
+    Svc-->>Ctrl: CoursePermissionResponse(ACTIVE)
+    Ctrl-->>Student: 加入成功
+  else 邀请码不匹配
+    Svc-->>Ctrl: BusinessException(INVALID_INVITE_CODE)
+    Ctrl-->>Student: 邀请码错误提示
+  end

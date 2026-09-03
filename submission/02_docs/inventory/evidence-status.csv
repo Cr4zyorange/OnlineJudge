@@ -1,0 +1,7 @@
+issue,status,pr_or_state,final_sha,evidence,conclusion
+307,PASS,PR #360,c56b16f916b4a4c3d33915aa37beab6b05c72888,performance/issue-307/results/20260902-225234/evidence/README.md,18/18 formal rounds; 21582/21582 accepted requests
+319,BLOCKED,PR #374 open,,https://github.com/Cr4zyorange/OnlineJudge/pull/374,not merged into fixed base; do not promote candidate evidence to PASS
+320,BLOCKED,PR #377 draft,,https://github.com/Cr4zyorange/OnlineJudge/pull/377,12 passed / 8 failed / 4 skipped reported by draft PR
+340,BLOCKED,upstream issue open,,https://github.com/Cr4zyorange/OnlineJudge/issues/340,final merged evidence unavailable at fixed base
+366,PASS,PR #371,82b61eb04d5d565f77e779c527b4e98398ca0b49,docs/过程/测试/Issue-366-三服务自动交付复演验收.md,9/9 workloads; 4/4 migrations; controlled failure and recovery
+367,PASS,PR #373,bb4d83ee7a0891490869960370670a2dd03e9962,tests/api/README.md,124/124 endpoints mapped; 0 unmapped

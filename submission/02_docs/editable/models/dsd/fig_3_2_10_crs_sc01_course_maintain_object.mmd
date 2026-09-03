@@ -1,0 +1,25 @@
+sequenceDiagram
+  participant Teacher as 教师
+  participant Ctrl as CourseController
+  participant Svc as CourseService
+  participant Repo as CourseRepository
+  participant DB as MySQL 数据库
+  Teacher->>Ctrl: POST /api/v1/courses
+  Ctrl->>Svc: create(CourseCreateRequest, CurrentUser)
+  Svc->>Svc: requireTeacher(user)
+  Svc->>Repo: insert(request, teacherId)
+  Repo->>DB: INSERT crs_course
+  DB-->>Repo: 返回课程主键
+  Repo-->>Svc: Course
+  Svc->>Repo: insertMember(courseId, teacherId, TEACHER, ACTIVE, CREATED)
+  Repo->>DB: INSERT crs_course_member
+  DB-->>Repo: 返回成员主键
+  Repo-->>Svc: CourseMember
+  Svc-->>Ctrl: CourseResponse
+  Ctrl-->>Teacher: 创建成功与课程主页入口
+  Teacher->>Ctrl: PUT /api/v1/courses/{courseId}
+  Ctrl->>Svc: update(courseId, CourseUpdateRequest, user)
+  Svc->>Svc: requireManagePermission(courseId, user)
+  Svc->>Repo: update(courseId, request)
+  Repo-->>Svc: Course
+  Svc-->>Ctrl: CourseResponse

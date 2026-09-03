@@ -1,0 +1,19 @@
+sequenceDiagram
+  participant Browser as Browser
+  participant Frontend as Vue 前端组件
+  participant Gateway as Nginx/API 网关
+  participant API as Spring Boot API
+  participant CRS as CRS 课程组件
+  participant DB as MySQL 数据库
+  Browser->>Frontend: 课程管理页操作
+  Frontend->>Gateway: POST/PUT /api/v1/courses(/id)
+  Gateway->>API: 反向代理 /api/v1
+  API->>CRS: 调用 CourseService
+  CRS->>DB: 校验课程权限并读写 crs_course
+  DB-->>CRS: 返回课程记录
+  CRS->>DB: 创建/更新 crs_course_member 负责人关系
+  DB-->>CRS: 返回成员关系
+  CRS-->>API: 返回课程信息
+  API-->>Gateway: 统一响应
+  Gateway-->>Frontend: JSON 响应
+  Frontend-->>Browser: 更新课程列表/详情

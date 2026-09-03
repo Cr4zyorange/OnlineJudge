@@ -1,0 +1,38 @@
+Issue #368 final documentation package verification
+Date: 2026-09-03 Asia/Shanghai
+Fixed base: c56b16f916b4a4c3d33915aa37beab6b05c72888
+
+RED evidence:
+- node --test scripts/test/verify-issue-368-docs.test.mjs
+- Initial implementation RED: FAIL; 10 required package files were missing.
+- Review regression RED: a clean Git checkout reported checksum mismatches after CRLF-to-LF normalization.
+- Frozen-package RED: 2 archived links were missing and PDF audit regeneration removed the manual-inspection attestation.
+
+Review closure:
+- The builder rejects authoritative inputs that differ from the fixed base, including untracked files.
+- Rebuilds preserve pdf-page-audit.json and verification.log while replacing generated render evidence.
+- Every tracked text artifact is normalized to LF before SHA256SUMS is generated.
+- Frozen-document links are resolved from editable/final and their two required local targets are archived.
+
+Build evidence:
+- node scripts/delivery/build-issue-368-docs.mjs --base c56b16f916b4a4c3d33915aa37beab6b05c72888
+- Result: BUILT scenarios=24 apis=124 tables=79 render_total=115 render_pass=115 render_fail=0 blocked=3
+
+PDF visual evidence:
+- Eight PDFs rasterized at 96 DPI with Poppler pdftoppm.
+- scripts/delivery/audit-issue-368-pdf-pages.py checked 545/545 pages; near_blank=0; edge_content=0.
+- All 22 contact sheets were manually inspected; no clipping, overlap, missing glyphs, broken tables, black blocks, blank pages, or missing diagrams were observed.
+
+Final verification contract:
+- node scripts/delivery/refresh-issue-368-checksums.mjs
+- node scripts/delivery/verify-issue-368-docs.mjs
+- node --test scripts/test/verify-issue-368-docs.test.mjs
+- git diff --check
+
+Expected fail-closed result:
+- required_files=12
+- scenarios=24
+- apis=124/124
+- render=115/115
+- pdf_pages=545/545
+- blocked=3 (#319, #320, #340)

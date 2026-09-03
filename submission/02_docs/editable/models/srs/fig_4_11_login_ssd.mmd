@@ -1,0 +1,13 @@
+sequenceDiagram
+  actor User as 学生/教师/管理员
+  participant System as OnlineJudgeForSE 系统边界
+  User->>System: OP-AUTH-01 提交登录请求
+  Note over System: OP-AUTH-02 校验账号密码与账号状态
+  alt 登录成功
+    Note over System: OP-AUTH-03 创建会话或访问令牌
+    System-->>User: 返回角色首页、菜单和权限摘要
+    User->>System: 访问受保护功能
+    System-->>User: OP-AUTH-04 返回允许访问或拒绝访问
+  else 登录失败或账号异常
+    System-->>User: 返回登录失败、账号异常或重新登录提示
+  end

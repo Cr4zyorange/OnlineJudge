@@ -1,0 +1,12 @@
+sequenceDiagram
+  actor User as 学生/教师
+  participant System as OnlineJudgeForSE 系统边界
+  System-->>User: OP-LRN-04 业务事件生成站内通知
+  User->>System: 打开通知中心
+  System-->>User: 返回分类通知、未读数和跳转地址
+  User->>System: OP-LRN-05 标记已读、删除或点击通知详情
+  alt 通知可访问
+    System-->>User: 更新通知状态并跳转到课程、实验、作业或成绩页面
+  else 通知失效或无权限
+    System-->>User: 返回通知失效、目标已删除或无权限提示
+  end

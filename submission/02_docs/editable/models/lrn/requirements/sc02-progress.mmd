@@ -1,0 +1,11 @@
+sequenceDiagram
+  actor Student as 学生
+  participant System as 在线教学平台
+  Student->>System: 从任务/进度入口继续学习
+  System-->>Student: 打开可访问目标并恢复 lastPosition
+  Student->>System: 学习并保存位置/完成状态
+  alt 在线
+    System-->>Student: 持久化后返回最新进度
+  else 短时断线
+    System-->>Student: 保留本地记录，恢复后按时间戳重放
+  end

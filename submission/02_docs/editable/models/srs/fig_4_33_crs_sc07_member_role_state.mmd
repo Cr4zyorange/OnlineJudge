@@ -1,0 +1,11 @@
+stateDiagram-v2
+  [*] --> STUDENT: 加入课程
+  STUDENT --> ASSISTANT: 教师调整角色
+  ASSISTANT --> STUDENT: 教师调整角色
+  STUDENT --> TEACHER: 教师授予协作教师
+  ASSISTANT --> TEACHER: 教师授予协作教师
+  TEACHER --> STUDENT: 教师调整角色（保留最后教师）
+  STUDENT --> REMOVED: 教师移除
+  ASSISTANT --> REMOVED: 教师移除
+  TEACHER --> REMOVED: 移除（至少保留一名教师）
+  REMOVED --> [*]
