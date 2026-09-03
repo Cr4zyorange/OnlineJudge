@@ -178,7 +178,7 @@ public class LrnEventProjection {
         long sourceId = parseId(payload.path("sourceId").asText());
         long studentId = parseId(payload.path("studentId").asText());
         if (courseId <= 0 || sourceId <= 0 || studentId <= 0) return;
-        String title = "HWK".equals(sourceModule) ? "homework score published" : "lab score published";
+        String title = "HWK".equals(sourceModule) ? "homework score published" : "实验成绩已发布";
         String content = "HWK".equals(sourceModule) ? "作业成绩已发布，请查看反馈。" : "实验成绩已发布，请查看反馈。";
         notifications.createForFact(eventId, "assessment.source-grade.changed.v2", "GRADE", courseId,
                 sourceModule, sourceId, List.of(studentId), title, content, 1,
