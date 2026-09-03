@@ -1,8 +1,0 @@
-sequenceDiagram
-  actor User as 学生/教师/管理员
-  participant System as OnlineJudgeForSE 系统边界
-  User->>System: 退出登录（携带当前令牌）
-  Note over System: 校验登录态，按令牌摘要作废会话并记录审计
-  System-->>User: 返回退出成功
-  User->>System: 使用旧令牌继续访问需认证资源
-  System-->>User: 返回“登录已失效，请重新登录”
