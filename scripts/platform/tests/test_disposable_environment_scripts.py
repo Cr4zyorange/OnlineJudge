@@ -72,7 +72,9 @@ class DisposableEnvironmentScriptsTest(unittest.TestCase):
         # interception); the shared default must stay on Docker's bridge
         # network, so the unconditional --network=host flag must not return.
         self.assertIn("OJ318_DOCKER_BUILD_NETWORK", source)
-        self.assertIn('"${docker_build_network_args[@]}"', source)
+        self.assertIn('if ((${#docker_build_network_args[@]})); then', source)
+        self.assertIn('retry 3 docker build "${docker_build_network_args[@]}"', source)
+        self.assertIn('retry 3 docker build --file', source)
         self.assertNotIn("docker build --network=host", source)
 
     def test_frontend_image_installation_retries_transient_registry_failures(self) -> None:
