@@ -6,7 +6,7 @@
 - [每日站会与看板材料](daily-materials.md)：9 个已到期正式开发日的逐日状态。
 - [六人贡献、权重与确认](contributions.md)：人员到 Issue、PR、Review、commit、可执行证据的映射。
 - [正式 Review 与返工链](review-rework.md)：仅包含 GitHub 的 CHANGES_REQUESTED 和 APPROVED 记录。
-- [官方通知与外部访问](official-notice-and-access.md)：答辩、云盘冲突与非 Owner 验证的真实缺口。
+- [官方通知与外部访问](official-notice-and-access.md)：答辩、云盘方式冲突与外部访问的真实边界。
 - [采集快照](evidence/snapshot.md)：命令、环境、Project 字段与原始结果路径。
 - [SHA256SUMS](SHA256SUMS)：固定文本材料的完整性清单。
 

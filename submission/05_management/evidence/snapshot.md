@@ -4,7 +4,7 @@
 
 | 项 | 值 |
 | --- | --- |
-| 仓库 | Cr4zyorange/OnlineJudge，PRIVATE |
+| 仓库 | Cr4zyorange/OnlineJudge，PUBLIC |
 | 默认和目标分支 | dev |
 | 基线 SHA | c56b16f916b4a4c3d33915aa37beab6b05c72888 |
 | 工作分支 | feature/369-management-evidence |
@@ -22,10 +22,10 @@
 
 结果：
 
-- Project 为 Team planning，地址 https://github.com/users/Cr4zyorange/projects/3，私有，item 总数 190，字段数 21。
-- 当前状态汇总为 Done=175、In progress=6、Todo=6、待审核=3。
+- Project 为 Team planning，地址 https://github.com/users/Cr4zyorange/projects/3，私有（`public=false`），item 总数 190，字段数 21。
+- 当前状态汇总为 Done=176、In progress=3、Todo=6、待审核=5。
 - #369 Project item 为 PVTI_lAHOBGs3_c4BVG7hzg5ASHg。
-- #369 字段为 Status=In progress、Priority=P0、Size=M、Type=设计、start date=2026-09-03、target date=2026-09-03。
+- #369 字段为 Status=待审核、Priority=P0、Size=M、Type=设计、start date=2026-09-03、target date=2026-09-03；关联 PR #384。
 - #369 Assignee 为 Cr4zyorange；Issue timeline 在 2026-09-03T01:15:23Z 记录 Project 状态切换。
 
 ## 可复现 GitHub 采集命令
@@ -51,12 +51,12 @@
 | 任务书执行基线 | https://app.notion.com/p/3c666e71b0d981a1996fed86722b7f19 | 正式日历、D10、管理证据要求。 |
 | 站会与日报规范 | https://app.notion.com/p/3c666e71b0d981bba14ee712e8bdf5c6 | 09:00 站会、日报与证据口径。 |
 | 项目页 | https://app.notion.com/p/3aa66e71b0d9810a9692ed6819bee1ca | 项目状态、风险、Next Action、日报关联。 |
-| 2026-09-03 小组日报 | https://app.notion.com/p/3d066e71b0d981b39b88dcd3926c71a5 | #369 开工、D10 分工与当日缺口。 |
+| 2026-08-26—2026-09-03 小组日报 | 见 [看板原件来源清单](notion-boards/README.md) | 导出 14 张看板原件并绑定日报日期。 |
 
 ## 本地检查命令
 
     git diff --check
     rg -n -i 'gh[pousr]_[A-Za-z0-9_]+|Bearer[[:space:]]+|BEGIN (RSA|EC|OPENSSH) PRIVATE KEY|password[[:space:]]*=' submission/05_management
-    shasum -a 256 README.md INDEX.md daily-materials.md contributions.md review-rework.md official-notice-and-access.md evidence/snapshot.md
+    shasum -a 256 README.md INDEX.md daily-materials.md contributions.md review-rework.md official-notice-and-access.md evidence/snapshot.md evidence/notion-boards/README.md evidence/notion-boards/*
 
 原始结果路径是本目录各 Markdown 文件和 SHA256SUMS。不导出 GitHub 或 Notion 的 cookie、Token 或短时签名资源。
