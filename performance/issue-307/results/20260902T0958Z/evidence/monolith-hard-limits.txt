@@ -1,0 +1,3 @@
+/onlinejudge-backend cpu=2500000000 memory=4294967296 state=running health=healthy
+/onlinejudge-frontend cpu=500000000 memory=536870912 state=running health=healthy
+/onlinejudge-mysql cpu=1000000000 memory=1610612736 state=running health=healthy

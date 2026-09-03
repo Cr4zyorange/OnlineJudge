@@ -8,6 +8,7 @@ renderer="$repo_root/scripts/platform/render_disposable_environment.py"
 schema="$repo_root/deploy/platform/workload-manifest.schema.json"
 manifest="$repo_root/deploy/platform/workloads.json"
 builder="$repo_root/scripts/platform/build_workload_images.sh"
+bundle_generator="$repo_root/scripts/platform/generate_jwks_trust_bundle.mjs"
 
 usage() {
   cat <<'USAGE'
@@ -57,6 +58,9 @@ if [[ -n "$failure_mode" && "$failure_mode" != "migration" && "$failure_mode" !=
 fi
 command -v docker >/dev/null 2>&1 || { printf 'run-disposable-environment: docker is required\n' >&2; exit 2; }
 command -v openssl >/dev/null 2>&1 || { printf 'run-disposable-environment: openssl is required\n' >&2; exit 2; }
+command -v node >/dev/null 2>&1 || { printf 'run-disposable-environment: node is required\n' >&2; exit 2; }
+python_bin="${PYTHON_BIN:-python3}"
+command -v "$python_bin" >/dev/null 2>&1 || { printf 'run-disposable-environment: %s is required\n' "$python_bin" >&2; exit 2; }
 docker info >/dev/null
 
 run_id="$(date -u +%Y%m%dT%H%M%SZ)-$$"
@@ -151,16 +155,17 @@ PY
   rm -f "$private_key"
   printf 'Bearer %s.%s.%s' "$header" "$payload" "$signature"
 }
-PYTHONDONTWRITEBYTECODE=1 python3 "$renderer" --schema "$schema" --manifest "$manifest" --git-sha "$git_sha" --compose-output "$compose_file" --kubernetes-output "$kubernetes_file" --repository-root "$repo_root"
+identity_kid="issue318-disposable"
+identity_jwks="$(IDENTITY_JWT_SIGNING_KEY="$identity_key" IDENTITY_JWT_KID="$identity_kid" node "$bundle_generator")"
+PYTHONDONTWRITEBYTECODE=1 "$python_bin" "$renderer" --schema "$schema" --manifest "$manifest" --git-sha "$git_sha" --compose-output "$compose_file" --kubernetes-output "$kubernetes_file" --repository-root "$repo_root"
 if (( ! skip_build )); then
   build_arguments=(--git-sha "$git_sha" --output-dir "$output_dir/artifacts")
   if (( skip_tests )); then build_arguments+=(--skip-tests); fi
   "$builder" "${build_arguments[@]}"
 fi
 
-# Service JWTs are intentionally short lived.  Mint them only after any image
-# build has completed, so the first Assessment -> Course authorization call
-# always starts with the complete credential lifetime available.
+# Service JWTs are intentionally short lived. Mint them only after image builds
+# complete so the first authorization call has the full credential lifetime.
 assessment_course_identity="$(mint_service_token assessment-api course course.authorizations.read)"
 grade_course_identity="$(mint_service_token grade-service course course.authorizations.read course.members.read)"
 grade_assessment_identity="$(mint_service_token grade-service assessment grades:read)"
@@ -172,8 +177,9 @@ umask 077
   printf 'COURSE_DATABASE_PASSWORD=%s\n' "$(random_secret)"
   printf 'ASSESSMENT_DATABASE_PASSWORD=%s\n' "$(random_secret)"
   printf 'GRADE_DATABASE_PASSWORD=%s\n' "$(random_secret)"
+  printf 'IDENTITY_JWT_KID=%s\n' "$identity_kid"
   printf 'IDENTITY_JWT_SIGNING_KEY=%s\n' "$identity_key"
-  printf 'IDENTITY_JWKS_TRUST_BUNDLE=\n'
+  printf 'IDENTITY_JWKS_TRUST_BUNDLE=%s\n' "$identity_jwks"
   printf 'GATEWAY_SERVICE_IDENTITY=issue318-gateway\n'
   printf 'COURSE_SERVICE_IDENTITY=issue318-course\n'
   printf 'ASSESSMENT_SERVICE_IDENTITY=%s\n' "$assessment_course_identity"
@@ -234,7 +240,7 @@ collect_diagnostics success
 
 base_url="http://127.0.0.1:${GATEWAY_HTTP_PORT:-18080}"
 context_file="$output_dir/three-service-context.json"
-python3 - "$context_file" "$git_sha" "$project_name" "$base_url" "$compose_file" "$output_dir" <<'PY'
+"$python_bin" - "$context_file" "$git_sha" "$project_name" "$base_url" "$compose_file" "$output_dir" <<'PY'
 import json
 import sys
 
@@ -262,7 +268,7 @@ if ((${#after_ready_command[@]})); then
   fi
 fi
 
-ready_count="$(python3 - "$output_dir/compose-ps-success.json" <<'PY'
+ready_count="$("$python_bin" - "$output_dir/compose-ps-success.json" <<'PY'
 import json
 import sys
 payload = open(sys.argv[1], encoding="utf-8").read().strip()

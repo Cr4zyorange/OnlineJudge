@@ -1,0 +1,11 @@
+# Generated from performance/issue-307/resource-policy.json; do not edit.
+services:
+  mysql:
+    cpus: "1"
+    mem_limit: "1536m"
+  backend:
+    cpus: "2.5"
+    mem_limit: "4096m"
+  frontend:
+    cpus: "0.5"
+    mem_limit: "512m"

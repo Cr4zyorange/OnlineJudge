@@ -1,0 +1,85 @@
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+DATASET_READY architecture=three-service project=oj307-three-200359 users=101 courses=105 members=101 homeworks=1 summaries=100 grade-records=300 submissions=0
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+DATASET_READY architecture=three-service project=oj307-three-200359 users=101 courses=105 members=101 homeworks=1 summaries=100 grade-records=300 submissions=0
+PREFLIGHT_VALID scenario=course-list requests=10 successful=10 success-rate=100%
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+DATASET_READY architecture=three-service project=oj307-three-200359 users=101 courses=105 members=101 homeworks=1 summaries=100 grade-records=300 submissions=0
+FORMAL_WINDOW_RECORDED architecture=three-service project=oj307-three-200359 output=/private/tmp/oj307-perf.Vwbe8B/performance/issue-307/results/20260902T200359Z/formal/three-service/course-list-round-1.json
+ROUND_RECORDED architecture=three-service scenario=course-list round=1 requests=1199 output=/private/tmp/oj307-perf.Vwbe8B/performance/issue-307/results/20260902T200359Z/raw/three-service/course-list/round-1.json
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+DATASET_READY architecture=three-service project=oj307-three-200359 users=101 courses=105 members=101 homeworks=1 summaries=100 grade-records=300 submissions=0
+PREFLIGHT_VALID scenario=course-list requests=10 successful=10 success-rate=100%
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+DATASET_READY architecture=three-service project=oj307-three-200359 users=101 courses=105 members=101 homeworks=1 summaries=100 grade-records=300 submissions=0
+FORMAL_WINDOW_RECORDED architecture=three-service project=oj307-three-200359 output=/private/tmp/oj307-perf.Vwbe8B/performance/issue-307/results/20260902T200359Z/formal/three-service/course-list-round-2.json
+ROUND_RECORDED architecture=three-service scenario=course-list round=2 requests=1199 output=/private/tmp/oj307-perf.Vwbe8B/performance/issue-307/results/20260902T200359Z/raw/three-service/course-list/round-2.json
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+DATASET_READY architecture=three-service project=oj307-three-200359 users=101 courses=105 members=101 homeworks=1 summaries=100 grade-records=300 submissions=0
+PREFLIGHT_VALID scenario=course-list requests=10 successful=10 success-rate=100%
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+DATASET_READY architecture=three-service project=oj307-three-200359 users=101 courses=105 members=101 homeworks=1 summaries=100 grade-records=300 submissions=0
+FORMAL_WINDOW_RECORDED architecture=three-service project=oj307-three-200359 output=/private/tmp/oj307-perf.Vwbe8B/performance/issue-307/results/20260902T200359Z/formal/three-service/course-list-round-3.json
+ROUND_RECORDED architecture=three-service scenario=course-list round=3 requests=1199 output=/private/tmp/oj307-perf.Vwbe8B/performance/issue-307/results/20260902T200359Z/raw/three-service/course-list/round-3.json
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+DATASET_READY architecture=three-service project=oj307-three-200359 users=101 courses=105 members=101 homeworks=1 summaries=100 grade-records=300 submissions=0
+PREFLIGHT_VALID scenario=homework-submission requests=10 successful=10 success-rate=100%
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+DATASET_READY architecture=three-service project=oj307-three-200359 users=101 courses=105 members=101 homeworks=1 summaries=100 grade-records=300 submissions=0
+FORMAL_WINDOW_RECORDED architecture=three-service project=oj307-three-200359 output=/private/tmp/oj307-perf.Vwbe8B/performance/issue-307/results/20260902T200359Z/formal/three-service/homework-submission-round-1.json
+ROUND_RECORDED architecture=three-service scenario=homework-submission round=1 requests=1199 output=/private/tmp/oj307-perf.Vwbe8B/performance/issue-307/results/20260902T200359Z/raw/three-service/homework-submission/round-1.json
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+DATASET_READY architecture=three-service project=oj307-three-200359 users=101 courses=105 members=101 homeworks=1 summaries=100 grade-records=300 submissions=0
+PREFLIGHT_VALID scenario=homework-submission requests=10 successful=10 success-rate=100%
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+DATASET_READY architecture=three-service project=oj307-three-200359 users=101 courses=105 members=101 homeworks=1 summaries=100 grade-records=300 submissions=0
+FORMAL_WINDOW_RECORDED architecture=three-service project=oj307-three-200359 output=/private/tmp/oj307-perf.Vwbe8B/performance/issue-307/results/20260902T200359Z/formal/three-service/homework-submission-round-2.json
+ROUND_RECORDED architecture=three-service scenario=homework-submission round=2 requests=1199 output=/private/tmp/oj307-perf.Vwbe8B/performance/issue-307/results/20260902T200359Z/raw/three-service/homework-submission/round-2.json
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+DATASET_READY architecture=three-service project=oj307-three-200359 users=101 courses=105 members=101 homeworks=1 summaries=100 grade-records=300 submissions=0
+PREFLIGHT_VALID scenario=homework-submission requests=10 successful=10 success-rate=100%
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+DATASET_READY architecture=three-service project=oj307-three-200359 users=101 courses=105 members=101 homeworks=1 summaries=100 grade-records=300 submissions=0
+FORMAL_WINDOW_RECORDED architecture=three-service project=oj307-three-200359 output=/private/tmp/oj307-perf.Vwbe8B/performance/issue-307/results/20260902T200359Z/formal/three-service/homework-submission-round-3.json
+ROUND_RECORDED architecture=three-service scenario=homework-submission round=3 requests=1199 output=/private/tmp/oj307-perf.Vwbe8B/performance/issue-307/results/20260902T200359Z/raw/three-service/homework-submission/round-3.json
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+DATASET_READY architecture=three-service project=oj307-three-200359 users=101 courses=105 members=101 homeworks=1 summaries=100 grade-records=300 submissions=0
+PREFLIGHT_VALID scenario=my-grades requests=10 successful=10 success-rate=100%
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+DATASET_READY architecture=three-service project=oj307-three-200359 users=101 courses=105 members=101 homeworks=1 summaries=100 grade-records=300 submissions=0
+FORMAL_WINDOW_RECORDED architecture=three-service project=oj307-three-200359 output=/private/tmp/oj307-perf.Vwbe8B/performance/issue-307/results/20260902T200359Z/formal/three-service/my-grades-round-1.json
+ROUND_RECORDED architecture=three-service scenario=my-grades round=1 requests=1199 output=/private/tmp/oj307-perf.Vwbe8B/performance/issue-307/results/20260902T200359Z/raw/three-service/my-grades/round-1.json
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+DATASET_READY architecture=three-service project=oj307-three-200359 users=101 courses=105 members=101 homeworks=1 summaries=100 grade-records=300 submissions=0
+PREFLIGHT_VALID scenario=my-grades requests=10 successful=10 success-rate=100%
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+DATASET_READY architecture=three-service project=oj307-three-200359 users=101 courses=105 members=101 homeworks=1 summaries=100 grade-records=300 submissions=0
+FORMAL_WINDOW_RECORDED architecture=three-service project=oj307-three-200359 output=/private/tmp/oj307-perf.Vwbe8B/performance/issue-307/results/20260902T200359Z/formal/three-service/my-grades-round-2.json
+ROUND_RECORDED architecture=three-service scenario=my-grades round=2 requests=1199 output=/private/tmp/oj307-perf.Vwbe8B/performance/issue-307/results/20260902T200359Z/raw/three-service/my-grades/round-2.json
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+DATASET_READY architecture=three-service project=oj307-three-200359 users=101 courses=105 members=101 homeworks=1 summaries=100 grade-records=300 submissions=0
+PREFLIGHT_VALID scenario=my-grades requests=10 successful=10 success-rate=100%
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+DATASET_READY architecture=three-service project=oj307-three-200359 users=101 courses=105 members=101 homeworks=1 summaries=100 grade-records=300 submissions=0
+FORMAL_WINDOW_RECORDED architecture=three-service project=oj307-three-200359 output=/private/tmp/oj307-perf.Vwbe8B/performance/issue-307/results/20260902T200359Z/formal/three-service/my-grades-round-3.json
+ROUND_RECORDED architecture=three-service scenario=my-grades round=3 requests=1199 output=/private/tmp/oj307-perf.Vwbe8B/performance/issue-307/results/20260902T200359Z/raw/three-service/my-grades/round-3.json
+FORMAL_ARCHITECTURE_COMPLETE architecture=three-service project=oj307-three-200359 output=/private/tmp/oj307-perf.Vwbe8B/performance/issue-307/results/20260902T200359Z
