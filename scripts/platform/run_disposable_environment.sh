@@ -80,7 +80,7 @@ if [[ -n "$runtime_env_path" ]]; then
   esac
   (umask 077; : > "$runtime_env")
 else
-  runtime_env="$(mktemp "${TMPDIR:-/tmp}/onlinejudge-issue318.XXXXXX.env")"
+  runtime_env="$(mktemp "${TMPDIR:-/tmp}/onlinejudge-issue318.XXXXXX")"
 fi
 runtime_env_ready=0
 project_name="oj318-${git_sha:0:12}-${run_id##*-}"
