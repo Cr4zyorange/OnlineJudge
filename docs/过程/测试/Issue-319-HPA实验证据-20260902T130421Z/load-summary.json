@@ -1,0 +1,7 @@
+{
+  "requests": 20700,
+  "errors": 0,
+  "request_latency_avg": 0.009216271787439613,
+  "request_latency_p95": 0.020281,
+  "error_rate": 0.0
+}

@@ -1,0 +1,10 @@
+# Correlated request example (gateway access log + assessment DB submission/task rows)
+## requestIds used:
+request_id=e6973021-8580-4906-b109-095692a6495b
+request_id=e46d7143-9add-4b41-8a30-3e95da2c465e
+## gateway access log rows:
+127.0.0.1 - - [02/Sep/2026:12:15:04 +0000] "POST /api/v1/homeworks/9005/submissions HTTP/1.1" 201 356 "-" "curl/8.5.0" request_id=e6973021-8580-4906-b109-095692a6495b
+127.0.0.1 - - [02/Sep/2026:12:15:06 +0000] "POST /api/v1/homeworks/9009/submissions HTTP/1.1" 201 357 "-" "curl/8.5.0" request_id=e46d7143-9add-4b41-8a30-3e95da2c465e
+## assessment DB rows (X-Request-Id -> public submissionId -> submission row -> evaluation_task):
+request_id=e6973021-8580-4906-b109-095692a6495b | submission(public_id=6306): submission_id=cb3533eb-414c-4f1f-a8a8-4afbc163b458 homework=9005 student=7 version=88 evaluation_status=PENDING | evaluation_task: id=4daed157-0561-4beb-9b50-d47288a1e8e1 state=PENDING attempt=0
+request_id=e46d7143-9add-4b41-8a30-3e95da2c465e | submission(public_id=6314): submission_id=1b438c7d-e494-4701-be8b-09bc8a88db26 homework=9009 student=11 version=88 evaluation_status=PENDING | evaluation_task: id=aaa7a49c-3a06-4aad-bf64-3c2cb1a0b744 state=PENDING attempt=0

@@ -1,0 +1,11 @@
+Timeout: 60.0 seconds ...
+Listing queues for vhost / ...
+name	messages_ready	messages_unacknowledged
+grade.source-grades.v2	0	0
+assessment.identity-security-version.v2	0	0
+assessment.course-members.v2	0	0
+course.identity-security-version.v2	0	0
+assessment.course-members.dlq.v2	0	0
+assessment.identity-security-version.dlq.v2	0	0
+course.learning-facts.v2	0	0
+grade.source-grades.dlq.v2	0	0

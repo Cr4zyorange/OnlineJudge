@@ -1,0 +1,517 @@
+apiVersion: v1
+items:
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    annotations:
+      deployment.kubernetes.io/revision: "2"
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"apps/v1","kind":"Deployment","metadata":{"annotations":{},"labels":{"app.kubernetes.io/name":"assessment-api","app.kubernetes.io/part-of":"onlinejudge-platform","app.kubernetes.io/version":"f11ad9a9aee3467af5100213f01901c3f608713b"},"name":"assessment-api","namespace":"issue319-final"},"spec":{"replicas":1,"selector":{"matchLabels":{"app.kubernetes.io/name":"assessment-api"}},"template":{"metadata":{"labels":{"app.kubernetes.io/name":"assessment-api"}},"spec":{"containers":[{"env":[{"name":"ASSESSMENT_COURSE_AUTHORIZATION_URI","value":"http://course-service:8082/internal/v2/courses/{courseId}/authorizations/{userId}"},{"name":"ASSESSMENT_COURSE_SERVICE_AUTHORIZATION","valueFrom":{"secretKeyRef":{"key":"ASSESSMENT_SERVICE_IDENTITY","name":"onlinejudge-platform-runtime"}}},{"name":"ASSESSMENT_DATABASE_DRIVER","value":"com.mysql.cj.jdbc.Driver"},{"name":"ASSESSMENT_DATABASE_HOST","value":"mysql"},{"name":"ASSESSMENT_DATABASE_NAME","value":"oj_assessment"},{"name":"ASSESSMENT_DATABASE_PASSWORD","valueFrom":{"secretKeyRef":{"key":"ASSESSMENT_DATABASE_PASSWORD","name":"onlinejudge-platform-runtime"}}},{"name":"ASSESSMENT_DATABASE_PORT","value":"3306"},{"name":"ASSESSMENT_DATABASE_USER","value":"oj_assessment_rw"},{"name":"ASSESSMENT_DATASOURCE_URL","value":"jdbc:mysql://mysql:3306/oj_assessment?useUnicode=true\u0026characterEncoding=utf8\u0026serverTimezone=UTC\u0026allowPublicKeyRetrieval=true\u0026useSSL=false"},{"name":"ASSESSMENT_RABBIT_ENABLED","value":"false"},{"name":"ASSESSMENT_RABBIT_HOST","value":"rabbitmq"},{"name":"ASSESSMENT_RABBIT_RELAY_ENABLED","value":"false"},{"name":"ASSESSMENT_RABBIT_USERNAME","value":"onlinejudge"},{"name":"ASSESSMENT_SERVICE_IDENTITY","valueFrom":{"secretKeyRef":{"key":"ASSESSMENT_SERVICE_IDENTITY","name":"onlinejudge-platform-runtime"}}},{"name":"ASSESSMENT_STORAGE_ROOT","value":"/var/lib/onlinejudge-assessment"},{"name":"GIT_SHA","value":"f11ad9a9aee3467af5100213f01901c3f608713b"},{"name":"IDENTITY_JWKS_TRUST_BUNDLE","valueFrom":{"secretKeyRef":{"key":"IDENTITY_JWKS_TRUST_BUNDLE","name":"onlinejudge-platform-runtime"}}},{"name":"IDENTITY_JWKS_URI","value":"http://identity-service:8081/.well-known/jwks.json"},{"name":"IDENTITY_JWT_AUDIENCE","value":"onlinejudge.api"},{"name":"IDENTITY_JWT_ISSUER","value":"onlinejudge.identity.v2"},{"name":"ISSUE318_FAIL_READINESS","value":"0"},{"name":"RABBITMQ_PASSWORD","valueFrom":{"secretKeyRef":{"key":"RABBITMQ_PASSWORD","name":"onlinejudge-platform-runtime"}}},{"name":"SPRING_SQL_INIT_MODE","value":"never"}],"image":"onlinejudge/assessment-api:f11ad9a9aee3467af5100213f01901c3f608713b","imagePullPolicy":"IfNotPresent","livenessProbe":{"failureThreshold":24,"httpGet":{"path":"/health/ready","port":8083},"periodSeconds":5,"timeoutSeconds":3},"name":"assessment-api","ports":[{"containerPort":8083,"name":"http"}],"readinessProbe":{"failureThreshold":24,"httpGet":{"path":"/health/ready","port":8083},"periodSeconds":5,"timeoutSeconds":3},"resources":{"limits":{"cpu":"1500m","memory":"2Gi"},"requests":{"cpu":"300m","memory":"512Mi"}},"startupProbe":{"failureThreshold":24,"httpGet":{"path":"/health/ready","port":8083},"periodSeconds":5,"timeoutSeconds":3}}],"enableServiceLinks":false}}}}
+    creationTimestamp: "2026-09-03T02:59:55Z"
+    generation: 2
+    labels:
+      app.kubernetes.io/name: assessment-api
+      app.kubernetes.io/part-of: onlinejudge-platform
+      app.kubernetes.io/version: f11ad9a9aee3467af5100213f01901c3f608713b
+    name: assessment-api
+    namespace: issue319-final
+    resourceVersion: "3441"
+    uid: 080c5ca2-5de0-4a00-ad69-7d229b1001aa
+  spec:
+    progressDeadlineSeconds: 600
+    replicas: 1
+    revisionHistoryLimit: 10
+    selector:
+      matchLabels:
+        app.kubernetes.io/name: assessment-api
+    strategy:
+      rollingUpdate:
+        maxSurge: 25%
+        maxUnavailable: 25%
+      type: RollingUpdate
+    template:
+      metadata:
+        annotations:
+          kubectl.kubernetes.io/restartedAt: "2026-09-03T11:04:15+08:00"
+        labels:
+          app.kubernetes.io/name: assessment-api
+      spec:
+        containers:
+        - env:
+          - name: ASSESSMENT_COURSE_AUTHORIZATION_URI
+            value: http://course-service:8082/internal/v2/courses/{courseId}/authorizations/{userId}
+          - name: ASSESSMENT_COURSE_SERVICE_AUTHORIZATION
+            valueFrom:
+              secretKeyRef:
+                key: ASSESSMENT_SERVICE_IDENTITY
+                name: onlinejudge-platform-runtime
+          - name: ASSESSMENT_DATABASE_DRIVER
+            value: com.mysql.cj.jdbc.Driver
+          - name: ASSESSMENT_DATABASE_HOST
+            value: mysql
+          - name: ASSESSMENT_DATABASE_NAME
+            value: oj_assessment
+          - name: ASSESSMENT_DATABASE_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                key: ASSESSMENT_DATABASE_PASSWORD
+                name: onlinejudge-platform-runtime
+          - name: ASSESSMENT_DATABASE_PORT
+            value: "3306"
+          - name: ASSESSMENT_DATABASE_USER
+            value: oj_assessment_rw
+          - name: ASSESSMENT_DATASOURCE_URL
+            value: jdbc:mysql://mysql:3306/oj_assessment?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC&allowPublicKeyRetrieval=true&useSSL=false
+          - name: ASSESSMENT_RABBIT_ENABLED
+            value: "false"
+          - name: ASSESSMENT_RABBIT_HOST
+            value: rabbitmq
+          - name: ASSESSMENT_RABBIT_RELAY_ENABLED
+            value: "false"
+          - name: ASSESSMENT_RABBIT_USERNAME
+            value: onlinejudge
+          - name: ASSESSMENT_SERVICE_IDENTITY
+            valueFrom:
+              secretKeyRef:
+                key: ASSESSMENT_SERVICE_IDENTITY
+                name: onlinejudge-platform-runtime
+          - name: ASSESSMENT_STORAGE_ROOT
+            value: /var/lib/onlinejudge-assessment
+          - name: GIT_SHA
+            value: f11ad9a9aee3467af5100213f01901c3f608713b
+          - name: IDENTITY_JWKS_TRUST_BUNDLE
+            valueFrom:
+              secretKeyRef:
+                key: IDENTITY_JWKS_TRUST_BUNDLE
+                name: onlinejudge-platform-runtime
+          - name: IDENTITY_JWKS_URI
+            value: http://identity-service:8081/.well-known/jwks.json
+          - name: IDENTITY_JWT_AUDIENCE
+            value: onlinejudge.api
+          - name: IDENTITY_JWT_ISSUER
+            value: onlinejudge.identity.v2
+          - name: ISSUE318_FAIL_READINESS
+            value: "0"
+          - name: RABBITMQ_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                key: RABBITMQ_PASSWORD
+                name: onlinejudge-platform-runtime
+          - name: SPRING_SQL_INIT_MODE
+            value: never
+          image: onlinejudge/assessment-api:f11ad9a9aee3467af5100213f01901c3f608713b
+          imagePullPolicy: IfNotPresent
+          livenessProbe:
+            failureThreshold: 24
+            httpGet:
+              path: /health/ready
+              port: 8083
+              scheme: HTTP
+            periodSeconds: 5
+            successThreshold: 1
+            timeoutSeconds: 3
+          name: assessment-api
+          ports:
+          - containerPort: 8083
+            name: http
+            protocol: TCP
+          readinessProbe:
+            failureThreshold: 24
+            httpGet:
+              path: /health/ready
+              port: 8083
+              scheme: HTTP
+            periodSeconds: 5
+            successThreshold: 1
+            timeoutSeconds: 3
+          resources:
+            limits:
+              cpu: 1500m
+              memory: 2Gi
+            requests:
+              cpu: 300m
+              memory: 512Mi
+          startupProbe:
+            failureThreshold: 24
+            httpGet:
+              path: /health/ready
+              port: 8083
+              scheme: HTTP
+            periodSeconds: 5
+            successThreshold: 1
+            timeoutSeconds: 3
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+        dnsPolicy: ClusterFirst
+        enableServiceLinks: false
+        restartPolicy: Always
+        schedulerName: default-scheduler
+        securityContext: {}
+        terminationGracePeriodSeconds: 30
+  status:
+    availableReplicas: 1
+    conditions:
+    - lastTransitionTime: "2026-09-03T03:00:06Z"
+      lastUpdateTime: "2026-09-03T03:00:06Z"
+      message: Deployment has minimum availability.
+      reason: MinimumReplicasAvailable
+      status: "True"
+      type: Available
+    - lastTransitionTime: "2026-09-03T02:59:55Z"
+      lastUpdateTime: "2026-09-03T03:04:21Z"
+      message: ReplicaSet "assessment-api-8d7c786cb" has successfully progressed.
+      reason: NewReplicaSetAvailable
+      status: "True"
+      type: Progressing
+    observedGeneration: 2
+    readyReplicas: 1
+    replicas: 1
+    terminatingReplicas: 0
+    updatedReplicas: 1
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    annotations:
+      deployment.kubernetes.io/revision: "2"
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"apps/v1","kind":"Deployment","metadata":{"annotations":{},"labels":{"app.kubernetes.io/name":"assessment-worker","app.kubernetes.io/part-of":"onlinejudge-platform","app.kubernetes.io/version":"f11ad9a9aee3467af5100213f01901c3f608713b"},"name":"assessment-worker","namespace":"issue319-final"},"spec":{"replicas":1,"selector":{"matchLabels":{"app.kubernetes.io/name":"assessment-worker"}},"template":{"metadata":{"labels":{"app.kubernetes.io/name":"assessment-worker"}},"spec":{"containers":[{"args":["-jar","/opt/onlinejudge-assessment/app.jar","--spring.main.web-application-type=none","--assessment.worker.enabled=true"],"command":["java"],"env":[{"name":"ASSESSMENT_COURSE_AUTHORIZATION_URI","value":"http://course-service:8082/internal/v2/courses/{courseId}/authorizations/{userId}"},{"name":"ASSESSMENT_COURSE_SERVICE_AUTHORIZATION","valueFrom":{"secretKeyRef":{"key":"ASSESSMENT_SERVICE_IDENTITY","name":"onlinejudge-platform-runtime"}}},{"name":"ASSESSMENT_DATABASE_DRIVER","value":"com.mysql.cj.jdbc.Driver"},{"name":"ASSESSMENT_DATABASE_HOST","value":"mysql"},{"name":"ASSESSMENT_DATABASE_NAME","value":"oj_assessment"},{"name":"ASSESSMENT_DATABASE_PASSWORD","valueFrom":{"secretKeyRef":{"key":"ASSESSMENT_DATABASE_PASSWORD","name":"onlinejudge-platform-runtime"}}},{"name":"ASSESSMENT_DATABASE_PORT","value":"3306"},{"name":"ASSESSMENT_DATABASE_USER","value":"oj_assessment_rw"},{"name":"ASSESSMENT_DATASOURCE_URL","value":"jdbc:mysql://mysql:3306/oj_assessment?useUnicode=true\u0026characterEncoding=utf8\u0026serverTimezone=UTC\u0026allowPublicKeyRetrieval=true\u0026useSSL=false"},{"name":"ASSESSMENT_RABBIT_ENABLED","value":"true"},{"name":"ASSESSMENT_RABBIT_HOST","value":"rabbitmq"},{"name":"ASSESSMENT_RABBIT_RELAY_ENABLED","value":"true"},{"name":"ASSESSMENT_RABBIT_USERNAME","value":"onlinejudge"},{"name":"ASSESSMENT_SANDBOX_DOCKER_API_URI","value":""},{"name":"ASSESSMENT_STORAGE_ROOT","value":"/var/lib/onlinejudge-assessment"},{"name":"ASSESSMENT_WORKER_ENABLED","value":"true"},{"name":"ASSESSMENT_WORKER_IDENTITY","valueFrom":{"secretKeyRef":{"key":"ASSESSMENT_WORKER_IDENTITY","name":"onlinejudge-platform-runtime"}}},{"name":"GIT_SHA","value":"f11ad9a9aee3467af5100213f01901c3f608713b"},{"name":"IDENTITY_JWKS_URI","value":"http://identity-service:8081/.well-known/jwks.json"},{"name":"IDENTITY_JWT_AUDIENCE","value":"onlinejudge.api"},{"name":"IDENTITY_JWT_ISSUER","value":"onlinejudge.identity.v2"},{"name":"ISSUE318_FAIL_READINESS","value":"0"},{"name":"RABBITMQ_PASSWORD","valueFrom":{"secretKeyRef":{"key":"RABBITMQ_PASSWORD","name":"onlinejudge-platform-runtime"}}},{"name":"SPRING_SQL_INIT_MODE","value":"never"}],"image":"onlinejudge/assessment-worker:f11ad9a9aee3467af5100213f01901c3f608713b","imagePullPolicy":"IfNotPresent","livenessProbe":{"exec":{"command":["sh","-ec","test -f /tmp/assessment-worker-ready"]},"failureThreshold":24,"periodSeconds":5,"timeoutSeconds":3},"name":"assessment-worker","readinessProbe":{"exec":{"command":["sh","-ec","test -f /tmp/assessment-worker-ready"]},"failureThreshold":24,"periodSeconds":5,"timeoutSeconds":3},"resources":{"limits":{"cpu":"2000m","memory":"4Gi"},"requests":{"cpu":"500m","memory":"1Gi"}},"startupProbe":{"exec":{"command":["sh","-ec","test -f /tmp/assessment-worker-ready"]},"failureThreshold":24,"periodSeconds":5,"timeoutSeconds":3}}],"enableServiceLinks":false}}}}
+    creationTimestamp: "2026-09-03T02:59:55Z"
+    generation: 2
+    labels:
+      app.kubernetes.io/name: assessment-worker
+      app.kubernetes.io/part-of: onlinejudge-platform
+      app.kubernetes.io/version: f11ad9a9aee3467af5100213f01901c3f608713b
+    name: assessment-worker
+    namespace: issue319-final
+    resourceVersion: "3491"
+    uid: 5baea4a2-7ec7-47d2-b06b-a2b779464030
+  spec:
+    progressDeadlineSeconds: 600
+    replicas: 1
+    revisionHistoryLimit: 10
+    selector:
+      matchLabels:
+        app.kubernetes.io/name: assessment-worker
+    strategy:
+      rollingUpdate:
+        maxSurge: 25%
+        maxUnavailable: 25%
+      type: RollingUpdate
+    template:
+      metadata:
+        annotations:
+          kubectl.kubernetes.io/restartedAt: "2026-09-03T11:04:21+08:00"
+        labels:
+          app.kubernetes.io/name: assessment-worker
+      spec:
+        containers:
+        - args:
+          - -jar
+          - /opt/onlinejudge-assessment/app.jar
+          - --spring.main.web-application-type=none
+          - --assessment.worker.enabled=true
+          command:
+          - java
+          env:
+          - name: ASSESSMENT_COURSE_AUTHORIZATION_URI
+            value: http://course-service:8082/internal/v2/courses/{courseId}/authorizations/{userId}
+          - name: ASSESSMENT_COURSE_SERVICE_AUTHORIZATION
+            valueFrom:
+              secretKeyRef:
+                key: ASSESSMENT_SERVICE_IDENTITY
+                name: onlinejudge-platform-runtime
+          - name: ASSESSMENT_DATABASE_DRIVER
+            value: com.mysql.cj.jdbc.Driver
+          - name: ASSESSMENT_DATABASE_HOST
+            value: mysql
+          - name: ASSESSMENT_DATABASE_NAME
+            value: oj_assessment
+          - name: ASSESSMENT_DATABASE_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                key: ASSESSMENT_DATABASE_PASSWORD
+                name: onlinejudge-platform-runtime
+          - name: ASSESSMENT_DATABASE_PORT
+            value: "3306"
+          - name: ASSESSMENT_DATABASE_USER
+            value: oj_assessment_rw
+          - name: ASSESSMENT_DATASOURCE_URL
+            value: jdbc:mysql://mysql:3306/oj_assessment?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC&allowPublicKeyRetrieval=true&useSSL=false
+          - name: ASSESSMENT_RABBIT_ENABLED
+            value: "true"
+          - name: ASSESSMENT_RABBIT_HOST
+            value: rabbitmq
+          - name: ASSESSMENT_RABBIT_RELAY_ENABLED
+            value: "true"
+          - name: ASSESSMENT_RABBIT_USERNAME
+            value: onlinejudge
+          - name: ASSESSMENT_SANDBOX_DOCKER_API_URI
+          - name: ASSESSMENT_STORAGE_ROOT
+            value: /var/lib/onlinejudge-assessment
+          - name: ASSESSMENT_WORKER_ENABLED
+            value: "true"
+          - name: ASSESSMENT_WORKER_IDENTITY
+            valueFrom:
+              secretKeyRef:
+                key: ASSESSMENT_WORKER_IDENTITY
+                name: onlinejudge-platform-runtime
+          - name: GIT_SHA
+            value: f11ad9a9aee3467af5100213f01901c3f608713b
+          - name: IDENTITY_JWKS_URI
+            value: http://identity-service:8081/.well-known/jwks.json
+          - name: IDENTITY_JWT_AUDIENCE
+            value: onlinejudge.api
+          - name: IDENTITY_JWT_ISSUER
+            value: onlinejudge.identity.v2
+          - name: ISSUE318_FAIL_READINESS
+            value: "0"
+          - name: RABBITMQ_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                key: RABBITMQ_PASSWORD
+                name: onlinejudge-platform-runtime
+          - name: SPRING_SQL_INIT_MODE
+            value: never
+          image: onlinejudge/assessment-worker:f11ad9a9aee3467af5100213f01901c3f608713b
+          imagePullPolicy: IfNotPresent
+          livenessProbe:
+            exec:
+              command:
+              - sh
+              - -ec
+              - test -f /tmp/assessment-worker-ready
+            failureThreshold: 24
+            periodSeconds: 5
+            successThreshold: 1
+            timeoutSeconds: 3
+          name: assessment-worker
+          readinessProbe:
+            exec:
+              command:
+              - sh
+              - -ec
+              - test -f /tmp/assessment-worker-ready
+            failureThreshold: 24
+            periodSeconds: 5
+            successThreshold: 1
+            timeoutSeconds: 3
+          resources:
+            limits:
+              cpu: "2"
+              memory: 4Gi
+            requests:
+              cpu: 500m
+              memory: 1Gi
+          startupProbe:
+            exec:
+              command:
+              - sh
+              - -ec
+              - test -f /tmp/assessment-worker-ready
+            failureThreshold: 24
+            periodSeconds: 5
+            successThreshold: 1
+            timeoutSeconds: 3
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+        dnsPolicy: ClusterFirst
+        enableServiceLinks: false
+        restartPolicy: Always
+        schedulerName: default-scheduler
+        securityContext: {}
+        terminationGracePeriodSeconds: 30
+  status:
+    availableReplicas: 1
+    conditions:
+    - lastTransitionTime: "2026-09-03T03:00:06Z"
+      lastUpdateTime: "2026-09-03T03:00:06Z"
+      message: Deployment has minimum availability.
+      reason: MinimumReplicasAvailable
+      status: "True"
+      type: Available
+    - lastTransitionTime: "2026-09-03T02:59:55Z"
+      lastUpdateTime: "2026-09-03T03:04:27Z"
+      message: ReplicaSet "assessment-worker-7d97f7765b" has successfully progressed.
+      reason: NewReplicaSetAvailable
+      status: "True"
+      type: Progressing
+    observedGeneration: 2
+    readyReplicas: 1
+    replicas: 1
+    terminatingReplicas: 0
+    updatedReplicas: 1
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    annotations:
+      deployment.kubernetes.io/revision: "2"
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"apps/v1","kind":"Deployment","metadata":{"annotations":{},"labels":{"app.kubernetes.io/name":"grade-service","app.kubernetes.io/part-of":"onlinejudge-platform","app.kubernetes.io/version":"f11ad9a9aee3467af5100213f01901c3f608713b"},"name":"grade-service","namespace":"issue319-final"},"spec":{"replicas":1,"selector":{"matchLabels":{"app.kubernetes.io/name":"grade-service"}},"template":{"metadata":{"labels":{"app.kubernetes.io/name":"grade-service"}},"spec":{"containers":[{"env":[{"name":"GIT_SHA","value":"f11ad9a9aee3467af5100213f01901c3f608713b"},{"name":"GRADE_ASSESSMENT_BASE_URL","value":"http://assessment-api:8083"},{"name":"GRADE_ASSESSMENT_SERVICE_AUTHORIZATION","valueFrom":{"secretKeyRef":{"key":"GRADE_ASSESSMENT_SERVICE_IDENTITY","name":"onlinejudge-platform-runtime"}}},{"name":"GRADE_ASSESSMENT_SERVICE_IDENTITY","valueFrom":{"secretKeyRef":{"key":"GRADE_ASSESSMENT_SERVICE_IDENTITY","name":"onlinejudge-platform-runtime"}}},{"name":"GRADE_COURSE_BASE_URL","value":"http://course-service:8082"},{"name":"GRADE_COURSE_SERVICE_AUTHORIZATION","valueFrom":{"secretKeyRef":{"key":"GRADE_COURSE_SERVICE_IDENTITY","name":"onlinejudge-platform-runtime"}}},{"name":"GRADE_COURSE_SERVICE_IDENTITY","valueFrom":{"secretKeyRef":{"key":"GRADE_COURSE_SERVICE_IDENTITY","name":"onlinejudge-platform-runtime"}}},{"name":"GRADE_DATABASE_DRIVER","value":"com.mysql.cj.jdbc.Driver"},{"name":"GRADE_DATABASE_PASSWORD","valueFrom":{"secretKeyRef":{"key":"GRADE_DATABASE_PASSWORD","name":"onlinejudge-platform-runtime"}}},{"name":"GRADE_DATABASE_USER","value":"oj_grade_rw"},{"name":"GRADE_DATASOURCE_URL","value":"jdbc:mysql://mysql:3306/oj_grade?useUnicode=true\u0026characterEncoding=utf8\u0026serverTimezone=UTC\u0026allowPublicKeyRetrieval=true\u0026useSSL=false"},{"name":"GRADE_HTTP_PORT","value":"8084"},{"name":"GRADE_RABBIT_ENABLED","value":"true"},{"name":"GRADE_RABBIT_RELAY_ENABLED","value":"true"},{"name":"IDENTITY_JWKS_TRUST_BUNDLE","valueFrom":{"secretKeyRef":{"key":"IDENTITY_JWKS_TRUST_BUNDLE","name":"onlinejudge-platform-runtime"}}},{"name":"IDENTITY_JWKS_URI","value":"http://identity-service:8081/.well-known/jwks.json"},{"name":"IDENTITY_JWT_AUDIENCE","value":"onlinejudge.api"},{"name":"IDENTITY_JWT_ISSUER","value":"onlinejudge.identity.v2"},{"name":"ISSUE318_FAIL_READINESS","value":"0"},{"name":"RABBITMQ_HOST","value":"rabbitmq"},{"name":"RABBITMQ_PASSWORD","valueFrom":{"secretKeyRef":{"key":"RABBITMQ_PASSWORD","name":"onlinejudge-platform-runtime"}}},{"name":"RABBITMQ_USERNAME","value":"onlinejudge"}],"image":"onlinejudge/grade-service:f11ad9a9aee3467af5100213f01901c3f608713b","imagePullPolicy":"IfNotPresent","livenessProbe":{"failureThreshold":24,"httpGet":{"path":"/health/ready","port":8084},"periodSeconds":5,"timeoutSeconds":3},"name":"grade-service","ports":[{"containerPort":8084,"name":"http"}],"readinessProbe":{"failureThreshold":24,"httpGet":{"path":"/health/ready","port":8084},"periodSeconds":5,"timeoutSeconds":3},"resources":{"limits":{"cpu":"1000m","memory":"1Gi"},"requests":{"cpu":"200m","memory":"256Mi"}},"startupProbe":{"failureThreshold":24,"httpGet":{"path":"/health/ready","port":8084},"periodSeconds":5,"timeoutSeconds":3}}],"enableServiceLinks":false}}}}
+    creationTimestamp: "2026-09-03T02:59:55Z"
+    generation: 2
+    labels:
+      app.kubernetes.io/name: grade-service
+      app.kubernetes.io/part-of: onlinejudge-platform
+      app.kubernetes.io/version: f11ad9a9aee3467af5100213f01901c3f608713b
+    name: grade-service
+    namespace: issue319-final
+    resourceVersion: "3528"
+    uid: 2b086bc3-7de2-40b5-9535-4708489c6987
+  spec:
+    progressDeadlineSeconds: 600
+    replicas: 1
+    revisionHistoryLimit: 10
+    selector:
+      matchLabels:
+        app.kubernetes.io/name: grade-service
+    strategy:
+      rollingUpdate:
+        maxSurge: 25%
+        maxUnavailable: 25%
+      type: RollingUpdate
+    template:
+      metadata:
+        annotations:
+          kubectl.kubernetes.io/restartedAt: "2026-09-03T11:04:27+08:00"
+        labels:
+          app.kubernetes.io/name: grade-service
+      spec:
+        containers:
+        - env:
+          - name: GIT_SHA
+            value: f11ad9a9aee3467af5100213f01901c3f608713b
+          - name: GRADE_ASSESSMENT_BASE_URL
+            value: http://assessment-api:8083
+          - name: GRADE_ASSESSMENT_SERVICE_AUTHORIZATION
+            valueFrom:
+              secretKeyRef:
+                key: GRADE_ASSESSMENT_SERVICE_IDENTITY
+                name: onlinejudge-platform-runtime
+          - name: GRADE_ASSESSMENT_SERVICE_IDENTITY
+            valueFrom:
+              secretKeyRef:
+                key: GRADE_ASSESSMENT_SERVICE_IDENTITY
+                name: onlinejudge-platform-runtime
+          - name: GRADE_COURSE_BASE_URL
+            value: http://course-service:8082
+          - name: GRADE_COURSE_SERVICE_AUTHORIZATION
+            valueFrom:
+              secretKeyRef:
+                key: GRADE_COURSE_SERVICE_IDENTITY
+                name: onlinejudge-platform-runtime
+          - name: GRADE_COURSE_SERVICE_IDENTITY
+            valueFrom:
+              secretKeyRef:
+                key: GRADE_COURSE_SERVICE_IDENTITY
+                name: onlinejudge-platform-runtime
+          - name: GRADE_DATABASE_DRIVER
+            value: com.mysql.cj.jdbc.Driver
+          - name: GRADE_DATABASE_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                key: GRADE_DATABASE_PASSWORD
+                name: onlinejudge-platform-runtime
+          - name: GRADE_DATABASE_USER
+            value: oj_grade_rw
+          - name: GRADE_DATASOURCE_URL
+            value: jdbc:mysql://mysql:3306/oj_grade?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC&allowPublicKeyRetrieval=true&useSSL=false
+          - name: GRADE_HTTP_PORT
+            value: "8084"
+          - name: GRADE_RABBIT_ENABLED
+            value: "true"
+          - name: GRADE_RABBIT_RELAY_ENABLED
+            value: "true"
+          - name: IDENTITY_JWKS_TRUST_BUNDLE
+            valueFrom:
+              secretKeyRef:
+                key: IDENTITY_JWKS_TRUST_BUNDLE
+                name: onlinejudge-platform-runtime
+          - name: IDENTITY_JWKS_URI
+            value: http://identity-service:8081/.well-known/jwks.json
+          - name: IDENTITY_JWT_AUDIENCE
+            value: onlinejudge.api
+          - name: IDENTITY_JWT_ISSUER
+            value: onlinejudge.identity.v2
+          - name: ISSUE318_FAIL_READINESS
+            value: "0"
+          - name: RABBITMQ_HOST
+            value: rabbitmq
+          - name: RABBITMQ_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                key: RABBITMQ_PASSWORD
+                name: onlinejudge-platform-runtime
+          - name: RABBITMQ_USERNAME
+            value: onlinejudge
+          image: onlinejudge/grade-service:f11ad9a9aee3467af5100213f01901c3f608713b
+          imagePullPolicy: IfNotPresent
+          livenessProbe:
+            failureThreshold: 24
+            httpGet:
+              path: /health/ready
+              port: 8084
+              scheme: HTTP
+            periodSeconds: 5
+            successThreshold: 1
+            timeoutSeconds: 3
+          name: grade-service
+          ports:
+          - containerPort: 8084
+            name: http
+            protocol: TCP
+          readinessProbe:
+            failureThreshold: 24
+            httpGet:
+              path: /health/ready
+              port: 8084
+              scheme: HTTP
+            periodSeconds: 5
+            successThreshold: 1
+            timeoutSeconds: 3
+          resources:
+            limits:
+              cpu: "1"
+              memory: 1Gi
+            requests:
+              cpu: 200m
+              memory: 256Mi
+          startupProbe:
+            failureThreshold: 24
+            httpGet:
+              path: /health/ready
+              port: 8084
+              scheme: HTTP
+            periodSeconds: 5
+            successThreshold: 1
+            timeoutSeconds: 3
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+        dnsPolicy: ClusterFirst
+        enableServiceLinks: false
+        restartPolicy: Always
+        schedulerName: default-scheduler
+        securityContext: {}
+        terminationGracePeriodSeconds: 30
+  status:
+    availableReplicas: 1
+    conditions:
+    - lastTransitionTime: "2026-09-03T03:00:11Z"
+      lastUpdateTime: "2026-09-03T03:00:11Z"
+      message: Deployment has minimum availability.
+      reason: MinimumReplicasAvailable
+      status: "True"
+      type: Available
+    - lastTransitionTime: "2026-09-03T02:59:55Z"
+      lastUpdateTime: "2026-09-03T03:04:33Z"
+      message: ReplicaSet "grade-service-d9f7598db" has successfully progressed.
+      reason: NewReplicaSetAvailable
+      status: "True"
+      type: Progressing
+    observedGeneration: 2
+    readyReplicas: 1
+    replicas: 1
+    terminatingReplicas: 0
+    updatedReplicas: 1
+kind: List
+metadata:
+  resourceVersion: ""

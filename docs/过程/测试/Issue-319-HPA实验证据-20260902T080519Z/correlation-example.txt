@@ -1,0 +1,8 @@
+# Correlated request example (gateway access log + assessment DB task origin_request_id)
+## requestIds used:
+d8cec2c8-1191-4a8a-8e63-82ea390eb98e
+c3e9c214-8eb1-4fe3-97c8-8a1a3177c17c
+## gateway access log rows:
+127.0.0.1 - - [02/Sep/2026:08:16:50 +0000] "POST /api/v1/homeworks/9001/submissions HTTP/1.1" 201 356 "-" "curl/8.5.0" request_id=d8cec2c8-1191-4a8a-8e63-82ea390eb98e
+127.0.0.1 - - [02/Sep/2026:08:16:50 +0000] "POST /api/v1/homeworks/9002/submissions HTTP/1.1" 201 355 "-" "curl/8.5.0" request_id=c3e9c214-8eb1-4fe3-97c8-8a1a3177c17c
+## assessment DB tasks (origin_request_id -> task/submission):

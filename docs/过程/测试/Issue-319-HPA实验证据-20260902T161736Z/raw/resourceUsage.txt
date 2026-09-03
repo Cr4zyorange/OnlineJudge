@@ -1,0 +1,2 @@
+NAME                              CPU(cores)   MEMORY(bytes)
+assessment-api-7d8f8dbc76-zvgr7   3m           227Mi

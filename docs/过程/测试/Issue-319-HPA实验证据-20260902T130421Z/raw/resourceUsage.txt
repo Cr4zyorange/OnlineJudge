@@ -1,0 +1,2 @@
+NAME                             CPU(cores)   MEMORY(bytes)
+assessment-api-bdf6946cb-vqxc9   4m           325Mi

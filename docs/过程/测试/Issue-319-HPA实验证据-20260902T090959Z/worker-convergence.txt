@@ -1,0 +1,7 @@
+# Worker convergence around the experiment (PENDING evaluation_task)
+During load (two ~4 req/s HWK streams, worker online): PENDING rises 3085 -> 4603
+(submission intake outpaces the worker, whose retry is bounded by SYSTEM_ERROR
+backoff with no sandbox in this disposable env).
+After load stops (streams ended ~09:18Z): 4603 -> 4500 -> 4475 -> 4448 -> 4436,
+monotonically decreasing: the worker drains the backlog once intake stops.
+Raw samples: raw/worker-convergence-samples.txt (30s interval)

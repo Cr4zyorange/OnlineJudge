@@ -1,0 +1,74 @@
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"autoscaling/v2","kind":"HorizontalPodAutoscaler","metadata":{"annotations":{},"labels":{"app.kubernetes.io/part-of":"onlinejudge-platform","delivery.onlinejudge.io/owner-issue":"319"},"name":"assessment-api","namespace":"issue319-rework"},"spec":{"behavior":{"scaleDown":{"stabilizationWindowSeconds":300}},"maxReplicas":3,"metrics":[{"resource":{"name":"cpu","target":{"averageUtilization":60,"type":"Utilization"}},"type":"Resource"}],"minReplicas":1,"scaleTargetRef":{"apiVersion":"apps/v1","kind":"Deployment","name":"assessment-api"}}}
+  creationTimestamp: "2026-09-02T12:03:10Z"
+  labels:
+    app.kubernetes.io/part-of: onlinejudge-platform
+    delivery.onlinejudge.io/owner-issue: "319"
+  name: assessment-api
+  namespace: issue319-rework
+  resourceVersion: "8429"
+  uid: 0a0de24c-89ea-4fdf-87a3-c367935400a6
+spec:
+  behavior:
+    scaleDown:
+      policies:
+      - periodSeconds: 15
+        type: Percent
+        value: 100
+      selectPolicy: Max
+      stabilizationWindowSeconds: 300
+    scaleUp:
+      policies:
+      - periodSeconds: 15
+        type: Pods
+        value: 4
+      - periodSeconds: 15
+        type: Percent
+        value: 100
+      selectPolicy: Max
+      stabilizationWindowSeconds: 0
+  maxReplicas: 3
+  metrics:
+  - resource:
+      name: cpu
+      target:
+        averageUtilization: 60
+        type: Utilization
+    type: Resource
+  minReplicas: 1
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: assessment-api
+status:
+  conditions:
+  - lastTransitionTime: "2026-09-02T12:03:25Z"
+    message: the HPA controller was able to update the target scale to 1
+    reason: SucceededRescale
+    status: "True"
+    type: AbleToScale
+  - lastTransitionTime: "2026-09-02T13:00:14Z"
+    message: the HPA was able to successfully calculate a replica count from cpu resource
+      utilization (percentage of request)
+    reason: ValidMetricFound
+    status: "True"
+    type: ScalingActive
+  - lastTransitionTime: "2026-09-02T13:06:00Z"
+    message: the desired count is within the acceptable range
+    reason: DesiredWithinRange
+    status: "False"
+    type: ScalingLimited
+  currentMetrics:
+  - resource:
+      current:
+        averageUtilization: 3
+        averageValue: 9m
+      name: cpu
+    type: Resource
+  currentReplicas: 2
+  desiredReplicas: 1
+  lastScaleTime: "2026-09-02T13:13:16Z"

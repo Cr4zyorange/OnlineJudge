@@ -1,0 +1,13 @@
+{
+  "baseSha": "c66686ff0e011f5ee63e3908683f01afd4f83ebc",
+  "headSha": "cf2979dc2fcfd1bc7e6640a71d6f6864e7de7f1b",
+  "runnerSha": "cf2979dc2fcfd1bc7e6640a71d6f6864e7de7f1b",
+  "deploymentVersion": "cf2979dc2fcfd1bc7e6640a71d6f6864e7de7f1b",
+  "environment": "issue319-rerun",
+  "startedAtUtc": "2026-09-02T16:17:57Z",
+  "finishedAtUtc": "2026-09-02T16:26:49Z",
+  "gatewayUrl": "http://127.0.0.1:18085",
+  "requestUrls": [
+    "http://127.0.0.1:18085/api/v1/evaluations/39de4c76-0871-4cf5-bcb6-56c4ee629cad"
+  ]
+}

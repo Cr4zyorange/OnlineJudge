@@ -1,0 +1,15 @@
+# 业务事实与 Grade 水位来源（无凭据）
+# 所有时间均为 UTC；该文件说明实际 API/事件路径，不代替 raw/ 中的数据库查询结果。
+
+2026-09-02T12:xx:xxZ course-create HTTP 201; student join HTTP 200
+2026-09-02T12:xx:xxZ LAB create HTTP 201; publish HTTP 200; student LAB submit HTTP 201
+2026-09-02T12:39:38Z teacher manual score HTTP 200; release scores HTTP 200
+2026-09-02T12:39:39Z Assessment outbox delivered assessment.source-grade.changed.v2 for LAB:1:1, version=1, score=95.00/100.00
+
+# 运行中发现的前向迁移缺口及恢复动作：V20260901_01 的 legacy
+# grade_source_projection.status 是 NOT NULL，而版本化投影仅写 source_status。
+# V20260902_03__allow_legacy_projection_status_null.sql 已以 SHA-256
+# 7511a1c749bf57439498fab3ee82fbb076cbf025c13e28104fe8cd00c11a91b8
+# 应用于一次性 oj_grade schema 并写入 schema_migrations；随后从 Grade DLQ
+# 重投同一 eventId（不是 INSERT/UPDATE 水位）。Grade 消费事务才生成 raw/
+# grade_projection_watermark.txt 中的 watermark/projection/inbox 行。

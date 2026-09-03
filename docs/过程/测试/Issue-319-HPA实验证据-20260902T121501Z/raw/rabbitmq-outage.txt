@@ -1,0 +1,22 @@
+2026-09-02T12:15:03Z scaling rabbitmq statefulset to 0 (original replicas=1)
+statefulset.apps/rabbitmq scaled
+2026-09-02T12:15:03Z rabbitmq readyReplicas=1 serviceEndpoints=none
+2026-09-02T12:15:05Z rabbitmq readyReplicas=0 serviceEndpoints=none
+2026-09-02T12:15:05Z rabbitmq confirmed unavailable (readyReplicas=0, service endpoints empty)
+2026-09-02T12:15:06Z assessment-api availableReplicas=1 readyReplicas=1 serviceEndpoints=10.244.0.17
+2026-09-02T12:15:09Z assessment-api availableReplicas=1 readyReplicas=1 serviceEndpoints=10.244.0.17
+2026-09-02T12:15:13Z assessment-api availableReplicas=1 readyReplicas=1 serviceEndpoints=10.244.0.17
+2026-09-02T12:15:16Z assessment-api availableReplicas=1 readyReplicas=1 serviceEndpoints=10.244.0.17
+2026-09-02T12:15:20Z assessment-api availableReplicas=1 readyReplicas=1 serviceEndpoints=10.244.0.17
+2026-09-02T12:15:23Z assessment-api availableReplicas=1 readyReplicas=1 serviceEndpoints=10.244.0.17
+2026-09-02T12:15:27Z assessment-api availableReplicas=1 readyReplicas=1 serviceEndpoints=10.244.0.17
+2026-09-02T12:15:30Z assessment-api availableReplicas=1 readyReplicas=1 serviceEndpoints=10.244.0.17
+2026-09-02T12:15:34Z assessment-api availableReplicas=1 readyReplicas=1 serviceEndpoints=10.244.0.17
+2026-09-02T12:15:37Z assessment-api availableReplicas=1 readyReplicas=1 serviceEndpoints=10.244.0.17
+2026-09-02T12:15:37Z restoring rabbitmq statefulset to 1 replicas
+statefulset.apps/rabbitmq scaled
+2026-09-02T12:15:38Z rabbitmq readyReplicas=0 serviceEndpoints=none
+2026-09-02T12:15:41Z rabbitmq readyReplicas=0 serviceEndpoints=none
+2026-09-02T12:15:44Z rabbitmq readyReplicas=0 serviceEndpoints=10.244.0.62
+2026-09-02T12:15:48Z rabbitmq readyReplicas=1 serviceEndpoints=10.244.0.62
+2026-09-02T12:15:48Z rabbitmq restored (readyReplicas=1, service endpoints repopulated)

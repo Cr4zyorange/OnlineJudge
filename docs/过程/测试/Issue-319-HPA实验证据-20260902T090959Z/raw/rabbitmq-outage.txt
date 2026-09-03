@@ -1,0 +1,3 @@
+statefulset.apps/rabbitmq scaled
+deployment "assessment-api" successfully rolled out
+statefulset.apps/rabbitmq scaled
