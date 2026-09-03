@@ -761,7 +761,7 @@ class HomeworkWorkflowContractTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.taskState").value("FAILED"))
                 .andExpect(jsonPath("$.data.evaluationStatus").value("COMPILE_ERROR"))
-                .andExpect(jsonPath("$.data.score").value(org.hamcrest.Matchers.nullValue()))
+                .andExpect(jsonPath("$.data.score").value(0))
                 .andExpect(jsonPath("$.data.finalScore").value(org.hamcrest.Matchers.nullValue()));
         assertNoSourceGrade(homeworkId, studentId);
         assertThat(jdbc.queryForObject("""
