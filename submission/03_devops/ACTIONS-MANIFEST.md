@@ -40,7 +40,28 @@ final image digest。
 ## 当前 origin/dev final SHA：`3a26ed2fe9399305b5e44eeae581911e6d32710e`
 
 #388 的 Grade MySQL 静态契约修复、#386 的 D3 JWKS 修复和后续 dev 合入已包含在该 SHA。
-该 SHA 的新 CI 尚未由本 PR 触发；等待分支同步提交推送后产生新的 quality-gate run。
+同步后的 PR quality-gate 已成功，但它是 PR 事件，不是该 SHA 合入 `dev` 后的正式
+`d3-delivery`；最终镜像、部署和回滚证据仍待正式 D3。
+
+## 同步后 PR 候选 CI：`5b59e8258248865de9414e2c1a5b45a8f2ec0604`
+
+Run [33724384655](https://github.com/Cr4zyorange/OnlineJudge/actions/runs/33724384655)
+为 PR 事件上的 `ci-quality-gate`，六个 job（workflow contracts、backend、frontend、
+repo contracts、browser E2E、Disposable delivery）全部成功。artifact 保留在 GitHub，
+其交付 manifest/image records 的内部构建 SHA 为
+`6ab2db7884df697760da370c66c356cc0e63e608`；仅作候选质量证据，不计入 final D3：
+
+| artifact ID / name | bytes | digest | archive status |
+| --- | ---: | --- | --- |
+| 9881404221 / `ci-validate-workflows-33724384655` | 677 | `sha256:af57fa79e003f6039383ced6018f77e0f98e9459839a14e21ce362e873071428` | GitHub artifact only |
+| 9881451041 / `ci-contracts-gate-33724384655` | 50949 | `sha256:46797feba4ffcd1e756b24e79273861ea41516136370e5512e4a512b796a67ab` | GitHub artifact only |
+| 9881453068 / `ci-frontend-gate-33724384655` | 27768 | `sha256:0e7743bc0188e9357949889abc91d861bbc01e339503a32aad4a3daed7fe0cdd` | GitHub artifact only |
+| 9881497625 / `ci-backend-gate-33724384655` | 654701 | `sha256:308ff78be578fa3fc38d239fc34c4d89aedd291d7f16b06a597586d026948831` | GitHub artifact only |
+| 9881778224 / `ci-browser-e2e-gate-33724384655` | 14309668 | `sha256:dfe43420e03df2ac37363da7eb5c3ee16a79fa3ddfd7f55e55c19cf3402b5918` | GitHub artifact only |
+| 9882064008 / `ci-delivery-33724384655` | 15513150 | `sha256:077c47aa3cd3cfdcb1420cd4d916fb9432d3e205178875fdcf2ae90e536e22a8` | GitHub artifact only |
+
+该 run 不能替代合入 `dev` 后的 `d3-quality-gate-*`、`d3-images-*`、
+`d3-kind-delivery-*` 和 `d3-delivery-outcome-*` 原始 artifact。
 
 ## PR 候选 head SHA：`82dd58d10eb49f1ceacec7965f7932c123891a1a`
 

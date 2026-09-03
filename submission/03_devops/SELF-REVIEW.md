@@ -14,11 +14,16 @@
 | Round 6 | 未发现新的归档、路径、契约、语法、敏感值或完整性问题 | 清洁复核通过；保留外部 CI/D3 阻塞作为验收前置，不再修改本 PR |
 | Round 7 | 远端 `dev` 已从 `ce87…` 前进到 `3a26…`，并合入 #388/#386 及后续变更；归档快照和旧 current 证据已落后 | 同步分支到最新 `dev`，更新受影响的 Kubernetes/Kind、Grade/D3 校验脚本和 D3 契约快照，将 ce87 证据降为 historical，等待新 CI |
 | Round 8 | #386 的新增 Kind 静态测试在缺少 `GIT_SHA` 时被 `openssl/node` 前置检查遮蔽；该测试未被当前 CI 调用且不属于 #379 | 不在本 PR 修改 #386；按快照边界不复制未被 CI 调用的新增测试，保留最新 Kind/D3 runtime 脚本并记录外部风险 |
+| Round 9 | 同步后的 PR quality-gate run 33724384655 的 workflow contracts、backend、frontend、repo contracts、browser E2E 和 Disposable delivery 全部成功；候选 artifact 的内部构建 SHA 与 PR head/final dev SHA 仍需分开 | 将本轮 CI artifact 作为 candidate-only 在线证据记录；不冒充 final D3，不提前填写镜像 digest、9 workload/4 migration 部署和回滚结论 |
+| Round 10 | 文档复核发现验收表把 PR candidate 描述成 origin/dev final CI、索引沿用上一候选的内部构建 SHA，且解阻条件编号跳号 | 统一改为 candidate-only，记录本轮内部 SHA `6ab2db…`，保留上一候选 `7402fc…` 的历史身份，并修正 D3 状态措辞和编号 |
+| Round 11 | 复核 282 个清单文件、路径/旧 SHA、敏感值、Markdown 状态、workflow/manifest/HPA/Grade/D3 校验及 67 项平台单测，未发现新问题；`upstreams.env` 是 canonical 配置输入，不是 Secret 实值 | 保持当前候选与 final D3 的证据边界；归档可进入 PR review，唯一剩余前置是合入 `dev` 后取得正式 final D3 原始证据 |
+| Round 12 | 提交前发现重建 `SHA256SUMS` 时使用已跟踪文件列表会漏掉被忽略但仍属于归档的原始 evidence，清单错误缩为 282 行 | 改用归档目录下除自身外的全部文件重建清单，恢复为 463 行并通过完整性校验 |
+| Round 13 | 在 Round 12 修复后复核状态措辞、SHA 身份、历史记录边界、463 项完整性清单、空白和全部本地验证结果，未发现新问题 | 终审通过；PR 可进入人工 review，保留“合入 `dev` 后正式 D3”这一唯一外部前置 |
 
 ## 当前阻塞
 
 - 当前 `origin/dev` final SHA 为 `3a26ed2fe9399305b5e44eeae581911e6d32710e`，已包含 #388 的 Grade MySQL
-  静态契约修复；同步后的新 CI/D3 结果尚未产生。
+  静态契约修复；同步后的 PR quality-gate 已由 run 33724384655 全部通过，但正式 final D3 尚未产生。
 - ce87 基线的 CI/D3 失败链已移动到 `historical/baseline-ce87/`，不能作为当前 final 结果。
 - #386 新增 Kind 静态测试的前置校验顺序问题未在 #379 中修改；该测试未进入当前归档快照和 CI 调用链。
 - 缺少的“最终候选 SHA 的成功 CI/D3 原始证据”属于 #379 本 issue 的验收任务；

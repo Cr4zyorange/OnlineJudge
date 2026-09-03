@@ -13,8 +13,9 @@ artifact。归档不包含 Secret 实值，也不把历史成功运行当作当�
 | [evidence/actions/](evidence/actions/) | 当前最终 SHA 和历史成功/失败运行的原始输出 |
 | [SHA256SUMS](SHA256SUMS) | 快照及原始证据文件完整性校验 |
 
-当前交付的结论是 `BLOCKED`：归档基线为 `origin/dev` 的
-`3a26ed2fe9399305b5e44eeae581911e6d32710e`。前一基线的 Grade MySQL 静态契约
-误计数已由 #388 修复并合入该基线；新基线的 CI/D3 尚未完成，不能声明最终部署成功。
-应在新基线上运行质量门禁和 D3，并在本目录追加新的最终 SHA 归档，而不是覆盖历史
-原始证据。
+当前交付的结论是 `READY_FOR_REVIEW_BLOCKED_FINAL_D3`：归档基线为 `origin/dev` 的
+`3a26ed2fe9399305b5e44eeae581911e6d32710e`。同步后的 PR quality-gate run
+`33724384655` 已全部成功，前一基线的 Grade MySQL 静态契约误计数已由 #388 修复并
+验证通过；但 PR 事件不是正式 `d3-delivery`，不能声明最终部署成功。合入 `dev` 后
+仍需追加对应最终 SHA 的 CI/D3、镜像、9 workload/4 migration、部署与回滚原始证据，
+而不是覆盖历史原始证据。
