@@ -1,0 +1,11 @@
+PASS .dockerignore
+PASS backend/src/main/java/com/onlinejudge/crs/domain/dto/AnnouncementPinRequest.java
+PASS backend/src/main/java/com/onlinejudge/grd/service/GradeReviewRequestView.java
+PASS backend/src/main/java/com/onlinejudge/lab/controller/LabSubmissionHistoryItemResponse.java
+PASS backend/src/main/java/com/onlinejudge/lrn/service/LearningProgressSaveRequest.java
+PASS backend/src/test/java/com/onlinejudge/lrn/controller/ReminderRuleControllerTest.java
+PASS docs/开发/assets/frontend-refactor-samples/2026-08-15/README.md
+PASS docs/过程/详细设计/LAB-实训实验模块-详细设计提交稿.md
+PASS frontend/src/views/grd/TeacherGradeTableView.vue
+PASS output/playwright/issue-213/11-objective-submit-390.png
+PASS output/playwright/issue-233/02-student-tasks-1024.jpg

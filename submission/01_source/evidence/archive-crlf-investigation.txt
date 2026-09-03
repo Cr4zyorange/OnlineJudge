@@ -1,0 +1,63 @@
+extract_root=/c/d10x
+== [1] full extraction ==
+extraction=PASS
+== [2] on-disk file counts vs git tree ==
+final: extracted_files=4170 git_tracked=4170 match=yes
+monolith: extracted_files=1038 git_tracked=1038 match=yes
+== [3] byte totals vs git ls-tree sizes ==
+final: extracted_bytes=727068724 git_tree_bytes=726533045 match=NO
+== [4] pax header entries explain listing delta ==
+0
+== [5] symlinks on disk (expect 0) ==
+final_symlinks=0 monolith_symlinks=0
+== [6] build entries (final) ==
+OK README.md
+OK backend/pom.xml
+OK frontend/package.json
+OK frontend/package-lock.json
+OK database/mysql/compose-schema.sql
+OK database/seeds/dev-ci.sql
+OK database/migrations/manifest.txt
+OK deploy/docker/compose.yml
+OK deploy/docker/backend.Dockerfile
+OK deploy/docker/frontend.Dockerfile
+OK scripts/dev/start-dev.sh
+OK scripts/docker/build-images.sh
+OK services/course/pom.xml
+OK services/assessment/pom.xml
+OK services/grade/pom.xml
+MISSING services/gateway/pom.xml
+OK services/identity/pom.xml
+OK contracts
+== [7] package.json JSON validity ==
+frontend package.json JSON=PASS
+== [8] submodules/LFS ==
+gitmodules=NONE
+git_lfs=NONE
+== [9] large files >10MB (final) ==
+100323696 onlinejudge-final-977338f4/OnlineJudge.pptx
+90962286 onlinejudge-final-977338f4/演示视频.mp4
+82261673 onlinejudge-final-977338f4/frontend/src/assets/live-back3.mp4
+23199310 onlinejudge-final-977338f4/performance/issue-307/results/20260902T0958Z/raw/three-service/my-grades/round-3.json.gz
+23033733 onlinejudge-final-977338f4/performance/issue-307/results/20260902T0958Z/raw/three-service/my-grades/round-2.json.gz
+22941514 onlinejudge-final-977338f4/performance/issue-307/results/20260902T0958Z/raw/three-service/my-grades/round-1.json.gz
+22005643 onlinejudge-final-977338f4/performance/issue-307/results/20260902T0958Z/raw/three-service/homework-submission/round-2.json.gz
+21228268 onlinejudge-final-977338f4/performance/issue-307/results/20260902T0958Z/raw/three-service/homework-submission/round-3.json.gz
+21166362 onlinejudge-final-977338f4/performance/issue-307/results/20260902T0958Z/raw/three-service/homework-submission/round-1.json.gz
+20864629 onlinejudge-final-977338f4/performance/issue-307/results/20260902T0958Z/raw/three-service/course-list/round-2.json.gz
+20733181 onlinejudge-final-977338f4/performance/issue-307/results/20260902T0958Z/raw/three-service/course-list/round-3.json.gz
+18053231 onlinejudge-final-977338f4/performance/issue-307/results/20260902T0958Z/raw/three-service/course-list/round-1.json.gz
+== [10] sampled content hash verification (git blob identity) ==
+hash_check: pass=0 fail=0
+== [11] sensitive scan (final, text files) ==
+secret_pattern_hits:
+C:/d10x/xf/onlinejudge-final-977338f4\scripts\ci\check-workflows.sh
+C:/d10x/xf/onlinejudge-final-977338f4\submission\03_devops\source\scripts\ci\check-workflows.sh
+-- password-like literals in configs (review; public demo accounts whitelisted) --
+C:/d10x/xf/onlinejudge-final-977338f4/backend/src/main/resources\application.yml:6:    password:
+C:/d10x/xf/onlinejudge-final-977338f4/backend/src/main/resources\application.properties:4:spring.datasource.password=
+C:/d10x/xf/onlinejudge-final-977338f4/services/identity/src/main/resources\application.yml:6:    password:
+== [12] docker availability probe ==
+29.3.1
+docker=AVAILABLE
+EXTRACTION-CHECK-DONE

@@ -1,0 +1,14 @@
+== regenerated archive checks ==
+final_gzip_integrity=PASS
+monolith_gzip_integrity=PASS
+final: extracted_files=4170 git_tracked=4170 match=yes
+final: extracted_bytes=726533045 git_tree_bytes=726533045 match=yes
+== per-file size comparison (expect 0 mismatches) ==
+final_size_mismatch_files=0
+== sampled content hash verification (git blob identity) ==
+hash_total=28 hash_pass=28 hash_fail=0
+== sensitive scan (regenerated final) ==
+C:/d10x/xf/onlinejudge-final-977338f4\scripts\ci\check-workflows.sh
+C:/d10x/xf/onlinejudge-final-977338f4\submission\03_devops\source\scripts\ci\check-workflows.sh
+== large files >10MB count (final) ==
+15

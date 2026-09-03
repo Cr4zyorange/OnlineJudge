@@ -1,0 +1,6 @@
+== monolith (autocrlf=false) extraction verification ==
+monolith: extracted_files=1038 git_tracked=1038 match=yes
+monolith: extracted_bytes=388881293 git_tree_bytes=388881293 match=yes
+monolith_hash_total=11 monolith_hash_pass=11 monolith_hash_fail=0
+monolith_symlinks=0
+MONOLITH-CHECK-DONE

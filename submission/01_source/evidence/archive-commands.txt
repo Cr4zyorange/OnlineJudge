@@ -1,0 +1,5 @@
+# exact generation commands (git 2.47.1.windows.2, GNU tar 1.35, Windows/MINGW64)
+# NOTE: system core.autocrlf=true corrupts git archive output with CRLF; -c core.autocrlf=false is REQUIRED for byte-exact reproducibility.
+git -c core.autocrlf=false archive --format=tar --prefix=onlinejudge-final-977338f4/ 977338f414a8cb72df157b139c8546d870e8bf23 | gzip -n > ../d10-01_source-delivery/source-onlinejudge-final-977338f414a8cb72df157b139c8546d870e8bf23.tar.gz
+git -c core.autocrlf=false archive --format=tar --prefix=onlinejudge-monolith-start-78715f21/ 78715f21288782a2c7ef1d9c23f933c46569b108 | gzip -n > ../d10-01_source-delivery/source-onlinejudge-monolith-start-78715f21288782a2c7ef1d9c23f933c46569b108.tar.gz
+git bundle create ../d10-01_source-delivery/history-onlinejudge-all-20260903.bundle --all

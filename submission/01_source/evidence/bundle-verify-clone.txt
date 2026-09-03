@@ -1,0 +1,8 @@
+977338f414a8cb72df157b139c8546d870e8bf23 refs/heads/dev
+515bd6bebd007b2c279ed8463eeb68d6cbd3bb4e refs/tags/monolith-start
+The bundle records a complete history.
+clone_head=977338f414a8cb72df157b139c8546d870e8bf23
+clone_monolith=78715f21288782a2c7ef1d9c23f933c46569b108
+clone_commit_count=1065
+clone_status_dirty_lines=0
+BUNDLE-RECHECK-DONE
