@@ -1,0 +1,55 @@
+sequenceDiagram
+  actor Student as 学生
+  participant Frontend as Vue HWK 页面
+  participant API as HWK API
+  participant Permission as CRS 课程权限边界
+  participant Storage as 文件存储边界
+  participant DB as HWK 数据表
+  participant Worker as HWK 评测 Worker
+  participant Recovery as HWK 评测恢复器
+  participant Evaluator as 共享评测边界
+  Student->>Frontend: 打开作业并填写提交内容
+  opt FILE 作业
+    Frontend->>API: 上传单附件
+    API->>Permission: 校验成员与作业归属
+    Permission-->>API: 允许上传
+    API->>Storage: 写入物理对象
+    Storage-->>API: 返回存储结果
+    API->>DB: 保存 UPLOADED 安全元数据
+    DB-->>API: 返回 fileId
+    API-->>Frontend: 返回 fileId 与安全摘要
+  end
+  Frontend->>API: 提交 TEXT/OBJECTIVE/CODE/fileId
+  API->>Permission: 校验成员、状态、截止与次数
+  Permission-->>API: 允许提交
+  API->>DB: 保存版本并维护唯一有效提交
+  alt OBJECTIVE
+    API->>DB: 保存自动评分终态与得分
+    DB-->>API: 返回评测结果
+  else CODE
+    API->>DB: 保存 CODE_JUDGE/PENDING 评测记录
+    DB-->>API: 返回 PENDING
+  else TEXT/FILE
+    API->>DB: 标记待人工批阅
+    DB-->>API: 返回待批阅状态
+  end
+  API-->>Frontend: 返回提交回执和可见状态
+  API-->>Worker: 事务提交后投递评测任务事件
+  opt 事件丢失、线程池拒绝或进程重启
+    Recovery->>DB: 定时扫描 PENDING；启动重置遗留 RUNNING
+    DB-->>Recovery: 返回可恢复任务
+    Recovery-->>Worker: 重新投递待评测任务
+  end
+  Worker->>DB: 原子认领 PENDING 任务并标记 RUNNING
+  Worker->>Evaluator: 执行 IO 评测
+  Evaluator-->>Worker: 返回 EvaluationResult
+  alt 评测正常完成
+    Worker->>DB: 回写评测终态与得分
+  else Worker 或评测器异常
+    Worker->>DB: 记录 SYSTEM_ERROR 并保留提交
+  end
+  Frontend->>API: GET API-HWK-10/11 查询提交或评测结果
+  API->>DB: 只读最新状态
+  DB-->>API: 返回 PENDING/RUNNING/终态
+  API-->>Frontend: 返回可见结果
+  Frontend-->>Student: 展示结果、错误或恢复提示

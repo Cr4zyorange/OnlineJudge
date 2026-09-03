@@ -96,6 +96,9 @@ output/issue-340/
 # Issue #367 API coverage raw run evidence is generated locally.
 output/issue-367/
 
+# Issue #368 PDF page rasters and contact sheets are local visual-QA intermediates.
+output/issue-368/
+
 # Python delivery helpers import each other as scripts.
 __pycache__/
 

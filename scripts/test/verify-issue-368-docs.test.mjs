@@ -14,5 +14,5 @@ test('Issue 368 documentation package satisfies its fail-closed delivery contrac
   });
 
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
-  assert.match(result.stdout, /PASS required_files=10/);
+  assert.match(result.stdout, /PASS required_files=12 scenarios=24 apis=124\/124 render=115\/115 pdf_pages=545\/545 blocked=3/);
 });

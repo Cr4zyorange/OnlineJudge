@@ -1,0 +1,23 @@
+sequenceDiagram
+  participant Student as 学生
+  participant Teacher as 教师
+  participant Ctrl as CourseController
+  participant Svc as CourseService
+  participant Repo as CourseRepository
+  participant DB as MySQL 数据库
+  Student->>Ctrl: POST /api/v1/courses/{courseId}/join
+  Ctrl->>Svc: join(courseId, request, user)
+  Svc->>Repo: findById + findMember
+  Svc->>Repo: insertMember(courseId, userId, STUDENT, PENDING, REVIEW, null)
+  Repo->>DB: INSERT crs_course_member
+  DB-->>Repo: CourseMember(PENDING)
+  Svc-->>Ctrl: CoursePermissionResponse(PENDING)
+  Ctrl-->>Student: 等待审核状态
+  Teacher->>Ctrl: PUT /api/v1/courses/{courseId}/members/{userId}
+  Ctrl->>Svc: updateMember(courseId, userId, CourseMemberUpdateRequest, user)
+  Svc->>Svc: validateMemberTransition(PENDING, ACTIVE/REJECTED)
+  Svc->>Repo: updateMember(courseId, userId, role, status, teacherId)
+  Repo->>DB: UPDATE crs_course_member
+  DB-->>Repo: CourseMember(ACTIVE/REJECTED)
+  Svc-->>Ctrl: CourseMemberResponse
+  Ctrl-->>Student: 审批通过后获得课程访问权限

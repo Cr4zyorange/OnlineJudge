@@ -1,0 +1,38 @@
+{
+  "issue": 368,
+  "baseSha": "c56b16f916b4a4c3d33915aa37beab6b05c72888",
+  "sourceHead": "f33007324df4be27594005e45818e9bf07f72b8d",
+  "authoritativeRoots": [
+    "docs/最终提交",
+    "docs/过程",
+    "docs/diagrams",
+    "tests/api",
+    "deploy/platform/workloads.json",
+    "database/migrations",
+    "contracts/v2"
+  ],
+  "counts": {
+    "finalEditableDocuments": 8,
+    "e2eScenarios": 24,
+    "publicApis": 124,
+    "unmappedPublicApis": 0,
+    "tables": 79,
+    "integrationContracts": 17,
+    "workloads": 9,
+    "migrationJobs": 4,
+    "schemas": 4,
+    "businessServices": 3,
+    "blockedEvidence": 3,
+    "renderTotal": 115,
+    "renderPass": 115,
+    "renderFail": 0
+  },
+  "commands": [
+    "node scripts/delivery/build-issue-368-docs.mjs --base c56b16f916b4a4c3d33915aa37beab6b05c72888",
+    "python scripts/delivery/audit-issue-368-pdf-pages.py --pages output/issue-368/pdf-pages --report submission/02_docs/evidence/pdf-page-audit.json --contacts output/issue-368/pdf-contact-sheets --expected 545",
+    "node scripts/delivery/refresh-issue-368-checksums.mjs",
+    "node scripts/delivery/verify-issue-368-docs.mjs",
+    "node --test scripts/test/verify-issue-368-docs.test.mjs",
+    "git diff --check"
+  ]
+}

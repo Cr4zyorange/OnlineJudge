@@ -1,0 +1,943 @@
+{
+  "generatedAt": "2026-09-03T02:22:41.148Z",
+  "baseSha": "c56b16f916b4a4c3d33915aa37beab6b05c72888",
+  "sourceHead": "f33007324df4be27594005e45818e9bf07f72b8d",
+  "tools": {
+    "node": "v24.19.0",
+    "chrome": "",
+    "java": "java version \"24.0.2\" 2025-07-15",
+    "plantuml": "PlantUML version 1.2025.4 (Sat Jun 28 19:09:25 GMT+08:00 2025)",
+    "mermaidPackage": "11.17.2",
+    "markedPackage": "16.4.2"
+  },
+  "counts": {
+    "mermaid": 100,
+    "plantuml": 7,
+    "pdf": 8,
+    "total": 115,
+    "pass": 115,
+    "fail": 0
+  },
+  "entries": [
+    {
+      "type": "mermaid",
+      "source": "docs/diagrams/arch/fig_2_10_crs_sc05_invite_join_component.mmd",
+      "output": "submission/02_docs/rendered/svg/models/arch/fig_2_10_crs_sc05_invite_join_component.svg",
+      "status": "PASS",
+      "bytes": 32242,
+      "sha256": "55ab6e093e63930572f6b8be865d4079b2360af7da547f6e9fe2d80a89575c5c"
+    },
+    {
+      "type": "mermaid",
+      "source": "docs/diagrams/arch/fig_2_11_crs_sc06_review_join_component.mmd",
+      "output": "submission/02_docs/rendered/svg/models/arch/fig_2_11_crs_sc06_review_join_component.svg",
+      "status": "PASS",
+      "bytes": 34751,
+      "sha256": "30beb8d89743e295114b9bddb10db9c67470518954a751ab3105476cf49712b4"
+    },
+    {
+      "type": "mermaid",
+      "source": "docs/diagrams/arch/fig_2_12_crs_sc07_member_component.mmd",
+      "output": "submission/02_docs/rendered/svg/models/arch/fig_2_12_crs_sc07_member_component.svg",
+      "status": "PASS",
+      "bytes": 32157,
+      "sha256": "cba03475399f5b4652ece32101ab4e6937c3802295da090ec52243d449e76814"
+    },
+    {
+      "type": "mermaid",
+      "source": "docs/diagrams/arch/fig_2_13_crs_sc08_announcement_component.mmd",
+      "output": "submission/02_docs/rendered/svg/models/arch/fig_2_13_crs_sc08_announcement_component.svg",
+      "status": "PASS",
+      "bytes": 31406,
+      "sha256": "d3adaadcf38badd398db6fcf3e17aada72cb8355bf88af22fc515dd3fb27cf2f"
+    },
+    {
+      "type": "mermaid",
+      "source": "docs/diagrams/arch/fig_2_14_crs_sc09_home_summary_component.mmd",
+      "output": "submission/02_docs/rendered/svg/models/arch/fig_2_14_crs_sc09_home_summary_component.svg",
+      "status": "PASS",
+      "bytes": 31912,
+      "sha256": "319f9aee34d9189eb2feb5455b46e6885a762e0ee35605b2aaa1ad91b25916dd"
+    },
+    {
+      "type": "mermaid",
+      "source": "docs/diagrams/arch/fig_2_6_crs_sc01_course_maintain_component.mmd",
+      "output": "submission/02_docs/rendered/svg/models/arch/fig_2_6_crs_sc01_course_maintain_component.svg",
+      "status": "PASS",
+      "bytes": 30820,
+      "sha256": "75b44f55bfbc90a1882f5046ae296198b06f937d64cd20b2d2de3af08d6fdcb3"
+    },
+    {
+      "type": "mermaid",
+      "source": "docs/diagrams/arch/fig_2_7_crs_sc02_chapter_component.mmd",
+      "output": "submission/02_docs/rendered/svg/models/arch/fig_2_7_crs_sc02_chapter_component.svg",
+      "status": "PASS",
+      "bytes": 32145,
+      "sha256": "661ce2cbcdfcf642cecbc01957ee2165600f3ac6e13a2d39ded7f04788ec5f9e"
+    },
+    {
+      "type": "mermaid",
+      "source": "docs/diagrams/arch/fig_2_8_crs_sc03_resource_component.mmd",
+      "output": "submission/02_docs/rendered/svg/models/arch/fig_2_8_crs_sc03_resource_component.svg",
+      "status": "PASS",
+      "bytes": 34437,
+      "sha256": "6904f995e89b068f9730505de3aafd07017bab21f781a336add7a69983f673bb"
+    },
+    {
+      "type": "mermaid",
+      "source": "docs/diagrams/arch/fig_2_9_crs_sc04_public_join_component.mmd",
+      "output": "submission/02_docs/rendered/svg/models/arch/fig_2_9_crs_sc04_public_join_component.svg",
+      "status": "PASS",
+      "bytes": 30861,
+      "sha256": "5ce18e727f1ee552d4a0f1b16086d71ab93157c47463f88bf8f46b5dbf971694"
+    },
+    {
+      "type": "mermaid",
+      "source": "docs/diagrams/arch/fig_5_2_hwk_01_submission_component.mmd",
+      "output": "submission/02_docs/rendered/svg/models/arch/fig_5_2_hwk_01_submission_component.svg",
+      "status": "PASS",
+      "bytes": 47796,
+      "sha256": "35ef91d2d4084f71ddbbb1b42a0c46e009d282c1e665ebbabc158158fbd5613b"
+    },
+    {
+      "type": "mermaid",
+      "source": "docs/diagrams/arch/fig_5_2_hwk_02_publish_component.mmd",
+      "output": "submission/02_docs/rendered/svg/models/arch/fig_5_2_hwk_02_publish_component.svg",
+      "status": "PASS",
+      "bytes": 36568,
+      "sha256": "d94809fe9e65d3061e3add64aa36d689237705141a2cc027304bc6682ab54803"
+    },
+    {
+      "type": "mermaid",
+      "source": "docs/diagrams/arch/issue306-assessment-worker-fencing.mmd",
+      "output": "submission/02_docs/rendered/svg/models/arch/issue306-assessment-worker-fencing.svg",
+      "status": "PASS",
+      "bytes": 14865,
+      "sha256": "28054e1f517d495db45185f0510c4994ff087d9a1defb483c7c7c78fe50ed7df"
+    },
+    {
+      "type": "mermaid",
+      "source": "docs/diagrams/arch/issue306-three-service-context.mmd",
+      "output": "submission/02_docs/rendered/svg/models/arch/issue306-three-service-context.svg",
+      "status": "PASS",
+      "bytes": 20182,
+      "sha256": "613479a8077299a54aba87a12ede3b11d7cdbd782c50c6d0a0df218f6f706ee3"
+    },
+    {
+      "type": "mermaid",
+      "source": "docs/diagrams/arch/issue306-three-service-deployment.mmd",
+      "output": "submission/02_docs/rendered/svg/models/arch/issue306-three-service-deployment.svg",
+      "status": "PASS",
+      "bytes": 25443,
+      "sha256": "26e848bb3415eb17f05531da41be4eb056676d3a62ff4c78f40e7b3ec4d63f32"
+    },
+    {
+      "type": "mermaid",
+      "source": "docs/diagrams/dsd/fig_3_2_10_crs_sc01_course_maintain_object.mmd",
+      "output": "submission/02_docs/rendered/svg/models/dsd/fig_3_2_10_crs_sc01_course_maintain_object.svg",
+      "status": "PASS",
+      "bytes": 32873,
+      "sha256": "932b4371b22928fb272be2c9f0cf3e617b85f0079f99073f543ed19398647db9"
+    },
+    {
+      "type": "mermaid",
+      "source": "docs/diagrams/dsd/fig_3_2_11_crs_sc02_chapter_object.mmd",
+      "output": "submission/02_docs/rendered/svg/models/dsd/fig_3_2_11_crs_sc02_chapter_object.svg",
+      "status": "PASS",
+      "bytes": 32042,
+      "sha256": "194bbca1eb2c3164153ef9171402179a993b709c49008fbb91163e4dde8aecf8"
+    },
+    {
+      "type": "mermaid",
+      "source": "docs/diagrams/dsd/fig_3_2_12_crs_sc03_resource_object.mmd",
+      "output": "submission/02_docs/rendered/svg/models/dsd/fig_3_2_12_crs_sc03_resource_object.svg",
+      "status": "PASS",
+      "bytes": 33172,
+      "sha256": "980636147a3a86565adbacf399dc024fbbddff0f69621f9f335c8341c45bc1b6"
+    },
+    {
+      "type": "mermaid",
+      "source": "docs/diagrams/dsd/fig_3_2_13_crs_sc04_public_join_object.mmd",
+      "output": "submission/02_docs/rendered/svg/models/dsd/fig_3_2_13_crs_sc04_public_join_object.svg",
+      "status": "PASS",
+      "bytes": 31156,
+      "sha256": "f85b04da4818a6d8e63597b6f389223ec761b61d45db6f7d8b8a9bf850f41790"
+    },
+    {
+      "type": "mermaid",
+      "source": "docs/diagrams/dsd/fig_3_2_14_crs_sc05_invite_join_object.mmd",
+      "output": "submission/02_docs/rendered/svg/models/dsd/fig_3_2_14_crs_sc05_invite_join_object.svg",
+      "status": "PASS",
+      "bytes": 30880,
+      "sha256": "2e8c7317ce6c78dfbb8dda84c49995a7a1a36824b68e3c7757e8c50d7ebf179f"
+    },
+    {
+      "type": "mermaid",
+      "source": "docs/diagrams/dsd/fig_3_2_15_crs_sc06_review_join_object.mmd",
+      "output": "submission/02_docs/rendered/svg/models/dsd/fig_3_2_15_crs_sc06_review_join_object.svg",
+      "status": "PASS",
+      "bytes": 32714,
+      "sha256": "883e9859c6caf51d3e3dc2ec50eff84c698e8c0c021a5f36bf8f1b64524efabc"
+    },
+    {
+      "type": "mermaid",
+      "source": "docs/diagrams/dsd/fig_3_2_16_crs_sc07_member_object.mmd",
+      "output": "submission/02_docs/rendered/svg/models/dsd/fig_3_2_16_crs_sc07_member_object.svg",
+      "status": "PASS",
+      "bytes": 33886,
+      "sha256": "c7f9f4dce85071eea593d00a392973cbcde6337272373a24e84c589835810de7"
+    },
+    {
+      "type": "mermaid",
+      "source": "docs/diagrams/dsd/fig_3_2_17_crs_sc08_announcement_object.mmd",
+      "output": "submission/02_docs/rendered/svg/models/dsd/fig_3_2_17_crs_sc08_announcement_object.svg",
+      "status": "PASS",
+      "bytes": 33168,
+      "sha256": "e418b80506b00a91bca8f722dbc50a0d3eeca0dacda1eef3ed09f2b64340f1e5"
+    },
+    {
+      "type": "mermaid",
+      "source": "docs/diagrams/dsd/fig_3_2_18_crs_sc09_home_summary_object.mmd",
+      "output": "submission/02_docs/rendered/svg/models/dsd/fig_3_2_18_crs_sc09_home_summary_object.svg",
+      "status": "PASS",
+      "bytes": 34322,
+      "sha256": "2b198d14e476dce5b5e1927a9aad957404bd38196ed769b2da9bb9a6da0eeafb"
+    },
+    {
+      "type": "mermaid",
+      "source": "docs/diagrams/dsd/fig_3_5_3a_hwk_publish_object.mmd",
+      "output": "submission/02_docs/rendered/svg/models/dsd/fig_3_5_3a_hwk_publish_object.svg",
+      "status": "PASS",
+      "bytes": 41204,
+      "sha256": "80232030e715862f4b0c069c84c53e2dccaca72bd095017d66b62a9c596ede70"
+    },
+    {
+      "type": "mermaid",
+      "source": "docs/diagrams/dsd/fig_3_5_3b_hwk_submission_object.mmd",
+      "output": "submission/02_docs/rendered/svg/models/dsd/fig_3_5_3b_hwk_submission_object.svg",
+      "status": "PASS",
+      "bytes": 53437,
+      "sha256": "e64348f97d44839f95190d3aa4a4fa66ccf5c14245bef53bf62cf4275c90b03f"
+    },
+    {
+      "type": "mermaid",
+      "source": "docs/diagrams/grd/fig_3_6_11_student_grade_query_sequence.mmd",
+      "output": "submission/02_docs/rendered/svg/models/grd/fig_3_6_11_student_grade_query_sequence.svg",
+      "status": "PASS",
+      "bytes": 37519,
+      "sha256": "48026a980acc6a81b44082d925c3f303afb8a3b3d150da0e1b87941e1bb5de10"
+    },
+    {
+      "type": "mermaid",
+      "source": "docs/diagrams/grd/fig_3_6_12_grade_review_sequence.mmd",
+      "output": "submission/02_docs/rendered/svg/models/grd/fig_3_6_12_grade_review_sequence.svg",
+      "status": "PASS",
+      "bytes": 76480,
+      "sha256": "28e55ca9e3baa4931b9ed684cf79e4bd1c42018b3af5bdfe18804a4d430b5622"
+    },
+    {
+      "type": "mermaid",
+      "source": "docs/diagrams/grd/fig_3_6_13_grade_analysis_sequence.mmd",
+      "output": "submission/02_docs/rendered/svg/models/grd/fig_3_6_13_grade_analysis_sequence.svg",
+      "status": "PASS",
+      "bytes": 47924,
+      "sha256": "2abe60c2a5537ed99ff871d51b36fb1b92d0aec295fdb1220c5d0f6a557d5450"
+    },
+    {
+      "type": "mermaid",
+      "source": "docs/diagrams/grd/fig_3_6_14_grade_analysis_activity.mmd",
+      "output": "submission/02_docs/rendered/svg/models/grd/fig_3_6_14_grade_analysis_activity.svg",
+      "status": "PASS",
+      "bytes": 119754,
+      "sha256": "fe4f3294f72d58c37803e8876d3ff3bd856ac964345d420790ff62260ed732a7"
+    },
+    {
+      "type": "mermaid",
+      "source": "docs/diagrams/grd/fig_3_6_15_grade_analysis_state.mmd",
+      "output": "submission/02_docs/rendered/svg/models/grd/fig_3_6_15_grade_analysis_state.svg",
+      "status": "PASS",
+      "bytes": 17701,
+      "sha256": "261dc115b2f111e3d3f648ed1aef7d3d8d06bfaab9b5791a6fc4ae83a49f983f"
+    },
+    {
+      "type": "mermaid",
+      "source": "docs/diagrams/lrn/detail/sc01-task-center.mmd",
+      "output": "submission/02_docs/rendered/svg/models/lrn/detail/sc01-task-center.svg",
+      "status": "PASS",
+      "bytes": 27690,
+      "sha256": "dd92c0836845c56af7c0d1464c3fdc4a464b66d077ed3a191f09610a1b973166"
+    },
+    {
+      "type": "mermaid",
+      "source": "docs/diagrams/lrn/detail/sc02-progress.mmd",
+      "output": "submission/02_docs/rendered/svg/models/lrn/detail/sc02-progress.svg",
+      "status": "PASS",
+      "bytes": 35265,
+      "sha256": "9aed3e50b188e3258e8e3c1c85c457aed208d84f3a82a7321d1d10b8742d8f17"
+    },
+    {
+      "type": "mermaid",
+      "source": "docs/diagrams/lrn/detail/sc03-statistics.mmd",
+      "output": "submission/02_docs/rendered/svg/models/lrn/detail/sc03-statistics.svg",
+      "status": "PASS",
+      "bytes": 27210,
+      "sha256": "5e4c00974272038cc3c4c1b7d2c4961de39cc06762b40b259e21a35b05e2e113"
+    },
+    {
+      "type": "mermaid",
+      "source": "docs/diagrams/lrn/detail/sc04-notification.mmd",
+      "output": "submission/02_docs/rendered/svg/models/lrn/detail/sc04-notification.svg",
+      "status": "PASS",
+      "bytes": 39700,
+      "sha256": "ed1ced867d76f1f0cf60b9218ef8bd8d1b1653f5bbe5bf06e299074dd86ae847"
+    },
+    {
+      "type": "mermaid",
+      "source": "docs/diagrams/lrn/detail/sc05-reminder.mmd",
+      "output": "submission/02_docs/rendered/svg/models/lrn/detail/sc05-reminder.svg",
+      "status": "PASS",
+      "bytes": 114155,
+      "sha256": "e68d3d623206dd4355d13195bbe1c3c4c096eb2190d68b8e24a4bd44bed8f7ca"
+    },
+    {
+      "type": "mermaid",
+      "source": "docs/diagrams/lrn/overview/sc01-task-center.mmd",
+      "output": "submission/02_docs/rendered/svg/models/lrn/overview/sc01-task-center.svg",
+      "status": "PASS",
+      "bytes": 21332,
+      "sha256": "47f89bbc172bdcc3b7bba0e7a74c646b5fbad065ecf4da95f39db601c330ecc8"
+    },
+    {
+      "type": "mermaid",
+      "source": "docs/diagrams/lrn/overview/sc02-progress.mmd",
+      "output": "submission/02_docs/rendered/svg/models/lrn/overview/sc02-progress.svg",
+      "status": "PASS",
+      "bytes": 20171,
+      "sha256": "1f544a88afa315ad83191c635dc5de0d863393a9832190d9510b213e004af480"
+    },
+    {
+      "type": "mermaid",
+      "source": "docs/diagrams/lrn/overview/sc03-statistics.mmd",
+      "output": "submission/02_docs/rendered/svg/models/lrn/overview/sc03-statistics.svg",
+      "status": "PASS",
+      "bytes": 20208,
+      "sha256": "f35d6f26152fe03c9b6549785d5d27ccd0463d399e9fee1f6527e96c3ffe519b"
+    },
+    {
+      "type": "mermaid",
+      "source": "docs/diagrams/lrn/overview/sc04-notification.mmd",
+      "output": "submission/02_docs/rendered/svg/models/lrn/overview/sc04-notification.svg",
+      "status": "PASS",
+      "bytes": 21021,
+      "sha256": "f366cd52200f7bcf819cac2bf7795235214486c9b8a6a872cda1f16d80e61d39"
+    },
+    {
+      "type": "mermaid",
+      "source": "docs/diagrams/lrn/overview/sc05-reminder.mmd",
+      "output": "submission/02_docs/rendered/svg/models/lrn/overview/sc05-reminder.svg",
+      "status": "PASS",
+      "bytes": 21155,
+      "sha256": "6a0a5059d04e34db029d59c11a354fab81bd45996997eb4d291221f7e8fcb1e1"
+    },
+    {
+      "type": "mermaid",
+      "source": "docs/diagrams/lrn/requirements/sc01-task-center.mmd",
+      "output": "submission/02_docs/rendered/svg/models/lrn/requirements/sc01-task-center.svg",
+      "status": "PASS",
+      "bytes": 24561,
+      "sha256": "e9b28432cbe4352e2a44cad4f991bd5615d40b879d4007f526cb3f403c5e1554"
+    },
+    {
+      "type": "mermaid",
+      "source": "docs/diagrams/lrn/requirements/sc02-progress.mmd",
+      "output": "submission/02_docs/rendered/svg/models/lrn/requirements/sc02-progress.svg",
+      "status": "PASS",
+      "bytes": 25393,
+      "sha256": "d7a552f0eff3ce5a47bb12b2080172fa6fa2b50d27ef794fd74e4db9227aca38"
+    },
+    {
+      "type": "mermaid",
+      "source": "docs/diagrams/lrn/requirements/sc03-statistics.mmd",
+      "output": "submission/02_docs/rendered/svg/models/lrn/requirements/sc03-statistics.svg",
+      "status": "PASS",
+      "bytes": 24522,
+      "sha256": "adc8517b2f277d0a31e91fb6495cedeb8b660220455fb774f7bc168c6963ce18"
+    },
+    {
+      "type": "mermaid",
+      "source": "docs/diagrams/lrn/requirements/sc04-notification.mmd",
+      "output": "submission/02_docs/rendered/svg/models/lrn/requirements/sc04-notification.svg",
+      "status": "PASS",
+      "bytes": 25425,
+      "sha256": "611f27cd742c064095765d73368c022ec4fa2c0f5ebbf2531567924b84fedaa2"
+    },
+    {
+      "type": "mermaid",
+      "source": "docs/diagrams/lrn/requirements/sc05-reminder.mmd",
+      "output": "submission/02_docs/rendered/svg/models/lrn/requirements/sc05-reminder.svg",
+      "status": "PASS",
+      "bytes": 25721,
+      "sha256": "36f3a074875c17dea680b950981d34a9103a35218fc5d5b721ccc3cfcc1c4cae"
+    },
+    {
+      "type": "mermaid",
+      "source": "docs/diagrams/srs/fig_4_10_business_flow.mmd",
+      "output": "submission/02_docs/rendered/svg/models/srs/fig_4_10_business_flow.svg",
+      "status": "PASS",
+      "bytes": 32601,
+      "sha256": "cad87a89bef3e60ab75fe7e4eb2326534c2c371965e4793bb722352c773810e2"
+    },
+    {
+      "type": "mermaid",
+      "source": "docs/diagrams/srs/fig_4_11_login_ssd.mmd",
+      "output": "submission/02_docs/rendered/svg/models/srs/fig_4_11_login_ssd.svg",
+      "status": "PASS",
+      "bytes": 26183,
+      "sha256": "cce33859035b66001d1745d83334ff15d99d0e7aa08b56ecb8ef5817f75ab731"
+    },
+    {
+      "type": "mermaid",
+      "source": "docs/diagrams/srs/fig_4_12_course_join_ssd.mmd",
+      "output": "submission/02_docs/rendered/svg/models/srs/fig_4_12_course_join_ssd.svg",
+      "status": "PASS",
+      "bytes": 26144,
+      "sha256": "f8a1621860e1600e4d25448b8ddb26ec6f28c8071485ad63db221ed868a991ac"
+    },
+    {
+      "type": "mermaid",
+      "source": "docs/diagrams/srs/fig_4_13_lab_submission_ssd.mmd",
+      "output": "submission/02_docs/rendered/svg/models/srs/fig_4_13_lab_submission_ssd.svg",
+      "status": "PASS",
+      "bytes": 35857,
+      "sha256": "a4cf1a34b1f5e56e1e7bc4c57541afa0c1600a6b7900e865328113de6734e952"
+    },
+    {
+      "type": "mermaid",
+      "source": "docs/diagrams/srs/fig_4_14a_hwk_submission_ssd.mmd",
+      "output": "submission/02_docs/rendered/svg/models/srs/fig_4_14a_hwk_submission_ssd.svg",
+      "status": "PASS",
+      "bytes": 30237,
+      "sha256": "2948e5f68e2d5358bce0895ad389ddf24dd27d6cb9705de3d28447f583dd7c04"
+    },
+    {
+      "type": "mermaid",
+      "source": "docs/diagrams/srs/fig_4_14b_hwk_publish_ssd.mmd",
+      "output": "submission/02_docs/rendered/svg/models/srs/fig_4_14b_hwk_publish_ssd.svg",
+      "status": "PASS",
+      "bytes": 27590,
+      "sha256": "0cdc0fb68bd8937c498d151fc14cfe590c1f39aa1bc9243a4fb2a8b5a60292b7"
+    },
+    {
+      "type": "mermaid",
+      "source": "docs/diagrams/srs/fig_4_15_grade_flow_ssd.mmd",
+      "output": "submission/02_docs/rendered/svg/models/srs/fig_4_15_grade_flow_ssd.svg",
+      "status": "PASS",
+      "bytes": 29961,
+      "sha256": "1a68c7ed82a5a49456f213210bf0b834cf461ee1a52631371b04d64216e4d90c"
+    },
+    {
+      "type": "mermaid",
+      "source": "docs/diagrams/srs/fig_4_16_notification_ssd.mmd",
+      "output": "submission/02_docs/rendered/svg/models/srs/fig_4_16_notification_ssd.svg",
+      "status": "PASS",
+      "bytes": 25931,
+      "sha256": "c1b205f402bc7d69d2581eee0345b2a20ae2ccd4138c4aed6079c334f728f7c1"
+    },
+    {
+      "type": "mermaid",
+      "source": "docs/diagrams/srs/fig_4_17_course_resource_ssd.mmd",
+      "output": "submission/02_docs/rendered/svg/models/srs/fig_4_17_course_resource_ssd.svg",
+      "status": "PASS",
+      "bytes": 28660,
+      "sha256": "864f293000b4952ad85ba993e2882f0c585dfeac9125cb822b9581f26246c36a"
+    },
+    {
+      "type": "mermaid",
+      "source": "docs/diagrams/srs/fig_4_18_experiment_publish_ssd.mmd",
+      "output": "submission/02_docs/rendered/svg/models/srs/fig_4_18_experiment_publish_ssd.svg",
+      "status": "PASS",
+      "bytes": 29668,
+      "sha256": "09029cbf7070f0206fe5d64be31ea2a130888805b01198cce8efe11a224bec1b"
+    },
+    {
+      "type": "mermaid",
+      "source": "docs/diagrams/srs/fig_4_19_learning_task_ssd.mmd",
+      "output": "submission/02_docs/rendered/svg/models/srs/fig_4_19_learning_task_ssd.svg",
+      "status": "PASS",
+      "bytes": 28140,
+      "sha256": "8d7358c6d8db763b38359bbb15c9cf17901bd5e111e0dde81b474d8ade8c3902"
+    },
+    {
+      "type": "mermaid",
+      "source": "docs/diagrams/srs/fig_4_20_auth_register_ssd.mmd",
+      "output": "submission/02_docs/rendered/svg/models/srs/fig_4_20_auth_register_ssd.svg",
+      "status": "PASS",
+      "bytes": 25442,
+      "sha256": "f639f49feabf9ff3c4b44f5b7a126e248491bd54787aca18988056922ac234b9"
+    },
+    {
+      "type": "mermaid",
+      "source": "docs/diagrams/srs/fig_4_20_crs_sc01_course_maintain_ssd.mmd",
+      "output": "submission/02_docs/rendered/svg/models/srs/fig_4_20_crs_sc01_course_maintain_ssd.svg",
+      "status": "PASS",
+      "bytes": 28483,
+      "sha256": "298623148108f4e853ae5b97b9ea76ffae09eed3cd01c8ef627e154b9d4e1280"
+    },
+    {
+      "type": "mermaid",
+      "source": "docs/diagrams/srs/fig_4_21_auth_login_ssd.mmd",
+      "output": "submission/02_docs/rendered/svg/models/srs/fig_4_21_auth_login_ssd.svg",
+      "status": "PASS",
+      "bytes": 26430,
+      "sha256": "ba8427f944551f2a9832b8db514e3e7b2dffa0b0e95199ab955a38540b6fd14b"
+    },
+    {
+      "type": "mermaid",
+      "source": "docs/diagrams/srs/fig_4_21_crs_sc01_course_state.mmd",
+      "output": "submission/02_docs/rendered/svg/models/srs/fig_4_21_crs_sc01_course_state.svg",
+      "status": "PASS",
+      "bytes": 36662,
+      "sha256": "4ec3530f3cdaf28d1728b7dec7e0df6ba82568078b1379aaa2a2eb7908294a85"
+    },
+    {
+      "type": "mermaid",
+      "source": "docs/diagrams/srs/fig_4_22_auth_logout_ssd.mmd",
+      "output": "submission/02_docs/rendered/svg/models/srs/fig_4_22_auth_logout_ssd.svg",
+      "status": "PASS",
+      "bytes": 24409,
+      "sha256": "8c649c18afd087c506ad0aff902a74e97c90239a2e47279d092d3591692968d5"
+    },
+    {
+      "type": "mermaid",
+      "source": "docs/diagrams/srs/fig_4_22_crs_sc02_chapter_manage_ssd.mmd",
+      "output": "submission/02_docs/rendered/svg/models/srs/fig_4_22_crs_sc02_chapter_manage_ssd.svg",
+      "status": "PASS",
+      "bytes": 28444,
+      "sha256": "c1ae4d381e576a40d2f22f36a7731b941f7b6a2f072b3bff9f13b185f03bd93e"
+    },
+    {
+      "type": "mermaid",
+      "source": "docs/diagrams/srs/fig_4_23_auth_persistent_auth_ssd.mmd",
+      "output": "submission/02_docs/rendered/svg/models/srs/fig_4_23_auth_persistent_auth_ssd.svg",
+      "status": "PASS",
+      "bytes": 26032,
+      "sha256": "6a58598c66fe2a4b961f040c7882eba4669803853350f70b82f2d0f55bcf6a52"
+    },
+    {
+      "type": "mermaid",
+      "source": "docs/diagrams/srs/fig_4_23_crs_sc02_chapter_manage_activity.mmd",
+      "output": "submission/02_docs/rendered/svg/models/srs/fig_4_23_crs_sc02_chapter_manage_activity.svg",
+      "status": "PASS",
+      "bytes": 23574,
+      "sha256": "7545d3cbafbb7ec6a3da0d22c264835653858c1b6231b9e04336cad4eed74728"
+    },
+    {
+      "type": "mermaid",
+      "source": "docs/diagrams/srs/fig_4_24_auth_profile_ssd.mmd",
+      "output": "submission/02_docs/rendered/svg/models/srs/fig_4_24_auth_profile_ssd.svg",
+      "status": "PASS",
+      "bytes": 25445,
+      "sha256": "0cdf8a4a1be12cbbcfa24f16637f8f3c38dee20ea23e37bc6b87c8bcda2087e5"
+    },
+    {
+      "type": "mermaid",
+      "source": "docs/diagrams/srs/fig_4_24_crs_sc03_resource_ssd.mmd",
+      "output": "submission/02_docs/rendered/svg/models/srs/fig_4_24_crs_sc03_resource_ssd.svg",
+      "status": "PASS",
+      "bytes": 26923,
+      "sha256": "6c03bb45a393c665b17b0eae5e1d9b675c45430e544260df3fa65e3b448604dc"
+    },
+    {
+      "type": "mermaid",
+      "source": "docs/diagrams/srs/fig_4_25_auth_change_password_ssd.mmd",
+      "output": "submission/02_docs/rendered/svg/models/srs/fig_4_25_auth_change_password_ssd.svg",
+      "status": "PASS",
+      "bytes": 25850,
+      "sha256": "290d6c8722cee0cd1904f3f1b5ad6540aba53d58714cc24c50bfb9149830c784"
+    },
+    {
+      "type": "mermaid",
+      "source": "docs/diagrams/srs/fig_4_25_crs_sc03_resource_upload_activity.mmd",
+      "output": "submission/02_docs/rendered/svg/models/srs/fig_4_25_crs_sc03_resource_upload_activity.svg",
+      "status": "PASS",
+      "bytes": 27551,
+      "sha256": "e37c567e300e50672e79fd915d4754c3b891378e1a77778b8dcce3b87a8716d1"
+    },
+    {
+      "type": "mermaid",
+      "source": "docs/diagrams/srs/fig_4_26_auth_admin_user_ssd.mmd",
+      "output": "submission/02_docs/rendered/svg/models/srs/fig_4_26_auth_admin_user_ssd.svg",
+      "status": "PASS",
+      "bytes": 24947,
+      "sha256": "9f202e31f6cee95a0b30dc5927dd6fd62c1fe08d767de8dc28b06dfa22323598"
+    },
+    {
+      "type": "mermaid",
+      "source": "docs/diagrams/srs/fig_4_26_crs_sc04_public_join_ssd.mmd",
+      "output": "submission/02_docs/rendered/svg/models/srs/fig_4_26_crs_sc04_public_join_ssd.svg",
+      "status": "PASS",
+      "bytes": 25438,
+      "sha256": "9c226e55c30d3c1eea5734bacc03c586708685b7e52d4c03ac3f6a600ba8c20d"
+    },
+    {
+      "type": "mermaid",
+      "source": "docs/diagrams/srs/fig_4_27_auth_user_role_ssd.mmd",
+      "output": "submission/02_docs/rendered/svg/models/srs/fig_4_27_auth_user_role_ssd.svg",
+      "status": "PASS",
+      "bytes": 24915,
+      "sha256": "7a4cd5fe5080c8d1de6d84c2d300057548a42a3baaa93134c074879544687c48"
+    },
+    {
+      "type": "mermaid",
+      "source": "docs/diagrams/srs/fig_4_27_crs_course_member_state.mmd",
+      "output": "submission/02_docs/rendered/svg/models/srs/fig_4_27_crs_course_member_state.svg",
+      "status": "PASS",
+      "bytes": 35403,
+      "sha256": "8251652da55bd94931b61544f11629005da8aa1ac7a8b9fbab41b94c081b63c3"
+    },
+    {
+      "type": "mermaid",
+      "source": "docs/diagrams/srs/fig_4_28_auth_role_permission_ssd.mmd",
+      "output": "submission/02_docs/rendered/svg/models/srs/fig_4_28_auth_role_permission_ssd.svg",
+      "status": "PASS",
+      "bytes": 25277,
+      "sha256": "b3682271c005392a3cc8164801f2e80335f4db2227fdfc90167bded79a30064f"
+    },
+    {
+      "type": "mermaid",
+      "source": "docs/diagrams/srs/fig_4_28_crs_sc05_invite_join_ssd.mmd",
+      "output": "submission/02_docs/rendered/svg/models/srs/fig_4_28_crs_sc05_invite_join_ssd.svg",
+      "status": "PASS",
+      "bytes": 25698,
+      "sha256": "1aac13c03fd1be2403cf2bed4acb4186901ba076186ce623d44fb5dce7573474"
+    },
+    {
+      "type": "mermaid",
+      "source": "docs/diagrams/srs/fig_4_29_auth_security_exception_ssd.mmd",
+      "output": "submission/02_docs/rendered/svg/models/srs/fig_4_29_auth_security_exception_ssd.svg",
+      "status": "PASS",
+      "bytes": 25335,
+      "sha256": "0c611e82c0853a91eeaa7339dc3d51d95fdaece642838bedde5c968d22cc771c"
+    },
+    {
+      "type": "mermaid",
+      "source": "docs/diagrams/srs/fig_4_29_crs_sc05_invite_join_activity.mmd",
+      "output": "submission/02_docs/rendered/svg/models/srs/fig_4_29_crs_sc05_invite_join_activity.svg",
+      "status": "PASS",
+      "bytes": 27340,
+      "sha256": "34ddeeed9c5d817f3782eec09fddc2066926af6a67648c5d4c193e06bd9d429f"
+    },
+    {
+      "type": "mermaid",
+      "source": "docs/diagrams/srs/fig_4_30_auth_audit_ssd.mmd",
+      "output": "submission/02_docs/rendered/svg/models/srs/fig_4_30_auth_audit_ssd.svg",
+      "status": "PASS",
+      "bytes": 25972,
+      "sha256": "598c27cc04c0b5e7cd1298b67a3deef48fbe51f5a24be13ccc5042e07c7b7f7b"
+    },
+    {
+      "type": "mermaid",
+      "source": "docs/diagrams/srs/fig_4_30_crs_sc06_review_join_ssd.mmd",
+      "output": "submission/02_docs/rendered/svg/models/srs/fig_4_30_crs_sc06_review_join_ssd.svg",
+      "status": "PASS",
+      "bytes": 28479,
+      "sha256": "7dd467160415899d5e51dc64a7ec8dc62db014a36774d2d283f12d200963fc5c"
+    },
+    {
+      "type": "mermaid",
+      "source": "docs/diagrams/srs/fig_4_31_auth_account_state.mmd",
+      "output": "submission/02_docs/rendered/svg/models/srs/fig_4_31_auth_account_state.svg",
+      "status": "PASS",
+      "bytes": 36836,
+      "sha256": "ae8bc1ea1587f17b335d40ed8a0a7e36c2bc36d54a2146b3b5b6b2e00685e9b8"
+    },
+    {
+      "type": "mermaid",
+      "source": "docs/diagrams/srs/fig_4_31_crs_sc06_review_join_activity.mmd",
+      "output": "submission/02_docs/rendered/svg/models/srs/fig_4_31_crs_sc06_review_join_activity.svg",
+      "status": "PASS",
+      "bytes": 26879,
+      "sha256": "3b0d383bb6395859a00a16e5d0d6977739bf088dc92a3f8f6e2fe4d4337cbdf9"
+    },
+    {
+      "type": "mermaid",
+      "source": "docs/diagrams/srs/fig_4_32_auth_session_state.mmd",
+      "output": "submission/02_docs/rendered/svg/models/srs/fig_4_32_auth_session_state.svg",
+      "status": "PASS",
+      "bytes": 29739,
+      "sha256": "f76f0a4e65f9213c02053d6a89f1106d6422a0bd2d3dac0369a3cde453c705e7"
+    },
+    {
+      "type": "mermaid",
+      "source": "docs/diagrams/srs/fig_4_32_crs_sc07_member_manage_ssd.mmd",
+      "output": "submission/02_docs/rendered/svg/models/srs/fig_4_32_crs_sc07_member_manage_ssd.svg",
+      "status": "PASS",
+      "bytes": 26126,
+      "sha256": "798305bf5beebf4ff22c8946be8879d6b0089ba1040162d0d23bdaf204ab8365"
+    },
+    {
+      "type": "mermaid",
+      "source": "docs/diagrams/srs/fig_4_33_auth_change_password_activity.mmd",
+      "output": "submission/02_docs/rendered/svg/models/srs/fig_4_33_auth_change_password_activity.svg",
+      "status": "PASS",
+      "bytes": 28628,
+      "sha256": "7f6811c998796f284c17fd5c74de6117d15e5b5fece3fe3576cd81956c1f96d1"
+    },
+    {
+      "type": "mermaid",
+      "source": "docs/diagrams/srs/fig_4_33_crs_sc07_member_role_state.mmd",
+      "output": "submission/02_docs/rendered/svg/models/srs/fig_4_33_crs_sc07_member_role_state.svg",
+      "status": "PASS",
+      "bytes": 35871,
+      "sha256": "715cde8891e24de1364116ef7183584b502f64f0bd877b9f0c7583690fb04471"
+    },
+    {
+      "type": "mermaid",
+      "source": "docs/diagrams/srs/fig_4_34_auth_role_permission_activity.mmd",
+      "output": "submission/02_docs/rendered/svg/models/srs/fig_4_34_auth_role_permission_activity.svg",
+      "status": "PASS",
+      "bytes": 23229,
+      "sha256": "ed6d094b01f7db1bc3783c9a3cbbd531615af0e600664e194fbf3f628b1e397b"
+    },
+    {
+      "type": "mermaid",
+      "source": "docs/diagrams/srs/fig_4_34_crs_sc08_announcement_ssd.mmd",
+      "output": "submission/02_docs/rendered/svg/models/srs/fig_4_34_crs_sc08_announcement_ssd.svg",
+      "status": "PASS",
+      "bytes": 28198,
+      "sha256": "039aa17b36f9abd5682b4ccbb14372f21f2526e3dc4bbea46f163ceeb997fc0b"
+    },
+    {
+      "type": "mermaid",
+      "source": "docs/diagrams/srs/fig_4_35_auth_access_control_activity.mmd",
+      "output": "submission/02_docs/rendered/svg/models/srs/fig_4_35_auth_access_control_activity.svg",
+      "status": "PASS",
+      "bytes": 29029,
+      "sha256": "874d9f0e71d43356eb2406f0cba418ece192481ccd1dab0c3ac4fb200a01c312"
+    },
+    {
+      "type": "mermaid",
+      "source": "docs/diagrams/srs/fig_4_35_crs_sc08_announcement_activity.mmd",
+      "output": "submission/02_docs/rendered/svg/models/srs/fig_4_35_crs_sc08_announcement_activity.svg",
+      "status": "PASS",
+      "bytes": 24231,
+      "sha256": "e106f72f1d196834c58941309bece1b2d62f627fca7905ecb3cdcf52cc5aa8da"
+    },
+    {
+      "type": "mermaid",
+      "source": "docs/diagrams/srs/fig_4_36_auth_profile_activity.mmd",
+      "output": "submission/02_docs/rendered/svg/models/srs/fig_4_36_auth_profile_activity.svg",
+      "status": "PASS",
+      "bytes": 24372,
+      "sha256": "10cae000f2a426c9e5fd51fa90a3cb5c8bf22d88ce32cc533111c1978b481f42"
+    },
+    {
+      "type": "mermaid",
+      "source": "docs/diagrams/srs/fig_4_36_crs_sc09_home_summary_ssd.mmd",
+      "output": "submission/02_docs/rendered/svg/models/srs/fig_4_36_crs_sc09_home_summary_ssd.svg",
+      "status": "PASS",
+      "bytes": 25875,
+      "sha256": "336f5f1a3e874b962070c1b7e38f9e630459bfb2f95072faf1898a2f3c9cb74a"
+    },
+    {
+      "type": "mermaid",
+      "source": "docs/diagrams/srs/fig_4_37_auth_audit_activity.mmd",
+      "output": "submission/02_docs/rendered/svg/models/srs/fig_4_37_auth_audit_activity.svg",
+      "status": "PASS",
+      "bytes": 27190,
+      "sha256": "15c6739c3f4944396ddb0bca232fe6d0d41b95cf168ccab8e526fd07c199a1c8"
+    },
+    {
+      "type": "mermaid",
+      "source": "docs/diagrams/srs/fig_4_37_crs_sc09_home_summary_activity.mmd",
+      "output": "submission/02_docs/rendered/svg/models/srs/fig_4_37_crs_sc09_home_summary_activity.svg",
+      "status": "PASS",
+      "bytes": 24589,
+      "sha256": "ac73b8c7037d2f14abda6e916c4acf633af8a35bce6e591db30b6bf2060c82b9"
+    },
+    {
+      "type": "mermaid",
+      "source": "docs/diagrams/srs/fig_4_56_grade_item_config_ssd.mmd",
+      "output": "submission/02_docs/rendered/svg/models/srs/fig_4_56_grade_item_config_ssd.svg",
+      "status": "PASS",
+      "bytes": 26784,
+      "sha256": "364e3cd65a43dfcf9c9bf849091b4db22c4b8a2bfa59fc2c394dd2f4d722a16c"
+    },
+    {
+      "type": "mermaid",
+      "source": "docs/diagrams/srs/fig_4_57_student_grade_query_ssd.mmd",
+      "output": "submission/02_docs/rendered/svg/models/srs/fig_4_57_student_grade_query_ssd.svg",
+      "status": "PASS",
+      "bytes": 24584,
+      "sha256": "4f386289f5ae5bc890b23576aea767e0e1de83317052ce085598c5262d95d4d3"
+    },
+    {
+      "type": "mermaid",
+      "source": "docs/diagrams/srs/fig_4_58_grade_review_ssd.mmd",
+      "output": "submission/02_docs/rendered/svg/models/srs/fig_4_58_grade_review_ssd.svg",
+      "status": "PASS",
+      "bytes": 30349,
+      "sha256": "923282a8c66696ee71d5385c58d0cf28919a3c1728f8c4fa6d76e28765ebb8dd"
+    },
+    {
+      "type": "mermaid",
+      "source": "docs/diagrams/srs/fig_4_59_grade_analysis_ssd.mmd",
+      "output": "submission/02_docs/rendered/svg/models/srs/fig_4_59_grade_analysis_ssd.svg",
+      "status": "PASS",
+      "bytes": 25351,
+      "sha256": "c38bcb0d93b35ef26120444e53d36c0b158df2401efd39ffaf575b3afa2e7505"
+    },
+    {
+      "type": "mermaid",
+      "source": "docs/diagrams/srs/fig_5_3_core_concept_class.mmd",
+      "output": "submission/02_docs/rendered/svg/models/srs/fig_5_3_core_concept_class.svg",
+      "status": "PASS",
+      "bytes": 84837,
+      "sha256": "ce19925bb8fcf6300b1d54e1e239e984042c51780d326904caa3e07cf07c5d41"
+    },
+    {
+      "type": "mermaid",
+      "source": "docs/diagrams/srs/fig_7_1_core_data_er.mmd",
+      "output": "submission/02_docs/rendered/svg/models/srs/fig_7_1_core_data_er.svg",
+      "status": "PASS",
+      "bytes": 51537,
+      "sha256": "863555ad158a117710928f114270c69453349e89a095a7880a78917b83811e7b"
+    },
+    {
+      "type": "mermaid",
+      "source": "docs/diagrams/srs/fig_lab_publish_overview_interaction.mmd",
+      "output": "submission/02_docs/rendered/svg/models/srs/fig_lab_publish_overview_interaction.svg",
+      "status": "PASS",
+      "bytes": 32944,
+      "sha256": "204b4cfb1c9dbb2372f76cf7d694621ee24109f430726258193c0190640879c3"
+    },
+    {
+      "type": "mermaid",
+      "source": "docs/diagrams/srs/fig_lab_publish_service_sequence.mmd",
+      "output": "submission/02_docs/rendered/svg/models/srs/fig_lab_publish_service_sequence.svg",
+      "status": "PASS",
+      "bytes": 36924,
+      "sha256": "b4bc4d249a2626778f884aa2035d0a0ed7088000944c19b1b111e370ae5abbb2"
+    },
+    {
+      "type": "plantuml",
+      "source": "docs/diagrams/srs/usecase-auth.puml",
+      "output": "submission/02_docs/rendered/svg/models/srs/usecase-auth.svg",
+      "status": "PASS",
+      "bytes": 18450,
+      "sha256": "cc0a9be12f508402015cf672cc05e3543f361a81d5f57758590047f7d01677f2"
+    },
+    {
+      "type": "plantuml",
+      "source": "docs/diagrams/srs/usecase-crs.puml",
+      "output": "submission/02_docs/rendered/svg/models/srs/usecase-crs.svg",
+      "status": "PASS",
+      "bytes": 14874,
+      "sha256": "beb24f49e863cdabe1203b63c3c22b22e720dc66493f96171147611c879af5b4"
+    },
+    {
+      "type": "plantuml",
+      "source": "docs/diagrams/srs/usecase-grd.puml",
+      "output": "submission/02_docs/rendered/svg/models/srs/usecase-grd.svg",
+      "status": "PASS",
+      "bytes": 19312,
+      "sha256": "282e304a2e2a60c80324f09009b14fc859c6c35140517c425e6f1bf66cf2e718"
+    },
+    {
+      "type": "plantuml",
+      "source": "docs/diagrams/srs/usecase-hwk.puml",
+      "output": "submission/02_docs/rendered/svg/models/srs/usecase-hwk.svg",
+      "status": "PASS",
+      "bytes": 16051,
+      "sha256": "2029b5bb38210739b17629237123b4ba8fd80cbbc802a56e9e3ad7b111340e43"
+    },
+    {
+      "type": "plantuml",
+      "source": "docs/diagrams/srs/usecase-lab.puml",
+      "output": "submission/02_docs/rendered/svg/models/srs/usecase-lab.svg",
+      "status": "PASS",
+      "bytes": 16006,
+      "sha256": "3167966eb4ff3a2400545cd27219963dce8113065ed96190fdf257ade7700f4b"
+    },
+    {
+      "type": "plantuml",
+      "source": "docs/diagrams/srs/usecase-lrn.puml",
+      "output": "submission/02_docs/rendered/svg/models/srs/usecase-lrn.svg",
+      "status": "PASS",
+      "bytes": 13144,
+      "sha256": "8254692aff21d59a92668eaea655048682e2367d8fc1605be27b2ad651bc22c1"
+    },
+    {
+      "type": "plantuml",
+      "source": "docs/diagrams/srs/usecase-overview.puml",
+      "output": "submission/02_docs/rendered/svg/models/srs/usecase-overview.svg",
+      "status": "PASS",
+      "bytes": 14230,
+      "sha256": "b47f51945c8882f31a4c50d23252da16eae7c45e0c42712805962de49eeb9338"
+    },
+    {
+      "type": "pdf",
+      "source": "docs/最终提交/软件需求规格说明书.md",
+      "output": "submission/02_docs/rendered/pdf/软件需求规格说明书.pdf",
+      "status": "PASS",
+      "bytes": 3632522,
+      "sha256": "a8220eb93a86ebb4ddce99d9c3ea3b4278d37580596387507dd9d40d0ce9d2c4"
+    },
+    {
+      "type": "pdf",
+      "source": "docs/最终提交/软件概要设计说明书.md",
+      "output": "submission/02_docs/rendered/pdf/软件概要设计说明书.pdf",
+      "status": "PASS",
+      "bytes": 2766505,
+      "sha256": "1410cc534c4c02f1b9532e08e681226df48c398822b46d118477a11db9b69d1f"
+    },
+    {
+      "type": "pdf",
+      "source": "docs/最终提交/软件详细设计说明书.md",
+      "output": "submission/02_docs/rendered/pdf/软件详细设计说明书.pdf",
+      "status": "PASS",
+      "bytes": 6100341,
+      "sha256": "69c0a791a68cdf9953f130df218d6306bab85561c6af4203b4d22ac83e670f2f"
+    },
+    {
+      "type": "pdf",
+      "source": "docs/最终提交/软件实现说明书.md",
+      "output": "submission/02_docs/rendered/pdf/软件实现说明书.pdf",
+      "status": "PASS",
+      "bytes": 14882626,
+      "sha256": "13e2d31f9d782cc370d1c804acd2252fcb8e712c516c6113617be7f949b223bb"
+    },
+    {
+      "type": "pdf",
+      "source": "docs/最终提交/测试文档.md",
+      "output": "submission/02_docs/rendered/pdf/测试文档.pdf",
+      "status": "PASS",
+      "bytes": 2945416,
+      "sha256": "dca4316fa82525d26d10ec2ab3e73f5f6dac0a05615b31fd82984aed859d7dea"
+    },
+    {
+      "type": "pdf",
+      "source": "docs/最终提交/部署文档.md",
+      "output": "submission/02_docs/rendered/pdf/部署文档.pdf",
+      "status": "PASS",
+      "bytes": 954222,
+      "sha256": "901e95d51cbee3da0df58705a5b5be09b7db1a1bd6026c83e0dd6091b4776af5"
+    },
+    {
+      "type": "pdf",
+      "source": "docs/最终提交/用户手册.md",
+      "output": "submission/02_docs/rendered/pdf/用户手册.pdf",
+      "status": "PASS",
+      "bytes": 42743540,
+      "sha256": "b1ca7dd7a99795b6cfa8c002bc0cfa2d369bbd64e6c56078f588d00e3da88d70"
+    },
+    {
+      "type": "pdf",
+      "source": "docs/最终提交/软件开发计划书.md",
+      "output": "submission/02_docs/rendered/pdf/软件开发计划书.pdf",
+      "status": "PASS",
+      "bytes": 474430,
+      "sha256": "f1e6d838f80e7e082933914729ee65d0b31d26fc680ec425e69d1c8e43631405"
+    }
+  ]
+}

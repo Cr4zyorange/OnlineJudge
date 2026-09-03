@@ -1,0 +1,8 @@
+flowchart LR
+  UI[UI-LRN-05 提醒设置] --> API[API-LRN-10/11]
+  API --> RULES[(DB-LRN-06/07)]
+  SCHED[LRN 定时扫描] --> LAB[LAB 截止/提交摘要]
+  SCHED --> HWK[HWK 截止/提交摘要]
+  SCHED --> RULES
+  SCHED --> NOTICE[LRN 通知服务]
+  NOTICE --> LOG[(扫描/失败日志)]
