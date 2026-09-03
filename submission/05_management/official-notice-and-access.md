@@ -21,8 +21,8 @@
 | 目标 | 已做检查 | 结果 |
 | --- | --- | --- |
 | GitHub 公开仓库 | Owner GitHub CLI 可读；无认证 curl 探针访问仓库页 | PASS：仓库 `visibility=PUBLIC`，匿名 HTTP 200。 |
-| GitHub 私有 Project #3 | Owner GitHub CLI 可读 190 个 item；无认证 curl 探针访问 Project 页 | 匿名 HTTP 404，不能替代受邀账户验证。 |
+| GitHub 公开 Project #3 | Owner GitHub CLI 可读 190 个 item；无认证 curl 探针访问 Project 页 | PASS：`public=true`，匿名 HTTP 200。 |
 | Notion 页面与日报 | 当前 Notion 连接可读；没有教师、助教或独立访客身份 | BLOCKED：Owner 或已授权连接不构成非 Owner 复核。 |
 | 云盘和最终证据外链 | 没有可审计云盘地址 | BLOCKED。 |
 
-解除门槛：用指定教师、助教或独立验收账号打开仓库、Project、Notion 共享页、云盘与最终证据链接，保存时间、账号角色、结果、失败提示与截图 SHA256；不得记录私人邮箱或 Token。
+仓库和 Project 的匿名访问已验证。剩余的 Notion 共享页、云盘和最终证据链接如需要外部验收，仍应由指定教师、助教或独立验收账号打开，并保存时间、账号角色、结果、失败提示与截图 SHA256；不得记录私人邮箱或 Token。

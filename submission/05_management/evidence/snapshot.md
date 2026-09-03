@@ -22,7 +22,7 @@
 
 结果：
 
-- Project 为 Team planning，地址 https://github.com/users/Cr4zyorange/projects/3，私有（`public=false`），item 总数 190，字段数 21。
+- Project 为 Team planning，地址 https://github.com/users/Cr4zyorange/projects/3，公开（`public=true`），item 总数 190，字段数 21；无认证 HTTP 探针返回 200。
 - 当前状态汇总为 Done=176、In progress=3、Todo=6、待审核=5。
 - #369 Project item 为 PVTI_lAHOBGs3_c4BVG7hzg5ASHg。
 - #369 字段为 Status=待审核、Priority=P0、Size=M、Type=设计、start date=2026-09-03、target date=2026-09-03；关联 PR #384。

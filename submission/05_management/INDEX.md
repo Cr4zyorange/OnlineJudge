@@ -10,7 +10,7 @@
 | 材料 | 地址或本地路径 | 访问要求 | 采集结论 |
 | --- | --- | --- | --- |
 | GitHub 仓库 | https://github.com/Cr4zyorange/OnlineJudge | 公开仓库 | PASS：`visibility=PUBLIC`；匿名探针 HTTP 200。 |
-| GitHub Project | https://github.com/users/Cr4zyorange/projects/3 | 私有 Project；需要受邀 GitHub 账号 | PASS：Owner 会话读取 Project #3 Team planning；匿名探针 HTTP 404。 |
+| GitHub Project | https://github.com/users/Cr4zyorange/projects/3 | 公开 Project | PASS：`public=true`；匿名探针 HTTP 200。 |
 | Issue #369 | https://github.com/Cr4zyorange/OnlineJudge/issues/369 | 同仓库访问权限 | PASS：Assignee 为 Cr4zyorange，Project 状态为待审核，关联 PR #384。 |
 | Notion 项目 | https://app.notion.com/p/3aa66e71b0d9810a9692ed6819bee1ca | 天枢OS Notion 工作区权限 | PASS：项目为进行中；本次读取前已先阅读适用 AI 手册。 |
 | Notion 日报知识库 | https://app.notion.com/p/25166e71b0d980d59888f7fdbb071679 | 同上 | PASS：用于逐日来源索引；不将临时图像签名 URL 写入仓库。 |
@@ -33,4 +33,4 @@ SHA256SUMS 覆盖本目录的固定 Markdown 材料，不含自身。提交前�
 
 ## 当前交付判断
 
-EVIDENCE_READY 不能发布。当前已固化 Project、正式 Review/返工、可回查的贡献事实，以及 8 个日报日期的 14 张原始看板图；仍缺最新书面官方通知（含云盘方式）、六人真实确认，以及 Project 的非 Owner 访问回执。
+EVIDENCE_READY 不能发布。当前已固化 Project、正式 Review/返工、可回查的贡献事实，以及 8 个日报日期的 14 张原始看板图；仍缺最新书面官方通知（含云盘方式）和六人真实确认。
