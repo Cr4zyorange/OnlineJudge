@@ -1,0 +1,21 @@
+sequenceDiagram
+  participant Student as 学生
+  participant Ctrl as CourseController
+  participant Svc as CourseService
+  participant Repo as CourseRepository
+  participant DB as MySQL 数据库
+  Student->>Ctrl: POST /api/v1/courses/{courseId}/join
+  Ctrl->>Svc: join(courseId, CourseJoinRequest, user)
+  Svc->>Repo: findById(courseId)
+  Repo->>DB: SELECT crs_course
+  DB-->>Repo: Course
+  Svc->>Svc: 校验课程状态与容量
+  Svc->>Repo: findMember(courseId, userId)
+  Repo->>DB: SELECT crs_course_member
+  DB-->>Repo: Optional<CourseMember>
+  Svc->>Repo: insertMember(courseId, userId, STUDENT, ACTIVE, PUBLIC, null)
+  Repo->>DB: INSERT crs_course_member
+  DB-->>Repo: 返回成员主键
+  Repo-->>Svc: CourseMember
+  Svc-->>Ctrl: CoursePermissionResponse(ACTIVE)
+  Ctrl-->>Student: 加入成功并开放课程资源与任务

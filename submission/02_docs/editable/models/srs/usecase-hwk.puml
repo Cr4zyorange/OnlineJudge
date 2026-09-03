@@ -1,0 +1,36 @@
+﻿@startuml
+left to right direction
+skinparam packageStyle rectangle
+skinparam shadowing false
+title 图 4-8 HWK 作业与自动评测用例图
+actor "学生" as Student
+actor "教师" as Teacher
+
+rectangle "HWK 作业与自动评测" {
+  usecase "UC-HWK-02\n教师发布作业" as PublishHw
+  usecase "配置题目、附件和测试用例" as Config
+  usecase "生成学习任务通知" as Notify
+  usecase "UC-HWK-01\n学生提交作业并触发自动评测" as SubmitHw
+  usecase "保存作业提交" as SaveSubmission
+  usecase "创建评测任务" as EvalTask
+  usecase "展示作业反馈" as Feedback
+  usecase "教师批阅或重评" as Review
+  usecase "校验课程权限" as Permission
+}
+
+Teacher --> PublishHw
+Teacher --> Config
+Teacher --> Review
+Student --> SubmitHw
+Student --> Feedback
+
+PublishHw ..> Permission : <<include>>
+PublishHw ..> Config : <<include>>
+Notify ..> PublishHw : <<extend>>
+SubmitHw ..> Permission : <<include>>
+SubmitHw ..> SaveSubmission : <<include>>
+SubmitHw ..> EvalTask : <<include>>
+Feedback ..> SubmitHw : <<extend>>
+Review ..> Permission : <<include>>
+Notify ..> Review : <<extend>>
+@enduml

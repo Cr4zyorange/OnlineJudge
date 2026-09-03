@@ -1,0 +1,9 @@
+stateDiagram-v2
+  [*] --> NOT_STARTED
+  NOT_STARTED --> IN_PROGRESS: 保存位置/首次行为
+  IN_PROGRESS --> IN_PROGRESS: lastPosition 更新（幂等覆盖）
+  IN_PROGRESS --> COMPLETED: 完成任务
+  IN_PROGRESS --> QUEUED_OFFLINE: 网络失败
+  QUEUED_OFFLINE --> IN_PROGRESS: 恢复在线按用户/课程重放成功
+  QUEUED_OFFLINE --> QUEUED_OFFLINE: 重放失败保留队列
+  COMPLETED --> [*]

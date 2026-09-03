@@ -1,0 +1,14 @@
+flowchart TD
+  Start[访问受保护页面或接口] --> HasToken{是否携带认证信息}
+  HasToken -->|否| Unauthenticated[返回登录已失效并引导重新登录]
+  HasToken -->|是| Validate[校验令牌签名、过期时间与会话状态]
+  Validate --> TokenOk{令牌是否有效}
+  TokenOk -->|否| Unauthenticated
+  TokenOk -->|是| LoadUser[加载当前用户与账号状态]
+  LoadUser --> AccountOk{账号是否正常}
+  AccountOk -->|否| AccountError[返回账号状态异常]
+  AccountOk -->|是| Permission{是否具备目标接口/页面权限}
+  Permission -->|否| AuditDenied[记录越权访问审计]
+  AuditDenied --> Forbidden[返回无权限访问]
+  Permission -->|是| Context[写入当前用户上下文]
+  Context --> Business[进入业务模块并继续数据归属校验]

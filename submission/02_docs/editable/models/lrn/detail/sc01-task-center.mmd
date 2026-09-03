@@ -1,0 +1,13 @@
+sequenceDiagram
+  participant V as LearningTaskCenterView
+  participant C as LearningTaskController
+  participant S as LearningTaskService
+  participant P as CoursePermissionClient
+  participant R as LearningTaskRepository
+  V->>C: GET /learning/tasks?type&status&page
+  C->>S: list(currentUser, query)
+  S->>P: accessibleCourseIds(userId)
+  P-->>S: active course ids
+  S->>R: find member-scoped snapshots
+  R-->>S: paged tasks
+  S-->>V: task page / empty state

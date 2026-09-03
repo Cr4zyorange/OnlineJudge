@@ -1,0 +1,5 @@
+flowchart LR
+  API[Assessment API] -->|transaction: submission, pending task, outbox| DB[Assessment DB]
+  Worker[Assessment Worker] -->|claim increments generation| DB
+  Worker -->|fenced final write: task, generation, owner, live lease| DB
+  DB -->|stale worker writes zero rows| Worker

@@ -1,0 +1,36 @@
+@startuml
+left to right direction
+skinparam packageStyle rectangle
+skinparam shadowing false
+title 图 4-7 LAB 实训实验用例图
+actor "学生" as Student
+actor "教师" as Teacher
+
+rectangle "LAB 实训实验" {
+  usecase "UC-LAB-01\n教师创建并发布实验" as PublishLab
+  usecase "维护实验附件与测试用例" as Artifacts
+  usecase "生成学习任务通知" as Notify
+  usecase "UC-LAB-02\n学生提交实验并查看评测结果" as SubmitLab
+  usecase "保存实验提交" as SaveSubmission
+  usecase "创建评测任务" as EvalTask
+  usecase "展示评测结果" as Result
+  usecase "教师评分与反馈" as Grade
+  usecase "校验课程权限" as Permission
+}
+
+Teacher --> PublishLab
+Teacher --> Artifacts
+Teacher --> Grade
+Student --> SubmitLab
+Student --> Result
+
+PublishLab ..> Permission : <<include>>
+PublishLab ..> Artifacts : <<include>>
+Notify ..> PublishLab : <<extend>>
+SubmitLab ..> Permission : <<include>>
+SubmitLab ..> SaveSubmission : <<include>>
+SubmitLab ..> EvalTask : <<include>>
+Result ..> SubmitLab : <<extend>>
+Grade ..> Permission : <<include>>
+Notify ..> Grade : <<extend>>
+@enduml

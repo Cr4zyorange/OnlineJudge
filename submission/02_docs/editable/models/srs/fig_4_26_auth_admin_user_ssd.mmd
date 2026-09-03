@@ -1,0 +1,9 @@
+sequenceDiagram
+  actor Admin as 管理员
+  participant System as OnlineJudgeForSE 系统边界
+  Admin->>System: 查询用户列表
+  System-->>Admin: 返回分页用户列表
+  Admin->>System: 创建用户（账号、密码、用户类型、初始角色）
+  System-->>Admin: 返回创建结果（不暴露密码）
+  Admin->>System: 禁用/启用账号（userId、accountStatus）
+  System-->>Admin: 返回账号最新状态；禁用时作废该用户会话并记录审计

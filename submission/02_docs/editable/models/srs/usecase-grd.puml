@@ -1,0 +1,40 @@
+@startuml
+left to right direction
+skinparam packageStyle rectangle
+skinparam shadowing false
+title 图 4-9 GRD 成绩评价与教学分析用例图
+actor "学生" as Student
+actor "教师" as Teacher
+
+rectangle "GRD 成绩评价与教学分析" {
+  usecase "UC-GR-02\n配置成绩项与计算规则" as Rule
+  usecase "同步来源成绩" as SourceGrades
+  usecase "重新计算成绩" as Recalculate
+  usecase "UC-GR-01\n汇总并发布成绩" as Publish
+  usecase "UC-GR-03\n查询已发布成绩" as Query
+  usecase "UC-GR-04\n成绩异议提交与复核" as Appeal
+  usecase "UC-GR-05\n查看教学分析" as Analysis
+  usecase "生成成绩通知" as Notify
+  usecase "校验课程权限" as Permission
+}
+
+Teacher --> Rule
+Teacher --> Publish
+Teacher --> Appeal
+Teacher --> Analysis
+Student --> Query
+Student --> Appeal
+
+Rule ..> Permission : <<include>>
+Rule ..> SourceGrades : <<include>>
+Recalculate ..> Rule : <<extend>>
+Publish ..> Permission : <<include>>
+Publish ..> SourceGrades : <<include>>
+Notify ..> Publish : <<extend>>
+Query ..> Permission : <<include>>
+Appeal ..> Query : <<extend>>
+Appeal ..> Permission : <<include>>
+Notify ..> Appeal : <<extend>>
+Analysis ..> Permission : <<include>>
+Analysis ..> SourceGrades : <<include>>
+@enduml
