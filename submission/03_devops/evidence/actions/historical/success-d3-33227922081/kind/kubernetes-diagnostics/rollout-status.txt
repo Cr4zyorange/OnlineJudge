@@ -1,0 +1,10 @@
+### rollout status snapshots (5s probe of current state)
+
+### kubectl rollout status statefulset/mysql
+statefulset rolling update complete 1 pods at revision mysql-5bbb5b894f...
+
+### kubectl rollout status deployment/backend
+deployment "backend" successfully rolled out
+
+### kubectl rollout status deployment/frontend
+deployment "frontend" successfully rolled out

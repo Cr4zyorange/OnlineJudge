@@ -1,0 +1,2 @@
+$ docker image inspect --format image=\{\{.RepoTags\}\}\ local_digest=\{\{.Id\}\}\ repo_digests=\{\{.RepoDigests\}\}\ revision=\{\{index\ .Config.Labels\ \"org.opencontainers.image.revision\"\}\} onlinejudge/frontend:5cdbe8533991bb0c7cfbe23e08d81b78d47af483
+image=[onlinejudge/frontend:5cdbe8533991bb0c7cfbe23e08d81b78d47af483] local_digest=sha256:777a4f3d10773c1c1525bbd7ee8f82699e0cbe930f16f661bc561da79ad3388a repo_digests=[] revision=5cdbe8533991bb0c7cfbe23e08d81b78d47af483

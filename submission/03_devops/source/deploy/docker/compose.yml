@@ -1,0 +1,206 @@
+name: onlinejudge
+
+services:
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-onlinejudge}
+      MYSQL_USER: ${MYSQL_USER:-onlinejudge}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?MYSQL_PASSWORD is required}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD is required}
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ../../database/mysql/compose-schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ../../database/seeds/dev-ci.sql:/docker-entrypoint-initdb.d/02-dev-ci-seed.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  rabbitmq:
+    image: rabbitmq:4.1-management
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-oj_course_events}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?RABBITMQ_PASSWORD is required}
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD-SHELL", "rabbitmq-diagnostics -q ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  course-migrations:
+    image: mysql:8.4
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      COURSE_DATABASE_HOST: mysql
+      COURSE_DATABASE_PORT: 3306
+      COURSE_DATABASE_NAME: oj_course
+      COURSE_DATABASE_USER: oj_course_rw
+      COURSE_DATABASE_PASSWORD: ${COURSE_DATABASE_PASSWORD:?COURSE_DATABASE_PASSWORD is required}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD is required}
+      COURSE_MIGRATIONS_DIR: /migrations/course
+    volumes:
+      - ../../database/migrations/course:/migrations/course:ro
+      - ../../database/mysql/migrate-course-service.sh:/migrations/migrate-course-service.sh:ro
+    entrypoint: ["bash", "/migrations/migrate-course-service.sh"]
+    restart: "no"
+
+  # Provisions the dev-only renewable workload credentials shared by Course and
+  # the backend (Learning).  Recreate the workload-tls volume to rotate them.
+  tls-init:
+    image: eclipse-temurin:21-jre@sha256:7a65df4b22d2de92d4e04056e884f3b9122d70b21e2847fd66084278bd0ce037
+    volumes:
+      - workload-tls:/tls
+      - ../../deploy/docker/scripts/generate-workload-tls.sh:/generate-workload-tls.sh:ro
+    entrypoint: ["bash", "/generate-workload-tls.sh", "/tls"]
+    restart: "no"
+
+  course-service:
+    image: onlinejudge/course-service:${GIT_SHA:?GIT_SHA must be the current full 40-character commit SHA}
+    depends_on:
+      course-migrations:
+        condition: service_completed_successfully
+      tls-init:
+        condition: service_completed_successfully
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      COURSE_DATABASE_HOST: mysql
+      COURSE_DATABASE_PORT: 3306
+      COURSE_DATABASE_NAME: oj_course
+      COURSE_DATABASE_USER: oj_course_rw
+      COURSE_DATABASE_PASSWORD: ${COURSE_DATABASE_PASSWORD:?COURSE_DATABASE_PASSWORD is required}
+      COURSE_RABBIT_ENABLED: "true"
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ${RABBITMQ_USER:-oj_course_events}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?RABBITMQ_PASSWORD is required}
+      RABBITMQ_EXCHANGE: onlinejudge.events.v2
+      IDENTITY_JWT_ISSUER: ${IDENTITY_JWT_ISSUER:-onlinejudge.identity.v2}
+      IDENTITY_JWT_AUDIENCE: ${IDENTITY_JWT_AUDIENCE:-onlinejudge.api}
+      IDENTITY_JWKS_TRUST_BUNDLE: ${IDENTITY_JWKS_TRUST_BUNDLE:?IDENTITY_JWKS_TRUST_BUNDLE is required}
+      IDENTITY_JWKS_URI: ${IDENTITY_JWKS_URI:?IDENTITY_JWKS_URI is required}
+      IDENTITY_JWKS_REFRESH_INTERVAL: ${IDENTITY_JWKS_REFRESH_INTERVAL:-PT5M}
+      IDENTITY_JWKS_REFRESH_INITIAL_DELAY: ${IDENTITY_JWKS_REFRESH_INITIAL_DELAY:-PT30S}
+      IDENTITY_JWKS_REQUEST_TIMEOUT: ${IDENTITY_JWKS_REQUEST_TIMEOUT:-PT1S}
+      COURSE_LEARNING_BASE_URL: ${COURSE_LEARNING_BASE_URL:-https://backend:8080}
+      COURSE_LEARNING_TIMEOUT_MS: ${COURSE_LEARNING_TIMEOUT_MS:-800}
+      # Short-lived JWT remains an operator override; the supported default is
+      # the renewable mTLS workload identity below, so no one-off token is needed.
+      COURSE_LEARNING_SERVICE_TOKEN: ${COURSE_LEARNING_SERVICE_TOKEN:-}
+      COURSE_LEARNING_MTLS_ENABLED: "true"
+      COURSE_LEARNING_MTLS_KEYSTORE_PATH: /tls/course-client.p12
+      COURSE_LEARNING_MTLS_KEYSTORE_PASSWORD: changeit
+      COURSE_LEARNING_MTLS_KEYSTORE_TYPE: PKCS12
+      COURSE_LEARNING_MTLS_TRUSTSTORE_PATH: /tls/course-truststore.p12
+      COURSE_LEARNING_MTLS_TRUSTSTORE_PASSWORD: changeit
+      COURSE_LEARNING_MTLS_TRUSTSTORE_TYPE: PKCS12
+      # Course's own TLS listener: the internal v2 receiving boundary is a
+      # real mTLS server, so inbound callers present a workload client
+      # certificate that CourseAuthentication observes after TLS termination.
+      # client-auth is 'want' so the readiness probe and the user API keep
+      # working without a certificate; only internal endpoints require a
+      # service identity (audience-bound JWT or a trusted mTLS client).
+      SERVER_SSL_ENABLED: "true"
+      SERVER_SSL_KEY_STORE: /tls/course-server.p12
+      SERVER_SSL_KEY_STORE_TYPE: PKCS12
+      SERVER_SSL_KEY_STORE_PASSWORD: changeit
+      SERVER_SSL_CLIENT_AUTH: want
+      SERVER_SSL_TRUST_STORE: /tls/course-truststore.p12
+      SERVER_SSL_TRUST_STORE_TYPE: PKCS12
+      SERVER_SSL_TRUST_STORE_PASSWORD: changeit
+      COURSE_INTERNAL_MTLS_SERVICE_SUBJECTS: ${COURSE_INTERNAL_MTLS_SERVICE_SUBJECTS:-CN=backend,CN=assessment-api,CN=learning-api,CN=grade-api}
+      COURSE_STORAGE_ROOT: /opt/onlinejudge-course/data
+    volumes:
+      - course-data:/opt/onlinejudge-course/data
+      - workload-tls:/tls:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- --no-check-certificate https://127.0.0.1:8082/actuator/health/readiness | grep -q '\"status\":\"UP\"'"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+
+  backend:
+    image: onlinejudge/backend:${GIT_SHA:?GIT_SHA must be the current full 40-character commit SHA}
+    depends_on:
+      mysql:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      tls-init:
+        condition: service_completed_successfully
+    environment:
+      MYSQL_HOST: mysql
+      MYSQL_PORT: 3306
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-onlinejudge}
+      MYSQL_USER: ${MYSQL_USER:-onlinejudge}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?MYSQL_PASSWORD is required}
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: 5672
+      SPRING_RABBITMQ_USERNAME: ${RABBITMQ_USER:-oj_course_events}
+      SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?RABBITMQ_PASSWORD is required}
+      IDENTITY_JWT_ISSUER: ${IDENTITY_JWT_ISSUER:-onlinejudge.identity.v2}
+      IDENTITY_JWT_AUDIENCE: ${IDENTITY_JWT_AUDIENCE:-onlinejudge.api}
+      IDENTITY_JWKS_TRUST_BUNDLE: ${IDENTITY_JWKS_TRUST_BUNDLE:?IDENTITY_JWKS_TRUST_BUNDLE is required}
+      IDENTITY_JWKS_URI: ${IDENTITY_JWKS_URI:?IDENTITY_JWKS_URI is required}
+      IDENTITY_JWKS_REFRESH_INTERVAL: ${IDENTITY_JWKS_REFRESH_INTERVAL:-PT5M}
+      IDENTITY_JWKS_REFRESH_INITIAL_DELAY: ${IDENTITY_JWKS_REFRESH_INITIAL_DELAY:-PT30S}
+      IDENTITY_JWKS_REQUEST_TIMEOUT: ${IDENTITY_JWKS_REQUEST_TIMEOUT:-PT1S}
+      # TLS at the Learning receiving boundary: the connector requests client
+      # certificates (want), and only the Course workload subject is mapped to
+      # the internal service scope.  Frontend/health traffic without a client
+      # certificate still works because client-auth is not required globally.
+      SERVER_SSL_ENABLED: "true"
+      SERVER_SSL_KEY_STORE: /tls/backend-server.p12
+      SERVER_SSL_KEY_STORE_TYPE: PKCS12
+      SERVER_SSL_KEY_STORE_PASSWORD: changeit
+      SERVER_SSL_CLIENT_AUTH: want
+      SERVER_SSL_TRUST_STORE: /tls/backend-truststore.p12
+      SERVER_SSL_TRUST_STORE_TYPE: PKCS12
+      SERVER_SSL_TRUST_STORE_PASSWORD: changeit
+      ONLINEJUDGE_LEARNING_INTERNAL_MTLS_COURSE_SUBJECTS: "CN=course-service"
+      ONLINEJUDGE_DEMO_DATA_ENABLED: ${ONLINEJUDGE_DEMO_DATA_ENABLED:-true}
+      ONLINEJUDGE_EVALUATION_SANDBOX_MODE: ${ONLINEJUDGE_EVALUATION_SANDBOX_MODE:-fake}
+    volumes:
+      - app-data:/opt/onlinejudge/data
+      - workload-tls:/tls:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- --no-check-certificate https://127.0.0.1:8080/api/v1/system/readiness | grep -q '\"status\":\"UP\"'"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  frontend:
+    image: onlinejudge/frontend:${GIT_SHA:?GIT_SHA must be the current full 40-character commit SHA}
+    depends_on:
+      backend:
+        condition: service_healthy
+    volumes:
+      - ../../deploy/docker/nginx.internal-ssl.conf:/etc/nginx/conf.d/default.conf:ro
+    ports:
+      - "${OJ_HTTP_PORT:-8088}:80"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/ | grep -q '<!doctype html>'"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+volumes:
+  mysql-data:
+  app-data:
+  rabbitmq-data:
+  course-data:
+  workload-tls:

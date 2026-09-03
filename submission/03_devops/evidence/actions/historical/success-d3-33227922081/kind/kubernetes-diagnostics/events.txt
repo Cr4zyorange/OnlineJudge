@@ -1,0 +1,26 @@
+### kubectl --namespace onlinejudge-ci get events --sort-by=.lastTimestamp
+
+LAST SEEN   TYPE      REASON                  OBJECT                               MESSAGE
+46s         Normal    WaitForFirstConsumer    persistentvolumeclaim/data-mysql-0   waiting for first consumer to be created before binding
+46s         Normal    SuccessfulCreate        statefulset/mysql                    Create Claim data-mysql-0 Pod mysql-0 in StatefulSet mysql success
+45s         Normal    Provisioning            persistentvolumeclaim/data-mysql-0   External provisioner is provisioning volume for claim "onlinejudge-ci/data-mysql-0"
+45s         Normal    ExternalProvisioning    persistentvolumeclaim/data-mysql-0   Waiting for a volume to be created either by the external provisioner 'rancher.io/local-path' or manually by the system administrator. If volume creation is delayed, please verify that the provisioner is running and correctly registered.
+45s         Normal    SuccessfulCreate        statefulset/mysql                    Create Pod mysql-0 in StatefulSet mysql successful
+42s         Normal    ProvisioningSucceeded   persistentvolumeclaim/data-mysql-0   Successfully provisioned volume pvc-7d654547-238d-4dbc-8504-c4af049c320f
+41s         Normal    Started                 pod/mysql-0                          Container started
+41s         Normal    Scheduled               pod/mysql-0                          Successfully assigned onlinejudge-ci/mysql-0 to onlinejudge-ci-control-plane
+41s         Normal    Pulled                  pod/mysql-0                          Container image "mysql:8.4" already present on machine and can be accessed by the pod
+41s         Normal    Created                 pod/mysql-0                          Container created
+31s         Warning   Unhealthy               pod/mysql-0                          Startup probe failed: mysqladmin: [Warning] Using a password on the command line interface can be insecure.
+21s         Normal    SuccessfulCreate        replicaset/backend-768668fbdf        Created pod: backend-768668fbdf-4svg2
+21s         Normal    ScalingReplicaSet       deployment/backend                   Scaled up replica set backend-768668fbdf from 0 to 1
+21s         Normal    Scheduled               pod/backend-768668fbdf-4svg2         Successfully assigned onlinejudge-ci/backend-768668fbdf-4svg2 to onlinejudge-ci-control-plane
+20s         Normal    Created                 pod/backend-768668fbdf-4svg2         Container created
+20s         Normal    Pulled                  pod/backend-768668fbdf-4svg2         Container image "onlinejudge/backend:5cdbe8533991bb0c7cfbe23e08d81b78d47af483" already present on machine and can be accessed by the pod
+20s         Normal    Started                 pod/backend-768668fbdf-4svg2         Container started
+10s         Normal    Scheduled               pod/frontend-586c57fd47-6wthq        Successfully assigned onlinejudge-ci/frontend-586c57fd47-6wthq to onlinejudge-ci-control-plane
+10s         Normal    ScalingReplicaSet       deployment/frontend                  Scaled up replica set frontend-586c57fd47 from 0 to 1
+10s         Normal    SuccessfulCreate        replicaset/frontend-586c57fd47       Created pod: frontend-586c57fd47-6wthq
+10s         Normal    Created                 pod/frontend-586c57fd47-6wthq        Container created
+10s         Normal    Pulled                  pod/frontend-586c57fd47-6wthq        Container image "onlinejudge/frontend:5cdbe8533991bb0c7cfbe23e08d81b78d47af483" already present on machine and can be accessed by the pod
+9s          Normal    Started                 pod/frontend-586c57fd47-6wthq        Container started

@@ -1,0 +1,6 @@
+backend unit: no reports found
+backend integration: no reports found
+backend contract: no reports found
+assessment service: no reports found
+frontend unit: no reports found
+browser E2E: no reports found

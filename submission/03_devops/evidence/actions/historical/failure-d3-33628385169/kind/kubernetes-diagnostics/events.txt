@@ -1,0 +1,44 @@
+### kubectl --namespace onlinejudge-ci get events --sort-by=.lastTimestamp
+
+LAST SEEN   TYPE      REASON                  OBJECT                               MESSAGE
+7m30s       Normal    WaitForFirstConsumer    persistentvolumeclaim/data-mysql-0   waiting for first consumer to be created before binding
+7m30s       Normal    SuccessfulCreate        statefulset/mysql                    Create Pod mysql-0 in StatefulSet mysql successful
+7m30s       Normal    SuccessfulCreate        statefulset/mysql                    Create Claim data-mysql-0 Pod mysql-0 in StatefulSet mysql success
+7m30s       Normal    Provisioning            persistentvolumeclaim/data-mysql-0   External provisioner is provisioning volume for claim "onlinejudge-ci/data-mysql-0"
+7m30s       Normal    ExternalProvisioning    persistentvolumeclaim/data-mysql-0   Waiting for a volume to be created either by the external provisioner 'rancher.io/local-path' or manually by the system administrator. If volume creation is delayed, please verify that the provisioner is running and correctly registered.
+7m28s       Normal    ProvisioningSucceeded   persistentvolumeclaim/data-mysql-0   Successfully provisioned volume pvc-f08afefc-a4fe-438b-93f2-372abf877276
+7m27s       Normal    Scheduled               pod/mysql-0                          Successfully assigned onlinejudge-ci/mysql-0 to onlinejudge-ci-control-plane
+7m27s       Normal    Pulled                  pod/mysql-0                          Container image "mysql:8.4" already present on machine and can be accessed by the pod
+7m27s       Normal    Created                 pod/mysql-0                          Container created
+7m27s       Normal    Started                 pod/mysql-0                          Container started
+7m17s       Warning   Unhealthy               pod/mysql-0                          Startup probe failed: mysqladmin: [Warning] Using a password on the command line interface can be insecure.
+7m7s        Normal    ScalingReplicaSet       deployment/backend                   Scaled up replica set backend-8567b9bdcb from 0 to 1
+7m7s        Normal    SuccessfulCreate        replicaset/backend-8567b9bdcb        Created pod: backend-8567b9bdcb-4xctw
+7m7s        Normal    Scheduled               pod/backend-8567b9bdcb-4xctw         Successfully assigned onlinejudge-ci/backend-8567b9bdcb-4xctw to onlinejudge-ci-control-plane
+50s         Normal    Started                 pod/backend-8567b9bdcb-4xctw         Container started
+50s         Normal    Created                 pod/backend-8567b9bdcb-4xctw         Container created
+50s         Normal    Pulled                  pod/backend-8567b9bdcb-4xctw         Container image "onlinejudge/backend:c66686ff0e011f5ee63e3908683f01afd4f83ebc" already present on machine and can be accessed by the pod
+46s         Warning   Unhealthy               pod/backend-8567b9bdcb-4xctw         Startup probe failed: Get "http://10.244.0.7:8080/api/v1/system/readiness": dial tcp 10.244.0.7:8080: connect: connection refused
+26s         Warning   BackOff                 pod/backend-8567b9bdcb-4xctw         Back-off restarting failed container backend in pod backend-8567b9bdcb-4xctw_onlinejudge-ci(fa7cc866-e6b8-4018-8630-f79e17cbfb81)
+### kubectl --namespace onlinejudge-ci get events --sort-by=.lastTimestamp
+
+LAST SEEN   TYPE      REASON                  OBJECT                               MESSAGE
+7m36s       Normal    WaitForFirstConsumer    persistentvolumeclaim/data-mysql-0   waiting for first consumer to be created before binding
+7m36s       Normal    SuccessfulCreate        statefulset/mysql                    Create Pod mysql-0 in StatefulSet mysql successful
+7m36s       Normal    SuccessfulCreate        statefulset/mysql                    Create Claim data-mysql-0 Pod mysql-0 in StatefulSet mysql success
+7m36s       Normal    Provisioning            persistentvolumeclaim/data-mysql-0   External provisioner is provisioning volume for claim "onlinejudge-ci/data-mysql-0"
+7m36s       Normal    ExternalProvisioning    persistentvolumeclaim/data-mysql-0   Waiting for a volume to be created either by the external provisioner 'rancher.io/local-path' or manually by the system administrator. If volume creation is delayed, please verify that the provisioner is running and correctly registered.
+7m34s       Normal    ProvisioningSucceeded   persistentvolumeclaim/data-mysql-0   Successfully provisioned volume pvc-f08afefc-a4fe-438b-93f2-372abf877276
+7m33s       Normal    Scheduled               pod/mysql-0                          Successfully assigned onlinejudge-ci/mysql-0 to onlinejudge-ci-control-plane
+7m33s       Normal    Pulled                  pod/mysql-0                          Container image "mysql:8.4" already present on machine and can be accessed by the pod
+7m33s       Normal    Created                 pod/mysql-0                          Container created
+7m33s       Normal    Started                 pod/mysql-0                          Container started
+7m23s       Warning   Unhealthy               pod/mysql-0                          Startup probe failed: mysqladmin: [Warning] Using a password on the command line interface can be insecure.
+7m13s       Normal    ScalingReplicaSet       deployment/backend                   Scaled up replica set backend-8567b9bdcb from 0 to 1
+7m13s       Normal    SuccessfulCreate        replicaset/backend-8567b9bdcb        Created pod: backend-8567b9bdcb-4xctw
+7m13s       Normal    Scheduled               pod/backend-8567b9bdcb-4xctw         Successfully assigned onlinejudge-ci/backend-8567b9bdcb-4xctw to onlinejudge-ci-control-plane
+56s         Normal    Started                 pod/backend-8567b9bdcb-4xctw         Container started
+56s         Normal    Created                 pod/backend-8567b9bdcb-4xctw         Container created
+56s         Normal    Pulled                  pod/backend-8567b9bdcb-4xctw         Container image "onlinejudge/backend:c66686ff0e011f5ee63e3908683f01afd4f83ebc" already present on machine and can be accessed by the pod
+52s         Warning   Unhealthy               pod/backend-8567b9bdcb-4xctw         Startup probe failed: Get "http://10.244.0.7:8080/api/v1/system/readiness": dial tcp 10.244.0.7:8080: connect: connection refused
+32s         Warning   BackOff                 pod/backend-8567b9bdcb-4xctw         Back-off restarting failed container backend in pod backend-8567b9bdcb-4xctw_onlinejudge-ci(fa7cc866-e6b8-4018-8630-f79e17cbfb81)

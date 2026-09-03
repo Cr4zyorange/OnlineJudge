@@ -1,0 +1,5 @@
+delivery checkpoint: PASS
+gates required: validate-workflows, backend-gate, frontend-gate, contracts-gate
+head_sha: 5cdbe8533991bb0c7cfbe23e08d81b78d47af483
+timestamp_utc: 2026-08-29T02:02:02Z
+note: 后续镜像构建与 Kind 部署 job 必须以 needs: [delivery] 挂在本门禁之后。

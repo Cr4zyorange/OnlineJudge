@@ -1,0 +1,10 @@
+### kubectl --namespace onlinejudge-ci exec deployment/frontend -- nginx -t
+
+Error from server (NotFound): deployments.apps "frontend" not found
+
+### command reported failure (captured above)
+### kubectl --namespace onlinejudge-ci exec deployment/frontend -- nginx -t
+
+Error from server (NotFound): deployments.apps "frontend" not found
+
+### command reported failure (captured above)

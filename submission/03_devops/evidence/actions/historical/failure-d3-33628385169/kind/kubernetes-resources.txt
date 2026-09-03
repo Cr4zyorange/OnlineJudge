@@ -1,0 +1,17 @@
+$ kubectl --context kind-onlinejudge-ci --namespace onlinejudge-ci get all -o wide
+NAME                           READY   STATUS             RESTARTS      AGE     IP           NODE                           NOMINATED NODE   READINESS GATES
+pod/backend-8567b9bdcb-4xctw   0/1     CrashLoopBackOff   6 (55s ago)   7m19s   10.244.0.7   onlinejudge-ci-control-plane   <none>           <none>
+pod/mysql-0                    1/1     Running            0             7m42s   10.244.0.6   onlinejudge-ci-control-plane   <none>           <none>
+
+NAME              TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)    AGE     SELECTOR
+service/backend   ClusterIP   10.96.194.145   <none>        8080/TCP   7m19s   app=backend
+service/mysql     ClusterIP   None            <none>        3306/TCP   7m42s   app=mysql
+
+NAME                      READY   UP-TO-DATE   AVAILABLE   AGE     CONTAINERS   IMAGES                                                         SELECTOR
+deployment.apps/backend   0/1     1            0           7m19s   backend      onlinejudge/backend:c66686ff0e011f5ee63e3908683f01afd4f83ebc   app=backend
+
+NAME                                 DESIRED   CURRENT   READY   AGE     CONTAINERS   IMAGES                                                         SELECTOR
+replicaset.apps/backend-8567b9bdcb   1         1         0       7m19s   backend      onlinejudge/backend:c66686ff0e011f5ee63e3908683f01afd4f83ebc   app=backend,pod-template-hash=8567b9bdcb
+
+NAME                     READY   AGE     CONTAINERS   IMAGES
+statefulset.apps/mysql   1/1     7m42s   mysql        mysql:8.4

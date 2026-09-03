@@ -1,0 +1,15 @@
+owner,schema,table,kind,lifecycle,implementation_issue
+IDENTITY,oj_identity,t_identity_outbox_event,OUTBOX,implemented,#311
+IDENTITY,oj_identity,t_identity_service_token_idempotency,IDEMPOTENCY,implemented,#311
+COURSE,oj_course,course_event_outbox,OUTBOX,implemented,#337
+COURSE,oj_course,course_membership_reconciliation_checkpoint,PROJECTION,implemented,#337
+COURSE,oj_course,event_inbox,INBOX,implemented,#312
+ASSESSMENT,oj_assessment,assessment_event_outbox,OUTBOX,implemented,#337
+ASSESSMENT,oj_assessment,assessment_event_inbox,INBOX,implemented,#337
+GRADE,oj_grade,grade_event_outbox,OUTBOX,implemented,#337
+GRADE,oj_grade,grade_event_inbox,INBOX,implemented,#337
+COURSE,oj_course,event_outbox,OUTBOX,planned,#337
+COURSE,oj_course,learning_event_inbox,INBOX,implemented,#337
+GRADE,oj_grade,t_grade_record,PROJECTION,existing,#306
+COURSE,oj_course,learning_course_member_projection,PROJECTION,implemented,#337
+COURSE,oj_course,learning_course_membership_watermark,PROJECTION,implemented,#337

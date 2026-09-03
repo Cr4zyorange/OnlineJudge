@@ -1,0 +1,118 @@
+### kubectl --namespace onlinejudge-ci describe statefulset mysql
+
+Name:               mysql
+Namespace:          onlinejudge-ci
+CreationTimestamp:  Wed, 02 Sep 2026 12:15:30 +0000
+Selector:           app=mysql
+Labels:             app=mysql
+                    app.kubernetes.io/part-of=onlinejudge
+Annotations:        <none>
+Replicas:           1 desired | 1 total
+Update Strategy:    RollingUpdate
+Pods Status:        1 Running / 0 Waiting / 0 Succeeded / 0 Failed
+Pod Template:
+  Labels:  app=mysql
+           app.kubernetes.io/part-of=onlinejudge
+  Containers:
+   mysql:
+    Image:      mysql:8.4
+    Port:       3306/TCP (mysql)
+    Host Port:  0/TCP (mysql)
+    Args:
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_unicode_ci
+    Limits:
+      cpu:     1
+      memory:  1Gi
+    Requests:
+      cpu:      250m
+      memory:   512Mi
+    Liveness:   exec [/bin/sh -c mysqladmin ping -h 127.0.0.1 -uroot -p"$MYSQL_ROOT_PASSWORD" --silent] delay=0s timeout=5s period=20s #success=1 #failure=3
+    Readiness:  exec [/bin/sh -c mysqladmin ping -h 127.0.0.1 -uroot -p"$MYSQL_ROOT_PASSWORD" --silent] delay=0s timeout=5s period=10s #success=1 #failure=3
+    Startup:    exec [/bin/sh -c mysqladmin ping -h 127.0.0.1 -uroot -p"$MYSQL_ROOT_PASSWORD" --silent] delay=0s timeout=5s period=10s #success=1 #failure=30
+    Environment:
+      MYSQL_DATABASE:       <set to the key 'MYSQL_DATABASE' of config map 'onlinejudge-config'>    Optional: false
+      MYSQL_USER:           <set to the key 'MYSQL_USER' of config map 'onlinejudge-config'>        Optional: false
+      MYSQL_PASSWORD:       <set to the key 'MYSQL_PASSWORD' in secret 'onlinejudge-secrets'>       Optional: false
+      MYSQL_ROOT_PASSWORD:  <set to the key 'MYSQL_ROOT_PASSWORD' in secret 'onlinejudge-secrets'>  Optional: false
+    Mounts:
+      /docker-entrypoint-initdb.d from init-schema (ro)
+      /var/lib/mysql from data (rw)
+  Volumes:
+   init-schema:
+    Type:          ConfigMap (a volume populated by a ConfigMap)
+    Name:          onlinejudge-mysql-init
+    Optional:      false
+  Node-Selectors:  <none>
+  Tolerations:     <none>
+Volume Claims:
+  Name:          data
+  StorageClass:  
+  Labels:        <none>
+  Annotations:   <none>
+  Capacity:      2Gi
+  Access Modes:  [ReadWriteOnce]
+Events:
+  Type    Reason            Age    From                    Message
+  ----    ------            ----   ----                    -------
+  Normal  SuccessfulCreate  7m30s  statefulset-controller  Create Claim data-mysql-0 Pod mysql-0 in StatefulSet mysql success
+  Normal  SuccessfulCreate  7m30s  statefulset-controller  Create Pod mysql-0 in StatefulSet mysql successful
+### kubectl --namespace onlinejudge-ci describe statefulset mysql
+
+Name:               mysql
+Namespace:          onlinejudge-ci
+CreationTimestamp:  Wed, 02 Sep 2026 12:15:30 +0000
+Selector:           app=mysql
+Labels:             app=mysql
+                    app.kubernetes.io/part-of=onlinejudge
+Annotations:        <none>
+Replicas:           1 desired | 1 total
+Update Strategy:    RollingUpdate
+Pods Status:        1 Running / 0 Waiting / 0 Succeeded / 0 Failed
+Pod Template:
+  Labels:  app=mysql
+           app.kubernetes.io/part-of=onlinejudge
+  Containers:
+   mysql:
+    Image:      mysql:8.4
+    Port:       3306/TCP (mysql)
+    Host Port:  0/TCP (mysql)
+    Args:
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_unicode_ci
+    Limits:
+      cpu:     1
+      memory:  1Gi
+    Requests:
+      cpu:      250m
+      memory:   512Mi
+    Liveness:   exec [/bin/sh -c mysqladmin ping -h 127.0.0.1 -uroot -p"$MYSQL_ROOT_PASSWORD" --silent] delay=0s timeout=5s period=20s #success=1 #failure=3
+    Readiness:  exec [/bin/sh -c mysqladmin ping -h 127.0.0.1 -uroot -p"$MYSQL_ROOT_PASSWORD" --silent] delay=0s timeout=5s period=10s #success=1 #failure=3
+    Startup:    exec [/bin/sh -c mysqladmin ping -h 127.0.0.1 -uroot -p"$MYSQL_ROOT_PASSWORD" --silent] delay=0s timeout=5s period=10s #success=1 #failure=30
+    Environment:
+      MYSQL_DATABASE:       <set to the key 'MYSQL_DATABASE' of config map 'onlinejudge-config'>    Optional: false
+      MYSQL_USER:           <set to the key 'MYSQL_USER' of config map 'onlinejudge-config'>        Optional: false
+      MYSQL_PASSWORD:       <set to the key 'MYSQL_PASSWORD' in secret 'onlinejudge-secrets'>       Optional: false
+      MYSQL_ROOT_PASSWORD:  <set to the key 'MYSQL_ROOT_PASSWORD' in secret 'onlinejudge-secrets'>  Optional: false
+    Mounts:
+      /docker-entrypoint-initdb.d from init-schema (ro)
+      /var/lib/mysql from data (rw)
+  Volumes:
+   init-schema:
+    Type:          ConfigMap (a volume populated by a ConfigMap)
+    Name:          onlinejudge-mysql-init
+    Optional:      false
+  Node-Selectors:  <none>
+  Tolerations:     <none>
+Volume Claims:
+  Name:          data
+  StorageClass:  
+  Labels:        <none>
+  Annotations:   <none>
+  Capacity:      2Gi
+  Access Modes:  [ReadWriteOnce]
+Events:
+  Type    Reason            Age    From                    Message
+  ----    ------            ----   ----                    -------
+  Normal  SuccessfulCreate  7m36s  statefulset-controller  Create Claim data-mysql-0 Pod mysql-0 in StatefulSet mysql success
+  Normal  SuccessfulCreate  7m36s  statefulset-controller  Create Pod mysql-0 in StatefulSet mysql successful

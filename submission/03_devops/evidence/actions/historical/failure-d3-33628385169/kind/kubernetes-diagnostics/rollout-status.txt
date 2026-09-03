@@ -1,0 +1,26 @@
+### rollout status snapshots (5s probe of current state)
+
+### kubectl rollout status statefulset/mysql
+statefulset rolling update complete 1 pods at revision mysql-5bbb5b894f...
+
+### kubectl rollout status deployment/backend
+Waiting for deployment "backend" rollout to finish: 0 of 1 updated replicas are available...
+error: timed out waiting for the condition
+### rollout not complete for deployment/backend
+
+### kubectl rollout status deployment/frontend
+Error from server (NotFound): deployments.apps "frontend" not found
+### rollout not complete for deployment/frontend
+### rollout status snapshots (5s probe of current state)
+
+### kubectl rollout status statefulset/mysql
+statefulset rolling update complete 1 pods at revision mysql-5bbb5b894f...
+
+### kubectl rollout status deployment/backend
+Waiting for deployment "backend" rollout to finish: 0 of 1 updated replicas are available...
+error: timed out waiting for the condition
+### rollout not complete for deployment/backend
+
+### kubectl rollout status deployment/frontend
+Error from server (NotFound): deployments.apps "frontend" not found
+### rollout not complete for deployment/frontend

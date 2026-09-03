@@ -1,0 +1,26 @@
+CREATE TABLE IF NOT EXISTS lab_submission (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    lab_id BIGINT NOT NULL,
+    student_id BIGINT NOT NULL,
+    code_content TEXT NULL,
+    file_id VARCHAR(128) NULL,
+    language VARCHAR(20) NOT NULL,
+    submit_status VARCHAR(20) NOT NULL DEFAULT 'SUBMITTED',
+    evaluation_status VARCHAR(32) NOT NULL DEFAULT 'NONE',
+    final_score INT NULL,
+    auto_score INT NULL,
+    version INT NOT NULL DEFAULT 1,
+    is_final TINYINT(1) NOT NULL DEFAULT 1,
+    submitted_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted TINYINT(1) NOT NULL DEFAULT 0,
+    KEY idx_sub_lab_id (lab_id),
+    KEY idx_sub_student_id (student_id),
+    KEY idx_sub_submit_status (submit_status),
+    KEY idx_sub_evaluation_status (evaluation_status),
+    KEY idx_submitted_at (submitted_at),
+    UNIQUE KEY uk_lab_student_version (lab_id, student_id, version),
+    CONSTRAINT fk_lab_submission_lab
+        FOREIGN KEY (lab_id) REFERENCES lab_experiment(id)
+);

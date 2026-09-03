@@ -1,0 +1,201 @@
+### kubectl --namespace onlinejudge-ci describe pods
+
+Name:             backend-768668fbdf-4svg2
+Namespace:        onlinejudge-ci
+Priority:         0
+Service Account:  default
+Node:             onlinejudge-ci-control-plane/172.18.0.2
+Start Time:       Sat, 29 Aug 2026 02:08:04 +0000
+Labels:           app=backend
+                  app.kubernetes.io/part-of=onlinejudge
+                  pod-template-hash=768668fbdf
+Annotations:      <none>
+Status:           Running
+IP:               10.244.0.7
+IPs:
+  IP:           10.244.0.7
+Controlled By:  ReplicaSet/backend-768668fbdf
+Containers:
+  backend:
+    Container ID:   containerd://8a8b74ccb9f6f55e21cb18872b4aadc06c2761f469759c02ab86a037b22164e7
+    Image:          onlinejudge/backend:5cdbe8533991bb0c7cfbe23e08d81b78d47af483
+    Image ID:       docker.io/library/import-2026-08-29@sha256:7dd247aa5004be651ed13f8186140a79629cedf269e8c96143a0515a1c9e7c55
+    Port:           8080/TCP (http)
+    Host Port:      0/TCP (http)
+    State:          Running
+      Started:      Sat, 29 Aug 2026 02:08:05 +0000
+    Ready:          True
+    Restart Count:  0
+    Limits:
+      cpu:     1500m
+      memory:  1536Mi
+    Requests:
+      cpu:      500m
+      memory:   768Mi
+    Liveness:   http-get http://:8080/api/v1/system/health delay=0s timeout=3s period=20s #success=1 #failure=3
+    Readiness:  http-get http://:8080/api/v1/system/readiness delay=0s timeout=3s period=10s #success=1 #failure=3
+    Startup:    http-get http://:8080/api/v1/system/readiness delay=0s timeout=3s period=10s #success=1 #failure=42
+    Environment Variables from:
+      onlinejudge-config   ConfigMap  Optional: false
+      onlinejudge-secrets  Secret     Optional: false
+    Environment:           <none>
+    Mounts:
+      /opt/onlinejudge/data from app-data (rw)
+      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-csmxq (ro)
+Conditions:
+  Type                        Status
+  PodReadyToStartContainers   True 
+  Initialized                 True 
+  Ready                       True 
+  ContainersReady             True 
+  PodScheduled                True 
+Volumes:
+  app-data:
+    Type:       EmptyDir (a temporary directory that shares a pod's lifetime)
+    Medium:     
+    SizeLimit:  <unset>
+  kube-api-access-csmxq:
+    Type:                    Projected (a volume that contains injected data from multiple sources)
+    TokenExpirationSeconds:  3607
+    ConfigMapName:           kube-root-ca.crt
+    Optional:                false
+    DownwardAPI:             true
+QoS Class:                   Burstable
+Node-Selectors:              <none>
+Tolerations:                 node.kubernetes.io/not-ready:NoExecute op=Exists for 300s
+                             node.kubernetes.io/unreachable:NoExecute op=Exists for 300s
+
+
+Name:             frontend-586c57fd47-6wthq
+Namespace:        onlinejudge-ci
+Priority:         0
+Service Account:  default
+Node:             onlinejudge-ci-control-plane/172.18.0.2
+Start Time:       Sat, 29 Aug 2026 02:08:15 +0000
+Labels:           app=frontend
+                  app.kubernetes.io/part-of=onlinejudge
+                  pod-template-hash=586c57fd47
+Annotations:      <none>
+Status:           Running
+IP:               10.244.0.8
+IPs:
+  IP:           10.244.0.8
+Controlled By:  ReplicaSet/frontend-586c57fd47
+Containers:
+  frontend:
+    Container ID:   containerd://2744ed99b662b47fd081ce12688d15166b1ddbe1fcfed3e2d55759e496e83863
+    Image:          onlinejudge/frontend:5cdbe8533991bb0c7cfbe23e08d81b78d47af483
+    Image ID:       docker.io/library/import-2026-08-29@sha256:f636b415d21efd3587aa0443a4833fff7d95488f1a1febb1cbd074bb6eab526b
+    Port:           80/TCP (http)
+    Host Port:      0/TCP (http)
+    State:          Running
+      Started:      Sat, 29 Aug 2026 02:08:16 +0000
+    Ready:          True
+    Restart Count:  0
+    Limits:
+      cpu:     200m
+      memory:  128Mi
+    Requests:
+      cpu:        50m
+      memory:     64Mi
+    Liveness:     http-get http://:80/ delay=0s timeout=2s period=20s #success=1 #failure=3
+    Readiness:    http-get http://:80/ delay=0s timeout=2s period=10s #success=1 #failure=3
+    Startup:      http-get http://:80/ delay=0s timeout=2s period=5s #success=1 #failure=24
+    Environment:  <none>
+    Mounts:
+      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-zckbb (ro)
+Conditions:
+  Type                        Status
+  PodReadyToStartContainers   True 
+  Initialized                 True 
+  Ready                       True 
+  ContainersReady             True 
+  PodScheduled                True 
+Volumes:
+  kube-api-access-zckbb:
+    Type:                    Projected (a volume that contains injected data from multiple sources)
+    TokenExpirationSeconds:  3607
+    ConfigMapName:           kube-root-ca.crt
+    Optional:                false
+    DownwardAPI:             true
+QoS Class:                   Burstable
+Node-Selectors:              <none>
+Tolerations:                 node.kubernetes.io/not-ready:NoExecute op=Exists for 300s
+                             node.kubernetes.io/unreachable:NoExecute op=Exists for 300s
+
+
+Name:             mysql-0
+Namespace:        onlinejudge-ci
+Priority:         0
+Service Account:  default
+Node:             onlinejudge-ci-control-plane/172.18.0.2
+Start Time:       Sat, 29 Aug 2026 02:07:44 +0000
+Labels:           app=mysql
+                  app.kubernetes.io/part-of=onlinejudge
+                  apps.kubernetes.io/pod-index=0
+                  controller-revision-hash=mysql-5bbb5b894f
+                  statefulset.kubernetes.io/pod-name=mysql-0
+Annotations:      <none>
+Status:           Running
+IP:               10.244.0.6
+IPs:
+  IP:           10.244.0.6
+Controlled By:  StatefulSet/mysql
+Containers:
+  mysql:
+    Container ID:  containerd://aee709b1d3908515efd12b8ff8a01913415f23a8e7f9e214b86a6674c3f2cf2b
+    Image:         mysql:8.4
+    Image ID:      docker.io/library/import-2026-08-29@sha256:b6f58b52d26ce62afc0f5774eb262dcc5740e313f9fe586aa1d55646428066b0
+    Port:          3306/TCP (mysql)
+    Host Port:     0/TCP (mysql)
+    Args:
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_unicode_ci
+    State:          Running
+      Started:      Sat, 29 Aug 2026 02:07:44 +0000
+    Ready:          True
+    Restart Count:  0
+    Limits:
+      cpu:     1
+      memory:  1Gi
+    Requests:
+      cpu:      250m
+      memory:   512Mi
+    Liveness:   exec [/bin/sh -c mysqladmin ping -h 127.0.0.1 -uroot -p"$MYSQL_ROOT_PASSWORD" --silent] delay=0s timeout=5s period=20s #success=1 #failure=3
+    Readiness:  exec [/bin/sh -c mysqladmin ping -h 127.0.0.1 -uroot -p"$MYSQL_ROOT_PASSWORD" --silent] delay=0s timeout=5s period=10s #success=1 #failure=3
+    Startup:    exec [/bin/sh -c mysqladmin ping -h 127.0.0.1 -uroot -p"$MYSQL_ROOT_PASSWORD" --silent] delay=0s timeout=5s period=10s #success=1 #failure=30
+    Environment:
+      MYSQL_DATABASE:       <set to the key 'MYSQL_DATABASE' of config map 'onlinejudge-config'>    Optional: false
+      MYSQL_USER:           <set to the key 'MYSQL_USER' of config map 'onlinejudge-config'>        Optional: false
+      MYSQL_PASSWORD:       <set to the key 'MYSQL_PASSWORD' in secret 'onlinejudge-secrets'>       Optional: false
+      MYSQL_ROOT_PASSWORD:  <set to the key 'MYSQL_ROOT_PASSWORD' in secret 'onlinejudge-secrets'>  Optional: false
+    Mounts:
+      /docker-entrypoint-initdb.d from init-schema (ro)
+      /var/lib/mysql from data (rw)
+      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-6ddmt (ro)
+Conditions:
+  Type                        Status
+  PodReadyToStartContainers   True 
+  Initialized                 True 
+  Ready                       True 
+  ContainersReady             True 
+  PodScheduled                True 
+Volumes:
+  data:
+    Type:       PersistentVolumeClaim (a reference to a PersistentVolumeClaim in the same namespace)
+    ClaimName:  data-mysql-0
+    ReadOnly:   false
+  init-schema:
+    Type:      ConfigMap (a volume populated by a ConfigMap)
+    Name:      onlinejudge-mysql-init
+    Optional:  false
+  kube-api-access-6ddmt:
+    Type:                    Projected (a volume that contains injected data from multiple sources)
+    TokenExpirationSeconds:  3607
+    ConfigMapName:           kube-root-ca.crt
+    Optional:                false
+    DownwardAPI:             true
+QoS Class:                   Burstable
+Node-Selectors:              <none>
+Tolerations:                 node.kubernetes.io/not-ready:NoExecute op=Exists for 300s
+                             node.kubernetes.io/unreachable:NoExecute op=Exists for 300s

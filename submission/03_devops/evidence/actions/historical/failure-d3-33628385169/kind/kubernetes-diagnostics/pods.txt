@@ -1,0 +1,10 @@
+### kubectl --namespace onlinejudge-ci get pods -o wide
+
+NAME                       READY   STATUS             RESTARTS      AGE     IP           NODE                           NOMINATED NODE   READINESS GATES
+backend-8567b9bdcb-4xctw   0/1     CrashLoopBackOff   6 (43s ago)   7m7s    10.244.0.7   onlinejudge-ci-control-plane   <none>           <none>
+mysql-0                    1/1     Running            0             7m30s   10.244.0.6   onlinejudge-ci-control-plane   <none>           <none>
+### kubectl --namespace onlinejudge-ci get pods -o wide
+
+NAME                       READY   STATUS             RESTARTS      AGE     IP           NODE                           NOMINATED NODE   READINESS GATES
+backend-8567b9bdcb-4xctw   0/1     CrashLoopBackOff   6 (49s ago)   7m13s   10.244.0.7   onlinejudge-ci-control-plane   <none>           <none>
+mysql-0                    1/1     Running            0             7m36s   10.244.0.6   onlinejudge-ci-control-plane   <none>           <none>
