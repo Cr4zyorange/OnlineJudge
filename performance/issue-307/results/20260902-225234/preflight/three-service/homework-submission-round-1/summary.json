@@ -1,0 +1,71 @@
+{
+  "scenario": "homework-submission",
+  "expectedStatuses": [
+    200,
+    201,
+    202
+  ],
+  "minimumSuccessRatePercent": 100,
+  "responses": [
+    {
+      "student": 1,
+      "attempt": 1,
+      "status": 201,
+      "responseFile": "responses/student-001-attempt-1.json"
+    },
+    {
+      "student": 2,
+      "attempt": 1,
+      "status": 201,
+      "responseFile": "responses/student-002-attempt-1.json"
+    },
+    {
+      "student": 3,
+      "attempt": 1,
+      "status": 201,
+      "responseFile": "responses/student-003-attempt-1.json"
+    },
+    {
+      "student": 4,
+      "attempt": 1,
+      "status": 201,
+      "responseFile": "responses/student-004-attempt-1.json"
+    },
+    {
+      "student": 5,
+      "attempt": 1,
+      "status": 201,
+      "responseFile": "responses/student-005-attempt-1.json"
+    },
+    {
+      "student": 6,
+      "attempt": 1,
+      "status": 201,
+      "responseFile": "responses/student-006-attempt-1.json"
+    },
+    {
+      "student": 7,
+      "attempt": 1,
+      "status": 201,
+      "responseFile": "responses/student-007-attempt-1.json"
+    },
+    {
+      "student": 8,
+      "attempt": 1,
+      "status": 201,
+      "responseFile": "responses/student-008-attempt-1.json"
+    },
+    {
+      "student": 9,
+      "attempt": 1,
+      "status": 201,
+      "responseFile": "responses/student-009-attempt-1.json"
+    },
+    {
+      "student": 10,
+      "attempt": 1,
+      "status": 201,
+      "responseFile": "responses/student-010-attempt-1.json"
+    }
+  ]
+}

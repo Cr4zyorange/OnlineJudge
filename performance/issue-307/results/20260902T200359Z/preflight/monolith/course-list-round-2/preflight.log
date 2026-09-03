@@ -1,0 +1,1 @@
+PREFLIGHT_VALID scenario=course-list requests=10 successful=10 success-rate=100%

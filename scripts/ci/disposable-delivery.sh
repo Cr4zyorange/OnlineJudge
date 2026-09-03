@@ -47,6 +47,8 @@ if [[ -z "$git_sha" ]]; then git_sha="$(git -C "$checkout" rev-parse HEAD)"; fi
   exit 2
 }
 if [[ -z "$output_dir" ]]; then output_dir="$checkout/ci-artifacts/delivery"; fi
+python_bin="${PYTHON_BIN:-python3}"
+command -v "$python_bin" >/dev/null 2>&1 || { printf 'disposable-delivery: %s is required\n' "$python_bin" >&2; exit 2; }
 mkdir -p "$output_dir"
 
 if (( changed_path_count == 0 )) && [[ -n "$base_sha" ]]; then
@@ -71,7 +73,7 @@ for (( changed_path_index=0; changed_path_index<changed_path_count; changed_path
   changed_path="${changed_paths[$changed_path_index]}"
   planner_arguments+=(--changed-path "$changed_path")
 done
-PYTHONDONTWRITEBYTECODE=1 python3 "$checkout/scripts/platform/plan_delivery.py" "${planner_arguments[@]}" > "$output_dir/selected-plan.json"
+PYTHONDONTWRITEBYTECODE=1 "$python_bin" "$checkout/scripts/platform/plan_delivery.py" "${planner_arguments[@]}" > "$output_dir/selected-plan.json"
 
 if (( dry_run )); then
   printf 'DISPOSABLE_DELIVERY_DRY_RUN sha=%s changed_paths=%s plan=%s\n' \

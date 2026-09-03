@@ -8,6 +8,7 @@ renderer="$repo_root/scripts/platform/render_disposable_environment.py"
 schema="$repo_root/deploy/platform/workload-manifest.schema.json"
 manifest="$repo_root/deploy/platform/workloads.json"
 builder="$repo_root/scripts/platform/build_workload_images.sh"
+bundle_generator="$repo_root/scripts/platform/generate_jwks_trust_bundle.mjs"
 
 usage() {
   cat <<'USAGE'
@@ -50,6 +51,9 @@ if [[ -n "$failure_mode" && "$failure_mode" != "migration" && "$failure_mode" !=
 fi
 command -v docker >/dev/null 2>&1 || { printf 'run-disposable-environment: docker is required\n' >&2; exit 2; }
 command -v openssl >/dev/null 2>&1 || { printf 'run-disposable-environment: openssl is required\n' >&2; exit 2; }
+command -v node >/dev/null 2>&1 || { printf 'run-disposable-environment: node is required\n' >&2; exit 2; }
+python_bin="${PYTHON_BIN:-python3}"
+command -v "$python_bin" >/dev/null 2>&1 || { printf 'run-disposable-environment: %s is required\n' "$python_bin" >&2; exit 2; }
 docker info >/dev/null
 
 run_id="$(date -u +%Y%m%dT%H%M%SZ)-$$"
@@ -75,6 +79,8 @@ trap cleanup EXIT
 
 random_secret() { openssl rand -hex 24; }
 identity_key="$(openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 2>/dev/null | openssl pkcs8 -topk8 -nocrypt -outform DER | base64 | tr -d '\n')"
+identity_kid="issue318-disposable"
+identity_jwks="$(IDENTITY_JWT_SIGNING_KEY="$identity_key" IDENTITY_JWT_KID="$identity_kid" node "$bundle_generator")"
 umask 077
 {
   printf 'MYSQL_ROOT_PASSWORD=%s\n' "$(random_secret)"
@@ -83,8 +89,9 @@ umask 077
   printf 'COURSE_DATABASE_PASSWORD=%s\n' "$(random_secret)"
   printf 'ASSESSMENT_DATABASE_PASSWORD=%s\n' "$(random_secret)"
   printf 'GRADE_DATABASE_PASSWORD=%s\n' "$(random_secret)"
+  printf 'IDENTITY_JWT_KID=%s\n' "$identity_kid"
   printf 'IDENTITY_JWT_SIGNING_KEY=%s\n' "$identity_key"
-  printf 'IDENTITY_JWKS_TRUST_BUNDLE=\n'
+  printf 'IDENTITY_JWKS_TRUST_BUNDLE=%s\n' "$identity_jwks"
   printf 'GATEWAY_SERVICE_IDENTITY=issue318-gateway\n'
   printf 'COURSE_SERVICE_IDENTITY=issue318-course\n'
   printf 'ASSESSMENT_SERVICE_IDENTITY=issue318-assessment\n'
@@ -92,7 +99,7 @@ umask 077
   printf 'GRADE_SERVICE_IDENTITY=issue318-grade\n'
 } > "$runtime_env"
 
-PYTHONDONTWRITEBYTECODE=1 python3 "$renderer" --schema "$schema" --manifest "$manifest" --git-sha "$git_sha" --compose-output "$compose_file" --kubernetes-output "$kubernetes_file" --repository-root "$repo_root"
+PYTHONDONTWRITEBYTECODE=1 "$python_bin" "$renderer" --schema "$schema" --manifest "$manifest" --git-sha "$git_sha" --compose-output "$compose_file" --kubernetes-output "$kubernetes_file" --repository-root "$repo_root"
 if (( ! skip_build )); then
   build_arguments=(--git-sha "$git_sha" --output-dir "$output_dir/artifacts")
   if (( skip_tests )); then build_arguments+=(--skip-tests); fi
@@ -145,7 +152,7 @@ curl --fail --silent --show-error --header 'X-Request-Id: issue318-disposable' "
 "${compose[@]}" exec -T grade-service wget -qO- http://127.0.0.1:8084/actuator/info > "$output_dir/grade-version.json"
 collect_diagnostics success
 
-ready_count="$(python3 - "$output_dir/compose-ps-success.json" <<'PY'
+ready_count="$("$python_bin" - "$output_dir/compose-ps-success.json" <<'PY'
 import json
 import sys
 payload = open(sys.argv[1], encoding="utf-8").read().strip()
