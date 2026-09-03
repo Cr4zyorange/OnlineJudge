@@ -43,27 +43,33 @@ final image digest。
 同步后的 PR quality-gate 已成功，但它是 PR 事件，不是该 SHA 合入 `dev` 后的正式
 `d3-delivery`；最终镜像、部署和回滚证据仍待正式 D3。
 
-## 同步后 PR 候选 CI：`5b59e8258248865de9414e2c1a5b45a8f2ec0604`
+## 最新同步后 PR 候选 CI：`2552a2a2d3f30ed7c48770469c161ce3b42554e0`
 
-Run [33724384655](https://github.com/Cr4zyorange/OnlineJudge/actions/runs/33724384655)
+Run [33727688910](https://github.com/Cr4zyorange/OnlineJudge/actions/runs/33727688910)
 为 PR 事件上的 `ci-quality-gate`，六个 job（workflow contracts、backend、frontend、
 repo contracts、browser E2E、Disposable delivery）全部成功。artifact 保留在 GitHub，
 其交付 manifest/image records 的内部构建 SHA 为
-`6ab2db7884df697760da370c66c356cc0e63e608`；仅作候选质量证据，不计入 final D3：
+`5158533131c85bab24405821092fb7bd0a247630`；仅作候选质量证据，不计入 final D3：
 
 | artifact ID / name | bytes | digest | archive status |
 | --- | ---: | --- | --- |
-| 9881404221 / `ci-validate-workflows-33724384655` | 677 | `sha256:af57fa79e003f6039383ced6018f77e0f98e9459839a14e21ce362e873071428` | GitHub artifact only |
-| 9881451041 / `ci-contracts-gate-33724384655` | 50949 | `sha256:46797feba4ffcd1e756b24e79273861ea41516136370e5512e4a512b796a67ab` | GitHub artifact only |
-| 9881453068 / `ci-frontend-gate-33724384655` | 27768 | `sha256:0e7743bc0188e9357949889abc91d861bbc01e339503a32aad4a3daed7fe0cdd` | GitHub artifact only |
-| 9881497625 / `ci-backend-gate-33724384655` | 654701 | `sha256:308ff78be578fa3fc38d239fc34c4d89aedd291d7f16b06a597586d026948831` | GitHub artifact only |
-| 9881778224 / `ci-browser-e2e-gate-33724384655` | 14309668 | `sha256:dfe43420e03df2ac37363da7eb5c3ee16a79fa3ddfd7f55e55c19cf3402b5918` | GitHub artifact only |
-| 9882064008 / `ci-delivery-33724384655` | 15513150 | `sha256:077c47aa3cd3cfdcb1420cd4d916fb9432d3e205178875fdcf2ae90e536e22a8` | GitHub artifact only |
+| 9882602195 / `ci-validate-workflows-33727688910` | 680 | `sha256:2796fc694c86339d2d3837fe24787fe7a11d0992b692133053b326d859b5d356` | GitHub artifact only |
+| 9882658369 / `ci-contracts-gate-33727688910` | 50879 | `sha256:d5deeea5ed78ff56da9bc35aa09ee75c6b6c4789cdfe61f3ad3e5a69dac7751a` | GitHub artifact only |
+| 9882649422 / `ci-frontend-gate-33727688910` | 27805 | `sha256:b82084c9de47dd4c00e6ee647b4e623eeff8e39c8ed275a8cb64bb10e5bb8039` | GitHub artifact only |
+| 9882719887 / `ci-backend-gate-33727688910` | 650817 | `sha256:16edb52c65b7191a420aec90849a86c5ba48667ebb3dc34f05471b7bf20f9e96` | GitHub artifact only |
+| 9883239131 / `ci-browser-e2e-gate-33727688910` | 14420632 | `sha256:84fe3d483847d897040320a62686a0b984908421a3014ec281f814dce20fa605` | GitHub artifact only |
+| 9883594340 / `ci-delivery-33727688910` | 15514386 | `sha256:717b32b3339275b366db5c6c115fa1925303e383561b4f1bfcc098527d01cef7` | GitHub artifact only |
 
 该 run 不能替代合入 `dev` 后的 `d3-quality-gate-*`、`d3-images-*`、
 `d3-kind-delivery-*` 和 `d3-delivery-outcome-*` 原始 artifact。
 
-## PR 候选 head SHA：`82dd58d10eb49f1ceacec7965f7932c123891a1a`
+## 上一轮同步后 PR 候选 CI：`5b59e8258248865de9414e2c1a5b45a8f2ec0604`
+
+Run [33724384655](https://github.com/Cr4zyorange/OnlineJudge/actions/runs/33724384655)
+及其六个成功 artifact 保留为上一轮候选记录；其内部构建 SHA 为
+`6ab2db7884df697760da370c66c356cc0e63e608`，不能替代本轮或 final SHA。
+
+## 更早 PR 候选 head SHA：`82dd58d10eb49f1ceacec7965f7932c123891a1a`
 
 Run [33707236357](https://github.com/Cr4zyorange/OnlineJudge/actions/runs/33707236357)
 是 PR 事件上的 `ci-quality-gate`，不是合规的 `d3-delivery` workflow。它的所有质量门禁

@@ -15,7 +15,7 @@ artifact。归档不包含 Secret 实值，也不把历史成功运行当作当�
 
 当前交付的结论是 `READY_FOR_REVIEW_BLOCKED_FINAL_D3`：归档基线为 `origin/dev` 的
 `3a26ed2fe9399305b5e44eeae581911e6d32710e`。同步后的 PR quality-gate run
-`33724384655` 已全部成功，前一基线的 Grade MySQL 静态契约误计数已由 #388 修复并
+`33727688910` 已全部成功，前一基线的 Grade MySQL 静态契约误计数已由 #388 修复并
 验证通过；但 PR 事件不是正式 `d3-delivery`，不能声明最终部署成功。合入 `dev` 后
 仍需追加对应最终 SHA 的 CI/D3、镜像、9 workload/4 migration、部署与回滚原始证据，
 而不是覆盖历史原始证据。

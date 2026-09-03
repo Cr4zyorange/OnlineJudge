@@ -10,8 +10,8 @@ origin/dev 最终交付链路尚未满足，不以 PR 候选或历史运行替�
 | Docker/Compose、workflow、Kubernetes/Kind、迁移/seed/账号矩阵 | PASS | `source/` 快照和 SOURCE-MAP |
 | workflow failure gate 与 final SHA 绑定 | PASS | final CI/D3 原始 artifacts；D3 在 quality gate failure 后 build/deploy skipped |
 | 前一 dev 基线 CI quality gate | PASS (historical failure archived) | run 33698399654；backend Course API coverage 404/expected 200，原始证据已移入 `historical/baseline-c56/` |
-| 同步后的 PR quality gate | PASS (candidate only) | run [33724384655](https://github.com/Cr4zyorange/OnlineJudge/actions/runs/33724384655)；workflow contracts/backend/frontend/repo contracts/browser E2E/Disposable delivery 全部成功，但尚未由 `dev` push 触发 |
-| PR 候选 CI quality gate | PASS (candidate only) | run 33724384655；六项质量门禁均成功，不能替代正式 `d3-delivery` |
+| 同步后的 PR quality gate | PASS (candidate only) | run [33727688910](https://github.com/Cr4zyorange/OnlineJudge/actions/runs/33727688910)；workflow contracts/backend/frontend/repo contracts/browser E2E/Disposable delivery 全部成功，但尚未由 `dev` push 触发 |
+| PR 候选 CI quality gate | PASS (candidate only) | run 33727688910；六项质量门禁均成功，不能替代正式 `d3-delivery` |
 | origin/dev final D3 delivery | BLOCKED | 正式 final CI/D3 尚未由合入后的 `dev` push 产生；ce87 旧 D3 仅作历史阻断证据 |
 | immutable image tags/digests + OCI revision | BLOCKED | final SHA 未进入 build；历史成功 digest 仅作旧 SHA 追溯 |
 | 成功部署证据 | PASS (historical only) | run 33227922081；旧 SHA、旧 3-workload topology，不能升级为 final PASS |

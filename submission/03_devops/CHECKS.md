@@ -2,14 +2,14 @@
 
 执行目录：issue #379 隔离 worktree；canonical source 快照来自
 `3a26ed2fe9399305b5e44eeae581911e6d32710e`，PR 候选 head 为
-`5b59e8258248865de9414e2c1a5b45a8f2ec0604`；同步后的 PR quality-gate run 为
-`33724384655`，其 Disposable artifact 的内部构建 SHA 与 PR head/final dev SHA
+`2552a2a2d3f30ed7c48770469c161ce3b42554e0`；同步后的 PR quality-gate run 为
+`33727688910`，其 Disposable artifact 的内部构建 SHA 与 PR head/final dev SHA
 分开记录，不能冒充 final SHA。
 
 | 检查 | 结果 | 说明 |
 | --- | --- | --- |
 | workload manifest validator | PASS | `9 workloads; 4 ordered migration jobs; schema, ports, dependencies, migrations, promotion, and D3 retirement are valid` |
-| PR candidate CI/D3-adjacent delivery | PASS (candidate only) | run `33724384655` 的 workflow contracts/backend/frontend/repo contracts/browser E2E/Disposable delivery 全部成功；它不是 `d3-delivery` |
+| PR candidate CI/D3-adjacent delivery | PASS (candidate only) | run `33727688910` 的 workflow contracts/backend/frontend/repo contracts/browser E2E/Disposable delivery 全部成功；它不是 `d3-delivery` |
 | final SHA CI/D3 provenance | BLOCKED | current `origin/dev` SHA is `3a26ed2f…`; #388 已修复前一 Grade MySQL count，正式 final CI/D3 仍待合入后的 `dev` push |
 | workflow static checks | PASS | `check-workflows: PASS (67 checks)` |
 | shell syntax | PASS | `bash -n` 覆盖归档的 delivery/kind/platform/docker shell files |
@@ -29,7 +29,7 @@
 平台单元测试共发现 67 个测试，在仓库开发容器提供的 Node 22 环境中全部通过；主机
 直接运行时缺少 `node`，因此本地用容器复演该命令，不将主机工具缺失记为产品失败。
 旧基线 run `33698399654` 和前一 final SHA 的失败链已归档。#388 已修复前一 final SHA
-的 Grade MySQL contract 静态计数；同步后的候选 run `33724384655` 全部成功，但仍是
+的 Grade MySQL contract 静态计数；同步后的候选 run `33727688910` 全部成功，但仍是
 PR 事件，不能替代合入 `dev` 后由 push 触发的 issue #379 要求的 `d3-delivery`。
 
 ## 敏感值处理

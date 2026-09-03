@@ -8,8 +8,8 @@
 | origin/dev final SHA（归档基线） | `3a26ed2fe9399305b5e44eeae581911e6d32710e` |
 | 已归档的前一 dev 基线 | `c56b16f916b4a4c3d33915aa37beab6b05c72888`（仅作历史失败链） |
 | PR 候选 head SHA | `5b59e8258248865de9414e2c1a5b45a8f2ec0604` |
-| PR 候选 Disposable 构建 SHA | `6ab2db7884df697760da370c66c356cc0e63e608`（33724384655 artifact 内部记录，不能冒充 head/final SHA） |
-| 最新 PR quality-gate run | [33724384655](https://github.com/Cr4zyorange/OnlineJudge/actions/runs/33724384655)，六个 job 全部成功 |
+| PR 候选 Disposable 构建 SHA | `5158533131c85bab24405821092fb7bd0a247630`（33727688910 artifact 内部记录，不能冒充 head/final SHA） |
+| 最新 PR quality-gate run | [33727688910](https://github.com/Cr4zyorange/OnlineJudge/actions/runs/33727688910)，六个 job 全部成功 |
 | 归档结论 | `READY_FOR_REVIEW_BLOCKED_FINAL_D3` |
 | 最新 final CI run | PR 候选 run 已成功；正式 final CI/D3 仍待合入 `dev` 后产生 |
 | 最新 D3 尝试 | 待新 CI 成功后由 `d3-delivery` 触发；ce87 基线的旧 D3 已降为历史证据 |
@@ -42,14 +42,15 @@ SHA 已由 run 33724384655 完成质量门禁和内置 Disposable delivery，但
 
 ## EVIDENCE_READY
 
-`EVIDENCE_READY issue=#379 final_sha=3a26ed2fe9399305b5e44eeae581911e6d32710e configs=submission/03_devops/source images=not-built-final-sha runs=33698399654,33698830921,33707236357,33724384655,33227922081,33628385169 artifacts=21 success=1 failure=2 blocked=1 evidence=submission/03_devops/evidence`
+`EVIDENCE_READY issue=#379 final_sha=3a26ed2fe9399305b5e44eeae581911e6d32710e configs=submission/03_devops/source images=not-built-final-sha runs=33698399654,33698830921,33707236357,33724384655,33727688910,33227922081,33628385169 artifacts=21 success=1 failure=2 blocked=1 evidence=submission/03_devops/evidence`
 
 `success=1` 仅统计已归档的历史成功 D3；PR 候选成功不计入 final，`failure=2`
 统计已归档的两条历史失败链，`blocked=1` 统计等待合入后 final D3 的当前阻断。
 
-候选证据的身份必须分开记录：当前 PR head 是 `5b59e825…`，本轮
-`ci-delivery` artifact 的 manifest/image tags 使用 `6ab2db…`；上一轮候选 run
-`33707236357` 的构建 SHA 为 `7402fc…`。候选镜像 digest 因此不能用于证明任一
+候选证据的身份必须分开记录：当前 PR head 是 `2552a2a2…`，本轮
+`ci-delivery` artifact 的 manifest/image tags 使用 `51585331…`；上一轮同步候选
+run `33724384655` 的构建 SHA 为 `6ab2db…`，更早候选 `33707236357` 的构建 SHA
+为 `7402fc…`。候选镜像 digest 因此不能用于证明任一
 final SHA 的镜像发布。
 
 ## 证据导航

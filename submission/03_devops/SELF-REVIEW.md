@@ -19,11 +19,14 @@
 | Round 11 | 复核 282 个清单文件、路径/旧 SHA、敏感值、Markdown 状态、workflow/manifest/HPA/Grade/D3 校验及 67 项平台单测，未发现新问题；`upstreams.env` 是 canonical 配置输入，不是 Secret 实值 | 保持当前候选与 final D3 的证据边界；归档可进入 PR review，唯一剩余前置是合入 `dev` 后取得正式 final D3 原始证据 |
 | Round 12 | 提交前发现重建 `SHA256SUMS` 时使用已跟踪文件列表会漏掉被忽略但仍属于归档的原始 evidence，清单错误缩为 282 行 | 改用归档目录下除自身外的全部文件重建清单，恢复为 463 行并通过完整性校验 |
 | Round 13 | 在 Round 12 修复后复核状态措辞、SHA 身份、历史记录边界、463 项完整性清单、空白和全部本地验证结果，未发现新问题 | 终审通过；PR 可进入人工 review，保留“合入 `dev` 后正式 D3”这一唯一外部前置 |
+| Round 14 | 新提交 `2552a2a2…` 的 PR quality-gate run 33727688910 全部成功；下载的交付 artifact 内部 SHA `51585331…` 与 PR head/final dev SHA 不同 | 将最新 run/artifact metadata 替换为当前候选记录，保留 33724384655 和更早候选为历史记录，继续禁止候选证据冒充 final D3 |
+| Round 15 | 文档复核发现最新候选 run 仍有部分位置引用上一轮 33724384655；本轮 artifact、PR head 和内部 SHA 已确认 | 统一切换“最新”引用到 33727688910 / `2552a2a2…` / `51585331…`，上一轮只保留在历史候选段落 |
+| Round 16 | Round 15 修复后的只读终审未发现旧“最新”状态残留、SHA 身份错配、清单范围缩小或空白错误；463 项校验和全部通过 | 终审通过；本次归档文档可提交，正式 final D3 仍仅受合入 `dev` 这一外部前置约束 |
 
 ## 当前阻塞
 
 - 当前 `origin/dev` final SHA 为 `3a26ed2fe9399305b5e44eeae581911e6d32710e`，已包含 #388 的 Grade MySQL
-  静态契约修复；同步后的 PR quality-gate 已由 run 33724384655 全部通过，但正式 final D3 尚未产生。
+  静态契约修复；同步后的 PR quality-gate 已由 run 33727688910 全部通过，但正式 final D3 尚未产生。
 - ce87 基线的 CI/D3 失败链已移动到 `historical/baseline-ce87/`，不能作为当前 final 结果。
 - #386 新增 Kind 静态测试的前置校验顺序问题未在 #379 中修改；该测试未进入当前归档快照和 CI 调用链。
 - 缺少的“最终候选 SHA 的成功 CI/D3 原始证据”属于 #379 本 issue 的验收任务；
