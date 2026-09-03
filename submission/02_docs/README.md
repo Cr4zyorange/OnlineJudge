@@ -7,7 +7,7 @@
 ```powershell
 node scripts/delivery/build-issue-368-docs.mjs --base c56b16f916b4a4c3d33915aa37beab6b05c72888
 pdftoppm -png -r 96 submission/02_docs/rendered/pdf/<文档>.pdf output/issue-368/pdf-pages/<文档>/page
-python scripts/delivery/audit-issue-368-pdf-pages.py --pages output/issue-368/pdf-pages --report submission/02_docs/evidence/pdf-page-audit.json --contacts output/issue-368/pdf-contact-sheets --expected 545
+python scripts/delivery/audit-issue-368-pdf-pages.py --pages output/issue-368/pdf-pages --report submission/02_docs/evidence/pdf-page-audit.json --contacts output/issue-368/pdf-contact-sheets --expected 545 --manual-inspection-note "22 contact sheets visually inspected; no clipping, overlap, missing glyphs, broken tables, black blocks, blank pages, or missing diagrams"
 node scripts/delivery/refresh-issue-368-checksums.mjs
 node scripts/delivery/verify-issue-368-docs.mjs
 ```

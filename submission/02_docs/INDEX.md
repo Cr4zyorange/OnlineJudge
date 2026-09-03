@@ -1,6 +1,6 @@
 # 02_docs 最终文档归档索引
 
-> Issue #368 frozen base: `c56b16f916b4a4c3d33915aa37beab6b05c72888`; build source: `f33007324df4be27594005e45818e9bf07f72b8d`. 本目录由 `scripts/delivery/build-issue-368-docs.mjs` 从唯一正本生成。
+> Issue #368 frozen base: `c56b16f916b4a4c3d33915aa37beab6b05c72888`; builder revision: `b69541e1c442e439f64d1a29f47a8ffffcbe1c22`. 本目录由 `scripts/delivery/build-issue-368-docs.mjs` 从与固定基线一致的唯一正本生成。
 
 ## 冻结口径
 
