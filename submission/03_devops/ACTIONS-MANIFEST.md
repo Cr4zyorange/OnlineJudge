@@ -19,6 +19,26 @@ Current D3 outcome is preserved verbatim at
 `evidence/actions/current/d3-33698830921/d3-delivery-outcome-33698830921/delivery-outcome.txt`:
 `quality_gate=failure`, `build_images=skipped`, `deploy_kind=skipped`.
 
+## PR 候选 SHA：`82dd58d10eb49f1ceacec7965f7932c123891a1a`
+
+Run [33707236357](https://github.com/Cr4zyorange/OnlineJudge/actions/runs/33707236357)
+是 PR 事件上的 `ci-quality-gate`，不是合规的 `d3-delivery` workflow。它的所有质量门禁
+和内置 `Disposable delivery` job 成功，但 `d3-delivery` 的触发契约只接受 `dev` push，
+所以以下记录只作为候选校验，不计入最终 `success`：
+
+| artifact ID / name | bytes | created | expires | archive status |
+| --- | ---: | --- | --- | --- |
+| 9875644224 / `ci-validate-workflows-33707236357` | 680 | 2026-09-03T02:20:21Z | 2026-09-17T02:20:21Z | GitHub artifact only |
+| 9875689023 / `ci-contracts-gate-33707236357` | 50589 | 2026-09-03T02:22:16Z | 2026-09-17T02:22:16Z | GitHub artifact only |
+| 9875709674 / `ci-frontend-gate-33707236357` | 27360 | 2026-09-03T02:23:10Z | 2026-09-17T02:23:09Z | GitHub artifact only |
+| 9875756328 / `ci-backend-gate-33707236357` | 640232 | 2026-09-03T02:25:16Z | 2026-09-17T02:25:15Z | GitHub artifact only |
+| 9875829062 / `ci-browser-e2e-gate-33707236357` | 2607052 | 2026-09-03T02:28:32Z | 2026-09-17T02:28:31Z | GitHub artifact only |
+| 9876041415 / `ci-delivery-33707236357` | 15510164 | 2026-09-03T02:38:29Z | 2026-09-17T02:38:26Z | GitHub artifact only |
+
+这些候选 artifact 不放入 `current/`，避免把 PR 事件结果误标为 final `d3-delivery`。
+合入 `dev` 后应下载新的 `d3-quality-gate-*`、`d3-images-*`、`d3-kind-delivery-*`
+和 `d3-delivery-outcome-*` 原始 artifact，替换本节的候选记录。
+
 ## 历史成功：旧 D3 三 workload 基线
 
 | run | SHA | artifact ID / name | bytes | archive path |

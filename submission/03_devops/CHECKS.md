@@ -1,11 +1,13 @@
 # 归档校验记录
 
-执行目录：issue #379 隔离 worktree；归档内容来自 final SHA
-`c56b16f916b4a4c3d33915aa37beab6b05c72888`。
+执行目录：issue #379 隔离 worktree；canonical source 快照来自
+`c56b16f916b4a4c3d33915aa37beab6b05c72888`，PR 候选为
+`82dd58d10eb49f1ceacec7965f7932c123891a1a`。
 
 | 检查 | 结果 | 说明 |
 | --- | --- | --- |
 | workload manifest validator | PASS | `9 workloads; 4 ordered migration jobs; schema, ports, dependencies, migrations, promotion, and D3 retirement are valid` |
+| PR candidate CI/D3-adjacent delivery | PASS (candidate only) | run `33707236357` all quality gates and the integrated Disposable delivery job succeeded; it is not `d3-delivery` |
 | workflow static checks | PASS | `check-workflows: PASS (67 checks)` |
 | shell syntax | PASS | `bash -n` 覆盖归档的 delivery/kind/platform/docker shell files |
 | JSON syntax | PASS | 归档的 `workloads.json` 与 `workload-manifest.schema.json` |
@@ -24,7 +26,8 @@
 `test_disposable_runtime_generates_a_public_jwks_bootstrap_bundle`。这不是该归档
 修改引入的断言失败；GitHub final SHA 的 CI 原始结果仍以
 [ci-quality-gate run 33698399654](https://github.com/Cr4zyorange/OnlineJudge/actions/runs/33698399654)
-为准，并且该 run 的失败原因已归档。
+为准，并且该 run 的失败原因已归档。候选 run `33707236357` 成功，但只有合入 `dev` 后的
+push 才能触发 issue #379 要求的 `d3-delivery`。
 
 ## 敏感值处理
 
