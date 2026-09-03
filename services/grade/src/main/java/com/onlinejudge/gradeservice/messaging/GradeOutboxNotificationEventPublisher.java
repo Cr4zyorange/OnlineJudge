@@ -61,10 +61,12 @@ public class GradeOutboxNotificationEventPublisher implements NotificationEventP
     }
 
     private CanonicalFact canonicalFact(NotificationEvent notification) {
-        if ("GRADE_PUBLISHED".equals(notification.type())) {
+        if ("GRADE_PUBLISHED".equals(notification.type()) || "GRADE_CHANGED".equals(notification.type())) {
             String publicationId = String.valueOf(notification.targetId());
             Instant publishedAt = notification.occurredAt().toInstant(ZoneOffset.UTC);
-            return new CanonicalFact("grade.published.v2", "grade-publication", publicationId, 1,
+            String aggregateType = "GRADE_CHANGED".equals(notification.type())
+                    ? "course-grade-summary" : "grade-publication";
+            return new CanonicalFact("grade.published.v2", aggregateType, publicationId, 1,
                     Map.of("courseId", String.valueOf(notification.courseId()),
                             "publicationId", publicationId,
                             "publishedAt", publishedAt.toString(),
@@ -89,7 +91,7 @@ public class GradeOutboxNotificationEventPublisher implements NotificationEventP
                             "resultVersion", 1,
                             "processedAt", review.processedAt().toString()));
         }
-        // The frozen three-service contract does not define grade.changed or review.requested facts.
+        // The frozen three-service contract does not define review.requested facts.
         return null;
     }
 

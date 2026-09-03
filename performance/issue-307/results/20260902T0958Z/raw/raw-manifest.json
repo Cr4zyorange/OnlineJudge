@@ -1,0 +1,134 @@
+{
+  "schemaVersion": 1,
+  "issue": 307,
+  "archiveFormat": "gzip",
+  "entryCount": 18,
+  "entries": [
+    {
+      "file": "monolith/course-list/round-1.json.gz",
+      "uncompressedBytes": 4368678,
+      "compressedBytes": 943251,
+      "uncompressedSha256": "cce74c4f8063c380df084cfd183ee84eff400435c6249340a275a5e6f0f22cea",
+      "compressedSha256": "6e2521f53fd4320c7c21ef3a11e722abf9c5a433a6f405d593ddf99ac62b6c11"
+    },
+    {
+      "file": "monolith/course-list/round-2.json.gz",
+      "uncompressedBytes": 4480730,
+      "compressedBytes": 967188,
+      "uncompressedSha256": "c774cc979434ee5b2ea6a2b2dc9c652a73c0e685c1167e61a372d5f2a9f28e08",
+      "compressedSha256": "13d522f1bd9672cd403889f53b686b2a901725a4b2d1e4dcc2a936af0d1c6f1a"
+    },
+    {
+      "file": "monolith/course-list/round-3.json.gz",
+      "uncompressedBytes": 4523525,
+      "compressedBytes": 976217,
+      "uncompressedSha256": "a20789e3cfc4f95ee63483fff01f1a5bfe9e792da1cee3b5e4affe50273193b5",
+      "compressedSha256": "7f926f41983d2f9a28dca683292f305e31fa4280401c380cd2e2aaecf9732433"
+    },
+    {
+      "file": "monolith/homework-submission/round-1.json.gz",
+      "uncompressedBytes": 8699159,
+      "compressedBytes": 1876855,
+      "uncompressedSha256": "8897d513eb549d738b73dc071768e90e9e0dafa3807261ad780c5622b68d9e65",
+      "compressedSha256": "73e1dc17cab371a279583d0301cb6be2e8fc25a082fb5c6fa9a3c30294e7705c"
+    },
+    {
+      "file": "monolith/homework-submission/round-2.json.gz",
+      "uncompressedBytes": 8294892,
+      "compressedBytes": 1790054,
+      "uncompressedSha256": "b0f28290e9d016901d2b6f3afd6ba29bd64b89a6e64e06e3819de1c04a513ea5",
+      "compressedSha256": "75b4e7ff67896141c36a9c00b0e83886277aa30ba82bdb73f78fd8a5cdb0d581"
+    },
+    {
+      "file": "monolith/homework-submission/round-3.json.gz",
+      "uncompressedBytes": 8834356,
+      "compressedBytes": 1904348,
+      "uncompressedSha256": "68314e4759d0bf3e014fdfef81d522c15ab4d6815006232e023b824c14623cb2",
+      "compressedSha256": "2cdbbfba43ffe8a43ef43b0dab7070ff66f92e9b7c1c961e3d5d8bb16a687854"
+    },
+    {
+      "file": "monolith/my-grades/round-1.json.gz",
+      "uncompressedBytes": 12221636,
+      "compressedBytes": 2632821,
+      "uncompressedSha256": "39a476e25c2af4537ee107e0399f0b80c2c127d92e795fcfe7e98c1283c38ec4",
+      "compressedSha256": "1f574ff52ed381b2b91dc422d0d968d9514dc4fcc4cd6cfde424aa2099b5748e"
+    },
+    {
+      "file": "monolith/my-grades/round-2.json.gz",
+      "uncompressedBytes": 11833853,
+      "compressedBytes": 2550937,
+      "uncompressedSha256": "a4d59f128ce1a293fde1361ab3d0890e9197da68580b001897b3a67ccc496759",
+      "compressedSha256": "22165a83c0bb68f950a738935448e1ba2848ec73ad86af9d4be6688873e80a63"
+    },
+    {
+      "file": "monolith/my-grades/round-3.json.gz",
+      "uncompressedBytes": 12282252,
+      "compressedBytes": 2648581,
+      "uncompressedSha256": "928eab7eda3910f77ad14c54d8230b91ca41a772c96853d09004ae1d180eab86",
+      "compressedSha256": "da97a031652ff69b37c914bacfce78c6b8a59eaa4b372c02f524fcfd09964c79"
+    },
+    {
+      "file": "three-service/course-list/round-1.json.gz",
+      "uncompressedBytes": 85424219,
+      "compressedBytes": 18053231,
+      "uncompressedSha256": "3e804cd0713a8684c515e7c277f4e9b6d0d1c26e80ae0c486e5c0636810db8f1",
+      "compressedSha256": "095441fee50180505cf0970a1cd923ed802ebd79803ad1b963ab796cffcca506"
+    },
+    {
+      "file": "three-service/course-list/round-2.json.gz",
+      "uncompressedBytes": 98730021,
+      "compressedBytes": 20864629,
+      "uncompressedSha256": "8ede30e66f9fc014c861625ad005b8a4baaeb3f524c7e62c38f9e2b23aefa0a6",
+      "compressedSha256": "f09cd22f6ed6e5965c49d64fb65269ae314c45ba8ceea5d571f14981d2f36102"
+    },
+    {
+      "file": "three-service/course-list/round-3.json.gz",
+      "uncompressedBytes": 98064257,
+      "compressedBytes": 20733181,
+      "uncompressedSha256": "05ed64b690af635e27aa64566b69ea471197882285f5a495144c424f6d009988",
+      "compressedSha256": "4f3dbf4f95ef70faf00a7fad8d356a9fc19b6ef370d7e4b9935b67297e523085"
+    },
+    {
+      "file": "three-service/homework-submission/round-1.json.gz",
+      "uncompressedBytes": 100212495,
+      "compressedBytes": 21166362,
+      "uncompressedSha256": "50f88062e753d08fd04819b421876f15b8337524f39db85f149508607ef43fe4",
+      "compressedSha256": "fdb55992590ec8496ab88121e6c68e70bddcc743ec1077dbfa2aaa6f36ce84b5"
+    },
+    {
+      "file": "three-service/homework-submission/round-2.json.gz",
+      "uncompressedBytes": 104236706,
+      "compressedBytes": 22005643,
+      "uncompressedSha256": "dabf4fbf6f6b4c74104c26490710745da133d1df7760ba68b49b84b41570c1ff",
+      "compressedSha256": "a345f8ac168f8702a24121c3c633863b27ab97ec7f47b419520009a264a5d9b3"
+    },
+    {
+      "file": "three-service/homework-submission/round-3.json.gz",
+      "uncompressedBytes": 100526818,
+      "compressedBytes": 21228268,
+      "uncompressedSha256": "9dbe8bd572f57962365b4ae83d7983dcb744694c7cdde13bb13738af51e65fe8",
+      "compressedSha256": "c51ddd000ac29161b6b333d3cbb04d259d20bfdef86636519da2d6a814831a6c"
+    },
+    {
+      "file": "three-service/my-grades/round-1.json.gz",
+      "uncompressedBytes": 108661300,
+      "compressedBytes": 22941514,
+      "uncompressedSha256": "394deac7f9725e3e3959a6537e9973b34e545e9404beb913bbc66d610278b589",
+      "compressedSha256": "8df2994731b20f37ecc53359e277a5ae0abb2d23356a99ebda687bedc0f56257"
+    },
+    {
+      "file": "three-service/my-grades/round-2.json.gz",
+      "uncompressedBytes": 109107486,
+      "compressedBytes": 23033733,
+      "uncompressedSha256": "858aa353a3af4e2046ae14f33f9666d71e1654e5d4b816b1c65d85ad7ecbcbdf",
+      "compressedSha256": "3f15b161f3af1c6a7e1137ba23f4a718632f211dec549c41e57a32bbdc2e1e73"
+    },
+    {
+      "file": "three-service/my-grades/round-3.json.gz",
+      "uncompressedBytes": 109897470,
+      "compressedBytes": 23199310,
+      "uncompressedSha256": "ff4bc0ee5663021322a9e1f8da42d452d69d46a655d17fa4864579f2419cb124",
+      "compressedSha256": "f7f04adbb792eb7c65efa2cf85c59242fac9db5f3d45bcb2066d7b078928da38"
+    }
+  ]
+}

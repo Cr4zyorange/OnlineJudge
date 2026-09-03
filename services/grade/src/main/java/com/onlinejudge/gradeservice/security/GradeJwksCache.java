@@ -34,12 +34,7 @@ public class GradeJwksCache {
     }
 
     GradeJwtVerifier.Claims verify(String authorization) {
-        try {
-            return GradeJwtVerifier.verify(json, keys, authorization, properties.getIssuer(), properties.getAudience());
-        } catch (GradeJwtVerifier.UnknownKid unknownKid) {
-            refresh();
-            return GradeJwtVerifier.verify(json, keys, authorization, properties.getIssuer(), properties.getAudience());
-        }
+        return GradeJwtVerifier.verify(json, keys, authorization, properties.getIssuer(), properties.getAudience());
     }
 
     @Scheduled(initialDelayString = "${grade.identity.refresh-initial-delay-ms:30000}",

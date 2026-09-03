@@ -44,6 +44,22 @@ class GradeOutboxNotificationEventPublisherTest {
     }
 
     @Test
+    void courseGradeAdjustmentPublishesTheUpdatedSummaryAsAVisibilityFact() {
+        publisher.publish(new NotificationEvent("GRD:GRADE_CHANGED:COURSE_TOTAL:904", "GRADE_CHANGED",
+                101, List.of(601L), "成绩已调整", "课程总评已调整", "COURSE_GRADE_SUMMARY", 904L,
+                "/courses/101/grades/904", LocalDateTime.of(2026, 9, 3, 9, 0)));
+
+        assertThat(outboxCount()).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT event_type FROM grade_event_outbox", String.class))
+                .isEqualTo("grade.published.v2");
+        assertThat(jdbc.queryForObject("SELECT aggregate_type FROM grade_event_outbox", String.class))
+                .isEqualTo("course-grade-summary");
+        assertThat(jdbc.queryForObject("SELECT payload_json FROM grade_event_outbox", String.class))
+                .contains("\"publicationId\":\"904\"")
+                .contains("\"courseId\":\"101\"");
+    }
+
+    @Test
     void aRolledBackGradeTransactionLeavesNoOutboxFact() {
         TransactionTemplate transaction = new TransactionTemplate(transactions);
 

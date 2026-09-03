@@ -11,6 +11,7 @@ class GradeDeploymentArtifactTest {
     @Test
     void productionMigrationAndImageContainTheCompleteIndependentGradeRuntime() throws Exception {
         String migration = Files.readString(Path.of("../../database/migrations/grade/V20260901_02__complete_grade_runtime.sql"));
+        String legacyProjectionCleanup = Files.readString(Path.of("../../database/migrations/grade/V20260902_03__drop_legacy_grade_source_projection_status.sql"));
         assertThat(migration)
                 .contains("CREATE TABLE IF NOT EXISTS t_grade_item")
                 .contains("CREATE TABLE IF NOT EXISTS t_grade_record")
@@ -18,6 +19,9 @@ class GradeDeploymentArtifactTest {
                 .contains("CREATE TABLE IF NOT EXISTS grade_result_trace")
                 .contains("grade_source_projection_gap")
                 .contains("source_status");
+        assertThat(legacyProjectionCleanup)
+                .contains("ALTER TABLE grade_source_projection")
+                .contains("DROP COLUMN status");
 
         String dockerfile = Files.readString(Path.of("Dockerfile"));
         assertThat(dockerfile)
@@ -40,6 +44,7 @@ class GradeDeploymentArtifactTest {
         assertThat(acceptance)
                 .contains("V20260901_01__grade_service_schema.sql")
                 .contains("V20260901_02__complete_grade_runtime.sql")
+                .contains("V20260902_03__drop_legacy_grade_source_projection_status.sql")
                 .contains("/actuator/health/readiness")
                 .contains("/health/ready")
                 .doesNotContain("SPRING_SQL_INIT_MODE=");

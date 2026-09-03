@@ -1,0 +1,89 @@
+{
+  "schemaVersion": 1,
+  "issue": 307,
+  "baselines": {
+    "monolith": {
+      "ref": "monolith-start",
+      "sha": "78715f21288782a2c7ef1d9c23f933c46569b108"
+    },
+    "threeService": {
+      "ref": "origin/dev",
+      "sha": "c66686ff0e011f5ee63e3908683f01afd4f83ebc",
+      "contentSha": "c66686ff0e011f5ee63e3908683f01afd4f83ebc"
+    }
+  },
+  "environment": {
+    "datasetId": "issue-307-v1",
+    "datasetFile": "performance/issue-307/dataset.json",
+    "datasetSha256": "733338e1ba51a64b693b60678eeacaa78a0597f7e2034bba6dc2b09e067885c6",
+    "resourceBudget": {
+      "cpuCores": 4,
+      "memoryMiB": 6144
+    },
+    "maxBusinessConcurrency": 20,
+    "resourceSampleIntervalMs": 1000,
+    "roundResetRequired": true
+  },
+  "load": {
+    "rounds": 3,
+    "warmupSeconds": 30,
+    "durationSeconds": 120,
+    "concurrency": 10,
+    "minimumRequestIntervalMs": 1000,
+    "requestTimeoutMs": 10000
+  },
+  "preflight": {
+    "requestsPerVirtualStudent": 1,
+    "minimumSuccessRatePercent": 100
+  },
+  "measurement": {
+    "minimumSuccessRatePercent": 100
+  },
+  "scenarios": [
+    {
+      "id": "course-list",
+      "category": "read",
+      "method": "GET",
+      "pathTemplate": "/api/v1/courses?page=0&size=20",
+      "expectedStatuses": [200]
+    },
+    {
+      "id": "homework-submission",
+      "category": "write",
+      "method": "POST",
+      "pathTemplate": "/api/v1/homeworks/${OJ_PERF_HOMEWORK_ID}/submissions",
+      "bodyTemplateEnv": "OJ_PERF_HOMEWORK_BODY",
+      "contentType": "application/json",
+      "expectedStatuses": [200, 201, 202]
+    },
+    {
+      "id": "my-grades",
+      "category": "split-main-path-read",
+      "method": "GET",
+      "pathTemplate": "/api/v1/courses/${OJ_PERF_COURSE_ID}/my-grades",
+      "expectedStatuses": [200]
+    }
+  ],
+  "architectures": [
+    {
+      "id": "monolith",
+      "baseline": "monolith",
+      "baseUrlEnv": "OJ_PERF_MONOLITH_URL",
+      "bearerTokenEnv": "OJ_PERF_MONOLITH_TOKEN",
+      "containersEnv": "OJ_PERF_MONOLITH_CONTAINERS"
+    },
+    {
+      "id": "three-service",
+      "baseline": "threeService",
+      "baseUrlEnv": "OJ_PERF_THREE_SERVICE_URL",
+      "bearerTokenEnv": "OJ_PERF_THREE_SERVICE_TOKEN",
+      "containersEnv": "OJ_PERF_THREE_SERVICE_CONTAINERS"
+    }
+  ],
+  "interpretationCategories": [
+    "process-count-and-runtime-overhead",
+    "network-hop-and-serialization",
+    "database-connection-pools",
+    "cache-warmth-and-hit-rate"
+  ]
+}

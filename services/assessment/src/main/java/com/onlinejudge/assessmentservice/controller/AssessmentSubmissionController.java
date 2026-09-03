@@ -61,7 +61,8 @@ public class AssessmentSubmissionController {
             byte[] content = hasFile ? file.getBytes() : code.getBytes(java.nio.charset.StandardCharsets.UTF_8);
             String filename = hasFile ? file.getOriginalFilename() : "Main." + language;
             return labSubmissions.submit(new LabSubmissionService.SubmitLabCommand(sourceId, courseId, user.id(), language,
-                    filename, content, hasFile, hasFile ? null : code, http.getHeader("X-Request-Id")));
+                    filename, content, hasFile, hasFile ? null : code,
+                    http.getHeader("X-Request-Id")));
         } catch (IllegalArgumentException invalid) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, invalid.getMessage(), invalid);
         } catch (IllegalStateException invalidState) {

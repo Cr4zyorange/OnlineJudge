@@ -114,6 +114,7 @@ import PageHeader from '../../components/foundation/PageHeader.vue';
 import PageState from '../../components/foundation/PageState.vue';
 import StatusBadge, { type StatusBadgeTone } from '../../components/foundation/StatusBadge.vue';
 import SummaryStrip, { type SummaryStripItem } from '../../components/foundation/SummaryStrip.vue';
+import { labStudentIdsMatch } from '../../types/lab';
 import type { LabExperimentSummary, LabSubmissionHistoryItem } from '../../types/lab';
 import { formatLabEvaluationMode, localizedLabError } from './labDisplay';
 
@@ -208,11 +209,11 @@ async function loadLabs() {
     if (histories.some((history) => history.status === 'rejected')) {
       throw new Error('提交记录同步失败，请重新加载后重试。');
     }
-    if (currentUser.value?.id !== requestedStudentId
+    if (!labStudentIdsMatch(currentUser.value?.id, requestedStudentId)
       || visible.some((lab, index) => {
         const history = histories[index];
         return history.status === 'fulfilled'
-          && history.value.some((item) => item.labId !== lab.id || item.studentId !== requestedStudentId);
+          && history.value.some((item) => item.labId !== lab.id || !labStudentIdsMatch(item.studentId, requestedStudentId));
       })) {
       throw new Error('提交记录与当前实验或学生不匹配，请重新加载。');
     }

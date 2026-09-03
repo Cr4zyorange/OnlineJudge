@@ -1,0 +1,123 @@
+{
+  "threeServiceRoundCount": 9,
+  "invalid": 0,
+  "rows": [
+    {
+      "scenario": "course-list",
+      "round": 1,
+      "requests": 1199,
+      "statusCounts": {
+        "200": 1199
+      },
+      "allOk": true,
+      "preflight": 100,
+      "samples": 40,
+      "exclusive": true,
+      "baselineSha": "c66686ff0e011f5ee63e3908683f01afd4f83ebc"
+    },
+    {
+      "scenario": "course-list",
+      "round": 2,
+      "requests": 1199,
+      "statusCounts": {
+        "200": 1199
+      },
+      "allOk": true,
+      "preflight": 100,
+      "samples": 40,
+      "exclusive": true,
+      "baselineSha": "c66686ff0e011f5ee63e3908683f01afd4f83ebc"
+    },
+    {
+      "scenario": "course-list",
+      "round": 3,
+      "requests": 1199,
+      "statusCounts": {
+        "200": 1199
+      },
+      "allOk": true,
+      "preflight": 100,
+      "samples": 40,
+      "exclusive": true,
+      "baselineSha": "c66686ff0e011f5ee63e3908683f01afd4f83ebc"
+    },
+    {
+      "scenario": "homework-submission",
+      "round": 1,
+      "requests": 1199,
+      "statusCounts": {
+        "201": 1199
+      },
+      "allOk": true,
+      "preflight": 100,
+      "samples": 40,
+      "exclusive": true,
+      "baselineSha": "c66686ff0e011f5ee63e3908683f01afd4f83ebc"
+    },
+    {
+      "scenario": "homework-submission",
+      "round": 2,
+      "requests": 1199,
+      "statusCounts": {
+        "201": 1199
+      },
+      "allOk": true,
+      "preflight": 100,
+      "samples": 40,
+      "exclusive": true,
+      "baselineSha": "c66686ff0e011f5ee63e3908683f01afd4f83ebc"
+    },
+    {
+      "scenario": "homework-submission",
+      "round": 3,
+      "requests": 1199,
+      "statusCounts": {
+        "201": 1199
+      },
+      "allOk": true,
+      "preflight": 100,
+      "samples": 40,
+      "exclusive": true,
+      "baselineSha": "c66686ff0e011f5ee63e3908683f01afd4f83ebc"
+    },
+    {
+      "scenario": "my-grades",
+      "round": 1,
+      "requests": 1199,
+      "statusCounts": {
+        "200": 1199
+      },
+      "allOk": true,
+      "preflight": 100,
+      "samples": 40,
+      "exclusive": true,
+      "baselineSha": "c66686ff0e011f5ee63e3908683f01afd4f83ebc"
+    },
+    {
+      "scenario": "my-grades",
+      "round": 2,
+      "requests": 1199,
+      "statusCounts": {
+        "200": 1199
+      },
+      "allOk": true,
+      "preflight": 100,
+      "samples": 40,
+      "exclusive": true,
+      "baselineSha": "c66686ff0e011f5ee63e3908683f01afd4f83ebc"
+    },
+    {
+      "scenario": "my-grades",
+      "round": 3,
+      "requests": 1199,
+      "statusCounts": {
+        "200": 1199
+      },
+      "allOk": true,
+      "preflight": 100,
+      "samples": 40,
+      "exclusive": true,
+      "baselineSha": "c66686ff0e011f5ee63e3908683f01afd4f83ebc"
+    }
+  ]
+}

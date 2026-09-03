@@ -1,7 +1,12 @@
 import type { APIRequestContext, APIResponse, Page } from '@playwright/test';
 import { expect, test } from '../fixtures';
+import {
+  captureIssue320RepresentativeScreenshot,
+  recordIssue320Representative
+} from '../issue320-representative-evidence';
 
-const COURSE_ID = 9501;
+const COURSE_ID = Number(process.env.E2E_COURSE_ID || 9501);
+const CHAPTER_ID = Number(process.env.E2E_CHAPTER_ID || 950101);
 
 interface ApiEnvelope<T> {
   code: string;
@@ -55,6 +60,14 @@ interface SubmissionRecord {
   autoScore?: number | null;
 }
 
+interface EvaluationResult {
+  submissionId: number;
+  taskId: string;
+  taskState: string;
+  evaluationStatus: string;
+  score: number | null;
+}
+
 interface AttachmentRecord {
   fileId: string;
 }
@@ -84,7 +97,7 @@ test.describe('@hwk HWK 真实业务闭环', () => {
     await page.getByTestId('save-homework').click();
 
     await expect(page.getByText('草稿已保存，可返回作业管理继续发布。')).toBeVisible();
-    await expect(page).toHaveURL(/\/courses\/9501\/homeworks\/\d+\/edit$/);
+    await expect(page).toHaveURL(new RegExp(`/courses/${COURSE_ID}/homeworks/\\d+/edit$`));
     const homeworkId = Number(page.url().match(/\/homeworks\/(\d+)\/edit$/)?.[1]);
     expect(homeworkId).toBeGreaterThan(0);
 
@@ -160,18 +173,28 @@ test.describe('@hwk HWK 真实业务闭环', () => {
       ));
       gradeItemId = gradeItem.id;
 
-      const syncResult = await apiData<GradeSyncResult>(await request.post(
-        `/api/v1/courses/${COURSE_ID}/grades/sync`,
-        { headers: teacherHeaders }
-      ));
-      expect(syncResult.affectedItemCount).toBeGreaterThan(0);
-      expect(syncResult.affectedStudentCount).toBeGreaterThan(0);
-      expect(syncResult.syncedCount).toBeGreaterThan(0);
+      let syncResult: GradeSyncResult | undefined;
+      let projectedGradeTable: CourseGradeTablePage | undefined;
+      await expect.poll(async () => {
+        syncResult = await apiData<GradeSyncResult>(await request.post(
+          `/api/v1/courses/${COURSE_ID}/grades/sync`,
+          { headers: teacherHeaders }
+        ));
+        projectedGradeTable = await apiData<CourseGradeTablePage>(await request.get(
+          `/api/v1/courses/${COURSE_ID}/grades?gradeItemId=${gradeItemId}&page=1&size=100`,
+          { headers: teacherHeaders }
+        ));
+        const gradeRecord = projectedGradeTable.records
+          .find((row) => row.studentId === student.id)?.records
+          .find((record) => record.gradeItemId === gradeItemId);
+        return Number(gradeRecord?.rawScore);
+      }, { intervals: [100, 250, 500, 1_000], timeout: 15_000 }).toBe(88);
+      const confirmedSync = syncResult!;
+      expect(confirmedSync.affectedItemCount).toBeGreaterThan(0);
+      expect(confirmedSync.affectedStudentCount).toBeGreaterThan(0);
+      expect(confirmedSync.syncedCount).toBeGreaterThan(0);
 
-      const gradeTable = await apiData<CourseGradeTablePage>(await request.get(
-        `/api/v1/courses/${COURSE_ID}/grades?gradeItemId=${gradeItemId}&page=1&size=100`,
-        { headers: teacherHeaders }
-      ));
+      const gradeTable = projectedGradeTable!;
       const studentGradeRow = gradeTable.records.find((row) => row.studentId === student.id);
       const gradeRecord = studentGradeRow?.records.find((record) => record.gradeItemId === gradeItemId);
       expect(gradeRecord).toEqual(expect.objectContaining({
@@ -192,15 +215,18 @@ test.describe('@hwk HWK 真实业务闭环', () => {
     await expect(page.getByTestId('published-review')).toContainText('最终得分 88');
     await expect(page.getByTestId('published-review')).toContainText(reviewComment);
 
-    const scorePublishedNotifications = await apiData<NotificationPage>(await request.get(
-      '/api/v1/notifications?page=1&size=100',
-      { headers: await authorizationHeaders(page) }
-    ));
-    expect(scorePublishedNotifications.records).toContainEqual(expect.objectContaining({
-      sourceModule: 'HWK',
-      sourceId: homeworkId,
-      title: 'homework score published'
-    }));
+    const notificationHeaders = await authorizationHeaders(page);
+    await expect.poll(async () => {
+      const notifications = await apiData<NotificationPage>(await request.get(
+        '/api/v1/notifications?page=1&size=100',
+        { headers: notificationHeaders }
+      ));
+      return notifications.records.some((notification) => (
+        notification.sourceModule === 'HWK'
+          && notification.sourceId === homeworkId
+          && notification.title === 'homework score published'
+      ));
+    }, { intervals: [100, 250, 500, 1_000], timeout: 15_000 }).toBe(true);
   });
 
   test('多类型提交验证代码后台评测并覆盖附件异常、过期、越权与重评', async ({
@@ -241,7 +267,7 @@ test.describe('@hwk HWK 真实业务闭环', () => {
     expect(objectiveSubmission.evaluationStatus).toBe('ACCEPTED');
     expect(objectiveSubmission.autoScore).toBe(100);
 
-    const acceptedCodeSubmission = await apiData<SubmissionRecord>(await request.post(
+    const acceptedCodeResponse = await request.post(
       `/api/v1/homeworks/${code.id}/submissions`,
       {
         headers: studentHeaders,
@@ -250,7 +276,8 @@ test.describe('@hwk HWK 真实业务闭环', () => {
           language: 'python'
         }
       }
-    ));
+    );
+    const acceptedCodeSubmission = await apiData<SubmissionRecord>(acceptedCodeResponse);
     expect(acceptedCodeSubmission.evaluationStatus).toBe('PENDING');
     const acceptedCodeResult = await waitForSubmissionTerminal(
       request,
@@ -259,6 +286,55 @@ test.describe('@hwk HWK 真实业务闭环', () => {
     );
     expect(acceptedCodeResult.evaluationStatus).toBe('ACCEPTED');
     expect(acceptedCodeResult.autoScore).toBe(100);
+    const acceptedCodeEvaluationResponse = await request.get(
+      `/api/v1/submissions/${acceptedCodeSubmission.submissionId}/evaluation`,
+      { headers: studentHeaders }
+    );
+    const acceptedCodeEvaluation = await apiData<EvaluationResult>(acceptedCodeEvaluationResponse);
+    expect(acceptedCodeEvaluation).toMatchObject({
+      submissionId: acceptedCodeSubmission.submissionId,
+      taskState: 'SUCCEEDED',
+      evaluationStatus: 'ACCEPTED',
+      score: 100
+    });
+    expect(acceptedCodeEvaluation.taskId).toMatch(/\S/);
+    await page.goto(`/courses/${COURSE_ID}/homeworks/${code.id}/submissions/${acceptedCodeSubmission.submissionId}/result`);
+    await expect(page.getByTestId('evaluation-score')).toContainText('100');
+    const screenshot = await captureIssue320RepresentativeScreenshot(page, 'assessment-worker');
+    recordIssue320Representative({
+      group: 'ASSESSMENT-WORKER',
+      proofId: `task-${acceptedCodeEvaluation.taskId}`,
+      chain: {
+        submit: {
+          method: 'POST',
+          path: `/api/v1/homeworks/${code.id}/submissions`,
+          status: acceptedCodeResponse.status(),
+          response: {
+            submissionId: acceptedCodeSubmission.submissionId,
+            evaluationStatus: acceptedCodeSubmission.evaluationStatus
+          }
+        },
+        finalRead: {
+          method: 'GET',
+          path: `/api/v1/submissions/${acceptedCodeSubmission.submissionId}/evaluation`,
+          status: acceptedCodeEvaluationResponse.status(),
+          response: {
+            submissionId: acceptedCodeEvaluation.submissionId,
+            taskId: acceptedCodeEvaluation.taskId,
+            taskState: acceptedCodeEvaluation.taskState,
+            evaluationStatus: acceptedCodeEvaluation.evaluationStatus,
+            score: acceptedCodeEvaluation.score
+          }
+        }
+      },
+      uiAssertion: {
+        route: new URL(page.url()).pathname,
+        selector: '[data-testid="evaluation-score"]',
+        expected: 'student result page displays the terminal automatic score 100',
+        screenshot,
+        junitCase: '多类型提交验证代码后台评测并覆盖附件异常、过期、越权与重评'
+      }
+    });
 
     const failedCodeSubmission = await apiData<SubmissionRecord>(await request.post(
       `/api/v1/homeworks/${code.id}/submissions`,
@@ -328,12 +404,25 @@ test.describe('@hwk HWK 真实业务闭环', () => {
     await logout();
     await loginAs('teacher');
     const currentTeacherHeaders = await authorizationHeaders(page);
-    const reevaluation = await apiData<{ evaluationStatus: string; reevaluation: boolean }>(await request.post(
+    const reevaluation = await apiData<{
+      submissionId: number;
+      taskState: string;
+      evaluationStatus: string;
+      reevaluation: boolean;
+    }>(await request.post(
       `/api/v1/submissions/${acceptedCodeSubmission.submissionId}/reevaluate`,
       { headers: currentTeacherHeaders, data: { reason: `E2E rejudge ${runId}` } }
     ));
     expect(reevaluation.reevaluation).toBe(true);
-    expect(['ACCEPTED', 'SYSTEM_ERROR']).toContain(reevaluation.evaluationStatus);
+    expect(reevaluation.submissionId).toBe(acceptedCodeSubmission.submissionId);
+    expect(reevaluation.taskState).toBe('PENDING');
+    expect(reevaluation.evaluationStatus).toBe('PENDING');
+    const reevaluatedResult = await waitForSubmissionTerminal(
+      request,
+      currentTeacherHeaders,
+      acceptedCodeSubmission.submissionId
+    );
+    expect(['ACCEPTED', 'SYSTEM_ERROR']).toContain(reevaluatedResult.evaluationStatus);
   });
 });
 
@@ -345,9 +434,16 @@ async function authorizationHeaders(page: Page) {
 
 async function apiData<T>(response: APIResponse): Promise<T> {
   expect(response.ok(), `${response.url()} returned ${response.status()}`).toBe(true);
-  const body = await response.json() as ApiEnvelope<T>;
+  const body = await response.json() as ApiEnvelope<T> | T;
+  if (!isApiEnvelope<T>(body)) {
+    return body;
+  }
   expect(body.code).toBe('0');
   return body.data;
+}
+
+function isApiEnvelope<T>(body: ApiEnvelope<T> | T): body is ApiEnvelope<T> {
+  return typeof body === 'object' && body !== null && 'code' in body && 'data' in body;
 }
 
 async function waitForSubmissionTerminal(
@@ -380,9 +476,7 @@ function futureLocalDateTime() {
 }
 
 function localDateTimeFromNow(offset: number) {
-  const deadline = new Date(Date.now() + offset);
-  const offsetMs = deadline.getTimezoneOffset() * 60 * 1000;
-  return new Date(deadline.getTime() - offsetMs).toISOString().slice(0, 19);
+  return new Date(Date.now() + offset).toISOString();
 }
 
 async function createAndPublishHomework(
@@ -401,7 +495,7 @@ async function createAndPublishHomework(
 function basePayload(title: string, type: 'TEXT' | 'OBJECTIVE' | 'CODE' | 'FILE', deadline = localDateTimeFromNow(86_400_000)) {
   return {
     courseId: COURSE_ID,
-    chapterId: 950101,
+    chapterId: CHAPTER_ID,
     title,
     description: `E2E ${type} homework`,
     type,

@@ -1,0 +1,12 @@
+{
+  "environmentReadySignal": null,
+  "dockerDaemonReady": false,
+  "exclusiveWindow": false,
+  "hpaEnabled": null,
+  "e2eRunning": null,
+  "faultInjectionRunning": null,
+  "otherPressureRunning": null,
+  "datasetRestoreEvidence": null,
+  "resourcePolicyEvidence": null,
+  "notes": "Blocked template. Replace only after #318 publishes ENVIRONMENT_READY and the exclusive formal test window is verified."
+}

@@ -1,0 +1,17 @@
+{
+  "environmentReadySignal": "ENVIRONMENT_READY issue=#318 sha=2d6160fe570f60bba73922640cb8a58bdb692b97 endpoint=http://127.0.0.1:18080 workloads=9 migrations=4 evidence=https://github.com/Cr4zyorange/OnlineJudge/pull/363 actions=https://github.com/Cr4zyorange/OnlineJudge/actions/runs/33500641015",
+  "dockerDaemonReady": true,
+  "exclusiveWindow": true,
+  "hpaEnabled": false,
+  "e2eRunning": false,
+  "faultInjectionRunning": false,
+  "otherPressureRunning": false,
+  "datasetRestoreEvidence": "DATASET_READY architecture=monolith project=oj307-monolith-093141 users=101 courses=105 members=101 homeworks=1 summaries=100 grade-records=300 submissions=0 file=performance/issue-307/results/20260902T0958Z/formal/monolith/course-list-round-2-dataset-reset.log",
+  "resourcePolicyEvidence": "sha256=af4f65ca1d36da699cbc813265f9ff514dccd275be30b99d313a3785cd6528c2 file=/tmp/oj307-monolith-current-evidence.1015/hard-limits.txt",
+  "runtime": {
+    "architecture": "monolith",
+    "project": "oj307-monolith-093141",
+    "expectedLiveContainers": 3,
+    "observedLiveContainers": 3
+  }
+}

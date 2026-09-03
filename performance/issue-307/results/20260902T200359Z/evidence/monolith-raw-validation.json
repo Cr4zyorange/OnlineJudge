@@ -1,0 +1,123 @@
+{
+  "monolithRoundCount": 9,
+  "invalid": 0,
+  "rows": [
+    {
+      "scenario": "course-list",
+      "round": 1,
+      "requests": 1199,
+      "statusCounts": {
+        "200": 1199
+      },
+      "allOk": true,
+      "preflight": 100,
+      "samples": 42,
+      "exclusive": true,
+      "baselineSha": "78715f21288782a2c7ef1d9c23f933c46569b108"
+    },
+    {
+      "scenario": "course-list",
+      "round": 2,
+      "requests": 1199,
+      "statusCounts": {
+        "200": 1199
+      },
+      "allOk": true,
+      "preflight": 100,
+      "samples": 42,
+      "exclusive": true,
+      "baselineSha": "78715f21288782a2c7ef1d9c23f933c46569b108"
+    },
+    {
+      "scenario": "course-list",
+      "round": 3,
+      "requests": 1199,
+      "statusCounts": {
+        "200": 1199
+      },
+      "allOk": true,
+      "preflight": 100,
+      "samples": 43,
+      "exclusive": true,
+      "baselineSha": "78715f21288782a2c7ef1d9c23f933c46569b108"
+    },
+    {
+      "scenario": "homework-submission",
+      "round": 1,
+      "requests": 1199,
+      "statusCounts": {
+        "201": 1199
+      },
+      "allOk": true,
+      "preflight": 100,
+      "samples": 41,
+      "exclusive": true,
+      "baselineSha": "78715f21288782a2c7ef1d9c23f933c46569b108"
+    },
+    {
+      "scenario": "homework-submission",
+      "round": 2,
+      "requests": 1199,
+      "statusCounts": {
+        "201": 1199
+      },
+      "allOk": true,
+      "preflight": 100,
+      "samples": 43,
+      "exclusive": true,
+      "baselineSha": "78715f21288782a2c7ef1d9c23f933c46569b108"
+    },
+    {
+      "scenario": "homework-submission",
+      "round": 3,
+      "requests": 1199,
+      "statusCounts": {
+        "201": 1199
+      },
+      "allOk": true,
+      "preflight": 100,
+      "samples": 42,
+      "exclusive": true,
+      "baselineSha": "78715f21288782a2c7ef1d9c23f933c46569b108"
+    },
+    {
+      "scenario": "my-grades",
+      "round": 1,
+      "requests": 1199,
+      "statusCounts": {
+        "200": 1199
+      },
+      "allOk": true,
+      "preflight": 100,
+      "samples": 43,
+      "exclusive": true,
+      "baselineSha": "78715f21288782a2c7ef1d9c23f933c46569b108"
+    },
+    {
+      "scenario": "my-grades",
+      "round": 2,
+      "requests": 1199,
+      "statusCounts": {
+        "200": 1199
+      },
+      "allOk": true,
+      "preflight": 100,
+      "samples": 43,
+      "exclusive": true,
+      "baselineSha": "78715f21288782a2c7ef1d9c23f933c46569b108"
+    },
+    {
+      "scenario": "my-grades",
+      "round": 3,
+      "requests": 1199,
+      "statusCounts": {
+        "200": 1199
+      },
+      "allOk": true,
+      "preflight": 100,
+      "samples": 44,
+      "exclusive": true,
+      "baselineSha": "78715f21288782a2c7ef1d9c23f933c46569b108"
+    }
+  ]
+}

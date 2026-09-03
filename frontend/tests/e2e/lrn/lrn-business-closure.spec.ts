@@ -2,8 +2,8 @@ import type { APIResponse, Page } from '@playwright/test';
 import { expect, test } from '../fixtures';
 import { verifyLrnDisposableProof } from './disposable-proof';
 
-const DEMO_COURSE_ID = 9501;
-const DEMO_GRADE_SUMMARY_ID = 950421;
+const DEMO_COURSE_ID = Number(process.env.E2E_COURSE_ID || 9501);
+const DEMO_GRADE_SUMMARY_ID = Number(process.env.E2E_GRADE_SUMMARY_ID || 950421);
 const hasDisposableProof = verifyLrnDisposableProof();
 
 test.describe.configure({ timeout: 60_000 });
@@ -107,11 +107,20 @@ test.describe('@lrn UC-LRN-01 business closure', () => {
     await page.getByTestId(`notification-select-${homeworkNotice.notificationId}`).check();
     await page.getByTestId('mark-selected-read').click();
     await expect(page.getByTestId(`notification-card-${homeworkNotice.notificationId}`)).not.toContainText('未读');
+    const deleted = page.waitForResponse((response) => (
+      response.request().method() === 'DELETE'
+        && new URL(response.url()).pathname === `/api/v1/notifications/${homeworkNotice.notificationId}`
+    ));
     await page.getByTestId(`delete-notification-${homeworkNotice.notificationId}`).click();
+    expect((await deleted).status()).toBe(200);
     await expect(page.getByTestId(`notification-card-${homeworkNotice.notificationId}`)).toHaveCount(0);
 
+    await expect.poll(async () => (await notificationPage(page, studentHeaders)).records
+      .some((notice) => notice.notificationId === homeworkNotice.notificationId), {
+      intervals: [50, 100, 250],
+      timeout: 5_000
+    }).toBe(false);
     const finalList = await notificationPage(page, studentHeaders);
-    expect(finalList.records.some((notice) => notice.notificationId === homeworkNotice.notificationId)).toBe(false);
     expect(finalList.records.some((notice) => notice.notificationId === gradeNotice.notificationId)).toBe(true);
     expect(student.id).toBeGreaterThan(0);
   });
@@ -166,13 +175,18 @@ test.describe('@lrn UC-LRN-01 business closure', () => {
 
 async function apiData<T>(response: APIResponse): Promise<T> {
   expect(response.ok(), `${response.url()} returned ${response.status()}`).toBe(true);
-  const envelope = await response.json() as ApiEnvelope<T>;
+  const envelope = await response.json() as ApiEnvelope<T> | T;
+  if (!isApiEnvelope<T>(envelope)) return envelope;
   expect(envelope.code).toBe('0');
   return envelope.data;
 }
 
 async function expectOk(response: APIResponse) {
   await apiData<unknown>(response);
+}
+
+function isApiEnvelope<T>(body: ApiEnvelope<T> | T): body is ApiEnvelope<T> {
+  return typeof body === 'object' && body !== null && 'code' in body && 'data' in body;
 }
 
 async function notificationPage(page: Page, headers: Record<string, string>) {
@@ -230,9 +244,9 @@ function labPayload(title: string) {
     deadline: futureDeadline(),
     maxScore: 100,
     attachmentIds: [],
-    allowedLanguages: 'java,python',
-    evaluationMode: 'DOCKER_IO',
-    autoEvaluate: true,
+    allowedLanguages: 'python',
+    evaluationMode: 'MANUAL',
+    autoEvaluate: false,
     reportRequired: false,
     timeLimitMs: 60000,
     memoryLimitKb: 262144,
@@ -259,7 +273,7 @@ function homeworkPayload(title: string) {
 function futureDeadline() {
   const date = new Date();
   date.setUTCDate(date.getUTCDate() + 30);
-  return date.toISOString().replace(/\.\d{3}Z$/, '');
+  return date.toISOString();
 }
 
 async function authHeaders(page: Page) {

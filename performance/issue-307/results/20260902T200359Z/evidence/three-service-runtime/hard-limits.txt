@@ -1,0 +1,9 @@
+/oj307-three-200359-mysql-1 cpu=750000000 memory=1610612736 state=running health=healthy
+/oj307-three-200359-rabbitmq-1 cpu=250000000 memory=402653184 state=running health=healthy
+/oj307-three-200359-identity-service-1 cpu=250000000 memory=402653184 state=running health=healthy
+/oj307-three-200359-course-service-1 cpu=500000000 memory=805306368 state=running health=healthy
+/oj307-three-200359-assessment-api-1 cpu=750000000 memory=1073741824 state=running health=healthy
+/oj307-three-200359-assessment-worker-1 cpu=500000000 memory=805306368 state=running health=healthy
+/oj307-three-200359-grade-service-1 cpu=500000000 memory=805306368 state=running health=healthy
+/oj307-three-200359-gateway-1 cpu=250000000 memory=268435456 state=running health=healthy
+/oj307-three-200359-frontend-1 cpu=250000000 memory=268435456 state=running health=healthy

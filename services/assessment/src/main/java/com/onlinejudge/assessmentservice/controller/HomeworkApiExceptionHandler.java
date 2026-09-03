@@ -17,6 +17,11 @@ import java.util.Map;
 /** User-facing HWK errors use the shared v2 envelope {code, message, requestId, retryable}. */
 @RestControllerAdvice(assignableTypes = { HomeworkController.class, HomeworkEvaluationController.class })
 class HomeworkApiExceptionHandler {
+    @ExceptionHandler(HomeworkClientException.class)
+    ResponseEntity<Map<String, Object>> clientFailure(HomeworkClientException failure, HttpServletRequest request) {
+        return error(failure.status(), failure.code(), failure.getMessage(), false, request);
+    }
+
     @ExceptionHandler(HomeworkPublicationException.class)
     ResponseEntity<Map<String, Object>> publicationFailed(HomeworkPublicationException failure, HttpServletRequest request) {
         return error(HttpStatusCode.valueOf(503), "HWK_5003", failure.getMessage(), true, request);
