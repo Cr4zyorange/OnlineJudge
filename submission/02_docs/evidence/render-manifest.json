@@ -1,9 +1,10 @@
 {
-  "generatedAt": "2026-09-03T02:22:41.148Z",
+  "generatedAt": "2026-09-03T06:49:10.917Z",
   "baseSha": "c56b16f916b4a4c3d33915aa37beab6b05c72888",
-  "sourceHead": "f33007324df4be27594005e45818e9bf07f72b8d",
+  "sourceHead": "c56b16f916b4a4c3d33915aa37beab6b05c72888",
+  "buildHead": "b69541e1c442e439f64d1a29f47a8ffffcbe1c22",
   "tools": {
-    "node": "v24.19.0",
+    "node": "v22.19.0",
     "chrome": "",
     "java": "java version \"24.0.2\" 2025-07-15",
     "plantuml": "PlantUML version 1.2025.4 (Sat Jun 28 19:09:25 GMT+08:00 2025)",
@@ -248,8 +249,8 @@
       "source": "docs/diagrams/grd/fig_3_6_14_grade_analysis_activity.mmd",
       "output": "submission/02_docs/rendered/svg/models/grd/fig_3_6_14_grade_analysis_activity.svg",
       "status": "PASS",
-      "bytes": 119754,
-      "sha256": "fe4f3294f72d58c37803e8876d3ff3bd856ac964345d420790ff62260ed732a7"
+      "bytes": 119789,
+      "sha256": "919ea639b53f907788446bdf5094ac0417c0fcd9288faf1384401dd6a1a0bb7e"
     },
     {
       "type": "mermaid",
@@ -296,8 +297,8 @@
       "source": "docs/diagrams/lrn/detail/sc05-reminder.mmd",
       "output": "submission/02_docs/rendered/svg/models/lrn/detail/sc05-reminder.svg",
       "status": "PASS",
-      "bytes": 114155,
-      "sha256": "e68d3d623206dd4355d13195bbe1c3c4c096eb2190d68b8e24a4bd44bed8f7ca"
+      "bytes": 114126,
+      "sha256": "b0b5a968af4efb2878509dd95b9b0ddb9bcd38cb5d0e85cc8d89c6491f62baf6"
     },
     {
       "type": "mermaid",
@@ -792,8 +793,8 @@
       "source": "docs/diagrams/srs/fig_5_3_core_concept_class.mmd",
       "output": "submission/02_docs/rendered/svg/models/srs/fig_5_3_core_concept_class.svg",
       "status": "PASS",
-      "bytes": 84837,
-      "sha256": "ce19925bb8fcf6300b1d54e1e239e984042c51780d326904caa3e07cf07c5d41"
+      "bytes": 84829,
+      "sha256": "122785b0f5c28a312bc9f3831a7dc22e23ca5f35adf760e08ff47c76b91d6794"
     },
     {
       "type": "mermaid",
@@ -881,7 +882,7 @@
       "output": "submission/02_docs/rendered/pdf/软件需求规格说明书.pdf",
       "status": "PASS",
       "bytes": 3632522,
-      "sha256": "a8220eb93a86ebb4ddce99d9c3ea3b4278d37580596387507dd9d40d0ce9d2c4"
+      "sha256": "2a4675d6f490a43d8d46e8977ac63ecb803f74c7d503c9bb90610271b4c98ae3"
     },
     {
       "type": "pdf",
@@ -889,7 +890,7 @@
       "output": "submission/02_docs/rendered/pdf/软件概要设计说明书.pdf",
       "status": "PASS",
       "bytes": 2766505,
-      "sha256": "1410cc534c4c02f1b9532e08e681226df48c398822b46d118477a11db9b69d1f"
+      "sha256": "42935f1c68f02b2360b173f9bf6eb17483813a7cf1c0ae3b179311cc92443abd"
     },
     {
       "type": "pdf",
@@ -897,7 +898,7 @@
       "output": "submission/02_docs/rendered/pdf/软件详细设计说明书.pdf",
       "status": "PASS",
       "bytes": 6100341,
-      "sha256": "69c0a791a68cdf9953f130df218d6306bab85561c6af4203b4d22ac83e670f2f"
+      "sha256": "a9dcd6e20336b818f749256c792b64361922f38be0525c5da0f5431b3ccda36e"
     },
     {
       "type": "pdf",
@@ -905,7 +906,7 @@
       "output": "submission/02_docs/rendered/pdf/软件实现说明书.pdf",
       "status": "PASS",
       "bytes": 14882626,
-      "sha256": "13e2d31f9d782cc370d1c804acd2252fcb8e712c516c6113617be7f949b223bb"
+      "sha256": "79e19f2df7349cadfa4e0534f1afa5d324c186a1636bf45c1cc71b539b447c58"
     },
     {
       "type": "pdf",
@@ -913,7 +914,7 @@
       "output": "submission/02_docs/rendered/pdf/测试文档.pdf",
       "status": "PASS",
       "bytes": 2945416,
-      "sha256": "dca4316fa82525d26d10ec2ab3e73f5f6dac0a05615b31fd82984aed859d7dea"
+      "sha256": "413db41bd689f515d42b0567735d02811cf6ea8b4b9d3a938c29e8f9304559f1"
     },
     {
       "type": "pdf",
@@ -921,7 +922,7 @@
       "output": "submission/02_docs/rendered/pdf/部署文档.pdf",
       "status": "PASS",
       "bytes": 954222,
-      "sha256": "901e95d51cbee3da0df58705a5b5be09b7db1a1bd6026c83e0dd6091b4776af5"
+      "sha256": "7a59517872d63cc2f7550fa1824794aa95403d4136a038930f87d39a1bcb0302"
     },
     {
       "type": "pdf",
@@ -929,7 +930,7 @@
       "output": "submission/02_docs/rendered/pdf/用户手册.pdf",
       "status": "PASS",
       "bytes": 42743540,
-      "sha256": "b1ca7dd7a99795b6cfa8c002bc0cfa2d369bbd64e6c56078f588d00e3da88d70"
+      "sha256": "a1d2f7c4ca8a1fcf38015199c67a6a39e3e67853476b2a8303b164824766185a"
     },
     {
       "type": "pdf",
@@ -937,7 +938,7 @@
       "output": "submission/02_docs/rendered/pdf/软件开发计划书.pdf",
       "status": "PASS",
       "bytes": 474430,
-      "sha256": "f1e6d838f80e7e082933914729ee65d0b31d26fc680ec425e69d1c8e43631405"
+      "sha256": "93b77b30e7cec23347327eb9afb34d9b52432263b40690e9d5e33dfa60b2efa9"
     }
   ]
 }

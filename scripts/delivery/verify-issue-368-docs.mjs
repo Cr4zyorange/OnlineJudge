@@ -4,6 +4,7 @@ import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { dirname, relative, resolve } from 'node:path';
 import process from 'node:process';
+import { findLocalLinkGaps, PACKAGE_TEXT_EXTENSIONS } from './issue-368-package.mjs';
 
 function repositoryRoot() {
   const rootIndex = process.argv.indexOf('--root');
@@ -105,16 +106,17 @@ const sensitivePatterns = [
   /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/,
   /(?:token|cookie|authorization)\s*[:=]\s*(?:bearer\s+)?[A-Za-z0-9._~+\/-]{24,}/i,
 ];
-const textExtensions = new Set(['.csv', '.json', '.log', '.md', '.mmd', '.puml', '.txt', '.xml', '.yaml', '.yml']);
 for (const path of packageFiles) {
   const absolute = resolve(packageRoot, path);
   const extension = /\.[^.]+$/.exec(path)?.[0]?.toLowerCase();
-  if (!textExtensions.has(extension) || statSync(absolute).size > 10_000_000) continue;
+  if (!PACKAGE_TEXT_EXTENSIONS.has(extension) || statSync(absolute).size > 10_000_000) continue;
   const contents = readFileSync(absolute, 'utf8');
+  expect(!contents.includes('\r'), `tracked text file is not normalized to LF: ${path}`);
   for (const pattern of sensitivePatterns) expect(!pattern.test(contents), `possible sensitive value in ${path}: ${pattern}`);
 }
 
 const canonicalDocs = walkFiles(resolve(packageRoot, 'editable/final')).filter((path) => path.endsWith('.md'));
+for (const gap of findLocalLinkGaps(canonicalDocs)) expect(false, `frozen document ${gap}`);
 for (const path of canonicalDocs) {
   const lines = readFileSync(path, 'utf8').split(/\r?\n/);
   lines.forEach((line, index) => {

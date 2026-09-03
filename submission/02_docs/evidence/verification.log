@@ -4,7 +4,15 @@ Fixed base: c56b16f916b4a4c3d33915aa37beab6b05c72888
 
 RED evidence:
 - node --test scripts/test/verify-issue-368-docs.test.mjs
-- Result before implementation: FAIL; 10 required package files were missing.
+- Initial implementation RED: FAIL; 10 required package files were missing.
+- Review regression RED: a clean Git checkout reported checksum mismatches after CRLF-to-LF normalization.
+- Frozen-package RED: 2 archived links were missing and PDF audit regeneration removed the manual-inspection attestation.
+
+Review closure:
+- The builder rejects authoritative inputs that differ from the fixed base, including untracked files.
+- Rebuilds preserve pdf-page-audit.json and verification.log while replacing generated render evidence.
+- Every tracked text artifact is normalized to LF before SHA256SUMS is generated.
+- Frozen-document links are resolved from editable/final and their two required local targets are archived.
 
 Build evidence:
 - node scripts/delivery/build-issue-368-docs.mjs --base c56b16f916b4a4c3d33915aa37beab6b05c72888

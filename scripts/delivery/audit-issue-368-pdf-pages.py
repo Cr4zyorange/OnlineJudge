@@ -16,6 +16,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--report", type=Path, required=True)
     parser.add_argument("--contacts", type=Path, required=True)
     parser.add_argument("--expected", type=int, default=545)
+    parser.add_argument("--manual-inspection-note")
     return parser.parse_args()
 
 
@@ -84,6 +85,13 @@ def main() -> int:
         "status": "PASS" if len(audits) == args.expected and not near_blank and not edge_content else "FAIL",
         "pages": audits,
     }
+    if args.manual_inspection_note:
+        report["manualInspection"] = {
+            "status": report["status"],
+            "pages": len(audits),
+            "contactSheets": len(contacts),
+            "note": args.manual_inspection_note,
+        }
     args.report.parent.mkdir(parents=True, exist_ok=True)
     args.report.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(

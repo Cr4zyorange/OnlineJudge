@@ -3,9 +3,11 @@
 import { createHash } from 'node:crypto';
 import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { relative, resolve } from 'node:path';
+import { normalizePackageText } from './issue-368-package.mjs';
 
 const root = resolve(import.meta.dirname, '../..');
 const packageRoot = resolve(root, 'submission/02_docs');
+normalizePackageText(packageRoot);
 
 function walkFiles(directory) {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {

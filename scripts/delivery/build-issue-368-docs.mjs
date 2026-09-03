@@ -4,7 +4,6 @@ import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
   copyFileSync,
-  cpSync,
   existsSync,
   mkdirSync,
   readFileSync,
@@ -17,6 +16,12 @@ import { createRequire } from 'node:module';
 import { basename, dirname, extname, join, relative, resolve, sep } from 'node:path';
 import process from 'node:process';
 import { pathToFileURL } from 'node:url';
+import {
+  authoritativeInputChanges,
+  findLocalLinkGaps,
+  normalizePackageText,
+  resetGeneratedRoots,
+} from './issue-368-package.mjs';
 
 const BASE_SHA = 'c56b16f916b4a4c3d33915aa37beab6b05c72888';
 const FINAL_DOCUMENTS = [
@@ -38,6 +43,18 @@ const E2E_FILES = [
   'frontend/tests/e2e/lrn/lrn-business-closure.spec.ts',
   'frontend/tests/e2e/lrn/notification-read-on-open.spec.ts',
   'frontend/tests/e2e/shared/application.smoke.spec.ts',
+];
+const AUTHORITATIVE_INPUTS = [
+  'docs/最终提交',
+  'docs/过程',
+  'docs/开发/D3-CICD-共享契约.md',
+  'docs/diagrams',
+  ...E2E_FILES,
+  'tests/api',
+  'deploy/platform/workloads.json',
+  'database/migrations',
+  'contracts/v2',
+  'submission/03_devops/README.md',
 ];
 const MODULE_META = {
   auth: ['FR-UA-01~07; NFR-UA-01~05', '软件概要设计说明书§AUTH; 软件详细设计说明书§AUTH', 'services/identity; frontend/src/views/auth'],
@@ -92,6 +109,14 @@ function walk(directory, predicate = () => true) {
       return entry.isDirectory() ? walk(path, predicate) : predicate(path) ? [path] : [];
     })
     .sort((left, right) => slash(left).localeCompare(slash(right), 'en'));
+}
+
+function copyTree(sourceRoot, targetRoot) {
+  for (const source of walk(sourceRoot)) {
+    const target = resolve(targetRoot, relative(sourceRoot, source));
+    mkdirSync(dirname(target), { recursive: true });
+    copyFileSync(source, target);
+  }
 }
 
 function csvValue(value) {
@@ -224,23 +249,6 @@ function collectIntegrationRows() {
   return rows.sort((a, b) => `${a[0]}|${a[1]}|${a[4]}`.localeCompare(`${b[0]}|${b[1]}|${b[4]}`, 'en'));
 }
 
-function localLinkGaps() {
-  const gaps = [];
-  for (const name of FINAL_DOCUMENTS) {
-    const sourcePath = resolve(root, 'docs/最终提交', name);
-    const source = readFileSync(sourcePath, 'utf8');
-    const matcher = /!?\[[^\]]*\]\(([^)]+)\)/g;
-    let match;
-    while ((match = matcher.exec(source))) {
-      const target = match[1].trim().replace(/^<|>$/g, '').split('#')[0];
-      if (!target || /^(?:https?:|mailto:|data:)/i.test(target)) continue;
-      const decoded = decodeURIComponent(target);
-      if (!existsSync(resolve(dirname(sourcePath), decoded))) gaps.push(`${name}: missing local link ${target}`);
-    }
-  }
-  return gaps;
-}
-
 function headingGaps() {
   const gaps = [];
   for (const name of FINAL_DOCUMENTS) {
@@ -312,20 +320,36 @@ async function ensurePlantUml() {
   return path;
 }
 
-for (const path of [editableRoot, renderedRoot, inventoryRoot, evidenceRoot, reportRoot]) {
-  rmSync(path, { recursive: true, force: true });
-  mkdirSync(path, { recursive: true });
+const inputChanges = authoritativeInputChanges(root, requestedBase, AUTHORITATIVE_INPUTS);
+if (inputChanges.length > 0) {
+  throw new Error(`authoritative inputs differ from frozen base ${requestedBase}:\n${inputChanges.join('\n')}`);
 }
 
-const sourceHead = git('rev-parse', 'HEAD');
+resetGeneratedRoots(
+  [editableRoot, renderedRoot, inventoryRoot, evidenceRoot, reportRoot],
+  evidenceRoot,
+  ['pdf-page-audit.json', 'verification.log'],
+);
+
+const sourceHead = requestedBase;
+const buildHead = git('rev-parse', 'HEAD');
 const finalEditableRoot = resolve(editableRoot, 'final');
 mkdirSync(finalEditableRoot, { recursive: true });
 for (const name of FINAL_DOCUMENTS) copyFileSync(resolve(root, 'docs/最终提交', name), resolve(finalEditableRoot, name));
-cpSync(resolve(root, 'docs/最终提交/assets'), resolve(finalEditableRoot, 'assets'), { recursive: true });
+copyTree(resolve(root, 'docs/最终提交/assets'), resolve(finalEditableRoot, 'assets'));
+const frozenDevelopmentRoot = resolve(editableRoot, '开发');
+mkdirSync(frozenDevelopmentRoot, { recursive: true });
+copyFileSync(
+  resolve(root, 'docs/开发/D3-CICD-共享契约.md'),
+  resolve(frozenDevelopmentRoot, 'D3-CICD-共享契约.md'),
+);
+const frozenDevopsRoot = resolve(packageRoot, 'submission/03_devops');
+mkdirSync(frozenDevopsRoot, { recursive: true });
+copyFileSync(resolve(root, 'submission/03_devops/README.md'), resolve(frozenDevopsRoot, 'README.md'));
 
 const modelSourceRoot = resolve(root, 'docs/diagrams');
 const modelEditableRoot = resolve(editableRoot, 'models');
-cpSync(modelSourceRoot, modelEditableRoot, { recursive: true });
+copyTree(modelSourceRoot, modelEditableRoot);
 const modelSources = walk(modelSourceRoot, (path) => ['.mmd', '.puml'].includes(extname(path)));
 const mermaidSources = modelSources.filter((path) => extname(path) === '.mmd');
 const plantUmlSources = modelSources.filter((path) => extname(path) === '.puml');
@@ -362,7 +386,7 @@ writeCsv(resolve(inventoryRoot, 'evidence-status.csv'), ['issue', 'status', 'pr_
 const workloadManifest = JSON.parse(readFileSync(resolve(root, 'deploy/platform/workloads.json'), 'utf8'));
 const migrationJobs = [...new Set(workloadManifest.workloads.map((item) => item.migrationJob).filter(Boolean))].sort();
 const index = `# 02_docs 最终文档归档索引\n\n` +
-  `> Issue #368 frozen base: \`${BASE_SHA}\`; build source: \`${sourceHead}\`. 本目录由 \`scripts/delivery/build-issue-368-docs.mjs\` 从唯一正本生成。\n\n` +
+  `> Issue #368 frozen base: \`${BASE_SHA}\`; builder revision: \`${buildHead}\`. 本目录由 \`scripts/delivery/build-issue-368-docs.mjs\` 从与固定基线一致的唯一正本生成。\n\n` +
   `## 冻结口径\n\n` +
   `当前系统只有 **Course、Assessment、Grade 三个业务服务**。Identity 提供身份认证；Gateway 是统一入口；Assessment Worker 独立消费评测任务；RabbitMQ 承载可靠事件；MySQL 承载 identity/course/assessment/grade 四个 schema 与四个最小权限账号。工作负载清单固定为 ${workloadManifest.workloads.length} 个工作负载、${migrationJobs.length} 个迁移任务。\n\n` +
   `## 任务书与验收映射\n\n` +
@@ -384,12 +408,13 @@ writeFileSync(resolve(packageRoot, 'INDEX.md'), index, 'utf8');
 
 const readme = `# 02_docs 文档归档\n\n` +
   `本目录是 Issue #368 在固定 \`origin/dev@${BASE_SHA}\` 上生成的最终文档归档。开发正本仍位于 \`docs/最终提交\`、\`docs/过程\` 与 \`docs/diagrams\`；冻结副本、PDF/SVG、追溯清单、渲染日志和哈希由脚本统一生成，禁止手工制造 PASS。\n\n` +
-  `复现：\n\n\`\`\`powershell\nnode scripts/delivery/build-issue-368-docs.mjs --base ${BASE_SHA}\nnode scripts/delivery/verify-issue-368-docs.mjs\n\`\`\`\n\n` +
+  `复现：\n\n\`\`\`powershell\nnode scripts/delivery/build-issue-368-docs.mjs --base ${BASE_SHA}\npdftoppm -png -r 96 submission/02_docs/rendered/pdf/<文档>.pdf output/issue-368/pdf-pages/<文档>/page\npython scripts/delivery/audit-issue-368-pdf-pages.py --pages output/issue-368/pdf-pages --report submission/02_docs/evidence/pdf-page-audit.json --contacts output/issue-368/pdf-contact-sheets --expected 545 --manual-inspection-note \"22 contact sheets visually inspected; no clipping, overlap, missing glyphs, broken tables, black blocks, blank pages, or missing diagrams\"\nnode scripts/delivery/refresh-issue-368-checksums.mjs\nnode scripts/delivery/verify-issue-368-docs.mjs\n\`\`\`\n\n` +
+  `PDF 页图与联系表是本地复核中间产物，不进入归档；本次对 545 页和 22 张联系表的检查结论见 \`evidence/pdf-page-audit.json\` 与 \`evidence/verification.log\`。\n\n` +
   `入口见 [INDEX.md](INDEX.md)。上游 #319、#320、#340 未形成合并到固定基线的最终证据，均保留为 BLOCKED。\n`;
 writeFileSync(resolve(packageRoot, 'README.md'), readme, 'utf8');
 
 const headingIssues = headingGaps();
-const linkIssues = localLinkGaps();
+const linkIssues = findLocalLinkGaps(FINAL_DOCUMENTS.map((name) => resolve(finalEditableRoot, name)));
 const gaps = `# Issue #368 文档缺口与修复表\n\n` +
   `## 自动检查结果\n\n` +
   `| 检查 | 发现数 | 处置 |\n| --- | ---: | --- |\n` +
@@ -493,6 +518,7 @@ const renderSummary = {
   generatedAt: new Date().toISOString(),
   baseSha: BASE_SHA,
   sourceHead,
+  buildHead,
   tools: toolVersions,
   counts: {
     mermaid: mermaidSources.length,
@@ -511,7 +537,8 @@ const manifest = {
   issue: 368,
   baseSha: BASE_SHA,
   sourceHead,
-  authoritativeRoots: ['docs/最终提交', 'docs/过程', 'docs/diagrams', 'tests/api', 'deploy/platform/workloads.json', 'database/migrations', 'contracts/v2'],
+  buildHead,
+  authoritativeRoots: AUTHORITATIVE_INPUTS,
   counts: {
     finalEditableDocuments: FINAL_DOCUMENTS.length,
     e2eScenarios: scenarioRows.length,
@@ -530,6 +557,9 @@ const manifest = {
   },
   commands: [
     `node scripts/delivery/build-issue-368-docs.mjs --base ${BASE_SHA}`,
+    'pdftoppm -png -r 96 submission/02_docs/rendered/pdf/<文档>.pdf output/issue-368/pdf-pages/<文档>/page',
+    'python scripts/delivery/audit-issue-368-pdf-pages.py --pages output/issue-368/pdf-pages --report submission/02_docs/evidence/pdf-page-audit.json --contacts output/issue-368/pdf-contact-sheets --expected 545 --manual-inspection-note "22 contact sheets visually inspected; no clipping, overlap, missing glyphs, broken tables, black blocks, blank pages, or missing diagrams"',
+    'node scripts/delivery/refresh-issue-368-checksums.mjs',
     'node scripts/delivery/verify-issue-368-docs.mjs',
     'node --test scripts/test/verify-issue-368-docs.test.mjs',
     'git diff --check',
@@ -537,6 +567,7 @@ const manifest = {
 };
 writeFileSync(resolve(packageRoot, 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`, 'utf8');
 
+normalizePackageText(packageRoot);
 const checksumFiles = walk(packageRoot, (path) => basename(path) !== 'SHA256SUMS');
 const checksumLines = checksumFiles.map((path) => `${sha256(path)}  ${slash(relative(packageRoot, path))}`);
 writeFileSync(resolve(packageRoot, 'SHA256SUMS'), `${checksumLines.join('\n')}\n`, 'utf8');
