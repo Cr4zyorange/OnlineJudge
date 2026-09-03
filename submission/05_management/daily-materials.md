@@ -1,32 +1,14 @@
-# 每日站会与看板材料
+# 每日日报原文
 
-来源口径：
+| 日期 | 日报原文 | 看板截图 |
+| --- | --- | --- |
+| 2026-08-26 | [日报原文](evidence/daily-reports/2026-08-26.md) | [3 张](evidence/daily-boards/README.md#2026-08-26) |
+| 2026-08-27 | [日报原文](evidence/daily-reports/2026-08-27.md) | [4 张](evidence/daily-boards/README.md#2026-08-27) |
+| 2026-08-28 | [日报原文](evidence/daily-reports/2026-08-28.md) | [1 张](evidence/daily-boards/README.md#2026-08-28) |
+| 2026-08-29 | [日报原文](evidence/daily-reports/2026-08-29.md) | [1 张](evidence/daily-boards/README.md#2026-08-29) |
+| 2026-08-31 | [日报原文](evidence/daily-reports/2026-08-31.md) | [1 张](evidence/daily-boards/README.md#2026-08-31) |
+| 2026-09-01 | [日报原文](evidence/daily-reports/2026-09-01.md) | [1 张](evidence/daily-boards/README.md#2026-09-01) |
+| 2026-09-02 | [日报原文](evidence/daily-reports/2026-09-02.md) | [2 张](evidence/daily-boards/README.md#2026-09-02) |
+| 2026-09-03 | [日报原文](evidence/daily-reports/2026-09-03.md) | [1 张](evidence/daily-boards/README.md#2026-09-03) |
 
-- 正式任务书执行基线将 2026-08-25 至 08-29 和 2026-08-31 至 09-04 定义为 10 个正式工作日；2026-08-30 明确为不集中实践，不应伪造日报。
-- 截至本次采集，2026-09-04 尚未到期。项目负责人于 2026-09-03 书面确认 D1（2026-08-25）为项目启动日、未产生日报；因此本归档的日级矩阵以 D2 至 D9 的 8 个实际日报日为 `dates_expected`。
-- 项目负责人同次确认六人每日满勤，管理归档不再追索逐人到会、缺席或补报原始名单。每日的 Notion 小组日报作为站会简报，原始看板图见 [evidence/notion-boards/README.md](evidence/notion-boards/README.md)。
-- Notion 读取前已阅读 AI 主操作手册及 00、01、02 子手册，详见 [采集快照](evidence/snapshot.md)。
-
-## 日期级矩阵
-
-| 日期 | 日序 | 站会或日报来源 | 看板或统计来源 | 结论 |
-| --- | --- | --- | --- | --- |
-| 2026-08-25 | D1，启动日 | 项目负责人确认：项目第一天未产生日报 | 不适用 | PASS：不计入 `dates_expected`，不补写或虚构日报。 |
-| 2026-08-26 | D2 | [小组日报](https://app.notion.com/p/3c866e71b0d9813bb880cb4481132b6a) 明确记载 D2 Action 已记录 09:00 完成、六角色材料覆盖 | 同页 3 张看板原件 | PASS。 |
-| 2026-08-27 | D3 | [小组日报](https://app.notion.com/p/3c966e71b0d98116b976deb1c596ad7c) 记录六角色工作口径均已提交 | 同页 4 张看板原件 | PASS。 |
-| 2026-08-28 | D4 | [小组日报](https://app.notion.com/p/3ca66e71b0d981299fc0d32d591cb89f) | 同页 1 张看板原件 | PASS：按项目负责人满勤确认，不单列逐人出勤原始名单。 |
-| 2026-08-29 | D5 | [小组日报](https://app.notion.com/p/3cb66e71b0d9810faa90da7bf06d2dd0) | 同页 1 张看板原件 | PASS：同 D4。 |
-| 2026-08-30 | 非正式日 | 任务书明确不集中实践，不安排正式日任务 | 不适用 | PASS：不创建或补写虚构日报。 |
-| 2026-08-31 | D6 | [小组日报](https://app.notion.com/p/3cd66e71b0d981bb988fd57ae686fbb3) | 同页 1 张看板原件；文字记录 Todo 15、In progress 4、待审核 0、Done 157 | PASS。 |
-| 2026-09-01 | D7 | [小组日报](https://app.notion.com/p/3ce66e71b0d9813ba853fbe57176ae16)；五份成员日报与项目负责人 GitHub 补录 | 同页 1 张看板原件 | PASS。 |
-| 2026-09-02 | D8 | [小组日报](https://app.notion.com/p/3cf66e71b0d981089c53df296190edb7) | 同页 2 张看板原件 | PASS。 |
-| 2026-09-03 | D9 | [小组日报](https://app.notion.com/p/3d066e71b0d981b39b88dcd3926c71a5)；六人日报覆盖 | 同页 1 张看板原件 | PASS：日报正文的“GitHub Project 截图尚未提供”已由本次导出的同页看板原件补齐；当前 Project 状态另见 [采集快照](evidence/snapshot.md)。 |
-| 2026-09-04 | D10，未来 | Notion [D10 DDL](https://app.notion.com/p/3aa66e71b0d98146817dd1118143370e) 仍为未开始 | 不适用 | BLOCKED，但不计入 dates_expected：结果未发生，不能预填。 |
-
-## 汇总
-
-dates_expected=8，dates_complete=8，blocked_dates=0。
-
-日报页面是受权限控制的原始来源；其内嵌图片为短时签名链接，不能作为可长期复验或可公开提交的文件 URL。本次已将 14 张图片导出到 `evidence/notion-boards/`，并在同目录清单中记录采集时间、页面永久地址与 SHA256。
-
-2026-09-03 日报可核验的管理结论为：#307 已闭环；#319/#340 已批准但等待共享质量门；#320 的本地 24/24 不能替代当前 CI；D10 的 #368/#369/#378/#379/#380 正在进行；#370/#381 未分配。
+看板截图原件位于 [evidence/daily-boards](evidence/daily-boards/README.md)。
