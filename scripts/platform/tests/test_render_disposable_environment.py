@@ -258,6 +258,38 @@ class DisposableEnvironmentRendererTest(unittest.TestCase):
         self.assertIn("resolver kube-dns.kube-system.svc.cluster.local ipv6=off valid=10s", kubernetes)
         self.assertNotIn("aliases:\n          - backend", compose)
 
+    def test_compose_frontend_proxy_bind_mount_is_absolute(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory)
+            compose = output / "compose.yml"
+            kubernetes = output / "platform.yaml"
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(RENDERER),
+                    "--schema",
+                    str(SCHEMA),
+                    "--manifest",
+                    str(MANIFEST),
+                    "--git-sha",
+                    GIT_SHA,
+                    "--compose-output",
+                    str(compose),
+                    "--kubernetes-output",
+                    str(kubernetes),
+                ],
+                cwd=REPOSITORY_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            frontend = compose.read_text(encoding="utf-8")[
+                compose.read_text(encoding="utf-8").index("\n  frontend:") :
+                compose.read_text(encoding="utf-8").index("\n  rabbitmq:")
+            ]
+            self.assertIn(f'"{(output / "frontend-disposable.conf").resolve()}:/etc/nginx/conf.d/default.conf:ro"', frontend)
+
     def test_compose_frontend_proxy_file_remains_readable_when_runtime_secrets_use_a_private_umask(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory)

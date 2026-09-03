@@ -19,6 +19,8 @@ public class SourceGradeRabbitMessageHandler {
 
     public SourceGradeProjectionService.ApplyResult handle(byte[] body) {
         var root = parse(body);
+        // Projection failures are retryable infrastructure/business failures,
+        // not malformed wire facts. Let the AMQP consumer requeue them.
         return projection.apply(SourceGradeChangedEnvelope.parse(root));
     }
 

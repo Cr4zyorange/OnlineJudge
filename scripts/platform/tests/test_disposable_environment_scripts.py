@@ -291,6 +291,12 @@ class DisposableEnvironmentScriptsTest(unittest.TestCase):
         migration = GRADE_SOURCE_PROJECTION_STATUS_MIGRATION.read_text(encoding="utf-8")
         self.assertIn("DROP COLUMN status", migration)
 
+    def test_run_command_can_retain_a_temporary_runtime_env_for_resilience_restart_probes(self) -> None:
+        source = self.assert_help(RUN)
+        self.assertIn("--keep-runtime-env", source)
+        self.assertIn("--runtime-env-path", source)
+        self.assertIn("if (( ! keep_runtime_env )); then rm -f \"$runtime_env\"; fi", source)
+
     def test_rollback_command_requires_an_immutable_artifact_manifest(self) -> None:
         source = self.assert_help(ROLLBACK)
         self.assertIn("artifact-manifest.json", source)

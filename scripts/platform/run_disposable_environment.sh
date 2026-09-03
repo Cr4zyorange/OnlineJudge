@@ -12,7 +12,7 @@ bundle_generator="$repo_root/scripts/platform/generate_jwks_trust_bundle.mjs"
 
 usage() {
   cat <<'USAGE'
-Usage: scripts/platform/run_disposable_environment.sh [--git-sha SHA] [--output-dir DIR] [--keep] [--skip-build] [--skip-tests] [--inject-failure migration|readiness] [--after-ready COMMAND [ARGS...]]
+Usage: scripts/platform/run_disposable_environment.sh [--git-sha SHA] [--output-dir DIR] [--keep] [--keep-runtime-env] [--runtime-env-path FILE] [--skip-build] [--skip-tests] [--inject-failure migration|readiness] [--after-ready COMMAND [ARGS...]]
 
 Builds (unless --skip-build), starts and verifies an isolated nine-workload,
 four-migration Compose environment. --inject-failure proves that a controlled
@@ -24,6 +24,8 @@ USAGE
 git_sha=""
 output_dir=""
 keep=0
+keep_runtime_env=0
+runtime_env_path=""
 skip_build=0
 skip_tests=0
 failure_mode=""
@@ -33,6 +35,8 @@ while (($#)); do
     --git-sha) git_sha="${2:?--git-sha requires a value}"; shift 2 ;;
     --output-dir) output_dir="${2:?--output-dir requires a value}"; shift 2 ;;
     --keep) keep=1; shift ;;
+    --keep-runtime-env) keep_runtime_env=1; shift ;;
+    --runtime-env-path) runtime_env_path="${2:?--runtime-env-path requires a value}"; shift 2 ;;
     --skip-build) skip_build=1; shift ;;
     --skip-tests) skip_tests=1; shift ;;
     --inject-failure) failure_mode="${2:?--inject-failure requires migration or readiness}"; shift 2 ;;
@@ -68,7 +72,16 @@ if [[ -z "$output_dir" ]]; then output_dir="$repo_root/output/issue-318/$git_sha
 mkdir -p "$output_dir"
 compose_file="$output_dir/compose.yml"
 kubernetes_file="$output_dir/platform.yaml"
-runtime_env="$(mktemp "${TMPDIR:-/tmp}/onlinejudge-issue318.XXXXXX")"
+if [[ -n "$runtime_env_path" ]]; then
+  runtime_env="$runtime_env_path"
+  case "$runtime_env" in
+    /*) ;;
+    *) printf 'run-disposable-environment: --runtime-env-path must be absolute\n' >&2; exit 2 ;;
+  esac
+  (umask 077; : > "$runtime_env")
+else
+  runtime_env="$(mktemp "${TMPDIR:-/tmp}/onlinejudge-issue318.XXXXXX")"
+fi
 runtime_env_ready=0
 project_name="oj318-${git_sha:0:12}-${run_id##*-}"
 compose=(docker compose --project-name "$project_name" --env-file "$runtime_env" --file "$compose_file")
@@ -117,7 +130,7 @@ with open(sys.argv[1], "w", encoding="utf-8") as output:
     output.write("\n")
 PY
   fi
-  rm -f "$runtime_env"
+  if (( ! keep_runtime_env )); then rm -f "$runtime_env"; fi
   if (( status == 0 && cleanup_status != 0 )); then
     exit "$cleanup_status"
   fi
