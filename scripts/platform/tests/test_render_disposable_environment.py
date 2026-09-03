@@ -182,6 +182,14 @@ class DisposableEnvironmentRendererTest(unittest.TestCase):
             worker,
         )
 
+    def test_kubernetes_workloads_disable_service_link_environment_injection(self) -> None:
+        _, kubernetes = self.render()
+
+        # Service-link variables can collide with explicitly typed runtime
+        # settings (for example RABBITMQ_PORT). Every rendered workload Pod
+        # must therefore opt out before the container environment is built.
+        self.assertEqual(kubernetes.count("      enableServiceLinks: false"), 9)
+
     def test_kubernetes_stage_files_keep_migrations_before_workloads_and_gateway(self) -> None:
         stages = self.render_stages()
 

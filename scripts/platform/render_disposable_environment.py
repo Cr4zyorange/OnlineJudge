@@ -549,6 +549,7 @@ def kube_workload(workload: dict[str, Any], git_sha: str, namespace: str) -> str
             "      labels:",
             "        app.kubernetes.io/name: " + name,
             "    spec:",
+            "      enableServiceLinks: false",
             "      containers:",
             "        - name: " + name,
             "          image: " + image,
