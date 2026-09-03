@@ -1,0 +1,6 @@
+### kubectl --namespace onlinejudge-ci get pods -o wide
+
+NAME                        READY   STATUS    RESTARTS   AGE   IP           NODE                           NOMINATED NODE   READINESS GATES
+backend-768668fbdf-4svg2    1/1     Running   0          21s   10.244.0.7   onlinejudge-ci-control-plane   <none>           <none>
+frontend-586c57fd47-6wthq   1/1     Running   0          10s   10.244.0.8   onlinejudge-ci-control-plane   <none>           <none>
+mysql-0                     1/1     Running   0          46s   10.244.0.6   onlinejudge-ci-control-plane   <none>           <none>

@@ -1,0 +1,109 @@
+# MySQL 8.4 StatefulSet with a PVC and schema initialization that reuses the
+# single SQL original (database/mysql/compose-schema.sql) through the
+# onlinejudge-mysql-init ConfigMap generated at deploy time by
+# scripts/kind/k8s-deploy.sh. No SQL is copied into deploy/k8s.
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mysql
+  namespace: onlinejudge-ci
+  labels:
+    app: mysql
+    app.kubernetes.io/part-of: onlinejudge
+spec:
+  serviceName: mysql
+  replicas: 1
+  updateStrategy:
+    type: RollingUpdate
+  selector:
+    matchLabels:
+      app: mysql
+  template:
+    metadata:
+      labels:
+        app: mysql
+        app.kubernetes.io/part-of: onlinejudge
+    spec:
+      containers:
+        - name: mysql
+          image: mysql:8.4
+          args:
+            - --character-set-server=utf8mb4
+            - --collation-server=utf8mb4_unicode_ci
+          ports:
+            - containerPort: 3306
+              name: mysql
+          env:
+            - name: MYSQL_DATABASE
+              valueFrom:
+                configMapKeyRef:
+                  name: onlinejudge-config
+                  key: MYSQL_DATABASE
+            - name: MYSQL_USER
+              valueFrom:
+                configMapKeyRef:
+                  name: onlinejudge-config
+                  key: MYSQL_USER
+            - name: MYSQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: onlinejudge-secrets
+                  key: MYSQL_PASSWORD
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: onlinejudge-secrets
+                  key: MYSQL_ROOT_PASSWORD
+          startupProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - mysqladmin ping -h 127.0.0.1 -uroot -p"$MYSQL_ROOT_PASSWORD" --silent
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 30
+          readinessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - mysqladmin ping -h 127.0.0.1 -uroot -p"$MYSQL_ROOT_PASSWORD" --silent
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - mysqladmin ping -h 127.0.0.1 -uroot -p"$MYSQL_ROOT_PASSWORD" --silent
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/mysql
+            - name: init-schema
+              mountPath: /docker-entrypoint-initdb.d
+              readOnly: true
+      volumes:
+        - name: init-schema
+          configMap:
+            name: onlinejudge-mysql-init
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 2Gi

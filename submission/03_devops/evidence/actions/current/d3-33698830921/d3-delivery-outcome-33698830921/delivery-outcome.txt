@@ -1,0 +1,5 @@
+git_sha=c56b16f916b4a4c3d33915aa37beab6b05c72888
+quality_gate=failure
+build_images=skipped
+deploy_kind=skipped
+source_run=https://github.com/Cr4zyorange/OnlineJudge/actions/runs/33698399654

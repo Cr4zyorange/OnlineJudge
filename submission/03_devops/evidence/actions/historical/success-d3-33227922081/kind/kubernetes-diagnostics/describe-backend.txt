@@ -1,0 +1,54 @@
+### kubectl --namespace onlinejudge-ci describe deployment backend
+
+Name:                   backend
+Namespace:              onlinejudge-ci
+CreationTimestamp:      Sat, 29 Aug 2026 02:08:04 +0000
+Labels:                 app=backend
+                        app.kubernetes.io/part-of=onlinejudge
+Annotations:            deployment.kubernetes.io/revision: 1
+Selector:               app=backend
+Replicas:               1 desired | 1 updated | 1 total | 1 available | 0 unavailable
+StrategyType:           RollingUpdate
+MinReadySeconds:        0
+RollingUpdateStrategy:  0 max unavailable, 1 max surge
+Pod Template:
+  Labels:  app=backend
+           app.kubernetes.io/part-of=onlinejudge
+  Containers:
+   backend:
+    Image:      onlinejudge/backend:5cdbe8533991bb0c7cfbe23e08d81b78d47af483
+    Port:       8080/TCP (http)
+    Host Port:  0/TCP (http)
+    Limits:
+      cpu:     1500m
+      memory:  1536Mi
+    Requests:
+      cpu:      500m
+      memory:   768Mi
+    Liveness:   http-get http://:8080/api/v1/system/health delay=0s timeout=3s period=20s #success=1 #failure=3
+    Readiness:  http-get http://:8080/api/v1/system/readiness delay=0s timeout=3s period=10s #success=1 #failure=3
+    Startup:    http-get http://:8080/api/v1/system/readiness delay=0s timeout=3s period=10s #success=1 #failure=42
+    Environment Variables from:
+      onlinejudge-config   ConfigMap  Optional: false
+      onlinejudge-secrets  Secret     Optional: false
+    Environment:           <none>
+    Mounts:
+      /opt/onlinejudge/data from app-data (rw)
+  Volumes:
+   app-data:
+    Type:          EmptyDir (a temporary directory that shares a pod's lifetime)
+    Medium:        
+    SizeLimit:     <unset>
+  Node-Selectors:  <none>
+  Tolerations:     <none>
+Conditions:
+  Type           Status  Reason
+  ----           ------  ------
+  Available      True    MinimumReplicasAvailable
+  Progressing    True    NewReplicaSetAvailable
+OldReplicaSets:  <none>
+NewReplicaSet:   backend-768668fbdf (1/1 replicas created)
+Events:
+  Type    Reason             Age   From                   Message
+  ----    ------             ----  ----                   -------
+  Normal  ScalingReplicaSet  21s   deployment-controller  Scaled up replica set backend-768668fbdf from 0 to 1

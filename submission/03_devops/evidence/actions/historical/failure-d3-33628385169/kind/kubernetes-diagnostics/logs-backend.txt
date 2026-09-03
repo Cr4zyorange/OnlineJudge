@@ -1,0 +1,140 @@
+### kubectl --namespace onlinejudge-ci logs deployment/backend --all-containers --tail=200
+
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+
+ :: Spring Boot ::                (v3.4.5)
+
+2026-09-02T12:22:13.100Z  INFO 1 --- [           main] com.onlinejudge.OnlineJudgeApplication   : Starting OnlineJudgeApplication v0.1.0-SNAPSHOT using Java 21.0.12 with PID 1 (/opt/onlinejudge/app.jar started by onlinejudge in /opt/onlinejudge)
+2026-09-02T12:22:13.128Z  INFO 1 --- [           main] com.onlinejudge.OnlineJudgeApplication   : No active profile set, falling back to 1 default profile: "default"
+2026-09-02T12:22:16.647Z  INFO 1 --- [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port 8080 (http)
+2026-09-02T12:22:16.667Z  INFO 1 --- [           main] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+2026-09-02T12:22:16.668Z  INFO 1 --- [           main] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/10.1.40]
+2026-09-02T12:22:16.702Z  INFO 1 --- [           main] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring embedded WebApplicationContext
+2026-09-02T12:22:16.704Z  INFO 1 --- [           main] w.s.c.ServletWebServerApplicationContext : Root WebApplicationContext: initialization completed in 3443 ms
+2026-09-02T12:22:17.301Z  WARN 1 --- [           main] ConfigServletWebServerApplicationContext : Exception encountered during context initialization - cancelling refresh attempt: org.springframework.beans.factory.BeanCreationException: Error creating bean with name 'identityJwksCache' defined in URL [jar:nested:/opt/onlinejudge/app.jar/!BOOT-INF/classes/!/com/onlinejudge/auth/security/IdentityJwksCache.class]: Unexpected exception during bean creation
+2026-09-02T12:22:17.306Z  INFO 1 --- [           main] o.apache.catalina.core.StandardService   : Stopping service [Tomcat]
+2026-09-02T12:22:17.346Z  INFO 1 --- [           main] .s.b.a.l.ConditionEvaluationReportLogger : 
+
+Error starting ApplicationContext. To display the condition evaluation report re-run your application with 'debug' enabled.
+2026-09-02T12:22:17.367Z ERROR 1 --- [           main] o.s.boot.SpringApplication               : Application run failed
+
+org.springframework.beans.factory.BeanCreationException: Error creating bean with name 'identityJwksCache' defined in URL [jar:nested:/opt/onlinejudge/app.jar/!BOOT-INF/classes/!/com/onlinejudge/auth/security/IdentityJwksCache.class]: Unexpected exception during bean creation
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.createBean(AbstractAutowireCapableBeanFactory.java:542) ~[spring-beans-6.2.6.jar!/:6.2.6]
+	at org.springframework.beans.factory.support.AbstractBeanFactory.lambda$doGetBean$0(AbstractBeanFactory.java:339) ~[spring-beans-6.2.6.jar!/:6.2.6]
+	at org.springframework.beans.factory.support.DefaultSingletonBeanRegistry.getSingleton(DefaultSingletonBeanRegistry.java:371) ~[spring-beans-6.2.6.jar!/:6.2.6]
+	at org.springframework.beans.factory.support.AbstractBeanFactory.doGetBean(AbstractBeanFactory.java:337) ~[spring-beans-6.2.6.jar!/:6.2.6]
+	at org.springframework.beans.factory.support.AbstractBeanFactory.getBean(AbstractBeanFactory.java:202) ~[spring-beans-6.2.6.jar!/:6.2.6]
+	at org.springframework.beans.factory.support.DefaultListableBeanFactory.instantiateSingleton(DefaultListableBeanFactory.java:1221) ~[spring-beans-6.2.6.jar!/:6.2.6]
+	at org.springframework.beans.factory.support.DefaultListableBeanFactory.preInstantiateSingleton(DefaultListableBeanFactory.java:1187) ~[spring-beans-6.2.6.jar!/:6.2.6]
+	at org.springframework.beans.factory.support.DefaultListableBeanFactory.preInstantiateSingletons(DefaultListableBeanFactory.java:1122) ~[spring-beans-6.2.6.jar!/:6.2.6]
+	at org.springframework.context.support.AbstractApplicationContext.finishBeanFactoryInitialization(AbstractApplicationContext.java:987) ~[spring-context-6.2.6.jar!/:6.2.6]
+	at org.springframework.context.support.AbstractApplicationContext.refresh(AbstractApplicationContext.java:627) ~[spring-context-6.2.6.jar!/:6.2.6]
+	at org.springframework.boot.web.servlet.context.ServletWebServerApplicationContext.refresh(ServletWebServerApplicationContext.java:146) ~[spring-boot-3.4.5.jar!/:3.4.5]
+	at org.springframework.boot.SpringApplication.refresh(SpringApplication.java:753) ~[spring-boot-3.4.5.jar!/:3.4.5]
+	at org.springframework.boot.SpringApplication.refreshContext(SpringApplication.java:439) ~[spring-boot-3.4.5.jar!/:3.4.5]
+	at org.springframework.boot.SpringApplication.run(SpringApplication.java:318) ~[spring-boot-3.4.5.jar!/:3.4.5]
+	at org.springframework.boot.SpringApplication.run(SpringApplication.java:1362) ~[spring-boot-3.4.5.jar!/:3.4.5]
+	at org.springframework.boot.SpringApplication.run(SpringApplication.java:1351) ~[spring-boot-3.4.5.jar!/:3.4.5]
+	at com.onlinejudge.OnlineJudgeApplication.main(OnlineJudgeApplication.java:11) ~[!/:0.1.0-SNAPSHOT]
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(Unknown Source) ~[na:na]
+	at java.base/java.lang.reflect.Method.invoke(Unknown Source) ~[na:na]
+	at org.springframework.boot.loader.launch.Launcher.launch(Launcher.java:102) ~[app.jar:0.1.0-SNAPSHOT]
+	at org.springframework.boot.loader.launch.Launcher.launch(Launcher.java:64) ~[app.jar:0.1.0-SNAPSHOT]
+	at org.springframework.boot.loader.launch.JarLauncher.main(JarLauncher.java:40) ~[app.jar:0.1.0-SNAPSHOT]
+Caused by: org.springframework.util.PlaceholderResolutionException: Could not resolve placeholder 'IDENTITY_JWKS_TRUST_BUNDLE' in value "${IDENTITY_JWKS_TRUST_BUNDLE}" <-- "${onlinejudge.identity.jwks.trust-bundle:}"
+	at org.springframework.util.PlaceholderResolutionException.withValue(PlaceholderResolutionException.java:81) ~[spring-core-6.2.6.jar!/:6.2.6]
+	at org.springframework.util.PlaceholderParser$ParsedValue.resolve(PlaceholderParser.java:423) ~[spring-core-6.2.6.jar!/:6.2.6]
+	at org.springframework.util.PlaceholderParser.replacePlaceholders(PlaceholderParser.java:128) ~[spring-core-6.2.6.jar!/:6.2.6]
+	at org.springframework.util.PropertyPlaceholderHelper.parseStringValue(PropertyPlaceholderHelper.java:118) ~[spring-core-6.2.6.jar!/:6.2.6]
+	at org.springframework.util.PropertyPlaceholderHelper.replacePlaceholders(PropertyPlaceholderHelper.java:114) ~[spring-core-6.2.6.jar!/:6.2.6]
+	at org.springframework.core.env.AbstractPropertyResolver.doResolvePlaceholders(AbstractPropertyResolver.java:255) ~[spring-core-6.2.6.jar!/:6.2.6]
+	at org.springframework.core.env.AbstractPropertyResolver.resolveRequiredPlaceholders(AbstractPropertyResolver.java:226) ~[spring-core-6.2.6.jar!/:6.2.6]
+	at org.springframework.context.support.PropertySourcesPlaceholderConfigurer.lambda$processProperties$0(PropertySourcesPlaceholderConfigurer.java:201) ~[spring-context-6.2.6.jar!/:6.2.6]
+	at org.springframework.beans.factory.support.AbstractBeanFactory.resolveEmbeddedValue(AbstractBeanFactory.java:971) ~[spring-beans-6.2.6.jar!/:6.2.6]
+	at org.springframework.beans.factory.support.DefaultListableBeanFactory.doResolveDependency(DefaultListableBeanFactory.java:1649) ~[spring-beans-6.2.6.jar!/:6.2.6]
+	at org.springframework.beans.factory.support.DefaultListableBeanFactory.resolveDependency(DefaultListableBeanFactory.java:1627) ~[spring-beans-6.2.6.jar!/:6.2.6]
+	at org.springframework.beans.factory.support.ConstructorResolver.resolveAutowiredArgument(ConstructorResolver.java:913) ~[spring-beans-6.2.6.jar!/:6.2.6]
+	at org.springframework.beans.factory.support.ConstructorResolver.createArgumentArray(ConstructorResolver.java:791) ~[spring-beans-6.2.6.jar!/:6.2.6]
+	at org.springframework.beans.factory.support.ConstructorResolver.autowireConstructor(ConstructorResolver.java:240) ~[spring-beans-6.2.6.jar!/:6.2.6]
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.autowireConstructor(AbstractAutowireCapableBeanFactory.java:1387) ~[spring-beans-6.2.6.jar!/:6.2.6]
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.createBeanInstance(AbstractAutowireCapableBeanFactory.java:1224) ~[spring-beans-6.2.6.jar!/:6.2.6]
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.doCreateBean(AbstractAutowireCapableBeanFactory.java:569) ~[spring-beans-6.2.6.jar!/:6.2.6]
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.createBean(AbstractAutowireCapableBeanFactory.java:529) ~[spring-beans-6.2.6.jar!/:6.2.6]
+	... 21 common frames omitted
+
+### kubectl --namespace onlinejudge-ci logs deployment/backend --all-containers --tail=200
+
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+
+ :: Spring Boot ::                (v3.4.5)
+
+2026-09-02T12:22:13.100Z  INFO 1 --- [           main] com.onlinejudge.OnlineJudgeApplication   : Starting OnlineJudgeApplication v0.1.0-SNAPSHOT using Java 21.0.12 with PID 1 (/opt/onlinejudge/app.jar started by onlinejudge in /opt/onlinejudge)
+2026-09-02T12:22:13.128Z  INFO 1 --- [           main] com.onlinejudge.OnlineJudgeApplication   : No active profile set, falling back to 1 default profile: "default"
+2026-09-02T12:22:16.647Z  INFO 1 --- [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port 8080 (http)
+2026-09-02T12:22:16.667Z  INFO 1 --- [           main] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+2026-09-02T12:22:16.668Z  INFO 1 --- [           main] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/10.1.40]
+2026-09-02T12:22:16.702Z  INFO 1 --- [           main] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring embedded WebApplicationContext
+2026-09-02T12:22:16.704Z  INFO 1 --- [           main] w.s.c.ServletWebServerApplicationContext : Root WebApplicationContext: initialization completed in 3443 ms
+2026-09-02T12:22:17.301Z  WARN 1 --- [           main] ConfigServletWebServerApplicationContext : Exception encountered during context initialization - cancelling refresh attempt: org.springframework.beans.factory.BeanCreationException: Error creating bean with name 'identityJwksCache' defined in URL [jar:nested:/opt/onlinejudge/app.jar/!BOOT-INF/classes/!/com/onlinejudge/auth/security/IdentityJwksCache.class]: Unexpected exception during bean creation
+2026-09-02T12:22:17.306Z  INFO 1 --- [           main] o.apache.catalina.core.StandardService   : Stopping service [Tomcat]
+2026-09-02T12:22:17.346Z  INFO 1 --- [           main] .s.b.a.l.ConditionEvaluationReportLogger : 
+
+Error starting ApplicationContext. To display the condition evaluation report re-run your application with 'debug' enabled.
+2026-09-02T12:22:17.367Z ERROR 1 --- [           main] o.s.boot.SpringApplication               : Application run failed
+
+org.springframework.beans.factory.BeanCreationException: Error creating bean with name 'identityJwksCache' defined in URL [jar:nested:/opt/onlinejudge/app.jar/!BOOT-INF/classes/!/com/onlinejudge/auth/security/IdentityJwksCache.class]: Unexpected exception during bean creation
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.createBean(AbstractAutowireCapableBeanFactory.java:542) ~[spring-beans-6.2.6.jar!/:6.2.6]
+	at org.springframework.beans.factory.support.AbstractBeanFactory.lambda$doGetBean$0(AbstractBeanFactory.java:339) ~[spring-beans-6.2.6.jar!/:6.2.6]
+	at org.springframework.beans.factory.support.DefaultSingletonBeanRegistry.getSingleton(DefaultSingletonBeanRegistry.java:371) ~[spring-beans-6.2.6.jar!/:6.2.6]
+	at org.springframework.beans.factory.support.AbstractBeanFactory.doGetBean(AbstractBeanFactory.java:337) ~[spring-beans-6.2.6.jar!/:6.2.6]
+	at org.springframework.beans.factory.support.AbstractBeanFactory.getBean(AbstractBeanFactory.java:202) ~[spring-beans-6.2.6.jar!/:6.2.6]
+	at org.springframework.beans.factory.support.DefaultListableBeanFactory.instantiateSingleton(DefaultListableBeanFactory.java:1221) ~[spring-beans-6.2.6.jar!/:6.2.6]
+	at org.springframework.beans.factory.support.DefaultListableBeanFactory.preInstantiateSingleton(DefaultListableBeanFactory.java:1187) ~[spring-beans-6.2.6.jar!/:6.2.6]
+	at org.springframework.beans.factory.support.DefaultListableBeanFactory.preInstantiateSingletons(DefaultListableBeanFactory.java:1122) ~[spring-beans-6.2.6.jar!/:6.2.6]
+	at org.springframework.context.support.AbstractApplicationContext.finishBeanFactoryInitialization(AbstractApplicationContext.java:987) ~[spring-context-6.2.6.jar!/:6.2.6]
+	at org.springframework.context.support.AbstractApplicationContext.refresh(AbstractApplicationContext.java:627) ~[spring-context-6.2.6.jar!/:6.2.6]
+	at org.springframework.boot.web.servlet.context.ServletWebServerApplicationContext.refresh(ServletWebServerApplicationContext.java:146) ~[spring-boot-3.4.5.jar!/:3.4.5]
+	at org.springframework.boot.SpringApplication.refresh(SpringApplication.java:753) ~[spring-boot-3.4.5.jar!/:3.4.5]
+	at org.springframework.boot.SpringApplication.refreshContext(SpringApplication.java:439) ~[spring-boot-3.4.5.jar!/:3.4.5]
+	at org.springframework.boot.SpringApplication.run(SpringApplication.java:318) ~[spring-boot-3.4.5.jar!/:3.4.5]
+	at org.springframework.boot.SpringApplication.run(SpringApplication.java:1362) ~[spring-boot-3.4.5.jar!/:3.4.5]
+	at org.springframework.boot.SpringApplication.run(SpringApplication.java:1351) ~[spring-boot-3.4.5.jar!/:3.4.5]
+	at com.onlinejudge.OnlineJudgeApplication.main(OnlineJudgeApplication.java:11) ~[!/:0.1.0-SNAPSHOT]
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(Unknown Source) ~[na:na]
+	at java.base/java.lang.reflect.Method.invoke(Unknown Source) ~[na:na]
+	at org.springframework.boot.loader.launch.Launcher.launch(Launcher.java:102) ~[app.jar:0.1.0-SNAPSHOT]
+	at org.springframework.boot.loader.launch.Launcher.launch(Launcher.java:64) ~[app.jar:0.1.0-SNAPSHOT]
+	at org.springframework.boot.loader.launch.JarLauncher.main(JarLauncher.java:40) ~[app.jar:0.1.0-SNAPSHOT]
+Caused by: org.springframework.util.PlaceholderResolutionException: Could not resolve placeholder 'IDENTITY_JWKS_TRUST_BUNDLE' in value "${IDENTITY_JWKS_TRUST_BUNDLE}" <-- "${onlinejudge.identity.jwks.trust-bundle:}"
+	at org.springframework.util.PlaceholderResolutionException.withValue(PlaceholderResolutionException.java:81) ~[spring-core-6.2.6.jar!/:6.2.6]
+	at org.springframework.util.PlaceholderParser$ParsedValue.resolve(PlaceholderParser.java:423) ~[spring-core-6.2.6.jar!/:6.2.6]
+	at org.springframework.util.PlaceholderParser.replacePlaceholders(PlaceholderParser.java:128) ~[spring-core-6.2.6.jar!/:6.2.6]
+	at org.springframework.util.PropertyPlaceholderHelper.parseStringValue(PropertyPlaceholderHelper.java:118) ~[spring-core-6.2.6.jar!/:6.2.6]
+	at org.springframework.util.PropertyPlaceholderHelper.replacePlaceholders(PropertyPlaceholderHelper.java:114) ~[spring-core-6.2.6.jar!/:6.2.6]
+	at org.springframework.core.env.AbstractPropertyResolver.doResolvePlaceholders(AbstractPropertyResolver.java:255) ~[spring-core-6.2.6.jar!/:6.2.6]
+	at org.springframework.core.env.AbstractPropertyResolver.resolveRequiredPlaceholders(AbstractPropertyResolver.java:226) ~[spring-core-6.2.6.jar!/:6.2.6]
+	at org.springframework.context.support.PropertySourcesPlaceholderConfigurer.lambda$processProperties$0(PropertySourcesPlaceholderConfigurer.java:201) ~[spring-context-6.2.6.jar!/:6.2.6]
+	at org.springframework.beans.factory.support.AbstractBeanFactory.resolveEmbeddedValue(AbstractBeanFactory.java:971) ~[spring-beans-6.2.6.jar!/:6.2.6]
+	at org.springframework.beans.factory.support.DefaultListableBeanFactory.doResolveDependency(DefaultListableBeanFactory.java:1649) ~[spring-beans-6.2.6.jar!/:6.2.6]
+	at org.springframework.beans.factory.support.DefaultListableBeanFactory.resolveDependency(DefaultListableBeanFactory.java:1627) ~[spring-beans-6.2.6.jar!/:6.2.6]
+	at org.springframework.beans.factory.support.ConstructorResolver.resolveAutowiredArgument(ConstructorResolver.java:913) ~[spring-beans-6.2.6.jar!/:6.2.6]
+	at org.springframework.beans.factory.support.ConstructorResolver.createArgumentArray(ConstructorResolver.java:791) ~[spring-beans-6.2.6.jar!/:6.2.6]
+	at org.springframework.beans.factory.support.ConstructorResolver.autowireConstructor(ConstructorResolver.java:240) ~[spring-beans-6.2.6.jar!/:6.2.6]
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.autowireConstructor(AbstractAutowireCapableBeanFactory.java:1387) ~[spring-beans-6.2.6.jar!/:6.2.6]
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.createBeanInstance(AbstractAutowireCapableBeanFactory.java:1224) ~[spring-beans-6.2.6.jar!/:6.2.6]
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.doCreateBean(AbstractAutowireCapableBeanFactory.java:569) ~[spring-beans-6.2.6.jar!/:6.2.6]
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.createBean(AbstractAutowireCapableBeanFactory.java:529) ~[spring-beans-6.2.6.jar!/:6.2.6]
+	... 21 common frames omitted
+

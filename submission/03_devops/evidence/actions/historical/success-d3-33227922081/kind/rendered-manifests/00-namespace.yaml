@@ -1,0 +1,10 @@
+# Isolated CI namespace for the issue #288 Kind deployment baseline.
+# scripts/kind/k8s-cleanup.sh deletes exactly this namespace; nothing outside
+# it is ever created or removed by the deploy/cleanup entrypoints.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: onlinejudge-ci
+  labels:
+    app.kubernetes.io/part-of: onlinejudge
+    app.kubernetes.io/managed-by: scripts-kind

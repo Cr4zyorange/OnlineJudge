@@ -1,0 +1,21 @@
+$ kubectl --context kind-onlinejudge-ci --namespace onlinejudge-ci get all -o wide
+NAME                            READY   STATUS    RESTARTS   AGE   IP           NODE                           NOMINATED NODE   READINESS GATES
+pod/backend-768668fbdf-4svg2    1/1     Running   0          21s   10.244.0.7   onlinejudge-ci-control-plane   <none>           <none>
+pod/frontend-586c57fd47-6wthq   1/1     Running   0          10s   10.244.0.8   onlinejudge-ci-control-plane   <none>           <none>
+pod/mysql-0                     1/1     Running   0          46s   10.244.0.6   onlinejudge-ci-control-plane   <none>           <none>
+
+NAME               TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)    AGE   SELECTOR
+service/backend    ClusterIP   10.96.220.177   <none>        8080/TCP   21s   app=backend
+service/frontend   ClusterIP   10.96.187.3     <none>        80/TCP     10s   app=frontend
+service/mysql      ClusterIP   None            <none>        3306/TCP   45s   app=mysql
+
+NAME                       READY   UP-TO-DATE   AVAILABLE   AGE   CONTAINERS   IMAGES                                                          SELECTOR
+deployment.apps/backend    1/1     1            1           21s   backend      onlinejudge/backend:5cdbe8533991bb0c7cfbe23e08d81b78d47af483    app=backend
+deployment.apps/frontend   1/1     1            1           10s   frontend     onlinejudge/frontend:5cdbe8533991bb0c7cfbe23e08d81b78d47af483   app=frontend
+
+NAME                                  DESIRED   CURRENT   READY   AGE   CONTAINERS   IMAGES                                                          SELECTOR
+replicaset.apps/backend-768668fbdf    1         1         1       21s   backend      onlinejudge/backend:5cdbe8533991bb0c7cfbe23e08d81b78d47af483    app=backend,pod-template-hash=768668fbdf
+replicaset.apps/frontend-586c57fd47   1         1         1       10s   frontend     onlinejudge/frontend:5cdbe8533991bb0c7cfbe23e08d81b78d47af483   app=frontend,pod-template-hash=586c57fd47
+
+NAME                     READY   AGE   CONTAINERS   IMAGES
+statefulset.apps/mysql   1/1     46s   mysql        mysql:8.4

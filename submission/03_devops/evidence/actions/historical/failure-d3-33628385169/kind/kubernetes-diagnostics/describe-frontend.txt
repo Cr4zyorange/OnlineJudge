@@ -1,0 +1,10 @@
+### kubectl --namespace onlinejudge-ci describe deployment frontend
+
+Error from server (NotFound): deployments.apps "frontend" not found
+
+### command reported failure (captured above)
+### kubectl --namespace onlinejudge-ci describe deployment frontend
+
+Error from server (NotFound): deployments.apps "frontend" not found
+
+### command reported failure (captured above)

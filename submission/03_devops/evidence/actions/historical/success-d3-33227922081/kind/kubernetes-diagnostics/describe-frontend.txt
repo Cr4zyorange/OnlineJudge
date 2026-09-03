@@ -1,0 +1,46 @@
+### kubectl --namespace onlinejudge-ci describe deployment frontend
+
+Name:                   frontend
+Namespace:              onlinejudge-ci
+CreationTimestamp:      Sat, 29 Aug 2026 02:08:15 +0000
+Labels:                 app=frontend
+                        app.kubernetes.io/part-of=onlinejudge
+Annotations:            deployment.kubernetes.io/revision: 1
+Selector:               app=frontend
+Replicas:               1 desired | 1 updated | 1 total | 1 available | 0 unavailable
+StrategyType:           RollingUpdate
+MinReadySeconds:        0
+RollingUpdateStrategy:  0 max unavailable, 1 max surge
+Pod Template:
+  Labels:  app=frontend
+           app.kubernetes.io/part-of=onlinejudge
+  Containers:
+   frontend:
+    Image:      onlinejudge/frontend:5cdbe8533991bb0c7cfbe23e08d81b78d47af483
+    Port:       80/TCP (http)
+    Host Port:  0/TCP (http)
+    Limits:
+      cpu:     200m
+      memory:  128Mi
+    Requests:
+      cpu:         50m
+      memory:      64Mi
+    Liveness:      http-get http://:80/ delay=0s timeout=2s period=20s #success=1 #failure=3
+    Readiness:     http-get http://:80/ delay=0s timeout=2s period=10s #success=1 #failure=3
+    Startup:       http-get http://:80/ delay=0s timeout=2s period=5s #success=1 #failure=24
+    Environment:   <none>
+    Mounts:        <none>
+  Volumes:         <none>
+  Node-Selectors:  <none>
+  Tolerations:     <none>
+Conditions:
+  Type           Status  Reason
+  ----           ------  ------
+  Available      True    MinimumReplicasAvailable
+  Progressing    True    NewReplicaSetAvailable
+OldReplicaSets:  <none>
+NewReplicaSet:   frontend-586c57fd47 (1/1 replicas created)
+Events:
+  Type    Reason             Age   From                   Message
+  ----    ------             ----  ----                   -------
+  Normal  ScalingReplicaSet  10s   deployment-controller  Scaled up replica set frontend-586c57fd47 from 0 to 1

@@ -1,0 +1,18 @@
+# Shared non-sensitive configuration (D3 contract #293 section 4.1).
+# Sensitive values (MYSQL_PASSWORD, MYSQL_ROOT_PASSWORD,
+# ONLINEJUDGE_NOTIFICATIONS_INTERNAL_TOKEN) must never appear here; they are
+# injected at deploy time by scripts/kind/k8s-deploy.sh into the Secret.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: onlinejudge-config
+  namespace: onlinejudge-ci
+  labels:
+    app.kubernetes.io/part-of: onlinejudge
+data:
+  MYSQL_HOST: "mysql"
+  MYSQL_PORT: "3306"
+  MYSQL_DATABASE: "onlinejudge"
+  MYSQL_USER: "onlinejudge"
+  ONLINEJUDGE_DEMO_DATA_ENABLED: "true"
+  ONLINEJUDGE_EVALUATION_SANDBOX_MODE: "fake"

@@ -8,7 +8,7 @@
 | --- | --- | --- | --- |
 | [`01_source/`](01_source/README.md) | 可构建、可运行的前后端、数据库与必要开发脚本 | `backend/`、`frontend/`、`database/`、`scripts/dev/` | 排除依赖、编译产物、本地数据和密钥 |
 | [`02_docs/`](02_docs/README.md) | 需求、系统/构件/对象设计、实现、用户和部署文档 | `docs/最终提交/`、`docs/过程/` | 按用例补齐三层设计追溯关系 |
-| [`03_devops/`](03_devops/README.md) | 容器、CI/CD、Kubernetes、健康检查和 HPA | `deploy/`、`scripts/deploy/`、`.github/workflows/` | 当前仍需补齐 CI/CD、Kubernetes 部署、HPA 与验证证据 |
+| [`03_devops/`](03_devops/README.md) | 容器、CI/CD、Kubernetes、健康检查和 HPA | `deploy/`、`scripts/deploy/`、`.github/workflows/` | issue #379 已归档配置与 Actions 证据；final SHA 的质量门禁/D3 与 HPA 证据仍 BLOCKED，见 `03_devops/ACCEPTANCE.md` |
 | [`04_tests/`](04_tests/README.md) | 单元、API、端到端、回归、故障和性能测试及结果 | 各子工程测试目录、`tests/`、`scripts/test/`、`docs/最终提交/测试文档.md` | 补可执行 E2E、故障注入及 2–3 个接口的同环境多轮性能结果 |
 | [`05_management/`](05_management/README.md) | 计划、分工、看板、日报、会议、风险与评审证据 | Notion、GitHub Project/Issue/PR、`docs/最终提交/软件开发计划书.md` | 每日导出或固化关键证据，保留人员、时间和任务关联 |
 | [`06_defense/`](06_defense/README.md) | 答辩 PPT/PDF、演示脚本、演示数据、备份与问答 | 答辩阶段产物 | 按 4 分钟项目/架构、7 分钟演示、4 分钟问答定稿 |

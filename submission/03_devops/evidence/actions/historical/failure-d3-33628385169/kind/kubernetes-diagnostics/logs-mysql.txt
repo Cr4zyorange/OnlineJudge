@@ -1,0 +1,102 @@
+### kubectl --namespace onlinejudge-ci logs statefulset/mysql --all-containers --tail=200
+
+2026-09-02 12:15:33+00:00 [Note] [Entrypoint]: Entrypoint script for MySQL Server 8.4.11-1.el9 started.
+2026-09-02 12:15:33+00:00 [Note] [Entrypoint]: Switching to dedicated user 'mysql'
+2026-09-02 12:15:33+00:00 [Note] [Entrypoint]: Entrypoint script for MySQL Server 8.4.11-1.el9 started.
+2026-09-02 12:15:34+00:00 [Note] [Entrypoint]: Initializing database files
+2026-09-02T12:15:34.243147Z 0 [System] [MY-015017] [Server] MySQL Server Initialization - start.
+2026-09-02T12:15:34.244173Z 0 [System] [MY-013169] [Server] /usr/sbin/mysqld (mysqld 8.4.11) initializing of server in progress as process 86
+2026-09-02T12:15:34.244208Z 0 [ERROR] [MY-010338] [Server] Can't find error-message file '/usr/share/mysql-8.4/english/errmsg.sys'. Check error-message file location and 'lc-messages-dir' configuration directive.
+2026-09-02T12:15:34.248360Z 1 [System] [MY-013576] [InnoDB] InnoDB initialization has started.
+2026-09-02T12:15:34.444275Z 1 [System] [MY-013577] [InnoDB] InnoDB initialization has ended.
+2026-09-02T12:15:35.034506Z 6 [Warning] [MY-010453] [Server] root@localhost is created with an empty password ! Please consider switching off the --initialize-insecure option.
+2026-09-02T12:15:37.123949Z 0 [System] [MY-015018] [Server] MySQL Server Initialization - end.
+2026-09-02 12:15:37+00:00 [Note] [Entrypoint]: Database files initialized
+2026-09-02 12:15:37+00:00 [Note] [Entrypoint]: Starting temporary server
+2026-09-02T12:15:37.159709Z 0 [System] [MY-015015] [Server] MySQL Server - start.
+2026-09-02T12:15:37.376643Z 0 [System] [MY-010116] [Server] /usr/sbin/mysqld (mysqld 8.4.11) starting as process 125
+2026-09-02T12:15:37.376680Z 0 [ERROR] [MY-010338] [Server] Can't find error-message file '/usr/share/mysql-8.4/english/errmsg.sys'. Check error-message file location and 'lc-messages-dir' configuration directive.
+2026-09-02T12:15:37.390057Z 1 [System] [MY-013576] [InnoDB] InnoDB initialization has started.
+2026-09-02T12:15:37.576776Z 1 [System] [MY-013577] [InnoDB] InnoDB initialization has ended.
+2026-09-02T12:15:37.808631Z 0 [Warning] [MY-010068] [Server] CA certificate ca.pem is self signed.
+2026-09-02T12:15:37.808665Z 0 [System] [MY-013602] [Server] Channel mysql_main configured to support TLS. Encrypted connections are now supported for this channel.
+2026-09-02T12:15:37.810228Z 0 [Warning] [MY-011810] [Server] Insecure configuration for --pid-file: Location '/var/lib/mysql' in the path is accessible to all OS users. Consider choosing a different directory.
+2026-09-02T12:15:37.829327Z 0 [System] [MY-011323] [Server] X Plugin ready for connections. Socket: /var/run/mysqld/mysqlx.sock
+2026-09-02T12:15:37.829700Z 0 [System] [MY-010931] [Server] /usr/sbin/mysqld: ready for connections. Version: '8.4.11'  socket: '/var/lib/mysql/mysql.sock'  port: 0  MySQL Community Server - GPL.
+2026-09-02 12:15:37+00:00 [Note] [Entrypoint]: Temporary server started.
+2026-09-02 12:15:39+00:00 [Note] [Entrypoint]: Creating database onlinejudge
+2026-09-02 12:15:39+00:00 [Note] [Entrypoint]: Creating user onlinejudge
+2026-09-02 12:15:39+00:00 [Note] [Entrypoint]: Giving user onlinejudge access to schema onlinejudge
+
+2026-09-02 12:15:39+00:00 [Note] [Entrypoint]: /usr/local/bin/docker-entrypoint.sh: running /docker-entrypoint-initdb.d/01-schema.sql
+
+
+2026-09-02 12:15:40+00:00 [Note] [Entrypoint]: Stopping temporary server
+2026-09-02T12:15:40.847307Z 14 [System] [MY-013172] [Server] Received SHUTDOWN from user root. Shutting down mysqld (Version: 8.4.11).
+2026-09-02T12:15:42.237568Z 0 [System] [MY-010910] [Server] /usr/sbin/mysqld: Shutdown complete (mysqld 8.4.11)  MySQL Community Server - GPL.
+2026-09-02T12:15:42.237587Z 0 [System] [MY-015016] [Server] MySQL Server - end.
+2026-09-02 12:15:42+00:00 [Note] [Entrypoint]: Temporary server stopped
+
+2026-09-02 12:15:42+00:00 [Note] [Entrypoint]: MySQL init process done. Ready for start up.
+
+2026-09-02T12:15:42.865264Z 0 [System] [MY-015015] [Server] MySQL Server - start.
+2026-09-02T12:15:43.072566Z 0 [System] [MY-010116] [Server] /usr/sbin/mysqld (mysqld 8.4.11) starting as process 1
+2026-09-02T12:15:43.072604Z 0 [ERROR] [MY-010338] [Server] Can't find error-message file '/usr/share/mysql-8.4/english/errmsg.sys'. Check error-message file location and 'lc-messages-dir' configuration directive.
+2026-09-02T12:15:43.077206Z 1 [System] [MY-013576] [InnoDB] InnoDB initialization has started.
+2026-09-02T12:15:43.306972Z 1 [System] [MY-013577] [InnoDB] InnoDB initialization has ended.
+2026-09-02T12:15:43.529687Z 0 [Warning] [MY-010068] [Server] CA certificate ca.pem is self signed.
+2026-09-02T12:15:43.529723Z 0 [System] [MY-013602] [Server] Channel mysql_main configured to support TLS. Encrypted connections are now supported for this channel.
+2026-09-02T12:15:43.531985Z 0 [Warning] [MY-011810] [Server] Insecure configuration for --pid-file: Location '/var/lib/mysql' in the path is accessible to all OS users. Consider choosing a different directory.
+2026-09-02T12:15:43.565229Z 0 [System] [MY-011323] [Server] X Plugin ready for connections. Bind-address: '::' port: 33060, socket: /var/run/mysqld/mysqlx.sock
+2026-09-02T12:15:43.565592Z 0 [System] [MY-010931] [Server] /usr/sbin/mysqld: ready for connections. Version: '8.4.11'  socket: '/var/lib/mysql/mysql.sock'  port: 3306  MySQL Community Server - GPL.
+### kubectl --namespace onlinejudge-ci logs statefulset/mysql --all-containers --tail=200
+
+2026-09-02 12:15:33+00:00 [Note] [Entrypoint]: Entrypoint script for MySQL Server 8.4.11-1.el9 started.
+2026-09-02 12:15:33+00:00 [Note] [Entrypoint]: Switching to dedicated user 'mysql'
+2026-09-02 12:15:33+00:00 [Note] [Entrypoint]: Entrypoint script for MySQL Server 8.4.11-1.el9 started.
+2026-09-02 12:15:34+00:00 [Note] [Entrypoint]: Initializing database files
+2026-09-02T12:15:34.243147Z 0 [System] [MY-015017] [Server] MySQL Server Initialization - start.
+2026-09-02T12:15:34.244173Z 0 [System] [MY-013169] [Server] /usr/sbin/mysqld (mysqld 8.4.11) initializing of server in progress as process 86
+2026-09-02T12:15:34.244208Z 0 [ERROR] [MY-010338] [Server] Can't find error-message file '/usr/share/mysql-8.4/english/errmsg.sys'. Check error-message file location and 'lc-messages-dir' configuration directive.
+2026-09-02T12:15:34.248360Z 1 [System] [MY-013576] [InnoDB] InnoDB initialization has started.
+2026-09-02T12:15:34.444275Z 1 [System] [MY-013577] [InnoDB] InnoDB initialization has ended.
+2026-09-02T12:15:35.034506Z 6 [Warning] [MY-010453] [Server] root@localhost is created with an empty password ! Please consider switching off the --initialize-insecure option.
+2026-09-02T12:15:37.123949Z 0 [System] [MY-015018] [Server] MySQL Server Initialization - end.
+2026-09-02 12:15:37+00:00 [Note] [Entrypoint]: Database files initialized
+2026-09-02 12:15:37+00:00 [Note] [Entrypoint]: Starting temporary server
+2026-09-02T12:15:37.159709Z 0 [System] [MY-015015] [Server] MySQL Server - start.
+2026-09-02T12:15:37.376643Z 0 [System] [MY-010116] [Server] /usr/sbin/mysqld (mysqld 8.4.11) starting as process 125
+2026-09-02T12:15:37.376680Z 0 [ERROR] [MY-010338] [Server] Can't find error-message file '/usr/share/mysql-8.4/english/errmsg.sys'. Check error-message file location and 'lc-messages-dir' configuration directive.
+2026-09-02T12:15:37.390057Z 1 [System] [MY-013576] [InnoDB] InnoDB initialization has started.
+2026-09-02T12:15:37.576776Z 1 [System] [MY-013577] [InnoDB] InnoDB initialization has ended.
+2026-09-02T12:15:37.808631Z 0 [Warning] [MY-010068] [Server] CA certificate ca.pem is self signed.
+2026-09-02T12:15:37.808665Z 0 [System] [MY-013602] [Server] Channel mysql_main configured to support TLS. Encrypted connections are now supported for this channel.
+2026-09-02T12:15:37.810228Z 0 [Warning] [MY-011810] [Server] Insecure configuration for --pid-file: Location '/var/lib/mysql' in the path is accessible to all OS users. Consider choosing a different directory.
+2026-09-02T12:15:37.829327Z 0 [System] [MY-011323] [Server] X Plugin ready for connections. Socket: /var/run/mysqld/mysqlx.sock
+2026-09-02T12:15:37.829700Z 0 [System] [MY-010931] [Server] /usr/sbin/mysqld: ready for connections. Version: '8.4.11'  socket: '/var/lib/mysql/mysql.sock'  port: 0  MySQL Community Server - GPL.
+2026-09-02 12:15:37+00:00 [Note] [Entrypoint]: Temporary server started.
+2026-09-02 12:15:39+00:00 [Note] [Entrypoint]: Creating database onlinejudge
+2026-09-02 12:15:39+00:00 [Note] [Entrypoint]: Creating user onlinejudge
+2026-09-02 12:15:39+00:00 [Note] [Entrypoint]: Giving user onlinejudge access to schema onlinejudge
+
+2026-09-02 12:15:39+00:00 [Note] [Entrypoint]: /usr/local/bin/docker-entrypoint.sh: running /docker-entrypoint-initdb.d/01-schema.sql
+
+
+2026-09-02 12:15:40+00:00 [Note] [Entrypoint]: Stopping temporary server
+2026-09-02T12:15:40.847307Z 14 [System] [MY-013172] [Server] Received SHUTDOWN from user root. Shutting down mysqld (Version: 8.4.11).
+2026-09-02T12:15:42.237568Z 0 [System] [MY-010910] [Server] /usr/sbin/mysqld: Shutdown complete (mysqld 8.4.11)  MySQL Community Server - GPL.
+2026-09-02T12:15:42.237587Z 0 [System] [MY-015016] [Server] MySQL Server - end.
+2026-09-02 12:15:42+00:00 [Note] [Entrypoint]: Temporary server stopped
+
+2026-09-02 12:15:42+00:00 [Note] [Entrypoint]: MySQL init process done. Ready for start up.
+
+2026-09-02T12:15:42.865264Z 0 [System] [MY-015015] [Server] MySQL Server - start.
+2026-09-02T12:15:43.072566Z 0 [System] [MY-010116] [Server] /usr/sbin/mysqld (mysqld 8.4.11) starting as process 1
+2026-09-02T12:15:43.072604Z 0 [ERROR] [MY-010338] [Server] Can't find error-message file '/usr/share/mysql-8.4/english/errmsg.sys'. Check error-message file location and 'lc-messages-dir' configuration directive.
+2026-09-02T12:15:43.077206Z 1 [System] [MY-013576] [InnoDB] InnoDB initialization has started.
+2026-09-02T12:15:43.306972Z 1 [System] [MY-013577] [InnoDB] InnoDB initialization has ended.
+2026-09-02T12:15:43.529687Z 0 [Warning] [MY-010068] [Server] CA certificate ca.pem is self signed.
+2026-09-02T12:15:43.529723Z 0 [System] [MY-013602] [Server] Channel mysql_main configured to support TLS. Encrypted connections are now supported for this channel.
+2026-09-02T12:15:43.531985Z 0 [Warning] [MY-011810] [Server] Insecure configuration for --pid-file: Location '/var/lib/mysql' in the path is accessible to all OS users. Consider choosing a different directory.
+2026-09-02T12:15:43.565229Z 0 [System] [MY-011323] [Server] X Plugin ready for connections. Bind-address: '::' port: 33060, socket: /var/run/mysqld/mysqlx.sock
+2026-09-02T12:15:43.565592Z 0 [System] [MY-010931] [Server] /usr/sbin/mysqld: ready for connections. Version: '8.4.11'  socket: '/var/lib/mysql/mysql.sock'  port: 3306  MySQL Community Server - GPL.
