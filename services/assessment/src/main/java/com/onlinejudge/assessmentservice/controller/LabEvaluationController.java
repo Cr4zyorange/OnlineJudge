@@ -232,7 +232,7 @@ public class LabEvaluationController {
     public ResponseEntity<byte[]> downloadSubmissionSource(@PathVariable long labId, @PathVariable String submissionId,
             @RequestAttribute("assessment.currentUser") CurrentUser user) {
         if (!user.hasRole("TEACHER") && !user.hasRole("ADMIN")) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "LAB source download is restricted to course managers");
+            throw new LabAccessDeniedException("LAB source download is restricted to course managers");
         }
         LabExperimentService.LabSummary lab = findLab(labId);
         if (!canManage(lab, user)) {

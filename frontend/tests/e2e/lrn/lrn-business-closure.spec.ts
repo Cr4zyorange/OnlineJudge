@@ -107,11 +107,20 @@ test.describe('@lrn UC-LRN-01 business closure', () => {
     await page.getByTestId(`notification-select-${homeworkNotice.notificationId}`).check();
     await page.getByTestId('mark-selected-read').click();
     await expect(page.getByTestId(`notification-card-${homeworkNotice.notificationId}`)).not.toContainText('未读');
+    const deleted = page.waitForResponse((response) => (
+      response.request().method() === 'DELETE'
+        && new URL(response.url()).pathname === `/api/v1/notifications/${homeworkNotice.notificationId}`
+    ));
     await page.getByTestId(`delete-notification-${homeworkNotice.notificationId}`).click();
+    expect((await deleted).status()).toBe(200);
     await expect(page.getByTestId(`notification-card-${homeworkNotice.notificationId}`)).toHaveCount(0);
 
+    await expect.poll(async () => (await notificationPage(page, studentHeaders)).records
+      .some((notice) => notice.notificationId === homeworkNotice.notificationId), {
+      intervals: [50, 100, 250],
+      timeout: 5_000
+    }).toBe(false);
     const finalList = await notificationPage(page, studentHeaders);
-    expect(finalList.records.some((notice) => notice.notificationId === homeworkNotice.notificationId)).toBe(false);
     expect(finalList.records.some((notice) => notice.notificationId === gradeNotice.notificationId)).toBe(true);
     expect(student.id).toBeGreaterThan(0);
   });

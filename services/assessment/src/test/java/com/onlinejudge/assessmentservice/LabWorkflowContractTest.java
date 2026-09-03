@@ -215,7 +215,8 @@ class LabWorkflowContractTest {
 
         mockMvc.perform(get("/api/v1/labs/{labId}/submissions/{submissionId}/source/download", labId, submissionId)
                         .header("Authorization", "Bearer " + studentToken))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ERR-AUTH-05"));
         mockMvc.perform(get("/api/v1/labs/{labId}/submissions/{submissionId}/source/download", labId, submissionId)
                         .header("Authorization", "Bearer " + teacherToken))
                 .andExpect(status().isOk())
