@@ -156,6 +156,12 @@ class CourseApiCoverageTest {
                 VALUES (922, ?, 'coverage-notification-1', '覆盖测试通知', '内容', 'SYSTEM_ANNOUNCEMENT', 1,
                         FALSE, 'SYS', 1, CURRENT_TIMESTAMP)
                 """, Long.parseLong(courseId));
+        Long notificationId = jdbcTemplate.queryForObject(
+                "SELECT id FROM lrn_notification WHERE user_id = ? AND idempotency_key = ?",
+                Long.class,
+                922L,
+                "coverage-notification-1"
+        );
         String student = userToken("922", List.of("STUDENT"));
 
         mockMvc.perform(get("/api/v1/notifications")
@@ -174,7 +180,7 @@ class CourseApiCoverageTest {
                 .andExpect(jsonPath("$.code").value("0"))
                 .andExpect(jsonPath("$.data.updatedCount").value(1));
 
-        mockMvc.perform(delete("/api/v1/notifications/{notificationId}", 1L)
+        mockMvc.perform(delete("/api/v1/notifications/{notificationId}", notificationId)
                         .header("Authorization", student)
                         .header("X-Request-Id", "9d2ff3f0-0e29-4b5f-9432-cc9ec51ac910"))
                 .andExpect(status().isOk())

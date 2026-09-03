@@ -215,7 +215,7 @@ const scoreBuckets = [
 
 const detail = ref<LabExperimentDetail | null>(null);
 const statistics = ref<LabStatistics | null>(null);
-const studentNames = ref<Record<number, string>>({});
+const studentNames = ref<Record<string, string>>({});
 const loading = ref(false);
 const errorMessage = ref('');
 const studentNameWarning = ref('');
@@ -246,7 +246,7 @@ const distributionAriaLabel = computed(() => {
   return `分数分布柱状图：${summary}`;
 });
 const unsubmittedStudents = computed(() => (statistics.value?.unsubmittedStudentIds ?? []).map((studentId) => {
-  const synchronizedName = studentNames.value[studentId]?.trim();
+  const synchronizedName = studentNames.value[String(studentId)]?.trim();
   const name = synchronizedName || '姓名暂不可用';
   return {
     id: studentId,
@@ -302,7 +302,7 @@ async function loadPage() {
     return;
   }
 
-  if (statisticsResult.value.labId !== targetLabId || statisticsResult.value.courseId !== targetCourseId) {
+  if (statisticsResult.value.labId !== targetLabId || Number(statisticsResult.value.courseId) !== targetCourseId) {
     errorMessage.value = '实验统计归属与当前页面不一致，请重新加载。';
     loading.value = false;
     return;
@@ -320,11 +320,11 @@ async function loadPage() {
   if (progressResult.status === 'fulfilled') {
     studentNames.value = Object.fromEntries(
       progressResult.value.students
-        .map((student) => [student.studentId, student.studentName.trim()] as const)
+        .map((student) => [String(student.studentId), student.studentName.trim()] as const)
         .filter((entry) => Boolean(entry[1]))
     );
     const hasMissingNames = statisticsResult.value.unsubmittedStudentIds.some(
-      (studentId) => !studentNames.value[studentId]
+      (studentId) => !studentNames.value[String(studentId)]
     );
     if (hasMissingNames) {
       studentNameWarning.value = '部分学生姓名尚未同步，已使用待补充名称。';

@@ -83,10 +83,10 @@ describe('application router access contract', () => {
       props: { courseId: 42, labId: 9 }
     },
     {
-      path: '/courses/42/labs/9/manage/submissions/55',
+      path: '/courses/42/labs/9/manage/submissions/5f02eb1c-e1d4-437a-bd05-03b70c9327e9',
       routeName: 'lab-submission-review',
       uiIds: ['UI-LAB-06'],
-      props: { courseId: 42, labId: 9, submissionId: 55 }
+      props: { courseId: 42, labId: 9, submissionId: '5f02eb1c-e1d4-437a-bd05-03b70c9327e9' }
     },
     {
       path: '/courses/42/labs/9/manage/statistics',
@@ -444,10 +444,10 @@ describe('application router access contract', () => {
     },
     {
       label: 'historic result',
-      path: '/courses/42/labs/9/submissions/55/result',
+      path: '/courses/42/labs/9/submissions/0d25ce84-3a65-4dc8-8a82-7333f55c9143/result',
       routeName: 'lab-submission-result',
       uiIds: ['UI-LAB-07'],
-      props: { courseId: 42, labId: 9, submissionId: 55 }
+      props: { courseId: 42, labId: 9, submissionId: '0d25ce84-3a65-4dc8-8a82-7333f55c9143' }
     }
   ])('exposes the $label LAB student route contract', async ({ path, routeName, uiIds, props }) => {
     const router = createAppRouter({

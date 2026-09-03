@@ -66,7 +66,7 @@ test.describe('@auth AUTH real-application scenarios', () => {
       const failed = await request.post('/api/v1/auth/login', {
         data: { account: account.username, password: 'wrong-password' }
       });
-      expect(failed.status()).toBe(401);
+      expect(failed.status()).toBe(attempt === 4 ? 403 : 401);
     }
 
     await page.goto('/login');

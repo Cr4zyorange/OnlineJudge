@@ -63,7 +63,7 @@ class WorkerCompletionService {
                         UPDATE assessment_homework_submission
                            SET evaluation_status = ?, auto_score = ?, final_score = ?
                          WHERE submission_id = ?
-                        """, terminal.status(), terminal.successful() ? terminal.score() : null,
+                        """, terminal.status(), terminal.score(),
                         terminal.successful() ? terminal.score() : null, task.submissionId());
                 appendHomeworkEvaluation(task, terminal, finished);
             }
@@ -99,7 +99,7 @@ class WorkerCompletionService {
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, task.id(), task.generation(), task.submissionId(), Long.parseLong(task.sourceId()), task.studentId(),
                 task.generation() > 1 ? "REJUDGE" : "CODE_JUDGE", outcome.status(),
-                outcome.successful() ? outcome.score() : null, outcome.fullScore(), finished, finished);
+                outcome.score(), outcome.fullScore(), finished, finished);
     }
 
     private boolean shouldPublishSourceGrade(EvaluationTask task) {

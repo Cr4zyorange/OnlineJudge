@@ -1,5 +1,10 @@
-map $http_x_request_id $gateway_request_id {
+map $request_id $gateway_generated_request_id {
+    "~^(?<gateway_request_part_1>[0-9A-Fa-f]{8})(?<gateway_request_part_2>[0-9A-Fa-f]{4})(?<gateway_request_part_3>[0-9A-Fa-f]{4})(?<gateway_request_part_4>[0-9A-Fa-f]{4})(?<gateway_request_part_5>[0-9A-Fa-f]{12})$" $gateway_request_part_1-$gateway_request_part_2-$gateway_request_part_3-$gateway_request_part_4-$gateway_request_part_5;
     default $request_id;
+}
+
+map $http_x_request_id $gateway_request_id {
+    default $gateway_generated_request_id;
     "~^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" $http_x_request_id;
 }
 
@@ -76,6 +81,12 @@ server {
 
     location ^~ /api/v1/auth/ {
         limit_req zone=identity_limit burst=10 nodelay;
+        include /etc/nginx/includes/proxy-request-headers.conf;
+        proxy_pass http://__IDENTITY_UPSTREAM__;
+    }
+
+    location = /api/v1/system/health {
+        limit_req zone=read_limit burst=60 nodelay;
         include /etc/nginx/includes/proxy-request-headers.conf;
         proxy_pass http://__IDENTITY_UPSTREAM__;
     }

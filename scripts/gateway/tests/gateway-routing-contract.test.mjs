@@ -71,6 +71,8 @@ assert.match(template, /error_page 429 = @gateway_rate_limited;/);
 assert.match(template, /error_page 502 = @gateway_bad_gateway;/);
 assert.match(template, /error_page 503 = @gateway_unavailable;/);
 assert.match(template, /error_page 504 = @gateway_timeout;/);
+assert.match(template, /map \$request_id \$gateway_generated_request_id \{/);
+assert.match(template, /default \$gateway_generated_request_id;/);
 assert.match(template, /add_header X-Request-Id \$gateway_request_id always;/);
 
 const assessmentCourseRoute = template.indexOf(

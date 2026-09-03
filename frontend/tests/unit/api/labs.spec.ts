@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { getLabDetail } from '../../../src/api/lab/labs';
 import { request, requestBlob } from '../../../src/api/http';
+import type { LabExperimentDetail } from '../../../src/types/lab';
 
 vi.mock('../../../src/api/http', () => ({
   configureAuthContext: vi.fn(),
@@ -7,9 +9,22 @@ vi.mock('../../../src/api/http', () => ({
   requestBlob: vi.fn()
 }));
 
-describe('lab api blob downloads', () => {
+describe('LAB API adapters', () => {
   beforeEach(() => {
     vi.resetAllMocks();
+  });
+
+  it('normalizes an Assessment service course ID before exposing experiment detail to views', async () => {
+    vi.mocked(request).mockResolvedValue({
+      id: 7,
+      courseId: '101',
+      title: '容器评测实验'
+    } as unknown as LabExperimentDetail);
+
+    await expect(getLabDetail(7)).resolves.toEqual(expect.objectContaining({
+      id: 7,
+      courseId: 101
+    }));
   });
 
   it('downloads lab reports through the authenticated blob request helper', async () => {
@@ -28,7 +43,7 @@ describe('lab api blob downloads', () => {
     expect(result).toBe(response);
   });
 
-  it('downloads a submission source through the controlled teacher blob endpoint', async () => {
+  it('preserves the Assessment UUID submission identifier for controlled source downloads', async () => {
     const response = {
       blob: new Blob(['print("source")'], { type: 'text/x-python' }),
       filename: 'source-v3.py'
@@ -39,11 +54,13 @@ describe('lab api blob downloads', () => {
     const result = await (labApiModule as {
       downloadLabSubmissionSource: (
         labId: number,
-        submissionId: number
+        submissionId: string
       ) => Promise<typeof response>;
-    }).downloadLabSubmissionSource(13, 301);
+    }).downloadLabSubmissionSource(13, '0d25ce84-3a65-4dc8-8a82-7333f55c9143');
 
-    expect(requestBlob).toHaveBeenCalledWith('/api/v1/labs/13/submissions/301/source/download');
+    expect(requestBlob).toHaveBeenCalledWith(
+      '/api/v1/labs/13/submissions/0d25ce84-3a65-4dc8-8a82-7333f55c9143/source/download'
+    );
     expect(result).toBe(response);
   });
 

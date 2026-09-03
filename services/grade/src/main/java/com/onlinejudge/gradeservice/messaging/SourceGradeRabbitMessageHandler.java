@@ -1,8 +1,11 @@
 package com.onlinejudge.gradeservice.messaging;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.onlinejudge.gradeservice.service.SourceGradeProjectionService;
 import org.springframework.stereotype.Component;
+
+import java.io.IOException;
 
 @Component
 public class SourceGradeRabbitMessageHandler {
@@ -15,11 +18,16 @@ public class SourceGradeRabbitMessageHandler {
     }
 
     public SourceGradeProjectionService.ApplyResult handle(byte[] body) {
+        var root = parse(body);
+        // Projection failures are retryable infrastructure/business failures,
+        // not malformed wire facts. Let the AMQP consumer requeue them.
+        return projection.apply(SourceGradeChangedEnvelope.parse(root));
+    }
+
+    private JsonNode parse(byte[] body) {
         try {
-            return projection.apply(SourceGradeChangedEnvelope.parse(json.readTree(body)));
-        } catch (IllegalArgumentException invalid) {
-            throw invalid;
-        } catch (Exception malformed) {
+            return json.readTree(body);
+        } catch (IOException malformed) {
             throw new IllegalArgumentException("invalid assessment.source-grade.changed.v2 JSON", malformed);
         }
     }

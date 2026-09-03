@@ -132,7 +132,7 @@ run_check "validate-workflows has no needs" test -z "$validate_needs"
 run_check "backend-gate needs validate-workflows" test "$backend_needs" = "validate-workflows"
 run_check "frontend-gate needs validate-workflows" test "$frontend_needs" = "validate-workflows"
 run_check "contracts-gate needs validate-workflows" test "$contracts_needs" = "validate-workflows"
-run_check "browser-e2e-gate needs compile, frontend, and contract gates" test "$browser_e2e_needs" = "backend-gate,frontend-gate,contracts-gate"
+run_check "browser-e2e-gate starts after workflow validation and alongside quality gates" test "$browser_e2e_needs" = "validate-workflows"
 run_check "delivery needs every quality gate" test "$delivery_norm" = "backend-gate,browser-e2e-gate,contracts-gate,frontend-gate,validate-workflows"
 # GitHub Actions adds a default success() condition to jobs.  Any explicit
 # delivery job `if` could replace it (for example failure()), allowing delivery

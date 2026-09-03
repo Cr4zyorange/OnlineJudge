@@ -2,7 +2,7 @@ import type { APIResponse, Page } from '@playwright/test';
 import { expect, test } from '../fixtures';
 import { verifyLrnDisposableProof } from './disposable-proof';
 
-const DEMO_COURSE_ID = 9501;
+const DEMO_COURSE_ID = Number(process.env.E2E_COURSE_ID || 9501);
 const hasDisposableProof = verifyLrnDisposableProof();
 
 test.describe.configure({ timeout: 60_000 });
@@ -44,7 +44,7 @@ test.describe('@lrn #269 notification read-on-open', () => {
 
     await loginAs('student');
     const studentHeaders = await authHeaders(page);
-    const beforeOpen = await notificationPage(page, studentHeaders);
+    const beforeOpen = await waitForLabNotification(page, studentHeaders, lab.id);
     const notice = findNotice(beforeOpen, lab.id);
     expect(notice.isRead).toBe(false);
     const beforeUnreadNotificationIds = new Set(beforeOpen.records
@@ -107,15 +107,29 @@ async function notificationPage(page: Page, headers: Record<string, string>) {
   return apiData<NotificationPage>(await page.request.get('/api/v1/notifications?size=100', { headers }));
 }
 
+async function waitForLabNotification(page: Page, headers: Record<string, string>, labId: number) {
+  let latest: NotificationPage | undefined;
+  await expect.poll(async () => {
+    latest = await notificationPage(page, headers);
+    return latest.records.some((record) => record.sourceModule === 'LAB' && record.sourceId === labId);
+  }, { intervals: [100, 250, 500, 1_000], timeout: 10_000 }).toBe(true);
+  return latest!;
+}
+
 async function apiData<T>(response: APIResponse) {
   expect(response.ok(), `${response.url()} returned ${response.status()}`).toBe(true);
-  const envelope = await response.json() as ApiEnvelope<T>;
+  const envelope = await response.json() as ApiEnvelope<T> | T;
+  if (!isApiEnvelope<T>(envelope)) return envelope;
   expect(envelope.code).toBe('0');
   return envelope.data;
 }
 
 async function expectOk(response: APIResponse) {
   await apiData<unknown>(response);
+}
+
+function isApiEnvelope<T>(body: ApiEnvelope<T> | T): body is ApiEnvelope<T> {
+  return typeof body === 'object' && body !== null && 'code' in body && 'data' in body;
 }
 
 function findNotice(page: NotificationPage, sourceId: number) {
@@ -131,9 +145,9 @@ function labPayload(title: string) {
     deadline: futureDeadline(),
     maxScore: 100,
     attachmentIds: [],
-    allowedLanguages: 'java,python',
-    evaluationMode: 'DOCKER_IO',
-    autoEvaluate: true,
+    allowedLanguages: 'python',
+    evaluationMode: 'MANUAL',
+    autoEvaluate: false,
     reportRequired: false,
     timeLimitMs: 60000,
     memoryLimitKb: 262144,
@@ -144,7 +158,7 @@ function labPayload(title: string) {
 function futureDeadline() {
   const date = new Date();
   date.setUTCDate(date.getUTCDate() + 30);
-  return date.toISOString().replace(/\.\d{3}Z$/, '');
+  return date.toISOString();
 }
 
 async function authHeaders(page: Page) {

@@ -94,6 +94,8 @@ public class HomeworkEvaluationController {
         data.put("submissionId", submission.publicSubmissionId());
         data.put("taskId", replayed.id());
         data.put("taskState", replayed.state().name());
+        data.put("evaluationStatus", "PENDING");
+        data.put("reevaluation", true);
         data.put("generation", replayed.generation());
         data.put("requestId", requestId);
         return success(data);
@@ -152,7 +154,7 @@ public class HomeworkEvaluationController {
 
     private static Map<String, Object> success(Map<String, Object> data) {
         Map<String, Object> response = new LinkedHashMap<>();
-        response.put("code", 0);
+        response.put("code", "0");
         response.put("message", "success");
         response.put("data", data);
         return response;

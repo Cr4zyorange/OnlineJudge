@@ -29,6 +29,7 @@ import java.math.BigDecimal;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -64,7 +65,9 @@ class HomeworkWorkflowContractTest {
         jdbc.update("DELETE FROM assessment_source_grade_snapshot");
         jdbc.update("DELETE FROM assessment_source_grade");
         jdbc.update("DELETE FROM evaluation_task");
+        jdbc.update("DELETE FROM assessment_homework_attachment");
         jdbc.update("DELETE FROM assessment_homework_submission");
+        jdbc.update("DELETE FROM assessment_homework_question");
         jdbc.update("DELETE FROM assessment_submission");
         jdbc.update("DELETE FROM assessment_homework_testcase");
         jdbc.update("DELETE FROM assessment_homework");
@@ -115,6 +118,260 @@ class HomeworkWorkflowContractTest {
     }
 
     @Test
+    void objectiveHomeworkPreservesTheTeacherKeyAndScoresTheStudentAnswerWithoutLeakingIt() throws Exception {
+        String teacherId = "teacher-objective-" + UUID.randomUUID();
+        String studentId = "student-objective-" + UUID.randomUUID();
+        String teacherToken = TestJwtFactory.userToken(KEY, "homework-workflow-kid", teacherId, List.of("TEACHER"));
+        String studentToken = TestJwtFactory.userToken(KEY, "homework-workflow-kid", studentId, List.of("STUDENT"));
+        jdbc.update("INSERT INTO assessment_course_member_projection (course_id, user_id, membership_status, member_version) VALUES ('9501', ?, 'ACTIVE', 1)", teacherId);
+        jdbc.update("INSERT INTO assessment_course_member_projection (course_id, user_id, membership_status, member_version) VALUES ('9501', ?, 'ACTIVE', 1)", studentId);
+        when(coursePermissions.canManageCourse("9501", teacherId)).thenReturn(true);
+
+        String created = mockMvc.perform(post("/api/v1/homeworks")
+                        .header("Authorization", "Bearer " + teacherToken)
+                        .header("X-Request-Id", UUID.randomUUID().toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"courseId":9501,"title":"objective browser contract","description":"browser payload",
+                                 "type":"OBJECTIVE","deadline":"2030-01-01T12:00:00Z","totalScore":100,"allowResubmit":true,
+                                 "allowLateSubmit":false,"questions":[{"questionType":"SINGLE_CHOICE","stem":"1 + 1 = ?","optionsJson":"[\\"1\\",\\"2\\"]","answerJson":"[\\"2\\"]","score":100,"sortOrder":1}],"testCases":[]}
+                                """))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        long homeworkId = mapper.readTree(created).path("id").asLong();
+        mockMvc.perform(put("/api/v1/homeworks/{homeworkId}/publish", homeworkId)
+                        .header("Authorization", "Bearer " + teacherToken).header("X-Request-Id", UUID.randomUUID().toString()))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/v1/homeworks/{homeworkId}", homeworkId).header("Authorization", "Bearer " + studentToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.questions[0].answerJson").doesNotExist());
+        mockMvc.perform(post("/api/v1/homeworks/{homeworkId}/submissions", homeworkId)
+                        .header("Authorization", "Bearer " + studentToken).header("X-Request-Id", UUID.randomUUID().toString())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"answerJson\":\"{\\\"q1\\\":[\\\"2\\\"]}\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.submitType").value("OBJECTIVE"))
+                .andExpect(jsonPath("$.data.evaluationStatus").value("ACCEPTED"))
+                .andExpect(jsonPath("$.data.autoScore").value(100));
+    }
+
+    @Test
+    void homeworkStatisticsDenyStudentsWithFrozenCodeAndAggregateTheActiveRosterForManagers() throws Exception {
+        String courseId = "course-statistics-320";
+        String teacherId = "320101";
+        String submittedStudentId = "320102";
+        String unsubmittedStudentId = "320103";
+        String teacherToken = TestJwtFactory.userToken(KEY, "homework-workflow-kid", teacherId, List.of("TEACHER"));
+        String studentToken = TestJwtFactory.userToken(KEY, "homework-workflow-kid", submittedStudentId, List.of("STUDENT"));
+        String nonManagingTeacherToken = TestJwtFactory.userToken(KEY, "homework-workflow-kid", "320104", List.of("TEACHER"));
+        jdbc.update("INSERT INTO assessment_course_member_projection (course_id, user_id, membership_status, member_version) VALUES (?, ?, 'ACTIVE', 1)", courseId, teacherId);
+        jdbc.update("INSERT INTO assessment_course_member_projection (course_id, user_id, membership_status, member_version) VALUES (?, ?, 'ACTIVE', 1)", courseId, submittedStudentId);
+        jdbc.update("INSERT INTO assessment_course_member_projection (course_id, user_id, membership_status, member_version) VALUES (?, ?, 'ACTIVE', 1)", courseId, unsubmittedStudentId);
+        when(coursePermissions.canManageCourse(courseId, teacherId)).thenReturn(true);
+
+        String created = mockMvc.perform(post("/api/v1/homeworks")
+                        .header("Authorization", "Bearer " + teacherToken)
+                        .header("X-Request-Id", UUID.randomUUID().toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"courseId":"%s","title":"statistics contract","description":"active roster aggregate",
+                                 "type":"OBJECTIVE","deadline":"2030-01-01T12:00:00Z","totalScore":100,"allowResubmit":true,
+                                 "allowLateSubmit":false,"questions":[{"questionType":"SINGLE_CHOICE","stem":"1 + 1 = ?","optionsJson":"[\\"1\\",\\"2\\"]","answerJson":"[\\"2\\"]","score":100,"sortOrder":1}],"testCases":[]}
+                                """.formatted(courseId)))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        long homeworkId = mapper.readTree(created).path("id").asLong();
+        mockMvc.perform(put("/api/v1/homeworks/{homeworkId}/publish", homeworkId)
+                        .header("Authorization", "Bearer " + teacherToken)
+                        .header("X-Request-Id", UUID.randomUUID().toString()))
+                .andExpect(status().isOk());
+        mockMvc.perform(post("/api/v1/homeworks/{homeworkId}/submissions", homeworkId)
+                        .header("Authorization", "Bearer " + studentToken)
+                        .header("X-Request-Id", UUID.randomUUID().toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"answerJson\":\"{\\\"q1\\\":[\\\"2\\\"]}\"}"))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(get("/api/v1/homeworks/{homeworkId}/statistics", homeworkId)
+                        .header("Authorization", "Bearer " + studentToken))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("HWK_4031"))
+                .andExpect(jsonPath("$.data").doesNotExist());
+        mockMvc.perform(get("/api/v1/homeworks/{homeworkId}/statistics", homeworkId)
+                        .header("Authorization", "Bearer " + nonManagingTeacherToken))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("HWK_4031"))
+                .andExpect(jsonPath("$.data").doesNotExist());
+
+        mockMvc.perform(get("/api/v1/homeworks/{homeworkId}/statistics", homeworkId)
+                        .param("page", "1").param("size", "1")
+                        .header("Authorization", "Bearer " + teacherToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"))
+                .andExpect(jsonPath("$.data.homeworkId").value(homeworkId))
+                .andExpect(jsonPath("$.data.courseId").value(courseId))
+                .andExpect(jsonPath("$.data.totalStudentCount").value(2))
+                .andExpect(jsonPath("$.data.submittedCount").value(1))
+                .andExpect(jsonPath("$.data.unsubmittedCount").value(1))
+                .andExpect(jsonPath("$.data.autoEvaluableCount").value(1))
+                .andExpect(jsonPath("$.data.pendingEvaluationCount").value(0))
+                .andExpect(jsonPath("$.data.evaluatedCount").value(1))
+                .andExpect(jsonPath("$.data.pendingReviewCount").value(0))
+                .andExpect(jsonPath("$.data.reviewedCount").value(1))
+                .andExpect(jsonPath("$.data.scoredCount").value(1))
+                .andExpect(jsonPath("$.data.averageScore").value(100))
+                .andExpect(jsonPath("$.data.maxScore").value(100))
+                .andExpect(jsonPath("$.data.minScore").value(100))
+                .andExpect(jsonPath("$.data.scoreDistribution['90-100']").value(1))
+                .andExpect(jsonPath("$.data.unsubmittedPage").value(1))
+                .andExpect(jsonPath("$.data.unsubmittedSize").value(1))
+                .andExpect(jsonPath("$.data.unsubmittedTotal").value(1))
+                .andExpect(jsonPath("$.data.unsubmittedStudentIds[0]").value(320103));
+        mockMvc.perform(get("/api/v1/homeworks/{homeworkId}/statistics", homeworkId)
+                        .param("page", Integer.toString(Integer.MAX_VALUE)).param("size", "100")
+                        .header("Authorization", "Bearer " + teacherToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.unsubmittedPage").value(Integer.MAX_VALUE))
+                .andExpect(jsonPath("$.data.unsubmittedSize").value(100))
+                .andExpect(jsonPath("$.data.unsubmittedTotal").value(1))
+                .andExpect(jsonPath("$.data.unsubmittedStudentIds").isEmpty());
+    }
+
+    @Test
+    void codeHomeworkAcceptsTheFrontendLanguageAndTestcasePayload() throws Exception {
+        String teacherId = "teacher-code-browser-" + UUID.randomUUID();
+        String studentId = "student-code-browser-" + UUID.randomUUID();
+        String teacherToken = TestJwtFactory.userToken(KEY, "homework-workflow-kid", teacherId, List.of("TEACHER"));
+        String studentToken = TestJwtFactory.userToken(KEY, "homework-workflow-kid", studentId, List.of("STUDENT"));
+        jdbc.update("INSERT INTO assessment_course_member_projection (course_id, user_id, membership_status, member_version) VALUES ('9501', ?, 'ACTIVE', 1)", teacherId);
+        jdbc.update("INSERT INTO assessment_course_member_projection (course_id, user_id, membership_status, member_version) VALUES ('9501', ?, 'ACTIVE', 1)", studentId);
+        when(coursePermissions.canManageCourse("9501", teacherId)).thenReturn(true);
+
+        String created = mockMvc.perform(post("/api/v1/homeworks")
+                        .header("Authorization", "Bearer " + teacherToken).header("X-Request-Id", UUID.randomUUID().toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"courseId":9501,"title":"code browser contract","description":"browser payload",
+                                 "type":"CODE","deadline":"2030-01-01T12:00:00Z","totalScore":100,"allowResubmit":true,
+                                 "allowLateSubmit":false,"languageLimitJson":"[\\"python\\"]",
+                                 "testCases":[{"inputData":"1 2","expectedOutput":"3","scoreWeight":100,"hidden":false,"sortOrder":1}]}
+                                """))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        long homeworkId = mapper.readTree(created).path("id").asLong();
+        mockMvc.perform(put("/api/v1/homeworks/{homeworkId}/publish", homeworkId)
+                        .header("Authorization", "Bearer " + teacherToken).header("X-Request-Id", UUID.randomUUID().toString()))
+                .andExpect(status().isOk());
+        mockMvc.perform(post("/api/v1/homeworks/{homeworkId}/submissions", homeworkId)
+                        .header("Authorization", "Bearer " + studentToken).header("X-Request-Id", UUID.randomUUID().toString())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"codeText\":\"print(3)\",\"language\":\"python\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.submitType").value("CODE"))
+                .andExpect(jsonPath("$.data.evaluationStatus").value("PENDING"));
+    }
+
+    @Test
+    void fileHomeworkRejectsDisguisedPdfThenBindsTheStudentOwnedTextAttachment() throws Exception {
+        String teacherId = "teacher-file-browser-" + UUID.randomUUID();
+        String studentId = "student-file-browser-" + UUID.randomUUID();
+        String teacherToken = TestJwtFactory.userToken(KEY, "homework-workflow-kid", teacherId, List.of("TEACHER"));
+        String studentToken = TestJwtFactory.userToken(KEY, "homework-workflow-kid", studentId, List.of("STUDENT"));
+        jdbc.update("INSERT INTO assessment_course_member_projection (course_id, user_id, membership_status, member_version) VALUES ('9501', ?, 'ACTIVE', 1)", teacherId);
+        jdbc.update("INSERT INTO assessment_course_member_projection (course_id, user_id, membership_status, member_version) VALUES ('9501', ?, 'ACTIVE', 1)", studentId);
+        when(coursePermissions.canManageCourse("9501", teacherId)).thenReturn(true);
+
+        String created = mockMvc.perform(post("/api/v1/homeworks")
+                        .header("Authorization", "Bearer " + teacherToken).header("X-Request-Id", UUID.randomUUID().toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"courseId":9501,"title":"file browser contract","description":"browser payload",
+                                 "type":"FILE","deadline":"2030-01-01T12:00:00Z","totalScore":100,"allowResubmit":true,
+                                 "allowLateSubmit":false,"questions":[],"testCases":[]}
+                                """))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        long homeworkId = mapper.readTree(created).path("id").asLong();
+        mockMvc.perform(put("/api/v1/homeworks/{homeworkId}/publish", homeworkId)
+                        .header("Authorization", "Bearer " + teacherToken).header("X-Request-Id", UUID.randomUUID().toString()))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(multipart("/api/v1/homeworks/{homeworkId}/attachments", homeworkId)
+                        .file(new org.springframework.mock.web.MockMultipartFile("file", "disguised-answer.pdf", "application/pdf",
+                                "not-a-pdf".getBytes(java.nio.charset.StandardCharsets.UTF_8)))
+                        .header("Authorization", "Bearer " + studentToken)
+                        .characterEncoding("UTF-8"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("HWK_4005"));
+
+        String uploaded = mockMvc.perform(multipart("/api/v1/homeworks/{homeworkId}/attachments", homeworkId)
+                        .file(new org.springframework.mock.web.MockMultipartFile("file", "answer.txt", "text/plain",
+                                "durable file answer".getBytes(java.nio.charset.StandardCharsets.UTF_8)))
+                        .header("Authorization", "Bearer " + studentToken)
+                        .characterEncoding("UTF-8"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.status").value("UPLOADED"))
+                .andExpect(jsonPath("$.data.uploadedAt").exists())
+                .andReturn().getResponse().getContentAsString();
+        String fileId = mapper.readTree(uploaded).path("data").path("fileId").asText();
+
+        String submitted = mockMvc.perform(post("/api/v1/homeworks/{homeworkId}/submissions", homeworkId)
+                        .header("Authorization", "Bearer " + studentToken).header("X-Request-Id", UUID.randomUUID().toString())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"fileIds\":[\"" + fileId + "\"]}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.submitType").value("FILE"))
+                .andExpect(jsonPath("$.data.evaluationStatus").value("NONE"))
+                .andReturn().getResponse().getContentAsString();
+        long publicSubmissionId = publicSubmissionId(submitted);
+        assertThat(publicSubmissionId).isPositive();
+        assertThat(jdbc.queryForObject("SELECT status FROM assessment_homework_attachment WHERE file_id = ?", String.class, fileId))
+                .isEqualTo("SUBMITTED");
+        assertThat(jdbc.queryForObject("SELECT submission_id IS NOT NULL FROM assessment_homework_attachment WHERE file_id = ?", Boolean.class, fileId))
+                .isTrue();
+    }
+
+    @Test
+    void gatewayCompactRequestIdIsCanonicalizedForHomeworkOutboxCorrelation() throws Exception {
+        String teacherId = "teacher-gateway-" + UUID.randomUUID();
+        String title = "homework-gateway-" + UUID.randomUUID();
+        UUID gatewayRequestUuid = UUID.randomUUID();
+        String compactGatewayRequestId = gatewayRequestUuid.toString().replace("-", "");
+        String teacherToken = TestJwtFactory.userToken(KEY, "homework-workflow-kid", teacherId, List.of("TEACHER"));
+        jdbc.update("INSERT INTO assessment_course_member_projection (course_id, user_id, membership_status, member_version) VALUES ('course-315', ?, 'ACTIVE', 1)", teacherId);
+        when(coursePermissions.canManageCourse("course-315", teacherId)).thenReturn(true);
+
+        String created = mockMvc.perform(post("/api/v1/homeworks")
+                        .header("Authorization", "Bearer " + teacherToken)
+                        .header("X-Request-Id", compactGatewayRequestId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"courseId":"course-315","title":"%s","description":"gateway request id",
+                                 "type":"CODE","deadline":"%s","totalScore":100,"allowResubmit":true,
+                                 "allowLateSubmit":false,"languages":["python"],
+                                 "testCases":[{"input":"hello\\n","expectedOutput":"HELLO\\n","scoreWeight":100,"hidden":false,"sortOrder":1}]}
+                                """.formatted(title, Instant.parse("2030-01-01T12:00:00Z"))))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        long homeworkId = mapper.readTree(created).path("id").asLong();
+
+        mockMvc.perform(put("/api/v1/homeworks/{homeworkId}/publish", homeworkId)
+                        .header("Authorization", "Bearer " + teacherToken)
+                        .header("X-Request-Id", compactGatewayRequestId))
+                .andExpect(status().isOk());
+
+        String correlationId = jdbc.queryForObject("""
+                SELECT correlation_id FROM assessment_event_outbox
+                 WHERE event_type = 'assessment.homework.published.v2' AND aggregate_id = ?
+                """, String.class, Long.toString(homeworkId));
+        assertThat(correlationId).isEqualTo(gatewayRequestUuid.toString());
+        String payload = jdbc.queryForObject("""
+                SELECT payload_json FROM assessment_event_outbox
+                 WHERE event_type = 'assessment.homework.published.v2' AND aggregate_id = ?
+                """, String.class, Long.toString(homeworkId));
+        assertThat(mapper.readTree(payload).path("correlationId").asText())
+                .isEqualTo(gatewayRequestUuid.toString());
+    }
+
+    @Test
     void studentSubmissionPersistsHomeworkVersionAndDurableTaskInOneTransaction() throws Exception {
         String teacherId = "teacher-315-" + UUID.randomUUID();
         String studentId = "student-315-" + UUID.randomUUID();
@@ -153,18 +410,23 @@ class HomeworkWorkflowContractTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"codeText\":\"print('frontend')\",\"language\":\"python\"}"))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.code").value(0))
+                .andExpect(jsonPath("$.code").value("0"))
                 .andExpect(jsonPath("$.data.homeworkId").value(homeworkId))
                 .andExpect(jsonPath("$.data.submissionId").isNumber())
                 .andExpect(jsonPath("$.data.evaluationStatus").value("PENDING"))
                 .andReturn().getResponse().getContentAsString();
+        assertThat(mapper.readTree(submitted).path("code").isTextual()).isTrue();
+        assertThat(mapper.readTree(submitted).path("code").asText()).isEqualTo("0");
         long publicSubmissionId = publicSubmissionId(submitted);
-        mockMvc.perform(get("/api/v1/submissions/{submissionId}/evaluation", publicSubmissionId)
+        String evaluation = mockMvc.perform(get("/api/v1/submissions/{submissionId}/evaluation", publicSubmissionId)
                         .header("Authorization", "Bearer " + studentToken))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(0))
+                .andExpect(jsonPath("$.code").value("0"))
                 .andExpect(jsonPath("$.data.submissionId").value(publicSubmissionId))
-                .andExpect(jsonPath("$.data.taskState").value("PENDING"));
+                .andExpect(jsonPath("$.data.taskState").value("PENDING"))
+                .andReturn().getResponse().getContentAsString();
+        assertThat(mapper.readTree(evaluation).path("code").isTextual()).isTrue();
+        assertThat(mapper.readTree(evaluation).path("code").asText()).isEqualTo("0");
     }
 
     @Test
@@ -203,7 +465,7 @@ class HomeworkWorkflowContractTest {
                         .header("Authorization", "Bearer " + teacherToken)
                         .header("X-Request-Id", UUID.randomUUID().toString()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(0))
+                .andExpect(jsonPath("$.code").value("0"))
                 .andExpect(jsonPath("$.message").value("success"))
                 .andExpect(jsonPath("$.data.id").value(homeworkId))
                 .andExpect(jsonPath("$.data.status").value("SCORE_PUBLISHED"));
@@ -241,7 +503,7 @@ class HomeworkWorkflowContractTest {
                         .header("Authorization", "Bearer " + teacherToken)
                         .header("X-Request-Id", UUID.randomUUID().toString()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(0))
+                .andExpect(jsonPath("$.code").value("0"))
                 .andExpect(jsonPath("$.message").value("success"))
                 .andExpect(jsonPath("$.data.id").value(homeworkId))
                 .andExpect(jsonPath("$.data.status").value("SCORE_PUBLISHED"));
@@ -415,7 +677,8 @@ class HomeworkWorkflowContractTest {
                         .header("X-Request-Id", UUID.randomUUID().toString())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"code\":\"print('late')\",\"language\":\"python\"}"))
-                .andExpect(status().isConflict());
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("HWK_4004"));
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM assessment_homework_submission", Integer.class)).isZero();
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM evaluation_task", Integer.class)).isZero();
     }
@@ -450,7 +713,9 @@ class HomeworkWorkflowContractTest {
                         .content("{\"reason\":\"rerun after sandbox configuration repair\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.taskId").value(taskId))
-                .andExpect(jsonPath("$.data.taskState").value("PENDING"));
+                .andExpect(jsonPath("$.data.taskState").value("PENDING"))
+                .andExpect(jsonPath("$.data.evaluationStatus").value("PENDING"))
+                .andExpect(jsonPath("$.data.reevaluation").value(true));
 
         assertThat(jdbc.queryForObject("SELECT manual_replay_count FROM evaluation_task WHERE id = ?", Integer.class, taskId)).isEqualTo(1);
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM assessment_source_grade WHERE source_id = ?", Integer.class,
@@ -491,7 +756,9 @@ class HomeworkWorkflowContractTest {
                         .content("{\"reason\":\"teacher requested rejudge\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.taskId").value(taskId))
-                .andExpect(jsonPath("$.data.taskState").value("PENDING"));
+                .andExpect(jsonPath("$.data.taskState").value("PENDING"))
+                .andExpect(jsonPath("$.data.evaluationStatus").value("PENDING"))
+                .andExpect(jsonPath("$.data.reevaluation").value(true));
 
         mockMvc.perform(get("/api/v1/submissions/{submissionId}/evaluation", submissionId)
                         .header("Authorization", "Bearer " + teacherToken))
@@ -580,7 +847,7 @@ class HomeworkWorkflowContractTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.taskState").value("FAILED"))
                 .andExpect(jsonPath("$.data.evaluationStatus").value("COMPILE_ERROR"))
-                .andExpect(jsonPath("$.data.score").value(org.hamcrest.Matchers.nullValue()))
+                .andExpect(jsonPath("$.data.score").value(0))
                 .andExpect(jsonPath("$.data.finalScore").value(org.hamcrest.Matchers.nullValue()));
         assertNoSourceGrade(homeworkId, studentId);
         assertThat(jdbc.queryForObject("""
@@ -690,6 +957,86 @@ class HomeworkWorkflowContractTest {
                 .isEqualTo("FAILED");
         assertThat(jdbc.queryForObject("SELECT manual_replay_count FROM evaluation_task WHERE id = ?", Integer.class, taskId))
                 .isZero();
+    }
+
+    @Test
+    void textHomeworkCompletesManualReviewAndScorePublicationWithoutCreatingACodeTask() throws Exception {
+        String teacherId = "teacher-text-" + UUID.randomUUID();
+        String studentId = "student-text-" + UUID.randomUUID();
+        String teacherToken = TestJwtFactory.userToken(KEY, "homework-workflow-kid", teacherId, List.of("TEACHER"));
+        String studentToken = TestJwtFactory.userToken(KEY, "homework-workflow-kid", studentId, List.of("STUDENT"));
+        jdbc.update("INSERT INTO assessment_course_member_projection (course_id, user_id, membership_status, member_version) VALUES ('course-315', ?, 'ACTIVE', 1)", teacherId);
+        jdbc.update("INSERT INTO assessment_course_member_projection (course_id, user_id, membership_status, member_version) VALUES ('course-315', ?, 'ACTIVE', 1)", studentId);
+        when(coursePermissions.canManageCourse("course-315", teacherId)).thenReturn(true);
+
+        String created = mockMvc.perform(post("/api/v1/homeworks")
+                        .header("Authorization", "Bearer " + teacherToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"courseId":"course-315","title":"text homework","description":"manual review",
+                                 "type":"TEXT","deadline":"2030-01-01T12:00:00Z","totalScore":100,
+                                 "allowResubmit":true,"allowLateSubmit":false,"questions":[],"testCases":[]}
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.type").value("TEXT"))
+                .andReturn().getResponse().getContentAsString();
+        long homeworkId = mapper.readTree(created).path("id").asLong();
+
+        mockMvc.perform(get("/api/v1/homeworks")
+                        .param("courseId", "course-315")
+                        .header("Authorization", "Bearer " + teacherToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.list[0].id").value(homeworkId))
+                .andExpect(jsonPath("$.data.list[0].type").value("TEXT"));
+
+        mockMvc.perform(put("/api/v1/homeworks/{homeworkId}/publish", homeworkId)
+                        .header("Authorization", "Bearer " + teacherToken))
+                .andExpect(status().isOk());
+
+        String submitted = mockMvc.perform(post("/api/v1/homeworks/{homeworkId}/submissions", homeworkId)
+                        .header("Authorization", "Bearer " + studentToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"answerText\":\"a durable text answer\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.code").value("0"))
+                .andExpect(jsonPath("$.data.submitType").value("TEXT"))
+                .andExpect(jsonPath("$.data.evaluationStatus").value("NONE"))
+                .andExpect(jsonPath("$.data.reviewStatus").value("UNREVIEWED"))
+                .andReturn().getResponse().getContentAsString();
+        long publicSubmissionId = publicSubmissionId(submitted);
+
+        mockMvc.perform(get("/api/v1/homeworks/{homeworkId}/my-submissions", homeworkId)
+                        .header("Authorization", "Bearer " + studentToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].submissionId").value(publicSubmissionId))
+                .andExpect(jsonPath("$.data[0].answerText").value("a durable text answer"));
+
+        mockMvc.perform(get("/api/v1/homeworks/{homeworkId}/submissions", homeworkId)
+                        .header("Authorization", "Bearer " + teacherToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.list[0].submissionId").value(publicSubmissionId));
+
+        mockMvc.perform(put("/api/v1/submissions/{submissionId}/review", publicSubmissionId)
+                        .header("Authorization", "Bearer " + teacherToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"manualScore\":88,\"finalScore\":88,\"comment\":\"reviewed\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.finalScore").value(88))
+                .andExpect(jsonPath("$.data.comment").value("reviewed"));
+
+        mockMvc.perform(put("/api/v1/homeworks/{homeworkId}/scores/publish", homeworkId)
+                        .header("Authorization", "Bearer " + teacherToken)
+                        .header("X-Request-Id", UUID.randomUUID().toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("SCORE_PUBLISHED"));
+        assertCurrentSourceGrade(homeworkId, studentId, "SCORED", new BigDecimal("88"), 1);
+
+        mockMvc.perform(get("/api/v1/submissions/{submissionId}", publicSubmissionId)
+                        .header("Authorization", "Bearer " + studentToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.answerText").value("a durable text answer"))
+                .andExpect(jsonPath("$.data.finalScore").value(88))
+                .andExpect(jsonPath("$.data.comment").value("reviewed"));
     }
 
     private void assertSourceGradeIsUngraded(long homeworkId, String studentId) throws Exception {

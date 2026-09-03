@@ -8,6 +8,33 @@ export type LabExperimentStatus =
 
 export type LabEvaluationMode = 'DOCKER_IO' | 'MIXED' | 'MANUAL';
 
+/**
+ * Assessment persists LAB submissions under UUIDs. Numeric values are accepted
+ * only for legacy local fixtures; live service values are opaque strings and
+ * must travel unchanged through routes and API calls.
+ */
+export type LabSubmissionId = string | number;
+
+/** Assessment receives identity user IDs as JWT strings, while older UI fixtures use numbers. */
+export type LabStudentId = string | number;
+
+/**
+ * Identity exposes legacy numeric user IDs in the browser, while Assessment
+ * authorizes and persists the JWT subject as text. Compare the canonical text
+ * representation so a verified submission is not rejected only by transport
+ * encoding, without coercing opaque IDs to numbers.
+ */
+export function labStudentIdsMatch(
+  left: LabStudentId | null | undefined,
+  right: LabStudentId | null | undefined
+) {
+  return left !== null
+    && left !== undefined
+    && right !== null
+    && right !== undefined
+    && String(left) === String(right);
+}
+
 export interface LabTestcase {
   id: number;
   labId: number;
@@ -77,13 +104,13 @@ export interface LabSubmissionPayload {
 }
 
 export interface LabReportUploadPayload {
-  submissionId?: number;
+  submissionId?: LabSubmissionId;
   reportFile: File;
 }
 
 export interface LabReportSummary {
   reportId: number;
-  submissionId: number | null;
+  submissionId: LabSubmissionId | null;
   fileName: string;
   fileType: 'PDF' | 'DOCX' | 'ZIP';
   fileSize: number;
@@ -110,7 +137,7 @@ export interface LabScorePayload {
 }
 
 export interface LabScoreSummary {
-  submissionId: number;
+  submissionId: LabSubmissionId;
   reportId: number | null;
   autoScore: number | null;
   reportScore: number | null;
@@ -123,9 +150,9 @@ export interface LabScoreSummary {
 }
 
 export interface LabSubmissionSummary {
-  submissionId: number;
+  submissionId: LabSubmissionId;
   labId: number;
-  studentId: number;
+  studentId: LabStudentId;
   submitStatus: 'SUBMITTED' | 'LATE' | 'WITHDRAWN';
   evaluationStatus:
     | 'NONE'
@@ -143,9 +170,9 @@ export interface LabSubmissionSummary {
 }
 
 export interface LabSubmissionHistoryItem {
-  submissionId: number;
+  submissionId: LabSubmissionId;
   labId: number;
-  studentId: number;
+  studentId: LabStudentId;
   language: string;
   submitStatus: LabSubmissionSummary['submitStatus'];
   evaluationStatus: LabSubmissionSummary['evaluationStatus'];
@@ -185,7 +212,7 @@ export interface LabEvaluationCaseResult {
 }
 
 export interface LabSubmissionResult {
-  submissionId: number;
+  submissionId: LabSubmissionId;
   evaluationStatus: LabSubmissionSummary['evaluationStatus'];
   score: number;
   passedCases: number;
@@ -197,7 +224,7 @@ export interface LabSubmissionResult {
 }
 
 export interface LabSubmissionListFilters {
-  studentId?: number;
+  studentId?: LabStudentId;
   submitStatus?: LabSubmissionSummary['submitStatus'];
   evaluationStatus?: LabSubmissionSummary['evaluationStatus'];
   overdue?: boolean;
@@ -205,7 +232,7 @@ export interface LabSubmissionListFilters {
 
 export interface LabResult {
   labId: number;
-  studentId: number;
+  studentId: LabStudentId;
   status: LabExperimentStatus;
   submission: LabSubmissionDetail;
   evaluationResult: LabSubmissionResult;
@@ -225,7 +252,7 @@ export interface LabStatistics {
   evaluationCompletionRate: number;
   averageScore: number | null;
   lateSubmissionCount: number;
-  unsubmittedStudentIds: number[];
+  unsubmittedStudentIds: LabStudentId[];
   scoreDistribution: Record<string, number>;
   generatedAt: string;
 }

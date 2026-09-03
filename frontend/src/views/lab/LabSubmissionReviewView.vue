@@ -413,12 +413,14 @@ import {
   scoreLabSubmission
 } from '../../api/lab/labs';
 import { getTeacherLearningProgress } from '../../api/lrn/learningProgress';
+import { labStudentIdsMatch } from '../../types/lab';
 import type {
   LabExperimentDetail,
   LabReportSummary,
   LabReportScorePayload,
   LabScorePayload,
   LabSubmissionDetail,
+  LabSubmissionId,
   LabSubmissionResult
 } from '../../types/lab';
 import {
@@ -435,7 +437,7 @@ import {
 const props = defineProps<{
   courseId: number;
   labId: number;
-  submissionId: number;
+  submissionId: LabSubmissionId;
 }>();
 
 const submitStatusValues = new Set(['SUBMITTED', 'LATE', 'WITHDRAWN']);
@@ -572,7 +574,7 @@ async function loadPage() {
     const selectedStudentId = submissionResult.status === 'fulfilled'
       ? submissionResult.value.studentId
       : null;
-    const matchedStudent = progressResult.value.students.find((item) => item.studentId === selectedStudentId);
+    const matchedStudent = progressResult.value.students.find((item) => labStudentIdsMatch(item.studentId, selectedStudentId));
     studentName.value = matchedStudent?.studentName.trim() || '学生姓名暂不可用';
     if (!matchedStudent?.studentName.trim() && selectedStudentId !== null) {
       studentNameWarning.value = '课程名单中未找到该提交对应的学生姓名';
@@ -933,7 +935,7 @@ function formatFileSize(size: number) {
   return `${size} B`;
 }
 
-function isCurrentSourceFileDownload(requestId: number, labId: number, submissionId: number) {
+function isCurrentSourceFileDownload(requestId: number, labId: number, submissionId: LabSubmissionId) {
   return requestId === sourceFileDownloadRequestId
     && props.labId === labId
     && props.submissionId === submissionId

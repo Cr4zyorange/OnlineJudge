@@ -72,7 +72,9 @@ class DisposableEnvironmentScriptsTest(unittest.TestCase):
         # interception); the shared default must stay on Docker's bridge
         # network, so the unconditional --network=host flag must not return.
         self.assertIn("OJ318_DOCKER_BUILD_NETWORK", source)
-        self.assertIn('"${docker_build_network_args[@]}"', source)
+        self.assertIn('if ((${#docker_build_network_args[@]})); then', source)
+        self.assertIn('retry 3 docker build "${docker_build_network_args[@]}"', source)
+        self.assertIn('retry 3 docker build --file', source)
         self.assertNotIn("docker build --network=host", source)
 
     def test_frontend_image_installation_retries_transient_registry_failures(self) -> None:
@@ -147,6 +149,46 @@ class DisposableEnvironmentScriptsTest(unittest.TestCase):
         self.assertEqual(bundle["keys"][0]["use"], "sig")
         self.assertEqual(bundle["keys"][0]["alg"], "RS256")
         self.assertNotIn("d", bundle["keys"][0], "the bootstrap bundle must never contain a private key")
+
+    def test_run_command_has_argv_safe_e2e_hook_and_context(self) -> None:
+        source = self.assert_help(RUN)
+        self.assertIn("--after-ready", source)
+        self.assertIn("three-service-context.json", source)
+        self.assertIn('"${after_ready_command[@]}"', source)
+        self.assertNotIn('eval "$after_ready', source)
+
+    def test_run_command_cleanup_works_with_macos_bash_and_records_remaining_resources(self) -> None:
+        source = self.assert_help(RUN)
+        self.assertNotIn("mapfile -t cleanup_", source)
+        self.assertIn("while IFS= read -r cleanup_container; do", source)
+        self.assertIn("while IFS= read -r cleanup_volume; do", source)
+        self.assertIn('cleanup_arguments=("$output_dir/cleanup-summary.json" "$project_name" "$cleanup_status")', source)
+        self.assertIn('cleanup_arguments+=(--)', source)
+        self.assertNotIn('"${cleanup_containers[@]}" -- "${cleanup_volumes[@]}"', source)
+        self.assertIn("cleanup-summary.json", source)
+
+    def test_run_command_does_not_report_a_cleanup_failure_before_runtime_env_exists(self) -> None:
+        source = self.assert_help(RUN)
+        self.assertIn('runtime_env_ready=0', source)
+        self.assertIn('runtime_env_ready=1', source)
+        self.assertIn('if (( runtime_env_ready )); then', source)
+
+    def test_run_command_collects_post_hook_diagnostics_before_propagating_failure(self) -> None:
+        source = self.assert_help(RUN)
+        self.assertIn("collect_diagnostics after-ready-success", source)
+        self.assertIn("collect_diagnostics after-ready-failure", source)
+        self.assertIn("exit \"$after_ready_status\"", source)
+
+    def test_run_command_uses_a_portable_unique_runtime_secret_template(self) -> None:
+        source = self.assert_help(RUN)
+        self.assertNotIn('onlinejudge-issue318.XXXXXX.env', source)
+        self.assertIn('onlinejudge-issue318.XXXXXX")', source)
+
+    def test_run_command_can_retain_a_temporary_runtime_env_for_resilience_restart_probes(self) -> None:
+        source = self.assert_help(RUN)
+        self.assertIn("--keep-runtime-env", source)
+        self.assertIn("--runtime-env-path", source)
+        self.assertIn("if (( ! keep_runtime_env )); then rm -f \"$runtime_env\"; fi", source)
 
     def test_rollback_command_requires_an_immutable_artifact_manifest(self) -> None:
         source = self.assert_help(ROLLBACK)

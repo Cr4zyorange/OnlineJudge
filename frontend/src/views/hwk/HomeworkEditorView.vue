@@ -1119,7 +1119,7 @@ function buildPayload(): HomeworkPayload {
     title: form.title.trim(),
     description: form.description.trim(),
     type: form.type,
-    deadline: form.deadline.length === 16 ? `${form.deadline}:00` : form.deadline,
+    deadline: toUtcInstant(form.deadline),
     totalScore: Number(form.totalScore),
     allowResubmit: form.allowResubmit,
     allowLateSubmit: form.allowLateSubmit,
@@ -1131,6 +1131,11 @@ function buildPayload(): HomeworkPayload {
     memoryLimitKb: form.type === 'CODE' ? Number(form.memoryLimitKb) : 65536,
     outputCompareMode: form.type === 'CODE' ? 'TRIM' : 'EXACT'
   };
+}
+
+function toUtcInstant(value: string) {
+  const localDateTime = value.length === 16 ? `${value}:00` : value;
+  return new Date(localDateTime).toISOString();
 }
 
 function toQuestionPayload(question: QuestionDraft, index: number): HomeworkQuestionPayload {
