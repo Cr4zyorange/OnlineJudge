@@ -1,0 +1,3 @@
+git diff --check -- submission/04_tests
+
+结果：PASS（无输出；工作副本存在 LF/CRLF 提示属 Git autocrlf 行为，非空白错误）。

@@ -1,0 +1,9 @@
+{
+  "gitSha": "27eab66891bfbbc21cb39ec96dcbedd6be2fabe2",
+  "projectName": "oj318-27eab66891bf-3351",
+  "baseUrl": "http://127.0.0.1:33653",
+  "composeFile": "/home/runner/work/OnlineJudge/OnlineJudge/ci-artifacts/browser-e2e-gate/compose.yml",
+  "composeEnvFile": "/tmp/onlinejudge-issue318.JX6inx",
+  "evidenceDir": "/home/runner/work/OnlineJudge/OnlineJudge/ci-artifacts/browser-e2e-gate",
+  "workloads": 9
+}

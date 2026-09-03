@@ -1,0 +1,77 @@
+{
+  "apiVersion": "delivery.onlinejudge.io/v2",
+  "kind": "ArtifactManifest",
+  "gitSha": "27eab66891bfbbc21cb39ec96dcbedd6be2fabe2",
+  "artifacts": [
+    {
+      "workload": "gateway",
+      "image": "onlinejudge/gateway:27eab66891bfbbc21cb39ec96dcbedd6be2fabe2",
+      "digest": "sha256:d31582fe8fd24aa0e9d9d65ac4f29391fbf3b51c24ebd3db2c6df6a9d5b01910",
+      "sbom": "sbom/gateway.spdx.json",
+      "source": "source"
+    },
+    {
+      "workload": "identity-service",
+      "image": "onlinejudge/identity-service:27eab66891bfbbc21cb39ec96dcbedd6be2fabe2",
+      "digest": "sha256:416ae694c1845dc74e1ec4b138946db6e510a97327cb36012288c3a41b59ee86",
+      "sbom": "sbom/identity-service.spdx.json",
+      "source": "source"
+    },
+    {
+      "workload": "course-service",
+      "image": "onlinejudge/course-service:27eab66891bfbbc21cb39ec96dcbedd6be2fabe2",
+      "digest": "sha256:cf441a2a58a252cda18dec852c9b8d9381d38a5a106629673271e8b31c1160a1",
+      "sbom": "sbom/course-service.spdx.json",
+      "source": "source"
+    },
+    {
+      "workload": "assessment-api",
+      "image": "onlinejudge/assessment-api:27eab66891bfbbc21cb39ec96dcbedd6be2fabe2",
+      "digest": "sha256:1b99c374ea19122c89c25453f71e08782ba821d9ef2f3e81a5ddcf56341a476c",
+      "sbom": "sbom/assessment-api.spdx.json",
+      "source": "source"
+    },
+    {
+      "workload": "assessment-worker",
+      "image": "onlinejudge/assessment-worker:27eab66891bfbbc21cb39ec96dcbedd6be2fabe2",
+      "digest": "sha256:1b99c374ea19122c89c25453f71e08782ba821d9ef2f3e81a5ddcf56341a476c",
+      "sbom": "sbom/assessment-worker.spdx.json",
+      "source": "source"
+    },
+    {
+      "workload": "grade-service",
+      "image": "onlinejudge/grade-service:27eab66891bfbbc21cb39ec96dcbedd6be2fabe2",
+      "digest": "sha256:cb835c34296e696c364616462ae538c4c48d583d52db20e30b3121d0ec586615",
+      "sbom": "sbom/grade-service.spdx.json",
+      "source": "source"
+    },
+    {
+      "workload": "frontend",
+      "image": "onlinejudge/frontend:27eab66891bfbbc21cb39ec96dcbedd6be2fabe2",
+      "digest": "sha256:a7666c83fe24ab5bec50319f7f4207b86d53239f1e0bd197a3085b72ba51f845",
+      "sbom": "sbom/frontend.spdx.json",
+      "source": "source"
+    },
+    {
+      "workload": "platform-migration-runner",
+      "image": "onlinejudge/platform-migration-runner:27eab66891bfbbc21cb39ec96dcbedd6be2fabe2",
+      "digest": "sha256:699144e77f7fa3f72f560cb9f36c3e1329267b1c47c8617bbc445a9e7bb2c8fb",
+      "sbom": "sbom/platform-migration-runner.spdx.json",
+      "source": "source"
+    },
+    {
+      "workload": "rabbitmq",
+      "image": "rabbitmq:4.1-management",
+      "digest": "sha256:046fd3423a7668fc201318bca3bdad234aa0769cccc1c2427feb12f3c1239d2e",
+      "sbom": "sbom/rabbitmq.spdx.json",
+      "source": "infrastructure"
+    },
+    {
+      "workload": "mysql",
+      "image": "mysql:8.4",
+      "digest": "sha256:bced325a4ab7aec848f4688371c7433351dcb5dba26fbcc29c67727d898ae5cb",
+      "sbom": "sbom/mysql.spdx.json",
+      "source": "infrastructure"
+    }
+  ]
+}

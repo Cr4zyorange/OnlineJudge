@@ -1,0 +1,32 @@
+# grade_source_projection_watermark raw rows (consumer cursor per aggregate)
++----------------+
+| watermark_rows |
++----------------+
+|              0 |
++----------------+
+
+# grade_source_projection raw row count (projected source grades)
++-----------------+
+| projection_rows |
++-----------------+
+|               0 |
++-----------------+
+
+# grade consumer activity: inbox/outbox/deferred raw row counts
++-----------------------------+-----------+
+| tbl                         | rows_from |
++-----------------------------+-----------+
+| grade_event_inbox           |         0 |
+| grade_event_outbox          |         0 |
+| grade_source_deferred_event |         0 |
++-----------------------------+-----------+
+
+# projection source side: assessment source grade raw row counts
++----------------------------------+-----------+
+| tbl                              | rows_from |
++----------------------------------+-----------+
+| assessment_source_grade          |         0 |
+| assessment_source_grade_revision |         0 |
++----------------------------------+-----------+
+
+# grade queue depths at capture time (raw): raw/rabbitmq_queue_backlog.txt

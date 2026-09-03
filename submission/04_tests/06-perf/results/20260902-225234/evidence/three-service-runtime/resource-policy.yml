@@ -1,0 +1,85 @@
+# Generated from performance/issue-307/resource-policy.json; do not edit.
+services:
+  mysql:
+    deploy:
+      resources:
+        reservations:
+          cpus: "0.75"
+          memory: "1536m"
+        limits:
+          cpus: "0.75"
+          memory: "1536m"
+  rabbitmq:
+    deploy:
+      resources:
+        reservations:
+          cpus: "0.25"
+          memory: "384m"
+        limits:
+          cpus: "0.25"
+          memory: "384m"
+  identity-service:
+    deploy:
+      resources:
+        reservations:
+          cpus: "0.25"
+          memory: "384m"
+        limits:
+          cpus: "0.25"
+          memory: "384m"
+    environment:
+      IDENTITY_SEED_DATA_ENABLED: "true"
+  course-service:
+    deploy:
+      resources:
+        reservations:
+          cpus: "0.5"
+          memory: "768m"
+        limits:
+          cpus: "0.5"
+          memory: "768m"
+  assessment-api:
+    deploy:
+      resources:
+        reservations:
+          cpus: "0.75"
+          memory: "1024m"
+        limits:
+          cpus: "0.75"
+          memory: "1024m"
+  assessment-worker:
+    deploy:
+      resources:
+        reservations:
+          cpus: "0.5"
+          memory: "768m"
+        limits:
+          cpus: "0.5"
+          memory: "768m"
+  grade-service:
+    deploy:
+      resources:
+        reservations:
+          cpus: "0.5"
+          memory: "768m"
+        limits:
+          cpus: "0.5"
+          memory: "768m"
+  gateway:
+    deploy:
+      resources:
+        reservations:
+          cpus: "0.25"
+          memory: "256m"
+        limits:
+          cpus: "0.25"
+          memory: "256m"
+  frontend:
+    deploy:
+      resources:
+        reservations:
+          cpus: "0.25"
+          memory: "256m"
+        limits:
+          cpus: "0.25"
+          memory: "256m"

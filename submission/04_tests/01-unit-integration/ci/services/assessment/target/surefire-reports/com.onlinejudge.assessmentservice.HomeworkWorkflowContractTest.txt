@@ -1,0 +1,4 @@
+-------------------------------------------------------------------------------
+Test set: com.onlinejudge.assessmentservice.HomeworkWorkflowContractTest
+-------------------------------------------------------------------------------
+Tests run: 27, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.084 s -- in com.onlinejudge.assessmentservice.HomeworkWorkflowContractTest

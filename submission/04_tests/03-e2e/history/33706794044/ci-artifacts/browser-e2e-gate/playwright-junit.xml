@@ -1,0 +1,66 @@
+<testsuites id="" name="" tests="24" failures="0" skipped="0" errors="0" time="108.65660000000001">
+<testsuite name="auth/auth.spec.ts" timestamp="2026-09-03T02:28:53.922Z" hostname="chromium" tests="9" failures="0" skipped="0" time="15.765" errors="0">
+<testcase name="@auth AUTH real-application scenarios › student logs in and lands on the learning task center" classname="auth/auth.spec.ts" time="2.979">
+</testcase>
+<testcase name="@auth AUTH real-application scenarios › teacher logs in and lands on the course center" classname="auth/auth.spec.ts" time="1.471">
+</testcase>
+<testcase name="@auth AUTH real-application scenarios › admin logs in and lands on the auth and permission management page" classname="auth/auth.spec.ts" time="1.738">
+</testcase>
+<testcase name="@auth AUTH real-application scenarios › wrong credentials show the safe login failure without entering any workspace" classname="auth/auth.spec.ts" time="1.154">
+</testcase>
+<testcase name="@auth AUTH real-application scenarios › disabled account cannot log in and receives account status feedback" classname="auth/auth.spec.ts" time="1.878">
+</testcase>
+<testcase name="@auth AUTH real-application scenarios › account locked by repeated failures cannot log in with the correct password" classname="auth/auth.spec.ts" time="1.526">
+</testcase>
+<testcase name="@auth AUTH real-application scenarios › invalid session is rejected and the app redirects to the session expired page" classname="auth/auth.spec.ts" time="1.407">
+</testcase>
+<testcase name="@auth AUTH real-application scenarios › student accessing the admin page is rejected with the forbidden page" classname="auth/auth.spec.ts" time="1.488">
+</testcase>
+<testcase name="@auth AUTH real-application scenarios › logout invalidates the old session so the token and protected pages are rejected" classname="auth/auth.spec.ts" time="2.124">
+</testcase>
+</testsuite>
+<testsuite name="crs/crs-closure.spec.ts" timestamp="2026-09-03T02:28:53.922Z" hostname="chromium" tests="2" failures="0" skipped="0" time="11.307" errors="0">
+<testcase name="@crs CRS 主流程闭环 › 教师建课并展示章节/资源/公告管理入口，学生公开加入" classname="crs/crs-closure.spec.ts" time="5.44">
+</testcase>
+<testcase name="@crs CRS 主流程闭环 › 邀请码错误与审批加入的受控失败和审批后权限" classname="crs/crs-closure.spec.ts" time="5.867">
+</testcase>
+</testsuite>
+<testsuite name="grd/grade-lifecycle.spec.ts" timestamp="2026-09-03T02:28:53.922Z" hostname="chromium" tests="1" failures="0" skipped="0" time="6.803" errors="0">
+<testcase name="@grd GRD real source lifecycle › @grd-main @grd-alternative @grd-exception runs LAB/HWK -&gt; GRD -&gt; LRN with real APIs" classname="grd/grade-lifecycle.spec.ts" time="6.803">
+</testcase>
+</testsuite>
+<testsuite name="hwk/homework-lifecycle.spec.ts" timestamp="2026-09-03T02:28:53.922Z" hostname="chromium" tests="2" failures="0" skipped="0" time="26.117" errors="0">
+<testcase name="@hwk HWK 真实业务闭环 › 教师创建发布作业后学生提交并获得已发布评语" classname="hwk/homework-lifecycle.spec.ts" time="9.119">
+</testcase>
+<testcase name="@hwk HWK 真实业务闭环 › 多类型提交验证代码后台评测并覆盖附件异常、过期、越权与重评" classname="hwk/homework-lifecycle.spec.ts" time="16.998">
+</testcase>
+</testsuite>
+<testsuite name="lab/issue-265-lab-lifecycle.spec.ts" timestamp="2026-09-03T02:28:53.922Z" hostname="chromium" tests="4" failures="0" skipped="0" time="22.897" errors="0">
+<testcase name="teacher and student complete the LAB publish, submission, review, release, and feedback lifecycle" classname="lab/issue-265-lab-lifecycle.spec.ts" time="16.007">
+</testcase>
+<testcase name="student download permissions and teacher download failures remain observable" classname="lab/issue-265-lab-lifecycle.spec.ts" time="3.187">
+</testcase>
+<testcase name="student receives a LAB notification tied to the published lifecycle" classname="lab/issue-265-lab-lifecycle.spec.ts" time="2.036">
+</testcase>
+<testcase name="teacher syncs the released LAB source score into GRD" classname="lab/issue-265-lab-lifecycle.spec.ts" time="1.667">
+</testcase>
+</testsuite>
+<testsuite name="lrn/lrn-business-closure.spec.ts" timestamp="2026-09-03T02:28:53.922Z" hostname="chromium" tests="3" failures="0" skipped="0" time="12.364" errors="0">
+<testcase name="@lrn UC-LRN-01 business closure › real LAB/HWK/GRD changes create isolated notifications with auditable lifecycle" classname="lrn/lrn-business-closure.spec.ts" time="7.168">
+</testcase>
+<testcase name="@lrn UC-LRN-01 business closure › student opens every LRN page and saves reminder preferences on seeded real data" classname="lrn/lrn-business-closure.spec.ts" time="3.468">
+</testcase>
+<testcase name="@lrn UC-LRN-01 business closure › notification list reports a short disconnection and refreshes after recovery" classname="lrn/lrn-business-closure.spec.ts" time="1.728">
+</testcase>
+</testsuite>
+<testsuite name="lrn/notification-read-on-open.spec.ts" timestamp="2026-09-03T02:28:53.922Z" hostname="chromium" tests="1" failures="0" skipped="0" time="4.862" errors="0">
+<testcase name="@lrn #269 notification read-on-open › marks a real LAB notification read before navigating and keeps repeated opens idempotent" classname="lrn/notification-read-on-open.spec.ts" time="4.862">
+</testcase>
+</testsuite>
+<testsuite name="shared/application.smoke.spec.ts" timestamp="2026-09-03T02:28:53.922Z" hostname="chromium" tests="2" failures="0" skipped="0" time="1.609" errors="0">
+<testcase name="@smoke shared real-application contract › serves the OnlineJudgeForSE application shell" classname="shared/application.smoke.spec.ts" time="0.898">
+</testcase>
+<testcase name="@smoke shared real-application contract › proxies the backend health endpoint through the application entry" classname="shared/application.smoke.spec.ts" time="0.711">
+</testcase>
+</testsuite>
+</testsuites>

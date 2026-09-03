@@ -1,0 +1,16 @@
+3.12-alpine: Pulling from library/python
+55afa1ecc21d: Already exists
+47393b668ce5: Pulling fs layer
+2014fd3d47b2: Pulling fs layer
+ed62c91ccd94: Pulling fs layer
+ed62c91ccd94: Verifying Checksum
+ed62c91ccd94: Download complete
+47393b668ce5: Download complete
+2014fd3d47b2: Verifying Checksum
+2014fd3d47b2: Download complete
+47393b668ce5: Pull complete
+2014fd3d47b2: Pull complete
+ed62c91ccd94: Pull complete
+Digest: sha256:b64631e04e4920160c50fbe8d8df828f7f35f06f425cb44aa09bca53e708a35a
+Status: Downloaded newer image for python:3.12-alpine
+docker.io/library/python:3.12-alpine

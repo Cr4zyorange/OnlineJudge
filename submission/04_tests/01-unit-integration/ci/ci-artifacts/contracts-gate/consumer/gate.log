@@ -1,0 +1,331 @@
+
+$ node /home/runner/work/OnlineJudge/OnlineJudge/scripts/ci/verify-microservice-contract-v2.mjs
+microservice-contract-v2: PASS (4 OpenAPI, 10 AsyncAPI messages, 4 valid fixture(s), 8 incompatible fixture(s), 18 rejecting mutation(s) rejected)
+
+$ node /home/runner/work/OnlineJudge/OnlineJudge/scripts/ci/verify-three-service-baseline-306.mjs
+three-service baseline #306 passed: 9 workloads, 4 migration jobs, 4 accounts
+
+$ node --test /home/runner/work/OnlineJudge/OnlineJudge/scripts/test/verify-three-service-baseline-306.test.mjs
+TAP version 13
+# Subtest: Issue \#306 freezes three business services, Identity support, four schema accounts and 9/4 delivery inputs
+ok 1 - Issue \#306 freezes three business services, Identity support, four schema accounts and 9/4 delivery inputs
+  ---
+  duration_ms: 4.347803
+  type: 'test'
+  ...
+# Subtest: Issue \#306 rejects a stale Learning service contract from the canonical v2 set
+ok 2 - Issue \#306 rejects a stale Learning service contract from the canonical v2 set
+  ---
+  duration_ms: 14.332205
+  type: 'test'
+  ...
+# Subtest: Issue \#306 rejects Identity minting a token for a retired Learning audience
+ok 3 - Issue \#306 rejects Identity minting a token for a retired Learning audience
+  ---
+  duration_ms: 11.066276
+  type: 'test'
+  ...
+# Subtest: Issue \#306 rejects assigning an LRN table to a standalone owner
+ok 4 - Issue \#306 rejects assigning an LRN table to a standalone owner
+  ---
+  duration_ms: 10.477117
+  type: 'test'
+  ...
+# Subtest: Issue \#306 rejects duplicate or retired AsyncAPI consumers
+ok 5 - Issue \#306 rejects duplicate or retired AsyncAPI consumers
+  ---
+  duration_ms: 10.765142
+  type: 'test'
+  ...
+# Subtest: Issue \#306 rejects a Course migration that omits an owned LRN runtime table
+ok 6 - Issue \#306 rejects a Course migration that omits an owned LRN runtime table
+  ---
+  duration_ms: 10.56064
+  type: 'test'
+  ...
+# Subtest: Issue \#306 rejects a migration runner that accepts the retired Learning schema
+ok 7 - Issue \#306 rejects a migration runner that accepts the retired Learning schema
+  ---
+  duration_ms: 10.445831
+  type: 'test'
+  ...
+1..7
+# tests 7
+# suites 0
+# pass 7
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 135.134808
+
+$ bash /home/runner/work/OnlineJudge/OnlineJudge/database/tests/verify-four-domain-baseline.sh
+Unable to find image 'mysql:8.4' locally
+8.4: Pulling from library/mysql
+30627cea5424: Pulling fs layer
+a8ca58bc6ea9: Pulling fs layer
+d0f44f87b588: Pulling fs layer
+3efae9596a0b: Pulling fs layer
+860b7bc67210: Pulling fs layer
+a5cddd18da97: Pulling fs layer
+289dbe2b4aa0: Pulling fs layer
+01cb8e5472ee: Pulling fs layer
+e31ea7613c63: Pulling fs layer
+9bebc71cfb90: Pulling fs layer
+860b7bc67210: Waiting
+01cb8e5472ee: Waiting
+a5cddd18da97: Waiting
+e31ea7613c63: Waiting
+289dbe2b4aa0: Waiting
+9bebc71cfb90: Waiting
+3efae9596a0b: Waiting
+a8ca58bc6ea9: Verifying Checksum
+a8ca58bc6ea9: Download complete
+d0f44f87b588: Download complete
+860b7bc67210: Verifying Checksum
+860b7bc67210: Download complete
+3efae9596a0b: Verifying Checksum
+3efae9596a0b: Download complete
+a5cddd18da97: Verifying Checksum
+a5cddd18da97: Download complete
+01cb8e5472ee: Download complete
+30627cea5424: Verifying Checksum
+30627cea5424: Download complete
+9bebc71cfb90: Verifying Checksum
+9bebc71cfb90: Download complete
+289dbe2b4aa0: Verifying Checksum
+289dbe2b4aa0: Download complete
+e31ea7613c63: Verifying Checksum
+e31ea7613c63: Download complete
+30627cea5424: Pull complete
+a8ca58bc6ea9: Pull complete
+d0f44f87b588: Pull complete
+3efae9596a0b: Pull complete
+860b7bc67210: Pull complete
+a5cddd18da97: Pull complete
+289dbe2b4aa0: Pull complete
+01cb8e5472ee: Pull complete
+e31ea7613c63: Pull complete
+9bebc71cfb90: Pull complete
+Digest: sha256:b3b90af2a6552ae30c266fdb7d5dd55f3afb72404bb78d37fe8a23eb857fd3fb
+Status: Downloaded newer image for mysql:8.4
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+mysql: [Warning] Using a password on the command line interface can be insecure.
+PASS: 4 accounts; 12 local DML allow checks; 12 foreign-schema denies; 4 DDL denies; 15 Course LRN runtime tables; legacy cutover + migrate/rollback/repeat verified
+
+$ bash /home/runner/work/OnlineJudge/OnlineJudge/scripts/test/verify-shell-contract.sh /home/runner/work/OnlineJudge/OnlineJudge
+shell-contract: PASS (93 tracked scripts, LF and bash syntax valid)
+
+$ bash /home/runner/work/OnlineJudge/OnlineJudge/scripts/test/verify-readme-d3-replay-shell.test.sh /home/runner/work/OnlineJudge/OnlineJudge
+verify-readme-d3-replay-shell: PASS
+
+$ env PYTHONDONTWRITEBYTECODE=1 python3 scripts/platform/validate_workload_manifest.py --schema deploy/platform/workload-manifest.schema.json --manifest deploy/platform/workloads.json
+PASS: 9 workloads; 4 ordered migration jobs; schema, ports, dependencies, migrations, promotion, and D3 retirement are valid
+
+$ env PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v scripts.platform.tests.test_validate_workload_manifest
+test_auth_source_change_selects_identity_service (scripts.platform.tests.test_validate_workload_manifest.WorkloadManifestValidationTest.test_auth_source_change_selects_identity_service) ... ok
+test_canonical_microservice_v2_contract_inputs_select_backend_consumers_and_producers (scripts.platform.tests.test_validate_workload_manifest.WorkloadManifestValidationTest.test_canonical_microservice_v2_contract_inputs_select_backend_consumers_and_producers) ... ok
+test_contract_gate_runs_platform_validation_and_regression_suite (scripts.platform.tests.test_validate_workload_manifest.WorkloadManifestValidationTest.test_contract_gate_runs_platform_validation_and_regression_suite) ... ok
+test_current_monolith_module_paths_select_their_workloads (scripts.platform.tests.test_validate_workload_manifest.WorkloadManifestValidationTest.test_current_monolith_module_paths_select_their_workloads) ... ok
+test_cyclic_dependency_is_rejected (scripts.platform.tests.test_validate_workload_manifest.WorkloadManifestValidationTest.test_cyclic_dependency_is_rejected) ... ok
+test_direct_frontend_exposure_is_rejected (scripts.platform.tests.test_validate_workload_manifest.WorkloadManifestValidationTest.test_direct_frontend_exposure_is_rejected) ... ok
+test_duplicate_container_port_is_rejected (scripts.platform.tests.test_validate_workload_manifest.WorkloadManifestValidationTest.test_duplicate_container_port_is_rejected) ... ok
+test_gateway_models_the_browser_entry_for_frontend (scripts.platform.tests.test_validate_workload_manifest.WorkloadManifestValidationTest.test_gateway_models_the_browser_entry_for_frontend) ... ok
+test_gateway_without_frontend_dependency_is_rejected (scripts.platform.tests.test_validate_workload_manifest.WorkloadManifestValidationTest.test_gateway_without_frontend_dependency_is_rejected) ... ok
+test_migration_job_requires_the_checked_in_executable_runner (scripts.platform.tests.test_validate_workload_manifest.WorkloadManifestValidationTest.test_migration_job_requires_the_checked_in_executable_runner) ... ok
+test_migration_path_without_owning_workload_trigger_is_rejected (scripts.platform.tests.test_validate_workload_manifest.WorkloadManifestValidationTest.test_migration_path_without_owning_workload_trigger_is_rejected) ... ok
+test_missing_required_field_is_rejected (scripts.platform.tests.test_validate_workload_manifest.WorkloadManifestValidationTest.test_missing_required_field_is_rejected) ... ok
+test_path_resolution_includes_shared_contract_consumers (scripts.platform.tests.test_validate_workload_manifest.WorkloadManifestValidationTest.test_path_resolution_includes_shared_contract_consumers) ... ok
+test_production_manifest_conforms_to_schema_and_semantics (scripts.platform.tests.test_validate_workload_manifest.WorkloadManifestValidationTest.test_production_manifest_conforms_to_schema_and_semantics) ... ok
+test_removing_a_microservice_v2_contract_input_binding_is_rejected (scripts.platform.tests.test_validate_workload_manifest.WorkloadManifestValidationTest.test_removing_a_microservice_v2_contract_input_binding_is_rejected) ... ok
+test_removing_a_required_current_backend_input_is_rejected (scripts.platform.tests.test_validate_workload_manifest.WorkloadManifestValidationTest.test_removing_a_required_current_backend_input_is_rejected) ... ok
+test_sbom_is_required_for_every_workload_image (scripts.platform.tests.test_validate_workload_manifest.WorkloadManifestValidationTest.test_sbom_is_required_for_every_workload_image) ... ok
+test_shared_backend_inputs_select_all_backend_application_workloads (scripts.platform.tests.test_validate_workload_manifest.WorkloadManifestValidationTest.test_shared_backend_inputs_select_all_backend_application_workloads) ... ok
+test_source_path_without_trigger_is_rejected (scripts.platform.tests.test_validate_workload_manifest.WorkloadManifestValidationTest.test_source_path_without_trigger_is_rejected) ... ok
+test_unknown_dependency_is_rejected (scripts.platform.tests.test_validate_workload_manifest.WorkloadManifestValidationTest.test_unknown_dependency_is_rejected) ... ok
+
+----------------------------------------------------------------------
+Ran 20 tests in 4.358s
+
+OK
+
+$ env PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v scripts.platform.tests.test_plan_delivery
+test_contract_gate_and_delivery_checkpoint_consume_the_same_planner (scripts.platform.tests.test_plan_delivery.DeliveryPlanTest.test_contract_gate_and_delivery_checkpoint_consume_the_same_planner) ... ok
+test_full_release_plan_preserves_immutable_artifact_and_cutover_gates (scripts.platform.tests.test_plan_delivery.DeliveryPlanTest.test_full_release_plan_preserves_immutable_artifact_and_cutover_gates) ... ok
+test_invalid_git_sha_is_rejected_before_a_delivery_plan_is_emitted (scripts.platform.tests.test_plan_delivery.DeliveryPlanTest.test_invalid_git_sha_is_rejected_before_a_delivery_plan_is_emitted) ... ok
+test_shared_service_contract_change_builds_only_the_five_contract_participants (scripts.platform.tests.test_plan_delivery.DeliveryPlanTest.test_shared_service_contract_change_builds_only_the_five_contract_participants) ... ok
+
+----------------------------------------------------------------------
+Ran 4 tests in 0.155s
+
+OK
+
+$ env PYTHONDONTWRITEBYTECODE=1 python3 scripts/platform/validate_observability_experiment.py --workload-schema deploy/platform/workload-manifest.schema.json --workload-manifest deploy/platform/workloads.json --experiment deploy/platform/observability-hpa-experiment.json
+PASS: assessment-api HPA experiment has configuration, metrics, diagnostics, and evidence gates
+
+$ env PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v scripts.platform.tests.test_validate_observability_experiment
+test_assessment_hpa_experiment_has_all_required_metrics_diagnostics_and_evidence (scripts.platform.tests.test_validate_observability_experiment.ObservabilityExperimentValidationTest.test_assessment_hpa_experiment_has_all_required_metrics_diagnostics_and_evidence) ... ok
+test_contract_gate_runs_the_pre_environment_experiment_checks (scripts.platform.tests.test_validate_observability_experiment.ObservabilityExperimentValidationTest.test_contract_gate_runs_the_pre_environment_experiment_checks) ... ok
+test_diagnostic_contract_requires_request_correlation_and_recovery_watermarks (scripts.platform.tests.test_validate_observability_experiment.ObservabilityExperimentValidationTest.test_diagnostic_contract_requires_request_correlation_and_recovery_watermarks) ... ok
+test_hpa_without_cpu_resource_target_is_rejected (scripts.platform.tests.test_validate_observability_experiment.ObservabilityExperimentValidationTest.test_hpa_without_cpu_resource_target_is_rejected) ... ok
+test_missing_p95_or_error_rate_evidence_is_rejected (scripts.platform.tests.test_validate_observability_experiment.ObservabilityExperimentValidationTest.test_missing_p95_or_error_rate_evidence_is_rejected) ... ok
+test_noncritical_rabbitmq_cannot_be_a_readiness_dependency (scripts.platform.tests.test_validate_observability_experiment.ObservabilityExperimentValidationTest.test_noncritical_rabbitmq_cannot_be_a_readiness_dependency) ... ok
+
+----------------------------------------------------------------------
+Ran 6 tests in 0.264s
+
+OK
+
+$ mvn -B -ntp test -Dtest=CommonInfrastructureContractTest,CrossServiceContractRegistryTest,ContractDocumentationCompletenessTest,CoursePermissionConsumerContractTest,SourceGradeConsumerContractTest,GradeTimeoutConfigurationTest（consumer side）
+[INFO] Scanning for projects...
+[INFO] 
+[INFO] ----------------< com.onlinejudge:onlinejudge-backend >-----------------
+[INFO] Building onlinejudge-backend 0.1.0-SNAPSHOT
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ onlinejudge-backend ---
+[INFO] Copying 3 resources from src/main/resources to target/classes
+[INFO] Copying 12 resources from src/main/resources to target/classes
+[INFO] 
+[INFO] --- compiler:3.13.0:compile (default-compile) @ onlinejudge-backend ---
+[INFO] Recompiling the module because of changed source code.
+[INFO] Compiling 436 source files with javac [debug parameters release 21] to target/classes
+[INFO] 
+[INFO] --- resources:3.3.1:testResources (default-testResources) @ onlinejudge-backend ---
+[INFO] Copying 5 resources from src/test/resources to target/test-classes
+[INFO] 
+[INFO] --- compiler:3.13.0:testCompile (default-testCompile) @ onlinejudge-backend ---
+[INFO] Recompiling the module because of changed dependency.
+[INFO] Compiling 89 source files with javac [debug parameters release 21] to target/test-classes
+[WARNING] /home/runner/work/OnlineJudge/OnlineJudge/backend/src/test/java/com/onlinejudge/common/SystemReadinessControllerFailureTest.java:[30,6] org.springframework.boot.test.mock.mockito.SpyBean in org.springframework.boot.test.mock.mockito has been deprecated and marked for removal
+[WARNING] /home/runner/work/OnlineJudge/OnlineJudge/backend/src/test/java/com/onlinejudge/hwk/controller/HomeworkAttachmentControllerTest.java:[83,6] org.springframework.boot.test.mock.mockito.MockBean in org.springframework.boot.test.mock.mockito has been deprecated and marked for removal
+[INFO] 
+[INFO] --- surefire:3.5.3:test (default-test) @ onlinejudge-backend ---
+[INFO] Using auto detected provider org.apache.maven.surefire.junitplatform.JUnitPlatformProvider
+[INFO] 
+[INFO] -------------------------------------------------------
+[INFO]  T E S T S
+[INFO] -------------------------------------------------------
+[INFO] Running com.onlinejudge.contracts.SourceGradeConsumerContractTest
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.170 s -- in com.onlinejudge.contracts.SourceGradeConsumerContractTest
+[INFO] Running com.onlinejudge.contracts.CoursePermissionConsumerContractTest
+03:54:04.401 [main] WARN com.onlinejudge.integration.course.DefaultCoursePermissionClient -- CoursePermissionClient courseExists timed out after 50ms courseId=101 userId=0; denying
+03:54:04.454 [main] WARN com.onlinejudge.integration.course.DefaultCoursePermissionClient -- CoursePermissionClient canViewCourse timed out after 50ms courseId=101 userId=601; denying
+03:54:04.505 [main] WARN com.onlinejudge.integration.course.DefaultCoursePermissionClient -- CoursePermissionClient canManageCourse timed out after 50ms courseId=101 userId=501; denying
+03:54:04.556 [main] WARN com.onlinejudge.integration.course.DefaultCoursePermissionClient -- CoursePermissionClient listActiveStudentIds timed out after 50ms courseId=101; returning empty roster
+03:54:04.560 [main] WARN com.onlinejudge.integration.course.DefaultCoursePermissionClient -- CoursePermissionClient courseExists failed downstream courseId=101 userId=0; denying: java.lang.IllegalStateException: CRS service unavailable
+03:54:04.561 [main] WARN com.onlinejudge.integration.course.DefaultCoursePermissionClient -- CoursePermissionClient canViewCourse failed downstream courseId=101 userId=601; denying: java.lang.IllegalStateException: CRS service unavailable
+03:54:04.561 [main] WARN com.onlinejudge.integration.course.DefaultCoursePermissionClient -- CoursePermissionClient canManageCourse failed downstream courseId=101 userId=501; denying: java.lang.IllegalStateException: CRS service unavailable
+03:54:04.561 [main] WARN com.onlinejudge.integration.course.DefaultCoursePermissionClient -- CoursePermissionClient listActiveStudentIds failed downstream courseId=101; returning empty roster: java.lang.IllegalStateException: CRS service unavailable
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.281 s -- in com.onlinejudge.contracts.CoursePermissionConsumerContractTest
+[INFO] Running com.onlinejudge.contracts.CrossServiceContractRegistryTest
+[INFO] Tests run: 7, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.041 s -- in com.onlinejudge.contracts.CrossServiceContractRegistryTest
+[INFO] Running com.onlinejudge.contracts.ContractDocumentationCompletenessTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.008 s -- in com.onlinejudge.contracts.ContractDocumentationCompletenessTest
+[INFO] Running com.onlinejudge.common.contracts.CommonInfrastructureContractTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.012 s -- in com.onlinejudge.common.contracts.CommonInfrastructureContractTest
+[INFO] Running com.onlinejudge.integration.grade.GradeTimeoutConfigurationTest
+03:54:05.015 [main] WARN org.springframework.context.annotation.AnnotationConfigApplicationContext -- Exception encountered during context initialization - cancelling refresh attempt: org.springframework.beans.factory.BeanCreationException: Error creating bean with name 'com.onlinejudge.integration.grade.DefaultSourceGradeClient': Failed to instantiate [com.onlinejudge.integration.grade.DefaultSourceGradeClient]: Constructor threw exception
+03:54:05.029 [main] WARN org.springframework.context.annotation.AnnotationConfigApplicationContext -- Exception encountered during context initialization - cancelling refresh attempt: org.springframework.beans.factory.BeanCreationException: Error creating bean with name 'com.onlinejudge.integration.grade.DefaultSourceGradeClient': Failed to instantiate [com.onlinejudge.integration.grade.DefaultSourceGradeClient]: Constructor threw exception
+03:54:05.039 [main] WARN org.springframework.context.annotation.AnnotationConfigApplicationContext -- Exception encountered during context initialization - cancelling refresh attempt: org.springframework.beans.factory.BeanCreationException: Error creating bean with name 'com.onlinejudge.integration.grade.DefaultSourceGradeClient': Failed to instantiate [com.onlinejudge.integration.grade.DefaultSourceGradeClient]: Constructor threw exception
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.417 s -- in com.onlinejudge.integration.grade.GradeTimeoutConfigurationTest
+[INFO] 
+[INFO] Results:
+[INFO] 
+[INFO] Tests run: 25, Failures: 0, Errors: 0, Skipped: 0
+[INFO] 
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD SUCCESS
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  20.417 s
+[INFO] Finished at: 2026-09-03T03:54:05Z
+[INFO] ------------------------------------------------------------------------
+contract-verify: PASS (shell, README replay, D7 platform, and consumer-side contract suites)

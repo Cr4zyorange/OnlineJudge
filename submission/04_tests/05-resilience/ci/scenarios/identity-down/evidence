@@ -1,0 +1,1 @@
+compose=ci-artifacts/issue-340/scenarios/identity-down; cachedVerification=200; protectedReadStatus=200; newLoginStatus=504; refreshStatus=504; domainWrites=PASS; recoverySeconds=11

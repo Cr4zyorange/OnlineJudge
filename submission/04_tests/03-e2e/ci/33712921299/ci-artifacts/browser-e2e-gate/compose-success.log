@@ -1,0 +1,621 @@
+frontend-1  | /docker-entrypoint.sh: /docker-entrypoint.d/ is not empty, will attempt to perform configuration
+frontend-1  | /docker-entrypoint.sh: Looking for shell scripts in /docker-entrypoint.d/
+frontend-1  | /docker-entrypoint.sh: Launching /docker-entrypoint.d/10-listen-on-ipv6-by-default.sh
+frontend-1  | 10-listen-on-ipv6-by-default.sh: info: can not modify /etc/nginx/conf.d/default.conf (read-only file system?)
+frontend-1  | /docker-entrypoint.sh: Sourcing /docker-entrypoint.d/15-local-resolvers.envsh
+frontend-1  | /docker-entrypoint.sh: Launching /docker-entrypoint.d/20-envsubst-on-templates.sh
+frontend-1  | /docker-entrypoint.sh: Launching /docker-entrypoint.d/30-tune-worker-processes.sh
+frontend-1  | /docker-entrypoint.sh: Configuration complete; ready for start up
+frontend-1  | 2026/09/03 04:02:03 [warn] 1#1: the "user" directive makes sense only if the master process runs with super-user privileges, ignored in /etc/nginx/nginx.conf:2
+frontend-1  | nginx: [warn] the "user" directive makes sense only if the master process runs with super-user privileges, ignored in /etc/nginx/nginx.conf:2
+frontend-1  | 2026/09/03 04:02:03 [notice] 1#1: using the "epoll" event method
+frontend-1  | 2026/09/03 04:02:03 [notice] 1#1: nginx/1.27.5
+frontend-1  | 2026/09/03 04:02:03 [notice] 1#1: built by gcc 14.2.0 (Alpine 14.2.0) 
+frontend-1  | 2026/09/03 04:02:03 [notice] 1#1: OS: Linux 6.17.0-1022-azure
+frontend-1  | 2026/09/03 04:02:03 [notice] 1#1: getrlimit(RLIMIT_NOFILE): 65536:65536
+frontend-1  | 2026/09/03 04:02:03 [notice] 1#1: start worker processes
+frontend-1  | 2026/09/03 04:02:03 [notice] 1#1: start worker process 21
+frontend-1  | 2026/09/03 04:02:03 [notice] 1#1: start worker process 22
+frontend-1  | 2026/09/03 04:02:03 [notice] 1#1: start worker process 23
+frontend-1  | 2026/09/03 04:02:03 [notice] 1#1: start worker process 24
+frontend-1  | 127.0.0.1 - - [03/Sep/2026:04:02:08 +0000] "GET / HTTP/1.1" 200 885 "-" "Wget" "-"
+frontend-1  | 127.0.0.1 - - [03/Sep/2026:04:02:13 +0000] "GET / HTTP/1.1" 200 885 "-" "Wget" "-"
+frontend-1  | 127.0.0.1 - - [03/Sep/2026:04:02:18 +0000] "GET / HTTP/1.1" 200 885 "-" "Wget" "-"
+frontend-1  | 127.0.0.1 - - [03/Sep/2026:04:02:23 +0000] "GET / HTTP/1.1" 200 885 "-" "Wget" "-"
+frontend-1  | 127.0.0.1 - - [03/Sep/2026:04:02:29 +0000] "GET / HTTP/1.1" 200 885 "-" "Wget" "-"
+frontend-1  | 127.0.0.1 - - [03/Sep/2026:04:02:34 +0000] "GET / HTTP/1.1" 200 885 "-" "Wget" "-"
+frontend-1  | 127.0.0.1 - - [03/Sep/2026:04:02:39 +0000] "GET / HTTP/1.1" 200 885 "-" "Wget" "-"
+frontend-1  | 127.0.0.1 - - [03/Sep/2026:04:02:44 +0000] "GET / HTTP/1.1" 200 885 "-" "Wget" "-"
+grade-migrations-1  | migrate-service: schema=grade version=V20260901_01__grade_service_schema.sql applied
+grade-migrations-1  | migrate-service: schema=grade version=V20260901_02__complete_grade_runtime.sql applied
+grade-migrations-1  | migrate-service: schema=grade version=V20260902_03__drop_legacy_grade_source_projection_status.sql applied
+grade-migrations-1  | migrate-service: PASS schema=grade applied=3
+identity-service-1  | 
+identity-service-1  |   .   ____          _            __ _ _
+identity-service-1  |  /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+identity-service-1  | ( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+identity-service-1  |  \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+identity-service-1  |   '  |____| .__|_| |_|_| |_\__, | / / / /
+identity-service-1  |  =========|_|==============|___/=/_/_/_/
+identity-service-1  | 
+identity-service-1  |  :: Spring Boot ::                (v3.4.5)
+identity-service-1  | 
+identity-service-1  | 2026-09-03T04:02:18.024Z  INFO 1 --- [           main] c.o.i.IdentityServiceApplication         : Starting IdentityServiceApplication v0.1.0-SNAPSHOT using Java 21.0.12 with PID 1 (/opt/onlinejudge-identity/app.jar started by onlinejudge in /opt/onlinejudge-identity)
+identity-service-1  | 2026-09-03T04:02:18.027Z  INFO 1 --- [           main] c.o.i.IdentityServiceApplication         : No active profile set, falling back to 1 default profile: "default"
+identity-service-1  | 2026-09-03T04:02:21.418Z  INFO 1 --- [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port 8081 (http)
+identity-service-1  | 2026-09-03T04:02:21.473Z  INFO 1 --- [           main] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+identity-service-1  | 2026-09-03T04:02:21.473Z  INFO 1 --- [           main] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/10.1.40]
+identity-service-1  | 2026-09-03T04:02:21.809Z  INFO 1 --- [           main] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring embedded WebApplicationContext
+rabbitmq-1          | 2026-09-03 04:02:06.152650+00:00 [notice] <0.45.0> Application syslog exited with reason: stopped
+rabbitmq-1          | 2026-09-03 04:02:06.156544+00:00 [notice] <0.209.0> Logging: switching to configured handler(s); following messages may not be visible in this log output
+rabbitmq-1          | [38;5;87m2026-09-03 04:02:06.157133+00:00 [notice] <0.209.0> Logging: configured log handlers are now ACTIVE[0m
+rabbitmq-1          | 2026-09-03 04:02:06.163551+00:00 [info] <0.209.0> ra: starting system coordination[0m
+rabbitmq-1          | 2026-09-03 04:02:06.163620+00:00 [info] <0.209.0> starting Ra system: coordination in directory: /var/lib/rabbitmq/mnesia/rabbit@74aef9b56bfb/coordination/rabbit@74aef9b56bfb[0m
+rabbitmq-1          | 2026-09-03 04:02:06.169523+00:00 [info] <0.216.0> ra_coordination_log_ets: in system coordination initialising. Mem table opts: [set,{write_concurrency,auto},public,{compressed,false}][0m
+rabbitmq-1          | 2026-09-03 04:02:06.209208+00:00 [info] <0.222.0> ra system 'coordination' running pre init for 0 registered servers[0m
+rabbitmq-1          | 2026-09-03 04:02:06.215984+00:00 [info] <0.223.0> ra: meta data store initialised for system coordination. 0 record(s) recovered[0m
+rabbitmq-1          | 2026-09-03 04:02:06.220491+00:00 [info] <0.226.0> segment_writer: upgrading segment file names to new format in dirctory /var/lib/rabbitmq/mnesia/rabbit@74aef9b56bfb/coordination/rabbit@74aef9b56bfb[0m
+rabbitmq-1          | [38;5;87m2026-09-03 04:02:06.230381+00:00 [notice] <0.228.0> WAL: ra_coordination_log_wal init, mem-tables table name: ra_coordination_log_open_mem_tables[0m
+rabbitmq-1          | 2026-09-03 04:02:06.239203+00:00 [info] <0.209.0> ra: starting system quorum_queues[0m
+rabbitmq-1          | 2026-09-03 04:02:06.239248+00:00 [info] <0.209.0> starting Ra system: quorum_queues in directory: /var/lib/rabbitmq/mnesia/rabbit@74aef9b56bfb/quorum/rabbit@74aef9b56bfb[0m
+rabbitmq-1          | 2026-09-03 04:02:06.239702+00:00 [info] <0.232.0> ra_log_ets: in system quorum_queues initialising. Mem table opts: [set,{write_concurrency,auto},public,{compressed,true}][0m
+rabbitmq-1          | 2026-09-03 04:02:06.240284+00:00 [info] <0.236.0> ra system 'quorum_queues' running pre init for 0 registered servers[0m
+rabbitmq-1          | 2026-09-03 04:02:06.240881+00:00 [info] <0.237.0> ra: meta data store initialised for system quorum_queues. 0 record(s) recovered[0m
+rabbitmq-1          | 2026-09-03 04:02:06.241018+00:00 [info] <0.240.0> segment_writer: upgrading segment file names to new format in dirctory /var/lib/rabbitmq/mnesia/rabbit@74aef9b56bfb/quorum/rabbit@74aef9b56bfb[0m
+rabbitmq-1          | [38;5;87m2026-09-03 04:02:06.241550+00:00 [notice] <0.242.0> WAL: ra_log_wal init, mem-tables table name: ra_log_open_mem_tables[0m
+rabbitmq-1          | 2026-09-03 04:02:06.242580+00:00 [info] <0.244.0> ra_system_recover: ra system 'quorum_queues' server recovery strategy rabbit_quorum_queue:system_recover[0m
+rabbitmq-1          | 2026-09-03 04:02:06.242672+00:00 [info] <0.244.0> [rabbit_quorum_queue:system_recover/1] rabbit not booted, skipping queue recovery[0m
+rabbitmq-1          | 2026-09-03 04:02:06.242788+00:00 [info] <0.209.0> ra: starting system coordination[0m
+rabbitmq-1          | 2026-09-03 04:02:06.242828+00:00 [info] <0.209.0> starting Ra system: coordination in directory: /var/lib/rabbitmq/mnesia/rabbit@74aef9b56bfb/coordination/rabbit@74aef9b56bfb[0m
+rabbitmq-1          | [38;5;87m2026-09-03 04:02:06.315282+00:00 [notice] <0.246.0> RabbitMQ metadata store: candidate -> leader in term: 1 machine version: 1, last applied 0[0m
+rabbitmq-1          | 2026-09-03 04:02:06.443317+00:00 [info] <0.209.0> [0m
+rabbitmq-1          | 2026-09-03 04:02:06.443317+00:00 [info] <0.209.0>  Starting RabbitMQ 4.1.8 on Erlang 27.3.4.17 [jit][0m
+rabbitmq-1          | 2026-09-03 04:02:06.443317+00:00 [info] <0.209.0>  Copyright (c) 2007-2026 Broadcom Inc and/or its subsidiaries[0m
+rabbitmq-1          | 2026-09-03 04:02:06.443317+00:00 [info] <0.209.0>  Licensed under the MPL 2.0. Website: https://rabbitmq.com[0m
+rabbitmq-1          | 
+rabbitmq-1          |   ##  ##      RabbitMQ 4.1.8
+rabbitmq-1          |   ##  ##
+rabbitmq-1          |   ##########  Copyright (c) 2007-2026 Broadcom Inc and/or its subsidiaries
+rabbitmq-1          |   ######  ##
+rabbitmq-1          |   ##########  Licensed under the MPL 2.0. Website: https://rabbitmq.com
+rabbitmq-1          | 
+rabbitmq-1          |   Erlang:      27.3.4.17 [jit]
+rabbitmq-1          |   TLS Library: OpenSSL - OpenSSL 3.5.8 25 Aug 2026
+rabbitmq-1          |   Release series support status: see https://www.rabbitmq.com/release-information
+rabbitmq-1          | 
+rabbitmq-1          |   Doc guides:  https://www.rabbitmq.com/docs
+rabbitmq-1          |   Support:     https://www.rabbitmq.com/docs/contact
+rabbitmq-1          |   Tutorials:   https://www.rabbitmq.com/tutorials
+rabbitmq-1          |   Monitoring:  https://www.rabbitmq.com/docs/monitoring
+rabbitmq-1          |   Upgrading:   https://www.rabbitmq.com/docs/upgrade
+rabbitmq-1          | 
+rabbitmq-1          |   Logs: <stdout>
+rabbitmq-1          | 
+rabbitmq-1          |   Config file(s): /etc/rabbitmq/conf.d/10-defaults.conf
+rabbitmq-1          | 
+rabbitmq-1          |   Starting broker...2026-09-03 04:02:06.444367+00:00 [info] <0.209.0> [0m
+rabbitmq-1               | 2026-09-03 04:02:06.444367+00:00 [info] <0.209.0>  node           : rabbit@74aef9b56bfb[0m
+rabbitmq-1               | 2026-09-03 04:02:06.444367+00:00 [info] <0.209.0>  home dir       : /var/lib/rabbitmq[0m
+rabbitmq-1               | 2026-09-03 04:02:06.444367+00:00 [info] <0.209.0>  config file(s) : /etc/rabbitmq/conf.d/10-defaults.conf[0m
+rabbitmq-1               | 2026-09-03 04:02:06.444367+00:00 [info] <0.209.0>  cookie hash    : cDAskm/3si0XW47Txgid7w==[0m
+rabbitmq-1               | 2026-09-03 04:02:06.444367+00:00 [info] <0.209.0>  log(s)         : <stdout>[0m
+rabbitmq-1               | 2026-09-03 04:02:06.444367+00:00 [info] <0.209.0>  data dir       : /var/lib/rabbitmq/mnesia/rabbit@74aef9b56bfb[0m
+rabbitmq-1               | 2026-09-03 04:02:06.682909+00:00 [info] <0.209.0> Running boot step pre_boot defined by app rabbit[0m
+rabbitmq-1               | 2026-09-03 04:02:06.682971+00:00 [info] <0.209.0> Running boot step rabbit_global_counters defined by app rabbit[0m
+rabbitmq-1               | 2026-09-03 04:02:06.683246+00:00 [info] <0.209.0> Running boot step rabbit_osiris_metrics defined by app rabbit[0m
+rabbitmq-1               | 2026-09-03 04:02:06.683351+00:00 [info] <0.209.0> Running boot step rabbit_core_metrics defined by app rabbit[0m
+rabbitmq-1               | 2026-09-03 04:02:06.683805+00:00 [info] <0.209.0> Running boot step rabbit_alarm defined by app rabbit[0m
+rabbitmq-1               | 2026-09-03 04:02:06.691934+00:00 [info] <0.276.0> Memory high watermark set to 9593 MiB (10059848908 bytes) of 15989 MiB (16766414848 bytes) total[0m
+rabbitmq-1               | 2026-09-03 04:02:06.694576+00:00 [info] <0.278.0> Enabling free disk space monitoring (disk free space: 84075397120, total memory: 16766414848)[0m
+rabbitmq-1               | 2026-09-03 04:02:06.694643+00:00 [info] <0.278.0> Disk free limit set to 50MB[0m
+rabbitmq-1               | 2026-09-03 04:02:06.696263+00:00 [info] <0.209.0> Running boot step code_server_cache defined by app rabbit[0m
+rabbitmq-1               | 2026-09-03 04:02:06.696360+00:00 [info] <0.209.0> Running boot step file_handle_cache defined by app rabbit[0m
+rabbitmq-1               | 2026-09-03 04:02:06.700912+00:00 [info] <0.281.0> Limiting to approx 65439 file handles (58893 sockets)[0m
+rabbitmq-1               | 2026-09-03 04:02:06.701043+00:00 [info] <0.282.0> FHC read buffering: OFF[0m
+rabbitmq-1               | 2026-09-03 04:02:06.701085+00:00 [info] <0.282.0> FHC write buffering: ON[0m
+rabbitmq-1               | 2026-09-03 04:02:06.701496+00:00 [info] <0.209.0> Running boot step worker_pool defined by app rabbit[0m
+rabbitmq-1               | 2026-09-03 04:02:06.701583+00:00 [info] <0.263.0> Will use 4 processes for default worker pool[0m
+rabbitmq-1               | 2026-09-03 04:02:06.701639+00:00 [info] <0.263.0> Starting worker pool 'worker_pool' with 4 processes in it[0m
+rabbitmq-1               | 2026-09-03 04:02:06.701930+00:00 [info] <0.209.0> Running boot step rabbit_registry defined by app rabbit[0m
+rabbitmq-1               | 2026-09-03 04:02:06.702000+00:00 [info] <0.209.0> Running boot step database defined by app rabbit[0m
+rabbitmq-1               | 2026-09-03 04:02:06.702254+00:00 [info] <0.209.0> Peer discovery: configured backend: rabbit_peer_discovery_classic_config[0m
+rabbitmq-1               | [38;5;87m2026-09-03 04:02:06.703192+00:00 [notice] <0.264.0> Feature flags: attempt to enable `detailed_queues_endpoint`...[0m
+rabbitmq-1               | [38;5;87m2026-09-03 04:02:06.711651+00:00 [notice] <0.264.0> Feature flags: `detailed_queues_endpoint` enabled[0m
+rabbitmq-1               | [38;5;87m2026-09-03 04:02:06.711697+00:00 [notice] <0.264.0> Feature flags: attempt to enable `rabbitmq_4.1.0`...[0m
+rabbitmq-1               | [38;5;87m2026-09-03 04:02:06.716559+00:00 [notice] <0.264.0> Feature flags: attempt to enable `rabbitmq_4.0.0`...[0m
+rabbitmq-1               | [38;5;87m2026-09-03 04:02:06.726030+00:00 [notice] <0.264.0> Feature flags: `rabbitmq_4.0.0` enabled[0m
+rabbitmq-1               | [38;5;87m2026-09-03 04:02:06.738420+00:00 [notice] <0.264.0> Feature flags: `rabbitmq_4.1.0` enabled[0m
+rabbitmq-1               | [38;5;87m2026-09-03 04:02:06.738464+00:00 [notice] <0.264.0> Feature flags: attempt to enable `quorum_queue_non_voters`...[0m
+rabbitmq-1               | [38;5;87m2026-09-03 04:02:06.748090+00:00 [notice] <0.264.0> Feature flags: `quorum_queue_non_voters` enabled[0m
+rabbitmq-1               | [38;5;87m2026-09-03 04:02:06.748135+00:00 [notice] <0.264.0> Feature flags: attempt to enable `message_containers_deaths_v2`...[0m
+rabbitmq-1               | [38;5;87m2026-09-03 04:02:06.757759+00:00 [notice] <0.264.0> Feature flags: `message_containers_deaths_v2` enabled[0m
+rabbitmq-1               | [38;5;87m2026-09-03 04:02:06.757819+00:00 [notice] <0.264.0> Feature flags: attempt to enable `rabbit_exchange_type_local_random`...[0m
+rabbitmq-1               | [38;5;87m2026-09-03 04:02:06.767151+00:00 [notice] <0.264.0> Feature flags: `rabbit_exchange_type_local_random` enabled[0m
+rabbitmq-1               | 2026-09-03 04:02:06.767870+00:00 [info] <0.209.0> DB: virgin node -> run peer discovery[0m
+rabbitmq-1               | [38;5;214m2026-09-03 04:02:06.767967+00:00 [warning] <0.209.0> Classic peer discovery backend: list of nodes does not contain the local node [][0m
+course-migrations-1      | migrate-service: schema=course version=V20260831_01__course_service_schema.sql applied
+course-migrations-1      | migrate-service: schema=course version=V20260831_02__course_security_version_inbox.sql applied
+course-migrations-1      | 1
+course-migrations-1      | 1
+course-migrations-1      | 1
+course-migrations-1      | 1
+course-migrations-1      | 1
+course-migrations-1      | migrate-service: schema=course version=V20260831_03__course_runtime_version_columns.sql applied
+course-migrations-1      | migrate-service: schema=course version=V20260831_04__course_outbox_fencing.sql applied
+course-migrations-1      | migrate-service: schema=course version=V20260831_05__course_file_delete_journal.sql applied
+course-migrations-1      | migrate-service: schema=course version=V20260831_06__course_chapter_active_order_uniqueness.sql applied
+course-migrations-1      | migrate-service: schema=course version=V20260901_07__course_lrn_owned_tables.sql applied
+course-migrations-1      | migrate-service: PASS schema=course applied=7
+mysql-1                  | 2026-09-03 04:02:03+00:00 [Note] [Entrypoint]: Entrypoint script for MySQL Server 8.4.11-1.el9 started.
+mysql-1                  | 2026-09-03 04:02:03+00:00 [Note] [Entrypoint]: Switching to dedicated user 'mysql'
+mysql-1                  | 2026-09-03 04:02:03+00:00 [Note] [Entrypoint]: Entrypoint script for MySQL Server 8.4.11-1.el9 started.
+assessment-api-1         | 
+assessment-api-1         |   .   ____          _            __ _ _
+assessment-api-1         |  /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+assessment-api-1         | ( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+assessment-api-1         |  \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+assessment-api-1         |   '  |____| .__|_| |_|_| |_\__, | / / / /
+assessment-api-1         |  =========|_|==============|___/=/_/_/_/
+assessment-api-1         | 
+assessment-api-1         |  :: Spring Boot ::                (v3.4.5)
+assessment-api-1         | 
+assessment-api-1         | 2026-09-03T04:02:23.243Z  INFO 1 --- [assessment-service] [           main] c.o.a.AssessmentServiceApplication       : Starting AssessmentServiceApplication v0.1.0-SNAPSHOT using Java 21.0.12 with PID 1 (/opt/onlinejudge-assessment/app.jar started by onlinejudge in /opt/onlinejudge-assessment)
+assessment-api-1         | 2026-09-03T04:02:23.255Z  INFO 1 --- [assessment-service] [           main] c.o.a.AssessmentServiceApplication       : No active profile set, falling back to 1 default profile: "default"
+assessment-api-1         | 2026-09-03T04:02:29.756Z  INFO 1 --- [assessment-service] [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port 8083 (http)
+assessment-api-1         | 2026-09-03T04:02:29.774Z  INFO 1 --- [assessment-service] [           main] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+grade-service-1          | 
+identity-migrations-1    | migrate-service: schema=identity version=DB-IDENTITY-01-identity-user-session.sql applied
+grade-service-1          |   .   ____          _            __ _ _
+assessment-migrations-1  | migrate-service: schema=assessment version=20260831_01_create_assessment_service_tables.sql applied
+identity-service-1  | 2026-09-03T04:02:21.813Z  INFO 1 --- [           main] w.s.c.ServletWebServerApplicationContext : Root WebApplicationContext: initialization completed in 3672 ms
+identity-service-1       | 2026-09-03T04:02:26.510Z  INFO 1 --- [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat started on port 8081 (http) with context path '/'
+identity-service-1       | 2026-09-03T04:02:26.549Z  INFO 1 --- [           main] c.o.i.IdentityServiceApplication         : Started IdentityServiceApplication in 9.914 seconds (process running for 10.989)
+identity-service-1       | 2026-09-03T04:02:26.588Z  INFO 1 --- [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
+identity-service-1       | 2026-09-03T04:02:26.722Z  INFO 1 --- [nio-8081-exec-1] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring DispatcherServlet 'dispatcherServlet'
+identity-service-1       | 2026-09-03T04:02:26.723Z  INFO 1 --- [nio-8081-exec-1] o.s.web.servlet.DispatcherServlet        : Initializing Servlet 'dispatcherServlet'
+identity-service-1       | 2026-09-03T04:02:26.724Z  INFO 1 --- [nio-8081-exec-1] o.s.web.servlet.DispatcherServlet        : Completed initialization in 1 ms
+identity-service-1       | 2026-09-03T04:02:27.795Z  INFO 1 --- [           main] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Added connection com.mysql.cj.jdbc.ConnectionImpl@740c4868
+identity-service-1       | 2026-09-03T04:02:27.799Z  INFO 1 --- [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
+gateway-1                | nginx: the configuration file /etc/nginx/nginx.conf syntax is ok
+gateway-1                | nginx: configuration file /etc/nginx/nginx.conf test is successful
+gateway-1                | 2026/09/03 04:02:37 [notice] 1#1: using the "epoll" event method
+gateway-1                | 2026/09/03 04:02:37 [notice] 1#1: nginx/1.27.5
+gateway-1                | 2026/09/03 04:02:37 [notice] 1#1: built by gcc 14.2.0 (Alpine 14.2.0) 
+gateway-1                | 2026/09/03 04:02:37 [notice] 1#1: OS: Linux 6.17.0-1022-azure
+gateway-1                | 2026/09/03 04:02:37 [notice] 1#1: getrlimit(RLIMIT_NOFILE): 65536:65536
+rabbitmq-1               | [38;5;87m2026-09-03 04:02:06.775844+00:00 [notice] <0.45.0> Application mnesia exited with reason: stopped[0m
+rabbitmq-1               | 2026-09-03 04:02:06.859897+00:00 [info] <0.209.0> Waiting for Mnesia tables for 30000 ms, 9 retries left[0m
+mysql-1                  | 2026-09-03 04:02:04+00:00 [Note] [Entrypoint]: Initializing database files
+gateway-1                | 2026/09/03 04:02:37 [notice] 1#1: start worker processes
+mysql-1                  | 2026-09-03T04:02:04.151134Z 0 [System] [MY-015017] [Server] MySQL Server Initialization - start.
+identity-migrations-1    | migrate-service: schema=identity version=DB-IDENTITY-02-service-token-idempotency.sql applied
+assessment-api-1         | 2026-09-03T04:02:29.774Z  INFO 1 --- [assessment-service] [           main] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/10.1.40]
+identity-migrations-1    | migrate-service: PASS schema=identity applied=2
+assessment-api-1         | 2026-09-03T04:02:29.805Z  INFO 1 --- [assessment-service] [           main] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring embedded WebApplicationContext
+assessment-migrations-1  | migrate-service: schema=assessment version=20260831_02_assessment_outbox_delivery_error.sql applied
+assessment-api-1         | 2026-09-03T04:02:29.806Z  INFO 1 --- [assessment-service] [           main] w.s.c.ServletWebServerApplicationContext : Root WebApplicationContext: initialization completed in 6372 ms
+assessment-migrations-1  | migrate-service: schema=assessment version=20260831_03_identity_security_version_dead_letter.sql applied
+assessment-worker-1      | 
+assessment-worker-1      |   .   ____          _            __ _ _
+assessment-worker-1      |  /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+assessment-worker-1      | ( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+assessment-worker-1      |  \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+assessment-worker-1      |   '  |____| .__|_| |_|_| |_\__, | / / / /
+assessment-worker-1      |  =========|_|==============|___/=/_/_/_/
+assessment-worker-1      | 
+assessment-worker-1      |  :: Spring Boot ::                (v3.4.5)
+assessment-worker-1      | 
+assessment-worker-1      | 2026-09-03T04:02:22.784Z  INFO 1 --- [assessment-service] [           main] c.o.a.AssessmentServiceApplication       : Starting AssessmentServiceApplication v0.1.0-SNAPSHOT using Java 21.0.12 with PID 1 (/opt/onlinejudge-assessment/app.jar started by onlinejudge in /opt/onlinejudge-assessment)
+assessment-worker-1      | 2026-09-03T04:02:22.796Z  INFO 1 --- [assessment-service] [           main] c.o.a.AssessmentServiceApplication       : No active profile set, falling back to 1 default profile: "default"
+assessment-worker-1      | 2026-09-03T04:02:30.747Z  INFO 1 --- [assessment-service] [           main] c.o.a.AssessmentServiceApplication       : Started AssessmentServiceApplication in 9.565 seconds (process running for 11.256)
+assessment-worker-1      | 2026-09-03T04:02:30.793Z  INFO 1 --- [assessment-service] [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
+assessment-worker-1      | 2026-09-03T04:02:31.444Z  INFO 1 --- [assessment-service] [           main] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Added connection com.mysql.cj.jdbc.ConnectionImpl@6d6039df
+grade-service-1          |  /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+rabbitmq-1               | 2026-09-03 04:02:06.860034+00:00 [info] <0.209.0> Successfully synced tables from a peer[0m
+grade-service-1          | ( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+mysql-1                  | 2026-09-03T04:02:04.153013Z 0 [System] [MY-013169] [Server] /usr/sbin/mysqld (mysqld 8.4.11) initializing of server in progress as process 80
+assessment-api-1         | 2026-09-03T04:02:32.434Z  INFO 1 --- [assessment-service] [           main] o.s.b.a.e.web.EndpointLinksResolver      : Exposing 2 endpoints beneath base path '/actuator'
+mysql-1                  | 2026-09-03T04:02:04.159256Z 1 [System] [MY-013576] [InnoDB] InnoDB initialization has started.
+mysql-1                  | 2026-09-03T04:02:04.267060Z 1 [System] [MY-013577] [InnoDB] InnoDB initialization has ended.
+grade-service-1          |  \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+grade-service-1          |   '  |____| .__|_| |_|_| |_\__, | / / / /
+grade-service-1          |  =========|_|==============|___/=/_/_/_/
+grade-service-1          | 
+grade-service-1          |  :: Spring Boot ::                (v3.4.5)
+grade-service-1          | 
+grade-service-1          | 2026-09-03T04:02:24.601Z  INFO 1 --- [grade-service] [           main] c.o.g.GradeServiceApplication            : Starting GradeServiceApplication v0.1.0-SNAPSHOT using Java 21.0.12 with PID 1 (/opt/onlinejudge-grade/app.jar started by onlinejudge in /opt/onlinejudge-grade)
+mysql-1                  | 2026-09-03T04:02:04.978049Z 6 [Warning] [MY-010453] [Server] root@localhost is created with an empty password ! Please consider switching off the --initialize-insecure option.
+gateway-1                | 2026/09/03 04:02:37 [notice] 1#1: start worker process 15
+mysql-1                  | 2026-09-03T04:02:06.881742Z 0 [System] [MY-015018] [Server] MySQL Server Initialization - end.
+assessment-api-1         | 2026-09-03T04:02:32.594Z  INFO 1 --- [assessment-service] [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat started on port 8083 (http) with context path '/'
+mysql-1                  | 2026-09-03 04:02:06+00:00 [Note] [Entrypoint]: Database files initialized
+grade-service-1          | 2026-09-03T04:02:24.607Z  INFO 1 --- [grade-service] [           main] c.o.g.GradeServiceApplication            : No active profile set, falling back to 1 default profile: "default"
+grade-service-1          | 2026-09-03T04:02:29.788Z  INFO 1 --- [grade-service] [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port 8084 (http)
+grade-service-1          | 2026-09-03T04:02:29.815Z  INFO 1 --- [grade-service] [           main] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+grade-service-1          | 2026-09-03T04:02:29.815Z  INFO 1 --- [grade-service] [           main] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/10.1.40]
+grade-service-1          | 2026-09-03T04:02:30.010Z  INFO 1 --- [grade-service] [           main] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring embedded WebApplicationContext
+grade-service-1          | 2026-09-03T04:02:30.012Z  INFO 1 --- [grade-service] [           main] w.s.c.ServletWebServerApplicationContext : Root WebApplicationContext: initialization completed in 5267 ms
+grade-service-1          | 2026-09-03T04:02:30.896Z  INFO 1 --- [grade-service] [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
+mysql-1                  | 2026-09-03 04:02:06+00:00 [Note] [Entrypoint]: Starting temporary server
+mysql-1                  | 2026-09-03T04:02:06.927021Z 0 [System] [MY-015015] [Server] MySQL Server - start.
+mysql-1                  | 2026-09-03T04:02:07.132371Z 0 [System] [MY-010116] [Server] /usr/sbin/mysqld (mysqld 8.4.11) starting as process 121
+mysql-1                  | 2026-09-03T04:02:07.145076Z 1 [System] [MY-013576] [InnoDB] InnoDB initialization has started.
+mysql-1                  | 2026-09-03T04:02:07.261660Z 1 [System] [MY-013577] [InnoDB] InnoDB initialization has ended.
+mysql-1                  | 2026-09-03T04:02:07.465120Z 0 [Warning] [MY-010068] [Server] CA certificate ca.pem is self signed.
+mysql-1                  | 2026-09-03T04:02:07.465155Z 0 [System] [MY-013602] [Server] Channel mysql_main configured to support TLS. Encrypted connections are now supported for this channel.
+grade-service-1          | 2026-09-03T04:02:31.308Z  INFO 1 --- [grade-service] [           main] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Added connection com.mysql.cj.jdbc.ConnectionImpl@919086
+grade-service-1          | 2026-09-03T04:02:31.310Z  INFO 1 --- [grade-service] [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
+gateway-1                | 2026/09/03 04:02:37 [notice] 1#1: start worker process 16
+assessment-api-1         | 2026-09-03T04:02:32.625Z  INFO 1 --- [assessment-service] [           main] c.o.a.AssessmentServiceApplication       : Started AssessmentServiceApplication in 11.093 seconds (process running for 13.104)
+gateway-1                | 2026/09/03 04:02:37 [notice] 1#1: start worker process 17
+assessment-api-1         | 2026-09-03T04:02:35.242Z  INFO 1 --- [assessment-service] [nio-8083-exec-1] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring DispatcherServlet 'dispatcherServlet'
+mysql-1                  | 2026-09-03T04:02:07.467201Z 0 [Warning] [MY-011810] [Server] Insecure configuration for --pid-file: Location '/var/run/mysqld' in the path is accessible to all OS users. Consider choosing a different directory.
+assessment-api-1         | 2026-09-03T04:02:35.243Z  INFO 1 --- [assessment-service] [nio-8083-exec-1] o.s.web.servlet.DispatcherServlet        : Initializing Servlet 'dispatcherServlet'
+mysql-1                  | 2026-09-03T04:02:07.482476Z 0 [System] [MY-011323] [Server] X Plugin ready for connections. Socket: /var/run/mysqld/mysqlx.sock
+gateway-1                | 2026/09/03 04:02:37 [notice] 1#1: start worker process 18
+mysql-1                  | 2026-09-03T04:02:07.482531Z 0 [System] [MY-010931] [Server] /usr/sbin/mysqld: ready for connections. Version: '8.4.11'  socket: '/var/run/mysqld/mysqld.sock'  port: 0  MySQL Community Server - GPL.
+gateway-1                | 127.0.0.1 - - [03/Sep/2026:04:02:42 +0000] "GET /health/ready HTTP/1.1" 200 15 "-" "Wget" request_id=931e7ae5-fd4a-574c-8e84-c86435e80946
+grade-service-1          | 2026-09-03T04:02:34.052Z  INFO 1 --- [grade-service] [           main] o.s.b.a.e.web.EndpointLinksResolver      : Exposing 2 endpoints beneath base path '/actuator'
+mysql-1                  | 2026-09-03 04:02:07+00:00 [Note] [Entrypoint]: Temporary server started.
+assessment-migrations-1  | migrate-service: schema=assessment version=20260901_01_create_assessment_lab_experiment.sql applied
+gateway-1                | 172.18.0.1 - - [03/Sep/2026:04:02:43 +0000] "GET /health/ready HTTP/1.1" 200 15 "-" "curl/8.5.0" request_id=issue318-disposable
+assessment-migrations-1  | migrate-service: schema=assessment version=20260901_02_add_lab_testcases_and_results.sql applied
+mysql-1                  | '/var/lib/mysql/mysql.sock' -> '/var/run/mysqld/mysqld.sock'
+assessment-migrations-1  | migrate-service: schema=assessment version=20260901_03_create_assessment_homework.sql applied
+mysql-1                  | 
+rabbitmq-1               | 2026-09-03 04:02:06.860136+00:00 [info] <0.209.0> Waiting for Mnesia tables for 30000 ms, 9 retries left[0m
+assessment-worker-1      | 2026-09-03T04:02:31.452Z  INFO 1 --- [assessment-service] [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
+grade-service-1          | 2026-09-03T04:02:34.346Z  INFO 1 --- [grade-service] [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat started on port 8084 (http) with context path '/'
+grade-service-1          | 2026-09-03T04:02:34.366Z  INFO 1 --- [grade-service] [           main] c.o.g.GradeServiceApplication            : Started GradeServiceApplication in 11.265 seconds (process running for 12.666)
+grade-service-1          | 2026-09-03T04:02:37.192Z  INFO 1 --- [grade-service] [nio-8084-exec-1] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring DispatcherServlet 'dispatcherServlet'
+grade-service-1          | 2026-09-03T04:02:37.192Z  INFO 1 --- [grade-service] [nio-8084-exec-1] o.s.web.servlet.DispatcherServlet        : Initializing Servlet 'dispatcherServlet'
+grade-service-1          | 2026-09-03T04:02:37.194Z  INFO 1 --- [grade-service] [nio-8084-exec-1] o.s.web.servlet.DispatcherServlet        : Completed initialization in 1 ms
+mysql-1                  | 2026-09-03 04:02:08+00:00 [Note] [Entrypoint]: Stopping temporary server
+mysql-1                  | 2026-09-03T04:02:08.802974Z 10 [System] [MY-013172] [Server] Received SHUTDOWN from user root. Shutting down mysqld (Version: 8.4.11).
+mysql-1                  | 2026-09-03T04:02:09.868267Z 0 [System] [MY-010910] [Server] /usr/sbin/mysqld: Shutdown complete (mysqld 8.4.11)  MySQL Community Server - GPL.
+mysql-1                  | 2026-09-03T04:02:09.868285Z 0 [System] [MY-015016] [Server] MySQL Server - end.
+mysql-1                  | 2026-09-03 04:02:10+00:00 [Note] [Entrypoint]: Temporary server stopped
+mysql-1                  | 
+mysql-1                  | 2026-09-03 04:02:10+00:00 [Note] [Entrypoint]: MySQL init process done. Ready for start up.
+mysql-1                  | 
+mysql-1                  | 2026-09-03T04:02:10.821232Z 0 [System] [MY-015015] [Server] MySQL Server - start.
+mysql-1                  | 2026-09-03T04:02:11.002970Z 0 [System] [MY-010116] [Server] /usr/sbin/mysqld (mysqld 8.4.11) starting as process 1
+mysql-1                  | 2026-09-03T04:02:11.008172Z 1 [System] [MY-013576] [InnoDB] InnoDB initialization has started.
+mysql-1                  | 2026-09-03T04:02:11.103651Z 1 [System] [MY-013577] [InnoDB] InnoDB initialization has ended.
+assessment-api-1         | 2026-09-03T04:02:35.244Z  INFO 1 --- [assessment-service] [nio-8083-exec-1] o.s.web.servlet.DispatcherServlet        : Completed initialization in 1 ms
+rabbitmq-1               | 2026-09-03 04:02:06.860266+00:00 [info] <0.209.0> Successfully synced tables from a peer[0m
+assessment-api-1         | 2026-09-03T04:02:35.297Z  INFO 1 --- [assessment-service] [nio-8083-exec-1] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
+rabbitmq-1               | 2026-09-03 04:02:06.862183+00:00 [info] <0.209.0> Waiting for Mnesia tables for 30000 ms, 9 retries left[0m
+mysql-1                  | 2026-09-03T04:02:11.263687Z 0 [Warning] [MY-010068] [Server] CA certificate ca.pem is self signed.
+rabbitmq-1               | 2026-09-03 04:02:06.862273+00:00 [info] <0.209.0> Successfully synced tables from a peer[0m
+assessment-migrations-1  | migrate-service: schema=assessment version=20260901_03_lab_lifecycle_score.sql applied
+rabbitmq-1               | 2026-09-03 04:02:06.862437+00:00 [info] <0.209.0> Running boot step tracking_metadata_store defined by app rabbit[0m
+assessment-api-1         | 2026-09-03T04:02:35.524Z  INFO 1 --- [assessment-service] [nio-8083-exec-1] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Added connection com.mysql.cj.jdbc.ConnectionImpl@2d509922
+rabbitmq-1               | 2026-09-03 04:02:06.862546+00:00 [info] <0.479.0> Setting up a table for connection tracking on this node: tracked_connection[0m
+mysql-1                  | 2026-09-03T04:02:11.263716Z 0 [System] [MY-013602] [Server] Channel mysql_main configured to support TLS. Encrypted connections are now supported for this channel.
+mysql-1                  | 2026-09-03T04:02:11.265315Z 0 [Warning] [MY-011810] [Server] Insecure configuration for --pid-file: Location '/var/run/mysqld' in the path is accessible to all OS users. Consider choosing a different directory.
+mysql-1                  | 2026-09-03T04:02:11.281292Z 0 [System] [MY-011323] [Server] X Plugin ready for connections. Bind-address: '::' port: 33060, socket: /var/run/mysqld/mysqlx.sock
+mysql-1                  | 2026-09-03T04:02:11.281410Z 0 [System] [MY-010931] [Server] /usr/sbin/mysqld: ready for connections. Version: '8.4.11'  socket: '/var/run/mysqld/mysqld.sock'  port: 3306  MySQL Community Server - GPL.
+rabbitmq-1               | 2026-09-03 04:02:06.862604+00:00 [info] <0.479.0> Setting up a table for per-vhost connection counting on this node: tracked_connection_per_vhost[0m
+rabbitmq-1               | 2026-09-03 04:02:06.862683+00:00 [info] <0.479.0> Setting up a table for per-user connection counting on this node: tracked_connection_per_user[0m
+rabbitmq-1               | 2026-09-03 04:02:06.862777+00:00 [info] <0.479.0> Setting up a table for channel tracking on this node: tracked_channel[0m
+rabbitmq-1               | 2026-09-03 04:02:06.862814+00:00 [info] <0.479.0> Setting up a table for channel tracking on this node: tracked_channel_per_user[0m
+rabbitmq-1               | 2026-09-03 04:02:06.862909+00:00 [info] <0.209.0> Running boot step networking_metadata_store defined by app rabbit[0m
+rabbitmq-1               | 2026-09-03 04:02:06.862977+00:00 [info] <0.209.0> Running boot step feature_flags defined by app rabbit[0m
+rabbitmq-1               | 2026-09-03 04:02:06.863098+00:00 [info] <0.209.0> Running boot step auth_backend_plugins_check defined by app rabbit[0m
+rabbitmq-1               | 2026-09-03 04:02:06.863137+00:00 [info] <0.209.0> Running boot step codec_correctness_check defined by app rabbit[0m
+rabbitmq-1               | 2026-09-03 04:02:06.863186+00:00 [info] <0.209.0> Running boot step external_infrastructure defined by app rabbit[0m
+rabbitmq-1               | 2026-09-03 04:02:06.863235+00:00 [info] <0.209.0> Running boot step rabbit_event defined by app rabbit[0m
+rabbitmq-1               | 2026-09-03 04:02:06.863378+00:00 [info] <0.209.0> Running boot step rabbit_auth_mechanism_amqplain defined by app rabbit[0m
+rabbitmq-1               | 2026-09-03 04:02:06.863468+00:00 [info] <0.209.0> Running boot step rabbit_auth_mechanism_anonymous defined by app rabbit[0m
+rabbitmq-1               | 2026-09-03 04:02:06.863529+00:00 [info] <0.209.0> Running boot step rabbit_auth_mechanism_cr_demo defined by app rabbit[0m
+rabbitmq-1               | 2026-09-03 04:02:06.863584+00:00 [info] <0.209.0> Running boot step rabbit_auth_mechanism_plain defined by app rabbit[0m
+rabbitmq-1               | 2026-09-03 04:02:06.863625+00:00 [info] <0.209.0> Running boot step rabbit_exchange_type_direct defined by app rabbit[0m
+rabbitmq-1               | 2026-09-03 04:02:06.863667+00:00 [info] <0.209.0> Running boot step rabbit_exchange_type_fanout defined by app rabbit[0m
+rabbitmq-1               | 2026-09-03 04:02:06.863725+00:00 [info] <0.209.0> Running boot step rabbit_exchange_type_headers defined by app rabbit[0m
+rabbitmq-1               | 2026-09-03 04:02:06.863776+00:00 [info] <0.209.0> Running boot step rabbit_exchange_type_local_random defined by app rabbit[0m
+rabbitmq-1               | 2026-09-03 04:02:06.863824+00:00 [info] <0.209.0> Running boot step rabbit_exchange_type_topic defined by app rabbit[0m
+rabbitmq-1               | 2026-09-03 04:02:06.863865+00:00 [info] <0.209.0> Running boot step rabbit_priority_queue defined by app rabbit[0m
+rabbitmq-1               | 2026-09-03 04:02:06.863912+00:00 [info] <0.209.0> Priority queues enabled, real BQ is rabbit_variable_queue[0m
+rabbitmq-1               | 2026-09-03 04:02:06.863962+00:00 [info] <0.209.0> Running boot step kernel_ready defined by app rabbit[0m
+rabbitmq-1               | 2026-09-03 04:02:06.863994+00:00 [info] <0.209.0> Running boot step pg_local_amqp_connection defined by app rabbit[0m
+rabbitmq-1               | 2026-09-03 04:02:06.869282+00:00 [info] <0.209.0> Running boot step pg_local_amqp_session defined by app rabbit[0m
+rabbitmq-1               | 2026-09-03 04:02:06.869417+00:00 [info] <0.209.0> Running boot step rabbit_sysmon_minder defined by app rabbit[0m
+rabbitmq-1               | 2026-09-03 04:02:06.869555+00:00 [info] <0.209.0> Running boot step rabbit_epmd_monitor defined by app rabbit[0m
+rabbitmq-1               | 2026-09-03 04:02:06.870246+00:00 [info] <0.488.0> epmd monitor knows us, inter-node communication (distribution) port: 25672[0m
+rabbitmq-1               | 2026-09-03 04:02:06.870379+00:00 [info] <0.209.0> Running boot step guid_generator defined by app rabbit[0m
+rabbitmq-1               | 2026-09-03 04:02:06.871157+00:00 [info] <0.209.0> Running boot step rabbit_node_monitor defined by app rabbit[0m
+rabbitmq-1               | 2026-09-03 04:02:06.871413+00:00 [info] <0.492.0> Starting rabbit_node_monitor (in ignore mode)[0m
+rabbitmq-1               | 2026-09-03 04:02:06.871533+00:00 [info] <0.209.0> Running boot step delegate_sup defined by app rabbit[0m
+rabbitmq-1               | 2026-09-03 04:02:06.871992+00:00 [info] <0.209.0> Running boot step rabbit_fifo_dlx_sup defined by app rabbit[0m
+rabbitmq-1               | 2026-09-03 04:02:06.872074+00:00 [info] <0.209.0> Running boot step core_initialized defined by app rabbit[0m
+rabbitmq-1               | 2026-09-03 04:02:06.872114+00:00 [info] <0.209.0> Running boot step rabbit_channel_tracking_handler defined by app rabbit[0m
+rabbitmq-1               | 2026-09-03 04:02:06.872195+00:00 [info] <0.209.0> Running boot step rabbit_classic_queue defined by app rabbit[0m
+rabbitmq-1               | 2026-09-03 04:02:06.872277+00:00 [info] <0.209.0> Running boot step rabbit_connection_tracking_handler defined by app rabbit[0m
+rabbitmq-1               | 2026-09-03 04:02:06.872350+00:00 [info] <0.209.0> Running boot step rabbit_definitions_hashing defined by app rabbit[0m
+rabbitmq-1               | 2026-09-03 04:02:06.872417+00:00 [info] <0.209.0> Running boot step rabbit_exchange_parameters defined by app rabbit[0m
+rabbitmq-1               | 2026-09-03 04:02:07.022816+00:00 [info] <0.209.0> Running boot step rabbit_policies defined by app rabbit[0m
+rabbitmq-1               | 2026-09-03 04:02:07.023189+00:00 [info] <0.209.0> Running boot step rabbit_policy defined by app rabbit[0m
+rabbitmq-1               | 2026-09-03 04:02:07.023250+00:00 [info] <0.209.0> Running boot step rabbit_quorum_memory_manager defined by app rabbit[0m
+rabbitmq-1               | 2026-09-03 04:02:07.023346+00:00 [info] <0.209.0> Running boot step rabbit_quorum_queue defined by app rabbit[0m
+assessment-api-1         | 2026-09-03T04:02:35.527Z  INFO 1 --- [assessment-service] [nio-8083-exec-1] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
+rabbitmq-1               | 2026-09-03 04:02:07.023457+00:00 [info] <0.209.0> Running boot step rabbit_stream_coordinator defined by app rabbit[0m
+rabbitmq-1               | 2026-09-03 04:02:07.023625+00:00 [info] <0.209.0> Running boot step rabbit_vhost_limit defined by app rabbit[0m
+rabbitmq-1               | 2026-09-03 04:02:07.023713+00:00 [info] <0.209.0> Running boot step rabbit_mgmt_reset_handler defined by app rabbitmq_management[0m
+rabbitmq-1               | 2026-09-03 04:02:07.023758+00:00 [info] <0.209.0> Running boot step rabbit_mgmt_db_handler defined by app rabbitmq_management_agent[0m
+rabbitmq-1               | 2026-09-03 04:02:07.023802+00:00 [info] <0.209.0> Management plugin: using rates mode 'basic'[0m
+rabbitmq-1               | 2026-09-03 04:02:07.023998+00:00 [info] <0.209.0> Running boot step recovery defined by app rabbit[0m
+rabbitmq-1               | 2026-09-03 04:02:07.043217+00:00 [info] <0.209.0> Running boot step prevent_startup_if_node_was_reset defined by app rabbit[0m
+rabbitmq-1               | 2026-09-03 04:02:07.043276+00:00 [info] <0.209.0> Running boot step empty_db_check defined by app rabbit[0m
+rabbitmq-1               | 2026-09-03 04:02:07.043351+00:00 [info] <0.209.0> Will seed default virtual host and user...[0m
+rabbitmq-1               | 2026-09-03 04:02:07.043481+00:00 [info] <0.209.0> Adding vhost '/' (description: 'Default virtual host', tags: [])[0m
+rabbitmq-1               | 2026-09-03 04:02:07.047981+00:00 [info] <0.535.0> Making sure data directory '/var/lib/rabbitmq/mnesia/rabbit@74aef9b56bfb/msg_stores/vhosts/628WB79CIFDYO9LJI6DKMI09L' for vhost '/' exists[0m
+rabbitmq-1               | 2026-09-03 04:02:07.048875+00:00 [info] <0.535.0> Setting segment_entry_count for vhost '/' with 0 queues to '2048'[0m
+rabbitmq-1               | 2026-09-03 04:02:07.055516+00:00 [info] <0.535.0> Starting message stores for vhost '/'[0m
+rabbitmq-1               | 2026-09-03 04:02:07.056590+00:00 [info] <0.535.0> Started message store of type transient for vhost '/'[0m
+rabbitmq-1               | [38;5;214m2026-09-03 04:02:07.057092+00:00 [warning] <0.549.0> Message store "628WB79CIFDYO9LJI6DKMI09L/msg_store_persistent": rebuilding indices from scratch[0m
+rabbitmq-1               | 2026-09-03 04:02:07.057734+00:00 [info] <0.535.0> Started message store of type persistent for vhost '/'[0m
+rabbitmq-1               | 2026-09-03 04:02:07.057870+00:00 [info] <0.535.0> Recovering 0 queues of type rabbit_classic_queue took 8ms[0m
+rabbitmq-1               | 2026-09-03 04:02:07.057926+00:00 [info] <0.535.0> Recovering 0 queues of type rabbit_quorum_queue took 0ms[0m
+rabbitmq-1               | 2026-09-03 04:02:07.057995+00:00 [info] <0.535.0> Recovering 0 queues of type rabbit_stream_queue took 0ms[0m
+rabbitmq-1               | 2026-09-03 04:02:07.059285+00:00 [info] <0.209.0> Created user 'onlinejudge'[0m
+rabbitmq-1               | 2026-09-03 04:02:07.059777+00:00 [info] <0.209.0> Successfully set user tags for user 'onlinejudge' to [administrator][0m
+rabbitmq-1               | 2026-09-03 04:02:07.060519+00:00 [info] <0.209.0> Successfully set permissions for user 'onlinejudge' in virtual host '/' to '.*', '.*', '.*'[0m
+rabbitmq-1               | 2026-09-03 04:02:07.060571+00:00 [info] <0.209.0> Running boot step rabbit_observer_cli defined by app rabbit[0m
+rabbitmq-1               | 2026-09-03 04:02:07.060670+00:00 [info] <0.209.0> Running boot step rabbit_core_metrics_gc defined by app rabbit[0m
+assessment-migrations-1  | migrate-service: schema=assessment version=20260901_04_lab_event_correlation_and_score_validation.sql applied
+assessment-migrations-1  | migrate-service: schema=assessment version=20260901_04_source_grade_snapshot_revisions.sql applied
+assessment-migrations-1  | migrate-service: schema=assessment version=20260901_05_source_grade_snapshot_floor.sql applied
+assessment-migrations-1  | migrate-service: schema=assessment version=20260901_06_homework_evaluation_history.sql applied
+assessment-migrations-1  | migrate-service: schema=assessment version=20260902_01_hwk_multitype_submission.sql applied
+assessment-migrations-1  | migrate-service: schema=assessment version=20260902_02_create_assessment_lab_report.sql applied
+assessment-migrations-1  | migrate-service: schema=assessment version=20260903_01_create_assessment_lab_submission_source_file.sql applied
+assessment-migrations-1  | migrate-service: schema=assessment version=20260903_02_create_assessment_homework_question.sql applied
+assessment-migrations-1  | migrate-service: schema=assessment version=20260903_03_create_assessment_homework_attachment.sql applied
+assessment-migrations-1  | migrate-service: PASS schema=assessment applied=16
+rabbitmq-1               | 2026-09-03 04:02:07.060790+00:00 [info] <0.209.0> Running boot step background_gc defined by app rabbit[0m
+rabbitmq-1               | 2026-09-03 04:02:07.060948+00:00 [info] <0.209.0> Running boot step routing_ready defined by app rabbit[0m
+rabbitmq-1               | 2026-09-03 04:02:07.060991+00:00 [info] <0.209.0> Running boot step pre_flight defined by app rabbit[0m
+rabbitmq-1               | 2026-09-03 04:02:07.061047+00:00 [info] <0.209.0> Running boot step notify_cluster defined by app rabbit[0m
+rabbitmq-1               | 2026-09-03 04:02:07.061097+00:00 [info] <0.209.0> Running boot step networking defined by app rabbit[0m
+rabbitmq-1               | 2026-09-03 04:02:07.061202+00:00 [info] <0.209.0> Running boot step rabbit_quorum_queue_periodic_membership_reconciliation defined by app rabbit[0m
+rabbitmq-1               | 2026-09-03 04:02:07.061412+00:00 [info] <0.209.0> Running boot step definition_import_worker_pool defined by app rabbit[0m
+rabbitmq-1               | 2026-09-03 04:02:07.061473+00:00 [info] <0.263.0> Starting worker pool 'definition_import_pool' with 4 processes in it[0m
+rabbitmq-1               | 2026-09-03 04:02:07.061998+00:00 [info] <0.209.0> Running boot step cluster_name defined by app rabbit[0m
+rabbitmq-1               | 2026-09-03 04:02:07.062100+00:00 [info] <0.209.0> Initialising internal cluster ID to 'rabbitmq-cluster-id--K67oE1VFNCTplYa1-uRWQ'[0m
+rabbitmq-1               | 2026-09-03 04:02:07.062732+00:00 [info] <0.209.0> Running boot step virtual_host_reconciliation defined by app rabbit[0m
+rabbitmq-1               | 2026-09-03 04:02:07.062873+00:00 [info] <0.209.0> Running boot step direct_client defined by app rabbit[0m
+rabbitmq-1               | 2026-09-03 04:02:07.062959+00:00 [info] <0.209.0> Running boot step cluster_tags defined by app rabbit[0m
+rabbitmq-1               | 2026-09-03 04:02:07.063503+00:00 [info] <0.209.0> Running boot step rabbit_management_load_definitions defined by app rabbitmq_management[0m
+rabbitmq-1               | 2026-09-03 04:02:07.063595+00:00 [info] <0.587.0> Resetting node maintenance status[0m
+rabbitmq-1               | [38;5;214m2026-09-03 04:02:07.194804+00:00 [warning] <0.609.0> Deprecated features: `management_metrics_collection`: Feature `management_metrics_collection` is deprecated.[0m
+rabbitmq-1               | [38;5;214m2026-09-03 04:02:07.194804+00:00 [warning] <0.609.0> By default, this feature can still be used for now.[0m
+rabbitmq-1               | [38;5;214m2026-09-03 04:02:07.194804+00:00 [warning] <0.609.0> Its use will not be permitted by default in a future minor RabbitMQ version and the feature will be removed from a future major RabbitMQ version; actual versions to be determined.[0m
+rabbitmq-1               | [38;5;214m2026-09-03 04:02:07.194804+00:00 [warning] <0.609.0> To continue using this feature when it is not permitted by default, set the following parameter in your configuration:[0m
+rabbitmq-1               | [38;5;214m2026-09-03 04:02:07.194804+00:00 [warning] <0.609.0>     "deprecated_features.permit.management_metrics_collection = true"[0m
+rabbitmq-1               | [38;5;214m2026-09-03 04:02:07.194804+00:00 [warning] <0.609.0> To test RabbitMQ as if the feature was removed, set this in your configuration:[0m
+rabbitmq-1               | [38;5;214m2026-09-03 04:02:07.194804+00:00 [warning] <0.609.0>     "deprecated_features.permit.management_metrics_collection = false"[0m
+rabbitmq-1               | 2026-09-03 04:02:07.225554+00:00 [info] <0.645.0> Management plugin: HTTP (non-TLS) listener started on port 15672[0m
+rabbitmq-1               | 2026-09-03 04:02:07.225784+00:00 [info] <0.673.0> Statistics database started.[0m
+rabbitmq-1               | 2026-09-03 04:02:07.225965+00:00 [info] <0.672.0> Starting worker pool 'management_worker_pool' with 3 processes in it[0m
+rabbitmq-1               | 2026-09-03 04:02:07.238842+00:00 [info] <0.684.0> Prometheus metrics: HTTP (non-TLS) listener started on port 15692[0m
+rabbitmq-1               | 2026-09-03 04:02:07.238988+00:00 [info] <0.587.0> Ready to start client connection listeners[0m
+rabbitmq-1               | 2026-09-03 04:02:07.240541+00:00 [info] <0.728.0> started TCP listener on [::]:5672[0m
+rabbitmq-1               |  completed with 4 plugins.
+rabbitmq-1               | 2026-09-03 04:02:07.339107+00:00 [info] <0.587.0> Server startup complete; 4 plugins started.[0m
+rabbitmq-1               | 2026-09-03 04:02:07.339107+00:00 [info] <0.587.0>  * rabbitmq_prometheus[0m
+rabbitmq-1               | 2026-09-03 04:02:07.339107+00:00 [info] <0.587.0>  * rabbitmq_management[0m
+rabbitmq-1               | 2026-09-03 04:02:07.339107+00:00 [info] <0.587.0>  * rabbitmq_management_agent[0m
+rabbitmq-1               | 2026-09-03 04:02:07.339107+00:00 [info] <0.587.0>  * rabbitmq_web_dispatch[0m
+rabbitmq-1               | 2026-09-03 04:02:07.465373+00:00 [info] <0.10.0> Time to start RabbitMQ: 3525 ms[0m
+rabbitmq-1               | 2026-09-03 04:02:30.360464+00:00 [info] <0.750.0> accepting AMQP connection 172.18.0.6:43162 -> 172.18.0.4:5672[0m
+rabbitmq-1               | 2026-09-03 04:02:30.515634+00:00 [info] <0.750.0> connection 172.18.0.6:43162 -> 172.18.0.4:5672 has a client-provided name: course-learning-facts-consumer[0m
+rabbitmq-1               | 2026-09-03 04:02:30.529771+00:00 [info] <0.750.0> connection 172.18.0.6:43162 -> 172.18.0.4:5672 - course-learning-facts-consumer: user 'onlinejudge' authenticated and granted access to vhost '/'[0m
+rabbitmq-1               | 2026-09-03 04:02:30.540765+00:00 [info] <0.755.0> accepting AMQP connection 172.18.0.7:47002 -> 172.18.0.4:5672[0m
+rabbitmq-1               | 2026-09-03 04:02:30.639187+00:00 [info] <0.755.0> connection 172.18.0.7:47002 -> 172.18.0.4:5672 has a client-provided name: assessment-course-member-consumer[0m
+rabbitmq-1               | 2026-09-03 04:02:30.647683+00:00 [info] <0.755.0> connection 172.18.0.7:47002 -> 172.18.0.4:5672 - assessment-course-member-consumer: user 'onlinejudge' authenticated and granted access to vhost '/'[0m
+rabbitmq-1               | 2026-09-03 04:02:30.677093+00:00 [info] <0.750.0> closing AMQP connection (172.18.0.6:43162 -> 172.18.0.4:5672 - course-learning-facts-consumer, vhost: '/', user: 'onlinejudge', duration: '341ms')[0m
+rabbitmq-1               | 2026-09-03 04:02:30.695622+00:00 [info] <0.821.0> accepting AMQP connection 172.18.0.7:47016 -> 172.18.0.4:5672[0m
+rabbitmq-1               | 2026-09-03 04:02:30.697413+00:00 [info] <0.821.0> connection 172.18.0.7:47016 -> 172.18.0.4:5672 has a client-provided name: assessment-identity-security-version-consumer[0m
+rabbitmq-1               | 2026-09-03 04:02:30.698482+00:00 [info] <0.821.0> connection 172.18.0.7:47016 -> 172.18.0.4:5672 - assessment-identity-security-version-consumer: user 'onlinejudge' authenticated and granted access to vhost '/'[0m
+rabbitmq-1               | 2026-09-03 04:02:31.233846+00:00 [info] <0.847.0> accepting AMQP connection 172.18.0.7:47030 -> 172.18.0.4:5672[0m
+rabbitmq-1               | 2026-09-03 04:02:31.238791+00:00 [info] <0.847.0> connection 172.18.0.7:47030 -> 172.18.0.4:5672 has a client-provided name: assessment-outbox-relay[0m
+rabbitmq-1               | 2026-09-03 04:02:31.261814+00:00 [info] <0.847.0> connection 172.18.0.7:47030 -> 172.18.0.4:5672 - assessment-outbox-relay: user 'onlinejudge' authenticated and granted access to vhost '/'[0m
+rabbitmq-1               | 2026-09-03 04:02:31.568061+00:00 [info] <0.847.0> closing AMQP connection (172.18.0.7:47030 -> 172.18.0.4:5672 - assessment-outbox-relay, vhost: '/', user: 'onlinejudge', duration: '335ms')[0m
+rabbitmq-1               | 2026-09-03 04:02:31.580459+00:00 [info] <0.869.0> accepting AMQP connection 172.18.0.7:47036 -> 172.18.0.4:5672[0m
+rabbitmq-1               | 2026-09-03 04:02:31.581565+00:00 [info] <0.865.0> accepting AMQP connection 172.18.0.7:47034 -> 172.18.0.4:5672[0m
+rabbitmq-1               | 2026-09-03 04:02:31.583559+00:00 [info] <0.869.0> connection 172.18.0.7:47036 -> 172.18.0.4:5672 has a client-provided name: assessment-worker-readiness[0m
+rabbitmq-1               | 2026-09-03 04:02:31.583857+00:00 [info] <0.865.0> connection 172.18.0.7:47034 -> 172.18.0.4:5672 has a client-provided name: assessment-worker-readiness[0m
+rabbitmq-1               | 2026-09-03 04:02:31.585055+00:00 [info] <0.869.0> connection 172.18.0.7:47036 -> 172.18.0.4:5672 - assessment-worker-readiness: user 'onlinejudge' authenticated and granted access to vhost '/'[0m
+rabbitmq-1               | 2026-09-03 04:02:31.586869+00:00 [info] <0.869.0> closing AMQP connection (172.18.0.7:47036 -> 172.18.0.4:5672 - assessment-worker-readiness, vhost: '/', user: 'onlinejudge', duration: '6ms')[0m
+rabbitmq-1               | 2026-09-03 04:02:31.593167+00:00 [info] <0.865.0> connection 172.18.0.7:47034 -> 172.18.0.4:5672 - assessment-worker-readiness: user 'onlinejudge' authenticated and granted access to vhost '/'[0m
+rabbitmq-1               | 2026-09-03 04:02:31.594620+00:00 [info] <0.865.0> closing AMQP connection (172.18.0.7:47034 -> 172.18.0.4:5672 - assessment-worker-readiness, vhost: '/', user: 'onlinejudge', duration: '14ms')[0m
+rabbitmq-1               | 2026-09-03 04:02:31.702734+00:00 [info] <0.887.0> accepting AMQP connection 172.18.0.6:43166 -> 172.18.0.4:5672[0m
+rabbitmq-1               | 2026-09-03 04:02:31.709152+00:00 [info] <0.887.0> connection 172.18.0.6:43166 -> 172.18.0.4:5672 has a client-provided name: course-identity-security-version-consumer[0m
+rabbitmq-1               | 2026-09-03 04:02:31.711839+00:00 [info] <0.887.0> connection 172.18.0.6:43166 -> 172.18.0.4:5672 - course-identity-security-version-consumer: user 'onlinejudge' authenticated and granted access to vhost '/'[0m
+rabbitmq-1               | 2026-09-03 04:02:31.721917+00:00 [info] <0.887.0> closing AMQP connection (172.18.0.6:43166 -> 172.18.0.4:5672 - course-identity-security-version-consumer, vhost: '/', user: 'onlinejudge', duration: '19ms')[0m
+rabbitmq-1               | 2026-09-03 04:02:31.724178+00:00 [info] <0.911.0> accepting AMQP connection 172.18.0.6:43182 -> 172.18.0.4:5672[0m
+rabbitmq-1               | 2026-09-03 04:02:31.726138+00:00 [info] <0.911.0> connection 172.18.0.6:43182 -> 172.18.0.4:5672 has a client-provided name: course-learning-facts-consumer[0m
+rabbitmq-1               | 2026-09-03 04:02:31.727054+00:00 [info] <0.911.0> connection 172.18.0.6:43182 -> 172.18.0.4:5672 - course-learning-facts-consumer: user 'onlinejudge' authenticated and granted access to vhost '/'[0m
+rabbitmq-1               | 2026-09-03 04:02:31.741839+00:00 [info] <0.911.0> closing AMQP connection (172.18.0.6:43182 -> 172.18.0.4:5672 - course-learning-facts-consumer, vhost: '/', user: 'onlinejudge', duration: '17ms')[0m
+rabbitmq-1               | 2026-09-03 04:02:32.570577+00:00 [info] <0.938.0> accepting AMQP connection 172.18.0.7:47100 -> 172.18.0.4:5672[0m
+rabbitmq-1               | 2026-09-03 04:02:32.575122+00:00 [info] <0.938.0> connection 172.18.0.7:47100 -> 172.18.0.4:5672 has a client-provided name: assessment-outbox-relay[0m
+rabbitmq-1               | 2026-09-03 04:02:32.576202+00:00 [info] <0.938.0> connection 172.18.0.7:47100 -> 172.18.0.4:5672 - assessment-outbox-relay: user 'onlinejudge' authenticated and granted access to vhost '/'[0m
+rabbitmq-1               | 2026-09-03 04:02:32.582735+00:00 [info] <0.938.0> closing AMQP connection (172.18.0.7:47100 -> 172.18.0.4:5672 - assessment-outbox-relay, vhost: '/', user: 'onlinejudge', duration: '12ms')[0m
+rabbitmq-1               | 2026-09-03 04:02:32.733653+00:00 [info] <0.956.0> accepting AMQP connection 172.18.0.6:45752 -> 172.18.0.4:5672[0m
+rabbitmq-1               | 2026-09-03 04:02:32.737218+00:00 [info] <0.956.0> connection 172.18.0.6:45752 -> 172.18.0.4:5672 has a client-provided name: course-identity-security-version-consumer[0m
+rabbitmq-1               | 2026-09-03 04:02:32.738412+00:00 [info] <0.956.0> connection 172.18.0.6:45752 -> 172.18.0.4:5672 - course-identity-security-version-consumer: user 'onlinejudge' authenticated and granted access to vhost '/'[0m
+rabbitmq-1               | 2026-09-03 04:02:32.742813+00:00 [info] <0.956.0> closing AMQP connection (172.18.0.6:45752 -> 172.18.0.4:5672 - course-identity-security-version-consumer, vhost: '/', user: 'onlinejudge', duration: '10ms')[0m
+rabbitmq-1               | 2026-09-03 04:02:32.744081+00:00 [info] <0.975.0> accepting AMQP connection 172.18.0.6:45766 -> 172.18.0.4:5672[0m
+rabbitmq-1               | 2026-09-03 04:02:32.745675+00:00 [info] <0.975.0> connection 172.18.0.6:45766 -> 172.18.0.4:5672 has a client-provided name: course-learning-facts-consumer[0m
+rabbitmq-1               | 2026-09-03 04:02:32.748109+00:00 [info] <0.975.0> connection 172.18.0.6:45766 -> 172.18.0.4:5672 - course-learning-facts-consumer: user 'onlinejudge' authenticated and granted access to vhost '/'[0m
+rabbitmq-1               | 2026-09-03 04:02:32.760145+00:00 [info] <0.975.0> closing AMQP connection (172.18.0.6:45766 -> 172.18.0.4:5672 - course-learning-facts-consumer, vhost: '/', user: 'onlinejudge', duration: '16ms')[0m
+rabbitmq-1               | 2026-09-03 04:02:33.584774+00:00 [info] <0.1002.0> accepting AMQP connection 172.18.0.7:47114 -> 172.18.0.4:5672[0m
+rabbitmq-1               | 2026-09-03 04:02:33.587197+00:00 [info] <0.1002.0> connection 172.18.0.7:47114 -> 172.18.0.4:5672 has a client-provided name: assessment-outbox-relay[0m
+rabbitmq-1               | 2026-09-03 04:02:33.590360+00:00 [info] <0.1002.0> connection 172.18.0.7:47114 -> 172.18.0.4:5672 - assessment-outbox-relay: user 'onlinejudge' authenticated and granted access to vhost '/'[0m
+rabbitmq-1               | 2026-09-03 04:02:33.594388+00:00 [info] <0.1002.0> closing AMQP connection (172.18.0.7:47114 -> 172.18.0.4:5672 - assessment-outbox-relay, vhost: '/', user: 'onlinejudge', duration: '10ms')[0m
+rabbitmq-1               | 2026-09-03 04:02:33.744316+00:00 [info] <0.1020.0> accepting AMQP connection 172.18.0.6:45778 -> 172.18.0.4:5672[0m
+rabbitmq-1               | 2026-09-03 04:02:33.746127+00:00 [info] <0.1020.0> connection 172.18.0.6:45778 -> 172.18.0.4:5672 has a client-provided name: course-identity-security-version-consumer[0m
+rabbitmq-1               | 2026-09-03 04:02:33.747413+00:00 [info] <0.1020.0> connection 172.18.0.6:45778 -> 172.18.0.4:5672 - course-identity-security-version-consumer: user 'onlinejudge' authenticated and granted access to vhost '/'[0m
+rabbitmq-1               | 2026-09-03 04:02:33.753739+00:00 [info] <0.1020.0> closing AMQP connection (172.18.0.6:45778 -> 172.18.0.4:5672 - course-identity-security-version-consumer, vhost: '/', user: 'onlinejudge', duration: '9ms')[0m
+rabbitmq-1               | 2026-09-03 04:02:33.762602+00:00 [info] <0.1039.0> accepting AMQP connection 172.18.0.6:45788 -> 172.18.0.4:5672[0m
+rabbitmq-1               | 2026-09-03 04:02:33.765461+00:00 [info] <0.1039.0> connection 172.18.0.6:45788 -> 172.18.0.4:5672 has a client-provided name: course-learning-facts-consumer[0m
+rabbitmq-1               | 2026-09-03 04:02:33.766542+00:00 [info] <0.1039.0> connection 172.18.0.6:45788 -> 172.18.0.4:5672 - course-learning-facts-consumer: user 'onlinejudge' authenticated and granted access to vhost '/'[0m
+rabbitmq-1               | 2026-09-03 04:02:33.782726+00:00 [info] <0.1039.0> closing AMQP connection (172.18.0.6:45788 -> 172.18.0.4:5672 - course-learning-facts-consumer, vhost: '/', user: 'onlinejudge', duration: '21ms')[0m
+rabbitmq-1               | 2026-09-03 04:02:34.246548+00:00 [info] <0.1070.0> accepting AMQP connection 172.18.0.8:44194 -> 172.18.0.4:5672[0m
+rabbitmq-1               | 2026-09-03 04:02:34.262461+00:00 [info] <0.1070.0> connection 172.18.0.8:44194 -> 172.18.0.4:5672 has a client-provided name: grade-source-grade-consumer[0m
+rabbitmq-1               | 2026-09-03 04:02:34.266714+00:00 [info] <0.1070.0> connection 172.18.0.8:44194 -> 172.18.0.4:5672 - grade-source-grade-consumer: user 'onlinejudge' authenticated and granted access to vhost '/'[0m
+rabbitmq-1               | 2026-09-03 04:02:34.596843+00:00 [info] <0.1096.0> accepting AMQP connection 172.18.0.7:47122 -> 172.18.0.4:5672[0m
+rabbitmq-1               | 2026-09-03 04:02:34.599966+00:00 [info] <0.1096.0> connection 172.18.0.7:47122 -> 172.18.0.4:5672 has a client-provided name: assessment-outbox-relay[0m
+rabbitmq-1               | 2026-09-03 04:02:34.600841+00:00 [info] <0.1096.0> connection 172.18.0.7:47122 -> 172.18.0.4:5672 - assessment-outbox-relay: user 'onlinejudge' authenticated and granted access to vhost '/'[0m
+rabbitmq-1               | 2026-09-03 04:02:34.604302+00:00 [info] <0.1096.0> closing AMQP connection (172.18.0.7:47122 -> 172.18.0.4:5672 - assessment-outbox-relay, vhost: '/', user: 'onlinejudge', duration: '8ms')[0m
+rabbitmq-1               | 2026-09-03 04:02:34.755287+00:00 [info] <0.1114.0> accepting AMQP connection 172.18.0.6:45800 -> 172.18.0.4:5672[0m
+rabbitmq-1               | 2026-09-03 04:02:34.756635+00:00 [info] <0.1114.0> connection 172.18.0.6:45800 -> 172.18.0.4:5672 has a client-provided name: course-identity-security-version-consumer[0m
+rabbitmq-1               | 2026-09-03 04:02:34.757518+00:00 [info] <0.1114.0> connection 172.18.0.6:45800 -> 172.18.0.4:5672 - course-identity-security-version-consumer: user 'onlinejudge' authenticated and granted access to vhost '/'[0m
+rabbitmq-1               | 2026-09-03 04:02:34.760300+00:00 [info] <0.1114.0> closing AMQP connection (172.18.0.6:45800 -> 172.18.0.4:5672 - course-identity-security-version-consumer, vhost: '/', user: 'onlinejudge', duration: '5ms')[0m
+rabbitmq-1               | 2026-09-03 04:02:34.784158+00:00 [info] <0.1133.0> accepting AMQP connection 172.18.0.6:45806 -> 172.18.0.4:5672[0m
+rabbitmq-1               | 2026-09-03 04:02:34.785407+00:00 [info] <0.1133.0> connection 172.18.0.6:45806 -> 172.18.0.4:5672 has a client-provided name: course-learning-facts-consumer[0m
+rabbitmq-1               | 2026-09-03 04:02:34.786064+00:00 [info] <0.1133.0> connection 172.18.0.6:45806 -> 172.18.0.4:5672 - course-learning-facts-consumer: user 'onlinejudge' authenticated and granted access to vhost '/'[0m
+rabbitmq-1               | 2026-09-03 04:02:34.791789+00:00 [info] <0.1133.0> closing AMQP connection (172.18.0.6:45806 -> 172.18.0.4:5672 - course-learning-facts-consumer, vhost: '/', user: 'onlinejudge', duration: '7ms')[0m
+rabbitmq-1               | 2026-09-03 04:02:35.606164+00:00 [info] <0.1160.0> accepting AMQP connection 172.18.0.7:47132 -> 172.18.0.4:5672[0m
+rabbitmq-1               | 2026-09-03 04:02:35.608629+00:00 [info] <0.1160.0> connection 172.18.0.7:47132 -> 172.18.0.4:5672 has a client-provided name: assessment-outbox-relay[0m
+rabbitmq-1               | 2026-09-03 04:02:35.612403+00:00 [info] <0.1160.0> connection 172.18.0.7:47132 -> 172.18.0.4:5672 - assessment-outbox-relay: user 'onlinejudge' authenticated and granted access to vhost '/'[0m
+rabbitmq-1               | 2026-09-03 04:02:35.616250+00:00 [info] <0.1160.0> closing AMQP connection (172.18.0.7:47132 -> 172.18.0.4:5672 - assessment-outbox-relay, vhost: '/', user: 'onlinejudge', duration: '10ms')[0m
+rabbitmq-1               | 2026-09-03 04:02:35.761781+00:00 [info] <0.1178.0> accepting AMQP connection 172.18.0.6:45816 -> 172.18.0.4:5672[0m
+rabbitmq-1               | 2026-09-03 04:02:35.763443+00:00 [info] <0.1178.0> connection 172.18.0.6:45816 -> 172.18.0.4:5672 has a client-provided name: course-identity-security-version-consumer[0m
+rabbitmq-1               | 2026-09-03 04:02:35.764386+00:00 [info] <0.1178.0> connection 172.18.0.6:45816 -> 172.18.0.4:5672 - course-identity-security-version-consumer: user 'onlinejudge' authenticated and granted access to vhost '/'[0m
+rabbitmq-1               | 2026-09-03 04:02:35.767647+00:00 [info] <0.1178.0> closing AMQP connection (172.18.0.6:45816 -> 172.18.0.4:5672 - course-identity-security-version-consumer, vhost: '/', user: 'onlinejudge', duration: '6ms')[0m
+rabbitmq-1               | 2026-09-03 04:02:35.792861+00:00 [info] <0.1197.0> accepting AMQP connection 172.18.0.6:45822 -> 172.18.0.4:5672[0m
+rabbitmq-1               | 2026-09-03 04:02:35.793957+00:00 [info] <0.1197.0> connection 172.18.0.6:45822 -> 172.18.0.4:5672 has a client-provided name: course-learning-facts-consumer[0m
+rabbitmq-1               | 2026-09-03 04:02:35.794880+00:00 [info] <0.1197.0> connection 172.18.0.6:45822 -> 172.18.0.4:5672 - course-learning-facts-consumer: user 'onlinejudge' authenticated and granted access to vhost '/'[0m
+rabbitmq-1               | 2026-09-03 04:02:35.800771+00:00 [info] <0.1197.0> closing AMQP connection (172.18.0.6:45822 -> 172.18.0.4:5672 - course-learning-facts-consumer, vhost: '/', user: 'onlinejudge', duration: '8ms')[0m
+rabbitmq-1               | 2026-09-03 04:02:36.589661+00:00 [info] <0.1224.0> accepting AMQP connection 172.18.0.7:47142 -> 172.18.0.4:5672[0m
+rabbitmq-1               | 2026-09-03 04:02:36.591795+00:00 [info] <0.1224.0> connection 172.18.0.7:47142 -> 172.18.0.4:5672 has a client-provided name: assessment-worker-readiness[0m
+rabbitmq-1               | 2026-09-03 04:02:36.592552+00:00 [info] <0.1224.0> connection 172.18.0.7:47142 -> 172.18.0.4:5672 - assessment-worker-readiness: user 'onlinejudge' authenticated and granted access to vhost '/'[0m
+rabbitmq-1               | 2026-09-03 04:02:36.593399+00:00 [info] <0.1224.0> closing AMQP connection (172.18.0.7:47142 -> 172.18.0.4:5672 - assessment-worker-readiness, vhost: '/', user: 'onlinejudge', duration: '4ms')[0m
+rabbitmq-1               | 2026-09-03 04:02:36.617474+00:00 [info] <0.1235.0> accepting AMQP connection 172.18.0.7:47148 -> 172.18.0.4:5672[0m
+rabbitmq-1               | 2026-09-03 04:02:36.618780+00:00 [info] <0.1235.0> connection 172.18.0.7:47148 -> 172.18.0.4:5672 has a client-provided name: assessment-outbox-relay[0m
+rabbitmq-1               | 2026-09-03 04:02:36.619627+00:00 [info] <0.1235.0> connection 172.18.0.7:47148 -> 172.18.0.4:5672 - assessment-outbox-relay: user 'onlinejudge' authenticated and granted access to vhost '/'[0m
+rabbitmq-1               | 2026-09-03 04:02:36.622543+00:00 [info] <0.1235.0> closing AMQP connection (172.18.0.7:47148 -> 172.18.0.4:5672 - assessment-outbox-relay, vhost: '/', user: 'onlinejudge', duration: '5ms')[0m
+rabbitmq-1               | 2026-09-03 04:02:36.768805+00:00 [info] <0.1253.0> accepting AMQP connection 172.18.0.6:45828 -> 172.18.0.4:5672[0m
+rabbitmq-1               | 2026-09-03 04:02:36.770494+00:00 [info] <0.1253.0> connection 172.18.0.6:45828 -> 172.18.0.4:5672 has a client-provided name: course-identity-security-version-consumer[0m
+rabbitmq-1               | 2026-09-03 04:02:36.771178+00:00 [info] <0.1253.0> connection 172.18.0.6:45828 -> 172.18.0.4:5672 - course-identity-security-version-consumer: user 'onlinejudge' authenticated and granted access to vhost '/'[0m
+rabbitmq-1               | 2026-09-03 04:02:36.773660+00:00 [info] <0.1253.0> closing AMQP connection (172.18.0.6:45828 -> 172.18.0.4:5672 - course-identity-security-version-consumer, vhost: '/', user: 'onlinejudge', duration: '5ms')[0m
+rabbitmq-1               | 2026-09-03 04:02:36.801987+00:00 [info] <0.1272.0> accepting AMQP connection 172.18.0.6:45838 -> 172.18.0.4:5672[0m
+rabbitmq-1               | 2026-09-03 04:02:36.803076+00:00 [info] <0.1272.0> connection 172.18.0.6:45838 -> 172.18.0.4:5672 has a client-provided name: course-learning-facts-consumer[0m
+rabbitmq-1               | 2026-09-03 04:02:36.803746+00:00 [info] <0.1272.0> connection 172.18.0.6:45838 -> 172.18.0.4:5672 - course-learning-facts-consumer: user 'onlinejudge' authenticated and granted access to vhost '/'[0m
+rabbitmq-1               | 2026-09-03 04:02:36.810088+00:00 [info] <0.1272.0> closing AMQP connection (172.18.0.6:45838 -> 172.18.0.4:5672 - course-learning-facts-consumer, vhost: '/', user: 'onlinejudge', duration: '9ms')[0m
+rabbitmq-1               | 2026-09-03 04:02:37.624086+00:00 [info] <0.1301.0> accepting AMQP connection 172.18.0.7:47150 -> 172.18.0.4:5672[0m
+rabbitmq-1               | 2026-09-03 04:02:37.625944+00:00 [info] <0.1301.0> connection 172.18.0.7:47150 -> 172.18.0.4:5672 has a client-provided name: assessment-outbox-relay[0m
+rabbitmq-1               | 2026-09-03 04:02:37.626760+00:00 [info] <0.1301.0> connection 172.18.0.7:47150 -> 172.18.0.4:5672 - assessment-outbox-relay: user 'onlinejudge' authenticated and granted access to vhost '/'[0m
+rabbitmq-1               | 2026-09-03 04:02:37.629794+00:00 [info] <0.1301.0> closing AMQP connection (172.18.0.7:47150 -> 172.18.0.4:5672 - assessment-outbox-relay, vhost: '/', user: 'onlinejudge', duration: '5ms')[0m
+rabbitmq-1               | 2026-09-03 04:02:37.776785+00:00 [info] <0.1319.0> accepting AMQP connection 172.18.0.6:45842 -> 172.18.0.4:5672[0m
+rabbitmq-1               | 2026-09-03 04:02:37.778837+00:00 [info] <0.1319.0> connection 172.18.0.6:45842 -> 172.18.0.4:5672 has a client-provided name: course-identity-security-version-consumer[0m
+rabbitmq-1               | 2026-09-03 04:02:37.779645+00:00 [info] <0.1319.0> connection 172.18.0.6:45842 -> 172.18.0.4:5672 - course-identity-security-version-consumer: user 'onlinejudge' authenticated and granted access to vhost '/'[0m
+rabbitmq-1               | 2026-09-03 04:02:37.782529+00:00 [info] <0.1319.0> closing AMQP connection (172.18.0.6:45842 -> 172.18.0.4:5672 - course-identity-security-version-consumer, vhost: '/', user: 'onlinejudge', duration: '6ms')[0m
+rabbitmq-1               | 2026-09-03 04:02:37.812877+00:00 [info] <0.1338.0> accepting AMQP connection 172.18.0.6:45858 -> 172.18.0.4:5672[0m
+rabbitmq-1               | 2026-09-03 04:02:37.815098+00:00 [info] <0.1338.0> connection 172.18.0.6:45858 -> 172.18.0.4:5672 has a client-provided name: course-learning-facts-consumer[0m
+rabbitmq-1               | 2026-09-03 04:02:37.816069+00:00 [info] <0.1338.0> connection 172.18.0.6:45858 -> 172.18.0.4:5672 - course-learning-facts-consumer: user 'onlinejudge' authenticated and granted access to vhost '/'[0m
+rabbitmq-1               | 2026-09-03 04:02:37.824807+00:00 [info] <0.1338.0> closing AMQP connection (172.18.0.6:45858 -> 172.18.0.4:5672 - course-learning-facts-consumer, vhost: '/', user: 'onlinejudge', duration: '12ms')[0m
+rabbitmq-1               | 2026-09-03 04:02:38.631387+00:00 [info] <0.1365.0> accepting AMQP connection 172.18.0.7:47154 -> 172.18.0.4:5672[0m
+rabbitmq-1               | 2026-09-03 04:02:38.632800+00:00 [info] <0.1365.0> connection 172.18.0.7:47154 -> 172.18.0.4:5672 has a client-provided name: assessment-outbox-relay[0m
+rabbitmq-1               | 2026-09-03 04:02:38.633823+00:00 [info] <0.1365.0> connection 172.18.0.7:47154 -> 172.18.0.4:5672 - assessment-outbox-relay: user 'onlinejudge' authenticated and granted access to vhost '/'[0m
+rabbitmq-1               | 2026-09-03 04:02:38.636848+00:00 [info] <0.1365.0> closing AMQP connection (172.18.0.7:47154 -> 172.18.0.4:5672 - assessment-outbox-relay, vhost: '/', user: 'onlinejudge', duration: '5ms')[0m
+rabbitmq-1               | 2026-09-03 04:02:38.783807+00:00 [info] <0.1383.0> accepting AMQP connection 172.18.0.6:45868 -> 172.18.0.4:5672[0m
+rabbitmq-1               | 2026-09-03 04:02:38.785136+00:00 [info] <0.1383.0> connection 172.18.0.6:45868 -> 172.18.0.4:5672 has a client-provided name: course-identity-security-version-consumer[0m
+rabbitmq-1               | 2026-09-03 04:02:38.785934+00:00 [info] <0.1383.0> connection 172.18.0.6:45868 -> 172.18.0.4:5672 - course-identity-security-version-consumer: user 'onlinejudge' authenticated and granted access to vhost '/'[0m
+rabbitmq-1               | 2026-09-03 04:02:38.788669+00:00 [info] <0.1383.0> closing AMQP connection (172.18.0.6:45868 -> 172.18.0.4:5672 - course-identity-security-version-consumer, vhost: '/', user: 'onlinejudge', duration: '5ms')[0m
+rabbitmq-1               | 2026-09-03 04:02:38.826179+00:00 [info] <0.1402.0> accepting AMQP connection 172.18.0.6:45874 -> 172.18.0.4:5672[0m
+rabbitmq-1               | 2026-09-03 04:02:38.827372+00:00 [info] <0.1402.0> connection 172.18.0.6:45874 -> 172.18.0.4:5672 has a client-provided name: course-learning-facts-consumer[0m
+rabbitmq-1               | 2026-09-03 04:02:38.828069+00:00 [info] <0.1402.0> connection 172.18.0.6:45874 -> 172.18.0.4:5672 - course-learning-facts-consumer: user 'onlinejudge' authenticated and granted access to vhost '/'[0m
+rabbitmq-1               | 2026-09-03 04:02:38.833692+00:00 [info] <0.1402.0> closing AMQP connection (172.18.0.6:45874 -> 172.18.0.4:5672 - course-learning-facts-consumer, vhost: '/', user: 'onlinejudge', duration: '7ms')[0m
+rabbitmq-1               | 2026-09-03 04:02:39.638711+00:00 [info] <0.1429.0> accepting AMQP connection 172.18.0.7:47168 -> 172.18.0.4:5672[0m
+rabbitmq-1               | 2026-09-03 04:02:39.640907+00:00 [info] <0.1429.0> connection 172.18.0.7:47168 -> 172.18.0.4:5672 has a client-provided name: assessment-outbox-relay[0m
+rabbitmq-1               | 2026-09-03 04:02:39.642134+00:00 [info] <0.1429.0> connection 172.18.0.7:47168 -> 172.18.0.4:5672 - assessment-outbox-relay: user 'onlinejudge' authenticated and granted access to vhost '/'[0m
+rabbitmq-1               | 2026-09-03 04:02:39.647245+00:00 [info] <0.1429.0> closing AMQP connection (172.18.0.7:47168 -> 172.18.0.4:5672 - assessment-outbox-relay, vhost: '/', user: 'onlinejudge', duration: '9ms')[0m
+rabbitmq-1               | 2026-09-03 04:02:39.790140+00:00 [info] <0.1447.0> accepting AMQP connection 172.18.0.6:45890 -> 172.18.0.4:5672[0m
+rabbitmq-1               | 2026-09-03 04:02:39.792348+00:00 [info] <0.1447.0> connection 172.18.0.6:45890 -> 172.18.0.4:5672 has a client-provided name: course-identity-security-version-consumer[0m
+rabbitmq-1               | 2026-09-03 04:02:39.793711+00:00 [info] <0.1447.0> connection 172.18.0.6:45890 -> 172.18.0.4:5672 - course-identity-security-version-consumer: user 'onlinejudge' authenticated and granted access to vhost '/'[0m
+rabbitmq-1               | 2026-09-03 04:02:39.837384+00:00 [info] <0.1447.0> closing AMQP connection (172.18.0.6:45890 -> 172.18.0.4:5672 - course-identity-security-version-consumer, vhost: '/', user: 'onlinejudge', duration: '47ms')[0m
+rabbitmq-1               | 2026-09-03 04:02:39.838378+00:00 [info] <0.1466.0> accepting AMQP connection 172.18.0.6:45902 -> 172.18.0.4:5672[0m
+rabbitmq-1               | 2026-09-03 04:02:39.839951+00:00 [info] <0.1466.0> connection 172.18.0.6:45902 -> 172.18.0.4:5672 has a client-provided name: course-learning-facts-consumer[0m
+rabbitmq-1               | 2026-09-03 04:02:39.840991+00:00 [info] <0.1466.0> connection 172.18.0.6:45902 -> 172.18.0.4:5672 - course-learning-facts-consumer: user 'onlinejudge' authenticated and granted access to vhost '/'[0m
+rabbitmq-1               | 2026-09-03 04:02:39.849305+00:00 [info] <0.1466.0> closing AMQP connection (172.18.0.6:45902 -> 172.18.0.4:5672 - course-learning-facts-consumer, vhost: '/', user: 'onlinejudge', duration: '11ms')[0m
+rabbitmq-1               | 2026-09-03 04:02:40.649064+00:00 [info] <0.1497.0> accepting AMQP connection 172.18.0.7:47180 -> 172.18.0.4:5672[0m
+rabbitmq-1               | 2026-09-03 04:02:40.650764+00:00 [info] <0.1497.0> connection 172.18.0.7:47180 -> 172.18.0.4:5672 has a client-provided name: assessment-outbox-relay[0m
+rabbitmq-1               | 2026-09-03 04:02:40.651585+00:00 [info] <0.1497.0> connection 172.18.0.7:47180 -> 172.18.0.4:5672 - assessment-outbox-relay: user 'onlinejudge' authenticated and granted access to vhost '/'[0m
+rabbitmq-1               | 2026-09-03 04:02:40.655974+00:00 [info] <0.1497.0> closing AMQP connection (172.18.0.7:47180 -> 172.18.0.4:5672 - assessment-outbox-relay, vhost: '/', user: 'onlinejudge', duration: '6ms')[0m
+rabbitmq-1               | 2026-09-03 04:02:40.838884+00:00 [info] <0.1515.0> accepting AMQP connection 172.18.0.6:45908 -> 172.18.0.4:5672[0m
+rabbitmq-1               | 2026-09-03 04:02:40.841456+00:00 [info] <0.1515.0> connection 172.18.0.6:45908 -> 172.18.0.4:5672 has a client-provided name: course-identity-security-version-consumer[0m
+rabbitmq-1               | 2026-09-03 04:02:40.842175+00:00 [info] <0.1515.0> connection 172.18.0.6:45908 -> 172.18.0.4:5672 - course-identity-security-version-consumer: user 'onlinejudge' authenticated and granted access to vhost '/'[0m
+rabbitmq-1               | 2026-09-03 04:02:40.844913+00:00 [info] <0.1515.0> closing AMQP connection (172.18.0.6:45908 -> 172.18.0.4:5672 - course-identity-security-version-consumer, vhost: '/', user: 'onlinejudge', duration: '6ms')[0m
+rabbitmq-1               | 2026-09-03 04:02:40.850179+00:00 [info] <0.1534.0> accepting AMQP connection 172.18.0.6:45924 -> 172.18.0.4:5672[0m
+rabbitmq-1               | 2026-09-03 04:02:40.851239+00:00 [info] <0.1534.0> connection 172.18.0.6:45924 -> 172.18.0.4:5672 has a client-provided name: course-learning-facts-consumer[0m
+rabbitmq-1               | 2026-09-03 04:02:40.851993+00:00 [info] <0.1534.0> connection 172.18.0.6:45924 -> 172.18.0.4:5672 - course-learning-facts-consumer: user 'onlinejudge' authenticated and granted access to vhost '/'[0m
+rabbitmq-1               | 2026-09-03 04:02:40.856626+00:00 [info] <0.1534.0> closing AMQP connection (172.18.0.6:45924 -> 172.18.0.4:5672 - course-learning-facts-consumer, vhost: '/', user: 'onlinejudge', duration: '6ms')[0m
+rabbitmq-1               | 2026-09-03 04:02:41.595825+00:00 [info] <0.1561.0> accepting AMQP connection 172.18.0.7:47190 -> 172.18.0.4:5672[0m
+rabbitmq-1               | 2026-09-03 04:02:41.597257+00:00 [info] <0.1561.0> connection 172.18.0.7:47190 -> 172.18.0.4:5672 has a client-provided name: assessment-worker-readiness[0m
+course-service-1         | 
+course-service-1         |   .   ____          _            __ _ _
+course-service-1         |  /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+course-service-1         | ( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+course-service-1         |  \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+course-service-1         |   '  |____| .__|_| |_|_| |_\__, | / / / /
+course-service-1         |  =========|_|==============|___/=/_/_/_/
+course-service-1         | 
+course-service-1         |  :: Spring Boot ::                (v3.4.5)
+course-service-1         | 
+course-service-1         | 2026-09-03T04:02:19.415Z  INFO 1 --- [course-service] [           main] c.o.c.CourseServiceApplication           : Starting CourseServiceApplication v0.1.0-SNAPSHOT using Java 21.0.12 with PID 1 (/opt/onlinejudge-course/app.jar started by onlinejudge in /opt/onlinejudge-course)
+course-service-1         | 2026-09-03T04:02:19.425Z  INFO 1 --- [course-service] [           main] c.o.c.CourseServiceApplication           : No active profile set, falling back to 1 default profile: "default"
+course-service-1         | 2026-09-03T04:02:24.410Z  INFO 1 --- [course-service] [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port 8082 (http)
+course-service-1         | 2026-09-03T04:02:24.438Z  INFO 1 --- [course-service] [           main] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+rabbitmq-1               | 2026-09-03 04:02:41.598070+00:00 [info] <0.1561.0> connection 172.18.0.7:47190 -> 172.18.0.4:5672 - assessment-worker-readiness: user 'onlinejudge' authenticated and granted access to vhost '/'[0m
+rabbitmq-1               | 2026-09-03 04:02:41.598897+00:00 [info] <0.1561.0> closing AMQP connection (172.18.0.7:47190 -> 172.18.0.4:5672 - assessment-worker-readiness, vhost: '/', user: 'onlinejudge', duration: '3ms')[0m
+rabbitmq-1               | 2026-09-03 04:02:41.657540+00:00 [info] <0.1572.0> accepting AMQP connection 172.18.0.7:47192 -> 172.18.0.4:5672[0m
+rabbitmq-1               | 2026-09-03 04:02:41.658872+00:00 [info] <0.1572.0> connection 172.18.0.7:47192 -> 172.18.0.4:5672 has a client-provided name: assessment-outbox-relay[0m
+rabbitmq-1               | 2026-09-03 04:02:41.659803+00:00 [info] <0.1572.0> connection 172.18.0.7:47192 -> 172.18.0.4:5672 - assessment-outbox-relay: user 'onlinejudge' authenticated and granted access to vhost '/'[0m
+rabbitmq-1               | 2026-09-03 04:02:41.662790+00:00 [info] <0.1572.0> closing AMQP connection (172.18.0.7:47192 -> 172.18.0.4:5672 - assessment-outbox-relay, vhost: '/', user: 'onlinejudge', duration: '5ms')[0m
+rabbitmq-1               | 2026-09-03 04:02:41.846394+00:00 [info] <0.1590.0> accepting AMQP connection 172.18.0.6:45930 -> 172.18.0.4:5672[0m
+rabbitmq-1               | 2026-09-03 04:02:41.847846+00:00 [info] <0.1590.0> connection 172.18.0.6:45930 -> 172.18.0.4:5672 has a client-provided name: course-identity-security-version-consumer[0m
+rabbitmq-1               | 2026-09-03 04:02:41.848594+00:00 [info] <0.1590.0> connection 172.18.0.6:45930 -> 172.18.0.4:5672 - course-identity-security-version-consumer: user 'onlinejudge' authenticated and granted access to vhost '/'[0m
+rabbitmq-1               | 2026-09-03 04:02:41.851568+00:00 [info] <0.1590.0> closing AMQP connection (172.18.0.6:45930 -> 172.18.0.4:5672 - course-identity-security-version-consumer, vhost: '/', user: 'onlinejudge', duration: '5ms')[0m
+rabbitmq-1               | 2026-09-03 04:02:41.857536+00:00 [info] <0.1609.0> accepting AMQP connection 172.18.0.6:45936 -> 172.18.0.4:5672[0m
+rabbitmq-1               | 2026-09-03 04:02:41.858523+00:00 [info] <0.1609.0> connection 172.18.0.6:45936 -> 172.18.0.4:5672 has a client-provided name: course-learning-facts-consumer[0m
+rabbitmq-1               | 2026-09-03 04:02:41.859133+00:00 [info] <0.1609.0> connection 172.18.0.6:45936 -> 172.18.0.4:5672 - course-learning-facts-consumer: user 'onlinejudge' authenticated and granted access to vhost '/'[0m
+rabbitmq-1               | 2026-09-03 04:02:41.864895+00:00 [info] <0.1609.0> closing AMQP connection (172.18.0.6:45936 -> 172.18.0.4:5672 - course-learning-facts-consumer, vhost: '/', user: 'onlinejudge', duration: '7ms')[0m
+rabbitmq-1               | 2026-09-03 04:02:42.664223+00:00 [info] <0.1636.0> accepting AMQP connection 172.18.0.7:44232 -> 172.18.0.4:5672[0m
+rabbitmq-1               | 2026-09-03 04:02:42.665522+00:00 [info] <0.1636.0> connection 172.18.0.7:44232 -> 172.18.0.4:5672 has a client-provided name: assessment-outbox-relay[0m
+rabbitmq-1               | 2026-09-03 04:02:42.667126+00:00 [info] <0.1636.0> connection 172.18.0.7:44232 -> 172.18.0.4:5672 - assessment-outbox-relay: user 'onlinejudge' authenticated and granted access to vhost '/'[0m
+rabbitmq-1               | 2026-09-03 04:02:42.670153+00:00 [info] <0.1636.0> closing AMQP connection (172.18.0.7:44232 -> 172.18.0.4:5672 - assessment-outbox-relay, vhost: '/', user: 'onlinejudge', duration: '6ms')[0m
+rabbitmq-1               | 2026-09-03 04:02:42.853064+00:00 [info] <0.1654.0> accepting AMQP connection 172.18.0.6:44398 -> 172.18.0.4:5672[0m
+rabbitmq-1               | 2026-09-03 04:02:42.854432+00:00 [info] <0.1654.0> connection 172.18.0.6:44398 -> 172.18.0.4:5672 has a client-provided name: course-identity-security-version-consumer[0m
+rabbitmq-1               | 2026-09-03 04:02:42.855187+00:00 [info] <0.1654.0> connection 172.18.0.6:44398 -> 172.18.0.4:5672 - course-identity-security-version-consumer: user 'onlinejudge' authenticated and granted access to vhost '/'[0m
+rabbitmq-1               | 2026-09-03 04:02:42.857764+00:00 [info] <0.1654.0> closing AMQP connection (172.18.0.6:44398 -> 172.18.0.4:5672 - course-identity-security-version-consumer, vhost: '/', user: 'onlinejudge', duration: '4ms')[0m
+course-service-1         | 2026-09-03T04:02:24.438Z  INFO 1 --- [course-service] [           main] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/10.1.40]
+course-service-1         | 2026-09-03T04:02:24.742Z  INFO 1 --- [course-service] [           main] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring embedded WebApplicationContext
+course-service-1         | 2026-09-03T04:02:24.743Z  INFO 1 --- [course-service] [           main] w.s.c.ServletWebServerApplicationContext : Root WebApplicationContext: initialization completed in 5093 ms
+course-service-1         | 2026-09-03T04:02:29.626Z  INFO 1 --- [course-service] [           main] o.s.b.a.e.web.EndpointLinksResolver      : Exposing 2 endpoints beneath base path '/actuator'
+course-service-1         | 2026-09-03T04:02:30.154Z  INFO 1 --- [course-service] [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat started on port 8082 (http) with context path '/'
+course-service-1         | 2026-09-03T04:02:30.270Z  INFO 1 --- [course-service] [           main] c.o.c.CourseServiceApplication           : Started CourseServiceApplication in 12.331 seconds (process running for 13.535)
+course-service-1         | 2026-09-03T04:02:30.634Z  INFO 1 --- [course-service] [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
+course-service-1         | 2026-09-03T04:02:31.521Z  INFO 1 --- [course-service] [           main] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Added connection com.mysql.cj.jdbc.ConnectionImpl@516037be
+course-service-1         | 2026-09-03T04:02:31.531Z  INFO 1 --- [course-service] [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
+course-service-1         | 2026-09-03T04:02:32.600Z  INFO 1 --- [course-service] [nio-8082-exec-1] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring DispatcherServlet 'dispatcherServlet'
+rabbitmq-1               | 2026-09-03 04:02:42.865939+00:00 [info] <0.1673.0> accepting AMQP connection 172.18.0.6:44402 -> 172.18.0.4:5672[0m
+rabbitmq-1               | 2026-09-03 04:02:42.867341+00:00 [info] <0.1673.0> connection 172.18.0.6:44402 -> 172.18.0.4:5672 has a client-provided name: course-learning-facts-consumer[0m
+rabbitmq-1               | 2026-09-03 04:02:42.868038+00:00 [info] <0.1673.0> connection 172.18.0.6:44402 -> 172.18.0.4:5672 - course-learning-facts-consumer: user 'onlinejudge' authenticated and granted access to vhost '/'[0m
+course-service-1         | 2026-09-03T04:02:32.602Z  INFO 1 --- [course-service] [nio-8082-exec-1] o.s.web.servlet.DispatcherServlet        : Initializing Servlet 'dispatcherServlet'
+course-service-1         | 2026-09-03T04:02:32.604Z  INFO 1 --- [course-service] [nio-8082-exec-1] o.s.web.servlet.DispatcherServlet        : Completed initialization in 2 ms
+rabbitmq-1               | 2026-09-03 04:02:42.874670+00:00 [info] <0.1673.0> closing AMQP connection (172.18.0.6:44402 -> 172.18.0.4:5672 - course-learning-facts-consumer, vhost: '/', user: 'onlinejudge', duration: '9ms')[0m
+rabbitmq-1               | 2026-09-03 04:02:43.672485+00:00 [info] <0.1700.0> accepting AMQP connection 172.18.0.7:44244 -> 172.18.0.4:5672[0m
+rabbitmq-1               | 2026-09-03 04:02:43.674459+00:00 [info] <0.1700.0> connection 172.18.0.7:44244 -> 172.18.0.4:5672 has a client-provided name: assessment-outbox-relay[0m
+rabbitmq-1               | 2026-09-03 04:02:43.675366+00:00 [info] <0.1700.0> connection 172.18.0.7:44244 -> 172.18.0.4:5672 - assessment-outbox-relay: user 'onlinejudge' authenticated and granted access to vhost '/'[0m
+rabbitmq-1               | 2026-09-03 04:02:43.680964+00:00 [info] <0.1700.0> closing AMQP connection (172.18.0.7:44244 -> 172.18.0.4:5672 - assessment-outbox-relay, vhost: '/', user: 'onlinejudge', duration: '8ms')[0m
+rabbitmq-1               | 2026-09-03 04:02:43.859390+00:00 [info] <0.1718.0> accepting AMQP connection 172.18.0.6:44412 -> 172.18.0.4:5672[0m
+rabbitmq-1               | 2026-09-03 04:02:43.860834+00:00 [info] <0.1718.0> connection 172.18.0.6:44412 -> 172.18.0.4:5672 has a client-provided name: course-identity-security-version-consumer[0m
+rabbitmq-1               | 2026-09-03 04:02:43.861666+00:00 [info] <0.1718.0> connection 172.18.0.6:44412 -> 172.18.0.4:5672 - course-identity-security-version-consumer: user 'onlinejudge' authenticated and granted access to vhost '/'[0m
+rabbitmq-1               | 2026-09-03 04:02:43.866095+00:00 [info] <0.1718.0> closing AMQP connection (172.18.0.6:44412 -> 172.18.0.4:5672 - course-identity-security-version-consumer, vhost: '/', user: 'onlinejudge', duration: '7ms')[0m
+rabbitmq-1               | 2026-09-03 04:02:43.876194+00:00 [info] <0.1737.0> accepting AMQP connection 172.18.0.6:44420 -> 172.18.0.4:5672[0m
+rabbitmq-1               | 2026-09-03 04:02:43.877635+00:00 [info] <0.1737.0> connection 172.18.0.6:44420 -> 172.18.0.4:5672 has a client-provided name: course-learning-facts-consumer[0m
+rabbitmq-1               | 2026-09-03 04:02:43.878540+00:00 [info] <0.1737.0> connection 172.18.0.6:44420 -> 172.18.0.4:5672 - course-learning-facts-consumer: user 'onlinejudge' authenticated and granted access to vhost '/'[0m
+rabbitmq-1               | 2026-09-03 04:02:43.885854+00:00 [info] <0.1737.0> closing AMQP connection (172.18.0.6:44420 -> 172.18.0.4:5672 - course-learning-facts-consumer, vhost: '/', user: 'onlinejudge', duration: '9ms')[0m

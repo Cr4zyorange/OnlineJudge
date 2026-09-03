@@ -1,0 +1,6 @@
+# captured_at_utc=2026-09-02T16:26:48Z
+# evaluation_task lease state (oj_assessment)
+mysql: [Warning] Using a password on the command line interface can be insecure.
+FAILED	1	0	NULL	NULL
+39de4c76-0871-4cf5-bcb6-56c4ee629cad	84a10109-8c72-4b40-9ee1-ee923c77aa7a	FAILED	NULL	NULL	2026-09-02 16:16:10	3	3
+DELIVERED	4	2026-09-02 16:16:10

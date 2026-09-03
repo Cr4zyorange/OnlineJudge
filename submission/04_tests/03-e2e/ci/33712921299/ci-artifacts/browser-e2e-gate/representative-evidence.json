@@ -1,0 +1,30 @@
+{
+  "baseUrl": "http://127.0.0.1:33653",
+  "representative": [
+    {
+      "group": "AUTH-CRS",
+      "proofId": "course-2",
+      "requestResponse": "{\"login\":{\"method\":\"POST\",\"path\":\"/api/v1/auth/login\",\"status\":200,\"response\":{\"userId\":2}},\"courseDetail\":{\"method\":\"GET\",\"path\":\"/api/v1/courses/2\",\"status\":200,\"response\":{\"courseId\":2,\"member\":true,\"role\":\"\"}}}",
+      "uiAssertion": "{\"route\":\"/courses/2\",\"selector\":\"button[name=\\\"管理章节\\\"], button[name=\\\"管理资源\\\"], button[name=\\\"管理公告\\\"]\",\"expected\":\"teacher course detail exposes all three management controls\",\"screenshot\":\"/home/runner/work/OnlineJudge/OnlineJudge/ci-artifacts/browser-e2e-gate/representative-auth-crs.png\",\"junitCase\":\"教师建课并展示章节/资源/公告管理入口，学生公开加入\"}",
+      "logExcerpt": "gateway-1                | 2026-09-03T04:03:05.951448436Z 172.18.0.1 - - [03/Sep/2026:04:03:05 +0000] \"GET /api/v1/courses/2 HTTP/1.1\" 200 243 \"http://127.0.0.1:33653/courses\" \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.7922.34 Safari/537.36\" request_id=9dc689ce-e708-d0b5-669f-081b09555f1d"
+    },
+    {
+      "group": "ASSESSMENT-WORKER",
+      "proofId": "task-2b13c708-76d2-4475-a4a2-f6a63ce4f725",
+      "requestResponse": "{\"submit\":{\"method\":\"POST\",\"path\":\"/api/v1/homeworks/4/submissions\",\"status\":201,\"response\":{\"submissionId\":4,\"evaluationStatus\":\"PENDING\"}},\"finalRead\":{\"method\":\"GET\",\"path\":\"/api/v1/submissions/4/evaluation\",\"status\":200,\"response\":{\"submissionId\":4,\"taskId\":\"2b13c708-76d2-4475-a4a2-f6a63ce4f725\",\"taskState\":\"SUCCEEDED\",\"evaluationStatus\":\"ACCEPTED\",\"score\":100}},\"internalSubmissionId\":\"ba293d07-bef3-4b6a-a89e-849a900ba61e\",\"taskId\":\"2b13c708-76d2-4475-a4a2-f6a63ce4f725\"}",
+      "uiAssertion": "{\"route\":\"/courses/1/homeworks/4/submissions/4/result\",\"selector\":\"[data-testid=\\\"evaluation-score\\\"]\",\"expected\":\"student result page displays the terminal automatic score 100\",\"screenshot\":\"/home/runner/work/OnlineJudge/OnlineJudge/ci-artifacts/browser-e2e-gate/representative-assessment-worker.png\",\"junitCase\":\"多类型提交验证代码后台评测并覆盖附件异常、过期、越权与重评\"}",
+      "logExcerpt": "assessment-api-1         | 2026-09-03T04:03:25.132114854Z 2026-09-03T04:03:25.131Z  INFO 1 --- [assessment-service] [nio-8083-exec-2] c.o.a.controller.HomeworkController      : homework_submission_queued publicSubmissionId=4 submissionId=ba293d07-bef3-4b6a-a89e-849a900ba61e taskId=2b13c708-76d2-4475-a4a2-f6a63ce4f725\nassessment-worker-1      | 2026-09-03T04:03:25.786648134Z 2026-09-03T04:03:25.786Z  INFO 1 --- [assessment-service] [   scheduling-1] c.o.a.worker.AssessmentWorker            : assessment_worker_terminal taskId=2b13c708-76d2-4475-a4a2-f6a63ce4f725 submissionId=ba293d07-bef3-4b6a-a89e-849a900ba61e sourceType=HWK taskState=SUCCEEDED evaluationStatus=ACCEPTED score=100.00\ngateway-1                | 2026-09-03T04:03:26.237206502Z 172.18.0.1 - - [03/Sep/2026:04:03:26 +0000] \"GET /api/v1/submissions/4/evaluation HTTP/1.1\" 200 414 \"http://127.0.0.1:33653/courses/1/homeworks/4/submissions/4/result\" \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.7922.34 Safari/537.36\" request_id=8843c8f9-0c5d-699a-a891-33e702975349"
+    },
+    {
+      "group": "GRD-LRN",
+      "proofId": "notification-12",
+      "requestResponse": "{\"publish\":{\"method\":\"POST\",\"path\":\"/api/v1/courses/5/grades/publish\",\"status\":200,\"response\":{\"publishId\":2,\"publishedCount\":1,\"notificationStatus\":\"SENT\"}},\"notification\":{\"method\":\"GET\",\"path\":\"/api/v1/notifications?type=GRADE&size=100\",\"status\":200,\"response\":{\"notificationId\":12,\"sourceModule\":\"GRD\",\"sourceId\":2,\"title\":\"成绩已发布\"}},\"eventId\":\"fae938b7-30b2-3e91-8b34-513fd465d179\",\"correlationId\":\"71d8a32d-3682-30f6-a7e9-3a689ee56430\"}",
+      "uiAssertion": "{\"route\":\"/notifications\",\"selector\":\"[data-testid=\\\"notification-card-12\\\"]\",\"expected\":\"student notification center displays the grade publication notification\",\"screenshot\":\"/home/runner/work/OnlineJudge/OnlineJudge/ci-artifacts/browser-e2e-gate/representative-grd-lrn.png\",\"junitCase\":\"@grd-main @grd-alternative @grd-exception runs LAB/HWK -> GRD -> LRN with real APIs\"}",
+      "logExcerpt": "course-service-1         | 2026-09-03T04:03:14.841188873Z 2026-09-03T04:03:14.840Z  INFO 1 --- [course-service] [   scheduling-1] c.o.c.learning.LrnEventProjection        : lrn_notification_projected eventId=fae938b7-30b2-3e91-8b34-513fd465d179 correlationId=71d8a32d-3682-30f6-a7e9-3a689ee56430 sourceModule=GRD sourceId=2 notificationIds=[12, 13, 14]\ngateway-1                | 2026-09-03T04:03:14.877155742Z 172.18.0.1 - - [03/Sep/2026:04:03:14 +0000] \"GET /api/v1/notifications?type=GRADE&size=100 HTTP/1.1\" 200 1514 \"-\" \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.7922.34 Safari/537.36\" request_id=6f2a8b4d-0b3f-8691-5624-2c2e70d74500"
+    }
+  ],
+  "rawRuntimeLog": "/home/runner/work/OnlineJudge/OnlineJudge/ci-artifacts/browser-e2e-gate/three-service-runtime-evidence.log",
+  "rawRepresentativeRecords": "/home/runner/work/OnlineJudge/OnlineJudge/ci-artifacts/browser-e2e-gate/representative-evidence.raw.jsonl",
+  "junit": "/home/runner/work/OnlineJudge/OnlineJudge/ci-artifacts/browser-e2e-gate/playwright-junit.xml",
+  "artifactDir": "/home/runner/work/OnlineJudge/OnlineJudge/ci-artifacts/browser-e2e-gate"
+}

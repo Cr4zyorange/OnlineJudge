@@ -1,0 +1,111 @@
+import { flushPromises, mount } from '@vue/test-utils';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import AuthView from '../../../src/views/auth/AuthView.vue';
+
+describe('AuthView', () => {
+  beforeEach(() => {
+    installLocalStorageMock();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    window.localStorage.clear();
+  });
+
+  it('logs in and shows the role landing entry with success feedback', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(jsonResponse({
+      token: 'token-45',
+      expiresAt: '2026-05-28T18:00:00',
+      user: {
+        id: 45,
+        username: 'teacher45',
+        userType: 'TEACHER',
+        displayName: '教师45',
+        roles: ['TEACHER'],
+        permissions: ['course:manage']
+      }
+    }));
+    const wrapper = mount(AuthView);
+
+    await wrapper.find('input[name="account"]').setValue('teacher45');
+    await wrapper.find('input[name="password"]').setValue('Teacher45@pass');
+    await wrapper.find('form[data-auth-form="login"]').trigger('submit.prevent');
+    await flushPromises();
+
+    expect(wrapper.text()).toContain('登录成功');
+    expect(wrapper.text()).toContain('教师工作台');
+    expect(wrapper.get('.landing-link').attributes('href')).toBe('/courses');
+    expect(window.localStorage.getItem('onlinejudge.authToken')).toBe('token-45');
+  });
+
+  it.each([
+    { role: 'ADMIN', expectedText: '管理员工作台', expectedHref: '/admin/auth' },
+    { role: 'STUDENT', expectedText: '学生工作台', expectedHref: '/learning/tasks' }
+  ])('uses the trusted $role role to expose its real landing entry', async ({ role, expectedText, expectedHref }) => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(jsonResponse({
+      token: `token-${role.toLowerCase()}`,
+      expiresAt: '2026-08-21T18:00:00',
+      user: {
+        id: role === 'ADMIN' ? 1 : 601,
+        username: role.toLowerCase(),
+        userType: role,
+        displayName: expectedText,
+        roles: [role],
+        permissions: []
+      }
+    }));
+    const wrapper = mount(AuthView);
+
+    await wrapper.find('input[name="account"]').setValue(role.toLowerCase());
+    await wrapper.find('input[name="password"]').setValue('Password123');
+    await wrapper.find('form[data-auth-form="login"]').trigger('submit.prevent');
+    await flushPromises();
+
+    expect(wrapper.text()).toContain(expectedText);
+    expect(wrapper.get('.landing-link').attributes('href')).toBe(expectedHref);
+  });
+
+  it('switches to register mode and renders backend validation failures', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
+      ok: false,
+      json: async () => ({ code: 'AUTH_409', message: '账号已存在', data: null })
+    } as Response);
+    const wrapper = mount(AuthView);
+
+    await wrapper.find('button[data-auth-mode="register"]').trigger('click');
+    await wrapper.find('input[name="username"]').setValue('student45');
+    await wrapper.find('input[name="displayName"]').setValue('学生45');
+    await wrapper.find('input[name="registerPassword"]').setValue('Student45@pass');
+    await wrapper.find('form[data-auth-form="register"]').trigger('submit.prevent');
+    await flushPromises();
+
+    expect(wrapper.text()).toContain('账号已存在');
+    expect(wrapper.text()).toContain('创建平台账号');
+    expect(wrapper.find('option[value="ADMIN"]').exists()).toBe(false);
+    expect(wrapper.find('option[value="TEACHER"]').exists()).toBe(false);
+  });
+});
+
+function jsonResponse<T>(data: T) {
+  return {
+    ok: true,
+    json: async () => ({
+      code: '0',
+      message: 'success',
+      data
+    })
+  } as Response;
+}
+
+function installLocalStorageMock() {
+  const values = new Map<string, string>();
+  Object.defineProperty(window, 'localStorage', {
+    configurable: true,
+    value: {
+      getItem: vi.fn((key: string) => values.get(key) ?? null),
+      setItem: vi.fn((key: string, value: string) => values.set(key, value)),
+      removeItem: vi.fn((key: string) => values.delete(key)),
+      clear: vi.fn(() => values.clear())
+    }
+  });
+}

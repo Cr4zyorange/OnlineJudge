@@ -1,0 +1,2 @@
+maven=services/assessment; tests=WorkerAndProjectionReliabilityTest,RabbitConsumerRecoveryContractTest; result=PASS
+grade-maven=services/grade; tests=SourceGradeProjectionServiceTest,SourceGradeReconciliationWorkerTest; result=PASS

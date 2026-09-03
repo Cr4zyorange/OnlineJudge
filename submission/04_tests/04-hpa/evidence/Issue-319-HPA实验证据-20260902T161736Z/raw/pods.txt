@@ -1,0 +1,2 @@
+NAME                              READY   STATUS    RESTARTS   AGE   IP            NODE                     NOMINATED NODE   READINESS GATES
+assessment-api-7d8f8dbc76-zvgr7   1/1     Running   0          17m   10.244.0.39   issue319-control-plane   <none>           <none>

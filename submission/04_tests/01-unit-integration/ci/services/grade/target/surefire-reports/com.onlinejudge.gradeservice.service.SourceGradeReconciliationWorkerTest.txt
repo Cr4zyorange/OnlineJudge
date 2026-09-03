@@ -1,0 +1,4 @@
+-------------------------------------------------------------------------------
+Test set: com.onlinejudge.gradeservice.service.SourceGradeReconciliationWorkerTest
+-------------------------------------------------------------------------------
+Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 3.510 s -- in com.onlinejudge.gradeservice.service.SourceGradeReconciliationWorkerTest

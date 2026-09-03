@@ -1,0 +1,27 @@
+# #380 evidence archive: pin text artifacts to LF in both the index and
+# checkouts so checks/SHA256SUMS.txt stays byte-for-byte reproducible on any
+# platform after a fresh clone.
+*.md  text eol=lf
+*.json text eol=lf
+*.jsonl text eol=lf
+*.txt  text eol=lf
+*.tsv  text eol=lf
+*.csv  text eol=lf
+*.xml  text eol=lf
+*.yml  text eol=lf
+*.yaml text eol=lf
+*.sh   text eol=lf
+*.mjs  text eol=lf
+*.ts   text eol=lf
+*.java text eol=lf
+*.conf text eol=lf
+*.properties text eol=lf
+*.log  text eol=lf -whitespace
+*.html text eol=lf
+*.png  binary
+*.gz   binary
+*.zip  binary
+
+# #340 scenario evidence files are stored without extensions and keep their
+# original runner formatting (including intentional trailing separators).
+05-resilience/ci/scenarios/** text eol=lf -whitespace

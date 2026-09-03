@@ -1,0 +1,91 @@
+{
+  "issue": 340,
+  "version": 1,
+  "failureWindow": ["before", "during", "recovery"],
+  "scenarios": [
+    {
+      "id": "course-delay",
+      "acs": ["AC-340-01", "AC-340-02", "AC-340-05"],
+      "command": "mvn -B -ntp test -Dtest=LabCourseProjectionFallbackTest,HomeworkCourseProjectionFallbackTest",
+      "assertions": {
+        "before": "projection gap is seeded and a local member exists",
+        "during": "random-port Course stub delays the real HttpCoursePermissionClient; LAB/HWK submit returns 503",
+        "recovery": "allowing the stub completes a normal submission; assessment facts remain zero for the timeout request"
+      },
+      "evidence": [
+        "requestId",
+        "httpStatus",
+        "assessment_submission",
+        "assessment_lab_submission",
+        "evaluation_task",
+        "assessment_source_grade"
+      ]
+    },
+    {
+      "id": "assessment-api-down",
+      "acs": ["AC-340-01", "AC-340-02", "AC-340-05"],
+      "command": "docker compose stop assessment-api; curl gateway/api/v1/submissions; docker compose start assessment-api",
+      "assertions": {
+        "before": "Assessment readiness is healthy and Course/Grade readiness is healthy",
+        "during": "Assessment API is stopped; new submission is unavailable while independent Course and Grade read probes remain healthy",
+        "recovery": "Assessment API readiness returns healthy and the independent read probes still have no write side effect"
+      },
+      "evidence": ["composeStatus", "submissionStatus", "courseReadStatus", "gradeReadStatus", "dbWriteDelta"]
+    },
+    {
+      "id": "worker-kill",
+      "acs": ["AC-340-01", "AC-340-02", "AC-340-03", "AC-340-04"],
+      "command": "bash scripts/test/verify-issue-314-recovery-disposable.sh",
+      "assertions": {
+        "before": "a persisted PENDING task is claimed with a live lease",
+        "during": "the worker is SIGKILLed while RUNNING and the old generation cannot write terminal facts",
+        "recovery": "a replacement generation completes once and source-grade/outbox counts stay stable after restart"
+      },
+      "evidence": ["taskId", "leaseOwner", "generation", "leaseUntil", "sourceGradeCount", "outboxCount", "recoverySeconds"]
+    },
+    {
+      "id": "grade-down",
+      "acs": ["AC-340-01", "AC-340-02", "AC-340-04"],
+      "command": "docker compose stop grade-service; verify Assessment source fact/outbox; docker compose start grade-service",
+      "assertions": {
+        "before": "Assessment source-grade fact and its event outbox are durable",
+        "during": "Grade service is stopped; Assessment source fact remains readable and no duplicate fact is written",
+        "recovery": "Grade readiness returns healthy and the same event identity is projected exactly once"
+      },
+      "evidence": ["composeStatus", "sourceGradeEventId", "sourceGradeRevision", "sourceGradeOutboxState", "gradeInboxStatus", "gradeProjectionCount", "duplicateDecision", "recoverySeconds"]
+    },
+    {
+      "id": "rabbitmq-down",
+      "acs": ["AC-340-01", "AC-340-02", "AC-340-03", "AC-340-04"],
+      "command": "bash scripts/test/verify-issue-314-recovery-disposable.sh",
+      "assertions": {
+        "before": "Assessment has a terminal source fact and two pending canonical outbox events",
+        "during": "RabbitMQ is stopped; local source facts commit and pending outbox rows are retained",
+        "recovery": "RabbitMQ and the durable queue return; the same event ids are delivered without duplicates"
+      },
+      "evidence": ["eventId", "correlationId", "outboxState", "queueMessages", "recoverySeconds"]
+    },
+    {
+      "id": "identity-down",
+      "acs": ["AC-340-01", "AC-340-04", "AC-340-05"],
+      "command": "mvn -B -ntp test -Dtest=JwksCacheRefreshTest; docker compose stop identity-service; verify cached JWT; docker compose start identity-service",
+      "assertions": {
+        "before": "services bootstrap a valid JWKS snapshot and an unexpired signed JWT",
+        "during": "Identity is stopped; an existing JWT remains locally verifiable while a new login/refresh probe fails",
+        "recovery": "Identity JWKS refresh succeeds and the cached-key request path still performs no business write"
+      },
+      "evidence": ["kid", "jwtMode", "identityStatus", "cachedVerification", "protectedReadStatus", "newLoginStatus", "recoverySeconds"]
+    },
+    {
+      "id": "duplicate-gap-dlq",
+      "acs": ["AC-340-03", "AC-340-04", "AC-340-05"],
+      "command": "mvn -B -ntp test -Dtest=WorkerAndProjectionReliabilityTest,LearningReliableEventConsumerTest,RabbitConsumerRecoveryContractTest,SourceGradeProjectionServiceTest,SourceGradeReconciliationWorkerTest",
+      "assertions": {
+        "before": "versioned event identities and an authoritative roster watermark are seeded",
+        "during": "duplicate, out-of-order, gap and poison messages are deduplicated, deferred or dead-lettered",
+        "recovery": "reconciliation/replay applies each event once and preserves the newest aggregate revision"
+      },
+      "evidence": ["eventId", "aggregateVersion", "watermark", "inboxCount", "notificationCount", "deadLetterCount"]
+    }
+  ]
+}

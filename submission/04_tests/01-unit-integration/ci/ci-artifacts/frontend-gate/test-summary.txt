@@ -1,0 +1,10 @@
+backend unit: no reports found
+backend integration: no reports found
+backend contract: no reports found
+assessment service: no reports found
+frontend unit: files=1 tests=573 failures=0 errors=0 skipped=0
+browser E2E: no reports found
+frontend runner contracts: # tests 3
+frontend runner contracts: # pass 3
+frontend runner contracts: # fail 0
+frontend runner contracts: # skipped 0

@@ -1,0 +1,17 @@
+{
+  "baseUrl": "http://127.0.0.1:36815",
+  "projectName": "oj318-2903999ffe88-3079",
+  "workloads": 9,
+  "targets": [
+    "tests/e2e/auth",
+    "tests/e2e/crs",
+    "tests/e2e/grd",
+    "tests/e2e/hwk",
+    "tests/e2e/lab",
+    "tests/e2e/lrn/lrn-business-closure.spec.ts",
+    "tests/e2e/lrn/notification-read-on-open.spec.ts",
+    "tests/e2e/shared"
+  ],
+  "junit": "/home/runner/work/OnlineJudge/OnlineJudge/ci-artifacts/browser-e2e-gate/playwright-junit.xml",
+  "summary": "/home/runner/work/OnlineJudge/OnlineJudge/ci-artifacts/browser-e2e-gate/test-summary.json"
+}

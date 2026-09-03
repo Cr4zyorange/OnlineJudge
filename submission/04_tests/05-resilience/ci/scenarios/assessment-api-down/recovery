@@ -1,0 +1,1 @@
+service=assessment-api healthy; seconds=11; db-before=0 db-after=0 peer=healthy

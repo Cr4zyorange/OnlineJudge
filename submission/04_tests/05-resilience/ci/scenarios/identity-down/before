@@ -1,0 +1,1 @@
+identity-service state=running|healthy; cache-warm HTTP=200; JWKS cache was primed before stop

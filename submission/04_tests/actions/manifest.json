@@ -1,0 +1,94 @@
+{
+  "generated_at_utc": "2026-09-03T08:22:55Z",
+  "retention_note": "GitHub artifact retention is 14 days from upload; local zips below are the offline archive",
+  "artifacts": [
+    {
+      "file": "ci-backend-gate-33712921299.zip",
+      "size_bytes": 650642,
+      "sha256": "705fcc70840ff39238210533249fcbe6319842f29c805369e6ec7e2c59b7804c",
+      "downloaded_at_utc": "2026-09-03T08:22:55Z",
+      "run_id": 33712921299,
+      "artifact_id": 9877596264,
+      "expires_at": "2026-09-17T03:56:28Z",
+      "purpose": "FINAL_SHA ci-quality-gate evidence (unit/integration/contracts/frontend/browser E2E)",
+      "archived_evidence_path": "01-unit-integration/ci/"
+    },
+    {
+      "file": "ci-browser-e2e-gate-33705748031.zip",
+      "size_bytes": 60920,
+      "sha256": "257ebb71c1560151aa3258cc09356f9df9ff43be6add2dd9455dda716ee4ff58",
+      "downloaded_at_utc": "2026-09-03T08:22:55Z",
+      "run_id": 33705748031,
+      "artifact_id": 9875371531,
+      "expires_at": "2026-09-17T02:08:26Z",
+      "purpose": "#320 historical FAIL window (docker scout --format error)",
+      "archived_evidence_path": "03-e2e/history/33705748031/"
+    },
+    {
+      "file": "ci-browser-e2e-gate-33706794044.zip",
+      "size_bytes": 14403833,
+      "sha256": "5e6c9b8ca83cdcdb05b3d6c957858eafea66e2574e81278d2f498fa7f2610097",
+      "downloaded_at_utc": "2026-09-03T08:22:55Z",
+      "run_id": 33706794044,
+      "artifact_id": 9875878349,
+      "expires_at": "2026-09-17T02:30:46Z",
+      "purpose": "#320 historical FAIL window (evidence ordering check, Playwright 24/24)",
+      "archived_evidence_path": "03-e2e/history/33706794044/"
+    },
+    {
+      "file": "ci-browser-e2e-gate-33712921299.zip",
+      "size_bytes": 14324907,
+      "sha256": "9f001ba670fbed591b2bccee0c24f5d69683add18d6b724972b941c5911656aa",
+      "downloaded_at_utc": "2026-09-03T08:22:55Z",
+      "run_id": 33712921299,
+      "artifact_id": 9877750235,
+      "expires_at": "2026-09-17T04:04:08Z",
+      "purpose": "FINAL_SHA ci-quality-gate evidence (unit/integration/contracts/frontend/browser E2E)",
+      "archived_evidence_path": "03-e2e/ci/33712921299/"
+    },
+    {
+      "file": "ci-contracts-gate-33712921299.zip",
+      "size_bytes": 50837,
+      "sha256": "334a913bf57fe32a4c7360575bcc7266e973961602b2f887c2169fc6d689338a",
+      "downloaded_at_utc": "2026-09-03T08:22:55Z",
+      "run_id": 33712921299,
+      "artifact_id": 9877551881,
+      "expires_at": "2026-09-17T03:54:10Z",
+      "purpose": "FINAL_SHA ci-quality-gate evidence (unit/integration/contracts/frontend/browser E2E)",
+      "archived_evidence_path": "01-unit-integration/ci/"
+    },
+    {
+      "file": "ci-frontend-gate-33712921299.zip",
+      "size_bytes": 27721,
+      "sha256": "51849e6eac7505497fb0509c7dc22a58763030351c61bd8aaa5831b5050369b5",
+      "downloaded_at_utc": "2026-09-03T08:22:55Z",
+      "run_id": 33712921299,
+      "artifact_id": 9877553143,
+      "expires_at": "2026-09-17T03:54:14Z",
+      "purpose": "FINAL_SHA ci-quality-gate evidence (unit/integration/contracts/frontend/browser E2E)",
+      "archived_evidence_path": "01-unit-integration/ci/"
+    },
+    {
+      "file": "ci-validate-workflows-33712921299.zip",
+      "size_bytes": 635,
+      "sha256": "80a1a20dd313d05b22ac8a3dbfbde4f9cd10bedfae144915f7aa5de253f1b88d",
+      "downloaded_at_utc": "2026-09-03T08:22:55Z",
+      "run_id": 33712921299,
+      "artifact_id": 9877519000,
+      "expires_at": "2026-09-17T03:52:32Z",
+      "purpose": "FINAL_SHA ci-quality-gate evidence (unit/integration/contracts/frontend/browser E2E)",
+      "archived_evidence_path": "01-unit-integration/ci/"
+    },
+    {
+      "file": "issue-340-resilience-33708861734.zip",
+      "size_bytes": 14259,
+      "sha256": "cdc16b307129168d763c24b6352c72d4460118129116e44605d761b249060275",
+      "downloaded_at_utc": "2026-09-03T08:22:55Z",
+      "run_id": 33708861734,
+      "artifact_id": 9876466825,
+      "expires_at": "2026-09-17T02:59:11Z",
+      "purpose": "#340 resilience matrix run artifact",
+      "archived_evidence_path": "05-resilience/ci/"
+    }
+  ]
+}
