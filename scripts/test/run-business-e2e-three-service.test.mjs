@@ -203,7 +203,9 @@ test('requires three independent browser-to-runtime representative evidence chai
     'course | lrn_notification_projected eventId=event-617 correlationId=correlation-617 sourceModule=GRD sourceId=617 notificationIds=[620]',
     'gateway | "GET /api/v1/notifications?type=GRADE&size=100 HTTP/1.1" 200'
   ].join('\n');
-  const junit = [authCase, workerCase, gradeCase].map((name) => `<testcase name="${name}"/>`).join('\n');
+  const junit = [authCase, workerCase, gradeCase].map((name) => (
+    `<testcase name="${name.replaceAll('>', '&gt;')}"/>`
+  )).join('\n');
 
   const manifest = buildRepresentativeEvidence({ baseUrl: 'http://127.0.0.1:18080', records, logs, junit });
 

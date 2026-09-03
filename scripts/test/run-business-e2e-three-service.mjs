@@ -230,7 +230,14 @@ function requireUiEvidence(record, junit) {
   if (!existsSync(ui.screenshot)) {
     throw new Error(`${record.group} representative screenshot was not retained: ${ui.screenshot}`);
   }
-  if (!junit.includes(ui.junitCase)) {
+  const junitCase = String(ui.junitCase);
+  const encodedJunitCase = junitCase
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&apos;');
+  if (!junit.includes(junitCase) && !junit.includes(encodedJunitCase)) {
     throw new Error(`${record.group} representative JUnit testcase was not retained: ${ui.junitCase}`);
   }
   return ui;
