@@ -404,12 +404,25 @@ test.describe('@hwk HWK 真实业务闭环', () => {
     await logout();
     await loginAs('teacher');
     const currentTeacherHeaders = await authorizationHeaders(page);
-    const reevaluation = await apiData<{ evaluationStatus: string; reevaluation: boolean }>(await request.post(
+    const reevaluation = await apiData<{
+      submissionId: number;
+      taskState: string;
+      evaluationStatus: string;
+      reevaluation: boolean;
+    }>(await request.post(
       `/api/v1/submissions/${acceptedCodeSubmission.submissionId}/reevaluate`,
       { headers: currentTeacherHeaders, data: { reason: `E2E rejudge ${runId}` } }
     ));
     expect(reevaluation.reevaluation).toBe(true);
-    expect(['ACCEPTED', 'SYSTEM_ERROR']).toContain(reevaluation.evaluationStatus);
+    expect(reevaluation.submissionId).toBe(acceptedCodeSubmission.submissionId);
+    expect(reevaluation.taskState).toBe('PENDING');
+    expect(reevaluation.evaluationStatus).toBe('PENDING');
+    const reevaluatedResult = await waitForSubmissionTerminal(
+      request,
+      currentTeacherHeaders,
+      acceptedCodeSubmission.submissionId
+    );
+    expect(['ACCEPTED', 'SYSTEM_ERROR']).toContain(reevaluatedResult.evaluationStatus);
   });
 });
 

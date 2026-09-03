@@ -94,6 +94,8 @@ public class HomeworkEvaluationController {
         data.put("submissionId", submission.publicSubmissionId());
         data.put("taskId", replayed.id());
         data.put("taskState", replayed.state().name());
+        data.put("evaluationStatus", "PENDING");
+        data.put("reevaluation", true);
         data.put("generation", replayed.generation());
         data.put("requestId", requestId);
         return success(data);

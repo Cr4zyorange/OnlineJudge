@@ -713,7 +713,9 @@ class HomeworkWorkflowContractTest {
                         .content("{\"reason\":\"rerun after sandbox configuration repair\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.taskId").value(taskId))
-                .andExpect(jsonPath("$.data.taskState").value("PENDING"));
+                .andExpect(jsonPath("$.data.taskState").value("PENDING"))
+                .andExpect(jsonPath("$.data.evaluationStatus").value("PENDING"))
+                .andExpect(jsonPath("$.data.reevaluation").value(true));
 
         assertThat(jdbc.queryForObject("SELECT manual_replay_count FROM evaluation_task WHERE id = ?", Integer.class, taskId)).isEqualTo(1);
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM assessment_source_grade WHERE source_id = ?", Integer.class,
@@ -754,7 +756,9 @@ class HomeworkWorkflowContractTest {
                         .content("{\"reason\":\"teacher requested rejudge\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.taskId").value(taskId))
-                .andExpect(jsonPath("$.data.taskState").value("PENDING"));
+                .andExpect(jsonPath("$.data.taskState").value("PENDING"))
+                .andExpect(jsonPath("$.data.evaluationStatus").value("PENDING"))
+                .andExpect(jsonPath("$.data.reevaluation").value(true));
 
         mockMvc.perform(get("/api/v1/submissions/{submissionId}/evaluation", submissionId)
                         .header("Authorization", "Bearer " + teacherToken))
