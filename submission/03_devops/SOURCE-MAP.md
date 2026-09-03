@@ -1,7 +1,7 @@
 # Final SHA 配置来源映射
 
 快照根目录为 `source/`，所有条目均从
-`ce87dfabd54239b9d4138736cbb93b06e6c9b260` checkout 复制。仓库原路径仍是
+`3a26ed2fe9399305b5e44eeae581911e6d32710e` checkout 复制。仓库原路径仍是
 canonical source；快照只为评审和离线验收服务。
 
 | 领域 | canonical source | snapshot |

@@ -5,14 +5,14 @@ origin/dev 最终交付链路尚未满足，不以 PR 候选或历史运行替�
 
 | 项目 | 状态 | 依据 |
 | --- | --- | --- |
-| 配置入口与边界 | PASS | [SOURCE-MAP.md](SOURCE-MAP.md)、D3/D7/D8 契约快照；source 快照基线为 `ce87dfab…` |
+| 配置入口与边界 | PASS | [SOURCE-MAP.md](SOURCE-MAP.md)、D3/D7/D8 契约快照；source 快照基线为 `3a26ed2f…` |
 | 9 workloads 与 4 migration jobs | PASS | `source/deploy/platform/workloads.json`，本地 validator 输出待补入校验记录 |
 | Docker/Compose、workflow、Kubernetes/Kind、迁移/seed/账号矩阵 | PASS | `source/` 快照和 SOURCE-MAP |
 | workflow failure gate 与 final SHA 绑定 | PASS | final CI/D3 原始 artifacts；D3 在 quality gate failure 后 build/deploy skipped |
 | 前一 dev 基线 CI quality gate | PASS (historical failure archived) | run 33698399654；backend Course API coverage 404/expected 200，原始证据已移入 `historical/baseline-c56/` |
-| 最新 origin/dev final CI quality gate | BLOCKED | run 33710740174 尚未形成稳定可归档结论；对应 D3 消费到已取消的 source run 33710071217 |
+| 最新 origin/dev final CI quality gate | BLOCKED | `3a26ed2f…` 已包含 #388 修复，但新的 quality-gate run 尚未产生 |
 | PR 候选 CI quality gate | PASS (candidate only) | run 33707236357；backend/frontend/contracts/browser E2E/内置 Disposable delivery 均成功 |
-| origin/dev final D3 delivery | BLOCKED | run 33710097381 因 source quality-gate run 33708404785 为 `cancelled` 而阻断；合入候选后需重新产生有效 `d3-delivery` |
+| origin/dev final D3 delivery | BLOCKED | 新 final CI 尚未成功，因此新的正式 `d3-delivery` 尚未产生；ce87 旧 D3 仅作历史阻断证据 |
 | immutable image tags/digests + OCI revision | BLOCKED | final SHA 未进入 build；历史成功 digest 仅作旧 SHA 追溯 |
 | 成功部署证据 | PASS (historical only) | run 33227922081；旧 SHA、旧 3-workload topology，不能升级为 final PASS |
 | 真实失败与诊断 | PASS (historical only) | run 33628385169；backend CrashLoopBackOff、rollout timeout、diagnostics、bounded cleanup |
@@ -24,7 +24,6 @@ origin/dev 最终交付链路尚未满足，不以 PR 候选或历史运行替�
 
 ## 解阻条件
 
-1. 将 PR 候选合入 `dev`，以产生新的 origin/dev final SHA。
-2. 取得该 SHA 的 `ci-quality-gate=success`；若 Course API 404 回归复现，再由独立修复 issue 处理。
-3. 让该 SHA 的 `d3-delivery` 完成镜像构建、9 workload/4 migration Kind 验收，并归档 image inspect、部署、诊断和恢复/回滚证据。
+1. 让同步到最新 `dev` 的 #379 分支产生新的 CI，并取得 `ci-quality-gate=success`。
+2. 让该 SHA 的 `d3-delivery` 完成镜像构建、9 workload/4 migration Kind 验收，并归档 image inspect、部署、诊断和恢复/回滚证据。
 4. 若 #321 仍要求 D8 输入，再同步 HPA/observability 的真实运行证据；不得复用旧 SHA 的 PASS。

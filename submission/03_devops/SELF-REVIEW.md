@@ -12,16 +12,15 @@
 | Round 4 | #319 合入后 D8 配置/证据状态已变化；最新 `dev` CI 的 Grade MySQL contract 失败 | 纳入 D8 配置并引用 #319 provenance；记录最新基线失败，不越界修改其他 issue 的业务验证脚本 |
 | Round 5 | 发现旧 D3 路径、旧基线文字和 `SHA256SUMS` 中残留旧路径；测试产生的 `__pycache__` 也被错误纳入清单 | 统一修正归档路径与 `origin/dev` 文字，删除测试缓存，重建并验证完整性清单 |
 | Round 6 | 未发现新的归档、路径、契约、语法、敏感值或完整性问题 | 清洁复核通过；保留外部 CI/D3 阻塞作为验收前置，不再修改本 PR |
+| Round 7 | 远端 `dev` 已从 `ce87…` 前进到 `3a26…`，并合入 #388/#386 及后续变更；归档快照和旧 current 证据已落后 | 同步分支到最新 `dev`，更新受影响的 Kubernetes/Kind、Grade/D3 校验脚本和 D3 契约快照，将 ce87 证据降为 historical，等待新 CI |
+| Round 8 | #386 的新增 Kind 静态测试在缺少 `GIT_SHA` 时被 `openssl/node` 前置检查遮蔽；该测试未被当前 CI 调用且不属于 #379 | 不在本 PR 修改 #386；按快照边界不复制未被 CI 调用的新增测试，保留最新 Kind/D3 runtime 脚本并记录外部风险 |
 
 ## 当前阻塞
 
-- 最新 `origin/dev` final SHA 为 `ce87dfabd54239b9d4138736cbb93b06e6c9b260`。
-- CI run [33710740174](https://github.com/Cr4zyorange/OnlineJudge/actions/runs/33710740174)
-  的 Grade MySQL contract 期望 5 个查询但实际找到 4 个，导致 Disposable delivery 跳过。
-  该回归来自 #319 合入后的 dev 基线，不属于本 issue 的归档文字/快照修复。
-- D3 run [33710760915](https://github.com/Cr4zyorange/OnlineJudge/actions/runs/33710760915)
-  消费到已取消的 source run [33710071217](https://github.com/Cr4zyorange/OnlineJudge/actions/runs/33710071217)，
-  因而不能作为 final D3 证据。
+- 当前 `origin/dev` final SHA 为 `3a26ed2fe9399305b5e44eeae581911e6d32710e`，已包含 #388 的 Grade MySQL
+  静态契约修复；同步后的新 CI/D3 结果尚未产生。
+- ce87 基线的 CI/D3 失败链已移动到 `historical/baseline-ce87/`，不能作为当前 final 结果。
+- #386 新增 Kind 静态测试的前置校验顺序问题未在 #379 中修改；该测试未进入当前归档快照和 CI 调用链。
 - 缺少的“最终候选 SHA 的成功 CI/D3 原始证据”属于 #379 本 issue 的验收任务；
   #319 的 HPA/observability 证据只能作为已合入的 cross-issue 输入，不能替代 #379
   的 final CI/D3 原始 artifacts。

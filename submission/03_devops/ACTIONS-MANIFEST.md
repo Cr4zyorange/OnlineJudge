@@ -19,7 +19,7 @@ Previous D3 outcome is preserved verbatim at
 `evidence/actions/historical/baseline-c56/d3-33698830921/d3-delivery-outcome-33698830921/delivery-outcome.txt`:
 `quality_gate=failure`, `build_images=skipped`, `deploy_kind=skipped`.
 
-## 最新 origin/dev final SHA：`ce87dfabd54239b9d4138736cbb93b06e6c9b260`
+## 前一 final SHA：`ce87dfabd54239b9d4138736cbb93b06e6c9b260`
 
 | workflow run | conclusion at archive update | artifact / status |
 | --- | --- | --- |
@@ -30,12 +30,17 @@ Previous D3 outcome is preserved verbatim at
 
 | artifact ID / name | bytes | archive path |
 | --- | ---: | --- |
-| 9876858615 / `ci-backend-gate-33710740174` | 156117 | `evidence/actions/current/ci-33710740174/` |
-| 9876824611 / `d3-delivery-outcome-33710760915` | 305 | `evidence/actions/current/d3-33710760915/` |
+| 9876858615 / `ci-backend-gate-33710740174` | 156117 | `evidence/actions/historical/baseline-ce87/ci-33710740174/` |
+| 9876824611 / `d3-delivery-outcome-33710760915` | 305 | `evidence/actions/historical/baseline-ce87/d3-33710760915/` |
 | 9876822160 / `d3-quality-gate-33710760915` | 10740482 | GitHub artifact metadata only; large consumed-gate output not copied |
 
-该 SHA 的成功 CI/D3 原始证据尚未进入归档；上述 run 只记录当前阻断链，不能填充
+该 SHA 的成功 CI/D3 原始证据尚未进入归档；上述 run 只记录前一基线阻断链，不能填充
 final image digest。
+
+## 当前 origin/dev final SHA：`3a26ed2fe9399305b5e44eeae581911e6d32710e`
+
+#388 的 Grade MySQL 静态契约修复、#386 的 D3 JWKS 修复和后续 dev 合入已包含在该 SHA。
+该 SHA 的新 CI 尚未由本 PR 触发；等待分支同步提交推送后产生新的 quality-gate run。
 
 ## PR 候选 head SHA：`82dd58d10eb49f1ceacec7965f7932c123891a1a`
 
