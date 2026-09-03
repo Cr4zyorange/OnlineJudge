@@ -49,8 +49,26 @@ test('GitHub Actions blocks delivery on the real browser E2E gate and preserves 
 
   assert.match(workflow, /^  browser-e2e-gate:\n/m);
   assert.match(workflow, /name: Browser business E2E/);
-  assert.match(workflow, /needs: \[backend-gate, frontend-gate, contracts-gate\]/);
+  assert.match(workflow, /browser-e2e-gate:[\s\S]*?needs: \[validate-workflows\]/);
   assert.match(workflow, /scripts\/ci\/browser-e2e-verify\.sh/);
   assert.match(workflow, /frontend\/playwright-report\/\*\*/);
   assert.match(workflow, /needs: \[validate-workflows, backend-gate, frontend-gate, contracts-gate, browser-e2e-gate\]/);
+});
+
+test('Browser E2E installs the pinned Docker Scout SBOM producer before the disposable runner', () => {
+  const workflow = readRepositoryFile('.github/workflows/ci.yml');
+  const browserStart = workflow.indexOf('  browser-e2e-gate:\n');
+  const deliveryStart = workflow.indexOf('  delivery:\n');
+  assert.ok(browserStart >= 0 && deliveryStart > browserStart, 'workflow must delimit the Browser E2E job');
+  const browserJob = workflow.slice(browserStart, deliveryStart);
+  const scoutInstall = browserJob.indexOf('name: Install Docker Scout 1.24.0');
+  const runner = browserJob.indexOf('scripts/ci/browser-e2e-verify.sh');
+
+  assert.ok(scoutInstall >= 0, 'Browser E2E must not depend on the runner default Docker Scout plugin');
+  assert.ok(runner > scoutInstall, 'Browser E2E must install Docker Scout before building SBOM-bearing disposable images');
+  assert.match(browserJob, /docker-scout_1\.24\.0_linux_amd64\.tar\.gz/);
+  assert.match(browserJob, /f4e2814bd61040365153d5b964b144cb2dc6ee536a68b5bac4cadf00fc0ec34b/);
+  assert.match(browserJob, /sha256sum --check --status/);
+  assert.match(browserJob, /cli-plugins\/docker-scout/);
+  assert.match(browserJob, /docker scout version/);
 });
