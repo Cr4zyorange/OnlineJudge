@@ -19,14 +19,3 @@ output/test/issue-262/raw/*.log text eol=lf -whitespace
 # #307 hashes the frozen performance dataset byte-for-byte.
 performance/issue-307/*.json text eol=lf
 output/test/issue-317/logs/*.log text eol=lf -whitespace
-
-# #368 freezes a byte-addressed documentation package whose SHA256SUMS must be
-# reproducible on Windows and Linux checkouts.
-submission/02_docs/**/*.md text eol=lf
-submission/02_docs/**/*.json text eol=lf
-submission/02_docs/**/*.csv text eol=lf
-submission/02_docs/**/*.log text eol=lf -whitespace
-submission/02_docs/**/*.mmd text eol=lf
-submission/02_docs/**/*.puml text eol=lf
-submission/02_docs/**/*.svg text eol=lf
-submission/02_docs/**/SHA256SUMS text eol=lf
