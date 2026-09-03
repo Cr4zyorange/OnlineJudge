@@ -24,7 +24,9 @@ public class SourceGradeProjectionService {
         long currentVersion = lockAggregate(event.aggregateId());
         // A concurrent delivery can pass the optimistic check above while the first
         // transaction is still uncommitted. Recheck after the aggregate lock is held.
-        if (inboxContains(event.eventId())) return new ApplyResult("DUPLICATE");
+        // Use a locking/current read after the aggregate lock so a concurrent
+        // transaction cannot classify the same committed delivery as stale.
+        if (inboxContainsCurrent(event.eventId())) return new ApplyResult("DUPLICATE");
         if (event.sourceVersion() > currentVersion + 1) {
             defer(event, currentVersion + 1);
             recordInbox(event, "DEFERRED");
@@ -65,6 +67,16 @@ public class SourceGradeProjectionService {
                 "SELECT COUNT(*) FROM grade_event_inbox WHERE consumer_name=? AND event_id=?",
                 Integer.class, CONSUMER, eventId);
         return count != null && count > 0;
+    }
+
+    private boolean inboxContainsCurrent(String eventId) {
+        return !jdbc.query("""
+                        SELECT event_id
+                          FROM grade_event_inbox
+                         WHERE consumer_name=? AND event_id=?
+                         FOR UPDATE
+                        """,
+                (rs, ignored) -> rs.getString("event_id"), CONSUMER, eventId).isEmpty();
     }
 
     private long lockAggregate(String aggregateId) {

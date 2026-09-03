@@ -60,10 +60,12 @@ public class SourceGradeRabbitConsumer implements SmartLifecycle {
                     handler.handle(message.getBody());
                     channel.basicAck(message.getEnvelope().getDeliveryTag(), false);
                 } catch (IllegalArgumentException invalidEnvelope) {
-                    log.warn("dead-lettering invalid Grade source-grade event: {}", invalidEnvelope.getMessage());
+                    // The body may contain student data; only record the bounded parser/service reason.
+                    log.warn("Grade source-grade message rejected: {}", invalidEnvelope.getMessage());
                     channel.basicNack(message.getEnvelope().getDeliveryTag(), false, false);
                 } catch (Exception temporaryFailure) {
-                    log.warn("Grade source-grade projection failed; retaining message for retry", temporaryFailure);
+                    log.warn("Grade source-grade projection failed; retaining message for retry: {}: {}",
+                            temporaryFailure.getClass().getSimpleName(), temporaryFailure.getMessage());
                     channel.basicNack(message.getEnvelope().getDeliveryTag(), false, true);
                 }
             }, tag -> running = false);

@@ -184,6 +184,12 @@ class DisposableEnvironmentScriptsTest(unittest.TestCase):
         self.assertNotIn('onlinejudge-issue318.XXXXXX.env', source)
         self.assertIn('onlinejudge-issue318.XXXXXX")', source)
 
+    def test_run_command_can_retain_a_temporary_runtime_env_for_resilience_restart_probes(self) -> None:
+        source = self.assert_help(RUN)
+        self.assertIn("--keep-runtime-env", source)
+        self.assertIn("--runtime-env-path", source)
+        self.assertIn("if (( ! keep_runtime_env )); then rm -f \"$runtime_env\"; fi", source)
+
     def test_rollback_command_requires_an_immutable_artifact_manifest(self) -> None:
         source = self.assert_help(ROLLBACK)
         self.assertIn("artifact-manifest.json", source)

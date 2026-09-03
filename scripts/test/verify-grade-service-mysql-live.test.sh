@@ -14,6 +14,19 @@ if grep -Fq -- '--protocol=socket' "$runner"; then
   exit 1
 fi
 
+python3 - "$repo_root/database/migrations/grade/V20260902_03__drop_legacy_grade_source_projection_status.sql" <<'PY'
+from pathlib import Path
+import sys
+
+migration = Path(sys.argv[1])
+assert migration.is_file(), "the legacy status column needs a forward-only Grade migration"
+text = migration.read_text(encoding="utf-8")
+assert "DROP COLUMN status" in text, text
+PY
+
+grep -Fq -- 'V20260902_03__drop_legacy_grade_source_projection_status.sql' "$runner" \
+  || { echo "grade-mysql-live-contract: runner must execute the legacy-status cleanup migration" >&2; exit 1; }
+
 awk '
   function verify_invocation() {
     if (command !~ /(^|[[:space:]])mysql([[:space:]]|$)/ || command !~ /--user=root/) {

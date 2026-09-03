@@ -783,7 +783,11 @@ def main() -> int:
         repository_root = arguments.repository_root.resolve()
         if not (repository_root / "database/mysql/migrate-service.sh").is_file():
             raise ManifestValidationError("--repository-root must contain database/mysql/migrate-service.sh")
-        compose_frontend_proxy_config = arguments.compose_output.parent / "frontend-disposable.conf"
+        # Compose resolves bind mounts relative to the Compose file, so emit
+        # an absolute host path when the generated file lives under a caller's
+        # evidence directory.  A relative path would be resolved twice and
+        # interpreted as a named volume by Docker Compose.
+        compose_frontend_proxy_config = (arguments.compose_output.parent / "frontend-disposable.conf").resolve()
         write_output(compose_frontend_proxy_config, frontend_proxy_config("127.0.0.11"))
         # The runner creates runtime secrets under umask 077.  This generated
         # Nginx configuration contains no secrets and is mounted into an image
