@@ -1,0 +1,139 @@
+[
+    {
+        "Id": "sha256:715d6a1f6a30ddc231f93d015dcd7e1187abc8a1b25c18dfc4113eb9ecb3be42",
+        "RepoTags": [
+            "oj307-monolith-200359-backend:latest"
+        ],
+        "RepoDigests": [],
+        "Comment": "buildkit.dockerfile.v0",
+        "Created": "2026-09-02T09:31:52.485169134Z",
+        "Config": {
+            "ExposedPorts": {
+                "8080/tcp": {}
+            },
+            "Env": [
+                "PATH=/opt/java/openjdk/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+                "JAVA_HOME=/opt/java/openjdk",
+                "LANG=en_US.UTF-8",
+                "LANGUAGE=en_US:en",
+                "LC_ALL=en_US.UTF-8",
+                "JAVA_VERSION=jdk-21.0.12+8"
+            ],
+            "Entrypoint": [
+                "java",
+                "-jar",
+                "/opt/onlinejudge/app.jar",
+                "--spring.config.additional-location=classpath:/application-compose.properties"
+            ],
+            "WorkingDir": "/opt/onlinejudge",
+            "Labels": {
+                "com.docker.compose.project": "oj307-monolith-200359",
+                "com.docker.compose.service": "backend",
+                "com.docker.compose.version": "5.4.0",
+                "org.opencontainers.image.created": "2026-08-17T09:04:34.463771+00:00",
+                "org.opencontainers.image.description": "The Ubuntu container image maintained by Canonical\n\nUbuntu is a Debian-based Linux operating system that runs from the desktop to the cloud, to all your internet connected things.\nIt is the world's most popular operating system across public clouds and OpenStack clouds.\nIt is the number one platform for containers; from Docker to Kubernetes to LXD, Ubuntu can run your containers at scale.\nFast, secure and simple, Ubuntu powers millions of PCs worldwide.\n",
+                "org.opencontainers.image.title": "ubuntu",
+                "org.opencontainers.image.version": "26.04"
+            }
+        },
+        "Architecture": "arm64",
+        "Variant": "v8",
+        "Os": "linux",
+        "Size": 369441987,
+        "GraphDriver": {
+            "Data": {
+                "LowerDir": "/var/lib/docker/overlay2/oprn1odz80dwz8w305vfnflve/diff:/var/lib/docker/overlay2/q8xnt1cum91zwn9gf3z73kwma/diff:/var/lib/docker/overlay2/qcz44sl603jezpnqsdmmacksp/diff:/var/lib/docker/overlay2/85977c5dc6a4a165057be5a46fea870b4b977e1db79cb8a14e8a1fb2a51de539/diff:/var/lib/docker/overlay2/8cb47c0daeab2a8436442fcc403466d01ca374a75b4ec65dbcf4fc5dab2370f4/diff:/var/lib/docker/overlay2/68ee4aa9cc01ec63e7f81c1aa2499627be54a7eb336d06bf3c5f0291a5fef640/diff:/var/lib/docker/overlay2/1382ec292206b85c01600528f1eb87a02ef6aca4b9f3c3895ea6365f006bd3df/diff:/var/lib/docker/overlay2/6b6e18e97a356436b2f83acdde3f060d6cabdc45c7da527b10f307299efc43ae/diff:/var/lib/docker/overlay2/d913715dfd4850f465ab704fa45f4cc374c0d8932ca20848a0332798d313c51c/diff",
+                "MergedDir": "/var/lib/docker/overlay2/2j6dhupd04ewx4stqeky25xez/merged",
+                "UpperDir": "/var/lib/docker/overlay2/2j6dhupd04ewx4stqeky25xez/diff",
+                "WorkDir": "/var/lib/docker/overlay2/2j6dhupd04ewx4stqeky25xez/work"
+            },
+            "Name": "overlay2"
+        },
+        "RootFS": {
+            "Type": "layers",
+            "Layers": [
+                "sha256:feefe6a173bdb7374d50d062fc8edf1c351e153045a32db205b1e7af3d3df90f",
+                "sha256:e6b78a6ffb3be073d0175fe6798d3995c51fc23df5a9bebf67a06f8087007281",
+                "sha256:abd46076031dcacfb35701d4f9631667ac7bec4231879c758232b0427572e09e",
+                "sha256:eef512cd944acf2355d8fb49a504c9b54318c75973869f40a32da5765b1ff1dd",
+                "sha256:ca1856cddafb306c716fa2bdac5c2bd782297ddbfc70972564f194a3988c6e3e",
+                "sha256:e9059a7cdeff64b90f9bf5dea7c403666e5890e6374364aa53e427f05b9dff9b",
+                "sha256:e9884d7eeaee8eece93d6d5a2ebc1937c1f26d460f7dd053fac1263f4b3e18d6",
+                "sha256:82c986538a6fc6635ce064739f2950d4880c4cbd3165699de332e991cdf40086",
+                "sha256:72ea5451966c6db1ce6a56dac379fdd74da7fba15e0d7aa9fa7a749498b42d73",
+                "sha256:d5b3dd8043444921e4b89fa17471104abce3672cf19d57c528b1210b6dc08293"
+            ]
+        },
+        "Metadata": {
+            "LastTagTime": "2026-09-02T20:30:15.675545543Z"
+        }
+    },
+    {
+        "Id": "sha256:b5bcb6c277cfabeaf769552eb3c812f082f2af8fb0a417f2b68bb270443f6df8",
+        "RepoTags": [
+            "oj307-monolith-200359-frontend:latest"
+        ],
+        "RepoDigests": [],
+        "Comment": "buildkit.dockerfile.v0",
+        "Created": "2026-09-02T09:31:54.005513509Z",
+        "Config": {
+            "ExposedPorts": {
+                "80/tcp": {}
+            },
+            "Env": [
+                "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+                "NGINX_VERSION=1.27.5",
+                "PKG_RELEASE=1",
+                "DYNPKG_RELEASE=1",
+                "NJS_VERSION=0.8.10",
+                "NJS_RELEASE=1"
+            ],
+            "Entrypoint": [
+                "/docker-entrypoint.sh"
+            ],
+            "Cmd": [
+                "nginx",
+                "-g",
+                "daemon off;"
+            ],
+            "WorkingDir": "/",
+            "Labels": {
+                "com.docker.compose.project": "oj307-monolith-200359",
+                "com.docker.compose.service": "frontend",
+                "com.docker.compose.version": "5.4.0",
+                "maintainer": "NGINX Docker Maintainers <docker-maint@nginx.com>"
+            },
+            "StopSignal": "SIGQUIT"
+        },
+        "Architecture": "arm64",
+        "Os": "linux",
+        "Size": 51808535,
+        "GraphDriver": {
+            "Data": {
+                "LowerDir": "/var/lib/docker/overlay2/yof8x9het6gphvacqm0bng3iv/diff:/var/lib/docker/overlay2/d4b35fedb9bb8e5709961a7abc1874bf80b751710ec1a760d91d11a82d46b984/diff:/var/lib/docker/overlay2/47c53988441533ae0532214636bd12d77d4f30a09b91c0d01b182037f39f81d6/diff:/var/lib/docker/overlay2/381e29e5550f3a535e8ea15bcccb360c82e6c4c404065ba10d09c13262794fb8/diff:/var/lib/docker/overlay2/f8c071f0adc1016156081ecab1c4c2bd45707f719aaf5afb89a636e96c55b464/diff:/var/lib/docker/overlay2/c3eb284ca7e3c90863169ad5f170da5fde691e3643c92a87bb9a335742eac050/diff:/var/lib/docker/overlay2/cf0127122f3def5670c996424ba98295569a678cbe248ac79bbe702bb632dcab/diff:/var/lib/docker/overlay2/4e6264d22ff2e493ed400f8cad226e4f2035e8ea3b336ba6ba6e85352041374d/diff:/var/lib/docker/overlay2/dcfba2415c9811899ca71c9debbf9c1e7fba7c66a376cb9797b56e6c1d53d72c/diff",
+                "MergedDir": "/var/lib/docker/overlay2/zc9rl0oe6c77o2s3yvwn2tqqh/merged",
+                "UpperDir": "/var/lib/docker/overlay2/zc9rl0oe6c77o2s3yvwn2tqqh/diff",
+                "WorkDir": "/var/lib/docker/overlay2/zc9rl0oe6c77o2s3yvwn2tqqh/work"
+            },
+            "Name": "overlay2"
+        },
+        "RootFS": {
+            "Type": "layers",
+            "Layers": [
+                "sha256:a16e98724c05975ee8c40d8fe389c3481373d34ab20a1cf52ea2accc43f71f4c",
+                "sha256:3459dc8f926a274f60633e093c2a9ee4397b725b7e073fb6c8acb1fd60746c30",
+                "sha256:9aad78ecf38071e3f8840ed045b8942764c9422f57a93f7ce3ef454cefea1493",
+                "sha256:c32437183174478433490733569987446b0c6ade7da0cbecc2c7dafc55235902",
+                "sha256:0fe7bdfe639df8fee4697dd80e4543ac826a673e2b70ad08880a1ebd2f2afeaf",
+                "sha256:4a651ac2c218aee739601deb108b7d1e76b3b1ae32af9808a580fb7a773c2169",
+                "sha256:97ca58bb468d55a95784fdad4e026713bc3ed4265a24a46fc168d37517cd31f4",
+                "sha256:96a0d9b1e80c2cf10de96bbd18d2d5f275b8a08feacf5878a80facef2e674017",
+                "sha256:aee08f5468b471445319485fe5e2607b228e00277c59c63ee8137550a2efd322",
+                "sha256:a87e90625f5fb9d62b35708fb4e30700291843c26523feb02fca3a09cfa9ac4b"
+            ]
+        },
+        "Metadata": {
+            "LastTagTime": "2026-09-02T20:30:16.253645668Z"
+        }
+    }
+]

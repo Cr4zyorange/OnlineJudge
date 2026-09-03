@@ -88,6 +88,20 @@ revision_count="$(admin_mysql -N -Doj_assessment -e "SELECT COUNT(*) FROM assess
 [[ "$revision_count" == "1" ]] || fail "expected one upgraded source-grade revision at snapshot 5, found $revision_count"
 admin_mysql -Doj_assessment -e 'SELECT COUNT(*) FROM assessment_lab_testcase;' >>"$raw_log" 2>&1
 admin_mysql -Doj_assessment -e 'SELECT COUNT(*) FROM assessment_lab_evaluation_result;' >>"$raw_log" 2>&1
+report_table_count="$(admin_mysql -N -Doj_assessment -e "
+  SELECT COUNT(*)
+    FROM information_schema.tables
+   WHERE table_schema = DATABASE()
+     AND table_name = 'assessment_lab_report';
+")"
+[[ "$report_table_count" == "1" ]] || fail "expected assessment_lab_report after migration, found $report_table_count tables"
+report_index_count="$(admin_mysql -N -Doj_assessment -e "
+  SELECT COUNT(DISTINCT index_name)
+    FROM information_schema.statistics
+   WHERE table_schema = DATABASE()
+     AND table_name = 'assessment_lab_report';
+")"
+[[ "$report_index_count" -ge 3 ]] || fail "expected report lookup/version indexes, found $report_index_count"
 admin_mysql -e "CREATE USER 'oj_assessment_rw'@'%' IDENTIFIED BY '$runtime_password'; GRANT SELECT, INSERT, UPDATE, DELETE ON oj_assessment.* TO 'oj_assessment_rw'@'%'; FLUSH PRIVILEGES;" >>"$raw_log" 2>&1
 MYSQL_PWD="$runtime_password" mysql --protocol=TCP --host=127.0.0.1 --port="$mysql_port" --user=oj_assessment_rw oj_assessment -e 'SELECT COUNT(*) FROM assessment_submission;' >>"$raw_log" 2>&1
 if MYSQL_PWD="$runtime_password" mysql --protocol=TCP --host=127.0.0.1 --port="$mysql_port" --user=oj_assessment_rw oj_assessment -e 'CREATE TABLE forbidden_runtime_ddl (id INT);' >>"$raw_log" 2>&1; then

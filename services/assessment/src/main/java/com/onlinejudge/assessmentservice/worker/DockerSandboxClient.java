@@ -17,11 +17,15 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 
+interface SandboxExecutionClient {
+    DockerSandboxClient.Result evaluate(String language, byte[] source, String input, int timeLimitMs, int memoryLimitKb);
+}
+
 /**
  * Creates an untrusted LAB execution container through the narrowly scoped
  * Docker socket proxy.  The worker never gets the Docker Unix socket itself.
  */
-final class DockerSandboxClient {
+final class DockerSandboxClient implements SandboxExecutionClient {
     private static final int CONNECT_TIMEOUT_MS = 2_000;
     private static final int COMPILE_FAILURE_EXIT_CODE = 66;
     private static final int MAX_OUTPUT_BYTES = 64 * 1024;
@@ -51,7 +55,7 @@ final class DockerSandboxClient {
         return baseUri != null;
     }
 
-    Result evaluate(String language, byte[] source, String input, int timeLimitMs, int memoryLimitKb) {
+    public Result evaluate(String language, byte[] source, String input, int timeLimitMs, int memoryLimitKb) {
         RuntimeImage runtime = runtime(language);
         if (!configured()) return new Result(null, "SYSTEM_ERROR");
         if (runtime == null) {

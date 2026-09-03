@@ -60,7 +60,7 @@ mysql_file() {
 
 mysql_file "$repo_root/database/migrations/grade/V20260901_01__grade_service_schema.sql"
 mysql_file "$repo_root/database/migrations/grade/V20260901_02__complete_grade_runtime.sql"
-mysql_file "$repo_root/database/migrations/grade/V20260903_01__allow_runtime_source_status_projection.sql"
+mysql_file "$repo_root/database/migrations/grade/V20260902_03__drop_legacy_grade_source_projection_status.sql"
 docker exec "$mysql_name" mysql \
   --protocol=tcp --host=127.0.0.1 --user=root --password="$mysql_root_password" \
   --execute="CREATE USER 'oj_grade_rw'@'%' IDENTIFIED BY '$grade_password'; GRANT SELECT, INSERT, UPDATE, DELETE ON oj_grade.* TO 'oj_grade_rw'@'%'; FLUSH PRIVILEGES;"
@@ -70,14 +70,6 @@ table_count="$(docker exec "$mysql_name" mysql --batch --skip-column-names \
   --execute="SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE();")"
 [[ "$table_count" == "18" ]] || {
   echo "grade-mysql-live: expected 18 migrated tables, got $table_count" >&2
-  exit 1
-}
-
-legacy_status_nullable="$(docker exec "$mysql_name" mysql --batch --skip-column-names \
-  --protocol=tcp --host=127.0.0.1 --user=root --password="$mysql_root_password" "$database_name" \
-  --execute="SELECT IS_NULLABLE FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='grade_source_projection' AND column_name='status';")"
-[[ "$legacy_status_nullable" == "YES" ]] || {
-  echo "grade-mysql-live: expected legacy grade_source_projection.status to be nullable, got ${legacy_status_nullable:-<empty>}" >&2
   exit 1
 }
 
@@ -118,5 +110,5 @@ curl --fail --silent "http://127.0.0.1:$http_port/health/ready" \
 grep -Fq '"status":"UP"' "$evidence_dir/actuator-readiness.json"
 grep -Fq '"status":"UP"' "$evidence_dir/service-readiness.json"
 
-printf 'grade-mysql-live: PASS mysql=8.4 migrations=V01+V02+V03 tables=%s legacyStatusNullable=%s user=oj_grade_rw readiness=2/2 evidence=%s\n' \
-  "$table_count" "$legacy_status_nullable" "$evidence_dir"
+printf 'grade-mysql-live: PASS mysql=8.4 migrations=V01+V02+V03 tables=%s user=oj_grade_rw readiness=2/2 evidence=%s\n' \
+  "$table_count" "$evidence_dir"

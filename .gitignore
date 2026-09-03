@@ -93,6 +93,9 @@ ci-artifacts/
 output/issue-318/
 output/issue-340/
 
+# Issue #367 API coverage raw run evidence is generated locally.
+output/issue-367/
+
 # Python delivery helpers import each other as scripts.
 __pycache__/
 

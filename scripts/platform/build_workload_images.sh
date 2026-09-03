@@ -16,6 +16,10 @@ Builds the seven source-backed images, attests the two pinned infrastructure
 images, and builds the platform migration runner. Writes plan.json, SPDX SBOMs,
 local content digests and artifact-manifest.json to --output-dir. SHA must be a
 full 40-character Git SHA.
+
+Set OJ318_DOCKER_BUILD_NETWORK=host only on machines whose default bridge
+build network cannot reach the outside (VPN/proxy intercepting container
+egress); the shared default is Docker's bridge network.
 USAGE
 }
 
@@ -58,7 +62,8 @@ require() {
 }
 
 require docker
-require python3
+python_bin="${PYTHON_BIN:-python3}"
+require "$python_bin"
 docker info >/dev/null
 docker scout sbom --help >/dev/null
 
@@ -86,7 +91,7 @@ fi
   printf 'build-workload-images: OJ318_JAVA_HOME must point to a Java 21 runtime\n' >&2
   exit 2
 }
-java_version="$($java_home/bin/java -version 2>&1 | sed -n '1s/.*version "\([0-9][0-9]*\).*/\1/p')"
+java_version="$("$java_home/bin/java" -version 2>&1 | sed -n '1s/.*version "\([0-9][0-9]*\).*/\1/p')"
 [[ "$java_version" == "21" ]] || {
   printf 'build-workload-images: Java 21 is required, got %s\n' "${java_version:-unknown}" >&2
   exit 2
@@ -98,7 +103,7 @@ for (( changed_path_index=0; changed_path_index<changed_path_count; changed_path
   changed_path="${changed_paths[$changed_path_index]}"
   planner_arguments+=(--changed-path "$changed_path")
 done
-PYTHONDONTWRITEBYTECODE=1 python3 "$planner" "${planner_arguments[@]}" > "$plan"
+PYTHONDONTWRITEBYTECODE=1 "$python_bin" "$planner" "${planner_arguments[@]}" > "$plan"
 
 run_tests() {
   local module
@@ -113,13 +118,26 @@ if (( ! skip_tests )); then run_tests; fi
 
 records="$output_dir/image-records.tsv"
 : > "$records"
+# Docker's default bridge network is the shared default.  OJ318_DOCKER_BUILD_NETWORK=host
+# is an environment workaround for machines where container egress is intercepted
+# (VPN/proxy); it must never become an unconditional flag.
+docker_build_network_args=()
+case "${OJ318_DOCKER_BUILD_NETWORK:-bridge}" in
+  bridge) ;;
+  host) docker_build_network_args+=(--network=host) ;;
+  *) printf 'build-workload-images: unsupported OJ318_DOCKER_BUILD_NETWORK value: %s\n' "${OJ318_DOCKER_BUILD_NETWORK}" >&2; exit 2 ;;
+esac
 build_one() {
   local workload="$1"
   local dockerfile="$2"
   local image="$3"
   local sbom="$output_dir/sbom/$workload.spdx.json"
   local digest revision
-  retry 3 docker build --file "$repo_root/$dockerfile" --build-arg "GIT_SHA=$git_sha" --tag "$image" "$repo_root"
+  if ((${#docker_build_network_args[@]})); then
+    retry 3 docker build "${docker_build_network_args[@]}" --file "$repo_root/$dockerfile" --build-arg "GIT_SHA=$git_sha" --tag "$image" "$repo_root"
+  else
+    retry 3 docker build --file "$repo_root/$dockerfile" --build-arg "GIT_SHA=$git_sha" --tag "$image" "$repo_root"
+  fi
   digest="$(docker image inspect --format '{{.Id}}' "$image")"
   revision="$(docker image inspect --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' "$image")"
   [[ "$revision" == "$git_sha" ]] || {
@@ -145,25 +163,25 @@ attest_prebuilt() {
 
 while IFS=$'\t' read -r workload dockerfile image; do
   build_one "$workload" "$dockerfile" "$image"
-done < <(python3 -c '
+done < <("$python_bin" -c '
 import json, sys
 plan = json.load(open(sys.argv[1], encoding="utf-8"))
 for build in plan["builds"]:
     print("\t".join((build["workload"], build["dockerfile"], build["image"])))
-' "$plan")
+' "$plan" | tr -d '\r')
 
 build_one "platform-migration-runner" "deploy/platform/migration-runner.Dockerfile" "onlinejudge/platform-migration-runner:$git_sha"
 
 while IFS=$'\t' read -r workload image; do
   attest_prebuilt "$workload" "$image"
-done < <(python3 -c '
+done < <("$python_bin" -c '
 import json, sys
 plan = json.load(open(sys.argv[1], encoding="utf-8"))
 for workload in plan["releaseTemplate"]["infrastructureWorkloads"]:
     print("\t".join((workload["workload"], workload["image"])))
-' "$plan")
+' "$plan" | tr -d '\r')
 
-python3 - "$records" "$git_sha" "$output_dir/artifact-manifest.json" <<'PY'
+"$python_bin" - "$records" "$git_sha" "$output_dir/artifact-manifest.json" <<'PY'
 import csv
 import json
 import sys

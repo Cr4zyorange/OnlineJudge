@@ -49,6 +49,11 @@ command -v "$kubectl_bin" >/dev/null 2>&1 || {
   printf 'deploy-kubernetes-disposable-environment: kubectl is required\n' >&2
   exit 2
 }
+python_bin="${PYTHON_BIN:-python3}"
+command -v "$python_bin" >/dev/null 2>&1 || {
+  printf 'deploy-kubernetes-disposable-environment: %s is required\n' "$python_bin" >&2
+  exit 2
+}
 if [[ -z "$output_dir" ]]; then output_dir="$repo_root/output/issue-318/$git_sha/kubernetes"; fi
 mkdir -p "$output_dir"
 stage_dir="$output_dir/stages"
@@ -72,7 +77,7 @@ trap collect_failure_diagnostics EXIT
 
 compose_inventory="$output_dir/compose.yml"
 kubernetes_inventory="$output_dir/platform.yaml"
-PYTHONDONTWRITEBYTECODE=1 python3 "$renderer" \
+PYTHONDONTWRITEBYTECODE=1 "$python_bin" "$renderer" \
   --schema "$schema" \
   --manifest "$manifest" \
   --git-sha "$git_sha" \

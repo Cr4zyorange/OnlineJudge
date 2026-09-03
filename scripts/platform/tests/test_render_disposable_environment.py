@@ -47,7 +47,7 @@ class DisposableEnvironmentRendererTest(unittest.TestCase):
                 text=True,
             )
             self.assertEqual(result.returncode, 0, result.stderr)
-            return compose.read_text(), kubernetes.read_text()
+            return compose.read_text(encoding="utf-8"), kubernetes.read_text(encoding="utf-8")
 
     def render_stages(self) -> dict[str, str]:
         with tempfile.TemporaryDirectory() as directory:
@@ -78,7 +78,7 @@ class DisposableEnvironmentRendererTest(unittest.TestCase):
                 text=True,
             )
             self.assertEqual(result.returncode, 0, result.stderr)
-            return {path.name: path.read_text() for path in stages.glob("*.yaml")}
+            return {path.name: path.read_text(encoding="utf-8") for path in stages.glob("*.yaml")}
 
     def test_rendered_targets_preserve_all_manifest_workloads_and_migration_order(self) -> None:
         compose, kubernetes = self.render()
@@ -125,6 +125,19 @@ class DisposableEnvironmentRendererTest(unittest.TestCase):
         self.assertNotIn("root-password", compose)
         self.assertNotIn("assessment-password", compose)
         self.assertNotIn("root-password", kubernetes)
+
+    def test_gateway_is_loopback_only_and_e2e_seed_is_opt_in(self) -> None:
+        compose, _ = self.render()
+        self.assertIn('127.0.0.1:${GATEWAY_HTTP_PORT:-18080}:8080', compose)
+        self.assertIn('IDENTITY_SEED_DATA_ENABLED: "${IDENTITY_SEED_DATA_ENABLED:-false}"', compose)
+
+    def test_jwks_bootstrap_secret_fails_closed_when_omitted(self) -> None:
+        compose, _ = self.render()
+
+        self.assertIn(
+            "${IDENTITY_JWKS_TRUST_BUNDLE:?IDENTITY_JWKS_TRUST_BUNDLE is required}",
+            compose,
+        )
 
     def test_compose_shell_jobs_pass_the_script_as_the_entrypoint_argument(self) -> None:
         compose, _ = self.render()
@@ -198,6 +211,19 @@ class DisposableEnvironmentRendererTest(unittest.TestCase):
         worker = compose[compose.index("\n  assessment-worker:") : compose.index("\n  grade-service:")]
 
         self.assertIn("      assessment-migrations:\n        condition: service_completed_successfully", worker)
+
+    def test_course_and_assessment_runtime_use_the_migrated_mysql_schemas(self) -> None:
+        compose, _ = self.render()
+
+        course = compose[compose.index("\n  course-service:") : compose.index("\n  assessment-api:")]
+        assessment = compose[compose.index("\n  assessment-api:") : compose.index("\n  grade-service:")]
+
+        self.assertIn('COURSE_DATASOURCE_URL: "jdbc:mysql://mysql:3306/oj_course?', course)
+        self.assertIn('COURSE_DATABASE_DRIVER: "com.mysql.cj.jdbc.Driver"', course)
+        self.assertIn('SPRING_SQL_INIT_MODE: "never"', course)
+        self.assertIn('ASSESSMENT_DATASOURCE_URL: "jdbc:mysql://mysql:3306/oj_assessment?', assessment)
+        self.assertIn('ASSESSMENT_DATABASE_DRIVER: "com.mysql.cj.jdbc.Driver"', assessment)
+        self.assertIn('SPRING_SQL_INIT_MODE: "never"', assessment)
 
     def test_frontend_legacy_backend_upstream_resolves_to_the_gateway_in_both_targets(self) -> None:
         compose, kubernetes = self.render()
@@ -276,7 +302,11 @@ class DisposableEnvironmentRendererTest(unittest.TestCase):
                 os.umask(previous_umask)
 
             self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertEqual((output / "frontend-disposable.conf").stat().st_mode & 0o777, 0o644)
+            mode = (output / "frontend-disposable.conf").stat().st_mode & 0o777
+            if os.name == "nt":
+                self.assertTrue(mode & 0o444)
+            else:
+                self.assertEqual(mode, 0o644)
 
     def test_invalid_sha_does_not_emit_an_environment_definition(self) -> None:
         result = subprocess.run(

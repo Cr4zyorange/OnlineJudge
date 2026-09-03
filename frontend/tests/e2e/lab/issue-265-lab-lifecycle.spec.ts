@@ -1,11 +1,12 @@
+import type { Response } from '@playwright/test';
 import { test, expect } from '../fixtures';
 
-const COURSE_ID = 9501;
+const COURSE_ID = Number(process.env.E2E_COURSE_ID || 9501);
 const SOURCE_NAME = 'issue-265-source.py';
 const REPORT_NAME = 'issue-265-report.pdf';
-const lifecycleState: { labId: number; submissionId: number } = {
+const lifecycleState: { labId: number; submissionId: string } = {
   labId: 0,
-  submissionId: 0
+  submissionId: ''
 };
 
 test.describe.configure({ mode: 'serial' });
@@ -33,7 +34,7 @@ test('teacher and student complete the LAB publish, submission, review, release,
   await page.getByRole('button', { name: '保存草稿' }).click();
   await expect(page.getByRole('status')).toContainText('草稿已保存');
 
-  const labId = Number(page.url().match(/\/courses\/9501\/labs\/(\d+)\/edit/)?.[1]);
+  const labId = Number(page.url().match(new RegExp(`/courses/${COURSE_ID}/labs/(\\d+)/edit`))?.[1]);
   expect(labId).toBeGreaterThan(0);
 
   await page.goto(`/courses/${COURSE_ID}/labs/manage`);
@@ -63,9 +64,9 @@ test('teacher and student complete the LAB publish, submission, review, release,
   await page.getByTestId('submit-lab-button').click();
   const submissionResponse = await submissionResponsePromise;
   expect(submissionResponse.ok()).toBe(true);
-  const submissionPayload = await submissionResponse.json() as { data: { submissionId: number } };
-  const submissionId = submissionPayload.data.submissionId;
-  expect(submissionId).toBeGreaterThan(0);
+  const submissionPayload = await apiData<{ submissionId: string }>(submissionResponse);
+  const submissionId = submissionPayload.submissionId;
+  expect(submissionId).toMatch(/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i);
   lifecycleState.labId = labId;
   lifecycleState.submissionId = submissionId;
   await expect(page.getByRole('status')).toContainText('提交成功');
@@ -140,7 +141,7 @@ test('teacher and student complete the LAB publish, submission, review, release,
 test('student download permissions and teacher download failures remain observable', async ({ page, loginAs, logout }) => {
   const { labId, submissionId } = lifecycleState;
   expect(labId).toBeGreaterThan(0);
-  expect(submissionId).toBeGreaterThan(0);
+  expect(submissionId).toMatch(/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i);
 
   await loginAs('student');
   // loginAs verifies credentials only; enter the authenticated shell before using its logout control.
@@ -288,3 +289,14 @@ test('teacher syncs the released LAB source score into GRD', async ({ page, logi
   expect(labRecord?.gradeStatus).toBe('SCORED');
   await logout();
 });
+
+async function apiData<T>(response: Response) {
+  const body = await response.json() as ApiEnvelope<T> | T;
+  return isApiEnvelope(body) ? body.data : body;
+}
+
+type ApiEnvelope<T> = { code: string; message: string; data: T };
+
+function isApiEnvelope<T>(body: ApiEnvelope<T> | T): body is ApiEnvelope<T> {
+  return typeof body === 'object' && body !== null && 'code' in body && 'data' in body;
+}

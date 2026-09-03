@@ -117,7 +117,13 @@ done
 curl -fsS --connect-timeout 1 --max-time 2 "$gateway/health/live" >/dev/null \
   || fail "gateway did not become ready within 20 seconds"
 
+body="$(request GET /health/startup 200)"
+[[ "$body" == *'"status":"UP"'* ]] || fail "gateway startup probe contract is unstable: $body"
+body="$(request GET /health/ready 200)"
+[[ "$body" == *'"status":"UP"'* ]] || fail "gateway readiness probe contract is unstable: $body"
+
 assert_service /api/v1/auth/login identity
+assert_service /api/v1/system/health identity
 jwks_headers="$runtime_dir/jwks.headers"
 jwks_body="$runtime_dir/jwks.json"
 jwks_status="$(curl -sS --connect-timeout 3 --max-time 8 -D "$jwks_headers" -o "$jwks_body" -w '%{http_code}' "$gateway/.well-known/jwks.json")"
@@ -127,6 +133,9 @@ grep -Eqi '^Cache-Control:' "$jwks_headers" || fail "JWKS response lost Cache-Co
 assert_service /api/v1/courses course
 assert_service /api/v1/homeworks assessment
 assert_service /api/v1/grades grade
+submissions_body="$(request POST /api/v1/submissions 200 --data '{}')"
+[[ "$submissions_body" == *'"service":"assessment"'* && "$submissions_body" == *'"path":"/api/v1/submissions"'* ]] \
+  || fail "POST /api/v1/submissions reached the wrong service or path: $submissions_body"
 assert_service '/api/v1/learning/tasks?page=2&size=20' course
 assert_service /api/v1/notifications course
 assert_service / frontend
@@ -170,9 +179,11 @@ grep -Eqi '^X-Request-Id: issue317-valid\.1\r?$' "$valid_headers" || fail "valid
 invalid_headers="$runtime_dir/invalid.headers"
 body="$(curl -sS -D "$invalid_headers" -H 'X-Request-Id: invalid value' "$gateway/api/v1/courses")"
 [[ "$body" != *'"requestId":"invalid value"'* ]] || fail "invalid request ID was forwarded"
-generated_id="$(sed -nE 's/^X-Request-Id:[[:space:]]*([^\r]+)\r?$/\1/ip' "$invalid_headers" | head -n 1)"
+generated_id="$(tr -d '\r' < "$invalid_headers" | sed -nE 's/^X-Request-Id:[[:space:]]*//Ip' | head -n 1)"
 [[ -n "$generated_id" && "$body" == *"\"requestId\":\"$generated_id\""* ]] \
   || fail "generated request ID was not continuous"
+[[ "$generated_id" =~ ^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$ ]] \
+  || fail "generated request ID must be UUID-shaped for asynchronous correlation"
 
 body="$(request GET /internal/v2/source-grades 404)"
 [[ "$body" == *'"code":"GATEWAY_404"'* ]] || fail "internal route rejection is unstable"

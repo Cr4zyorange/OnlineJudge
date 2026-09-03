@@ -1,0 +1,3 @@
+sha256:7c80609ca94aee6d51faa9945b01e7d9e917cc0c50dcbef76f4d30c69b5bc1f8 oj307-monolith-20260902-225234-frontend /onlinejudge-frontend
+sha256:0004ae0742ca7dae73f3f2314362e2ecbda9554e7fec2e18c234968fde8d8d1c oj307-monolith-20260902-225234-backend /onlinejudge-backend
+sha256:5e7e005a680e75d935984d3d9390990d2a709b3ed67e92708e9e6747f1f754c9 mysql:8.4 /onlinejudge-mysql

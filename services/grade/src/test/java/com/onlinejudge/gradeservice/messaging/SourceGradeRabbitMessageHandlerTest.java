@@ -31,18 +31,18 @@ class SourceGradeRabbitMessageHandlerTest {
     }
 
     @Test
-    void propagatesProjectionFailuresSoTheConsumerCanRequeueThemInsteadOfDeadLetteringAsInvalidJson() {
+    void keepsProjectionFailuresRetryableInsteadOfMisclassifyingThemAsInvalidJson() {
         SourceGradeProjectionService unavailableProjection = new SourceGradeProjectionService(null) {
             @Override
             public ApplyResult apply(SourceGradeChangedEnvelope event) {
-                throw new IllegalStateException("temporary projection storage outage");
+                throw new IllegalStateException("projection database is temporarily unavailable");
             }
         };
         SourceGradeRabbitMessageHandler unavailableHandler = new SourceGradeRabbitMessageHandler(new ObjectMapper(), unavailableProjection);
 
         assertThatThrownBy(() -> unavailableHandler.handle(canonical().getBytes(StandardCharsets.UTF_8)))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessage("temporary projection storage outage");
+                .hasMessage("projection database is temporarily unavailable");
     }
 
     private static String canonical() {
