@@ -16,6 +16,7 @@ import {
   parseStudentGradeSummaryIdentifier,
   parsePositiveIdentifier,
   redact,
+  waitForAssessmentLabMembership,
   validateCleanup,
   validateContext,
   validateEvidenceManifest
@@ -31,6 +32,31 @@ test('generates UUID correlation ids accepted by the Grade source-event consumer
     createBootstrapRequestId(),
     /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i
   );
+});
+
+test('waits read-only for the Assessment LAB membership projection before one submission', async () => {
+  const requests = [];
+  const delays = [];
+  const statuses = [403, 200];
+
+  await waitForAssessmentLabMembership({
+    baseUrl: 'http://127.0.0.1:18080',
+    labId: 418,
+    token: 'student-token',
+    fetchImpl: async (url, options) => {
+      requests.push({ url: String(url), method: options.method, headers: options.headers });
+      return { status: statuses.shift() };
+    },
+    sleep: async (delay) => { delays.push(delay); }
+  });
+
+  assert.deepEqual(delays, [100]);
+  assert.equal(requests.length, 2);
+  assert.ok(requests.every((request) => request.method === 'GET'));
+  assert.ok(requests.every((request) => request.url.endsWith('/api/v1/labs/418')));
+  assert.ok(requests.every((request) => !request.url.includes('/submissions')));
+  assert.ok(requests.every((request) => /^Bearer student-token$/.test(request.headers.authorization)));
+  assert.ok(requests.every((request) => /^[0-9a-f-]{36}$/i.test(request.headers['x-request-id'])));
 });
 
 test('selects the bootstrapped student course-grade summary rather than a legacy fixture id', () => {

@@ -27,6 +27,52 @@ export function createBootstrapRequestId() {
   return randomUUID();
 }
 
+const ASSESSMENT_MEMBERSHIP_PROJECTION_DELAYS_MS = [100, 200, 400, 800, 1_600];
+
+/**
+ * Assessment consumes course membership asynchronously.  The fixture must not
+ * replay a submission when that projection lags: it performs only bounded,
+ * authenticated reads until the student's published LAB becomes visible.
+ */
+export async function waitForAssessmentLabMembership({
+  baseUrl,
+  labId,
+  token,
+  fetchImpl = fetch,
+  sleep = (milliseconds) => new Promise((resolveSleep) => setTimeout(resolveSleep, milliseconds))
+}) {
+  if (!/^http:\/\/127\.0\.0\.1:\d+$/.test(baseUrl || '')) {
+    throw new Error('Assessment LAB membership barrier requires a loopback base URL');
+  }
+  if (!Number.isSafeInteger(labId) || labId <= 0) {
+    throw new Error('Assessment LAB membership barrier requires a positive LAB id');
+  }
+  if (typeof token !== 'string' || !token.trim()) {
+    throw new Error('Assessment LAB membership barrier requires a student token');
+  }
+
+  for (let attempt = 0; attempt <= ASSESSMENT_MEMBERSHIP_PROJECTION_DELAYS_MS.length; attempt += 1) {
+    const response = await fetchImpl(new URL(`/api/v1/labs/${labId}`, `${baseUrl}/`), {
+      method: 'GET',
+      headers: {
+        authorization: `Bearer ${token}`,
+        'x-request-id': createBootstrapRequestId()
+      }
+    });
+    if (response.status === 200) {
+      return;
+    }
+    if (response.status !== 403) {
+      throw new Error(`Assessment LAB membership barrier: HTTP ${response.status}`);
+    }
+    if (attempt < ASSESSMENT_MEMBERSHIP_PROJECTION_DELAYS_MS.length) {
+      await sleep(ASSESSMENT_MEMBERSHIP_PROJECTION_DELAYS_MS[attempt]);
+    }
+  }
+
+  throw new Error(`Assessment LAB membership barrier did not observe LAB ${labId} after bounded projection polling`);
+}
+
 export function validateContext(context) {
   const hasNineWorkloads = context?.workloads === 9;
   const isLoopback = /^http:\/\/127\.0\.0\.1:\d+$/.test(context?.baseUrl || '');
@@ -505,6 +551,11 @@ async function bootstrapScenarioCourse(context, artifactDir) {
     headers: teacherHeaders,
     body: '{}'
   }, 'bootstrap publish GRD source LAB', normalizeBareLabCreateResponse);
+  await waitForAssessmentLabMembership({
+    baseUrl: context.baseUrl,
+    labId: fixtureLabId,
+    token: studentLogin.data.token
+  });
   const sourceSubmission = new FormData();
   sourceSubmission.set('code', 'print("Issue #320 GRD fixture")');
   sourceSubmission.set('language', 'python');
