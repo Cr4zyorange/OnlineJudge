@@ -242,22 +242,51 @@ function stableIdentity(value, label) {
   return identity;
 }
 
-function findRuntimeLine(logs, label, needles) {
-  const lines = logs.split(/\r?\n/);
-  const offset = lines.findIndex((line) => needles.every((needle) => line.includes(needle)));
-  if (offset < 0) {
+const RFC3339_TIMESTAMP = /\b(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2}))\b/;
+const NGINX_ACCESS_TIMESTAMP = /\[(\d{2})\/([A-Za-z]{3})\/(\d{4}):(\d{2}:\d{2}:\d{2})\s+([+-]\d{4})\]/;
+
+function runtimeTimestamp(line, label) {
+  // `docker compose logs --timestamps` prepends this RFC3339 value.  The
+  // fallback allows an archived pre-fix run to be replayed without pretending
+  // its service-grouped physical line offsets describe cross-service order.
+  const rfc3339 = line.match(RFC3339_TIMESTAMP)?.[1];
+  if (rfc3339) {
+    const milliseconds = Date.parse(rfc3339);
+    if (Number.isFinite(milliseconds)) {
+      return milliseconds;
+    }
+  }
+  const nginx = line.match(NGINX_ACCESS_TIMESTAMP);
+  if (nginx) {
+    const [, day, month, year, time, offset] = nginx;
+    const milliseconds = Date.parse(`${day} ${month} ${year} ${time} ${offset}`);
+    if (Number.isFinite(milliseconds)) {
+      return milliseconds;
+    }
+  }
+  throw new Error(`runtime evidence ${label} is missing a parseable timestamp`);
+}
+
+function matchingRuntimeLines(logs, label, needles) {
+  const matches = logs.split(/\r?\n/).flatMap((line, offset) => (
+    needles.every((needle) => line.includes(needle))
+      ? [{ line, offset, timestamp: runtimeTimestamp(line, label) }]
+      : []
+  ));
+  if (matches.length === 0) {
     throw new Error(`runtime evidence is missing ${label}: ${needles.join(' + ')}`);
   }
-  return { line: lines[offset], offset };
+  return matches;
+}
+
+function findRuntimeLine(logs, label, needles) {
+  return matchingRuntimeLines(logs, label, needles)
+    .reduce((earliest, candidate) => candidate.timestamp < earliest.timestamp ? candidate : earliest);
 }
 
 function findLastRuntimeLine(logs, label, needles) {
-  const lines = logs.split(/\r?\n/);
-  const offset = lines.findLastIndex((line) => needles.every((needle) => line.includes(needle)));
-  if (offset < 0) {
-    throw new Error(`runtime evidence is missing ${label}: ${needles.join(' + ')}`);
-  }
-  return { line: lines[offset], offset };
+  return matchingRuntimeLines(logs, label, needles)
+    .reduce((latest, candidate) => candidate.timestamp > latest.timestamp ? candidate : latest);
 }
 
 function runtimeValue(line, key, label) {
@@ -353,7 +382,7 @@ export function buildRepresentativeEvidence({ baseUrl, records, logs, junit }) {
   const workerGet = findLastRuntimeLine(logs, 'ASSESSMENT-WORKER passive final GET', [
     `GET /api/v1/submissions/${publicSubmissionId}/evaluation`
   ]);
-  if (!(queued.offset < terminal.offset && terminal.offset < workerGet.offset)) {
+  if (!(queued.timestamp <= terminal.timestamp && terminal.timestamp <= workerGet.timestamp)) {
     throw new Error('ASSESSMENT-WORKER evidence must prove submit then worker completion then passive GET');
   }
   const workerUi = requireUiEvidence(worker, junit);
@@ -384,7 +413,7 @@ export function buildRepresentativeEvidence({ baseUrl, records, logs, junit }) {
   const notificationGet = findLastRuntimeLine(logs, 'GRD-LRN final notification GET', [
     'GET /api/v1/notifications?type=GRADE&size=100'
   ]);
-  if (projected.offset >= notificationGet.offset) {
+  if (projected.timestamp > notificationGet.timestamp) {
     throw new Error('GRD-LRN evidence must prove publication projection before the final notification GET');
   }
   const gradeUi = requireUiEvidence(grade, junit);
@@ -471,7 +500,7 @@ async function writePrivateFile(path, content) {
 async function captureRuntimeLogs(context, artifactDir) {
   const output = await capture('docker', [
     'compose', '--project-name', context.projectName, '--env-file', context.composeEnvFile,
-    '--file', context.composeFile, 'logs', '--no-color'
+    '--file', context.composeFile, 'logs', '--no-color', '--timestamps'
   ], { cwd: repositoryRoot, env: process.env });
   const rawLogPath = join(artifactDir, 'three-service-runtime-evidence.log');
   await writePrivateFile(rawLogPath, redact(output, [process.env.E2E_THREE_SERVICE_TOKEN || '']));

@@ -183,6 +183,11 @@ test('requires the three representative evidence groups', () => {
   );
 });
 
+test('captures post-E2E Compose logs with RFC3339 timestamps for cross-service evidence ordering', () => {
+  const runner = readFileSync(resolve('scripts/test/run-business-e2e-three-service.mjs'), 'utf8');
+  assert.match(runner, /'logs', '--no-color', '--timestamps'/);
+});
+
 test('requires three independent browser-to-runtime representative evidence chains', () => {
   const evidenceDir = mkdtempSync(join(tmpdir(), 'issue320-representative-'));
   const screenshot = (name) => {
@@ -219,15 +224,18 @@ test('requires three independent browser-to-runtime representative evidence chai
       uiAssertion: { route: '/notifications', selector: '[data-testid="notification-card-620"]', expected: '成绩已发布', screenshot: screenshot('grade'), junitCase: gradeCase }
     }
   ];
+  // Compose groups lines by service, not timestamp.  These three CI-shaped
+  // assessment lines are intentionally physically ordered queued, final GET,
+  // worker completion while their RFC3339 timestamps prove the actual chain.
   const logs = [
-    'gateway | "GET /api/v1/courses/418 HTTP/1.1" 200',
-    'gateway | "GET /api/v1/submissions/419/evaluation HTTP/1.1" 200 early-poll',
-    'assessment | homework_submission_queued publicSubmissionId=419 submissionId=internal-419 taskId=e640c4ad-6bd5-4ad4-b5f4-48c740f7df55',
-    'assessment | assessment_worker_terminal taskId=e640c4ad-6bd5-4ad4-b5f4-48c740f7df55 submissionId=internal-419 sourceType=HWK taskState=SUCCEEDED evaluationStatus=ACCEPTED score=100',
-    'gateway | "GET /api/v1/submissions/419/evaluation HTTP/1.1" 200',
-    'gateway | "GET /api/v1/notifications?type=GRADE&size=100 HTTP/1.1" 200 early-poll',
-    'course | lrn_notification_projected eventId=event-617 correlationId=correlation-617 sourceModule=GRD sourceId=617 notificationIds=[620]',
-    'gateway | "GET /api/v1/notifications?type=GRADE&size=100 HTTP/1.1" 200'
+    'gateway-1 | 2026-09-03T02:29:40.000Z "GET /api/v1/courses/418 HTTP/1.1" 200',
+    'gateway-1 | 2026-09-03T02:29:43.000Z "GET /api/v1/submissions/419/evaluation HTTP/1.1" 200 early-poll',
+    'assessment-api-1 | 2026-09-03T02:29:44.870Z homework_submission_queued publicSubmissionId=419 submissionId=internal-419 taskId=e640c4ad-6bd5-4ad4-b5f4-48c740f7df55',
+    'gateway-1 | 2026-09-03T02:29:48.000Z "GET /api/v1/submissions/419/evaluation HTTP/1.1" 200',
+    'gateway-1 | 2026-09-03T02:29:49.000Z "GET /api/v1/notifications?type=GRADE&size=100 HTTP/1.1" 200 early-poll',
+    'course-service-1 | 2026-09-03T02:29:50.000Z lrn_notification_projected eventId=event-617 correlationId=correlation-617 sourceModule=GRD sourceId=617 notificationIds=[620]',
+    'gateway-1 | 2026-09-03T02:29:51.000Z "GET /api/v1/notifications?type=GRADE&size=100 HTTP/1.1" 200',
+    'assessment-worker-1 | 2026-09-03T02:29:47.320Z assessment_worker_terminal taskId=e640c4ad-6bd5-4ad4-b5f4-48c740f7df55 submissionId=internal-419 sourceType=HWK taskState=SUCCEEDED evaluationStatus=ACCEPTED score=100'
   ].join('\n');
   const junit = [authCase, workerCase, gradeCase].map((name) => (
     `<testcase name="${name.replaceAll('>', '&gt;')}"/>`
@@ -241,6 +249,14 @@ test('requires three independent browser-to-runtime representative evidence chai
   assert.equal(new Set(manifest.representative.map((entry) => entry.proofId)).size, 3);
   assert.match(manifest.representative[1].requestResponse, /internal-419/);
   assert.match(manifest.representative[2].logExcerpt, /notifications\?type=GRADE/);
+  assert.throws(() => buildRepresentativeEvidence({
+    baseUrl: 'http://127.0.0.1:18080', records, junit,
+    logs: logs.replace('2026-09-03T02:29:47.320Z assessment_worker_terminal', '2026-09-03T02:29:49.000Z assessment_worker_terminal')
+  }), /submit then worker completion then passive GET/i);
+  assert.throws(() => buildRepresentativeEvidence({
+    baseUrl: 'http://127.0.0.1:18080', records, junit,
+    logs: logs.replace('gateway-1 | 2026-09-03T02:29:48.000Z "GET /api/v1/submissions/419/evaluation HTTP/1.1" 200', 'gateway-1 | "GET /api/v1/submissions/419/evaluation HTTP/1.1" 200')
+  }), /timestamp/i);
   assert.throws(() => buildRepresentativeEvidence({
     baseUrl: 'http://127.0.0.1:18080', logs, junit,
     records: [...records.slice(0, 2), { ...records[2], proofId: 'task-e640c4ad-6bd5-4ad4-b5f4-48c740f7df55' }]
