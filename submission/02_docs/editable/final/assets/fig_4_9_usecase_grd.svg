@@ -1,0 +1,80 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="930" height="640" viewBox="0 0 930 640">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#334155"/>
+    </marker>
+    <marker id="arrowDashed" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#64748b"/>
+    </marker>
+    <style>
+      .title { font: 700 22px 'Microsoft YaHei', 'Noto Sans CJK SC', Arial, sans-serif; fill: #0f172a; }
+      .label { font: 14px 'Microsoft YaHei', 'Noto Sans CJK SC', Arial, sans-serif; fill: #0f172a; }
+      .small { font: 12px 'Microsoft YaHei', 'Noto Sans CJK SC', Arial, sans-serif; fill: #475569; }
+      .actor { stroke: #0f172a; stroke-width: 2; fill: none; stroke-linecap: round; }
+      .boundary { fill: #f8fafc; stroke: #334155; stroke-width: 1.5; rx: 10; }
+      .usecase { fill: #ffffff; stroke: #2563eb; stroke-width: 1.6; }
+      .line { stroke: #334155; stroke-width: 1.5; fill: none; marker-end: url(#arrow); }
+      .assoc { stroke: #475569; stroke-width: 1.5; fill: none; }
+      .dash { stroke: #64748b; stroke-width: 1.4; fill: none; stroke-dasharray: 6 5; marker-end: url(#arrowDashed); }
+    </style>
+  </defs>
+  <rect width="100%" height="100%" fill="#ffffff"/>
+  <text x="465.0" y="34" text-anchor="middle" class="title">图 4-9 GRD 成绩评价与教学分析用例图</text>
+  <rect x="210" y="70" width="670" height="520" class="boundary"/>
+  <text x="545.0" y="96.0" text-anchor="middle" class="small">4-9 GRD 成绩评价与教学分析用例图</text>
+  <circle cx="70" cy="310" r="12" class="actor"/>
+  <path d="M 70 322 L 70 362 M 48 338 L 92 338 M 70 362 L 50 392 M 70 362 L 90 392" class="actor"/>
+  <text x="70" y="415.0" text-anchor="middle" class="label">学生</text>
+  <circle cx="70" cy="475" r="12" class="actor"/>
+  <path d="M 70 487 L 70 527 M 48 503 L 92 503 M 70 527 L 50 557 M 70 527 L 90 557" class="actor"/>
+  <text x="70" y="580.0" text-anchor="middle" class="label">教师</text>
+  <ellipse cx="365" cy="120" rx="115.0" ry="30.0" class="usecase"/>
+  <text x="365" y="116.0" text-anchor="middle" class="label">UC-GR-02</text>
+  <text x="365" y="134.0" text-anchor="middle" class="label">配置成绩项与规则</text>
+  <ellipse cx="635" cy="95" rx="85.0" ry="24.0" class="usecase"/>
+  <text x="635" y="100.0" text-anchor="middle" class="label">同步来源成绩</text>
+  <ellipse cx="635" cy="165" rx="85.0" ry="24.0" class="usecase"/>
+  <text x="635" y="170.0" text-anchor="middle" class="label">重新计算成绩</text>
+  <ellipse cx="365" cy="245" rx="115.0" ry="30.0" class="usecase"/>
+  <text x="365" y="241.0" text-anchor="middle" class="label">UC-GR-01</text>
+  <text x="365" y="259.0" text-anchor="middle" class="label">汇总并发布成绩</text>
+  <ellipse cx="365" cy="365" rx="115.0" ry="30.0" class="usecase"/>
+  <text x="365" y="361.0" text-anchor="middle" class="label">UC-GR-03</text>
+  <text x="365" y="379.0" text-anchor="middle" class="label">查询已发布成绩</text>
+  <ellipse cx="635" cy="365" rx="105.0" ry="29.0" class="usecase"/>
+  <text x="635" y="361.0" text-anchor="middle" class="label">UC-GR-04</text>
+  <text x="635" y="379.0" text-anchor="middle" class="label">成绩异议与复核</text>
+  <ellipse cx="365" cy="490" rx="115.0" ry="30.0" class="usecase"/>
+  <text x="365" y="486.0" text-anchor="middle" class="label">UC-GR-05</text>
+  <text x="365" y="504.0" text-anchor="middle" class="label">查看教学分析</text>
+  <ellipse cx="635" cy="455" rx="85.0" ry="24.0" class="usecase"/>
+  <text x="635" y="460.0" text-anchor="middle" class="label">生成成绩通知</text>
+  <ellipse cx="635" cy="535" rx="85.0" ry="24.0" class="usecase"/>
+  <text x="635" y="540.0" text-anchor="middle" class="label">校验课程权限</text>
+  <path d="M 95 337 L 250 365" class="assoc"/>
+  <path d="M 95 337 L 530 365" class="assoc"/>
+  <path d="M 95 502 L 250 120" class="assoc"/>
+  <path d="M 95 502 L 250 245" class="assoc"/>
+  <path d="M 95 502 L 530 365" class="assoc"/>
+  <path d="M 95 502 L 250 490" class="assoc"/>
+  <path d="M 480 115 L 550 95" class="dash"/>
+  <text x="515.0" y="99.0" text-anchor="middle" class="small">&lt;&lt;include&gt;&gt;</text>
+  <path d="M 550 165 L 480 130" class="dash"/>
+  <text x="515.0" y="141.5" text-anchor="middle" class="small">&lt;&lt;extend&gt;&gt;</text>
+  <path d="M 480 245 L 550 95" class="dash"/>
+  <text x="515.0" y="164.0" text-anchor="middle" class="small">&lt;&lt;include&gt;&gt;</text>
+  <path d="M 550 455 L 480 255" class="dash"/>
+  <text x="515.0" y="349.0" text-anchor="middle" class="small">&lt;&lt;extend&gt;&gt;</text>
+  <path d="M 535 365 L 480 365" class="dash"/>
+  <text x="507.5" y="359.0" text-anchor="middle" class="small">&lt;&lt;extend&gt;&gt;</text>
+  <path d="M 550 455 L 635 388" class="dash"/>
+  <text x="592.5" y="415.5" text-anchor="middle" class="small">&lt;&lt;extend&gt;&gt;</text>
+  <path d="M 365 150 L 550 535" class="dash"/>
+  <text x="457.5" y="336.5" text-anchor="middle" class="small">&lt;&lt;include&gt;&gt;</text>
+  <path d="M 365 275 L 550 535" class="dash"/>
+  <text x="457.5" y="399.0" text-anchor="middle" class="small">&lt;&lt;include&gt;&gt;</text>
+  <path d="M 365 395 L 550 535" class="dash"/>
+  <text x="457.5" y="459.0" text-anchor="middle" class="small">&lt;&lt;include&gt;&gt;</text>
+  <path d="M 365 520 L 550 535" class="dash"/>
+  <text x="457.5" y="521.5" text-anchor="middle" class="small">&lt;&lt;include&gt;&gt;</text>
+</svg>

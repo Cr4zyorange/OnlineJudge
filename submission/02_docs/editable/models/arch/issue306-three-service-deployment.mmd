@@ -1,0 +1,12 @@
+flowchart TB
+  Browser --> Gateway
+  Gateway --> Frontend
+  Gateway --> Identity
+  Gateway --> Course
+  Gateway --> AssessmentAPI[Assessment API]
+  Gateway --> Grade
+  AssessmentAPI --> RabbitMQ
+  RabbitMQ --> AssessmentWorker[Assessment Worker]
+  Course --> MySQL[(four schemas / four accounts)]
+  AssessmentAPI --> MySQL
+  Grade --> MySQL

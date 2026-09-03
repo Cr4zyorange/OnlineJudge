@@ -1,0 +1,11 @@
+{
+  "formalUseCase": "UC-LRN-01",
+  "note": "LRN-SC-* 为 UC-LRN-01 内部分析场景，不新增或重排正式 UC 编号。",
+  "scenarios": [
+    {"id":"LRN-SC-01","name":"查看与筛选个人学习任务中心","requirements":{"source":"docs/diagrams/lrn/requirements/sc01-task-center.mmd","asset":"docs/最终提交/assets/lrn/sc01-requirements.svg"},"overview":{"source":"docs/diagrams/lrn/overview/sc01-task-center.mmd","asset":"docs/最终提交/assets/lrn/sc01-overview.svg"},"detail":{"source":"docs/diagrams/lrn/detail/sc01-task-center.mmd","asset":"docs/最终提交/assets/lrn/sc01-detail.svg"}},
+    {"id":"LRN-SC-02","name":"继续学习并保存/恢复进度","requirements":{"source":"docs/diagrams/lrn/requirements/sc02-progress.mmd","asset":"docs/最终提交/assets/lrn/sc02-requirements.svg"},"overview":{"source":"docs/diagrams/lrn/overview/sc02-progress.mmd","asset":"docs/最终提交/assets/lrn/sc02-overview.svg"},"detail":{"source":"docs/diagrams/lrn/detail/sc02-progress.mmd","asset":"docs/最终提交/assets/lrn/sc02-detail.svg"}},
+    {"id":"LRN-SC-03","name":"查看个人学习统计","requirements":{"source":"docs/diagrams/lrn/requirements/sc03-statistics.mmd","asset":"docs/最终提交/assets/lrn/sc03-requirements.svg"},"overview":{"source":"docs/diagrams/lrn/overview/sc03-statistics.mmd","asset":"docs/最终提交/assets/lrn/sc03-overview.svg"},"detail":{"source":"docs/diagrams/lrn/detail/sc03-statistics.mmd","asset":"docs/最终提交/assets/lrn/sc03-detail.svg"}},
+    {"id":"LRN-SC-04","name":"查看与管理通知并跳转业务页面","requirements":{"source":"docs/diagrams/lrn/requirements/sc04-notification.mmd","asset":"docs/最终提交/assets/lrn/sc04-requirements.svg"},"overview":{"source":"docs/diagrams/lrn/overview/sc04-notification.mmd","asset":"docs/最终提交/assets/lrn/sc04-overview.svg"},"detail":{"source":"docs/diagrams/lrn/detail/sc04-notification.mmd","asset":"docs/最终提交/assets/lrn/sc04-detail.svg"}},
+    {"id":"LRN-SC-05","name":"配置提醒并接收截止提醒","requirements":{"source":"docs/diagrams/lrn/requirements/sc05-reminder.mmd","asset":"docs/最终提交/assets/lrn/sc05-requirements.svg"},"overview":{"source":"docs/diagrams/lrn/overview/sc05-reminder.mmd","asset":"docs/最终提交/assets/lrn/sc05-overview.svg"},"detail":{"source":"docs/diagrams/lrn/detail/sc05-reminder.mmd","asset":"docs/最终提交/assets/lrn/sc05-detail.svg"}}
+  ]
+}

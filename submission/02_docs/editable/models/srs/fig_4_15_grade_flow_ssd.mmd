@@ -1,0 +1,22 @@
+sequenceDiagram
+  actor Teacher as 教师
+  participant System as OnlineJudgeForSE 系统边界
+  Teacher->>System: OP-GR-02 同步来源成绩并生成总评
+  alt 来源同步与重算成功
+    System-->>Teacher: 返回 calculationBatchId、affectedItemCount、affectedStudentCount、syncedCount、missingCount、ungradedCount
+    Teacher->>System: OP-GR-04 单独查询成绩总表（GET /courses/{courseId}/grades）
+    System-->>Teacher: 返回分页成绩总表
+  else 来源同步失败：提供方抛出未映射异常
+    System-->>Teacher: HTTP 500，code=500，系统错误，请联系管理员；事务回滚
+  else 无课程权限
+    System-->>Teacher: 返回 ERR-GRD-01/403，且不读取或写入成绩数据
+  end
+  Teacher->>System: OP-GR-03 发布成绩
+  alt 首次发布成功
+    System-->>Teacher: 返回 publishId、publishedCount、publishedAt 和 notificationStatus=SENT
+    Note over Teacher,System: 登记 after-commit 通知；来源事务提交后由 LRN 独立事务 best-effort 持久化，回滚时不生成通知，失败只记日志
+  else 相同发布范围已成功
+    System-->>Teacher: 幂等返回既有 publishId 和原 notificationStatus，不重复写记录或通知
+  else 发布校验失败
+    System-->>Teacher: 返回未评分、规则缺失、发布范围非法或权限不足提示
+  end

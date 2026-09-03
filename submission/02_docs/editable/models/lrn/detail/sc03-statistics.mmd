@@ -1,0 +1,12 @@
+sequenceDiagram
+  participant V as LearningStatisticsView
+  participant A as learningRecordsApi
+  participant C as LearningRecordController
+  participant S as LearningRecordService
+  participant R as LearningRecordRepository
+  V->>A: load seven-day statistics
+  A->>C: GET /learning/statistics
+  C->>S: statistics(currentUser, course)
+  S->>R: aggregate duration/visits/completions
+  R-->>V: trend + recent records
+  Note over A,V: 仅同用户同课程缓存；401/403 不回退旧缓存

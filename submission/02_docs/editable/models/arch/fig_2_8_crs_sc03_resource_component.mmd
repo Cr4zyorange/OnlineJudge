@@ -1,0 +1,26 @@
+sequenceDiagram
+  participant Browser as Browser
+  participant Frontend as Vue 前端组件
+  participant Gateway as Nginx/API 网关
+  participant API as Spring Boot API
+  participant CRS as CRS 资源组件
+  participant File as 文件存储组件
+  participant DB as MySQL 数据库
+  Browser->>Frontend: 资源管理页上传文件
+  Frontend->>Gateway: POST /api/v1/courses/{id}/resources
+  Gateway->>API: 反向代理 /api/v1
+  API->>CRS: 调用 ResourceService
+  CRS->>File: 校验并保存文件
+  File-->>CRS: 返回存储键与文件元数据
+  CRS->>DB: 校验课程教师权限并写入 crs_resource
+  DB-->>CRS: 返回资源记录
+  CRS-->>API: 返回资源元数据
+  API-->>Gateway: 统一响应
+  Gateway-->>Frontend: JSON 响应
+  Frontend-->>Browser: 展示资源列表
+  Browser->>Frontend: 成员下载资源
+  Frontend->>Gateway: GET /api/v1/courses/{id}/resources/{rid}/download
+  Gateway->>API: 反向代理
+  API->>CRS: 校验成员关系与可见范围
+  CRS->>File: 读取文件流
+  File-->>Browser: 返回受控下载内容

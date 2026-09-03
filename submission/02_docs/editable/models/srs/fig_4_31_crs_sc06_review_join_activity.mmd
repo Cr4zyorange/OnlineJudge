@@ -1,0 +1,13 @@
+flowchart TD
+  A[学生提交审批制课程申请] --> B{校验课程状态/重复申请}
+  B -->|关闭/已满/重复| C[返回对应 409 错误]
+  B -->|可申请| D[创建 PENDING 成员]
+  D --> E[教师查看待审核列表]
+  E --> F{教师审批}
+  F -->|通过| G[成员置为 ACTIVE，开放资源/任务/公告]
+  F -->|拒绝| H[成员置为 REJECTED，学生可重新申请]
+  F -->|非待审状态| I[返回 INVALID_MEMBER_STATUS_TRANSITION]
+  C --> Z[结束]
+  G --> Z
+  H --> Z
+  I --> Z

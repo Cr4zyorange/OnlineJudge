@@ -1,0 +1,41 @@
+@startuml
+left to right direction
+skinparam packageStyle rectangle
+skinparam shadowing false
+title 图 4-4 AUTH 用户权限与平台安全用例图
+actor "未登录访问者" as Visitor
+actor "学生" as Student
+actor "教师" as Teacher
+actor "管理员" as Admin
+
+rectangle "AUTH 用户权限与平台安全" {
+  usecase "UC-AUTH-01\n用户登录并按角色访问" as Login
+  usecase "提交登录凭据" as SubmitLogin
+  usecase "校验账号与状态" as Verify
+  usecase "创建会话" as Session
+  usecase "按角色加载入口" as RoleMenu
+  usecase "持续权限校验" as Authz
+  usecase "维护个人资料与密码" as Profile
+  usecase "管理用户角色权限" as RoleAdmin
+  usecase "记录关键操作审计" as Audit
+}
+
+Visitor --> Login
+Student --> Login
+Teacher --> Login
+Admin --> Login
+Student --> Profile
+Teacher --> Profile
+Admin --> Profile
+Admin --> RoleAdmin
+
+Login ..> SubmitLogin : <<include>>
+Login ..> Verify : <<include>>
+Login ..> Session : <<include>>
+Login ..> RoleMenu : <<include>>
+RoleMenu ..> Authz : <<include>>
+Profile ..> Authz : <<include>>
+RoleAdmin ..> Authz : <<include>>
+Audit ..> RoleAdmin : <<extend>>
+Audit ..> Login : <<extend>>
+@enduml
