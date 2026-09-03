@@ -26,6 +26,7 @@ public class LrnFactRabbitConsumer {
             "onlinejudge.course.member.changed.v2",
             "onlinejudge.course.membership.snapshot.v2",
             "onlinejudge.course.announcement.published.v2",
+            "onlinejudge.assessment.source-grade.changed.v2",
             "onlinejudge.assessment.homework.published.v2",
             "onlinejudge.assessment.lab.published.v2",
             "onlinejudge.assessment.evaluation.completed.v2",

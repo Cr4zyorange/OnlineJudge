@@ -140,6 +140,14 @@ export interface CourseHomeSummary {
   recentTasks: CourseRecentTask[];
 }
 
+/** API-CRS-15 is paged even where the current teacher detail only renders its first page. */
+export interface CourseMemberPage {
+  items: CourseMember[];
+  page: number;
+  size: number;
+  total: number;
+}
+
 export interface ResourcePayload {
   chapterId?: number | null;
   name: string;

@@ -239,10 +239,12 @@ import PageHeader from '../../components/foundation/PageHeader.vue';
 import PageState from '../../components/foundation/PageState.vue';
 import StatusBadge from '../../components/foundation/StatusBadge.vue';
 import SummaryStrip, { type SummaryStripItem } from '../../components/foundation/SummaryStrip.vue';
+import { labStudentIdsMatch } from '../../types/lab';
 import type {
   LabExperimentDetail,
   LabSubmissionDetail,
-  LabSubmissionHistoryItem
+  LabSubmissionHistoryItem,
+  LabSubmissionId
 } from '../../types/lab';
 import {
   formatLabDateTime,
@@ -266,7 +268,7 @@ const props = defineProps<{
 const experiment = ref<LabExperimentDetail | null>(null);
 const history = ref<LabSubmissionHistoryItem[]>([]);
 const detail = ref<LabSubmissionDetail | null>(null);
-const selectedSubmissionId = ref<number | null>(null);
+const selectedSubmissionId = ref<LabSubmissionId | null>(null);
 const experimentLoading = ref(false);
 const loading = ref(false);
 const detailLoading = ref(false);
@@ -412,8 +414,8 @@ async function loadHistory() {
     if (!isCurrentRequest(context, request, historyRequestVersion)) {
       return;
     }
-    if (currentUser.value?.id !== studentId
-      || result.some((item) => item.labId !== labId || item.studentId !== studentId)) {
+    if (!labStudentIdsMatch(currentUser.value?.id, studentId)
+      || result.some((item) => item.labId !== labId || !labStudentIdsMatch(item.studentId, studentId))) {
       throw new Error('提交历史与当前实验或学生不匹配，请重新加载。');
     }
     history.value = result.slice().sort(compareSubmissions);
@@ -435,7 +437,7 @@ async function loadHistory() {
   }
 }
 
-async function openDetail(submissionId: number) {
+async function openDetail(submissionId: LabSubmissionId) {
   const context = contextVersion;
   const request = ++detailRequestVersion;
   const labId = props.labId;
@@ -453,8 +455,8 @@ async function openDetail(submissionId: number) {
       || result.submissionId !== submissionId
       || studentId === undefined
       || studentId === null
-      || currentUser.value?.id !== studentId
-      || result.studentId !== studentId) {
+      || !labStudentIdsMatch(currentUser.value?.id, studentId)
+      || !labStudentIdsMatch(result.studentId, studentId)) {
       throw new Error('提交内容与所选版本不匹配，请重新加载。');
     }
     detail.value = result;
@@ -484,7 +486,7 @@ function isCurrentRequest(context: number, request: number, latestRequest: numbe
   return context === contextVersion && request === latestRequest;
 }
 
-function isCurrentDetailRequest(context: number, request: number, submissionId: number) {
+function isCurrentDetailRequest(context: number, request: number, submissionId: LabSubmissionId) {
   return isCurrentRequest(context, request, detailRequestVersion)
     && selectedSubmissionId.value === submissionId;
 }

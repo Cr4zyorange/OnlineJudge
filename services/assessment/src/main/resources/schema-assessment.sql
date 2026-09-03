@@ -94,14 +94,31 @@ CREATE TABLE IF NOT EXISTS assessment_homework_testcase (
   UNIQUE KEY uq_assessment_homework_testcase_order (homework_id, sort_order),
   CONSTRAINT fk_assessment_homework_testcase_homework FOREIGN KEY (homework_id) REFERENCES assessment_homework(id)
 );
+CREATE TABLE IF NOT EXISTS assessment_homework_question (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY, homework_id BIGINT NOT NULL, question_type VARCHAR(32) NOT NULL,
+  stem TEXT NOT NULL, options_json TEXT NOT NULL, answer_json TEXT NOT NULL, score DECIMAL(10,2) NOT NULL,
+  sort_order INT NOT NULL, UNIQUE KEY uq_assessment_homework_question_order (homework_id, sort_order),
+  CONSTRAINT fk_assessment_homework_question_homework FOREIGN KEY (homework_id) REFERENCES assessment_homework(id) ON DELETE CASCADE
+);
 CREATE TABLE IF NOT EXISTS assessment_homework_submission (
   submission_id VARCHAR(36) PRIMARY KEY, public_id BIGINT AUTO_INCREMENT UNIQUE, homework_id BIGINT NOT NULL, student_id VARCHAR(80) NOT NULL,
-  submission_version INTEGER NOT NULL, language VARCHAR(40) NOT NULL, submit_status VARCHAR(20) NOT NULL,
-  evaluation_status VARCHAR(32) NOT NULL, auto_score DECIMAL(10,2), final_score DECIMAL(10,2), is_final BOOLEAN NOT NULL,
+  submission_version INTEGER NOT NULL, submit_type VARCHAR(20) NOT NULL DEFAULT 'CODE', language VARCHAR(40) NOT NULL, answer_text TEXT,
+  answer_json TEXT, submit_status VARCHAR(20) NOT NULL, evaluation_status VARCHAR(32) NOT NULL,
+  review_status VARCHAR(32) NOT NULL DEFAULT 'NEED_REVIEW', auto_score DECIMAL(10,2), manual_score DECIMAL(10,2), final_score DECIMAL(10,2),
+  review_comment TEXT, is_final BOOLEAN NOT NULL,
   submitted_at TIMESTAMP NOT NULL, UNIQUE KEY uq_assessment_homework_submission_version (homework_id, student_id, submission_version),
   INDEX idx_assessment_homework_submission_student (homework_id, student_id, is_final, submitted_at),
   CONSTRAINT fk_assessment_homework_submission_homework FOREIGN KEY (homework_id) REFERENCES assessment_homework(id),
   CONSTRAINT fk_assessment_homework_submission_submission FOREIGN KEY (submission_id) REFERENCES assessment_submission(id)
+);
+CREATE TABLE IF NOT EXISTS assessment_homework_attachment (
+  file_id VARCHAR(36) PRIMARY KEY, homework_id BIGINT NOT NULL, course_id VARCHAR(80) NOT NULL,
+  uploader_id VARCHAR(80) NOT NULL, storage_key VARCHAR(500) NOT NULL UNIQUE, original_filename VARCHAR(255) NOT NULL,
+  content_type VARCHAR(120) NOT NULL, file_size BIGINT NOT NULL, status VARCHAR(20) NOT NULL,
+  expires_at TIMESTAMP NOT NULL, submission_id VARCHAR(36) NULL, created_at TIMESTAMP NOT NULL, updated_at TIMESTAMP NOT NULL,
+  INDEX idx_assessment_homework_attachment_lookup (homework_id, uploader_id, status, expires_at),
+  CONSTRAINT fk_assessment_homework_attachment_homework FOREIGN KEY (homework_id) REFERENCES assessment_homework(id) ON DELETE CASCADE,
+  CONSTRAINT fk_assessment_homework_attachment_submission FOREIGN KEY (submission_id) REFERENCES assessment_homework_submission(submission_id) ON DELETE SET NULL
 );
 CREATE TABLE IF NOT EXISTS assessment_homework_evaluation (
   id BIGINT AUTO_INCREMENT PRIMARY KEY, task_id VARCHAR(36) NOT NULL, task_generation BIGINT NOT NULL,
@@ -141,6 +158,19 @@ CREATE TABLE IF NOT EXISTS assessment_lab_submission (
   UNIQUE KEY uq_assessment_lab_submission_version (lab_id, student_id, submission_version),
   INDEX idx_assessment_lab_submission_lab_student (lab_id, student_id, submitted_at)
 );
+CREATE TABLE IF NOT EXISTS assessment_lab_submission_source_file (
+  submission_id VARCHAR(36) PRIMARY KEY, lab_id BIGINT NOT NULL, course_id VARCHAR(80) NOT NULL,
+  uploader_id VARCHAR(80) NOT NULL, storage_key VARCHAR(500) NOT NULL UNIQUE,
+  original_filename VARCHAR(255) NOT NULL, content_type VARCHAR(120) NOT NULL, file_size BIGINT NOT NULL,
+  status VARCHAR(20) NOT NULL DEFAULT 'AVAILABLE', created_at TIMESTAMP NOT NULL, updated_at TIMESTAMP NOT NULL,
+  deleted_at TIMESTAMP NULL,
+  INDEX idx_assessment_lab_source_file_lab (lab_id),
+  INDEX idx_assessment_lab_source_file_course (course_id),
+  CONSTRAINT ck_assessment_lab_source_file_size CHECK (file_size >= 0),
+  CONSTRAINT ck_assessment_lab_source_file_status CHECK (status IN ('AVAILABLE', 'DELETED')),
+  CONSTRAINT fk_assessment_lab_source_file_submission
+    FOREIGN KEY (submission_id) REFERENCES assessment_lab_submission(submission_id) ON DELETE CASCADE
+);
 CREATE TABLE IF NOT EXISTS assessment_lab_testcase (
   id BIGINT AUTO_INCREMENT PRIMARY KEY, lab_id BIGINT NOT NULL, input_text CLOB NOT NULL,
   expected_output CLOB NOT NULL, score_weight DECIMAL(10,2) NOT NULL, is_public BOOLEAN NOT NULL,
@@ -150,6 +180,17 @@ CREATE TABLE IF NOT EXISTS assessment_lab_evaluation_result (
   submission_id VARCHAR(36) NOT NULL, testcase_id BIGINT NOT NULL, passed BOOLEAN NOT NULL,
   score DECIMAL(10,2) NOT NULL, actual_output CLOB, message VARCHAR(500), executed_at TIMESTAMP NOT NULL,
   PRIMARY KEY (submission_id, testcase_id)
+);
+CREATE TABLE IF NOT EXISTS assessment_lab_report (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY, lab_id BIGINT NOT NULL, student_id VARCHAR(80) NOT NULL,
+  submission_id VARCHAR(36) NULL, storage_key VARCHAR(500) NOT NULL, file_name VARCHAR(255) NOT NULL,
+  file_type VARCHAR(8) NOT NULL, content_type VARCHAR(120) NOT NULL, file_size BIGINT NOT NULL,
+  report_version INT NOT NULL, score DECIMAL(10,2) NULL, comment VARCHAR(500) NULL,
+  submitted_at TIMESTAMP NOT NULL, scored_by VARCHAR(80) NULL, scored_at TIMESTAMP NULL,
+  updated_at TIMESTAMP NOT NULL,
+  UNIQUE KEY uq_assessment_lab_report_version (lab_id, student_id, report_version),
+  INDEX idx_assessment_lab_report_submission (submission_id, report_version),
+  INDEX idx_assessment_lab_report_lab_student (lab_id, student_id, report_version)
 );
 CREATE TABLE IF NOT EXISTS assessment_lab_score (
   submission_id VARCHAR(36) PRIMARY KEY, lab_id BIGINT NOT NULL, report_id BIGINT NULL,

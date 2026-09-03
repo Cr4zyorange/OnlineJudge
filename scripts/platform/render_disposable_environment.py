@@ -128,16 +128,19 @@ def workload_environment(workload: dict[str, Any], git_sha: str) -> dict[str, st
                 "IDENTITY_DATABASE_USERNAME": RUNTIME_ACCOUNT["identity"],
                 "IDENTITY_JWT_KID": "issue318-disposable",
                 "IDENTITY_SERVICE_REVISION": git_sha,
-                "IDENTITY_SEED_DATA_ENABLED": "false",
+                "IDENTITY_SEED_DATA_ENABLED": "${IDENTITY_SEED_DATA_ENABLED:-false}",
             }
         )
     elif name == "course-service":
         environment.update(
             {
+                "COURSE_DATASOURCE_URL": "jdbc:mysql://mysql:3306/oj_course?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC&allowPublicKeyRetrieval=true&useSSL=false",
+                "COURSE_DATABASE_DRIVER": "com.mysql.cj.jdbc.Driver",
                 "COURSE_DATABASE_HOST": "mysql",
                 "COURSE_DATABASE_PORT": "3306",
                 "COURSE_DATABASE_NAME": DATABASE_NAME["course"],
                 "COURSE_DATABASE_USER": RUNTIME_ACCOUNT["course"],
+                "SPRING_SQL_INIT_MODE": "never",
                 "IDENTITY_JWKS_URI": "http://identity-service:8081/.well-known/jwks.json",
                 "RABBITMQ_HOST": "rabbitmq",
                 "RABBITMQ_PORT": "5672",
@@ -148,12 +151,15 @@ def workload_environment(workload: dict[str, Any], git_sha: str) -> dict[str, st
     elif name in {"assessment-api", "assessment-worker"}:
         environment.update(
             {
+                "ASSESSMENT_DATASOURCE_URL": "jdbc:mysql://mysql:3306/oj_assessment?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC&allowPublicKeyRetrieval=true&useSSL=false",
+                "ASSESSMENT_DATABASE_DRIVER": "com.mysql.cj.jdbc.Driver",
                 "ASSESSMENT_DATABASE_HOST": "mysql",
                 "ASSESSMENT_DATABASE_PORT": "3306",
                 "ASSESSMENT_DATABASE_NAME": DATABASE_NAME["assessment"],
                 "ASSESSMENT_DATABASE_USER": RUNTIME_ACCOUNT["assessment"],
+                "SPRING_SQL_INIT_MODE": "never",
                 "IDENTITY_JWKS_URI": "http://identity-service:8081/.well-known/jwks.json",
-                "ASSESSMENT_COURSE_AUTHORIZATION_URI": "http://course-service:8082/internal/v2/courses/{courseId}/members/{userId}/authorization",
+                "ASSESSMENT_COURSE_AUTHORIZATION_URI": "http://course-service:8082/internal/v2/courses/{courseId}/authorizations/{userId}",
                 "ASSESSMENT_COURSE_SERVICE_AUTHORIZATION": "${ASSESSMENT_SERVICE_IDENTITY:?ASSESSMENT_SERVICE_IDENTITY is required}",
                 "ASSESSMENT_RABBIT_HOST": "rabbitmq",
                 "ASSESSMENT_RABBIT_USERNAME": "onlinejudge",
@@ -182,9 +188,9 @@ def workload_environment(workload: dict[str, Any], git_sha: str) -> dict[str, st
                 "GRADE_HTTP_PORT": "8084",
                 "IDENTITY_JWKS_URI": "http://identity-service:8081/.well-known/jwks.json",
                 "GRADE_COURSE_BASE_URL": "http://course-service:8082",
-                "GRADE_COURSE_SERVICE_AUTHORIZATION": "${GRADE_SERVICE_IDENTITY:?GRADE_SERVICE_IDENTITY is required}",
+                "GRADE_COURSE_SERVICE_AUTHORIZATION": "${GRADE_COURSE_SERVICE_IDENTITY:?GRADE_COURSE_SERVICE_IDENTITY is required}",
                 "GRADE_ASSESSMENT_BASE_URL": "http://assessment-api:8083",
-                "GRADE_ASSESSMENT_SERVICE_AUTHORIZATION": "${GRADE_SERVICE_IDENTITY:?GRADE_SERVICE_IDENTITY is required}",
+                "GRADE_ASSESSMENT_SERVICE_AUTHORIZATION": "${GRADE_ASSESSMENT_SERVICE_IDENTITY:?GRADE_ASSESSMENT_SERVICE_IDENTITY is required}",
                 "RABBITMQ_HOST": "rabbitmq",
                 "RABBITMQ_USERNAME": "onlinejudge",
                 "GRADE_RABBIT_ENABLED": "true",
@@ -318,7 +324,7 @@ def compose_service(
         lines.append("    command: [\"--spring.main.web-application-type=none\", \"--assessment.worker.enabled=true\"]")
     if workload["traffic"]["exposed"]:
         port = workload["ports"][0]["containerPort"]
-        lines.extend(["    ports:", "      - " + yaml_scalar("${GATEWAY_HTTP_PORT:-18080}:" + str(port))])
+        lines.extend(["    ports:", "      - " + yaml_scalar("127.0.0.1:${GATEWAY_HTTP_PORT:-18080}:" + str(port))])
     lines.extend(indent(compose_healthcheck(workload), 4))
     lines.extend(indent(compose_resources(workload), 4))
     lines.append("    restart: \"no\"")

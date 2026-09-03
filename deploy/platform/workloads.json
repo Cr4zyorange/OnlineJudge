@@ -195,7 +195,8 @@
       "secrets": [
         {"key": "GRADE_DATABASE_PASSWORD", "injectedAs": "runtime-secret", "redact": true, "imageBuild": "forbidden"},
         {"key": "IDENTITY_JWKS_TRUST_BUNDLE", "injectedAs": "runtime-secret", "redact": true, "imageBuild": "forbidden"},
-        {"key": "GRADE_SERVICE_IDENTITY", "injectedAs": "workload-identity", "redact": true, "imageBuild": "forbidden"},
+        {"key": "GRADE_COURSE_SERVICE_IDENTITY", "injectedAs": "workload-identity", "redact": true, "imageBuild": "forbidden"},
+        {"key": "GRADE_ASSESSMENT_SERVICE_IDENTITY", "injectedAs": "workload-identity", "redact": true, "imageBuild": "forbidden"},
         {"key": "RABBITMQ_PASSWORD", "injectedAs": "runtime-secret", "redact": true, "imageBuild": "forbidden"}
       ],
       "resources": {"requests": {"cpu": "200m", "memory": "256Mi"}, "limits": {"cpu": "1000m", "memory": "1Gi"}},

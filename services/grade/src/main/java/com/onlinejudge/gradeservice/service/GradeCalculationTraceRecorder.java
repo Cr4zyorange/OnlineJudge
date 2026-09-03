@@ -32,10 +32,10 @@ public class GradeCalculationTraceRecorder implements GradeResultTraceRecorder {
                   JOIN t_grade_item i ON i.id=r.grade_item_id AND i.course_id=r.course_id
                   JOIN grade_rule_version rv ON rv.grade_item_id=i.id
              LEFT JOIN grade_source_projection p
-                    ON CAST(p.course_id AS BIGINT)=r.course_id
+                    ON CAST(p.course_id AS DECIMAL(19, 0))=r.course_id
                    AND p.source_type=r.source_type
-                   AND CAST(p.source_id AS BIGINT)=r.source_id
-                   AND CAST(p.student_id AS BIGINT)=r.student_id
+                   AND CAST(p.source_id AS DECIMAL(19, 0))=r.source_id
+                   AND CAST(p.student_id AS DECIMAL(19, 0))=r.student_id
                  WHERE r.course_id=?
                 ON DUPLICATE KEY UPDATE calculation_batch_id=VALUES(calculation_batch_id)
                 """, calculationBatchId, courseId);

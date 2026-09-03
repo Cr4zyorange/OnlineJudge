@@ -281,6 +281,7 @@ import PageHeader from '../../components/foundation/PageHeader.vue';
 import PageState from '../../components/foundation/PageState.vue';
 import StatusBadge, { type StatusBadgeTone } from '../../components/foundation/StatusBadge.vue';
 import SummaryStrip, { type SummaryStripItem } from '../../components/foundation/SummaryStrip.vue';
+import { labStudentIdsMatch } from '../../types/lab';
 import type {
   LabEvaluationCaseResult,
   LabExperimentDetail,
@@ -290,8 +291,10 @@ import type {
   LabScoreSummary,
   LabSubmissionDetail,
   LabSubmissionHistoryItem,
+  LabSubmissionId,
   LabSubmissionResult,
-  LabSubmissionSummary
+  LabSubmissionSummary,
+  LabStudentId
 } from '../../types/lab';
 import {
   formatLabDateTime,
@@ -307,7 +310,7 @@ import {
 const props = defineProps<{
   courseId: number;
   labId: number;
-  submissionId?: number;
+  submissionId?: LabSubmissionId;
 }>();
 
 type LabEvaluationStatus = LabSubmissionSummary['evaluationStatus'];
@@ -519,7 +522,7 @@ async function loadLatestResult(generation: number) {
 
 async function loadHistoricResult(
   generation: number,
-  selectedSubmissionId: number,
+  selectedSubmissionId: LabSubmissionId,
   labStatus: LabExperimentStatus
 ) {
   const [loadedSubmission, loadedEvaluation] = await Promise.all([
@@ -672,7 +675,7 @@ function applyEvaluationResult(loadedEvaluation: LabSubmissionResult) {
 }
 
 async function requestEvaluationWithWatchdog(
-  selectedSubmissionId: number,
+  selectedSubmissionId: LabSubmissionId,
   requestGeneration: number,
   timeoutMs: number,
   timeoutMessage: string
@@ -717,13 +720,14 @@ function selectLatestSubmission(history: LabSubmissionHistoryItem[]) {
     const latestDifference = Number(right.isLatest) - Number(left.isLatest);
     const versionDifference = right.version - left.version;
     const timeDifference = timestamp(right.submittedAt) - timestamp(left.submittedAt);
-    return latestDifference || versionDifference || timeDifference || right.submissionId - left.submissionId;
+    return latestDifference || versionDifference || timeDifference
+      || String(right.submissionId).localeCompare(String(left.submissionId));
   })[0] ?? null;
 }
 
-function validateLatestHistory(history: LabSubmissionHistoryItem[], studentId: number) {
-  if (currentUser.value?.id !== studentId
-    || history.some((item) => item.labId !== props.labId || item.studentId !== studentId)) {
+function validateLatestHistory(history: LabSubmissionHistoryItem[], studentId: LabStudentId) {
+  if (!labStudentIdsMatch(currentUser.value?.id, studentId)
+    || history.some((item) => item.labId !== props.labId || !labStudentIdsMatch(item.studentId, studentId))) {
     throw new Error('提交历史与当前实验或学生不匹配，请重新加载。');
   }
 }
@@ -737,9 +741,9 @@ function validateLab(loadedLab: LabExperimentDetail) {
 function validateAggregateResult(aggregate: LabResult, selected: LabSubmissionHistoryItem) {
   if (
     aggregate.labId !== props.labId
-    || aggregate.studentId !== selected.studentId
+    || !labStudentIdsMatch(aggregate.studentId, selected.studentId)
     || aggregate.submission.labId !== props.labId
-    || aggregate.submission.studentId !== selected.studentId
+    || !labStudentIdsMatch(aggregate.submission.studentId, selected.studentId)
     || aggregate.submission.submissionId !== selected.submissionId
     || aggregate.evaluationResult.submissionId !== selected.submissionId
   ) {
@@ -750,19 +754,19 @@ function validateAggregateResult(aggregate: LabResult, selected: LabSubmissionHi
 function validateHistoricResult(
   loadedSubmission: LabSubmissionDetail,
   loadedEvaluation: LabSubmissionResult,
-  selectedSubmissionId: number
+  selectedSubmissionId: LabSubmissionId
 ) {
   if (
     loadedSubmission.labId !== props.labId
     || loadedSubmission.submissionId !== selectedSubmissionId
-    || loadedSubmission.studentId !== currentUser.value?.id
+    || !labStudentIdsMatch(loadedSubmission.studentId, currentUser.value?.id)
     || loadedEvaluation.submissionId !== selectedSubmissionId
   ) {
     throw new Error('返回的实验结果与当前提交不匹配。');
   }
 }
 
-function validateEvaluationResult(loadedEvaluation: LabSubmissionResult, selectedSubmissionId: number) {
+function validateEvaluationResult(loadedEvaluation: LabSubmissionResult, selectedSubmissionId: LabSubmissionId) {
   if (loadedEvaluation.submissionId !== selectedSubmissionId) {
     throw new Error('评测结果与当前提交不匹配。');
   }
@@ -777,7 +781,7 @@ function isCurrentGeneration(generation: number) {
   return !disposed && generation === loadGeneration;
 }
 
-function isCurrentEvaluationRequest(generation: number, selectedSubmissionId: number) {
+function isCurrentEvaluationRequest(generation: number, selectedSubmissionId: LabSubmissionId) {
   return !disposed
     && generation === evaluationRequestGeneration
     && submission.value?.submissionId === selectedSubmissionId;

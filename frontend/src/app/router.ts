@@ -284,7 +284,7 @@ const routes: RouteRecordRaw[] = [
             path: 'labs/:labId/submissions/:submissionId/result',
             name: 'lab-submission-result',
             component: () => import('../views/lab/LabSubmissionResultView.vue'),
-            props: numericProps('courseId', 'labId', 'submissionId'),
+            props: labSubmissionProps,
             meta: {
               title: '实验评测结果',
               shell: 'course',
@@ -310,7 +310,7 @@ const routes: RouteRecordRaw[] = [
             path: 'labs/:labId/manage/submissions/:submissionId',
             name: 'lab-submission-review',
             component: () => import('../views/lab/LabSubmissionReviewView.vue'),
-            props: numericProps('courseId', 'labId', 'submissionId'),
+            props: labSubmissionProps,
             meta: {
               title: '实验提交批阅',
               shell: 'course',
@@ -699,6 +699,14 @@ export function createAppRouter(options: AppRouterOptions = {}) {
 
 function numericProps(...keys: string[]) {
   return (route: RouteLocationNormalized) => numberParams(route, ...keys);
+}
+
+function labSubmissionProps(route: RouteLocationNormalized) {
+  return {
+    ...numberParams(route, 'courseId', 'labId'),
+    // Assessment owns opaque UUID submission identifiers; only course and LAB ids are numeric.
+    submissionId: String(route.params.submissionId)
+  };
 }
 
 function numberParams(route: RouteLocationNormalized, ...keys: string[]) {

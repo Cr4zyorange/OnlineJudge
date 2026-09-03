@@ -10,7 +10,9 @@ import type {
   LabSubmissionResult,
   LabSubmissionDetail,
   LabSubmissionHistoryItem,
+  LabSubmissionId,
   LabSubmissionListFilters,
+  LabStudentId,
   LabExperimentDetail,
   LabExperimentPayload,
   LabExperimentStatus,
@@ -49,49 +51,56 @@ export function configureLabAuthContext(provider: LabAuthContextProvider | null)
 
 export async function listLabs(courseId: number, status?: LabExperimentStatus): Promise<LabExperimentSummary[]> {
   const query = status ? `?status=${status}` : '';
-  return request<LabExperimentSummary[]>(`/api/v1/courses/${courseId}/labs${query}`);
+  const labs = await request<LabExperimentSummary[]>(`/api/v1/courses/${courseId}/labs${query}`);
+  return labs.map(normalizeLabCourseId);
 }
 
 export async function createLab(courseId: number, payload: LabExperimentPayload): Promise<LabExperimentDetail> {
-  return request<LabExperimentDetail>(`/api/v1/courses/${courseId}/labs`, {
+  const lab = await request<LabExperimentDetail>(`/api/v1/courses/${courseId}/labs`, {
     method: 'POST',
     body: payload
   });
+  return normalizeLabCourseId(lab);
 }
 
 export async function getLabDetail(labId: number): Promise<LabExperimentDetail> {
-  return request<LabExperimentDetail>(`/api/v1/labs/${labId}`);
+  return normalizeLabCourseId(await request<LabExperimentDetail>(`/api/v1/labs/${labId}`));
 }
 
 export async function updateLab(labId: number, payload: LabExperimentPayload): Promise<LabExperimentDetail> {
-  return request<LabExperimentDetail>(`/api/v1/labs/${labId}`, {
+  const lab = await request<LabExperimentDetail>(`/api/v1/labs/${labId}`, {
     method: 'PUT',
     body: payload
   });
+  return normalizeLabCourseId(lab);
 }
 
 export async function deleteLab(labId: number): Promise<LabExperimentSummary> {
-  return request<LabExperimentSummary>(`/api/v1/labs/${labId}`, {
+  const lab = await request<LabExperimentSummary>(`/api/v1/labs/${labId}`, {
     method: 'DELETE'
   });
+  return normalizeLabCourseId(lab);
 }
 
 export async function publishLab(labId: number): Promise<LabExperimentSummary> {
-  return request<LabExperimentSummary>(`/api/v1/labs/${labId}/publish`, {
+  const lab = await request<LabExperimentSummary>(`/api/v1/labs/${labId}/publish`, {
     method: 'POST'
   });
+  return normalizeLabCourseId(lab);
 }
 
 export async function closeLab(labId: number): Promise<LabExperimentSummary> {
-  return request<LabExperimentSummary>(`/api/v1/labs/${labId}/close`, {
+  const lab = await request<LabExperimentSummary>(`/api/v1/labs/${labId}/close`, {
     method: 'POST'
   });
+  return normalizeLabCourseId(lab);
 }
 
 export async function releaseLabScores(labId: number): Promise<LabExperimentSummary> {
-  return request<LabExperimentSummary>(`/api/v1/labs/${labId}/release-scores`, {
+  const lab = await request<LabExperimentSummary>(`/api/v1/labs/${labId}/release-scores`, {
     method: 'PUT'
   });
+  return normalizeLabCourseId(lab);
 }
 
 export async function submitLab(labId: number, payload: LabSubmissionPayload): Promise<LabSubmissionSummary> {
@@ -130,7 +139,7 @@ export async function listLabSubmissions(
   return request<LabSubmissionHistoryItem[]>(`/api/v1/labs/${labId}/submissions${suffix}`);
 }
 
-export async function getLabSubmissionDetail(labId: number, submissionId: number): Promise<LabSubmissionDetail> {
+export async function getLabSubmissionDetail(labId: number, submissionId: LabSubmissionId): Promise<LabSubmissionDetail> {
   return request<LabSubmissionDetail>(`/api/v1/labs/${labId}/submissions/${submissionId}`);
 }
 
@@ -154,7 +163,7 @@ export function downloadLabReport(labId: number, reportId: number) {
   return requestBlob(`/api/v1/labs/${labId}/reports/${reportId}/download`);
 }
 
-export function downloadLabSubmissionSource(labId: number, submissionId: number) {
+export function downloadLabSubmissionSource(labId: number, submissionId: LabSubmissionId) {
   return requestBlob(`/api/v1/labs/${labId}/submissions/${submissionId}/source/download`);
 }
 
@@ -171,7 +180,7 @@ export async function scoreLabReport(
 
 export async function scoreLabSubmission(
   labId: number,
-  submissionId: number,
+  submissionId: LabSubmissionId,
   payload: LabScorePayload
 ): Promise<LabScoreSummary> {
   return request<LabScoreSummary>(`/api/v1/labs/${labId}/submissions/${submissionId}/score`, {
@@ -180,11 +189,11 @@ export async function scoreLabSubmission(
   });
 }
 
-export async function getLabSubmissionResult(labId: number, submissionId: number): Promise<LabSubmissionResult> {
+export async function getLabSubmissionResult(labId: number, submissionId: LabSubmissionId): Promise<LabSubmissionResult> {
   return request<LabSubmissionResult>(`/api/v1/labs/${labId}/submissions/${submissionId}/result`);
 }
 
-export async function getLabResult(labId: number, studentId: number): Promise<LabResult> {
+export async function getLabResult(labId: number, studentId: LabStudentId): Promise<LabResult> {
   return request<LabResult>(`/api/v1/labs/${labId}/results/${studentId}`);
 }
 
@@ -192,8 +201,15 @@ export async function getLabStatistics(labId: number): Promise<LabStatistics> {
   return request<LabStatistics>(`/api/v1/labs/${labId}/statistics`);
 }
 
-export async function evaluateLabSubmission(labId: number, submissionId: number): Promise<LabSubmissionResult> {
+export async function evaluateLabSubmission(labId: number, submissionId: LabSubmissionId): Promise<LabSubmissionResult> {
   return request<LabSubmissionResult>(`/api/v1/labs/${labId}/submissions/${submissionId}/evaluate`, {
     method: 'POST'
   });
+}
+
+function normalizeLabCourseId<T extends LabExperimentSummary>(lab: T): T {
+  const courseId = Number(lab.courseId);
+  return Number.isSafeInteger(courseId) && courseId > 0
+    ? { ...lab, courseId }
+    : lab;
 }

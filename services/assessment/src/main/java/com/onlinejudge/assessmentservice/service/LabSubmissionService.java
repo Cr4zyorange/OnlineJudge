@@ -10,6 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.Locale;
 import java.util.UUID;
 
 /**
@@ -62,10 +63,20 @@ public class LabSubmissionService {
                     INSERT INTO assessment_lab_submission (submission_id, lab_id, student_id, submission_version, language,
                         submit_status, has_file, submitted_at) VALUES (?, ?, ?, ?, ?, 'SUBMITTED', ?, ?)
                     """, submissionId, lab.labId(), command.studentId(), version, command.language(), command.hasFile(), Timestamp.from(now));
+            if (command.hasFile()) {
+                jdbc.update("""
+                        INSERT INTO assessment_lab_submission_source_file
+                            (submission_id, lab_id, course_id, uploader_id, storage_key, original_filename,
+                             content_type, file_size, status, created_at, updated_at)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'AVAILABLE', ?, ?)
+                        """, submissionId, lab.labId(), lab.courseId(), command.studentId(), stored.storageKey(),
+                        stored.originalFilename(), trustedSourceContentType(command.language()),
+                        stored.size(), Timestamp.from(now), Timestamp.from(now));
+            }
             if (autoEvaluation) {
                 tasks.insert(taskId, submissionId, "LAB", Long.toString(lab.labId()), lab.courseId(), command.studentId(), command.originRequestId(), now);
             }
-            return new SubmittedLabSubmission(submissionId, taskId, lab.labId(), version, "SUBMITTED", evaluationStatus, now);
+            return new SubmittedLabSubmission(submissionId, taskId, lab.labId(), command.studentId(), version, "SUBMITTED", evaluationStatus, now);
         } catch (RuntimeException | java.io.IOException failed) {
             if (stored != null) {
                 try { files.delete(stored.storageKey()); }
@@ -98,14 +109,27 @@ public class LabSubmissionService {
         return configured != null && java.util.Arrays.stream(configured.split(",")).anyMatch(language::equalsIgnoreCase);
     }
 
-    public record SubmitLabCommand(long labId, String courseId, String studentId, String language, String originalFilename, byte[] content,
+    private static String trustedSourceContentType(String language) {
+        return switch (language == null ? "" : language.trim().toLowerCase(Locale.ROOT)) {
+            case "python", "py" -> "text/x-python";
+            case "java" -> "text/x-java-source";
+            case "c" -> "text/x-csrc";
+            case "cpp", "c++" -> "text/x-c++src";
+            default -> "application/octet-stream";
+        };
+    }
+
+    public record SubmitLabCommand(long labId, String courseId, String studentId, String language, String originalFilename,
+                                   byte[] content,
                                    boolean hasFile, String codeContent, String originRequestId) {
         public SubmitLabCommand(long labId, String courseId, String studentId, String language, String originalFilename, byte[] content,
                                 boolean hasFile, String codeContent) {
-            this(labId, courseId, studentId, language, originalFilename, content, hasFile, codeContent, UUID.randomUUID().toString());
+            this(labId, courseId, studentId, language, originalFilename, content, hasFile, codeContent,
+                    UUID.randomUUID().toString());
         }
         public SubmitLabCommand(long labId, String courseId, String studentId, String language, String originalFilename, byte[] content) {
-            this(labId, courseId, studentId, language, originalFilename, content, true, null, UUID.randomUUID().toString());
+            this(labId, courseId, studentId, language, originalFilename, content, true, null,
+                    UUID.randomUUID().toString());
         }
         public SubmitLabCommand {
             if (studentId == null || studentId.isBlank() || language == null || language.isBlank()) {
@@ -115,6 +139,6 @@ public class LabSubmissionService {
             if (originRequestId == null || originRequestId.isBlank() || originRequestId.length() > 80) throw new IllegalArgumentException("origin request id is required");
         }
     }
-    public record SubmittedLabSubmission(String submissionId, String taskId, long labId, int version,
+    public record SubmittedLabSubmission(String submissionId, String taskId, long labId, String studentId, int version,
                                          String submitStatus, String evaluationStatus, Instant submittedAt) { }
 }

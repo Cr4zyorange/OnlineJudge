@@ -92,7 +92,7 @@ public class LrnProgressService {
                     int percent = records.stream().mapToInt(LearningProgressItem::progressPercent).max().orElse(0);
                     LrnProgressRepository.ProgressRow latest = latest(entry.getValue());
                     return new LearningChapterProgress(chapterId, chapterName, percent, status(percent),
-                            latest.lastPosition(), null, format(latest.updatedAt()), records);
+                            latest.lastPosition(), continueUrl(latest), format(latest.updatedAt()), records);
                 })
                 .sorted(Comparator.comparing(chapter -> chapter.chapterId() == null ? -1L : chapter.chapterId()))
                 .toList();
@@ -103,13 +103,21 @@ public class LrnProgressService {
                         Comparator.nullsFirst(Comparator.naturalOrder())))
                 .map(this::item).orElse(null);
         return new LearningCourseProgress(courseId, latest.courseName(), percent, status(percent), latest.lastPosition(),
-                null, format(latest.updatedAt()), continueLearning, chapters);
+                continueLearning == null ? null : continueLearning.continueUrl(), format(latest.updatedAt()), continueLearning, chapters);
     }
 
     private LearningProgressItem item(LrnProgressRepository.ProgressRow row) {
         return new LearningProgressItem(row.id(), row.courseId(), row.courseName(), row.chapterId(), row.chapterName(),
                 row.sourceModule(), row.sourceId(), row.progressPercent(), row.lastPosition(), status(row.progressPercent()),
-                "", format(row.updatedAt()));
+                continueUrl(row), format(row.updatedAt()));
+    }
+
+    private String continueUrl(LrnProgressRepository.ProgressRow row) {
+        return switch (row.sourceModule()) {
+            case "LAB" -> "/courses/" + row.courseId() + "/labs/" + row.sourceId();
+            case "HWK" -> "/courses/" + row.courseId() + "/homeworks/" + row.sourceId();
+            default -> "/courses/" + row.courseId();
+        };
     }
 
     private LrnProgressRepository.ProgressRow latest(List<LrnProgressRepository.ProgressRow> rows) {

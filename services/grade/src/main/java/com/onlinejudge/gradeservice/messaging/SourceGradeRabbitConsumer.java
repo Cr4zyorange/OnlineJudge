@@ -3,6 +3,8 @@ package com.onlinejudge.gradeservice.messaging;
 import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.Connection;
 import com.rabbitmq.client.ConnectionFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.SmartLifecycle;
@@ -14,6 +16,7 @@ import java.util.Map;
 @Component
 @ConditionalOnProperty(name = "grade.rabbit.enabled", havingValue = "true")
 public class SourceGradeRabbitConsumer implements SmartLifecycle {
+    private static final Logger log = LoggerFactory.getLogger(SourceGradeRabbitConsumer.class);
     private final SourceGradeRabbitMessageHandler handler;
     private final String host, username, password, exchange, queue, routingKey, deadLetterExchange, deadLetterQueue, deadLetterRoutingKey;
     private final int port;
@@ -57,8 +60,10 @@ public class SourceGradeRabbitConsumer implements SmartLifecycle {
                     handler.handle(message.getBody());
                     channel.basicAck(message.getEnvelope().getDeliveryTag(), false);
                 } catch (IllegalArgumentException invalidEnvelope) {
+                    log.warn("dead-lettering invalid Grade source-grade event: {}", invalidEnvelope.getMessage());
                     channel.basicNack(message.getEnvelope().getDeliveryTag(), false, false);
                 } catch (Exception temporaryFailure) {
+                    log.warn("Grade source-grade projection failed; retaining message for retry", temporaryFailure);
                     channel.basicNack(message.getEnvelope().getDeliveryTag(), false, true);
                 }
             }, tag -> running = false);

@@ -17,7 +17,7 @@ import java.util.List;
 public class SandboxEvaluator {
     private final JdbcTemplate jdbc;
     private final Path root;
-    private final DockerSandboxClient docker;
+    private final SandboxExecutionClient docker;
 
     @Autowired
     public SandboxEvaluator(JdbcTemplate jdbc, @Value("${assessment.storage.root:./var/assessment-files}") String root,
@@ -29,7 +29,7 @@ public class SandboxEvaluator {
     }
 
     public SandboxEvaluator(Path root) { this(null, root, new DockerSandboxClient("", "")); }
-    private SandboxEvaluator(JdbcTemplate jdbc, Path root, DockerSandboxClient docker) {
+    SandboxEvaluator(JdbcTemplate jdbc, Path root, SandboxExecutionClient docker) {
         this.jdbc = jdbc; this.root = root.toAbsolutePath().normalize(); this.docker = docker;
     }
 
@@ -37,7 +37,8 @@ public class SandboxEvaluator {
         if (jdbc == null) return AssessmentWorker.EvaluationOutcome.failed("SANDBOX_UNAVAILABLE");
         String key = jdbc.queryForObject("SELECT content_ref FROM assessment_submission WHERE id = ?", String.class, task.submissionId());
         if ("LAB".equals(task.sourceType())) return evaluateLab(task, key);
-        return evaluate(key);
+        if ("HWK".equals(task.sourceType())) return evaluateHomework(task, key);
+        return AssessmentWorker.EvaluationOutcome.failed("SYSTEM_ERROR");
     }
 
     public AssessmentWorker.EvaluationOutcome evaluate(String storageKey) {
@@ -77,6 +78,38 @@ public class SandboxEvaluator {
         return new AssessmentWorker.EvaluationOutcome(true, awarded.compareTo(fullScore) == 0 ? "ACCEPTED" : "WRONG_ANSWER", awarded, fullScore, results);
     }
 
+    private AssessmentWorker.EvaluationOutcome evaluateHomework(EvaluationTask task, String storageKey) {
+        try {
+            List<HomeworkCase> cases = jdbc.query("""
+                    SELECT input_text, expected_output, score_weight
+                      FROM assessment_homework_testcase
+                     WHERE homework_id = ?
+                     ORDER BY sort_order, id
+                    """, (rs, ignored) -> new HomeworkCase(rs.getString("input_text"), rs.getString("expected_output"),
+                    rs.getBigDecimal("score_weight")), Long.parseLong(task.sourceId()));
+            if (cases.isEmpty()) return AssessmentWorker.EvaluationOutcome.failed("SYSTEM_ERROR");
+            BigDecimal fullScore = cases.stream().map(HomeworkCase::scoreWeight).reduce(BigDecimal.ZERO, BigDecimal::add);
+            if (fullScore.signum() <= 0) return AssessmentWorker.EvaluationOutcome.failed("SYSTEM_ERROR");
+            Path source = source(storageKey);
+            byte[] sourceBytes = Files.readAllBytes(source);
+            String language = languageFor(storageKey);
+            BigDecimal awarded = BigDecimal.ZERO;
+            for (HomeworkCase testcase : cases) {
+                DockerSandboxClient.Result result = docker.evaluate(language, sourceBytes, testcase.input(), 60_000, 262_144);
+                if (result.status() != null) {
+                    return new AssessmentWorker.EvaluationOutcome(false, result.status(), awarded, fullScore);
+                }
+                if (normalize(result.output()).equals(normalize(testcase.expectedOutput()))) {
+                    awarded = awarded.add(testcase.scoreWeight());
+                }
+            }
+            return new AssessmentWorker.EvaluationOutcome(true,
+                    awarded.compareTo(fullScore) == 0 ? "ACCEPTED" : "WRONG_ANSWER", awarded, fullScore);
+        } catch (Exception rejected) {
+            return AssessmentWorker.EvaluationOutcome.failed("SYSTEM_ERROR");
+        }
+    }
+
     private ProcessResult executeInDocker(String submissionId, String storageKey, String inputText, LabLimits limits) {
         try {
             Path source = source(storageKey);
@@ -105,6 +138,7 @@ public class SandboxEvaluator {
 
     private static String normalize(String value) { return value == null ? "" : value.replace("\r\n", "\n").trim(); }
     private record LabCase(long id, String input, String expectedOutput, BigDecimal scoreWeight) { }
+    private record HomeworkCase(String input, String expectedOutput, BigDecimal scoreWeight) { }
     private record LabLimits(int timeLimitMs, int memoryLimitKb) { }
     private record ProcessResult(String output, String status) { }
 }

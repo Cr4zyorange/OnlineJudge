@@ -2,6 +2,7 @@ import { timingSafeEqual } from 'node:crypto';
 import { readFileSync, realpathSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, dirname, isAbsolute, relative } from 'node:path';
+import { verifyThreeServiceDisposableProof } from '../three-service-disposable-proof';
 
 type DisposableProof = {
   token: string;
@@ -13,6 +14,9 @@ type DisposableProof = {
 };
 
 export function verifyLrnDisposableProof(): boolean {
+  if (verifyThreeServiceDisposableProof()) {
+    return true;
+  }
   const proofFile = process.env.E2E_LRN_DISPOSABLE_PROOF_FILE?.trim();
   const suppliedToken = process.env.E2E_LRN_DISPOSABLE_TOKEN?.trim();
   const baseUrl = process.env.E2E_BASE_URL?.trim();

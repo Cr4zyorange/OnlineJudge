@@ -133,7 +133,11 @@ build_one() {
   local image="$3"
   local sbom="$output_dir/sbom/$workload.spdx.json"
   local digest revision
-  retry 3 docker build "${docker_build_network_args[@]}" --file "$repo_root/$dockerfile" --build-arg "GIT_SHA=$git_sha" --tag "$image" "$repo_root"
+  if ((${#docker_build_network_args[@]})); then
+    retry 3 docker build "${docker_build_network_args[@]}" --file "$repo_root/$dockerfile" --build-arg "GIT_SHA=$git_sha" --tag "$image" "$repo_root"
+  else
+    retry 3 docker build --file "$repo_root/$dockerfile" --build-arg "GIT_SHA=$git_sha" --tag "$image" "$repo_root"
+  fi
   digest="$(docker image inspect --format '{{.Id}}' "$image")"
   revision="$(docker image inspect --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' "$image")"
   [[ "$revision" == "$git_sha" ]] || {

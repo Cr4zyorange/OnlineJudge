@@ -6,6 +6,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.onlinejudge.courseservice.persistence.CourseRepository;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -25,6 +27,7 @@ import java.util.List;
  */
 @Component
 public class LrnEventProjection {
+    private static final Logger log = LoggerFactory.getLogger(LrnEventProjection.class);
     private final ObjectMapper mapper;
     private final LrnEventInboxRepository inbox;
     private final LrnTaskService tasks;
@@ -69,15 +72,17 @@ public class LrnEventProjection {
             case "course.member.changed.v2" -> memberChanged(eventId, payload, correlationId);
             case "course.membership.snapshot.v2" -> membershipSnapshot(payload);
             case "course.announcement.published.v2" -> announcementPublished(eventId, payload);
+            case "assessment.source-grade.changed.v2" -> sourceGradePublished(eventId, payload);
             case "assessment.homework.published.v2" ->
                     publishTask(eventId, "HWK", "HOMEWORK", "TASK", "homeworkId", envelope, correlationId, envelopeJson);
             case "assessment.lab.published.v2" ->
                     publishTask(eventId, "LAB", "EXPERIMENT", "TASK", "labId", envelope, correlationId, envelopeJson);
             case "assessment.evaluation.completed.v2" ->
-                    notifyCourse(eventId, "TASK", "HWK", envelope, "评测完成", correlationId, envelopeJson);
+                    notifyCourse(eventId, "TASK", "HWK", null, envelope, "评测完成", correlationId, envelopeJson);
             case "grade.published.v2" ->
-                    notifyCourse(eventId, "GRADE", "GRD", envelope, "成绩已发布", correlationId, envelopeJson);
-            case "grade.review.processed.v2" -> notifyStudent(eventId, "GRADE", "GRD", payload);
+                    notifyCourse(eventId, "GRADE", "GRD", "publicationId", envelope, "成绩已发布", correlationId, envelopeJson);
+            case "grade.review.processed.v2" ->
+                    notifyStudent(eventId, "GRADE", "GRD", "reviewRequestId", payload);
             default -> {
                 // Retained in the inbox (idempotency) but no LRN projection is needed.
             }
@@ -161,6 +166,28 @@ public class LrnEventProjection {
                 "CRS", announcementId, receivers, title, content, 1, "/courses/" + courseId);
     }
 
+    /**
+     * A SCORED source-grade fact is the existing cross-service completion fact
+     * for a student-visible LAB/HWK score.  Keep recipient resolution tied to
+     * the event's student rather than broadening it to the entire course.
+     */
+    private void sourceGradePublished(String eventId, JsonNode payload) {
+        String sourceModule = payload.path("sourceType").asText("");
+        if (!"SCORED".equals(payload.path("status").asText())
+                || !("HWK".equals(sourceModule) || "LAB".equals(sourceModule))) {
+            return;
+        }
+        long courseId = parseId(payload.path("courseId").asText());
+        long sourceId = parseId(payload.path("sourceId").asText());
+        long studentId = parseId(payload.path("studentId").asText());
+        if (courseId <= 0 || sourceId <= 0 || studentId <= 0) return;
+        String title = "HWK".equals(sourceModule) ? "homework score published" : "实验成绩已发布";
+        String content = "HWK".equals(sourceModule) ? "作业成绩已发布，请查看反馈。" : "实验成绩已发布，请查看反馈。";
+        notifications.createForFact(eventId, "assessment.source-grade.changed.v2", "GRADE", courseId,
+                sourceModule, sourceId, List.of(studentId), title, content, 1,
+                taskActionUrl(sourceModule, courseId, sourceId));
+    }
+
     private void publishTask(String eventId, String sourceModule, String taskType, String notificationType,
                              String idField, JsonNode envelope, String correlationId, String envelopeJson) {
         JsonNode payload = envelope.path("payload");
@@ -173,16 +200,17 @@ public class LrnEventProjection {
         }
         String title = payload.path("title").asText("").trim();
         LocalDateTime deadline = parseTime(payload.path("deadline").asText(null));
-        String actionUrl = "/learning/tasks";
+        String actionUrl = taskActionUrl(sourceModule, courseId, sourceId);
         List<Long> receivers = inbox.activeMemberUserIds(courseId);
         if (receivers.isEmpty()) return;
         tasks.applyPublishedFact(courseId, sourceModule, taskType, title, deadline, actionUrl, sourceId, receivers);
         String content = "新的" + ("HWK".equals(sourceModule) ? "作业" : "实验") + "已发布：" + (title.isEmpty() ? "查看详情" : title);
+        String notificationTitle = "HWK".equals(sourceModule) ? "homework published" : (title.isEmpty() ? content : title);
         notifications.createForFact(eventId, eventTypeOf(sourceModule), notificationType, courseId, sourceModule,
-                sourceId, receivers, title.isEmpty() ? content : title, content, 1, actionUrl);
+                sourceId, receivers, notificationTitle, content, 1, actionUrl);
     }
 
-    private void notifyCourse(String eventId, String notificationType, String sourceModule, JsonNode envelope,
+    private void notifyCourse(String eventId, String notificationType, String sourceModule, String sourceIdField, JsonNode envelope,
                               String defaultTitle, String correlationId, String envelopeJson) {
         JsonNode payload = envelope.path("payload");
         long courseId = parseId(payload.path("courseId").asText());
@@ -193,8 +221,12 @@ public class LrnEventProjection {
         }
         List<Long> receivers = inbox.activeMemberUserIds(courseId);
         if (receivers.isEmpty()) return;
-        notifications.createForFact(eventId, eventTypeOf(sourceModule), notificationType, courseId, sourceModule, null,
-                receivers, defaultTitle, defaultTitle + "，请前往对应课程查看。", 1, "/learning/tasks");
+        long parsedSourceId = sourceIdField == null ? 0 : parseId(payload.path(sourceIdField).asText());
+        Long sourceId = parsedSourceId > 0 ? parsedSourceId : null;
+        LrnNotificationService.NotificationEventResult result = notifications.createForFact(eventId, eventTypeOf(sourceModule), notificationType,
+                courseId, sourceModule, sourceId, receivers, defaultTitle, defaultTitle + "，请前往对应课程查看。", 1, "/learning/tasks");
+        log.info("lrn_notification_projected eventId={} correlationId={} sourceModule={} sourceId={} notificationIds={}",
+                eventId, correlationId, sourceModule, sourceId, result.notificationIds());
     }
 
     /** Same transaction: keep the original envelope replayable and record the open roster gap. */
@@ -206,13 +238,16 @@ public class LrnEventProjection {
         inbox.recordGap(courseId, 0, eventId, correlationId);
     }
 
-    private void notifyStudent(String eventId, String notificationType, String sourceModule, JsonNode payload) {
+    private void notifyStudent(String eventId, String notificationType, String sourceModule,
+                               String sourceIdField, JsonNode payload) {
         long courseId = parseId(payload.path("courseId").asText());
         long studentId = parseId(payload.path("studentId").asText());
         if (courseId <= 0 || studentId <= 0) return;
         String reviewStatus = payload.path("reviewStatus").asText("PROCESSED");
-        notifications.createForFact(eventId, eventTypeOf(sourceModule), notificationType, courseId, sourceModule, null,
-                List.of(studentId), "成绩复核结果", "您的成绩复核申请已处理（" + reviewStatus + "）。", 1, "/learning/tasks");
+        long parsedSourceId = parseId(payload.path(sourceIdField).asText());
+        Long sourceId = parsedSourceId > 0 ? parsedSourceId : null;
+        notifications.createForFact(eventId, "grade.review.processed.v2", notificationType, courseId, sourceModule, sourceId,
+                List.of(studentId), "成绩复核已处理", "您的成绩复核申请已处理（" + reviewStatus + "）。", 1, "/learning/tasks");
     }
 
     private String eventTypeOf(String sourceModule) {
@@ -220,6 +255,14 @@ public class LrnEventProjection {
             case "LAB" -> "assessment.lab.published.v2";
             case "GRD" -> "grade.published.v2";
             default -> "assessment.homework.published.v2";
+        };
+    }
+
+    private String taskActionUrl(String sourceModule, long courseId, long sourceId) {
+        return switch (sourceModule) {
+            case "LAB" -> "/courses/" + courseId + "/labs/" + sourceId;
+            case "HWK" -> "/courses/" + courseId + "/homeworks/" + sourceId;
+            default -> "/learning/tasks";
         };
     }
 

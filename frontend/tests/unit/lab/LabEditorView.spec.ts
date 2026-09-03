@@ -63,6 +63,7 @@ describe('LabEditorView', () => {
       chapterId: 8,
       title: '容器评测实验',
       description: '完成容器输入输出评测。',
+      deadline: new Date('2026-08-25T23:59').toISOString(),
       attachmentIds: [10],
       allowedLanguages: 'python',
       evaluationMode: 'MIXED',
@@ -104,6 +105,17 @@ describe('LabEditorView', () => {
       attachmentIds: [10]
     }));
     expect(wrapper.get('[role="status"]').text()).toContain('草稿已更新');
+  });
+
+  it('accepts a detail course ID serialized as a string by the Assessment service', async () => {
+    vi.mocked(labApi.getLabDetail).mockResolvedValue(detail({
+      courseId: '101' as unknown as number
+    }));
+    const wrapper = mountEditor({ courseId: 101, labId: 7 });
+    await flushPromises();
+
+    expect(wrapper.find('[data-state="error"]').exists()).toBe(false);
+    expect((wrapper.get('[name="title"]').element as HTMLInputElement).value).toBe('原实验');
   });
 
   it('keeps invalid input visible and blocks the request with an actionable summary', async () => {

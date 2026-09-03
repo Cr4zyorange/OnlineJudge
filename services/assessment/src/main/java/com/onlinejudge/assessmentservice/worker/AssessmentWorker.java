@@ -6,6 +6,8 @@ import com.onlinejudge.assessmentservice.persistence.EvaluationTaskRepository;
 import com.onlinejudge.assessmentservice.persistence.SourceGradeRepository;
 import org.springframework.stereotype.Component;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.Clock;
 import java.time.Duration;
@@ -21,6 +23,7 @@ import java.util.concurrent.TimeoutException;
 /** Worker entrypoint: it is invoked by the worker workload, never by an HTTP GET. */
 @Component
 public class AssessmentWorker {
+    private static final Logger log = LoggerFactory.getLogger(AssessmentWorker.class);
     private final EvaluationTaskRepository tasks;
     private final AssessmentOutboxRepository outbox;
     private final SourceGradeRepository grades;
@@ -53,7 +56,11 @@ public class AssessmentWorker {
         outcome = evaluateWithHeartbeats(task, workerId, executor);
         Instant finished = clock.instant();
         completion.complete(task, workerId, outcome, finished);
-        return tasks.find(task.id());
+        Optional<EvaluationTask> completed = tasks.find(task.id());
+        completed.ifPresent(result -> log.info(
+                "assessment_worker_terminal taskId={} submissionId={} sourceType={} taskState={} evaluationStatus={} score={}",
+                result.id(), result.submissionId(), result.sourceType(), result.state(), outcome.status(), outcome.score()));
+        return completed;
     }
 
     private EvaluationOutcome evaluateWithHeartbeats(EvaluationTask task, String workerId, EvaluationExecutor executor) {

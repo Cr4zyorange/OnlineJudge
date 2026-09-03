@@ -7,6 +7,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.math.BigDecimal;
+import java.nio.file.Files;
+import java.nio.file.Path;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -65,5 +67,16 @@ class GradeCalculationTraceRecorderTest {
                  WHERE calculation_batch_id=9002 AND grade_record_id=601
                 """, Long.class);
         assertThat(nextRuleVersion).isEqualTo(2);
+    }
+
+    @Test
+    void usesMysqlCompatibleDecimalCastsWhenJoiningStringSourceProjectionKeys() throws Exception {
+        String source = Files.readString(Path.of("src/main/java/com/onlinejudge/gradeservice/service/GradeCalculationTraceRecorder.java"));
+
+        assertThat(source)
+                .contains("CAST(p.course_id AS DECIMAL(19, 0))=r.course_id")
+                .contains("CAST(p.source_id AS DECIMAL(19, 0))=r.source_id")
+                .contains("CAST(p.student_id AS DECIMAL(19, 0))=r.student_id")
+                .doesNotContain("AS BIGINT");
     }
 }

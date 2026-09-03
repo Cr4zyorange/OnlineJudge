@@ -27,5 +27,11 @@ public class PersistentSubmissionFileStore {
         if (!target.startsWith(root)) throw new IllegalArgumentException("storage key escapes root");
         Files.deleteIfExists(target);
     }
+    public byte[] read(String storageKey) throws IOException {
+        if (storageKey == null || storageKey.isBlank()) throw new IllegalArgumentException("storage key is required");
+        Path target = root.resolve(storageKey).normalize();
+        if (!target.startsWith(root)) throw new IllegalArgumentException("storage key escapes root");
+        return Files.readAllBytes(target);
+    }
     public record StoredFile(String storageKey, String originalFilename, long size) { }
 }
