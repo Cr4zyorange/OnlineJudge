@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "issue": 307,
+  "seed": 30720260901,
+  "description": "Deterministic logical dataset contract for monolith and three-service performance comparison.",
+  "accounts": {
+    "teachers": 1,
+    "students": 100,
+    "administrators": 0
+  },
+  "courses": {
+    "visibleToBenchmarkStudent": 105,
+    "primaryCourseMembers": 100,
+    "pageSize": 20
+  },
+  "assessment": {
+    "publishedHomeworks": 1,
+    "homeworkType": "CODE",
+    "allowMultipleSubmissions": true,
+    "testCases": 3,
+    "sandboxMode": "fake",
+    "resetToSnapshotBeforeEveryRound": true
+  },
+  "grade": {
+    "gradeItems": 3,
+    "publishedStudentSummaries": 100,
+    "sourceGradesPerStudent": 2
+  },
+  "requiredRuntimeValues": [
+    "OJ_PERF_COURSE_ID",
+    "OJ_PERF_HOMEWORK_ID",
+    "OJ_PERF_HOMEWORK_BODY"
+  ],
+  "normalization": {
+    "timestamps": "fixed-by-seed-loader",
+    "identifiers": "captured-after-load-and-reused-per-architecture",
+    "roundReset": "restore-identical-database-and-file snapshot before each measured round"
+  }
+}

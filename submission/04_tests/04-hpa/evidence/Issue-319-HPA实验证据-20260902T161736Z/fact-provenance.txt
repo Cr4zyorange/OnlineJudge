@@ -1,0 +1,44 @@
+# 业务事实与 Grade 水位来源（无凭据）
+# 所有时间均为 UTC；该文件说明实际 API/事件路径，不代替 raw/ 中的数据库查询结果。
+
+2026-09-02T16:1x:xxZ 环境就绪：`deploy_kubernetes_disposable_environment.sh` 以
+--git-sha cf2979dc2fcfd1bc7e6640a71d6f6864e7de7f1b 部署 9 workloads / 4 migrations
+（namespace issue319-rerun），deployment GIT_SHA 与 runner/head 为同一提交。
+grade 迁移含 V20260902_03__allow_legacy_projection_status_null.sql，由迁移 Job
+预先应用，本轮无 DLQ 重投。
+
+环境身份种子（IDENTITY_SEED_DATA_ENABLED=true）提供 teacher001/student001。
+
+2026-09-02T16:14:0xZ teacher001 登录 HTTP 200；POST /api/v1/courses HTTP 201（course 12）
+2026-09-02T16:14:1xZ student001 POST /api/v1/courses/12/join HTTP 200
+2026-09-02T16:14:2xZ teacher001 POST /api/v1/courses/12/labs HTTP 201（lab 5，
+  含 1 个自动评测测试用例）；POST /api/v1/labs/5/publish HTTP 200
+2026-09-02T16:14:2xZ student001 POST /api/v1/labs/5/submissions（multipart，
+  language=python）HTTP 201；响应含 submissionId=84a10109-8c72-4b40-9ee1-ee923c77aa7a
+  与 taskId=39de4c76-0871-4cf5-bcb6-56c4ee629cad
+2026-09-02T16:14:3xZ teacher001 POST /api/v1/labs/5/submissions/84a10109.../score
+  （manualScore/finalScore=95.00）HTTP 200；PUT /api/v1/labs/5/release-scores HTTP 200
+2026-09-02T16:16:10Z Assessment outbox 交付 assessment.source-grade.changed.v2
+  （LAB:5:1, version=1, score=95.00/100.00）；worker 将 evaluation_task
+  置为终态 FAILED/SYSTEM_ERROR（本环境无评测沙箱，真实行为）并按 fenced
+  terminal-write 语义清空 lease 字段。
+2026-09-02T16:16:0xZ Grade 消费同一事件：grade_event_inbox APPLIED=1，
+  grade_source_projection_watermark 出现 LAB:5:1 current_version=1，
+  grade_source_projection 出现 LAB:5:1 source_version=1。全部读数由
+  raw/grade_projection_watermark.txt 与 raw/rabbitmq_queue_backlog.txt 记录。
+
+# 运行环境操作事实（与 Round 5/7 记录的 #318 渲染器缺陷一致，均属一次性
+# 环境运行时修补，非 #319 代码改动）：
+# 1) RABBITMQ_PORT=5672 显式注入 grade-service/assessment-worker（R5-02）。
+# 2) assessment-worker args 追加
+#    --spring.config.additional-location=classpath:/application-compose.properties，
+#    使 worker 连入 MySQL 而非 H2（R5-01）。
+# 3) 以环境 secret 中的 IDENTITY_JWT_SIGNING_KEY 离线铸造服务 JWT（aud=course，
+#    scopes 含 course.authorizations.read/course.members.read；aud=assessment，
+#    scope grades:read），注入 ASSESSMENT_COURSE_SERVICE_AUTHORIZATION 与
+#    GRADE_{COURSE,ASSESSMENT}_SERVICE_AUTHORIZATION；并将
+#    ASSESSMENT_COURSE_AUTHORIZATION_URI 修正为 course 实际暴露的
+#    /internal/v2/courses/{courseId}/authorizations/{userId}（R5-03 服务身份缺口
+#    的环境侧处置，渲染器硬编码 URI 与控制器不一致归口 #318）。
+# 以上修补只影响一次性环境，不改变被测工作负载镜像（deploymentVersion 如实
+# 记录为 cf2979dc）；鉴权链路（用户 JWT + 服务 JWT）全程真实校验。

@@ -1,0 +1,18 @@
+{
+  "event_name": "pull_request",
+  "repository": "Cr4zyorange/OnlineJudge",
+  "workflow": "ci-quality-gate",
+  "run_id": "33706794044",
+  "run_attempt": "1",
+  "ref": "feature/320-three-service-e2e",
+  "base_ref": "dev",
+  "base_sha": "c56b16f916b4a4c3d33915aa37beab6b05c72888",
+  "head_sha": "6338d4a3cba6a64281d2ad0d5503d8cef2f0a757",
+  "runner_os": "Linux",
+  "runner_arch": "X64",
+  "java_version": "21.0.12.1 2026-08-18 LTS",
+  "maven_version": "Apache Maven 3.9.16 (2bdd9fddda4b155ebf8000e807eb73fd829a51d5)",
+  "node_version": "v22.23.2",
+  "npm_version": "10.9.8",
+  "timestamp_utc": "2026-09-03T02:14:17Z"
+}

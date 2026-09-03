@@ -1,0 +1,2 @@
+NAME                              READY   STATUS    RESTARTS   AGE     IP            NODE                     NOMINATED NODE   READINESS GATES
+assessment-api-5dd8d575fc-8l47p   1/1     Running   0          6h40m   10.244.0.17   issue319-control-plane   <none>           <none>

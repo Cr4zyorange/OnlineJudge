@@ -1,0 +1,6 @@
+EMPTY_FILE_SCAN:
+  03-e2e/history/33705748031/ci-artifacts/browser-e2e-gate/artifacts/image-records.tsv
+  04-hpa/evidence/Issue-319-HPA实验证据-20260902T121501Z/raw/curl-errors.txt
+  04-hpa/evidence/Issue-319-HPA实验证据-20260902T161736Z/raw/curl-errors.txt
+
+说明：curl-errors.txt（HPA 两轮，0 字节）为“零传输错误”的故意证据；image-records.tsv（#320 历史 run 33705748031）为上游 artifact 原样空文件。

@@ -1,0 +1,34 @@
+[WARNING] 245/040246 (1) : config : missing timeouts for backend 'docker-events'.
+   | While not properly invalid, you will certainly encounter various problems
+   | with such a configuration. To fix this, please ensure that all following
+   | timeouts are set to a non-zero value: 'client', 'connect', 'server'.
+Proxy dockerbackend started.
+Proxy docker-events started.
+Proxy dockerfrontend started.
+[WARNING] 245/040246 (1) : Can't open global server state file '/var/lib/haproxy/server-state': No such file or directory
+[NOTICE] 245/040246 (1) : New worker #1 (12) forked
+::ffff:172.18.0.7:51882 [03/Sep/2026:04:03:25.224] dockerfrontend dockerbackend/dockersocket 0/0/0/148/148 201 286 - - ---- 1/1/0/0/0 0/0 "POST /containers/create?name=oj-lab-c83d2710-0ea6-4407-9e21-0f326881cbe1 HTTP/1.1"
+::ffff:172.18.0.7:51882 [03/Sep/2026:04:03:25.378] dockerfrontend dockerbackend/dockersocket 0/0/0/82/82 204 157 - - ---- 1/1/0/0/0 0/0 "POST /containers/75a199158ecf5e1bfd5dc494fe90c2f60ffd4267c8d26a17b1feb2ec6091aea6/start HTTP/1.1"
+::ffff:172.18.0.7:51882 [03/Sep/2026:04:03:25.464] dockerfrontend dockerbackend/dockersocket 0/0/0/0/295 200 219 - - ---- 1/1/0/0/0 0/0 "POST /containers/75a199158ecf5e1bfd5dc494fe90c2f60ffd4267c8d26a17b1feb2ec6091aea6/wait HTTP/1.1"
+::ffff:172.18.0.7:51882 [03/Sep/2026:04:03:25.761] dockerfrontend dockerbackend/dockersocket 0/0/0/0/0 200 237 - - ---- 1/1/0/0/0 0/0 "GET /containers/75a199158ecf5e1bfd5dc494fe90c2f60ffd4267c8d26a17b1feb2ec6091aea6/logs?stdout=1&stderr=1&tail=200 HTTP/1.1"
+::ffff:172.18.0.7:51882 [03/Sep/2026:04:03:25.762] dockerfrontend dockerbackend/dockersocket 0/0/0/3/3 204 157 - - ---- 1/1/0/0/0 0/0 "DELETE /containers/75a199158ecf5e1bfd5dc494fe90c2f60ffd4267c8d26a17b1feb2ec6091aea6?force=1&v=1 HTTP/1.1"
+::ffff:172.18.0.7:51882 [03/Sep/2026:04:03:26.795] dockerfrontend dockerbackend/dockersocket 0/0/0/56/56 201 286 - - ---- 1/1/0/0/0 0/0 "POST /containers/create?name=oj-lab-db735faf-f104-498d-b210-c3918a06a869 HTTP/1.1"
+::ffff:172.18.0.7:51882 [03/Sep/2026:04:03:26.854] dockerfrontend dockerbackend/dockersocket 0/0/0/74/74 204 157 - - ---- 1/1/0/0/0 0/0 "POST /containers/9cd2085b4d3e0d7ccd994e6f6ce50a7fcec6a0a4ca307fa82072cae3ecf52085/start HTTP/1.1"
+::ffff:172.18.0.7:51882 [03/Sep/2026:04:03:26.930] dockerfrontend dockerbackend/dockersocket 0/0/0/0/342 200 220 - - ---- 1/1/0/0/0 0/0 "POST /containers/9cd2085b4d3e0d7ccd994e6f6ce50a7fcec6a0a4ca307fa82072cae3ecf52085/wait HTTP/1.1"
+::ffff:172.18.0.7:51882 [03/Sep/2026:04:03:27.273] dockerfrontend dockerbackend/dockersocket 0/0/0/0/1 200 351 - - ---- 1/1/0/0/0 0/0 "GET /containers/9cd2085b4d3e0d7ccd994e6f6ce50a7fcec6a0a4ca307fa82072cae3ecf52085/logs?stdout=1&stderr=1&tail=200 HTTP/1.1"
+::ffff:172.18.0.7:51882 [03/Sep/2026:04:03:27.275] dockerfrontend dockerbackend/dockersocket 0/0/0/5/5 204 157 - - ---- 1/1/0/0/0 0/0 "DELETE /containers/9cd2085b4d3e0d7ccd994e6f6ce50a7fcec6a0a4ca307fa82072cae3ecf52085?force=1&v=1 HTTP/1.1"
+::ffff:172.18.0.7:57316 [03/Sep/2026:04:03:33.316] dockerfrontend dockerbackend/dockersocket 0/0/0/89/89 201 286 - - ---- 2/2/0/0/0 0/0 "POST /containers/create?name=oj-lab-be788f2a-f93b-488a-98ea-ed86bc9f16f0 HTTP/1.1"
+::ffff:172.18.0.7:57316 [03/Sep/2026:04:03:33.408] dockerfrontend dockerbackend/dockersocket 0/0/0/116/116 204 157 - - ---- 2/2/0/0/0 0/0 "POST /containers/7304820a08ab632832d520ea738a7cb290fa8f639df202e830ca6c491ca0b10f/start HTTP/1.1"
+::ffff:172.18.0.7:57316 [03/Sep/2026:04:03:33.527] dockerfrontend dockerbackend/dockersocket 0/0/0/0/359 200 219 - - ---- 2/2/0/0/0 0/0 "POST /containers/7304820a08ab632832d520ea738a7cb290fa8f639df202e830ca6c491ca0b10f/wait HTTP/1.1"
+::ffff:172.18.0.7:57316 [03/Sep/2026:04:03:33.888] dockerfrontend dockerbackend/dockersocket 0/0/0/0/0 200 237 - - ---- 2/2/0/0/0 0/0 "GET /containers/7304820a08ab632832d520ea738a7cb290fa8f639df202e830ca6c491ca0b10f/logs?stdout=1&stderr=1&tail=200 HTTP/1.1"
+::ffff:172.18.0.7:57316 [03/Sep/2026:04:03:33.889] dockerfrontend dockerbackend/dockersocket 0/0/0/4/4 204 157 - - ---- 2/2/0/0/0 0/0 "DELETE /containers/7304820a08ab632832d520ea738a7cb290fa8f639df202e830ca6c491ca0b10f?force=1&v=1 HTTP/1.1"
+::ffff:172.18.0.7:57316 [03/Sep/2026:04:03:37.924] dockerfrontend dockerbackend/dockersocket 0/0/0/326/326 201 286 - - ---- 1/1/0/0/0 0/0 "POST /containers/create?name=oj-lab-8d65bada-c636-4bc5-aa1a-0cc1849c1b53 HTTP/1.1"
+::ffff:172.18.0.7:57316 [03/Sep/2026:04:03:38.254] dockerfrontend dockerbackend/dockersocket 0/0/0/143/143 204 157 - - ---- 1/1/0/0/0 0/0 "POST /containers/b7cb9ba93079cf9bf3961b82de3271f4e3b635defc2b4f46ab838b9fde4baa12/start HTTP/1.1"
+::ffff:172.18.0.7:57316 [03/Sep/2026:04:03:38.400] dockerfrontend dockerbackend/dockersocket 0/0/0/0/514 200 219 - - ---- 1/1/0/0/0 0/0 "POST /containers/b7cb9ba93079cf9bf3961b82de3271f4e3b635defc2b4f46ab838b9fde4baa12/wait HTTP/1.1"
+::ffff:172.18.0.7:57316 [03/Sep/2026:04:03:38.916] dockerfrontend dockerbackend/dockersocket 0/0/0/0/1 200 237 - - ---- 1/1/0/0/0 0/0 "GET /containers/b7cb9ba93079cf9bf3961b82de3271f4e3b635defc2b4f46ab838b9fde4baa12/logs?stdout=1&stderr=1&tail=200 HTTP/1.1"
+::ffff:172.18.0.7:57316 [03/Sep/2026:04:03:38.918] dockerfrontend dockerbackend/dockersocket 0/0/0/4/4 204 157 - - ---- 1/1/0/0/0 0/0 "DELETE /containers/b7cb9ba93079cf9bf3961b82de3271f4e3b635defc2b4f46ab838b9fde4baa12?force=1&v=1 HTTP/1.1"
+::ffff:172.18.0.7:57316 [03/Sep/2026:04:03:38.926] dockerfrontend dockerbackend/dockersocket 0/0/0/18/18 201 286 - - ---- 1/1/0/0/0 0/0 "POST /containers/create?name=oj-lab-b5dc7f7b-9593-42f9-b660-26dae0c0fff7 HTTP/1.1"
+::ffff:172.18.0.7:57316 [03/Sep/2026:04:03:38.948] dockerfrontend dockerbackend/dockersocket 0/0/0/115/115 204 157 - - ---- 1/1/0/0/0 0/0 "POST /containers/296fd30fd3f14c942c51c51e1d9049c2a68ed061060c8f3a4885e50b70f7bf55/start HTTP/1.1"
+::ffff:172.18.0.7:57316 [03/Sep/2026:04:03:39.065] dockerfrontend dockerbackend/dockersocket 0/0/0/0/408 200 219 - - ---- 1/1/0/0/0 0/0 "POST /containers/296fd30fd3f14c942c51c51e1d9049c2a68ed061060c8f3a4885e50b70f7bf55/wait HTTP/1.1"
+::ffff:172.18.0.7:57316 [03/Sep/2026:04:03:39.475] dockerfrontend dockerbackend/dockersocket 0/0/0/0/0 200 238 - - ---- 1/1/0/0/0 0/0 "GET /containers/296fd30fd3f14c942c51c51e1d9049c2a68ed061060c8f3a4885e50b70f7bf55/logs?stdout=1&stderr=1&tail=200 HTTP/1.1"
+::ffff:172.18.0.7:57316 [03/Sep/2026:04:03:39.476] dockerfrontend dockerbackend/dockersocket 0/0/0/8/8 204 157 - - ---- 1/1/0/0/0 0/0 "DELETE /containers/296fd30fd3f14c942c51c51e1d9049c2a68ed061060c8f3a4885e50b70f7bf55?force=1&v=1 HTTP/1.1"

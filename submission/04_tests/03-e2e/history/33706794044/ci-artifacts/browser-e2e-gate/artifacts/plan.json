@@ -1,0 +1,241 @@
+{
+  "apiVersion": "delivery.onlinejudge.io/v2",
+  "kind": "DeliveryPlan",
+  "gitSha": "2903999ffe88df2dc2252a55a6f9e3862b7ed26e",
+  "selection": {
+    "changedPaths": [],
+    "affectedWorkloads": [
+      "gateway",
+      "identity-service",
+      "course-service",
+      "assessment-api",
+      "assessment-worker",
+      "grade-service",
+      "frontend",
+      "rabbitmq",
+      "mysql"
+    ],
+    "reasons": {
+      "gateway": {
+        "fullRelease": true
+      },
+      "identity-service": {
+        "fullRelease": true
+      },
+      "course-service": {
+        "fullRelease": true
+      },
+      "assessment-api": {
+        "fullRelease": true
+      },
+      "assessment-worker": {
+        "fullRelease": true
+      },
+      "grade-service": {
+        "fullRelease": true
+      },
+      "frontend": {
+        "fullRelease": true
+      },
+      "rabbitmq": {
+        "fullRelease": true
+      },
+      "mysql": {
+        "fullRelease": true
+      }
+    }
+  },
+  "builds": [
+    {
+      "workload": "gateway",
+      "dockerfile": "services/gateway/Dockerfile",
+      "image": "onlinejudge/gateway:2903999ffe88df2dc2252a55a6f9e3862b7ed26e",
+      "requiredArtifacts": [
+        "image-digest",
+        "sbom",
+        "artifact-manifest"
+      ]
+    },
+    {
+      "workload": "identity-service",
+      "dockerfile": "services/identity/Dockerfile",
+      "image": "onlinejudge/identity-service:2903999ffe88df2dc2252a55a6f9e3862b7ed26e",
+      "requiredArtifacts": [
+        "image-digest",
+        "sbom",
+        "artifact-manifest"
+      ]
+    },
+    {
+      "workload": "course-service",
+      "dockerfile": "services/course/Dockerfile",
+      "image": "onlinejudge/course-service:2903999ffe88df2dc2252a55a6f9e3862b7ed26e",
+      "requiredArtifacts": [
+        "image-digest",
+        "sbom",
+        "artifact-manifest"
+      ]
+    },
+    {
+      "workload": "assessment-api",
+      "dockerfile": "services/assessment/Dockerfile",
+      "image": "onlinejudge/assessment-api:2903999ffe88df2dc2252a55a6f9e3862b7ed26e",
+      "requiredArtifacts": [
+        "image-digest",
+        "sbom",
+        "artifact-manifest"
+      ]
+    },
+    {
+      "workload": "assessment-worker",
+      "dockerfile": "services/assessment/Dockerfile",
+      "image": "onlinejudge/assessment-worker:2903999ffe88df2dc2252a55a6f9e3862b7ed26e",
+      "requiredArtifacts": [
+        "image-digest",
+        "sbom",
+        "artifact-manifest"
+      ]
+    },
+    {
+      "workload": "grade-service",
+      "dockerfile": "services/grade/Dockerfile",
+      "image": "onlinejudge/grade-service:2903999ffe88df2dc2252a55a6f9e3862b7ed26e",
+      "requiredArtifacts": [
+        "image-digest",
+        "sbom",
+        "artifact-manifest"
+      ]
+    },
+    {
+      "workload": "frontend",
+      "dockerfile": "deploy/docker/frontend.Dockerfile",
+      "image": "onlinejudge/frontend:2903999ffe88df2dc2252a55a6f9e3862b7ed26e",
+      "requiredArtifacts": [
+        "image-digest",
+        "sbom",
+        "artifact-manifest"
+      ]
+    }
+  ],
+  "releaseTemplate": {
+    "infrastructureWorkloads": [
+      {
+        "workload": "rabbitmq",
+        "image": "rabbitmq:4.1-management",
+        "requiredArtifacts": [
+          "sbom",
+          "artifact-manifest"
+        ]
+      },
+      {
+        "workload": "mysql",
+        "image": "mysql:8.4",
+        "requiredArtifacts": [
+          "sbom",
+          "artifact-manifest"
+        ]
+      }
+    ],
+    "migrationJobs": [
+      {
+        "name": "identity-migrations",
+        "schema": "identity",
+        "forWorkload": "identity-service",
+        "command": "./database/mysql/migrate-service.sh --schema identity",
+        "dependsOnMigrationJobs": [],
+        "blocksTraffic": true,
+        "failurePolicy": "block",
+        "retryPolicy": "safe-to-rerun",
+        "rollback": "forward-fix-or-approved-restore"
+      },
+      {
+        "name": "course-migrations",
+        "schema": "course",
+        "forWorkload": "course-service",
+        "command": "./database/mysql/migrate-service.sh --schema course",
+        "dependsOnMigrationJobs": [
+          "identity-migrations"
+        ],
+        "blocksTraffic": true,
+        "failurePolicy": "block",
+        "retryPolicy": "safe-to-rerun",
+        "rollback": "forward-fix-or-approved-restore"
+      },
+      {
+        "name": "assessment-migrations",
+        "schema": "assessment",
+        "forWorkload": "assessment-api",
+        "command": "./database/mysql/migrate-service.sh --schema assessment",
+        "dependsOnMigrationJobs": [
+          "course-migrations"
+        ],
+        "blocksTraffic": true,
+        "failurePolicy": "block",
+        "retryPolicy": "safe-to-rerun",
+        "rollback": "forward-fix-or-approved-restore"
+      },
+      {
+        "name": "grade-migrations",
+        "schema": "grade",
+        "forWorkload": "grade-service",
+        "command": "./database/mysql/migrate-service.sh --schema grade",
+        "dependsOnMigrationJobs": [
+          "assessment-migrations"
+        ],
+        "blocksTraffic": true,
+        "failurePolicy": "block",
+        "retryPolicy": "safe-to-rerun",
+        "rollback": "forward-fix-or-approved-restore"
+      }
+    ],
+    "rolloutPrerequisites": {
+      "infrastructureWorkloads": [
+        "rabbitmq",
+        "mysql"
+      ],
+      "migrationJobs": [
+        "identity-migrations",
+        "course-migrations",
+        "assessment-migrations",
+        "grade-migrations"
+      ]
+    },
+    "rolloutStages": [
+      [
+        "identity-service",
+        "course-service",
+        "assessment-api",
+        "assessment-worker",
+        "grade-service",
+        "frontend"
+      ],
+      [
+        "gateway"
+      ]
+    ],
+    "trafficSwitch": {
+      "workload": "gateway",
+      "requiresMigrationJobs": [
+        "identity-migrations",
+        "course-migrations",
+        "assessment-migrations",
+        "grade-migrations"
+      ],
+      "requiresReadyWorkloads": [
+        "identity-service",
+        "course-service",
+        "assessment-api",
+        "assessment-worker",
+        "grade-service",
+        "frontend"
+      ],
+      "requiredEvidence": [
+        "immutable image digest",
+        "SBOM and artifact manifest",
+        "migration stdout/stderr and exit codes",
+        "startup/liveness/readiness probe output",
+        "rollback drill evidence"
+      ]
+    }
+  }
+}

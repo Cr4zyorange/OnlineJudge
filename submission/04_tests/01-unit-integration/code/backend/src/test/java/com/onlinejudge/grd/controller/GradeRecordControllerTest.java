@@ -1,0 +1,663 @@
+package com.onlinejudge.grd.controller;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.jdbc.Sql;
+import org.springframework.test.web.servlet.MockMvc;
+
+import java.util.Map;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.hasSize;
+import static org.hamcrest.Matchers.nullValue;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+@SpringBootTest(properties = {
+        "spring.datasource.url=jdbc:h2:mem:grade_record_controller;MODE=MySQL;DATABASE_TO_LOWER=TRUE;CASE_INSENSITIVE_IDENTIFIERS=TRUE;DB_CLOSE_DELAY=-1"
+})
+@AutoConfigureMockMvc
+@Sql(
+        statements = {
+                "DELETE FROM t_course_grade_summary",
+                "DELETE FROM t_grade_analysis_snapshot",
+                "DELETE FROM t_grade_review_request",
+                "DELETE FROM t_grade_change_log",
+                "DELETE FROM t_grade_publish_record",
+                "DELETE FROM t_grade_record",
+                "DELETE FROM t_grade_item",
+                "DELETE FROM t_grade_calculation_batch",
+                "DELETE FROM t_hwk_review_log",
+                "DELETE FROM t_hwk_evaluation",
+                "DELETE FROM t_hwk_submission",
+                "DELETE FROM t_hwk_test_case",
+                "DELETE FROM t_hwk_question",
+                "DELETE FROM t_hwk_judge_config",
+                "DELETE FROM t_hwk_homework",
+                "DELETE FROM lab_score_change_log",
+                "DELETE FROM lab_score",
+                "DELETE FROM lab_submission",
+                "DELETE FROM lab_testcase",
+                "DELETE FROM lab_report",
+                "DELETE FROM lab_experiment",
+                """
+                        INSERT INTO lab_experiment (
+                            id, course_id, chapter_id, title, description, status, deadline, max_score,
+                            attachment_ids, allowed_languages, evaluation_mode, auto_evaluate, report_required,
+                            time_limit_ms, memory_limit_kb, created_by, published_at, deleted, created_at, updated_at
+                        ) VALUES (
+                            301, 101, NULL, '实验一', 'GRD source lab', 'SCORE_PUBLISHED', '2026-06-30 23:59:59', 100,
+                            NULL, 'python', 'DOCKER_IO', 1, 0, 60000, 262144, 501,
+                            '2026-06-01 00:00:00', 0, '2026-06-01 00:00:00', '2026-06-01 00:00:00'
+                        );
+                        """,
+                """
+                        INSERT INTO lab_submission (
+                            id, lab_id, student_id, code_content, file_id, language, submit_status,
+                            evaluation_status, final_score, auto_score, version, is_final,
+                            submitted_at, created_at, updated_at, deleted
+                        ) VALUES
+                        (
+                            30101, 301, 601, 'print(601)', NULL, 'python', 'SUBMITTED',
+                            'ACCEPTED', 90, 90, 1, 1,
+                            '2026-06-01 00:10:00', '2026-06-01 00:10:00', '2026-06-01 00:20:00', 0
+                        ),
+                        (
+                            30102, 301, 602, 'print(602)', NULL, 'python', 'SUBMITTED',
+                            'ACCEPTED', 78, 78, 1, 1,
+                            '2026-06-01 00:11:00', '2026-06-01 00:11:00', '2026-06-01 00:21:00', 0
+                        );
+                        """,
+                """
+                        INSERT INTO lab_score (
+                            submission_id, report_id, teacher_id, auto_score, report_score,
+                            manual_score, final_score, comment, scored_at, updated_at
+                        ) VALUES
+                        (30101, NULL, 501, 90, NULL, NULL, 90, 'lab graded', '2026-06-01 00:20:00', '2026-06-01 00:20:00'),
+                        (30102, NULL, 501, 78, NULL, NULL, 78, 'lab graded', '2026-06-01 00:21:00', '2026-06-01 00:21:00');
+                        """,
+                """
+                        INSERT INTO t_hwk_homework (
+                            id, course_id, chapter_id, title, description, type, status, total_score,
+                            deadline, allow_resubmit, allow_late_submit, show_evaluation_before_publish,
+                            judge_config_id, created_by, published_at, is_deleted, created_at, updated_at
+                        ) VALUES (
+                            401, 101, NULL, '作业一', 'GRD source homework', 'TEXT', 'SCORE_PUBLISHED', 100.00,
+                            '2026-06-30 23:59:59', 1, 0, 1, NULL, 501, '2026-06-01 00:00:00',
+                            0, '2026-06-01 00:00:00', '2026-06-01 00:00:00'
+                        );
+                        """,
+                """
+                        INSERT INTO t_hwk_submission (
+                            id, homework_id, student_id, submit_type, answer_text, submit_status,
+                            evaluation_status, review_status, auto_score, manual_score, final_score,
+                            comment, version, is_final, submitted_at, reviewed_by, reviewed_at,
+                            created_at, updated_at, is_deleted
+                        ) VALUES
+                        (
+                            40101, 401, 601, 'TEXT', 'student 601 answer', 'SUBMITTED',
+                            'NONE', 'REVIEWED', NULL, 80.00, 80.00,
+                            'graded', 1, 1, '2026-06-01 00:10:00', 501, '2026-06-01 00:20:00',
+                            '2026-06-01 00:10:00', '2026-06-01 00:20:00', 0
+                        ),
+                        (
+                            40102, 401, 602, 'TEXT', 'student 602 answer', 'SUBMITTED',
+                            'NONE', 'UNREVIEWED', NULL, NULL, NULL,
+                            NULL, 1, 1, '2026-06-01 00:11:00', NULL, NULL,
+                            '2026-06-01 00:11:00', '2026-06-01 00:11:00', 0
+                        );
+                        """
+        },
+        executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD
+)
+class GradeRecordControllerTest {
+    @Autowired
+    private MockMvc mockMvc;
+
+    @Autowired
+    private ObjectMapper objectMapper;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
+    @Test
+    void teacherSyncsMissingLabSourceAsMissingWithoutDemoFallback() throws Exception {
+        createGradeItem(102L, "实验一", "LAB", 301, "1.00");
+
+        mockMvc.perform(post("/api/v1/courses/102/grades/sync")
+                        .headers(teacherHeaders("102", "102:701,702")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"))
+                .andExpect(jsonPath("$.data.syncedCount").value(0))
+                .andExpect(jsonPath("$.data.ungradedCount").value(0))
+                .andExpect(jsonPath("$.data.missingCount").value(2))
+                .andExpect(jsonPath("$.data.affectedStudentCount").value(2));
+
+        mockMvc.perform(get("/api/v1/courses/102/grades?gradeStatus=MISSING&page=1&size=10")
+                        .headers(teacherHeaders("102", "102:701,702")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.total").value(2))
+                .andExpect(jsonPath("$.data.records[0].records[0].gradeStatus").value("MISSING"))
+                .andExpect(jsonPath("$.data.records[1].records[0].gradeStatus").value("MISSING"));
+    }
+
+    @Test
+    void teacherSyncsSourceGradesRecalculatesAndQueriesCourseGradeTableThroughApi() throws Exception {
+        createGradeItem("实验一", "LAB", 301, "0.40");
+        createGradeItem("作业一", "HWK", 401, "0.60");
+
+        mockMvc.perform(post("/api/v1/courses/101/grades/sync")
+                        .headers(teacherHeaders("101")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"))
+                .andExpect(jsonPath("$.data.calculationBatchId").isNumber())
+                .andExpect(jsonPath("$.data.syncedCount").value(3))
+                .andExpect(jsonPath("$.data.ungradedCount").value(1))
+                .andExpect(jsonPath("$.data.missingCount").value(2))
+                .andExpect(jsonPath("$.data.affectedStudentCount").value(3));
+
+        mockMvc.perform(get("/api/v1/courses/101/grades?page=1&size=2")
+                        .headers(teacherHeaders("101")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"))
+                .andExpect(jsonPath("$.data.total").value(3))
+                .andExpect(jsonPath("$.data.page").value(1))
+                .andExpect(jsonPath("$.data.size").value(2))
+                .andExpect(jsonPath("$.data.records", hasSize(2)))
+                .andExpect(jsonPath("$.data.records[0].studentId").value(601))
+                .andExpect(jsonPath("$.data.records[0].summary.finalScore").value(84.00))
+                .andExpect(jsonPath("$.data.records[0].summary.finalStatus").value("CALCULATED"))
+                .andExpect(jsonPath("$.data.records[1].studentId").value(602))
+                .andExpect(jsonPath("$.data.records[1].summary.finalScore", nullValue()))
+                .andExpect(jsonPath("$.data.records[1].summary.finalStatus").value("INCOMPLETE"));
+
+        mockMvc.perform(get("/api/v1/courses/101/grades?gradeStatus=MISSING&studentKeyword=603&page=1&size=10")
+                        .headers(teacherHeaders("101")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.total").value(1))
+                .andExpect(jsonPath("$.data.records", hasSize(1)))
+                .andExpect(jsonPath("$.data.records[0].studentId").value(603))
+                .andExpect(jsonPath("$.data.records[0].records", hasSize(2)));
+    }
+
+    @Test
+    void studentCannotSyncCourseGradesThroughApi() throws Exception {
+        mockMvc.perform(post("/api/v1/courses/101/grades/sync")
+                        .header("X-User-Id", "601")
+                        .header("X-User-Role", "STUDENT")
+                        .header("X-Course-Ids", "101"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ERR-AUTH-05"));
+    }
+
+    @Test
+    void teacherAdjustsGradeRecordWithReasonAndQueriesChangeLogsThroughApi() throws Exception {
+        createGradeItem("实验一", "LAB", 301, "0.40");
+        createGradeItem("作业一", "HWK", 401, "0.60");
+        mockMvc.perform(post("/api/v1/courses/101/grades/sync")
+                        .headers(teacherHeaders("101")))
+                .andExpect(status().isOk());
+
+        String tableJson = mockMvc.perform(get("/api/v1/courses/101/grades?studentKeyword=601")
+                        .headers(teacherHeaders("101")))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        long recordId = objectMapper.readTree(tableJson)
+                .at("/data/records/0/records/0/id")
+                .asLong();
+
+        mockMvc.perform(put("/api/v1/grade-records/{recordId}/adjust", recordId)
+                        .headers(teacherHeaders("101"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "newScore", "95.00",
+                                "reason", "复核测试用例后修正"
+                        ))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"))
+                .andExpect(jsonPath("$.data.recordId").value(recordId))
+                .andExpect(jsonPath("$.data.oldScore").value(90.00))
+                .andExpect(jsonPath("$.data.newScore").value(95.00))
+                .andExpect(jsonPath("$.data.reason").value("复核测试用例后修正"));
+
+        mockMvc.perform(get("/api/v1/courses/101/grades/students/601")
+                        .headers(teacherHeaders("101")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.records[0].rawScore").value(95.00))
+                .andExpect(jsonPath("$.data.records[0].gradeStatus").value("ADJUSTED"));
+
+        mockMvc.perform(get("/api/v1/courses/101/grade-change-logs?studentId=601")
+                        .headers(teacherHeaders("101")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.total").value(1))
+                .andExpect(jsonPath("$.data.records[0].gradeItemId").value(1))
+                .andExpect(jsonPath("$.data.records[0].changeType").value("RECORD_ADJUST"))
+                .andExpect(jsonPath("$.data.records[0].oldValue").value(90.00))
+                .andExpect(jsonPath("$.data.records[0].newValue").value(95.00))
+                .andExpect(jsonPath("$.data.records[0].reason").value("复核测试用例后修正"))
+                .andExpect(jsonPath("$.data.records[0].operatorId").value(501));
+    }
+
+    @Test
+    void teacherCannotAdjustGradeRecordWithoutReason() throws Exception {
+        createGradeItem("实验一", "LAB", 301, "0.40");
+        mockMvc.perform(post("/api/v1/courses/101/grades/sync")
+                        .headers(teacherHeaders("101")))
+                .andExpect(status().isOk());
+        String tableJson = mockMvc.perform(get("/api/v1/courses/101/grades?studentKeyword=601")
+                        .headers(teacherHeaders("101")))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        long recordId = objectMapper.readTree(tableJson)
+                .at("/data/records/0/records/0/id")
+                .asLong();
+
+        mockMvc.perform(put("/api/v1/grade-records/{recordId}/adjust", recordId)
+                        .headers(teacherHeaders("101"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "newScore", "95.00",
+                                "reason", " "
+                        ))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("ERR-GRD-06"));
+    }
+
+    @Test
+    void teacherAdjustsCourseFinalScoreWithReasonAndKeepsChangeLog() throws Exception {
+        createGradeItem("实验一", "LAB", 301, "0.40");
+        createGradeItem("作业一", "HWK", 401, "0.60");
+        mockMvc.perform(post("/api/v1/courses/101/grades/sync")
+                        .headers(teacherHeaders("101")))
+                .andExpect(status().isOk());
+        String tableJson = mockMvc.perform(get("/api/v1/courses/101/grades?studentKeyword=601")
+                        .headers(teacherHeaders("101")))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        long summaryId = objectMapper.readTree(tableJson)
+                .at("/data/records/0/summary/id")
+                .asLong();
+
+        mockMvc.perform(put("/api/v1/course-grade-summaries/{summaryId}/adjust", summaryId)
+                        .headers(teacherHeaders("101"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "newScore", "88.00",
+                                "reason", "课程总评复核修正"
+                        ))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"))
+                .andExpect(jsonPath("$.data.summaryId").value(summaryId))
+                .andExpect(jsonPath("$.data.oldScore").value(84.00))
+                .andExpect(jsonPath("$.data.newScore").value(88.00))
+                .andExpect(jsonPath("$.data.reason").value("课程总评复核修正"));
+
+        mockMvc.perform(get("/api/v1/courses/101/grades?studentKeyword=601")
+                        .headers(teacherHeaders("101")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.records[0].summary.finalScore").value(88.00))
+                .andExpect(jsonPath("$.data.records[0].summary.finalStatus").value("ADJUSTED"));
+
+        mockMvc.perform(get("/api/v1/courses/101/grade-change-logs?studentId=601")
+                        .headers(teacherHeaders("101")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.total").value(1))
+                .andExpect(jsonPath("$.data.records[0].gradeItemId", nullValue()))
+                .andExpect(jsonPath("$.data.records[0].changeType").value("FINAL_ADJUST"))
+                .andExpect(jsonPath("$.data.records[0].oldValue").value(84.00))
+                .andExpect(jsonPath("$.data.records[0].newValue").value(88.00))
+                .andExpect(jsonPath("$.data.records[0].reason").value("课程总评复核修正"));
+    }
+
+    @Test
+    void teacherPublishesSelectedStudentGradesThenStudentCanQueryPublishedResultThroughApi() throws Exception {
+        createGradeItem("实验一", "LAB", 301, "0.40");
+        createGradeItem("作业一", "HWK", 401, "0.60");
+        mockMvc.perform(post("/api/v1/courses/101/grades/sync")
+                        .headers(teacherHeaders("101")))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/v1/courses/101/grades/publish")
+                        .headers(teacherHeaders("101"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "publishScope", "PARTIAL_STUDENTS",
+                                "studentIds", java.util.List.of(601),
+                                "gradeItemIds", java.util.List.of()
+                        ))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"))
+                .andExpect(jsonPath("$.data.publishId").isNumber())
+                .andExpect(jsonPath("$.data.publishedCount").value(1))
+                .andExpect(jsonPath("$.data.notificationStatus").value("SENT"));
+
+        mockMvc.perform(get("/api/v1/courses/101/my-grades")
+                        .header("X-User-Id", "601")
+                        .header("X-User-Role", "STUDENT")
+                        .header("X-Course-Ids", "101"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"))
+                .andExpect(jsonPath("$.data.studentId").value(601))
+                .andExpect(jsonPath("$.data.summary.finalScore").value(84.00))
+                .andExpect(jsonPath("$.data.summary.publishStatus").value("PUBLISHED"))
+                .andExpect(jsonPath("$.data.records", hasSize(2)))
+                .andExpect(jsonPath("$.data.records[0].publishStatus").value("PUBLISHED"));
+
+        mockMvc.perform(get("/api/v1/courses/101/grade-publish-records")
+                        .headers(teacherHeaders("101")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.total").value(1))
+                .andExpect(jsonPath("$.data.records[0].publishScope").value("PARTIAL_STUDENTS"))
+                .andExpect(jsonPath("$.data.records[0].publishedBy").value(501))
+                .andExpect(jsonPath("$.data.records[0].notificationStatus").value("SENT"));
+    }
+
+    @Test
+    void teacherQueriesCourseGradeAnalysisThroughApi() throws Exception {
+        createGradeItem("实验一", "LAB", 301, "0.40");
+        long homeworkItemId = createGradeItem("作业一", "HWK", 401, "0.60");
+        mockMvc.perform(post("/api/v1/courses/101/grades/sync")
+                        .headers(teacherHeaders("101")))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/v1/courses/101/grade-analysis?targetType=COURSE_TOTAL")
+                        .headers(teacherHeaders("101")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"))
+                .andExpect(jsonPath("$.data.targetType").value("COURSE_TOTAL"))
+                .andExpect(jsonPath("$.data.gradeItemId", nullValue()))
+                .andExpect(jsonPath("$.data.totalStudentCount").value(3))
+                .andExpect(jsonPath("$.data.completedCount").value(1))
+                .andExpect(jsonPath("$.data.missingCount").value(2))
+                .andExpect(jsonPath("$.data.ungradedCount").value(0))
+                .andExpect(jsonPath("$.data.unsubmittedCount").value(0))
+                .andExpect(jsonPath("$.data.averageScore").value(84.00))
+                .andExpect(jsonPath("$.data.maxScore").value(84.00))
+                .andExpect(jsonPath("$.data.minScore").value(84.00))
+                .andExpect(jsonPath("$.data.passRate").value(1.0000))
+                .andExpect(jsonPath("$.data.completionRate").value(0.3333))
+                .andExpect(jsonPath("$.data.distribution", hasSize(5)))
+                .andExpect(jsonPath("$.data.distribution[3].label").value("80-89"))
+                .andExpect(jsonPath("$.data.distribution[3].count").value(1))
+                .andExpect(jsonPath("$.data.sourceDataTime").isNotEmpty())
+                .andExpect(jsonPath("$.data.generatedAt").isNotEmpty());
+
+        mockMvc.perform(get("/api/v1/courses/101/grade-analysis?targetType=COURSE_TOTAL")
+                        .headers(teacherHeaders("101")))
+                .andExpect(status().isOk());
+
+        assertThat(snapshotCount(101L, "COURSE_TOTAL", null)).isEqualTo(1);
+
+        mockMvc.perform(get("/api/v1/courses/101/grade-analysis?targetType=GRADE_ITEM&gradeItemId={gradeItemId}", homeworkItemId)
+                        .headers(teacherHeaders("101")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.targetType").value("GRADE_ITEM"))
+                .andExpect(jsonPath("$.data.gradeItemId").value(homeworkItemId))
+                .andExpect(jsonPath("$.data.totalStudentCount").value(3))
+                .andExpect(jsonPath("$.data.completedCount").value(1))
+                .andExpect(jsonPath("$.data.missingCount").value(1))
+                .andExpect(jsonPath("$.data.ungradedCount").value(1))
+                .andExpect(jsonPath("$.data.averageScore").value(80.00))
+                .andExpect(jsonPath("$.data.completionRate").value(0.3333));
+
+        mockMvc.perform(get("/api/v1/courses/101/grade-analysis?targetType=GRADE_ITEM&gradeItemId={gradeItemId}", homeworkItemId)
+                        .headers(teacherHeaders("101")))
+                .andExpect(status().isOk());
+
+        assertThat(snapshotCount(101L, "GRADE_ITEM", homeworkItemId)).isEqualTo(1);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM t_grade_analysis_snapshot WHERE source_fingerprint IS NOT NULL",
+                Integer.class
+        )).isEqualTo(2);
+    }
+
+    @Test
+    void teacherQueriesGradeItemCompletionThroughApi() throws Exception {
+        createGradeItem("实验一", "LAB", 301, "0.40");
+        long homeworkItemId = createGradeItem("作业一", "HWK", 401, "0.60");
+        mockMvc.perform(post("/api/v1/courses/101/grades/sync")
+                        .headers(teacherHeaders("101")))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/v1/courses/101/grade-items/{gradeItemId}/completion", homeworkItemId)
+                        .headers(teacherHeaders("101")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"))
+                .andExpect(jsonPath("$.data.gradeItemId").value(homeworkItemId))
+                .andExpect(jsonPath("$.data.totalStudentCount").value(3))
+                .andExpect(jsonPath("$.data.submittedCount").value(2))
+                .andExpect(jsonPath("$.data.completedCount").value(1))
+                .andExpect(jsonPath("$.data.missingCount").value(1))
+                .andExpect(jsonPath("$.data.unsubmittedCount").value(0))
+                .andExpect(jsonPath("$.data.ungradedCount").value(1))
+                .andExpect(jsonPath("$.data.averageScore").value(80.00))
+                .andExpect(jsonPath("$.data.completionRate").value(0.3333))
+                .andExpect(jsonPath("$.data.sourceDataTime").isNotEmpty())
+                .andExpect(jsonPath("$.data.generatedAt").isNotEmpty());
+
+        mockMvc.perform(get("/api/v1/courses/101/grade-items/{gradeItemId}/completion", homeworkItemId)
+                        .headers(teacherHeaders("101")))
+                .andExpect(status().isOk());
+
+        assertThat(snapshotCount(101L, "GRADE_ITEM", homeworkItemId)).isEqualTo(1);
+    }
+
+    @Test
+    void teacherCannotQueryStudentMyGradesEndpointThroughApi() throws Exception {
+        mockMvc.perform(get("/api/v1/courses/101/my-grades")
+                        .header("X-User-Id", "501")
+                        .header("X-User-Role", "TEACHER")
+                        .header("X-Course-Ids", "101")
+                        .header("X-Manageable-Course-Ids", "101"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ERR-AUTH-05"));
+    }
+
+    private int snapshotCount(long courseId, String targetType, Long gradeItemId) {
+        return jdbcTemplate.queryForObject(
+                """
+                        SELECT COUNT(*)
+                          FROM t_grade_analysis_snapshot
+                         WHERE course_id = ?
+                           AND target_type = ?
+                           AND ((? IS NULL AND grade_item_id IS NULL) OR grade_item_id = ?)
+                        """,
+                Integer.class,
+                courseId,
+                targetType,
+                gradeItemId,
+                gradeItemId
+        );
+    }
+
+    @Test
+    void nonMemberStudentCannotQueryPublishedCourseGradesThroughApi() throws Exception {
+        createGradeItem("实验一", "LAB", 301, "0.40");
+        createGradeItem("作业一", "HWK", 401, "0.60");
+        mockMvc.perform(post("/api/v1/courses/101/grades/sync")
+                        .headers(teacherHeaders("101")))
+                .andExpect(status().isOk());
+        mockMvc.perform(post("/api/v1/courses/101/grades/publish")
+                        .headers(teacherHeaders("101"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "publishScope", "PARTIAL_STUDENTS",
+                                "studentIds", java.util.List.of(601),
+                                "gradeItemIds", java.util.List.of()
+                        ))))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/v1/courses/101/my-grades")
+                        .header("X-User-Id", "999")
+                        .header("X-User-Role", "STUDENT")
+                        .header("X-Course-Ids", "102"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ERR-GRD-02"));
+    }
+
+    @Test
+    void teacherCannotPublishPartialItemsUntilItemScopeVisibilityIsImplemented() throws Exception {
+        createGradeItem("实验一", "LAB", 301, "0.40");
+        createGradeItem("作业一", "HWK", 401, "0.60");
+        mockMvc.perform(post("/api/v1/courses/101/grades/sync")
+                        .headers(teacherHeaders("101")))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/v1/courses/101/grades/publish")
+                        .headers(teacherHeaders("101"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "publishScope", "PARTIAL_ITEMS",
+                                "studentIds", java.util.List.of(),
+                                "gradeItemIds", java.util.List.of(1)
+                        ))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("ERR-GRD-04"))
+                .andExpect(jsonPath("$.message").value("部分成绩项发布暂未实现，不能提前公开课程总评"));
+    }
+
+    @Test
+    void studentSubmitsGradeReviewAndTeacherProcessesItThroughApi() throws Exception {
+        createGradeItem("实验一", "LAB", 301, "0.40");
+        createGradeItem("作业一", "HWK", 401, "0.60");
+        mockMvc.perform(post("/api/v1/courses/101/grades/sync")
+                        .headers(teacherHeaders("101")))
+                .andExpect(status().isOk());
+        mockMvc.perform(post("/api/v1/courses/101/grades/publish")
+                        .headers(teacherHeaders("101"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "publishScope", "PARTIAL_STUDENTS",
+                                "studentIds", java.util.List.of(601),
+                                "gradeItemIds", java.util.List.of()
+                        ))))
+                .andExpect(status().isOk());
+
+        String requestJson = mockMvc.perform(post("/api/v1/courses/101/grade-review-requests")
+                        .header("X-User-Id", "601")
+                        .header("X-User-Role", "STUDENT")
+                        .header("X-Course-Ids", "101")
+                        .header("X-Course-Teacher-Ids", "101:501")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "targetType", "FINAL_SCORE",
+                                "reason", "总评未计入补交成绩"
+                        ))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"))
+                .andExpect(jsonPath("$.data.status").value("PENDING"))
+                .andExpect(jsonPath("$.data.submittedAt").isNotEmpty())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        long requestId = objectMapper.readTree(requestJson).at("/data/requestId").asLong();
+
+        mockMvc.perform(post("/api/v1/courses/101/grade-review-requests")
+                        .header("X-User-Id", "601")
+                        .header("X-User-Role", "STUDENT")
+                        .header("X-Course-Ids", "101")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "targetType", "FINAL_SCORE",
+                                "reason", "重复申请"
+                        ))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("ERR-GRD-08"));
+
+        mockMvc.perform(get("/api/v1/courses/101/my-grade-review-requests")
+                        .header("X-User-Id", "601")
+                        .header("X-User-Role", "STUDENT")
+                        .header("X-Course-Ids", "101"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.total").value(1))
+                .andExpect(jsonPath("$.data.records[0].requestId").value(requestId))
+                .andExpect(jsonPath("$.data.records[0].reason").value("总评未计入补交成绩"));
+
+        mockMvc.perform(get("/api/v1/courses/101/grade-review-requests?status=PENDING")
+                        .headers(teacherHeaders("101")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.total").value(1))
+                .andExpect(jsonPath("$.data.records[0].requestId").value(requestId));
+
+        mockMvc.perform(put("/api/v1/grade-review-requests/{requestId}/process", requestId)
+                        .headers(teacherHeaders("101"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "action", "APPROVE",
+                                "adjustedScore", "88.00",
+                                "responseComment", "确认补交成绩有效"
+                        ))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.requestId").value(requestId))
+                .andExpect(jsonPath("$.data.status").value("APPROVED"))
+                .andExpect(jsonPath("$.data.processedAt").isNotEmpty());
+
+        mockMvc.perform(get("/api/v1/courses/101/my-grade-review-requests")
+                        .header("X-User-Id", "601")
+                        .header("X-User-Role", "STUDENT")
+                        .header("X-Course-Ids", "101"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.records[0].status").value("APPROVED"))
+                .andExpect(jsonPath("$.data.records[0].adjustedScore").value(88.00))
+                .andExpect(jsonPath("$.data.records[0].responseComment").value("确认补交成绩有效"));
+
+        mockMvc.perform(get("/api/v1/courses/101/grades?studentKeyword=601")
+                        .headers(teacherHeaders("101")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.records[0].summary.finalScore").value(88.00));
+    }
+
+    private long createGradeItem(String name, String sourceType, long sourceId, String weight) throws Exception {
+        return createGradeItem(101L, name, sourceType, sourceId, weight);
+    }
+
+    private long createGradeItem(long courseId, String name, String sourceType, long sourceId, String weight) throws Exception {
+        Map<String, Object> payload = Map.of(
+                "name", name,
+                "sourceType", sourceType,
+                "sourceId", sourceId,
+                "fullScore", "100.00",
+                "weight", weight,
+                "includedInFinal", true,
+                "sortOrder", sourceId == 301 ? 1 : 2
+        );
+
+        String responseJson = mockMvc.perform(post("/api/v1/courses/{courseId}/grade-items", courseId)
+                        .headers(teacherHeaders(Long.toString(courseId)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(payload)))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        return objectMapper.readTree(responseJson).at("/data/id").asLong();
+    }
+
+    private org.springframework.http.HttpHeaders teacherHeaders(String manageableCourseIds) {
+        return teacherHeaders(manageableCourseIds, "101:601,602,603");
+    }
+
+    private org.springframework.http.HttpHeaders teacherHeaders(String manageableCourseIds, String courseStudentIds) {
+        org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
+        headers.add("X-User-Id", "501");
+        headers.add("X-User-Role", "TEACHER");
+        headers.add("X-Manageable-Course-Ids", manageableCourseIds);
+        headers.add("X-Course-Student-Ids", courseStudentIds);
+        headers.add("X-Course-Teacher-Ids", "101:501");
+        return headers;
+    }
+}

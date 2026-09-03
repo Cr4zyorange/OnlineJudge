@@ -1,0 +1,177 @@
+{
+  "issue": 340,
+  "matrixVersion": 1,
+  "testedSha": "cb53f265ba726c132f541156f41c84a5b18b7d05",
+  "runId": "20260903T024648Z-2412",
+  "executionMode": "live",
+  "environment": "isolated #318 disposable Compose: 9 workloads / 4 migrations",
+  "startedAt": "2026-09-03T02:46:48Z",
+  "finishedAt": "2026-09-03T02:59:08Z",
+  "status": "PASS",
+  "scenarioCount": 7,
+  "passed": 7,
+  "failed": 0,
+  "blocked": 0,
+  "redacted": true,
+  "sharedMySqlPhysicalSinglePoint": "disclosed: #340 proves logical service boundaries; MySQL remains one physical disposable workload",
+  "scenarios": [
+    {
+      "id": "course-delay",
+      "acs": [
+        "AC-340-01",
+        "AC-340-02",
+        "AC-340-05"
+      ],
+      "command": "mvn -B -ntp test -Dtest=LabCourseProjectionFallbackTest,HomeworkCourseProjectionFallbackTest",
+      "status": "PASS",
+      "before": "fixture setup was completed",
+      "during": "the Java test injected the bounded failure or duplicate delivery",
+      "recovery": "the Java test asserted recovery and exact write counts",
+      "evidence": [
+        "requestId",
+        "httpStatus",
+        "assessment_submission",
+        "assessment_lab_submission",
+        "evaluation_task",
+        "assessment_source_grade"
+      ],
+      "observed": "maven=services/assessment; tests=LabCourseProjectionFallbackTest,HomeworkCourseProjectionFallbackTest; result=PASS"
+    },
+    {
+      "id": "assessment-api-down",
+      "acs": [
+        "AC-340-01",
+        "AC-340-02",
+        "AC-340-05"
+      ],
+      "command": "docker compose stop assessment-api; curl gateway/api/v1/submissions; docker compose start assessment-api",
+      "status": "PASS",
+      "before": "service=assessment-api state=running|healthy; oj_assessment.assessment_submission=0",
+      "during": "service=assessment-api state=exited|; probe=unavailable",
+      "recovery": "service=assessment-api healthy; seconds=11; db-before=0 db-after=0 peer=healthy",
+      "evidence": [
+        "composeStatus",
+        "submissionStatus",
+        "courseReadStatus",
+        "gradeReadStatus",
+        "dbWriteDelta"
+      ],
+      "observed": "compose=ci-artifacts/issue-340/scenarios/assessment-api-down; command=stop/start assessment-api; query=PASS; target=504 peer=200 peerService=403"
+    },
+    {
+      "id": "worker-kill",
+      "acs": [
+        "AC-340-01",
+        "AC-340-02",
+        "AC-340-03",
+        "AC-340-04"
+      ],
+      "command": "bash scripts/test/verify-issue-314-recovery-disposable.sh",
+      "status": "PASS",
+      "before": "the disposable database contained persisted task/outbox facts",
+      "during": "the worker or RabbitMQ was stopped in the live lease/publish window",
+      "recovery": "replacement generation completed once; a stale completion was fenced; source-grade/outbox counts stayed stable",
+      "evidence": [
+        "taskId",
+        "leaseOwner",
+        "generation",
+        "leaseUntil",
+        "sourceGradeCount",
+        "outboxCount",
+        "recoverySeconds"
+      ],
+      "observed": "rawAssertions=ci-artifacts/issue-340/worker-rabbit-recovery-evidence.log"
+    },
+    {
+      "id": "grade-down",
+      "acs": [
+        "AC-340-01",
+        "AC-340-02",
+        "AC-340-04"
+      ],
+      "command": "docker compose stop grade-service; verify Assessment source fact/outbox; docker compose start grade-service",
+      "status": "PASS",
+      "before": "service=grade-service state=running|healthy; Assessment source fact=1 eventId=11011534-df1c-4bd4-982f-1745be3fa1a3 revision=1 outbox=PENDING",
+      "during": "service=grade-service state=exited|; probe=unavailable; sourceGradeEventId=11011534-df1c-4bd4-982f-1745be3fa1a3 sourceGradeRevision=1 sourceGradeOutboxStateBefore=PENDING query=PASS",
+      "recovery": "service=grade-service state=healthy-consumer-restarted; gradeConsumer=ACTIVE(1) gradeDlqMessages=0 sourceTransport=real-rabbitmq sourceGradeOutboxStateAfter=DELIVERED initialPublish=relay gradeInboxStatus=APPLIED gradeProjectionCount=1 duplicateDelivery=CONSUMED duplicateDecision=no-op recoverySeconds=18",
+      "evidence": [
+        "composeStatus",
+        "sourceGradeEventId",
+        "sourceGradeRevision",
+        "sourceGradeOutboxState",
+        "gradeInboxStatus",
+        "gradeProjectionCount",
+        "duplicateDecision",
+        "recoverySeconds"
+      ],
+      "observed": "compose=ci-artifacts/issue-340/scenarios/grade-down; sourceGradeEventId=11011534-df1c-4bd4-982f-1745be3fa1a3; sourceGradeRevision=1; sourceGradeOutboxStateBefore=PENDING; sourceGradeOutboxStateAfter=DELIVERED; gradeConsumer=ACTIVE(1); gradeDlqMessages=0; sourceTransport=real-rabbitmq; initialPublish=relay; gradeInboxStatus=APPLIED; gradeProjectionCount=1; duplicateDelivery=CONSUMED; duplicateDecision=no-op; duplicateInbox=1/1; duplicateProjection=1/1; recoverySeconds=18"
+    },
+    {
+      "id": "rabbitmq-down",
+      "acs": [
+        "AC-340-01",
+        "AC-340-02",
+        "AC-340-03",
+        "AC-340-04"
+      ],
+      "command": "bash scripts/test/verify-issue-314-recovery-disposable.sh",
+      "status": "PASS",
+      "before": "the disposable database contained persisted task/outbox facts",
+      "during": "the worker or RabbitMQ was stopped in the live lease/publish window",
+      "recovery": "replacement generation completed once; a stale completion was fenced; source-grade/outbox counts stayed stable",
+      "evidence": [
+        "eventId",
+        "correlationId",
+        "outboxState",
+        "queueMessages",
+        "recoverySeconds"
+      ],
+      "observed": "rawAssertions=ci-artifacts/issue-340/worker-rabbit-recovery-evidence.log"
+    },
+    {
+      "id": "identity-down",
+      "acs": [
+        "AC-340-01",
+        "AC-340-04",
+        "AC-340-05"
+      ],
+      "command": "mvn -B -ntp test -Dtest=JwksCacheRefreshTest; docker compose stop identity-service; verify cached JWT; docker compose start identity-service",
+      "status": "PASS",
+      "before": "identity-service state=running|healthy; cache-warm HTTP=200; JWKS cache was primed before stop",
+      "during": "identity-service state=exited|; cached-jwt-query HTTP=200; new-login HTTP=504; refresh HTTP=504; protectedReadStatus=200",
+      "recovery": "identity-service state=healthy; recoverySeconds=11",
+      "evidence": [
+        "kid",
+        "jwtMode",
+        "identityStatus",
+        "cachedVerification",
+        "protectedReadStatus",
+        "newLoginStatus",
+        "recoverySeconds"
+      ],
+      "observed": "compose=ci-artifacts/issue-340/scenarios/identity-down; cachedVerification=200; protectedReadStatus=200; newLoginStatus=504; refreshStatus=504; domainWrites=PASS; recoverySeconds=11"
+    },
+    {
+      "id": "duplicate-gap-dlq",
+      "acs": [
+        "AC-340-03",
+        "AC-340-04",
+        "AC-340-05"
+      ],
+      "command": "mvn -B -ntp test -Dtest=WorkerAndProjectionReliabilityTest,LearningReliableEventConsumerTest,RabbitConsumerRecoveryContractTest,SourceGradeProjectionServiceTest,SourceGradeReconciliationWorkerTest",
+      "status": "PASS",
+      "before": "fixture setup was completed",
+      "during": "the Java test injected the bounded failure or duplicate delivery",
+      "recovery": "the Java test asserted recovery and exact write counts",
+      "evidence": [
+        "eventId",
+        "aggregateVersion",
+        "watermark",
+        "inboxCount",
+        "notificationCount",
+        "deadLetterCount"
+      ],
+      "observed": "maven=services/assessment; tests=WorkerAndProjectionReliabilityTest,RabbitConsumerRecoveryContractTest; result=PASS\ngrade-maven=services/grade; tests=SourceGradeProjectionServiceTest,SourceGradeReconciliationWorkerTest; result=PASS"
+    }
+  ]
+}

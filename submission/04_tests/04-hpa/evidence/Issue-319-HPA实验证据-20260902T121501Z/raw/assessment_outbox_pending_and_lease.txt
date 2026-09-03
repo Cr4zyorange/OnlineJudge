@@ -1,0 +1,52 @@
+# assessment_event_outbox pending/delivered distribution (raw)
++-----------+--------+
+| state     | events |
++-----------+--------+
+| DELIVERED |   4952 |
++-----------+--------+
+
+# outbox event types by state (raw; grade consumes assessment.source-grade.changed.v2)
++------------------------------------+-----------+--------+
+| event_type                         | state     | events |
++------------------------------------+-----------+--------+
+| assessment.evaluation.completed.v2 | DELIVERED |   4952 |
++------------------------------------+-----------+--------+
+
+# evaluation_task state distribution (raw)
++------------+-------+
+| state      | tasks |
++------------+-------+
+| FAILED     |  4952 |
+| PENDING    |  3026 |
+| RETRY_WAIT |     3 |
++------------+-------+
+
+# active leases right now: lease_owner/lease_until/heartbeat_at raw values
+
+# recently leased tasks (lease lifecycle touched within 60s; heartbeat_at is the last lease heartbeat)
++--------------------------------------+------------+---------+-------------+-------------+---------------------+
+| id                                   | state      | attempt | lease_owner | lease_until | heartbeat_at        |
++--------------------------------------+------------+---------+-------------+-------------+---------------------+
+| 86680e4d-86ad-4ec0-a177-bcc962e08aaa | RETRY_WAIT |       1 | NULL        | NULL        | 2026-09-02 12:24:02 |
+| 238a8777-24aa-4ab3-a30a-eea41e952b2f | RETRY_WAIT |       1 | NULL        | NULL        | 2026-09-02 12:24:01 |
+| f554abb7-73f0-479d-b92f-8da1071fbd0d | RETRY_WAIT |       1 | NULL        | NULL        | 2026-09-02 12:24:00 |
+| ef87da2e-0e0c-4e67-ac70-ea02bf48c869 | RETRY_WAIT |       1 | NULL        | NULL        | 2026-09-02 12:23:59 |
+| b544e40f-bde6-4f8c-9ce6-f9f2264f7b64 | FAILED     |       3 | NULL        | NULL        | 2026-09-02 12:23:57 |
+| 08dbf718-790e-4bbd-aca8-f35ac1385997 | FAILED     |       3 | NULL        | NULL        | 2026-09-02 12:23:56 |
+| 63440842-f25c-4540-b550-f8a567875ebb | FAILED     |       3 | NULL        | NULL        | 2026-09-02 12:23:55 |
+| 2ed57ca1-df0d-4fe0-831d-b4eed542efe8 | FAILED     |       3 | NULL        | NULL        | 2026-09-02 12:23:54 |
+| 91980115-cbee-44ed-bc38-fc7a8dbfa056 | FAILED     |       3 | NULL        | NULL        | 2026-09-02 12:23:53 |
+| 89ec055a-cef7-4fb9-a35b-c57dbd5dc6aa | FAILED     |       3 | NULL        | NULL        | 2026-09-02 12:23:42 |
+| 84c3c830-1bd6-4208-b2e3-5dffa14c58fa | FAILED     |       3 | NULL        | NULL        | 2026-09-02 12:23:41 |
+| 31931b08-4639-41d9-bf24-594143851013 | FAILED     |       3 | NULL        | NULL        | 2026-09-02 12:23:40 |
+| 9faaee98-080b-4a59-a5c4-3624d30545dc | FAILED     |       3 | NULL        | NULL        | 2026-09-02 12:23:39 |
+| 75472fbb-a350-42f2-854c-0dade091c4de | FAILED     |       3 | NULL        | NULL        | 2026-09-02 12:23:38 |
+| 401c06ff-b142-4a19-a998-a606118de082 | FAILED     |       3 | NULL        | NULL        | 2026-09-02 12:23:32 |
+| e3337d5a-e813-4f16-9d7d-d9cc0fc99501 | FAILED     |       3 | NULL        | NULL        | 2026-09-02 12:23:25 |
+| 7ddc4048-8620-452b-8915-53a82c0c144b | FAILED     |       3 | NULL        | NULL        | 2026-09-02 12:23:24 |
+| 5b985e9f-4f88-4d4e-af66-5800c20c94b6 | FAILED     |       3 | NULL        | NULL        | 2026-09-02 12:23:23 |
+| f51ddc1f-d483-4355-8078-e4049a20b808 | FAILED     |       3 | NULL        | NULL        | 2026-09-02 12:23:22 |
+| ba20e43d-b922-43ca-b1ec-2de515487a64 | FAILED     |       3 | NULL        | NULL        | 2026-09-02 12:23:21 |
++--------------------------------------+------------+---------+-------------+-------------+---------------------+
+
+# lease timeline samples captured during the load: raw/assessment-outbox-lease-timeline.log

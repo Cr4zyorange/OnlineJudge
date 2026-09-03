@@ -1,0 +1,6 @@
+backend unit: files=78 tests=474 failures=0 errors=0 skipped=13
+backend integration: files=9 tests=23 failures=0 errors=0 skipped=1
+backend contract: no reports found
+assessment service: files=35 tests=119 failures=0 errors=0 skipped=8
+frontend unit: no reports found
+browser E2E: no reports found

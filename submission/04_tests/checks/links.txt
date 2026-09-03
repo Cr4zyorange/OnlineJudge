@@ -1,0 +1,2 @@
+LINK_SCAN:
+  0 broken relative links

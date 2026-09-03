@@ -1,0 +1,15 @@
+NAME                                 READY   STATUS      RESTARTS   AGE     IP            NODE                        NOMINATED NODE   READINESS GATES
+assessment-api-8d7c786cb-9t5hx       1/1     Running     0          4m14s   10.244.0.39   oj319-merge-control-plane   <none>           <none>
+assessment-migrations-s8mlz          0/1     Completed   0          8m41s   10.244.0.28   oj319-merge-control-plane   <none>           <none>
+assessment-worker-7d97f7765b-qf5r5   1/1     Running     0          4m8s    10.244.0.40   oj319-merge-control-plane   <none>           <none>
+course-migrations-dh2pq              0/1     Completed   0          8m45s   10.244.0.27   oj319-merge-control-plane   <none>           <none>
+course-service-7957f57bfb-64gbf      1/1     Running     0          4m20s   10.244.0.38   oj319-merge-control-plane   <none>           <none>
+frontend-658b779f54-n4v6r            1/1     Running     0          8m34s   10.244.0.35   oj319-merge-control-plane   <none>           <none>
+gateway-74d5597567-rv5kf             1/1     Running     0          6m21s   10.244.0.36   oj319-merge-control-plane   <none>           <none>
+grade-migrations-pxg8t               0/1     Completed   0          8m37s   10.244.0.29   oj319-merge-control-plane   <none>           <none>
+grade-service-d9f7598db-97gvt        1/1     Running     0          4m2s    10.244.0.41   oj319-merge-control-plane   <none>           <none>
+identity-migrations-bs7rx            0/1     Completed   0          8m48s   10.244.0.26   oj319-merge-control-plane   <none>           <none>
+identity-service-55c675865-ndp9h     1/1     Running     0          5m45s   10.244.0.37   oj319-merge-control-plane   <none>           <none>
+mysql-0                              1/1     Running     0          9m1s    10.244.0.24   oj319-merge-control-plane   <none>           <none>
+mysql-runtime-account-init-g7pbq     0/1     Completed   0          8m51s   10.244.0.25   oj319-merge-control-plane   <none>           <none>
+rabbitmq-0                           1/1     Running     0          9m1s    10.244.0.23   oj319-merge-control-plane   <none>           <none>

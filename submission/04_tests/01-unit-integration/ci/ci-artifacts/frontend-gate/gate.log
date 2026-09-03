@@ -1,0 +1,244 @@
+frontend-verify: pinning npm 10.9.8 -> 10.9.2
+
+$ npm install --global npm@10.9.2
+
+removed 11 packages, and changed 67 packages in 3s
+
+25 packages are looking for funding
+  run `npm fund` for details
+frontend-verify: node=22 npm=10.9.2
+
+$ npm ci --no-audit --no-fund
+npm warn deprecated whatwg-encoding@3.1.1: Use @exodus/bytes instead for a more spec-conformant and faster implementation
+npm warn deprecated glob@10.5.0: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+
+added 298 packages in 3s
+
+$ node --test /home/runner/work/OnlineJudge/OnlineJudge/scripts/test/verify-three-service-baseline-306-render.test.mjs
+TAP version 13
+# Subtest: the three-service context, fencing and deployment diagrams have the required semantics and really render
+ok 1 - the three-service context, fencing and deployment diagrams have the required semantics and really render
+  ---
+  duration_ms: 14565.835581
+  type: 'test'
+  ...
+1..1
+# tests 1
+# suites 0
+# pass 1
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 14633.779678
+
+$ node --test /home/runner/work/OnlineJudge/OnlineJudge/scripts/test/verify-three-service-baseline-306-frontend-gate.test.mjs
+TAP version 13
+# Subtest: the formal frontend gate rejects a malformed \#306 Mermaid source after its locked dependency install
+ok 1 - the formal frontend gate rejects a malformed \#306 Mermaid source after its locked dependency install
+  ---
+  duration_ms: 3448.894507
+  type: 'test'
+  ...
+1..1
+# tests 1
+# suites 0
+# pass 1
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 3507.169694
+
+$ npm run typecheck
+
+> onlinejudge-frontend@0.1.0 typecheck
+> vue-tsc --noEmit
+
+
+$ npm run test:unit -- --reporter=junit --outputFile=/home/runner/work/OnlineJudge/OnlineJudge/ci-artifacts/frontend-gate/frontend-unit-junit.xml
+
+> onlinejudge-frontend@0.1.0 test:unit
+> vitest run --reporter=junit --outputFile=/home/runner/work/OnlineJudge/OnlineJudge/ci-artifacts/frontend-gate/frontend-unit-junit.xml
+
+JUNIT report written to /home/runner/work/OnlineJudge/OnlineJudge/ci-artifacts/frontend-gate/frontend-unit-junit.xml
+
+$ npm run build
+
+> onlinejudge-frontend@0.1.0 build
+> vite build
+
+[36mvite v6.4.2 [32mbuilding for production...[36m[39m
+transforming...
+[32m✓[39m 191 modules transformed.
+rendering chunks...
+computing gzip size...
+[2mdist/[22m[32mcourses/index.html                                   [39m[1m[2m    0.88 kB[22m[1m[22m[2m │ gzip:  0.53 kB[22m
+[2mdist/[22m[32mindex.html                                           [39m[1m[2m    0.89 kB[22m[1m[22m[2m │ gzip:  0.52 kB[22m
+[2mdist/[22m[2massets/[22m[32mback1-DZz7Swmv.jpg                            [39m[1m[2m1,263.68 kB[22m[1m[22m
+[2mdist/[22m[2massets/[22m[35mStatusBadge-CWxdIRcs.css                      [39m[1m[2m    1.17 kB[22m[1m[22m[2m │ gzip:  0.47 kB[22m
+[2mdist/[22m[2massets/[22m[35mAuthStatusView-D_4jcVwu.css                   [39m[1m[2m    1.38 kB[22m[1m[22m[2m │ gzip:  0.60 kB[22m
+[2mdist/[22m[2massets/[22m[35mGradeItemConfigView-DZDGAh6Y.css              [39m[1m[2m    1.55 kB[22m[1m[22m[2m │ gzip:  0.54 kB[22m
+[2mdist/[22m[2massets/[22m[35mSummaryStrip-BkTex2wg.css                     [39m[1m[2m    1.70 kB[22m[1m[22m[2m │ gzip:  0.59 kB[22m
+[2mdist/[22m[2massets/[22m[35mAuthProfileView-PNRrg8Iv.css                  [39m[1m[2m    1.75 kB[22m[1m[22m[2m │ gzip:  0.65 kB[22m
+[2mdist/[22m[2massets/[22m[35mAuthView-C3Ivy6fO.css                         [39m[1m[2m    1.78 kB[22m[1m[22m[2m │ gzip:  0.64 kB[22m
+[2mdist/[22m[2massets/[22m[35mPageHeader-DR0SEWRN.css                       [39m[1m[2m    1.87 kB[22m[1m[22m[2m │ gzip:  0.62 kB[22m
+[2mdist/[22m[2massets/[22m[35mLabTeacherView-BeGXdBf8.css                   [39m[1m[2m    2.03 kB[22m[1m[22m[2m │ gzip:  0.67 kB[22m
+[2mdist/[22m[2massets/[22m[35mStudentGradeView-BW0gqU_2.css                 [39m[1m[2m    2.30 kB[22m[1m[22m[2m │ gzip:  0.72 kB[22m
+[2mdist/[22m[2massets/[22m[35mCourseHomeworkIndexView-B63beg2c.css          [39m[1m[2m    2.33 kB[22m[1m[22m[2m │ gzip:  0.65 kB[22m
+[2mdist/[22m[2massets/[22m[35mPageState-VWi1hXgg.css                        [39m[1m[2m    2.39 kB[22m[1m[22m[2m │ gzip:  0.75 kB[22m
+[2mdist/[22m[2massets/[22m[35mFilterBar-i2lEAkFD.css                        [39m[1m[2m    2.52 kB[22m[1m[22m[2m │ gzip:  0.65 kB[22m
+[2mdist/[22m[2massets/[22m[35mHomeworkTeacherView-BN7vKrzV.css              [39m[1m[2m    2.56 kB[22m[1m[22m[2m │ gzip:  0.76 kB[22m
+[2mdist/[22m[2massets/[22m[35mHomeworkManageView-CTJF01PE.css               [39m[1m[2m    3.13 kB[22m[1m[22m[2m │ gzip:  0.91 kB[22m
+[2mdist/[22m[2massets/[22m[35mDataTable-CP0-dvMT.css                        [39m[1m[2m    3.14 kB[22m[1m[22m[2m │ gzip:  0.85 kB[22m
+[2mdist/[22m[2massets/[22m[35mLabManageView-u8adsvKJ.css                    [39m[1m[2m    3.14 kB[22m[1m[22m[2m │ gzip:  0.89 kB[22m
+[2mdist/[22m[2massets/[22m[35mReminderRuleSettingsView-w-Zylnhq.css         [39m[1m[2m    3.35 kB[22m[1m[22m[2m │ gzip:  0.92 kB[22m
+[2mdist/[22m[2massets/[22m[35mLearningStatisticsView-kxYWnAWn.css           [39m[1m[2m    3.75 kB[22m[1m[22m[2m │ gzip:  0.95 kB[22m
+[2mdist/[22m[2massets/[22m[35mLearningProgressView-CtNDekbf.css             [39m[1m[2m    3.75 kB[22m[1m[22m[2m │ gzip:  0.99 kB[22m
+[2mdist/[22m[2massets/[22m[35mTeacherGradeTableView-jWJYI2el.css            [39m[1m[2m    4.12 kB[22m[1m[22m[2m │ gzip:  1.10 kB[22m
+[2mdist/[22m[2massets/[22m[35mCourseLabIndexView-BCOQBZR7.css               [39m[1m[2m    4.52 kB[22m[1m[22m[2m │ gzip:  1.19 kB[22m
+[2mdist/[22m[2massets/[22m[35mCourseManagementView-Ds2jQ0Bv.css             [39m[1m[2m    4.95 kB[22m[1m[22m[2m │ gzip:  1.26 kB[22m
+[2mdist/[22m[2massets/[22m[35mAuthAdminView-D1IlLK98.css                    [39m[1m[2m    5.08 kB[22m[1m[22m[2m │ gzip:  1.27 kB[22m
+[2mdist/[22m[2massets/[22m[35mHomeworkSubmissionResultView-ennY72bi.css     [39m[1m[2m    5.30 kB[22m[1m[22m[2m │ gzip:  1.34 kB[22m
+[2mdist/[22m[2massets/[22m[35mLabEditorView-DFT2C02D.css                    [39m[1m[2m    5.66 kB[22m[1m[22m[2m │ gzip:  1.36 kB[22m
+[2mdist/[22m[2massets/[22m[35mNotificationCenterView-CaXOOBug.css           [39m[1m[2m    5.92 kB[22m[1m[22m[2m │ gzip:  1.30 kB[22m
+[2mdist/[22m[2massets/[22m[35mLearningTaskCenterView-62FuBf2i.css           [39m[1m[2m    5.94 kB[22m[1m[22m[2m │ gzip:  1.39 kB[22m
+[2mdist/[22m[2massets/[22m[35mHomeworkEditorView-ihlDmYUV.css               [39m[1m[2m    6.04 kB[22m[1m[22m[2m │ gzip:  1.40 kB[22m
+[2mdist/[22m[2massets/[22m[35mHomeworkSubmissionWorkspaceView-5xIcDnwj.css  [39m[1m[2m    6.17 kB[22m[1m[22m[2m │ gzip:  1.48 kB[22m
+[2mdist/[22m[2massets/[22m[35mLabSubmissionResultView-C2nMeAdl.css          [39m[1m[2m    6.25 kB[22m[1m[22m[2m │ gzip:  1.45 kB[22m
+[2mdist/[22m[2massets/[22m[35mHomeworkStatisticsView-ZXEdRKCu.css           [39m[1m[2m    6.52 kB[22m[1m[22m[2m │ gzip:  1.53 kB[22m
+[2mdist/[22m[2massets/[22m[35mLabSubmissionHistoryView-B9aVndm5.css         [39m[1m[2m    6.93 kB[22m[1m[22m[2m │ gzip:  1.56 kB[22m
+[2mdist/[22m[2massets/[22m[35mHomeworkSubmissionHistoryView-B4eh0MGM.css    [39m[1m[2m    7.37 kB[22m[1m[22m[2m │ gzip:  1.64 kB[22m
+[2mdist/[22m[2massets/[22m[35mHomeworkSubmissionReviewView-C5l3zdRB.css     [39m[1m[2m    7.60 kB[22m[1m[22m[2m │ gzip:  1.77 kB[22m
+[2mdist/[22m[2massets/[22m[35mLabSubmissionReviewView-BsSDw76o.css          [39m[1m[2m    7.90 kB[22m[1m[22m[2m │ gzip:  1.73 kB[22m
+[2mdist/[22m[2massets/[22m[35mLabStatisticsView-DVqDmv8d.css                [39m[1m[2m    8.36 kB[22m[1m[22m[2m │ gzip:  2.18 kB[22m
+[2mdist/[22m[2massets/[22m[35mLabSubmissionWorkspaceView-Dy9ghSey.css       [39m[1m[2m    9.67 kB[22m[1m[22m[2m │ gzip:  2.32 kB[22m
+[2mdist/[22m[2massets/[22m[35mLabStudentView-DmsyFLwi.css                   [39m[1m[2m   12.63 kB[22m[1m[22m[2m │ gzip:  2.38 kB[22m
+[2mdist/[22m[2massets/[22m[35mHomeworkStudentView-CPAAJcRj.css              [39m[1m[2m   13.94 kB[22m[1m[22m[2m │ gzip:  2.57 kB[22m
+[2mdist/[22m[2massets/[22m[35mmain-BO85R8YM.css                             [39m[1m[2m   26.11 kB[22m[1m[22m[2m │ gzip:  5.86 kB[22m
+[2mdist/[22m[2massets/[22m[36mlab-CAUsRI-Y.js                               [39m[1m[2m    0.09 kB[22m[1m[22m[2m │ gzip:  0.10 kB[22m
+[2mdist/[22m[2massets/[22m[36mmain-D4M8nm71.js                              [39m[1m[2m    0.09 kB[22m[1m[22m[2m │ gzip:  0.11 kB[22m
+[2mdist/[22m[2massets/[22m[36mcourses-CBhW-ACr.js                           [39m[1m[2m    0.09 kB[22m[1m[22m[2m │ gzip:  0.11 kB[22m
+[2mdist/[22m[2massets/[22m[36mlearningProgress-BmwZYcwv.js                  [39m[1m[2m    0.37 kB[22m[1m[22m[2m │ gzip:  0.23 kB[22m
+[2mdist/[22m[2massets/[22m[36mgradeItems-DGATUWBh.js                        [39m[1m[2m    0.51 kB[22m[1m[22m[2m │ gzip:  0.24 kB[22m
+[2mdist/[22m[2massets/[22m[36mStatusBadge-KgrYSNQn.js                       [39m[1m[2m    0.67 kB[22m[1m[22m[2m │ gzip:  0.41 kB[22m
+[2mdist/[22m[2massets/[22m[36mSummaryStrip-7a1Ccga5.js                      [39m[1m[2m    0.90 kB[22m[1m[22m[2m │ gzip:  0.52 kB[22m
+[2mdist/[22m[2massets/[22m[36mhwkDisplay-CvCiv7zE.js                        [39m[1m[2m    0.93 kB[22m[1m[22m[2m │ gzip:  0.58 kB[22m
+[2mdist/[22m[2massets/[22m[36mgrdDisplay-Chys63Ow.js                        [39m[1m[2m    1.10 kB[22m[1m[22m[2m │ gzip:  0.63 kB[22m
+[2mdist/[22m[2massets/[22m[36mPageHeader-OcgWrsoX.js                        [39m[1m[2m    1.22 kB[22m[1m[22m[2m │ gzip:  0.55 kB[22m
+[2mdist/[22m[2massets/[22m[36minternalActionUrl-ZOGQcVTN.js                 [39m[1m[2m    1.39 kB[22m[1m[22m[2m │ gzip:  0.64 kB[22m
+[2mdist/[22m[2massets/[22m[36mlabDisplay-BAvwEZdb.js                        [39m[1m[2m    1.60 kB[22m[1m[22m[2m │ gzip:  0.90 kB[22m
+[2mdist/[22m[2massets/[22m[36mPageState-Blnl5mHx.js                         [39m[1m[2m    1.88 kB[22m[1m[22m[2m │ gzip:  0.99 kB[22m
+[2mdist/[22m[2massets/[22m[36mAuthStatusView-rhHGoEp_.js                    [39m[1m[2m    1.95 kB[22m[1m[22m[2m │ gzip:  1.02 kB[22m
+[2mdist/[22m[2massets/[22m[36mFilterBar-CemmWMZp.js                         [39m[1m[2m    2.28 kB[22m[1m[22m[2m │ gzip:  1.03 kB[22m
+[2mdist/[22m[2massets/[22m[36mlabs-BUvzXVQ7.js                              [39m[1m[2m    2.52 kB[22m[1m[22m[2m │ gzip:  0.76 kB[22m
+[2mdist/[22m[2massets/[22m[36mhomeworks-D3RQgT_9.js                         [39m[1m[2m    2.60 kB[22m[1m[22m[2m │ gzip:  0.83 kB[22m
+[2mdist/[22m[2massets/[22m[36mgradeRecords-CToUVCqZ.js                      [39m[1m[2m    2.65 kB[22m[1m[22m[2m │ gzip:  0.62 kB[22m
+[2mdist/[22m[2massets/[22m[36mDataTable-B4X2HJMr.js                         [39m[1m[2m    2.72 kB[22m[1m[22m[2m │ gzip:  1.20 kB[22m
+[2mdist/[22m[2massets/[22m[36mlearningRecords-B_loOX5z.js                   [39m[1m[2m    2.81 kB[22m[1m[22m[2m │ gzip:  1.18 kB[22m
+[2mdist/[22m[2massets/[22m[36mAuthView-Dc_NHxg6.js                          [39m[1m[2m    3.96 kB[22m[1m[22m[2m │ gzip:  1.82 kB[22m
+[2mdist/[22m[2massets/[22m[36mReminderRuleSettingsView-B7oHCzZw.js          [39m[1m[2m    4.45 kB[22m[1m[22m[2m │ gzip:  1.97 kB[22m
+[2mdist/[22m[2massets/[22m[36mLearningStatisticsView-CU8Z4936.js            [39m[1m[2m    4.54 kB[22m[1m[22m[2m │ gzip:  2.03 kB[22m
+[2mdist/[22m[2massets/[22m[36mAuthProfileView-DawZ2t-w.js                   [39m[1m[2m    4.62 kB[22m[1m[22m[2m │ gzip:  1.90 kB[22m
+[2mdist/[22m[2massets/[22m[36mLearningProgressView-DbSxjBqs.js              [39m[1m[2m    4.93 kB[22m[1m[22m[2m │ gzip:  2.14 kB[22m
+[2mdist/[22m[2massets/[22m[36mStudentGradeView-CmZkQ3AV.js                  [39m[1m[2m    5.92 kB[22m[1m[22m[2m │ gzip:  2.45 kB[22m
+[2mdist/[22m[2massets/[22m[36mLabManageView-DF1pfxAm.js                     [39m[1m[2m    6.69 kB[22m[1m[22m[2m │ gzip:  2.90 kB[22m
+[2mdist/[22m[2massets/[22m[36mCourseHomeworkIndexView-CT5OHBsX.js           [39m[1m[2m    7.05 kB[22m[1m[22m[2m │ gzip:  3.18 kB[22m
+[2mdist/[22m[2massets/[22m[36mLearningTaskCenterView-uZEHK5cR.js            [39m[1m[2m    7.61 kB[22m[1m[22m[2m │ gzip:  3.23 kB[22m
+[2mdist/[22m[2massets/[22m[36mGradeItemConfigView-DQ5B-tQj.js               [39m[1m[2m    8.28 kB[22m[1m[22m[2m │ gzip:  3.20 kB[22m
+[2mdist/[22m[2massets/[22m[36mHomeworkManageView-DwdiEGk9.js                [39m[1m[2m    8.68 kB[22m[1m[22m[2m │ gzip:  3.51 kB[22m
+[2mdist/[22m[2massets/[22m[36mCourseLabIndexView-BKr2altV.js                [39m[1m[2m    9.12 kB[22m[1m[22m[2m │ gzip:  4.15 kB[22m
+[2mdist/[22m[2massets/[22m[36mLabStatisticsView-O37kJjxy.js                 [39m[1m[2m    9.26 kB[22m[1m[22m[2m │ gzip:  3.57 kB[22m
+[2mdist/[22m[2massets/[22m[36mNotificationCenterView-B1VMj8Dh.js            [39m[1m[2m    9.54 kB[22m[1m[22m[2m │ gzip:  3.78 kB[22m
+[2mdist/[22m[2massets/[22m[36mLabTeacherView-BgeuHHKv.js                    [39m[1m[2m   10.06 kB[22m[1m[22m[2m │ gzip:  4.01 kB[22m
+[2mdist/[22m[2massets/[22m[36mLabSubmissionHistoryView-BgVerOEU.js          [39m[1m[2m   11.08 kB[22m[1m[22m[2m │ gzip:  3.94 kB[22m
+[2mdist/[22m[2massets/[22m[36mHomeworkSubmissionResultView-CLUMjoox.js      [39m[1m[2m   11.50 kB[22m[1m[22m[2m │ gzip:  4.38 kB[22m
+[2mdist/[22m[2massets/[22m[36mHomeworkTeacherView-Hw3ucCf1.js               [39m[1m[2m   13.07 kB[22m[1m[22m[2m │ gzip:  5.18 kB[22m
+[2mdist/[22m[2massets/[22m[36mLabSubmissionWorkspaceView-607eq50V.js        [39m[1m[2m   13.62 kB[22m[1m[22m[2m │ gzip:  4.96 kB[22m
+[2mdist/[22m[2massets/[22m[36mAuthAdminView-B81Laxkp.js                     [39m[1m[2m   14.35 kB[22m[1m[22m[2m │ gzip:  4.72 kB[22m
+[2mdist/[22m[2massets/[22m[36mHomeworkStatisticsView-CRO0ACIy.js            [39m[1m[2m   14.98 kB[22m[1m[22m[2m │ gzip:  5.26 kB[22m
+[2mdist/[22m[2massets/[22m[36mLabSubmissionResultView-BnaSlmtz.js           [39m[1m[2m   15.56 kB[22m[1m[22m[2m │ gzip:  5.34 kB[22m
+[2mdist/[22m[2massets/[22m[36mLabEditorView-BdKz66-1.js                     [39m[1m[2m   17.72 kB[22m[1m[22m[2m │ gzip:  6.39 kB[22m
+[2mdist/[22m[2massets/[22m[36mHomeworkSubmissionWorkspaceView-DZdQIzAw.js   [39m[1m[2m   18.54 kB[22m[1m[22m[2m │ gzip:  6.58 kB[22m
+[2mdist/[22m[2massets/[22m[36mLabSubmissionReviewView-UUQ6Nnzh.js           [39m[1m[2m   20.65 kB[22m[1m[22m[2m │ gzip:  6.82 kB[22m
+[2mdist/[22m[2massets/[22m[36mTeacherGradeTableView-AQxyQz4g.js             [39m[1m[2m   20.69 kB[22m[1m[22m[2m │ gzip:  6.22 kB[22m
+[2mdist/[22m[2massets/[22m[36mHomeworkSubmissionHistoryView-iE_obCT5.js     [39m[1m[2m   21.60 kB[22m[1m[22m[2m │ gzip:  7.13 kB[22m
+[2mdist/[22m[2massets/[22m[36mHomeworkSubmissionReviewView-DAgtm2Wn.js      [39m[1m[2m   24.31 kB[22m[1m[22m[2m │ gzip:  8.42 kB[22m
+[2mdist/[22m[2massets/[22m[36mHomeworkEditorView-JMDKEPml.js                [39m[1m[2m   29.63 kB[22m[1m[22m[2m │ gzip:  9.59 kB[22m
+[2mdist/[22m[2massets/[22m[36mHomeworkStudentView-DpU2WEj7.js               [39m[1m[2m   31.34 kB[22m[1m[22m[2m │ gzip: 10.00 kB[22m
+[2mdist/[22m[2massets/[22m[36mLabStudentView-C2yfojTL.js                    [39m[1m[2m   32.76 kB[22m[1m[22m[2m │ gzip: 11.38 kB[22m
+[2mdist/[22m[2massets/[22m[36mCourseManagementView-CooeAMSb.js              [39m[1m[2m   51.35 kB[22m[1m[22m[2m │ gzip: 14.63 kB[22m
+[2mdist/[22m[2massets/[22m[36mmain-10qykJ3k.js                              [39m[1m[2m  130.14 kB[22m[1m[22m[2m │ gzip: 46.38 kB[22m
+[32m✓ built in 3.61s[39m
+
+$ npm run test:e2e:contract
+
+> onlinejudge-frontend@0.1.0 test:e2e:contract
+> node --test tests/contracts/shared-e2e-entry.contract.test.mjs
+
+TAP version 13
+# Subtest: shared E2E package commands use the single Playwright runner
+ok 1 - shared E2E package commands use the single Playwright runner
+  ---
+  duration_ms: 0.974283
+  type: 'test'
+  ...
+# Subtest: repository has one Playwright config and one ignored artifact convention
+ok 2 - repository has one Playwright config and one ignored artifact convention
+  ---
+  duration_ms: 6.688455
+  type: 'test'
+  ...
+# Subtest: shared fixture, real-application smoke and local runbook are present
+ok 3 - shared fixture, real-application smoke and local runbook are present
+  ---
+  duration_ms: 0.352835
+  type: 'test'
+  ...
+1..3
+# tests 3
+# suites 0
+# pass 3
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 65.187519
+
+$ npm run test:e2e:verify-failure
+
+> onlinejudge-frontend@0.1.0 test:e2e:verify-failure
+> node scripts/verify-e2e-failure.mjs
+
+PASS: deliberate assertion failed with exit code 1
+
+$ node /home/runner/work/OnlineJudge/OnlineJudge/scripts/test/verify-e2e-ci-integration.test.mjs
+TAP version 13
+# Subtest: the disposable business E2E command runs every maintained browser scenario
+ok 1 - the disposable business E2E command runs every maintained browser scenario
+  ---
+  duration_ms: 2.203277
+  type: 'test'
+  ...
+# Subtest: GitHub Actions blocks delivery on the real browser E2E gate and preserves evidence
+ok 2 - GitHub Actions blocks delivery on the real browser E2E gate and preserves evidence
+  ---
+  duration_ms: 0.411947
+  type: 'test'
+  ...
+# Subtest: Browser E2E installs the pinned Docker Scout SBOM producer before the disposable runner
+ok 3 - Browser E2E installs the pinned Docker Scout SBOM producer before the disposable runner
+  ---
+  duration_ms: 0.3199
+  type: 'test'
+  ...
+1..3
+# tests 3
+# suites 0
+# pass 3
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 10.347382
+frontend-verify: PASS (ci + Mermaid render + typecheck + unit + build + runner contracts)

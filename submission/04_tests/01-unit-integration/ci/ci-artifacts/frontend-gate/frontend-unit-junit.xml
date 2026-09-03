@@ -1,0 +1,1257 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<testsuites name="vitest tests" tests="573" failures="0" errors="0" time="18.678935319">
+    <testsuite name="tests/unit/CourseManagementView.spec.ts" timestamp="2026-09-03T03:54:08.633Z" hostname="runnervmgx7h7" tests="25" failures="0" errors="0" skipped="0" time="1.069403622">
+        <testcase classname="tests/unit/CourseManagementView.spec.ts" name="CourseManagementView &gt; truncates long descriptions and enters the course home page from the all courses view" time="0.091389962">
+        </testcase>
+        <testcase classname="tests/unit/CourseManagementView.spec.ts" name="CourseManagementView &gt; replaces the concrete course loading placeholder with the detail request error" time="0.019680869">
+        </testcase>
+        <testcase classname="tests/unit/CourseManagementView.spec.ts" name="CourseManagementView &gt; keeps the teacher management actions visible when the documented member endpoint returns its paged envelope" time="0.02261737">
+        </testcase>
+        <testcase classname="tests/unit/CourseManagementView.spec.ts" name="CourseManagementView &gt; delegates course entry to Vue Router when mounted in the routed application" time="0.00785856">
+        </testcase>
+        <testcase classname="tests/unit/CourseManagementView.spec.ts" name="CourseManagementView &gt; opens chapter, resource, and announcement management from the teacher detail action area" time="0.242233712">
+        </testcase>
+        <testcase classname="tests/unit/CourseManagementView.spec.ts" name="CourseManagementView &gt; shows course announcements in the detail sidebar and lets teachers publish one" time="0.069137724">
+        </testcase>
+        <testcase classname="tests/unit/CourseManagementView.spec.ts" name="CourseManagementView &gt; keeps the original detail modal for students who have not joined a course" time="0.01952963">
+        </testcase>
+        <testcase classname="tests/unit/CourseManagementView.spec.ts" name="CourseManagementView &gt; keeps LRN secondary entries out of the course sidebar" time="0.008579025">
+        </testcase>
+        <testcase classname="tests/unit/CourseManagementView.spec.ts" name="CourseManagementView &gt; loads the mine course scope from the all courses sidebar entry" time="0.011543422">
+        </testcase>
+        <testcase classname="tests/unit/CourseManagementView.spec.ts" name="CourseManagementView &gt; uses different layouts for all courses and managed courses, then creates a course" time="0.059874014">
+        </testcase>
+        <testcase classname="tests/unit/CourseManagementView.spec.ts" name="CourseManagementView &gt; opens chapter management from a manageable course and saves a nested chapter" time="0.074194587">
+        </testcase>
+        <testcase classname="tests/unit/CourseManagementView.spec.ts" name="CourseManagementView &gt; reorders same-level chapters by drag and drop" time="0.052568778">
+        </testcase>
+        <testcase classname="tests/unit/CourseManagementView.spec.ts" name="CourseManagementView &gt; downloads resources from the rendered action through bearer-authenticated fetch" time="0.042238545">
+        </testcase>
+        <testcase classname="tests/unit/CourseManagementView.spec.ts" name="CourseManagementView &gt; shows unbound resources in the all resources filter for students and lets them download" time="0.059753609">
+        </testcase>
+        <testcase classname="tests/unit/CourseManagementView.spec.ts" name="CourseManagementView &gt; restores the course chapter context from the resume query" time="0.014865769">
+        </testcase>
+        <testcase classname="tests/unit/CourseManagementView.spec.ts" name="CourseManagementView &gt; sends the entered invite code when a student joins an invite course" time="0.013699023">
+        </testcase>
+        <testcase classname="tests/unit/CourseManagementView.spec.ts" name="CourseManagementView &gt; shows a pending success notice and refreshes the list for review-mode joins" time="0.014544907">
+        </testcase>
+        <testcase classname="tests/unit/CourseManagementView.spec.ts" name="CourseManagementView &gt; lets a teacher approve and reject pending course members" time="0.055612989">
+        </testcase>
+        <testcase classname="tests/unit/CourseManagementView.spec.ts" name="CourseManagementView &gt; lets a teacher change active member roles and remove course members" time="0.056280017">
+        </testcase>
+        <testcase classname="tests/unit/CourseManagementView.spec.ts" name="CourseManagementView &gt; allows teacher rows to request role changes and lets the backend enforce last-teacher rules" time="0.028655431">
+        </testcase>
+        <testcase classname="tests/unit/CourseManagementView.spec.ts" name="CourseManagementView &gt; keeps the course detail modal open and refreshes members after last-teacher removal is rejected" time="0.016620727">
+        </testcase>
+        <testcase classname="tests/unit/CourseManagementView.spec.ts" name="CourseManagementView &gt; surfaces the backend COURSE_FULL message when a public join is rejected" time="0.010450949">
+        </testcase>
+        <testcase classname="tests/unit/CourseManagementView.spec.ts" name="CourseManagementView &gt; surfaces the backend INVALID_INVITE_CODE message when an invite join is rejected" time="0.009689807">
+        </testcase>
+        <testcase classname="tests/unit/CourseManagementView.spec.ts" name="CourseManagementView &gt; shows upload failure from the backend without losing the resource form" time="0.049563639">
+        </testcase>
+        <testcase classname="tests/unit/CourseManagementView.spec.ts" name="CourseManagementView &gt; shows empty states for announcements and recent tasks in the course home summary" time="0.013959089">
+        </testcase>
+    </testsuite>
+    <testsuite name="src/views/grd/StudentGradeView.spec.ts" timestamp="2026-09-03T03:54:08.638Z" hostname="runnervmgx7h7" tests="4" failures="0" errors="0" skipped="0" time="0.140957085">
+        <testcase classname="src/views/grd/StudentGradeView.spec.ts" name="StudentGradeView &gt; loads the current student published grades with sources and feedback" time="0.056868558">
+        </testcase>
+        <testcase classname="src/views/grd/StudentGradeView.spec.ts" name="StudentGradeView &gt; shows an unpublished state without leaking score cells when the api rejects" time="0.025352447">
+        </testcase>
+        <testcase classname="src/views/grd/StudentGradeView.spec.ts" name="StudentGradeView &gt; submits a final score review request and renders its pending status" time="0.043365792">
+        </testcase>
+        <testcase classname="src/views/grd/StudentGradeView.spec.ts" name="StudentGradeView &gt; keeps a failed review query distinguishable from an empty review list and retries it" time="0.013493147">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/unit/api/http.spec.ts" timestamp="2026-09-03T03:54:08.639Z" hostname="runnervmgx7h7" tests="14" failures="0" errors="0" skipped="0" time="0.036260529">
+        <testcase classname="tests/unit/api/http.spec.ts" name="shared API request client &gt; unwraps standard ApiResponse data and injects the bearer token instead of user-controlled headers" time="0.017367005">
+        </testcase>
+        <testcase classname="tests/unit/api/http.spec.ts" name="shared API request client &gt; keeps bearer auth for multipart submissions without forcing a json content type" time="0.003190424">
+        </testcase>
+        <testcase classname="tests/unit/api/http.spec.ts" name="shared API request client &gt; does not use configured role context as runtime header auth when no bearer token exists" time="0.003138465">
+        </testcase>
+        <testcase classname="tests/unit/api/http.spec.ts" name="shared API request client &gt; downloads binary resources through bearer-authenticated fetch" time="0.002119909">
+        </testcase>
+        <testcase classname="tests/unit/api/http.spec.ts" name="shared API request client &gt; accepts the legacy success response code used by older backend processes" time="0.000823232">
+        </testcase>
+        <testcase classname="tests/unit/api/http.spec.ts" name="shared API request client &gt; accepts a successful direct service response without an envelope" time="0.000503381">
+        </testcase>
+        <testcase classname="tests/unit/api/http.spec.ts" name="shared API request client &gt; throws the backend message when the standard response is not successful" time="0.000606259">
+        </testcase>
+        <testcase classname="tests/unit/api/http.spec.ts" name="shared API request client &gt; preserves a direct service error code and message without a data field" time="0.001122399">
+        </testcase>
+        <testcase classname="tests/unit/api/http.spec.ts" name="shared API request client &gt; reports plain-text server errors without leaking json parse failures" time="0.00088337">
+        </testcase>
+        <testcase classname="tests/unit/api/http.spec.ts" name="shared API request client &gt; clears persisted and cached session state for authenticated API 401/session-expired responses" time="0.001570784">
+        </testcase>
+        <testcase classname="tests/unit/api/http.spec.ts" name="shared API request client &gt; does not replace an explicit logout with session-expired from a concurrent request" time="0.000973423">
+        </testcase>
+        <testcase classname="tests/unit/api/http.spec.ts" name="shared API request client &gt; clears persisted and cached session state for disabled or locked account responses" time="0.000768901">
+        </testcase>
+        <testcase classname="tests/unit/api/http.spec.ts" name="shared API request client &gt; routes forbidden responses to the 403 page without clearing the active session" time="0.000680197">
+        </testcase>
+        <testcase classname="tests/unit/api/http.spec.ts" name="shared API request client &gt; fails fast before network calls when no login context exists" time="0.000579804">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/unit/api/labs.spec.ts" timestamp="2026-09-03T03:54:08.640Z" hostname="runnervmgx7h7" tests="5" failures="0" errors="0" skipped="0" time="0.01003315">
+        <testcase classname="tests/unit/api/labs.spec.ts" name="LAB API adapters &gt; normalizes an Assessment service course ID before exposing experiment detail to views" time="0.003209247">
+        </testcase>
+        <testcase classname="tests/unit/api/labs.spec.ts" name="LAB API adapters &gt; downloads lab reports through the authenticated blob request helper" time="0.002696799">
+        </testcase>
+        <testcase classname="tests/unit/api/labs.spec.ts" name="LAB API adapters &gt; preserves the Assessment UUID submission identifier for controlled source downloads" time="0.000959576">
+        </testcase>
+        <testcase classname="tests/unit/api/labs.spec.ts" name="LAB API adapters &gt; scores lab reports through the teacher report scoring endpoint" time="0.000956534">
+        </testcase>
+        <testcase classname="tests/unit/api/labs.spec.ts" name="LAB API adapters &gt; loads lab statistics through the documented teacher statistics endpoint" time="0.000511989">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/unit/app/courseMain.spec.ts" timestamp="2026-09-03T03:54:08.641Z" hostname="runnervmgx7h7" tests="1" failures="0" errors="0" skipped="0" time="0.024989612">
+        <testcase classname="tests/unit/app/courseMain.spec.ts" name="course-main entry &gt; mounts the shared app router for course URLs" time="0.023599776">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/unit/app/router.spec.ts" timestamp="2026-09-03T03:54:08.641Z" hostname="runnervmgx7h7" tests="37" failures="0" errors="0" skipped="0" time="1.127204227">
+        <testcase classname="tests/unit/app/router.spec.ts" name="application router access contract &gt; maps all 50 formal UI identifiers to an addressable route carrier" time="0.017467151">
+        </testcase>
+        <testcase classname="tests/unit/app/router.spec.ts" name="application router access contract &gt; uses /auth/me and CRS membership instead of a role query to enter a student course page" time="0.148514387">
+        </testcase>
+        <testcase classname="tests/unit/app/router.spec.ts" name="application router access contract &gt; allows a CRS manager into a teacher workspace without role selectors" time="0.081860489">
+        </testcase>
+        <testcase classname="tests/unit/app/router.spec.ts" name="application router access contract &gt; exposes the &apos;lab-create&apos; LAB teacher route contract" time="0.124873265">
+        </testcase>
+        <testcase classname="tests/unit/app/router.spec.ts" name="application router access contract &gt; exposes the &apos;lab-manage-detail&apos; LAB teacher route contract" time="0.05633824">
+        </testcase>
+        <testcase classname="tests/unit/app/router.spec.ts" name="application router access contract &gt; exposes the &apos;lab-edit&apos; LAB teacher route contract" time="0.003005947">
+        </testcase>
+        <testcase classname="tests/unit/app/router.spec.ts" name="application router access contract &gt; exposes the &apos;lab-submission-workspace&apos; LAB teacher route contract" time="0.002207777">
+        </testcase>
+        <testcase classname="tests/unit/app/router.spec.ts" name="application router access contract &gt; exposes the &apos;lab-submission-review&apos; LAB teacher route contract" time="0.008627712">
+        </testcase>
+        <testcase classname="tests/unit/app/router.spec.ts" name="application router access contract &gt; exposes the &apos;lab-statistics&apos; LAB teacher route contract" time="0.072239225">
+        </testcase>
+        <testcase classname="tests/unit/app/router.spec.ts" name="application router access contract &gt; routes a course member without manage permission to 403 for teacher workspaces" time="0.022108145">
+        </testcase>
+        <testcase classname="tests/unit/app/router.spec.ts" name="application router access contract &gt; blocks a student from refreshed HWK teacher deep links" time="0.002491516">
+        </testcase>
+        <testcase classname="tests/unit/app/router.spec.ts" name="application router access contract &gt; exposes the &apos;homework-manage&apos; HWK teacher route contract" time="0.008152589">
+        </testcase>
+        <testcase classname="tests/unit/app/router.spec.ts" name="application router access contract &gt; exposes the &apos;homework-create&apos; HWK teacher route contract" time="0.008427102">
+        </testcase>
+        <testcase classname="tests/unit/app/router.spec.ts" name="application router access contract &gt; exposes the &apos;homework-manage-detail&apos; HWK teacher route contract" time="0.048767778">
+        </testcase>
+        <testcase classname="tests/unit/app/router.spec.ts" name="application router access contract &gt; exposes the &apos;homework-edit&apos; HWK teacher route contract" time="0.002331362">
+        </testcase>
+        <testcase classname="tests/unit/app/router.spec.ts" name="application router access contract &gt; exposes the &apos;homework-submission-workspace&apos; HWK teacher route contract" time="0.007543592">
+        </testcase>
+        <testcase classname="tests/unit/app/router.spec.ts" name="application router access contract &gt; exposes the &apos;homework-submission-review&apos; HWK teacher route contract" time="0.034135965">
+        </testcase>
+        <testcase classname="tests/unit/app/router.spec.ts" name="application router access contract &gt; exposes the &apos;homework-statistics&apos; HWK teacher route contract" time="0.009824999">
+        </testcase>
+        <testcase classname="tests/unit/app/router.spec.ts" name="application router access contract &gt; restores the HWK statistics follow-up page from a refreshed deep link" time="0.002036928">
+        </testcase>
+        <testcase classname="tests/unit/app/router.spec.ts" name="application router access contract &gt; ignores unsupported HWK statistics attention values on refresh" time="0.00291372">
+        </testcase>
+        <testcase classname="tests/unit/app/router.spec.ts" name="application router access contract &gt; restores HWK statistics attention and page props across browser history" time="0.104662269">
+        </testcase>
+        <testcase classname="tests/unit/app/router.spec.ts" name="application router access contract &gt; blocks a student from refreshed HWK attention deep link /courses/42/homeworks/9/manage/statistics?attention=REVIEW_PENDING&amp;page=2" time="0.002882282">
+        </testcase>
+        <testcase classname="tests/unit/app/router.spec.ts" name="application router access contract &gt; blocks a student from refreshed HWK attention deep link /courses/42/homeworks/9/manage/submissions?attention=EVALUATION_PENDING&amp;page=2" time="0.001868284">
+        </testcase>
+        <testcase classname="tests/unit/app/router.spec.ts" name="application router access contract &gt; routes a non-member course visit to 403" time="0.004707865">
+        </testcase>
+        <testcase classname="tests/unit/app/router.spec.ts" name="application router access contract &gt; routes an invalid session and an unknown location to explicit status pages" time="0.006646297">
+        </testcase>
+        <testcase classname="tests/unit/app/router.spec.ts" name="application router access contract &gt; preserves the HTTP login redirect for a first-time visitor without a token" time="0.037070009">
+        </testcase>
+        <testcase classname="tests/unit/app/router.spec.ts" name="application router access contract &gt; redirects legacy grade links into the formal route tree and drops role" time="0.066898964">
+        </testcase>
+        <testcase classname="tests/unit/app/router.spec.ts" name="application router access contract &gt; preserves formal deep links across history traversal and a recreated router" time="0.179804017">
+        </testcase>
+        <testcase classname="tests/unit/app/router.spec.ts" name="application router access contract &gt; keeps the current page title when an unsaved-draft guard cancels navigation" time="0.002245688">
+        </testcase>
+        <testcase classname="tests/unit/app/router.spec.ts" name="application router access contract &gt; exposes distinct homework detail, submit, latest-result and historic-result route contracts" time="0.02159861">
+        </testcase>
+        <testcase classname="tests/unit/app/router.spec.ts" name="application router access contract &gt; exposes the &apos;detail&apos; LAB student route contract" time="0.0188585">
+        </testcase>
+        <testcase classname="tests/unit/app/router.spec.ts" name="application router access contract &gt; exposes the &apos;submit&apos; LAB student route contract" time="0.001134058">
+        </testcase>
+        <testcase classname="tests/unit/app/router.spec.ts" name="application router access contract &gt; exposes the &apos;latest result&apos; LAB student route contract" time="0.005028353">
+        </testcase>
+        <testcase classname="tests/unit/app/router.spec.ts" name="application router access contract &gt; exposes the &apos;historic result&apos; LAB student route contract" time="0.001126234">
+        </testcase>
+        <testcase classname="tests/unit/app/router.spec.ts" name="application router access contract &gt; redirects a course manager from the student latest-result route to submission management" time="0.001793522">
+        </testcase>
+        <testcase classname="tests/unit/app/router.spec.ts" name="application router access contract &gt; redirects a course manager from the legacy student submission-history route to the review workspace" time="0.001656499">
+        </testcase>
+        <testcase classname="tests/unit/app/router.spec.ts" name="application router access contract &gt; redirects a course manager from the latest LAB student-result route to the submission workspace" time="0.001729609">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/unit/auth/AuthAdminView.spec.ts" timestamp="2026-09-03T03:54:08.646Z" hostname="runnervmgx7h7" tests="1" failures="0" errors="0" skipped="0" time="0.234261812">
+        <testcase classname="tests/unit/auth/AuthAdminView.spec.ts" name="AuthAdminView &gt; renders admin user role and role permission management states backed by AUTH APIs" time="0.232212403">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/unit/auth/AuthProfileView.spec.ts" timestamp="2026-09-03T03:54:08.646Z" hostname="runnervmgx7h7" tests="3" failures="0" errors="0" skipped="0" time="0.123371216">
+        <testcase classname="tests/unit/auth/AuthProfileView.spec.ts" name="AuthProfileView &gt; loads current profile, updates contact information, and changes password" time="0.086714075">
+        </testcase>
+        <testcase classname="tests/unit/auth/AuthProfileView.spec.ts" name="AuthProfileView &gt; blocks mismatched password confirmation before calling the password api" time="0.026334634">
+        </testcase>
+        <testcase classname="tests/unit/auth/AuthProfileView.spec.ts" name="AuthProfileView &gt; presents the account security page without development markers and uses the shared glass style" time="0.008741709">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/unit/auth/AuthView.spec.ts" timestamp="2026-09-03T03:54:08.646Z" hostname="runnervmgx7h7" tests="4" failures="0" errors="0" skipped="0" time="0.102826423">
+        <testcase classname="tests/unit/auth/AuthView.spec.ts" name="AuthView &gt; logs in and shows the role landing entry with success feedback" time="0.061584258">
+        </testcase>
+        <testcase classname="tests/unit/auth/AuthView.spec.ts" name="AuthView &gt; uses the trusted &apos;ADMIN&apos; role to expose its real landing entry" time="0.010874177">
+        </testcase>
+        <testcase classname="tests/unit/auth/AuthView.spec.ts" name="AuthView &gt; uses the trusted &apos;STUDENT&apos; role to expose its real landing entry" time="0.009799524">
+        </testcase>
+        <testcase classname="tests/unit/auth/AuthView.spec.ts" name="AuthView &gt; switches to register mode and renders backend validation failures" time="0.019003519">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/unit/auth/authApi.spec.ts" timestamp="2026-09-03T03:54:08.647Z" hostname="runnervmgx7h7" tests="8" failures="0" errors="0" skipped="0" time="0.022516539">
+        <testcase classname="tests/unit/auth/authApi.spec.ts" name="AUTH API client &gt; clears cached user and course context together with persisted authentication" time="0.00402899">
+        </testcase>
+        <testcase classname="tests/unit/auth/authApi.spec.ts" name="AUTH API client &gt; registers users through the documented AUTH endpoint without requiring existing login state" time="0.004851292">
+        </testcase>
+        <testcase classname="tests/unit/auth/authApi.spec.ts" name="AUTH API client &gt; stores token and current user context after login then uses bearer auth for me and logout" time="0.002255404">
+        </testcase>
+        <testcase classname="tests/unit/auth/authApi.spec.ts" name="AUTH API client &gt; keeps auth calls stable when browser storage methods are unavailable in tests" time="0.001959522">
+        </testcase>
+        <testcase classname="tests/unit/auth/authApi.spec.ts" name="AUTH API client &gt; calls documented administrator role and permission endpoints with bearer authentication" time="0.003386734">
+        </testcase>
+        <testcase classname="tests/unit/auth/authApi.spec.ts" name="AUTH API client &gt; queries audit logs through API-AUTH-17 with documented filters" time="0.001751309">
+        </testcase>
+        <testcase classname="tests/unit/auth/authApi.spec.ts" name="AUTH API client &gt; checks platform permissions through API-AUTH-16 with bearer authentication" time="0.001213977">
+        </testcase>
+        <testcase classname="tests/unit/auth/authApi.spec.ts" name="AUTH API client &gt; calls documented profile and password endpoints with bearer authentication" time="0.001076881">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/unit/components/CourseContextNavigation.spec.ts" timestamp="2026-09-03T03:54:08.648Z" hostname="runnervmgx7h7" tests="1" failures="0" errors="0" skipped="0" time="0.035631628">
+        <testcase classname="tests/unit/components/CourseContextNavigation.spec.ts" name="CourseContextNavigation &gt; derives student and manager destinations from CRS course access instead of browser role storage" time="0.034110455">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/unit/components/FoundationComponents.spec.ts" timestamp="2026-09-03T03:54:08.648Z" hostname="runnervmgx7h7" tests="9" failures="0" errors="0" skipped="0" time="0.138714083">
+        <testcase classname="tests/unit/components/FoundationComponents.spec.ts" name="foundation display components &gt; renders a semantic page heading with context, metadata, and primary actions" time="0.055009667">
+        </testcase>
+        <testcase classname="tests/unit/components/FoundationComponents.spec.ts" name="foundation display components &gt; renders summary display models as a semantic description list and supports item slots" time="0.010735679">
+        </testcase>
+        <testcase classname="tests/unit/components/FoundationComponents.spec.ts" name="foundation display components &gt; announces page states and exposes an explicit retry interaction for recoverable errors" time="0.01190095">
+        </testcase>
+        <testcase classname="tests/unit/components/FoundationComponents.spec.ts" name="foundation display components &gt; marks loading states as busy without turning non-live badges into alerts" time="0.005353435">
+        </testcase>
+        <testcase classname="tests/unit/components/FoundationComponents.spec.ts" name="foundation display components &gt; updates search and select fields through an immutable filter display model" time="0.013970361">
+        </testcase>
+        <testcase classname="tests/unit/components/FoundationComponents.spec.ts" name="foundation display components &gt; supports custom filter actions without imposing domain behavior" time="0.00427313">
+        </testcase>
+        <testcase classname="tests/unit/components/FoundationComponents.spec.ts" name="foundation display components &gt; renders a semantic desktop table and a default mobile card view from display rows" time="0.013697637">
+        </testcase>
+        <testcase classname="tests/unit/components/FoundationComponents.spec.ts" name="foundation display components &gt; lets consumers replace a mobile row with a purpose-built card and renders an accessible empty state" time="0.019384649">
+        </testcase>
+        <testcase classname="tests/unit/components/FoundationComponents.spec.ts" name="foundation display components &gt; keeps the shared layer domain-free and defines the 390px responsive layout in scoped styles" time="0.001559068">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/unit/components/PlatformNav.spec.ts" timestamp="2026-09-03T03:54:08.649Z" hostname="runnervmgx7h7" tests="3" failures="0" errors="0" skipped="0" time="0.087977508">
+        <testcase classname="tests/unit/components/PlatformNav.spec.ts" name="PlatformNav &gt; derives the AUTH administration entry from the current runtime user roles" time="0.059833208">
+        </testcase>
+        <testcase classname="tests/unit/components/PlatformNav.spec.ts" name="PlatformNav &gt; keeps notification and logout labels complete in the compact mobile navigation" time="0.018853884">
+        </testcase>
+        <testcase classname="tests/unit/components/PlatformNav.spec.ts" name="PlatformNav &gt; shows the shared unread count beside the notification entry" time="0.007471587">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/unit/components/PlatformNavigationBar.spec.ts" timestamp="2026-09-03T03:54:08.650Z" hostname="runnervmgx7h7" tests="8" failures="0" errors="0" skipped="0" time="0.21805639">
+        <testcase classname="tests/unit/components/PlatformNavigationBar.spec.ts" name="PlatformNavigationBar &gt; renders the unread notification badge from the shared state" time="0.07923977">
+        </testcase>
+        <testcase classname="tests/unit/components/PlatformNavigationBar.spec.ts" name="PlatformNavigationBar &gt; lets users pick a background image from the fixed image set" time="0.045622885">
+        </testcase>
+        <testcase classname="tests/unit/components/PlatformNavigationBar.spec.ts" name="PlatformNavigationBar &gt; applies and clears the live video background mode when users switch themes" time="0.026545117">
+        </testcase>
+        <testcase classname="tests/unit/components/PlatformNavigationBar.spec.ts" name="PlatformNavigationBar &gt; renders navigation when browser storage is unavailable" time="0.006138126">
+        </testcase>
+        <testcase classname="tests/unit/components/PlatformNavigationBar.spec.ts" name="PlatformNavigationBar &gt; logs out from the global navigation once, clears the route, and returns to login" time="0.008595722">
+        </testcase>
+        <testcase classname="tests/unit/components/PlatformNavigationBar.spec.ts" name="PlatformNavigationBar &gt; renders the theme menu as a dropdown grid" time="0.023053783">
+        </testcase>
+        <testcase classname="tests/unit/components/PlatformNavigationBar.spec.ts" name="PlatformNavigationBar &gt; positions the theme menu below the final navbar bottom during entrance animation" time="0.013256501">
+        </testcase>
+        <testcase classname="tests/unit/components/PlatformNavigationBar.spec.ts" name="PlatformNavigationBar &gt; keeps video previews on metadata preload to avoid eager theme asset downloads" time="0.010004973">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/unit/grd/App.spec.ts" timestamp="2026-09-03T03:54:08.651Z" hostname="runnervmgx7h7" tests="7" failures="0" errors="0" skipped="0" time="0.282405157">
+        <testcase classname="tests/unit/grd/App.spec.ts" name="App routed shell integration &gt; renders the platform shell and course center on the root route" time="0.102811147">
+        </testcase>
+        <testcase classname="tests/unit/grd/App.spec.ts" name="App routed shell integration &gt; renders a role-free course shell and the student LAB task list from CRS access" time="0.071046435">
+        </testcase>
+        <testcase classname="tests/unit/grd/App.spec.ts" name="App routed shell integration &gt; renders the dedicated teacher LAB submission workspace for a CRS manager" time="0.045782737">
+        </testcase>
+        <testcase classname="tests/unit/grd/App.spec.ts" name="App routed shell integration &gt; renders 403 instead of a teacher workspace for a course member without manage access" time="0.017157658">
+        </testcase>
+        <testcase classname="tests/unit/grd/App.spec.ts" name="App routed shell integration &gt; renders an explicit not-found page for unknown URLs" time="0.011221956">
+        </testcase>
+        <testcase classname="tests/unit/grd/App.spec.ts" name="App routed shell integration &gt; lets API auth failures hand navigation back to Vue Router" time="0.018342705">
+        </testcase>
+        <testcase classname="tests/unit/grd/App.spec.ts" name="App routed shell integration &gt; navigates public routes to the account status page when the API auth failure event is dispatched" time="0.014185227">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/unit/grd/GradeItemConfigView.spec.ts" timestamp="2026-09-03T03:54:08.651Z" hostname="runnervmgx7h7" tests="7" failures="0" errors="0" skipped="0" time="0.217093264">
+        <testcase classname="tests/unit/grd/GradeItemConfigView.spec.ts" name="GradeItemConfigView &gt; creates a LAB grade item and refreshes the visible item list" time="0.10129507">
+        </testcase>
+        <testcase classname="tests/unit/grd/GradeItemConfigView.spec.ts" name="GradeItemConfigView &gt; keeps invalid score rules on the page and shows validation feedback" time="0.019786549">
+        </testcase>
+        <testcase classname="tests/unit/grd/GradeItemConfigView.spec.ts" name="GradeItemConfigView &gt; requires a real LAB or HWK task selection instead of a numeric source id" time="0.035758947">
+        </testcase>
+        <testcase classname="tests/unit/grd/GradeItemConfigView.spec.ts" name="GradeItemConfigView &gt; keeps OTHER_COURSE_ITEM source nullable and explains that no task is required" time="0.018474981">
+        </testcase>
+        <testcase classname="tests/unit/grd/GradeItemConfigView.spec.ts" name="GradeItemConfigView &gt; uses PageState for source-list failures and retries the complete page data load" time="0.010254127">
+        </testcase>
+        <testcase classname="tests/unit/grd/GradeItemConfigView.spec.ts" name="GradeItemConfigView &gt; uses documented APIs to update, delete, and validate grade rules" time="0.028229539">
+        </testcase>
+        <testcase classname="tests/unit/grd/GradeItemConfigView.spec.ts" name="GradeItemConfigView &gt; maps every visible GRD enum family and keeps unknown values user friendly" time="0.001049961">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/unit/grd/TeacherGradeTableView.spec.ts" timestamp="2026-09-03T03:54:08.652Z" hostname="runnervmgx7h7" tests="15" failures="0" errors="0" skipped="0" time="0.600974655">
+        <testcase classname="tests/unit/grd/TeacherGradeTableView.spec.ts" name="TeacherGradeTableView &gt; syncs source grades and renders calculated final score and incomplete status" time="0.091911368">
+        </testcase>
+        <testcase classname="tests/unit/grd/TeacherGradeTableView.spec.ts" name="TeacherGradeTableView &gt; queries the grade table with filters and page navigation" time="0.053200379">
+        </testcase>
+        <testcase classname="tests/unit/grd/TeacherGradeTableView.spec.ts" name="TeacherGradeTableView &gt; shows student details, submits a reasoned grade adjustment, and renders change logs" time="0.097159606">
+        </testcase>
+        <testcase classname="tests/unit/grd/TeacherGradeTableView.spec.ts" name="TeacherGradeTableView &gt; clears stale student detail controls when a refreshed grade-table request fails" time="0.028048181">
+        </testcase>
+        <testcase classname="tests/unit/grd/TeacherGradeTableView.spec.ts" name="TeacherGradeTableView &gt; submits a reasoned final-score adjustment from the student detail panel" time="0.067762058">
+        </testcase>
+        <testcase classname="tests/unit/grd/TeacherGradeTableView.spec.ts" name="TeacherGradeTableView &gt; publishes selected student grades and renders the publish record" time="0.029227443">
+        </testcase>
+        <testcase classname="tests/unit/grd/TeacherGradeTableView.spec.ts" name="TeacherGradeTableView &gt; loads publish records when the grade table first renders" time="0.012488496">
+        </testcase>
+        <testcase classname="tests/unit/grd/TeacherGradeTableView.spec.ts" name="TeacherGradeTableView &gt; renders course grade analysis and refreshes a selected grade item analysis" time="0.039029883">
+        </testcase>
+        <testcase classname="tests/unit/grd/TeacherGradeTableView.spec.ts" name="TeacherGradeTableView &gt; shows an explicit empty analysis state without fabricated zero percentages" time="0.010625199">
+        </testcase>
+        <testcase classname="tests/unit/grd/TeacherGradeTableView.spec.ts" name="TeacherGradeTableView &gt; clears stale metrics and shows API errors for invalid items, forbidden access, and expired sessions" time="0.033597958">
+        </testcase>
+        <testcase classname="tests/unit/grd/TeacherGradeTableView.spec.ts" name="TeacherGradeTableView &gt; ignores late responses after switching grade items" time="0.025980815">
+        </testcase>
+        <testcase classname="tests/unit/grd/TeacherGradeTableView.spec.ts" name="TeacherGradeTableView &gt; reloads analysis for a new course and ignores the previous course response" time="0.034969112">
+        </testcase>
+        <testcase classname="tests/unit/grd/TeacherGradeTableView.spec.ts" name="TeacherGradeTableView &gt; keeps the new course grade items when the previous course list arrives late" time="0.03205997">
+        </testcase>
+        <testcase classname="tests/unit/grd/TeacherGradeTableView.spec.ts" name="TeacherGradeTableView &gt; filters grade review requests by approved status and renders processed results without action buttons" time="0.019061531">
+        </testcase>
+        <testcase classname="tests/unit/grd/TeacherGradeTableView.spec.ts" name="TeacherGradeTableView &gt; loads pending grade review requests and lets the teacher process one" time="0.02043367">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/unit/grd/gradeItemsApi.spec.ts" timestamp="2026-09-03T03:54:08.654Z" hostname="runnervmgx7h7" tests="2" failures="0" errors="0" skipped="0" time="0.020326105">
+        <testcase classname="tests/unit/grd/gradeItemsApi.spec.ts" name="gradeItems API client &gt; calls documented grade item endpoints with auth context supplied by the integration layer" time="0.005010233">
+        </testcase>
+        <testcase classname="tests/unit/grd/gradeItemsApi.spec.ts" name="gradeItems API client &gt; fails fast when grade item auth context is not available" time="0.013850088">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/unit/grd/gradeRecordsApi.spec.ts" timestamp="2026-09-03T03:54:08.654Z" hostname="runnervmgx7h7" tests="6" failures="0" errors="0" skipped="0" time="0.016453239">
+        <testcase classname="tests/unit/grd/gradeRecordsApi.spec.ts" name="gradeRecords API client &gt; calls documented grade sync, recalculation, and table endpoints with teacher course auth" time="0.00712705">
+        </testcase>
+        <testcase classname="tests/unit/grd/gradeRecordsApi.spec.ts" name="gradeRecords API client &gt; calls documented grade adjustment and change log endpoints" time="0.001526371">
+        </testcase>
+        <testcase classname="tests/unit/grd/gradeRecordsApi.spec.ts" name="gradeRecords API client &gt; calls documented grade publish and publish record endpoints" time="0.00099255">
+        </testcase>
+        <testcase classname="tests/unit/grd/gradeRecordsApi.spec.ts" name="gradeRecords API client &gt; calls documented grade analysis endpoint with target filters" time="0.002764909">
+        </testcase>
+        <testcase classname="tests/unit/grd/gradeRecordsApi.spec.ts" name="gradeRecords API client &gt; calls documented grade item completion endpoint" time="0.001075854">
+        </testcase>
+        <testcase classname="tests/unit/grd/gradeRecordsApi.spec.ts" name="gradeRecords API client &gt; calls documented grade review request endpoints" time="0.00135176">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/unit/hwk/HomeworkEditorView.spec.ts" timestamp="2026-09-03T03:54:08.655Z" hostname="runnervmgx7h7" tests="15" failures="0" errors="0" skipped="0" time="0.651532474">
+        <testcase classname="tests/unit/hwk/HomeworkEditorView.spec.ts" name="HomeworkEditorView &gt; presents staged editing for all four homework types without raw JSON fields" time="0.066462256">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkEditorView.spec.ts" name="HomeworkEditorView &gt; creates a text draft, exposes pending state, then updates the created draft" time="0.053305283">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkEditorView.spec.ts" name="HomeworkEditorView &gt; ignores a save response after the route switches to another homework context" time="0.043271336">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkEditorView.spec.ts" name="HomeworkEditorView &gt; serializes structured objective options and answers into the existing DTO" time="0.078432381">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkEditorView.spec.ts" name="HomeworkEditorView &gt; serializes selected code languages and structured test cases into the existing DTO" time="0.036646198">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkEditorView.spec.ts" name="HomeworkEditorView &gt; blocks legacy unsupported code languages until the teacher explicitly removes them" time="0.047003546">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkEditorView.spec.ts" name="HomeworkEditorView &gt; preserves valid empty-output and zero-weight CODE test cases" time="0.074862713">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkEditorView.spec.ts" name="HomeworkEditorView &gt; loads an existing objective draft into structured controls and updates it" time="0.029086331">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkEditorView.spec.ts" name="HomeworkEditorView &gt; round-trips legacy object-shaped objective options without exposing JSON controls" time="0.019156422">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkEditorView.spec.ts" name="HomeworkEditorView &gt; hydrates JUDGE and TRUE_FALSE drafts and serializes both with the canonical TRUE_FALSE type" time="0.018357253">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkEditorView.spec.ts" name="HomeworkEditorView &gt; reports field-level validation errors and keeps invalid input visible" time="0.048711844">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkEditorView.spec.ts" name="HomeworkEditorView &gt; rejects decimal values for integer API fields before sending a request" time="0.02746838">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkEditorView.spec.ts" name="HomeworkEditorView &gt; preserves every field when saving fails and restores the save action" time="0.056336959">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkEditorView.spec.ts" name="HomeworkEditorView &gt; auto-saves unsaved editor input and restores the fresh local draft on re-entry" time="0.036544977">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkEditorView.spec.ts" name="HomeworkEditorView &gt; saves locally and asks for confirmation before leaving with server-unsaved changes" time="0.013436295">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/unit/hwk/HomeworkManageView.spec.ts" timestamp="2026-09-03T03:54:08.656Z" hostname="runnervmgx7h7" tests="5" failures="0" errors="0" skipped="0" time="0.168609702">
+        <testcase classname="tests/unit/hwk/HomeworkManageView.spec.ts" name="HomeworkManageView &gt; shows one homework context with localized configuration, submission metrics, and deep links" time="0.081512193">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkManageView.spec.ts" name="HomeworkManageView &gt; keeps the management context usable when statistics are temporarily unavailable" time="0.024337209">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkManageView.spec.ts" name="HomeworkManageView &gt; does not expose the draft editor for a NOT_OPEN legacy state" time="0.011453974">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkManageView.spec.ts" name="HomeworkManageView &gt; does not show an obsolete publication blocker for a FILE draft" time="0.015725533">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkManageView.spec.ts" name="HomeworkManageView &gt; renders a recoverable context error and does not request statistics until detail succeeds" time="0.033727273">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/unit/hwk/HomeworkStatisticsView.spec.ts" timestamp="2026-09-03T03:54:08.657Z" hostname="runnervmgx7h7" tests="12" failures="0" errors="0" skipped="0" time="0.506518353">
+        <testcase classname="tests/unit/hwk/HomeworkStatisticsView.spec.ts" name="HomeworkStatisticsView &gt; renders the authoritative evaluation metrics, accessible five buckets, and named follow-up students" time="0.12518527">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkStatisticsView.spec.ts" name="HomeworkStatisticsView &gt; keeps metrics usable when names fail and never exposes internal student ids" time="0.022557869">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkStatisticsView.spec.ts" name="HomeworkStatisticsView &gt; renders evaluation completion as not applicable when TEXT has no auto-evaluable submissions" time="0.029566491">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkStatisticsView.spec.ts" name="HomeworkStatisticsView &gt; renders evaluation completion as not applicable when FILE has no auto-evaluable submissions" time="0.03638614">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkStatisticsView.spec.ts" name="HomeworkStatisticsView &gt; filters synthetic LRN student labels without exposing the embedded student id" time="0.037194862">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkStatisticsView.spec.ts" name="HomeworkStatisticsView &gt; exposes three count-backed follow-up links and attention-aware queue deep links" time="0.025171521">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkStatisticsView.spec.ts" name="HomeworkStatisticsView &gt; restores an evaluation-attention deep link with independent pagination and privacy-safe names" time="0.065923547">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkStatisticsView.spec.ts" name="HomeworkStatisticsView &gt; pushes user pagination into history while preserving the active attention query" time="0.035267332">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkStatisticsView.spec.ts" name="HomeworkStatisticsView &gt; shows a recoverable ownership error and reloads all dependencies" time="0.027560093">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkStatisticsView.spec.ts" name="HomeworkStatisticsView &gt; paginates the unsubmitted list with the API-provided page contract" time="0.037163386">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkStatisticsView.spec.ts" name="HomeworkStatisticsView &gt; loads the follow-up page restored from the statistics deep link" time="0.025205683">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkStatisticsView.spec.ts" name="HomeworkStatisticsView &gt; recovers to the last valid page when the unsubmitted total shrinks" time="0.035769422">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/unit/hwk/HomeworkStudentListView.spec.ts" timestamp="2026-09-03T03:54:08.658Z" hostname="runnervmgx7h7" tests="5" failures="0" errors="0" skipped="0" time="0.24749588">
+        <testcase classname="tests/unit/hwk/HomeworkStudentListView.spec.ts" name="HomeworkStudentListView &gt; loads only student-visible homework into the shared responsive list and links to details" time="0.134258498">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkStudentListView.spec.ts" name="HomeworkStudentListView &gt; offers only persisted student-visible lifecycle statuses as server filters" time="0.014415248">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkStudentListView.spec.ts" name="HomeworkStudentListView &gt; submits keyword, lifecycle status and page size to the server and keeps them while paging" time="0.056940587">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkStudentListView.spec.ts" name="HomeworkStudentListView &gt; retries the same server query after a list request fails" time="0.02568783">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkStudentListView.spec.ts" name="HomeworkStudentListView &gt; renders a shared empty state when no homework is visible" time="0.013516706">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/unit/hwk/HomeworkStudentView.spec.ts" timestamp="2026-09-03T03:54:08.659Z" hostname="runnervmgx7h7" tests="46" failures="0" errors="0" skipped="0" time="1.152075169">
+        <testcase classname="tests/unit/hwk/HomeworkStudentView.spec.ts" name="HomeworkStudentView &gt; loads published homework detail and submits a text answer" time="0.08919795">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkStudentView.spec.ts" name="HomeworkStudentView &gt; restores the latest submission and visible evaluation when reopening the homework" time="0.050951179">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkStudentView.spec.ts" name="HomeworkStudentView &gt; keeps evaluation and scores hidden until the homework permits result visibility" time="0.015638245">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkStudentView.spec.ts" name="HomeworkStudentView &gt; keeps published evaluation and final score visible after the homework is archived" time="0.015621749">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkStudentView.spec.ts" name="HomeworkStudentView &gt; blocks submission after the deadline when late submission is disabled" time="0.012599781">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkStudentView.spec.ts" name="HomeworkStudentView &gt; renders localized page loading and failure states" time="0.004806884">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkStudentView.spec.ts" name="HomeworkStudentView &gt; shows validation errors before sending an empty text submission" time="0.018493769">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkStudentView.spec.ts" name="HomeworkStudentView &gt; renders score published homework metadata with localized labels" time="0.014807222">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkStudentView.spec.ts" name="HomeworkStudentView &gt; renders objective homework options and submission fields without implementation labels" time="0.029468282">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkStudentView.spec.ts" name="HomeworkStudentView &gt; renders configured code languages and submits only the selected language" time="0.034944958">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkStudentView.spec.ts" name="HomeworkStudentView &gt; loads and displays the evaluation result after submitting code homework" time="0.0473331">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkStudentView.spec.ts" name="HomeworkStudentView &gt; submits the default language when code homework has a single configured language" time="0.019933452">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkStudentView.spec.ts" name="HomeworkStudentView &gt; records homework progress when a student opens and completes homework" time="0.025787796">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkStudentView.spec.ts" name="HomeworkStudentView &gt; shows the restored homework breakpoint from the resume query" time="0.020745401">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkStudentView.spec.ts" name="HomeworkStudentView &gt; keeps the detail route read-only and links every next step through the student flow" time="0.024513001">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkStudentView.spec.ts" name="HomeworkStudentView &gt; uses structured objective controls and serializes answers with stable question keys" time="0.033526414">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkStudentView.spec.ts" name="HomeworkStudentView &gt; renders boolean controls for both TRUE_FALSE and JUDGE objective question aliases" time="0.039964973">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkStudentView.spec.ts" name="HomeworkStudentView &gt; uses a real file picker and exposes the completed attachment upload workflow" time="0.031369061">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkStudentView.spec.ts" name="HomeworkStudentView &gt; uploads one FILE attachment and submits only the returned opaque file id" time="0.056042846">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkStudentView.spec.ts" name="HomeworkStudentView &gt; treats an uploaded but unsubmitted attachment as unsaved work when the tab closes" time="0.017042937">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkStudentView.spec.ts" name="HomeworkStudentView &gt; retains the selected File after upload failure and retries the same file" time="0.027985702">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkStudentView.spec.ts" name="HomeworkStudentView &gt; maps deterministic upload error HWK_4131 and requires a new file selection" time="0.016217833">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkStudentView.spec.ts" name="HomeworkStudentView &gt; maps deterministic upload error HWK_4151 and requires a new file selection" time="0.026788654">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkStudentView.spec.ts" name="HomeworkStudentView &gt; maps deterministic upload error HWK_4005 and requires a new file selection" time="0.020546614">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkStudentView.spec.ts" name="HomeworkStudentView &gt; shows the FILE constraints and rejects an oversized selection before upload" time="0.023972093">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkStudentView.spec.ts" name="HomeworkStudentView &gt; handles FILE submission attachment error HWK_4042 without unsafe DELETE" time="0.025231584">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkStudentView.spec.ts" name="HomeworkStudentView &gt; handles FILE submission attachment error HWK_4091 without unsafe DELETE" time="0.074969702">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkStudentView.spec.ts" name="HomeworkStudentView &gt; handles FILE submission attachment error HWK_4092 without unsafe DELETE" time="0.038059687">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkStudentView.spec.ts" name="HomeworkStudentView &gt; handles FILE submission attachment error HWK_5002 without unsafe DELETE" time="0.016337554">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkStudentView.spec.ts" name="HomeworkStudentView &gt; expires an uploaded attachment in place without attempting DELETE" time="0.025948345">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkStudentView.spec.ts" name="HomeworkStudentView &gt; clears a server-gone upload after one failed DELETE so removal cannot loop" time="0.014357734">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkStudentView.spec.ts" name="HomeworkStudentView &gt; removes an unbound upload through the server before clearing local metadata" time="0.024864306">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkStudentView.spec.ts" name="HomeworkStudentView &gt; restores only safe upload metadata after a server GET revalidation" time="0.017050715">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkStudentView.spec.ts" name="HomeworkStudentView &gt; forgets a restored file id when server revalidation rejects it" time="0.010734195">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkStudentView.spec.ts" name="HomeworkStudentView &gt; preserves restored file metadata when server revalidation has a retryable storage failure" time="0.008610124">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkStudentView.spec.ts" name="HomeworkStudentView &gt; restores a fresh draft and preserves it when submission fails" time="0.010410384">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkStudentView.spec.ts" name="HomeworkStudentView &gt; auto-saves edited text after 500ms and clears the draft only after a successful submission" time="0.021594589">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkStudentView.spec.ts" name="HomeworkStudentView &gt; offers a retry action when loading the homework detail fails" time="0.023826617">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkStudentView.spec.ts" name="HomeworkStudentView &gt; restores the draft when the router reuses the detail component for the submit route" time="0.010416956">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkStudentView.spec.ts" name="HomeworkStudentView &gt; removes the unload guard when a reused component leaves submit mode" time="0.010761921">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkStudentView.spec.ts" name="HomeworkStudentView &gt; reloads the homework when a reused route changes its homework id" time="0.011232014">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkStudentView.spec.ts" name="HomeworkStudentView &gt; ignores a stale evaluation response after route reuse loads another homework and submission" time="0.016416938">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkStudentView.spec.ts" name="HomeworkStudentView &gt; ignores a stale submit response after route reuse switches to another homework" time="0.016521435">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkStudentView.spec.ts" name="HomeworkStudentView &gt; clears only the submitted FILE upload metadata when its success response arrives after route reuse" time="0.020646118">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkStudentView.spec.ts" name="HomeworkStudentView &gt; invalidates a pending submit when the same homework leaves and re-enters submit mode" time="0.020518889">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkStudentView.spec.ts" name="HomeworkStudentView &gt; keeps a newer submit busy when an older request finishes on the same editor generation" time="0.012549399">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/unit/hwk/HomeworkSubmissionHistoryView.spec.ts" timestamp="2026-09-03T03:54:08.664Z" hostname="runnervmgx7h7" tests="15" failures="0" errors="0" skipped="0" time="0.587331845">
+        <testcase classname="tests/unit/hwk/HomeworkSubmissionHistoryView.spec.ts" name="HomeworkSubmissionHistoryView &gt; loads student history and marks the current effective submission" time="0.124050771">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkSubmissionHistoryView.spec.ts" name="HomeworkSubmissionHistoryView &gt; shows safe FILE metadata and downloads the selected student version through the blob endpoint" time="0.048382413">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkSubmissionHistoryView.spec.ts" name="HomeworkSubmissionHistoryView &gt; sorts student submissions newest first and keeps latest and effective markers independent" time="0.072766725">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkSubmissionHistoryView.spec.ts" name="HomeworkSubmissionHistoryView &gt; shows a retryable student error state and reloads the real history API" time="0.035489737">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkSubmissionHistoryView.spec.ts" name="HomeworkSubmissionHistoryView &gt; 将学生客观题的&apos;对象形式&apos;提交显示为可读答案而不暴露原始存储内容" time="0.027336729">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkSubmissionHistoryView.spec.ts" name="HomeworkSubmissionHistoryView &gt; 将学生客观题的&apos;数组形式&apos;提交显示为可读答案而不暴露原始存储内容" time="0.031229964">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkSubmissionHistoryView.spec.ts" name="HomeworkSubmissionHistoryView &gt; 将学生客观题的&apos;无法解析的历史数据&apos;提交显示为可读答案而不暴露原始存储内容" time="0.041891438">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkSubmissionHistoryView.spec.ts" name="HomeworkSubmissionHistoryView &gt; 在路由复用到新作业时重载并忽略旧列表的迟到响应" time="0.024423025">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkSubmissionHistoryView.spec.ts" name="HomeworkSubmissionHistoryView &gt; 课程或角色变化时清空分页与选中详情并按新权限上下文重载" time="0.046557496">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkSubmissionHistoryView.spec.ts" name="HomeworkSubmissionHistoryView &gt; loads teacher submission history with pagination" time="0.024586826">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkSubmissionHistoryView.spec.ts" name="HomeworkSubmissionHistoryView &gt; lets a teacher review a submission and refreshes review logs" time="0.038968369">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkSubmissionHistoryView.spec.ts" name="HomeworkSubmissionHistoryView &gt; lets a teacher trigger reevaluation and refreshes review logs" time="0.022224442">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkSubmissionHistoryView.spec.ts" name="HomeworkSubmissionHistoryView &gt; passes teacher submission filters to the history API" time="0.016565672">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkSubmissionHistoryView.spec.ts" name="HomeworkSubmissionHistoryView &gt; renders history filters and detail statuses with business labels" time="0.017232014">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkSubmissionHistoryView.spec.ts" name="HomeworkSubmissionHistoryView &gt; shows an empty state when there is no submission history" time="0.01317156">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/unit/hwk/HomeworkSubmissionResultView.spec.ts" timestamp="2026-09-03T03:54:08.666Z" hostname="runnervmgx7h7" tests="14" failures="0" errors="0" skipped="0" time="0.297631064">
+        <testcase classname="tests/unit/hwk/HomeworkSubmissionResultView.spec.ts" name="HomeworkSubmissionResultView &gt; selects the latest submission by submitted time and id and shows published scoring details" time="0.083127209">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkSubmissionResultView.spec.ts" name="HomeworkSubmissionResultView &gt; treats version as the authoritative latest-submission order before time and id" time="0.026016183">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkSubmissionResultView.spec.ts" name="HomeworkSubmissionResultView &gt; does not request or reveal evaluation and final review before the visibility policy permits it" time="0.012800174">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkSubmissionResultView.spec.ts" name="HomeworkSubmissionResultView &gt; keeps evaluation and published review visible after the homework is archived" time="0.016678644">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkSubmissionResultView.spec.ts" name="HomeworkSubmissionResultView &gt; loads an explicitly selected historic submission without replacing it with the latest version" time="0.015754837">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkSubmissionResultView.spec.ts" name="HomeworkSubmissionResultView &gt; reloads the result when navigation reuses the component for another submission" time="0.035336898">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkSubmissionResultView.spec.ts" name="HomeworkSubmissionResultView &gt; shows an empty state when the latest-result route has no submissions" time="0.008116482">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkSubmissionResultView.spec.ts" name="HomeworkSubmissionResultView &gt; retries a failed page load and renders forbidden failures explicitly" time="0.016768389">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkSubmissionResultView.spec.ts" name="HomeworkSubmissionResultView &gt; classifies the English access failure &quot;course access denied&quot; as forbidden" time="0.004327941">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkSubmissionResultView.spec.ts" name="HomeworkSubmissionResultView &gt; classifies the English access failure &quot;permission denied&quot; as forbidden" time="0.003724421">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkSubmissionResultView.spec.ts" name="HomeworkSubmissionResultView &gt; polls pending evaluations until a terminal result and stops after the component unmounts" time="0.022409576">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkSubmissionResultView.spec.ts" name="HomeworkSubmissionResultView &gt; does not let an older automatic-poll response overwrite a newer manual terminal result" time="0.025357009">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkSubmissionResultView.spec.ts" name="HomeworkSubmissionResultView &gt; cancels a scheduled pending-result poll when leaving the page" time="0.011597098">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkSubmissionResultView.spec.ts" name="HomeworkSubmissionResultView &gt; pauses automatic polling after three network failures and allows a manual recovery" time="0.013781632">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/unit/hwk/HomeworkSubmissionReviewView.spec.ts" timestamp="2026-09-03T03:54:08.667Z" hostname="runnervmgx7h7" tests="24" failures="0" errors="0" skipped="0" time="0.88635783">
+        <testcase classname="tests/unit/hwk/HomeworkSubmissionReviewView.spec.ts" name="HomeworkSubmissionReviewView &gt; loads one review with course, homework, student, version, evaluation, scores, and audit logs" time="0.112666534">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkSubmissionReviewView.spec.ts" name="HomeworkSubmissionReviewView &gt; returns to the queue with the opaque student reference and strips internal student query fields" time="0.028403333">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkSubmissionReviewView.spec.ts" name="HomeworkSubmissionReviewView &gt; drops unsupported attention values from the safe queue return link" time="0.018213504">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkSubmissionReviewView.spec.ts" name="HomeworkSubmissionReviewView &gt; renders &apos;TEXT&apos; answers as teacher-readable content without raw transport data" time="0.01683075">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkSubmissionReviewView.spec.ts" name="HomeworkSubmissionReviewView &gt; renders &apos;OBJECTIVE&apos; answers as teacher-readable content without raw transport data" time="0.044522422">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkSubmissionReviewView.spec.ts" name="HomeworkSubmissionReviewView &gt; renders &apos;FILE&apos; answers as teacher-readable content without raw transport data" time="0.014139019">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkSubmissionReviewView.spec.ts" name="HomeworkSubmissionReviewView &gt; downloads a FILE submission from safe metadata through the controlled teacher blob route" time="0.021119296">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkSubmissionReviewView.spec.ts" name="HomeworkSubmissionReviewView &gt; degrades only the student name when LRN fails and never leaks the student identifier" time="0.035293295">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkSubmissionReviewView.spec.ts" name="HomeworkSubmissionReviewView &gt; hides the LRN fallback label when it embeds the internal student identifier" time="0.015582561">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkSubmissionReviewView.spec.ts" name="HomeworkSubmissionReviewView &gt; hides a pure numeric LRN fallback from the title and confirmation copy" time="0.018336073">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkSubmissionReviewView.spec.ts" name="HomeworkSubmissionReviewView &gt; refreshes submission status, scores, and review form after GET evaluation completes a pending judge" time="0.034406402">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkSubmissionReviewView.spec.ts" name="HomeworkSubmissionReviewView &gt; keeps &apos;历史版本&apos; read-only and exposes no review or re-evaluation mutation form" time="0.050236117">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkSubmissionReviewView.spec.ts" name="HomeworkSubmissionReviewView &gt; keeps &apos;已归档作业&apos; read-only and exposes no review or re-evaluation mutation form" time="0.016460044">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkSubmissionReviewView.spec.ts" name="HomeworkSubmissionReviewView &gt; requires a review reason and confirmation, exposes pending state, then refreshes the audit log" time="0.048470115">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkSubmissionReviewView.spec.ts" name="HomeworkSubmissionReviewView &gt; retains review input and enables retry after a confirmed save fails" time="0.070849536">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkSubmissionReviewView.spec.ts" name="HomeworkSubmissionReviewView &gt; requires a rejudge reason and confirmation, exposes pending state, and refreshes the same version" time="0.0428503">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkSubmissionReviewView.spec.ts" name="HomeworkSubmissionReviewView &gt; retains the rejudge reason and review content when reevaluation fails" time="0.020136894">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkSubmissionReviewView.spec.ts" name="HomeworkSubmissionReviewView &gt; blocks reevaluation while a review mutation is pending" time="0.035578438">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkSubmissionReviewView.spec.ts" name="HomeworkSubmissionReviewView &gt; blocks review while a re-evaluation mutation is pending" time="0.039999582">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkSubmissionReviewView.spec.ts" name="HomeworkSubmissionReviewView &gt; resets a pending review and old re-evaluation reason when route props switch submissions" time="0.053299332">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkSubmissionReviewView.spec.ts" name="HomeworkSubmissionReviewView &gt; resets a pending re-evaluation when route props switch submissions" time="0.051147233">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkSubmissionReviewView.spec.ts" name="HomeworkSubmissionReviewView &gt; reports a successful re-evaluation with a failed page refresh as partial success and blocks repeat submission" time="0.03899813">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkSubmissionReviewView.spec.ts" name="HomeworkSubmissionReviewView &gt; shows a recoverable core error and retries the required review data" time="0.055198503">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkSubmissionReviewView.spec.ts" name="HomeworkSubmissionReviewView &gt; collapses the review grid to one column on phones" time="0.001152814">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/unit/hwk/HomeworkSubmissionWorkspaceView.spec.ts" timestamp="2026-09-03T03:54:08.670Z" hostname="runnervmgx7h7" tests="22" failures="0" errors="0" skipped="0" time="1.115411913">
+        <testcase classname="tests/unit/hwk/HomeworkSubmissionWorkspaceView.spec.ts" name="HomeworkSubmissionWorkspaceView &gt; loads the homework queue with resolved names, localized states, versions, and safe deep links" time="0.14137008">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkSubmissionWorkspaceView.spec.ts" name="HomeworkSubmissionWorkspaceView &gt; paginates and applies only supported status filters while preserving them in review links" time="0.094575662">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkSubmissionWorkspaceView.spec.ts" name="HomeworkSubmissionWorkspaceView &gt; restores an attention queue deep link and preserves it through review without leaking roster ids" time="0.050962718">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkSubmissionWorkspaceView.spec.ts" name="HomeworkSubmissionWorkspaceView &gt; adds user-selected attention filters to browser history and restores them on back" time="0.088225325">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkSubmissionWorkspaceView.spec.ts" name="HomeworkSubmissionWorkspaceView &gt; filters by a roster identity while exposing only its name and opaque reference in the URL" time="0.07470707">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkSubmissionWorkspaceView.spec.ts" name="HomeworkSubmissionWorkspaceView &gt; collects every fuzzy candidate page, keeps only the exact student, and paginates the exact versions locally" time="0.187648777">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkSubmissionWorkspaceView.spec.ts" name="HomeworkSubmissionWorkspaceView &gt; restores the same student by stable opaque reference after same-name roster insertions" time="0.026021864">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkSubmissionWorkspaceView.spec.ts" name="HomeworkSubmissionWorkspaceView &gt; blocks an expired name filter instead of silently loading the unfiltered queue" time="0.041443459">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkSubmissionWorkspaceView.spec.ts" name="HomeworkSubmissionWorkspaceView &gt; blocks an unresolved name filter when the roster fails, then restores it safely after retry" time="0.055473145">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkSubmissionWorkspaceView.spec.ts" name="HomeworkSubmissionWorkspaceView &gt; hides the roster synthetic fallback name because it contains the raw student identifier" time="0.025784231">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkSubmissionWorkspaceView.spec.ts" name="HomeworkSubmissionWorkspaceView &gt; hides a pure numeric roster fallback name just like the statistics page" time="0.01505488">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkSubmissionWorkspaceView.spec.ts" name="HomeworkSubmissionWorkspaceView &gt; does not count NONE for text or file submissions as an evaluation still in progress" time="0.017191812">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkSubmissionWorkspaceView.spec.ts" name="HomeworkSubmissionWorkspaceView &gt; counts NONE for OBJECTIVE submissions as evaluation pending" time="0.026438912">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkSubmissionWorkspaceView.spec.ts" name="HomeworkSubmissionWorkspaceView &gt; counts NONE for CODE submissions as evaluation pending" time="0.015550932">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkSubmissionWorkspaceView.spec.ts" name="HomeworkSubmissionWorkspaceView &gt; invalidates an old queue response as soon as homework props switch" time="0.031694349">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkSubmissionWorkspaceView.spec.ts" name="HomeworkSubmissionWorkspaceView &gt; invalidates an in-flight fuzzy candidate page before it can write into switched homework" time="0.061928218">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkSubmissionWorkspaceView.spec.ts" name="HomeworkSubmissionWorkspaceView &gt; invalidates old homework and roster responses before they can start a queue for switched props" time="0.033346964">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkSubmissionWorkspaceView.spec.ts" name="HomeworkSubmissionWorkspaceView &gt; recovers an out-of-range deep-linked page to the last real page" time="0.014644371">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkSubmissionWorkspaceView.spec.ts" name="HomeworkSubmissionWorkspaceView &gt; restores the safe student name and status filters on refresh and browser back navigation" time="0.08752488">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkSubmissionWorkspaceView.spec.ts" name="HomeworkSubmissionWorkspaceView &gt; shows loading, retryable queue errors, and an explicit empty state" time="0.014268362">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkSubmissionWorkspaceView.spec.ts" name="HomeworkSubmissionWorkspaceView &gt; rejects homework context mismatches without rendering submission data" time="0.007919023">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkSubmissionWorkspaceView.spec.ts" name="HomeworkSubmissionWorkspaceView &gt; keeps a single-column submission list at phone width" time="0.00065518">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/unit/hwk/HomeworkTeacherView.spec.ts" timestamp="2026-09-03T03:54:08.672Z" hostname="runnervmgx7h7" tests="14" failures="0" errors="0" skipped="0" time="1.276961967">
+        <testcase classname="tests/unit/hwk/HomeworkTeacherView.spec.ts" name="HomeworkTeacherView &gt; starts with existing homework, localized lifecycle summaries, and teacher task routes" time="0.19125659">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkTeacherView.spec.ts" name="HomeworkTeacherView &gt; keeps only the draft attention filter and scopes it explicitly to the current server page" time="0.128877422">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkTeacherView.spec.ts" name="HomeworkTeacherView &gt; uses the paginated list contract so homework after the first page remains reachable" time="0.252436116">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkTeacherView.spec.ts" name="HomeworkTeacherView &gt; confirms lifecycle operations, prevents duplicate actions, and refreshes after success" time="0.131192137">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkTeacherView.spec.ts" name="HomeworkTeacherView &gt; keeps the homework row and action available after a lifecycle failure" time="0.040506292">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkTeacherView.spec.ts" name="HomeworkTeacherView &gt; cancels draft deletion without sending a request" time="0.034416566">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkTeacherView.spec.ts" name="HomeworkTeacherView &gt; deduplicates draft deletion, disables lifecycle actions, and refreshes after success" time="0.036768235">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkTeacherView.spec.ts" name="HomeworkTeacherView &gt; retains a draft after deletion failure and allows retry" time="0.032905224">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkTeacherView.spec.ts" name="HomeworkTeacherView &gt; falls back to the last valid page after deleting the final row" time="0.258422895">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkTeacherView.spec.ts" name="HomeworkTeacherView &gt; does not offer draft-only or released-only actions for a NOT_OPEN legacy state" time="0.033255899">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkTeacherView.spec.ts" name="HomeworkTeacherView &gt; does not offer draft deletion for an archived homework" time="0.029902879">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkTeacherView.spec.ts" name="HomeworkTeacherView &gt; publishes a FILE draft now that the secure attachment contract is available" time="0.029650738">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkTeacherView.spec.ts" name="HomeworkTeacherView &gt; blocks direct publication of a legacy CODE draft that still enables unsupported sandbox languages" time="0.031313284">
+        </testcase>
+        <testcase classname="tests/unit/hwk/HomeworkTeacherView.spec.ts" name="HomeworkTeacherView &gt; shows loading, recoverable failure, and an empty state with the create entry" time="0.043820582">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/unit/hwk/homeworksApi.spec.ts" timestamp="2026-09-03T03:54:08.674Z" hostname="runnervmgx7h7" tests="10" failures="0" errors="0" skipped="0" time="0.032393958">
+        <testcase classname="tests/unit/hwk/homeworksApi.spec.ts" name="homeworks api &gt; builds documented HWK01 routes and unwraps ApiResponse data" time="0.014456598">
+        </testcase>
+        <testcase classname="tests/unit/hwk/homeworksApi.spec.ts" name="homeworks api &gt; posts documented HWK02 student submissions and returns the receipt" time="0.003784412">
+        </testcase>
+        <testcase classname="tests/unit/hwk/homeworksApi.spec.ts" name="homeworks api &gt; builds documented HWK03 submission history and detail routes" time="0.001811563">
+        </testcase>
+        <testcase classname="tests/unit/hwk/homeworksApi.spec.ts" name="homeworks api &gt; builds documented HWK04 evaluation result, logs, and reevaluation routes" time="0.00134409">
+        </testcase>
+        <testcase classname="tests/unit/hwk/homeworksApi.spec.ts" name="homeworks api &gt; builds documented HWK05 teacher review and audit log routes" time="0.001051692">
+        </testcase>
+        <testcase classname="tests/unit/hwk/homeworksApi.spec.ts" name="homeworks api &gt; builds documented HWK06 score publish and statistics routes" time="0.00169297">
+        </testcase>
+        <testcase classname="tests/unit/hwk/homeworksApi.spec.ts" name="homeworks api &gt; uploads one homework attachment as authenticated multipart data" time="0.002857659">
+        </testcase>
+        <testcase classname="tests/unit/hwk/homeworksApi.spec.ts" name="homeworks api &gt; preserves the backend HWK error code for deterministic upload failures" time="0.000976671">
+        </testcase>
+        <testcase classname="tests/unit/hwk/homeworksApi.spec.ts" name="homeworks api &gt; revalidates and removes only the current homework upload by opaque file id" time="0.000913497">
+        </testcase>
+        <testcase classname="tests/unit/hwk/homeworksApi.spec.ts" name="homeworks api &gt; downloads a submitted attachment only through the controlled blob route" time="0.001657798">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/unit/lab/LabEditorView.spec.ts" timestamp="2026-09-03T03:54:08.675Z" hostname="runnervmgx7h7" tests="6" failures="0" errors="0" skipped="0" time="0.311503794">
+        <testcase classname="tests/unit/lab/LabEditorView.spec.ts" name="LabEditorView &gt; creates a draft through structured sections and selects attachments by resource name" time="0.147160169">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabEditorView.spec.ts" name="LabEditorView &gt; loads and updates an existing draft without exposing raw resource identifiers" time="0.030298637">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabEditorView.spec.ts" name="LabEditorView &gt; accepts a detail course ID serialized as a string by the Assessment service" time="0.045146845">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabEditorView.spec.ts" name="LabEditorView &gt; keeps invalid input visible and blocks the request with an actionable summary" time="0.046412979">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabEditorView.spec.ts" name="LabEditorView &gt; uploads a real course resource and selects it for the lab" time="0.029616137">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabEditorView.spec.ts" name="LabEditorView &gt; blocks editing a non-draft experiment and provides a route back to teacher detail" time="0.010958513">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/unit/lab/LabManageView.spec.ts" timestamp="2026-09-03T03:54:08.676Z" hostname="runnervmgx7h7" tests="3" failures="0" errors="0" skipped="0" time="0.134481411">
+        <testcase classname="tests/unit/lab/LabManageView.spec.ts" name="LabManageView &gt; shows one experiment context with localized configuration, metrics, and teacher routes" time="0.082809108">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabManageView.spec.ts" name="LabManageView &gt; renders a recoverable detail error and does not request statistics until detail succeeds" time="0.032476363">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabManageView.spec.ts" name="LabManageView &gt; keeps the teacher hub usable when statistics are temporarily unavailable" time="0.017513704">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/unit/lab/LabStatisticsView.spec.ts" timestamp="2026-09-03T03:54:08.676Z" hostname="runnervmgx7h7" tests="11" failures="0" errors="0" skipped="0" time="0.215546892">
+        <testcase classname="tests/unit/lab/LabStatisticsView.spec.ts" name="LabStatisticsView &gt; loads the experiment statistics and renders named teacher-facing summaries" time="0.104131181">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabStatisticsView.spec.ts" name="LabStatisticsView &gt; renders statistics when Assessment serializes the matching course ID as a string" time="0.019061502">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabStatisticsView.spec.ts" name="LabStatisticsView &gt; keeps the statistics usable when student names cannot be synchronized" time="0.019407091">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabStatisticsView.spec.ts" name="LabStatisticsView &gt; shows an all-submitted state and a named empty score state" time="0.010192007">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabStatisticsView.spec.ts" name="LabStatisticsView &gt; shows a recoverable error and reloads all page data" time="0.016258885">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabStatisticsView.spec.ts" name="LabStatisticsView &gt; rejects a mismatched &apos;实验详情编号&apos; before rendering statistics" time="0.004371701">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabStatisticsView.spec.ts" name="LabStatisticsView &gt; rejects a mismatched &apos;实验详情课程&apos; before rendering statistics" time="0.004114447">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabStatisticsView.spec.ts" name="LabStatisticsView &gt; rejects a mismatched &apos;统计实验编号&apos; before rendering statistics" time="0.004165707">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabStatisticsView.spec.ts" name="LabStatisticsView &gt; rejects a mismatched &apos;统计课程&apos; before rendering statistics" time="0.005030023">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabStatisticsView.spec.ts" name="LabStatisticsView &gt; rejects a mismatched &apos;学生名单课程&apos; before rendering statistics" time="0.003962084">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabStatisticsView.spec.ts" name="LabStatisticsView &gt; retries all statistics dependencies after an ownership mismatch" time="0.019682298">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/unit/lab/LabStudentAttachments.spec.ts" timestamp="2026-09-03T03:54:08.678Z" hostname="runnervmgx7h7" tests="9" failures="0" errors="0" skipped="0" time="0.149857107">
+        <testcase classname="tests/unit/lab/LabStudentAttachments.spec.ts" name="LabStudentAttachments &gt; shows the empty state without requesting the whole course resource list" time="0.038422233">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabStudentAttachments.spec.ts" name="LabStudentAttachments &gt; renders the ordered intersection of configured ids and current published student resources" time="0.027210562">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabStudentAttachments.spec.ts" name="LabStudentAttachments &gt; keeps surrounding experiment content available when metadata fails and retries locally" time="0.027239946">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabStudentAttachments.spec.ts" name="LabStudentAttachments &gt; keeps the newest overlapping metadata retry when responses arrive out of order" time="0.006584623">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabStudentAttachments.spec.ts" name="LabStudentAttachments &gt; ignores metadata from the previous course and lab after route reuse" time="0.005365877">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabStudentAttachments.spec.ts" name="LabStudentAttachments &gt; downloads through the authenticated CRS API with the response filename and Blob URL" time="0.017684319">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabStudentAttachments.spec.ts" name="LabStudentAttachments &gt; gives every download button a resource-specific accessible name while downloading" time="0.008234595">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabStudentAttachments.spec.ts" name="LabStudentAttachments &gt; deduplicates downloads, keeps the row after failure, and allows a retry" time="0.009353375">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabStudentAttachments.spec.ts" name="LabStudentAttachments &gt; drops a late download response after the route changes" time="0.008017457">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/unit/lab/LabStudentFlowView.spec.ts" timestamp="2026-09-03T03:54:08.679Z" hostname="runnervmgx7h7" tests="44" failures="0" errors="0" skipped="0" time="1.216971933">
+        <testcase classname="tests/unit/lab/LabStudentFlowView.spec.ts" name="LabStudentView task-flow contract &gt; separates the detail summary from the focused submit workspace and exposes continuous next steps" time="0.109630614">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabStudentFlowView.spec.ts" name="LabStudentView task-flow contract &gt; renders a manual experiment as teacher-scored in the student detail" time="0.018817065">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabStudentFlowView.spec.ts" name="LabStudentView task-flow contract &gt; shows an explicit ungraded state when SCORE_PUBLISHED experiment scores are published without a student score" time="0.02331883">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabStudentFlowView.spec.ts" name="LabStudentView task-flow contract &gt; shows an explicit ungraded state when ARCHIVED experiment scores are published without a student score" time="0.020082113">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabStudentFlowView.spec.ts" name="LabStudentView task-flow contract &gt; fails closed when detail published but aggregate unpublished" time="0.027068391">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabStudentFlowView.spec.ts" name="LabStudentView task-flow contract &gt; fails closed when detail unpublished but aggregate published" time="0.01241028">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabStudentFlowView.spec.ts" name="LabStudentView task-flow contract &gt; rejects a student aggregate with a mismatched aggregate lab" time="0.01335536">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabStudentFlowView.spec.ts" name="LabStudentView task-flow contract &gt; rejects a student aggregate with a mismatched aggregate student" time="0.010291229">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabStudentFlowView.spec.ts" name="LabStudentView task-flow contract &gt; rejects a student aggregate with a mismatched submission lab" time="0.036531249">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabStudentFlowView.spec.ts" name="LabStudentView task-flow contract &gt; rejects a student aggregate with a mismatched submission student" time="0.013093679">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabStudentFlowView.spec.ts" name="LabStudentView task-flow contract &gt; rejects a student aggregate with a mismatched submission id" time="0.011097724">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabStudentFlowView.spec.ts" name="LabStudentView task-flow contract &gt; rejects a student aggregate with a mismatched evaluation submission id" time="0.022463242">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabStudentFlowView.spec.ts" name="LabStudentView task-flow contract &gt; rejects a lab detail with a mismatched experiment id without writing learning records and allows retry" time="0.039391066">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabStudentFlowView.spec.ts" name="LabStudentView task-flow contract &gt; rejects a lab detail with a mismatched course id without writing learning records and allows retry" time="0.018454364">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabStudentFlowView.spec.ts" name="LabStudentView task-flow contract &gt; keeps a terminal direct evaluation when a slower aggregate response still reports pending" time="0.010349797">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabStudentFlowView.spec.ts" name="LabStudentView task-flow contract &gt; stops evaluation polling after 60 seconds and can recover through retry synchronization" time="0.153532077">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabStudentFlowView.spec.ts" name="LabStudentView task-flow contract &gt; times out a never-settling evaluation request and ignores its late response" time="0.014038873">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabStudentFlowView.spec.ts" name="LabStudentView task-flow contract &gt; recovers after an evaluation polling request fails" time="0.024471424">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabStudentFlowView.spec.ts" name="LabStudentView task-flow contract &gt; disables the primary submit action and explains an expired experiment" time="0.012491195">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabStudentFlowView.spec.ts" name="LabStudentView task-flow contract &gt; renders an unavailable start action as a native disabled button instead of a focusable link" time="0.017127172">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabStudentFlowView.spec.ts" name="LabStudentView task-flow contract &gt; keeps an available start action as a real link to the submission workspace" time="0.016787">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabStudentFlowView.spec.ts" name="LabStudentView task-flow contract &gt; allows only one in-flight submission request" time="0.035181487">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabStudentFlowView.spec.ts" name="LabStudentView task-flow contract &gt; rejects a confirmed submission response belonging to another experiment" time="0.022707958">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabStudentFlowView.spec.ts" name="LabStudentView task-flow contract &gt; rejects a confirmed submission response belonging to another student" time="0.053917962">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabStudentFlowView.spec.ts" name="LabStudentView task-flow contract &gt; finishes the confirmed submission flow while optional learning records are still pending" time="0.048576502">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabStudentFlowView.spec.ts" name="LabStudentView task-flow contract &gt; blocks submission when both inline code and a source file are present" time="0.017227665">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabStudentFlowView.spec.ts" name="LabStudentView task-flow contract &gt; rejects every latest-history item belonging to another experiment before loading its result" time="0.021732637">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabStudentFlowView.spec.ts" name="LabStudentView task-flow contract &gt; rejects every latest-history item belonging to another student before loading its result" time="0.033844425">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabStudentFlowView.spec.ts" name="LabStudentView task-flow contract &gt; keeps the newest same-page history retry when overlapping responses arrive out of order" time="0.013958296">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabStudentFlowView.spec.ts" name="LabStudentView task-flow contract &gt; clears stale source and report validation errors when the student selects valid replacements" time="0.026149472">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabStudentFlowView.spec.ts" name="LabStudentView task-flow contract &gt; clears both native file controls after confirmed source and report uploads" time="0.05003546">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabStudentFlowView.spec.ts" name="LabStudentView task-flow contract &gt; preserves the native report selection after a failed report upload" time="0.013033163">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabStudentFlowView.spec.ts" name="LabStudentView task-flow contract &gt; releases the submit lock when route reuse leaves submit mode and ignores the old response after returning" time="0.027884418">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabStudentFlowView.spec.ts" name="LabStudentView task-flow contract &gt; auto-saves a user-scoped draft and keeps it after a confirmed submission failure" time="0.02526012">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabStudentFlowView.spec.ts" name="LabStudentView task-flow contract &gt; does not create or announce a draft for a default language without code or a file" time="0.012287161">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabStudentFlowView.spec.ts" name="LabStudentView task-flow contract &gt; protects a selected report file from accidental page unload" time="0.011976424">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabStudentFlowView.spec.ts" name="LabStudentView task-flow contract &gt; ignores an old report-upload response after route reuse loads another lab" time="0.021062634">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabStudentFlowView.spec.ts" name="LabStudentView task-flow contract &gt; keeps an auto-saved draft when the student cancels in-app navigation" time="0.042006089">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabStudentFlowView.spec.ts" name="LabStudentView task-flow contract &gt; reconciles submission history after an interrupted request before inviting a retry" time="0.026350707">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabStudentFlowView.spec.ts" name="LabStudentView task-flow contract &gt; does not reconcile a higher version when submitted language does not match the code attempt" time="0.013693406">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabStudentFlowView.spec.ts" name="LabStudentView task-flow contract &gt; does not reconcile a higher version when submitted code does not match the code attempt" time="0.029453135">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabStudentFlowView.spec.ts" name="LabStudentView task-flow contract &gt; does not reconcile a higher version when submitted submitted time does not match the code attempt" time="0.013932915">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabStudentFlowView.spec.ts" name="LabStudentView task-flow contract &gt; keeps the draft and selected file when an interrupted file submission cannot be correlated" time="0.012298434">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabStudentFlowView.spec.ts" name="LabStudentView task-flow contract &gt; does not reconcile an interrupted request to an older submission with a different id" time="0.017028742">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/unit/lab/LabStudentListView.spec.ts" timestamp="2026-09-03T03:54:08.688Z" hostname="runnervmgx7h7" tests="12" failures="0" errors="0" skipped="0" time="0.286170538">
+        <testcase classname="tests/unit/lab/LabStudentListView.spec.ts" name="LabStudentListView visual task-list contract &gt; adapts domain data into searchable task cards without exposing raw enums or role selectors" time="0.075361849">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabStudentListView.spec.ts" name="LabStudentListView visual task-list contract &gt; renders a manual experiment as teacher-scored instead of automatic evaluation" time="0.021527751">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabStudentListView.spec.ts" name="LabStudentListView visual task-list contract &gt; shows a retryable failure state" time="0.016438292">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabStudentListView.spec.ts" name="LabStudentListView visual task-list contract &gt; keeps the numeric course identifier in navigation URLs without rendering it as page copy" time="0.00993893">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabStudentListView.spec.ts" name="LabStudentListView visual task-list contract &gt; shows a retryable failure when any submission history cannot be synchronized" time="0.023361737">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabStudentListView.spec.ts" name="LabStudentListView visual task-list contract &gt; does not treat the source-attachment flag as experiment-report completion state" time="0.02664858">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabStudentListView.spec.ts" name="LabStudentListView visual task-list contract &gt; keeps archived experiments available for published scores and history" time="0.022357059">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabStudentListView.spec.ts" name="LabStudentListView visual task-list contract &gt; counts a closed experiment with history as submitted" time="0.015414349">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabStudentListView.spec.ts" name="LabStudentListView visual task-list contract &gt; shows the scoring-basis version instead of a newer non-scoring submission" time="0.014129278">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabStudentListView.spec.ts" name="LabStudentListView visual task-list contract &gt; rejects every history item belonging to another experiment instead of attaching it to a task card" time="0.015335038">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabStudentListView.spec.ts" name="LabStudentListView visual task-list contract &gt; rejects every history item belonging to another student instead of attaching it to a task card" time="0.008511845">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabStudentListView.spec.ts" name="LabStudentListView visual task-list contract &gt; reloads for a new course and ignores the previous course response when it arrives late" time="0.035040678">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/unit/lab/LabStudentView.spec.ts" timestamp="2026-09-03T03:54:08.691Z" hostname="runnervmgx7h7" tests="12" failures="0" errors="0" skipped="0" time="0.356375157">
+        <testcase classname="tests/unit/lab/LabStudentView.spec.ts" name="LabStudentView &gt; loads published lab detail and submits code successfully" time="0.12158258">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabStudentView.spec.ts" name="LabStudentView &gt; restores lab draft code from the resume query parameter" time="0.021227964">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabStudentView.spec.ts" name="LabStudentView &gt; shows frontend validation errors before calling the submit api" time="0.018037762">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabStudentView.spec.ts" name="LabStudentView &gt; blocks unsupported upload files before calling the submit api" time="0.02454363">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabStudentView.spec.ts" name="LabStudentView &gt; surfaces backend submission errors on the page" time="0.030591341">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabStudentView.spec.ts" name="LabStudentView &gt; shows a history loading failure without breaking the detail page" time="0.017536637">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabStudentView.spec.ts" name="LabStudentView &gt; shows evaluation failure details for the latest submission" time="0.013333661">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabStudentView.spec.ts" name="LabStudentView &gt; shows the report upload panel and uploads a report successfully" time="0.031332285">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabStudentView.spec.ts" name="LabStudentView &gt; downloads the latest report through the lab download action" time="0.023585223">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabStudentView.spec.ts" name="LabStudentView &gt; shows the latest teacher score and feedback beside evaluation results" time="0.021074309">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabStudentView.spec.ts" name="LabStudentView &gt; hides unpublished teacher scoring details until lab scores are released" time="0.016397665">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabStudentView.spec.ts" name="LabStudentView &gt; shows published teacher scoring details from the lab result api" time="0.014849366">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/unit/lab/LabSubmissionHistoryView.spec.ts" timestamp="2026-09-03T03:54:08.692Z" hostname="runnervmgx7h7" tests="17" failures="0" errors="0" skipped="0" time="0.591101016">
+        <testcase classname="tests/unit/lab/LabSubmissionHistoryView.spec.ts" name="LabSubmissionHistoryView &gt; loads experiment context, selects the current version, and never exposes raw storage values" time="0.108955451">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabSubmissionHistoryView.spec.ts" name="LabSubmissionHistoryView &gt; renders a manual experiment as teacher-scored in history context" time="0.013836887">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabSubmissionHistoryView.spec.ts" name="LabSubmissionHistoryView &gt; rejects experiment context with a mismatched experiment id and recovers on retry" time="0.017418639">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabSubmissionHistoryView.spec.ts" name="LabSubmissionHistoryView &gt; rejects experiment context with a mismatched course id and recovers on retry" time="0.01878866">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabSubmissionHistoryView.spec.ts" name="LabSubmissionHistoryView &gt; does not load or retain history before the experiment course context is verified" time="0.030741138">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabSubmissionHistoryView.spec.ts" name="LabSubmissionHistoryView &gt; rejects the entire history when any item belongs to another experiment" time="0.023783648">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabSubmissionHistoryView.spec.ts" name="LabSubmissionHistoryView &gt; rejects the entire history when any item belongs to another student" time="0.016827395">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabSubmissionHistoryView.spec.ts" name="LabSubmissionHistoryView &gt; rejects selected detail with a mismatched lab id and recovers on retry" time="0.03576314">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabSubmissionHistoryView.spec.ts" name="LabSubmissionHistoryView &gt; rejects selected detail with a mismatched submission id and recovers on retry" time="0.032422733">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabSubmissionHistoryView.spec.ts" name="LabSubmissionHistoryView &gt; falls back to the latest version when there is no current effective version" time="0.038106982">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabSubmissionHistoryView.spec.ts" name="LabSubmissionHistoryView &gt; hides final scores until the experiment scores are published" time="0.083766288">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabSubmissionHistoryView.spec.ts" name="LabSubmissionHistoryView &gt; shows an explicit ungraded state in the list and detail when the SCORE_PUBLISHED experiment has no score" time="0.041015117">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabSubmissionHistoryView.spec.ts" name="LabSubmissionHistoryView &gt; shows an explicit ungraded state in the list and detail when the ARCHIVED experiment has no score" time="0.036969214">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabSubmissionHistoryView.spec.ts" name="LabSubmissionHistoryView &gt; retries a failed history request and auto-selects the recovered version" time="0.018232557">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabSubmissionHistoryView.spec.ts" name="LabSubmissionHistoryView &gt; retries the selected version detail without reloading the list" time="0.033246057">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabSubmissionHistoryView.spec.ts" name="LabSubmissionHistoryView &gt; shows an actionable empty state when the student has no submissions yet" time="0.016424586">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabSubmissionHistoryView.spec.ts" name="LabSubmissionHistoryView &gt; reloads on prop changes, gates history, and ignores a stale experiment response" time="0.022650385">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/unit/lab/LabSubmissionResultView.spec.ts" timestamp="2026-09-03T03:54:08.694Z" hostname="runnervmgx7h7" tests="14" failures="0" errors="0" skipped="0" time="0.292044112">
+        <testcase classname="tests/unit/lab/LabSubmissionResultView.spec.ts" name="LabSubmissionResultView &gt; resolves the latest own submission, loads the aggregate result, and hides unpublished scoring" time="0.054405581">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabSubmissionResultView.spec.ts" name="LabSubmissionResultView &gt; shows published scores and feedback with passed and failed public cases grouped separately" time="0.037820436">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabSubmissionResultView.spec.ts" name="LabSubmissionResultView &gt; shows an explicit ungraded review when SCORE_PUBLISHED experiment scores are published without a score" time="0.020267432">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabSubmissionResultView.spec.ts" name="LabSubmissionResultView &gt; shows an explicit ungraded review when ARCHIVED experiment scores are published without a score" time="0.012445766">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabSubmissionResultView.spec.ts" name="LabSubmissionResultView &gt; loads an explicitly selected historic submission and localizes statuses without exposing internal ids" time="0.014558613">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabSubmissionResultView.spec.ts" name="LabSubmissionResultView &gt; rejects a historic submission that belongs to another student" time="0.023153032">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabSubmissionResultView.spec.ts" name="LabSubmissionResultView &gt; polls a pending evaluation until it becomes terminal and then stops polling" time="0.031430214">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabSubmissionResultView.spec.ts" name="LabSubmissionResultView &gt; stops pending evaluation polling at the 60 second boundary" time="0.029400448">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabSubmissionResultView.spec.ts" name="LabSubmissionResultView &gt; times out a never-settling poll request and ignores its late response" time="0.010175164">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabSubmissionResultView.spec.ts" name="LabSubmissionResultView &gt; rejects an aggregate response whose evaluation belongs to another submission" time="0.00619847">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabSubmissionResultView.spec.ts" name="LabSubmissionResultView &gt; rejects every latest-history item belonging to another experiment before requesting an aggregate result" time="0.022279174">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabSubmissionResultView.spec.ts" name="LabSubmissionResultView &gt; rejects every latest-history item belonging to another student before requesting an aggregate result" time="0.00573051">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabSubmissionResultView.spec.ts" name="LabSubmissionResultView &gt; shows an empty state when the latest-result route has no submission history" time="0.007183526">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabSubmissionResultView.spec.ts" name="LabSubmissionResultView &gt; offers a retry action after a recoverable page-load failure" time="0.015244298">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/unit/lab/LabSubmissionReviewView.spec.ts" timestamp="2026-09-03T03:54:08.695Z" hostname="runnervmgx7h7" tests="21" failures="0" errors="0" skipped="0" time="0.690121725">
+        <testcase classname="tests/unit/lab/LabSubmissionReviewView.spec.ts" name="LabSubmissionReviewView &gt; loads one full review context with the effective version, Chinese statuses, code, and case results" time="0.096792357">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabSubmissionReviewView.spec.ts" name="LabSubmissionReviewView &gt; forwards only validated queue filters when returning from a review route" time="0.022223305">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabSubmissionReviewView.spec.ts" name="LabSubmissionReviewView &gt; renders only safe source metadata and the controlled teacher download action" time="0.021094383">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabSubmissionReviewView.spec.ts" name="LabSubmissionReviewView &gt; keeps storage identifiers out of the public submission contract" time="0.000374585">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabSubmissionReviewView.spec.ts" name="LabSubmissionReviewView &gt; deduplicates pending source downloads and prefers the blob response filename" time="0.061938885">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabSubmissionReviewView.spec.ts" name="LabSubmissionReviewView &gt; falls back to the safe source metadata filename when the blob response has none" time="0.024352205">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabSubmissionReviewView.spec.ts" name="LabSubmissionReviewView &gt; shows a recoverable source download error and allows an explicit retry" time="0.025763785">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabSubmissionReviewView.spec.ts" name="LabSubmissionReviewView &gt; explains legacy source submissions whose safe metadata is unavailable" time="0.026269341">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabSubmissionReviewView.spec.ts" name="LabSubmissionReviewView &gt; hides all source download affordances when the submission has no file" time="0.03130128">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabSubmissionReviewView.spec.ts" name="LabSubmissionReviewView &gt; shows safe metadata without a download action when controlled download is unavailable" time="0.039581464">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabSubmissionReviewView.spec.ts" name="LabSubmissionReviewView &gt; ignores a source download response that arrives after the review unmounts" time="0.044865825">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabSubmissionReviewView.spec.ts" name="LabSubmissionReviewView &gt; ignores a source download response that arrives after the review route changes" time="0.037068677">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabSubmissionReviewView.spec.ts" name="LabSubmissionReviewView &gt; degrades only the student name when the roster service fails and does not leak a student id" time="0.011917571">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabSubmissionReviewView.spec.ts" name="LabSubmissionReviewView &gt; shows a recoverable page error and retries all required review data" time="0.040191593">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabSubmissionReviewView.spec.ts" name="LabSubmissionReviewView &gt; downloads and scores the attached report with recoverable feedback" time="0.037340326">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabSubmissionReviewView.spec.ts" name="LabSubmissionReviewView &gt; keeps the saved submission-score baseline after report scoring and requires a change reason to persist the new report score" time="0.034205185">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabSubmissionReviewView.spec.ts" name="LabSubmissionReviewView &gt; localizes the report file type without exposing its transport enum" time="0.02757441">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabSubmissionReviewView.spec.ts" name="LabSubmissionReviewView &gt; enforces integer scores within the experiment maximum and requires a reason when changing a saved score" time="0.047972637">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabSubmissionReviewView.spec.ts" name="LabSubmissionReviewView &gt; requires confirmation, exposes pending state, and refreshes the same review after reevaluation" time="0.027337332">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabSubmissionReviewView.spec.ts" name="LabSubmissionReviewView &gt; keeps the review content and retry action available when reevaluation fails" time="0.027742525">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabSubmissionReviewView.spec.ts" name="LabSubmissionReviewView &gt; keeps the review canvas full width and collapses the two-column content on phones" time="0.001662655">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/unit/lab/LabSubmissionWorkspaceView.spec.ts" timestamp="2026-09-03T03:54:08.697Z" hostname="runnervmgx7h7" tests="12" failures="0" errors="0" skipped="0" time="0.430473885">
+        <testcase classname="tests/unit/lab/LabSubmissionWorkspaceView.spec.ts" name="LabSubmissionWorkspaceView &gt; loads a queue without opening a submission and links each card to the standalone review page" time="0.137673374">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabSubmissionWorkspaceView.spec.ts" name="LabSubmissionWorkspaceView &gt; filters by resolved student name locally and sends only supported queue filters to the API" time="0.087191588">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabSubmissionWorkspaceView.spec.ts" name="LabSubmissionWorkspaceView &gt; restores safe filters from the URL and strips role and unsupported query fields" time="0.020567623">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabSubmissionWorkspaceView.spec.ts" name="LabSubmissionWorkspaceView &gt; rejects &apos;实验编号不匹配&apos; as a fatal retryable error without rendering queue data" time="0.017518324">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabSubmissionWorkspaceView.spec.ts" name="LabSubmissionWorkspaceView &gt; rejects &apos;实验课程不匹配&apos; as a fatal retryable error without rendering queue data" time="0.011782172">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabSubmissionWorkspaceView.spec.ts" name="LabSubmissionWorkspaceView &gt; rejects &apos;学生名单课程不匹配&apos; as a fatal retryable error without rendering queue data" time="0.027085844">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabSubmissionWorkspaceView.spec.ts" name="LabSubmissionWorkspaceView &gt; retries every queue dependency after a fatal ownership mismatch" time="0.034457732">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabSubmissionWorkspaceView.spec.ts" name="LabSubmissionWorkspaceView &gt; keeps the queue usable when student names fail and never exposes a student identifier" time="0.036907893">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabSubmissionWorkspaceView.spec.ts" name="LabSubmissionWorkspaceView &gt; shows queue loading, recoverable error, retry, and filtered empty states" time="0.017886115">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabSubmissionWorkspaceView.spec.ts" name="LabSubmissionWorkspaceView &gt; ignores a stale queue response after navigating to a different lab" time="0.015307597">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabSubmissionWorkspaceView.spec.ts" name="LabSubmissionWorkspaceView &gt; clears all filters, reloads the queue, and removes filter query state" time="0.020600643">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabSubmissionWorkspaceView.spec.ts" name="LabSubmissionWorkspaceView &gt; uses a full-width card queue and keeps the filter and cards usable at 390 pixels" time="0.001041142">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/unit/lab/LabTeacherView.spec.ts" timestamp="2026-09-03T03:54:08.698Z" hostname="runnervmgx7h7" tests="4" failures="0" errors="0" skipped="0" time="0.51397621">
+        <testcase classname="tests/unit/lab/LabTeacherView.spec.ts" name="LabTeacherView &gt; starts with the experiment table, localized lifecycle states, summaries, and task routes" time="0.140704447">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabTeacherView.spec.ts" name="LabTeacherView &gt; filters by keyword, lifecycle, and pending-review attention without refetching" time="0.085766572">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabTeacherView.spec.ts" name="LabTeacherView &gt; confirms lifecycle operations, shows per-row pending state, and refreshes after success" time="0.235890639">
+        </testcase>
+        <testcase classname="tests/unit/lab/LabTeacherView.spec.ts" name="LabTeacherView &gt; recovers from initial-load and lifecycle failures without losing the action" time="0.047105811">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/unit/lab/labDisplay.spec.ts" timestamp="2026-09-03T03:54:08.699Z" hostname="runnervmgx7h7" tests="24" failures="0" errors="0" skipped="0" time="0.007524316">
+        <testcase classname="tests/unit/lab/labDisplay.spec.ts" name="LAB student-facing display helpers &gt; formats experiment status DRAFT as 草稿 with a stable tone" time="0.001688041">
+        </testcase>
+        <testcase classname="tests/unit/lab/labDisplay.spec.ts" name="LAB student-facing display helpers &gt; formats experiment status NOT_OPEN as 未开放 with a stable tone" time="0.000394171">
+        </testcase>
+        <testcase classname="tests/unit/lab/labDisplay.spec.ts" name="LAB student-facing display helpers &gt; formats experiment status PUBLISHED as 进行中 with a stable tone" time="0.000198703">
+        </testcase>
+        <testcase classname="tests/unit/lab/labDisplay.spec.ts" name="LAB student-facing display helpers &gt; formats experiment status CLOSED as 已截止 with a stable tone" time="0.000209419">
+        </testcase>
+        <testcase classname="tests/unit/lab/labDisplay.spec.ts" name="LAB student-facing display helpers &gt; formats experiment status SCORE_PUBLISHED as 成绩已发布 with a stable tone" time="0.00020545">
+        </testcase>
+        <testcase classname="tests/unit/lab/labDisplay.spec.ts" name="LAB student-facing display helpers &gt; formats experiment status ARCHIVED as 已归档 with a stable tone" time="0.000168787">
+        </testcase>
+        <testcase classname="tests/unit/lab/labDisplay.spec.ts" name="LAB student-facing display helpers &gt; formats evaluation mode DOCKER_IO as 自动评测" time="0.000182513">
+        </testcase>
+        <testcase classname="tests/unit/lab/labDisplay.spec.ts" name="LAB student-facing display helpers &gt; formats evaluation mode MIXED as 自动评测 + 教师评分" time="0.000081247">
+        </testcase>
+        <testcase classname="tests/unit/lab/labDisplay.spec.ts" name="LAB student-facing display helpers &gt; formats evaluation mode MANUAL as 教师评分" time="0.000339272">
+        </testcase>
+        <testcase classname="tests/unit/lab/labDisplay.spec.ts" name="LAB student-facing display helpers &gt; formats submit status SUBMITTED as 已提交 with a stable tone" time="0.000245454">
+        </testcase>
+        <testcase classname="tests/unit/lab/labDisplay.spec.ts" name="LAB student-facing display helpers &gt; formats submit status LATE as 逾期提交 with a stable tone" time="0.000190928">
+        </testcase>
+        <testcase classname="tests/unit/lab/labDisplay.spec.ts" name="LAB student-facing display helpers &gt; formats submit status WITHDRAWN as 已撤回 with a stable tone" time="0.000100101">
+        </testcase>
+        <testcase classname="tests/unit/lab/labDisplay.spec.ts" name="LAB student-facing display helpers &gt; formats evaluation status NONE as 未评测 with a stable tone" time="0.000156391">
+        </testcase>
+        <testcase classname="tests/unit/lab/labDisplay.spec.ts" name="LAB student-facing display helpers &gt; formats evaluation status PENDING as 等待评测 with a stable tone" time="0.000088036">
+        </testcase>
+        <testcase classname="tests/unit/lab/labDisplay.spec.ts" name="LAB student-facing display helpers &gt; formats evaluation status RUNNING as 评测中 with a stable tone" time="0.000078821">
+        </testcase>
+        <testcase classname="tests/unit/lab/labDisplay.spec.ts" name="LAB student-facing display helpers &gt; formats evaluation status ACCEPTED as 通过 with a stable tone" time="0.000079934">
+        </testcase>
+        <testcase classname="tests/unit/lab/labDisplay.spec.ts" name="LAB student-facing display helpers &gt; formats evaluation status WRONG_ANSWER as 答案错误 with a stable tone" time="0.000076434">
+        </testcase>
+        <testcase classname="tests/unit/lab/labDisplay.spec.ts" name="LAB student-facing display helpers &gt; formats evaluation status COMPILE_ERROR as 编译失败 with a stable tone" time="0.000073925">
+        </testcase>
+        <testcase classname="tests/unit/lab/labDisplay.spec.ts" name="LAB student-facing display helpers &gt; formats evaluation status RUNTIME_ERROR as 运行失败 with a stable tone" time="0.000075974">
+        </testcase>
+        <testcase classname="tests/unit/lab/labDisplay.spec.ts" name="LAB student-facing display helpers &gt; formats evaluation status TIME_LIMIT_EXCEEDED as 运行超时 with a stable tone" time="0.000072262">
+        </testcase>
+        <testcase classname="tests/unit/lab/labDisplay.spec.ts" name="LAB student-facing display helpers &gt; formats evaluation status SYSTEM_ERROR as 评测异常 with a stable tone" time="0.000096588">
+        </testcase>
+        <testcase classname="tests/unit/lab/labDisplay.spec.ts" name="LAB student-facing display helpers &gt; formats supported language codes without leaking implementation casing" time="0.000311762">
+        </testcase>
+        <testcase classname="tests/unit/lab/labDisplay.spec.ts" name="LAB student-facing display helpers &gt; formats shared dates and scores as student-facing text" time="0.000285014">
+        </testcase>
+        <testcase classname="tests/unit/lab/labDisplay.spec.ts" name="LAB student-facing display helpers &gt; keeps actionable Chinese errors and replaces raw technical errors with the supplied fallback" time="0.000305605">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/unit/lrn/LearningProgressView.spec.ts" timestamp="2026-09-03T03:54:08.701Z" hostname="runnervmgx7h7" tests="4" failures="0" errors="0" skipped="0" time="0.164731521">
+        <testcase classname="tests/unit/lrn/LearningProgressView.spec.ts" name="LearningProgressView &gt; renders course and chapter progress with a continue learning entry" time="0.102873486">
+        </testcase>
+        <testcase classname="tests/unit/lrn/LearningProgressView.spec.ts" name="LearningProgressView &gt; shows loading failures and retries progress loading" time="0.021526617">
+        </testcase>
+        <testcase classname="tests/unit/lrn/LearningProgressView.spec.ts" name="LearningProgressView &gt; lets teachers query managed course aggregate progress" time="0.01964189">
+        </testcase>
+        <testcase classname="tests/unit/lrn/LearningProgressView.spec.ts" name="LearningProgressView &gt; does not allow local storage to elevate a student into teacher statistics" time="0.018878279">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/unit/lrn/LearningStatisticsView.spec.ts" timestamp="2026-09-03T03:54:08.701Z" hostname="runnervmgx7h7" tests="3" failures="0" errors="0" skipped="0" time="0.10936542">
+        <testcase classname="tests/unit/lrn/LearningStatisticsView.spec.ts" name="LearningStatisticsView &gt; renders personal behavior dashboard summary, trend and recent records" time="0.064700512">
+        </testcase>
+        <testcase classname="tests/unit/lrn/LearningStatisticsView.spec.ts" name="LearningStatisticsView &gt; shows cached dashboard state and retries loading" time="0.034314668">
+        </testcase>
+        <testcase classname="tests/unit/lrn/LearningStatisticsView.spec.ts" name="LearningStatisticsView &gt; shows loading failures and keeps a retry action" time="0.008940617">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/unit/lrn/LearningTaskCenterView.spec.ts" timestamp="2026-09-03T03:54:08.702Z" hostname="runnervmgx7h7" tests="6" failures="0" errors="0" skipped="0" time="1.06739572">
+        <testcase classname="tests/unit/lrn/LearningTaskCenterView.spec.ts" name="LearningTaskCenterView &gt; renders task cards with course, status, deadline, progress and action links" time="0.097410729">
+        </testcase>
+        <testcase classname="tests/unit/lrn/LearningTaskCenterView.spec.ts" name="LearningTaskCenterView &gt; uses a friendly unavailable state instead of a dead task link" time="0.03870335">
+        </testcase>
+        <testcase classname="tests/unit/lrn/LearningTaskCenterView.spec.ts" name="LearningTaskCenterView &gt; reloads tasks when filters change and shows empty state" time="0.031803064">
+        </testcase>
+        <testcase classname="tests/unit/lrn/LearningTaskCenterView.spec.ts" name="LearningTaskCenterView &gt; shows loading failures and retries the task query" time="0.026062588">
+        </testcase>
+        <testcase classname="tests/unit/lrn/LearningTaskCenterView.spec.ts" name="LearningTaskCenterView &gt; appends the next task page from the continuous loading control" time="0.038416655">
+        </testcase>
+        <testcase classname="tests/unit/lrn/LearningTaskCenterView.spec.ts" name="LearningTaskCenterView &gt; keeps appending task pages through one continuous 200-task browsing path" time="0.832522329">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/unit/lrn/NotificationCenterView.spec.ts" timestamp="2026-09-03T03:54:08.703Z" hostname="runnervmgx7h7" tests="11" failures="0" errors="0" skipped="0" time="0.450398136">
+        <testcase classname="tests/unit/lrn/NotificationCenterView.spec.ts" name="NotificationCenterView &gt; renders categorized notifications with unread highlight and action links" time="0.091948261">
+        </testcase>
+        <testcase classname="tests/unit/lrn/NotificationCenterView.spec.ts" name="NotificationCenterView &gt; renders a friendly unavailable state instead of a dead hash link" time="0.027165868">
+        </testcase>
+        <testcase classname="tests/unit/lrn/NotificationCenterView.spec.ts" name="NotificationCenterView &gt; marks an unread notification before navigating to its valid business page" time="0.030125172">
+        </testcase>
+        <testcase classname="tests/unit/lrn/NotificationCenterView.spec.ts" name="NotificationCenterView &gt; keeps the user in the notification center when marking read fails" time="0.020808628">
+        </testcase>
+        <testcase classname="tests/unit/lrn/NotificationCenterView.spec.ts" name="NotificationCenterView &gt; does not submit duplicate read mutations while the same notification is opening" time="0.034240549">
+        </testcase>
+        <testcase classname="tests/unit/lrn/NotificationCenterView.spec.ts" name="NotificationCenterView &gt; replaces an obsolete same-origin route with a recoverable course destination" time="0.015560034">
+        </testcase>
+        <testcase classname="tests/unit/lrn/NotificationCenterView.spec.ts" name="NotificationCenterView &gt; reloads from the first page when filters change and shows empty state" time="0.034072502">
+        </testcase>
+        <testcase classname="tests/unit/lrn/NotificationCenterView.spec.ts" name="NotificationCenterView &gt; shows loading failures and retries the notification query" time="0.023071082">
+        </testcase>
+        <testcase classname="tests/unit/lrn/NotificationCenterView.spec.ts" name="NotificationCenterView &gt; marks selected notifications as read and deletes a notification from the page" time="0.066502027">
+        </testcase>
+        <testcase classname="tests/unit/lrn/NotificationCenterView.spec.ts" name="NotificationCenterView &gt; marks all unread notifications as read from the bulk action" time="0.042904363">
+        </testcase>
+        <testcase classname="tests/unit/lrn/NotificationCenterView.spec.ts" name="NotificationCenterView &gt; clears stale notification cards before rendering a response for a different session" time="0.061735206">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/unit/lrn/ReminderRuleSettingsView.spec.ts" timestamp="2026-09-03T03:54:08.706Z" hostname="runnervmgx7h7" tests="2" failures="0" errors="0" skipped="0" time="0.101975497">
+        <testcase classname="tests/unit/lrn/ReminderRuleSettingsView.spec.ts" name="ReminderRuleSettingsView &gt; renders reminder rules and saves notification preferences" time="0.077985341">
+        </testcase>
+        <testcase classname="tests/unit/lrn/ReminderRuleSettingsView.spec.ts" name="ReminderRuleSettingsView &gt; shows a retry path when reminder settings fail to load" time="0.022030929">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/unit/lrn/learningProgressApi.spec.ts" timestamp="2026-09-03T03:54:08.706Z" hostname="runnervmgx7h7" tests="1" failures="0" errors="0" skipped="0" time="0.007382504">
+        <testcase classname="tests/unit/lrn/learningProgressApi.spec.ts" name="learning progress API client &gt; calls the documented progress endpoints with bearer auth" time="0.0058938">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/unit/lrn/learningRecordsApi.spec.ts" timestamp="2026-09-03T03:54:08.706Z" hostname="runnervmgx7h7" tests="6" failures="0" errors="0" skipped="0" time="0.060712427">
+        <testcase classname="tests/unit/lrn/learningRecordsApi.spec.ts" name="learning records API client &gt; calls the documented statistics and record endpoints with bearer auth" time="0.032260851">
+        </testcase>
+        <testcase classname="tests/unit/lrn/learningRecordsApi.spec.ts" name="learning records API client &gt; returns cached statistics and queues failed record reports for offline recovery" time="0.009537934">
+        </testcase>
+        <testcase classname="tests/unit/lrn/learningRecordsApi.spec.ts" name="learning records API client &gt; flushes queued behavior records after reconnect and keeps failed leftovers" time="0.002508554">
+        </testcase>
+        <testcase classname="tests/unit/lrn/learningRecordsApi.spec.ts" name="learning records API client &gt; replays queued behavior records when the browser comes back online" time="0.004558776">
+        </testcase>
+        <testcase classname="tests/unit/lrn/learningRecordsApi.spec.ts" name="learning records API client &gt; keeps cached statistics isolated by current user and course" time="0.005579968">
+        </testcase>
+        <testcase classname="tests/unit/lrn/learningRecordsApi.spec.ts" name="learning records API client &gt; does not use cached statistics for forbidden or expired sessions" time="0.002993751">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/unit/lrn/learningTasksApi.spec.ts" timestamp="2026-09-03T03:54:08.707Z" hostname="runnervmgx7h7" tests="1" failures="0" errors="0" skipped="0" time="0.009074451">
+        <testcase classname="tests/unit/lrn/learningTasksApi.spec.ts" name="learning tasks API client &gt; calls the documented task center endpoint with filters and student auth" time="0.007526558">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/unit/lrn/notificationUnreadState.spec.ts" timestamp="2026-09-03T03:54:08.708Z" hostname="runnervmgx7h7" tests="3" failures="0" errors="0" skipped="0" time="0.058034854">
+        <testcase classname="tests/unit/lrn/notificationUnreadState.spec.ts" name="notification unread state &gt; loads the unread count on mount and refreshes it without overlapping requests" time="0.046969549">
+        </testcase>
+        <testcase classname="tests/unit/lrn/notificationUnreadState.spec.ts" name="notification unread state &gt; discards an in-flight response after the authenticated user changes" time="0.0057256">
+        </testcase>
+        <testcase classname="tests/unit/lrn/notificationUnreadState.spec.ts" name="notification unread state &gt; stops polling after the consumer unmounts or the session is cleared" time="0.003827001">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/unit/lrn/notificationsApi.spec.ts" timestamp="2026-09-03T03:54:08.708Z" hostname="runnervmgx7h7" tests="3" failures="0" errors="0" skipped="0" time="0.011763287">
+        <testcase classname="tests/unit/lrn/notificationsApi.spec.ts" name="notifications API client &gt; calls the documented notification list endpoint with filters and bearer auth" time="0.007423693">
+        </testcase>
+        <testcase classname="tests/unit/lrn/notificationsApi.spec.ts" name="notifications API client &gt; calls the documented batch read endpoint with notification ids" time="0.001751172">
+        </testcase>
+        <testcase classname="tests/unit/lrn/notificationsApi.spec.ts" name="notifications API client &gt; calls the documented single delete endpoint" time="0.000930425">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/unit/lrn/reminderRulesApi.spec.ts" timestamp="2026-09-03T03:54:08.709Z" hostname="runnervmgx7h7" tests="2" failures="0" errors="0" skipped="0" time="0.010177007">
+        <testcase classname="tests/unit/lrn/reminderRulesApi.spec.ts" name="reminder rules API client &gt; calls the documented reminder rule query endpoint with bearer auth" time="0.006824649">
+        </testcase>
+        <testcase classname="tests/unit/lrn/reminderRulesApi.spec.ts" name="reminder rules API client &gt; saves rules and notification preferences through API-LRN-11" time="0.001745886">
+        </testcase>
+    </testsuite>
+</testsuites>

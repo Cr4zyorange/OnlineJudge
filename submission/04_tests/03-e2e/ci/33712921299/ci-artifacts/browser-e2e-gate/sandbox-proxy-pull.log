@@ -1,0 +1,41 @@
+0.1.2: Pulling from tecnativa/docker-socket-proxy
+a88dc8b54e91: Pulling fs layer
+283f2bd3e6ca: Pulling fs layer
+3fbff31f9f92: Pulling fs layer
+0a185cbbe76f: Pulling fs layer
+91672fd63f63: Pulling fs layer
+46b5852870b5: Pulling fs layer
+f0b72444e58b: Pulling fs layer
+f9fb978b3cab: Pulling fs layer
+91672fd63f63: Waiting
+46b5852870b5: Waiting
+f0b72444e58b: Waiting
+f9fb978b3cab: Waiting
+0a185cbbe76f: Waiting
+3fbff31f9f92: Verifying Checksum
+3fbff31f9f92: Download complete
+283f2bd3e6ca: Verifying Checksum
+283f2bd3e6ca: Download complete
+a88dc8b54e91: Verifying Checksum
+a88dc8b54e91: Download complete
+91672fd63f63: Verifying Checksum
+91672fd63f63: Download complete
+46b5852870b5: Verifying Checksum
+46b5852870b5: Download complete
+f0b72444e58b: Verifying Checksum
+f0b72444e58b: Download complete
+0a185cbbe76f: Verifying Checksum
+0a185cbbe76f: Download complete
+f9fb978b3cab: Verifying Checksum
+f9fb978b3cab: Download complete
+a88dc8b54e91: Pull complete
+283f2bd3e6ca: Pull complete
+3fbff31f9f92: Pull complete
+0a185cbbe76f: Pull complete
+91672fd63f63: Pull complete
+46b5852870b5: Pull complete
+f0b72444e58b: Pull complete
+f9fb978b3cab: Pull complete
+Digest: sha256:dc8ec925b1360c54e6bf350602d6faac4e33c5d8d809118e4c000c0b14a4529a
+Status: Downloaded newer image for tecnativa/docker-socket-proxy:0.1.2
+docker.io/tecnativa/docker-socket-proxy:0.1.2

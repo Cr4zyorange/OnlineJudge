@@ -1,0 +1,1 @@
+identity-service state=exited|; cached-jwt-query HTTP=200; new-login HTTP=504; refresh HTTP=504; protectedReadStatus=200

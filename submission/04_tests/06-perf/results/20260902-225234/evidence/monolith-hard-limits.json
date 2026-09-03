@@ -1,0 +1,100 @@
+[
+  {
+    "Id": "fcf7031cd95493382f1d63aaafdab63ac70b8c300d34ee322df20446690f059b",
+    "Name": "/onlinejudge-frontend",
+    "Created": "2026-09-02T23:18:16.143984179Z",
+    "State": {
+      "Status": "running",
+      "Running": true,
+      "Health": "healthy"
+    },
+    "Config": {
+      "Image": "oj307-monolith-20260902-225234-frontend",
+      "Labels": {
+        "com.docker.compose.config-hash": "f7c18c7c7c2b9f8e311ab4cce58a301a95f22ce6bb03c76320e8b30758563611",
+        "com.docker.compose.container-number": "1",
+        "com.docker.compose.depends_on": "backend:service_healthy:false",
+        "com.docker.compose.image": "sha256:7c80609ca94aee6d51faa9945b01e7d9e917cc0c50dcbef76f4d30c69b5bc1f8",
+        "com.docker.compose.oneoff": "False",
+        "com.docker.compose.project": "oj307-monolith-20260902-225234",
+        "com.docker.compose.project.config_files": "/private/tmp/oj307-monolith.najSTm/deploy/docker/compose.yml,/private/tmp/oj307-perf.Vwbe8B/performance/issue-307/results/20260902-225234/evidence/monolith-resource-policy.yml",
+        "com.docker.compose.project.working_dir": "/private/tmp/oj307-monolith.najSTm/deploy/docker",
+        "com.docker.compose.service": "frontend",
+        "com.docker.compose.version": "5.4.0",
+        "maintainer": "NGINX Docker Maintainers <docker-maint@nginx.com>"
+      }
+    },
+    "HostConfig": {
+      "Memory": 536870912,
+      "NanoCpus": 500000000,
+      "MemorySwap": 1073741824,
+      "NetworkMode": "oj307-monolith-20260902-225234_default"
+    }
+  },
+  {
+    "Id": "a0585be09a1575db4a52f53e06dcfc62fe0bc15a2682fc4838b348c90bf1423d",
+    "Name": "/onlinejudge-backend",
+    "Created": "2026-09-02T23:18:16.105191887Z",
+    "State": {
+      "Status": "running",
+      "Running": true,
+      "Health": "healthy"
+    },
+    "Config": {
+      "Image": "oj307-monolith-20260902-225234-backend",
+      "Labels": {
+        "com.docker.compose.config-hash": "4afba6b899bc89342c64d58c628cffdd0b8adb2e8a0865b30e82de8bd2589592",
+        "com.docker.compose.container-number": "1",
+        "com.docker.compose.depends_on": "mysql:service_healthy:false",
+        "com.docker.compose.image": "sha256:0004ae0742ca7dae73f3f2314362e2ecbda9554e7fec2e18c234968fde8d8d1c",
+        "com.docker.compose.oneoff": "False",
+        "com.docker.compose.project": "oj307-monolith-20260902-225234",
+        "com.docker.compose.project.config_files": "/private/tmp/oj307-monolith.najSTm/deploy/docker/compose.yml,/private/tmp/oj307-perf.Vwbe8B/performance/issue-307/results/20260902-225234/evidence/monolith-resource-policy.yml",
+        "com.docker.compose.project.working_dir": "/private/tmp/oj307-monolith.najSTm/deploy/docker",
+        "com.docker.compose.service": "backend",
+        "com.docker.compose.version": "5.4.0",
+        "org.opencontainers.image.created": "2026-08-17T09:04:34.463771+00:00",
+        "org.opencontainers.image.description": "The Ubuntu container image maintained by Canonical\n\nUbuntu is a Debian-based Linux operating system that runs from the desktop to the cloud, to all your internet connected things.\nIt is the world's most popular operating system across public clouds and OpenStack clouds.\nIt is the number one platform for containers; from Docker to Kubernetes to LXD, Ubuntu can run your containers at scale.\nFast, secure and simple, Ubuntu powers millions of PCs worldwide.\n",
+        "org.opencontainers.image.title": "ubuntu",
+        "org.opencontainers.image.version": "26.04"
+      }
+    },
+    "HostConfig": {
+      "Memory": 4294967296,
+      "NanoCpus": 2500000000,
+      "MemorySwap": 8589934592,
+      "NetworkMode": "oj307-monolith-20260902-225234_default"
+    }
+  },
+  {
+    "Id": "f365b104679dd198ebb1bed26b170041bc372acdd9358822d711b55ab09e1c02",
+    "Name": "/onlinejudge-mysql",
+    "Created": "2026-09-02T23:18:15.98306272Z",
+    "State": {
+      "Status": "running",
+      "Running": true,
+      "Health": "healthy"
+    },
+    "Config": {
+      "Image": "mysql:8.4",
+      "Labels": {
+        "com.docker.compose.config-hash": "8d1160b5da0de6e79f46c297545f926ba6adc3c586ea0c51c0c1a7d50a1a720b",
+        "com.docker.compose.container-number": "1",
+        "com.docker.compose.depends_on": "",
+        "com.docker.compose.image": "sha256:5e7e005a680e75d935984d3d9390990d2a709b3ed67e92708e9e6747f1f754c9",
+        "com.docker.compose.oneoff": "False",
+        "com.docker.compose.project": "oj307-monolith-20260902-225234",
+        "com.docker.compose.project.config_files": "/private/tmp/oj307-monolith.najSTm/deploy/docker/compose.yml,/private/tmp/oj307-perf.Vwbe8B/performance/issue-307/results/20260902-225234/evidence/monolith-resource-policy.yml",
+        "com.docker.compose.project.working_dir": "/private/tmp/oj307-monolith.najSTm/deploy/docker",
+        "com.docker.compose.service": "mysql",
+        "com.docker.compose.version": "5.4.0"
+      }
+    },
+    "HostConfig": {
+      "Memory": 1610612736,
+      "NanoCpus": 1000000000,
+      "MemorySwap": 3221225472,
+      "NetworkMode": "oj307-monolith-20260902-225234_default"
+    }
+  }
+]

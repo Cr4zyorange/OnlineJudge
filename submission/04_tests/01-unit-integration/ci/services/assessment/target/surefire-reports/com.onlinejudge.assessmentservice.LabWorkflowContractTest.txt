@@ -1,0 +1,4 @@
+-------------------------------------------------------------------------------
+Test set: com.onlinejudge.assessmentservice.LabWorkflowContractTest
+-------------------------------------------------------------------------------
+Tests run: 27, Failures: 0, Errors: 0, Skipped: 4, Time elapsed: 1.324 s -- in com.onlinejudge.assessmentservice.LabWorkflowContractTest

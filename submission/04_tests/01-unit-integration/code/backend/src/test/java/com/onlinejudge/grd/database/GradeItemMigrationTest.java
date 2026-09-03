@@ -1,0 +1,324 @@
+package com.onlinejudge.grd.database;
+
+import com.onlinejudge.grd.domain.CourseGradeSummary;
+import com.onlinejudge.grd.domain.FinalStatus;
+import com.onlinejudge.grd.domain.GradeAnalysisSnapshot;
+import com.onlinejudge.grd.domain.GradeChangeLog;
+import com.onlinejudge.grd.domain.GradeItem;
+import com.onlinejudge.grd.domain.GradeRecord;
+import com.onlinejudge.grd.domain.GradeStatus;
+import com.onlinejudge.grd.domain.PublishStatus;
+import com.onlinejudge.grd.domain.SourceType;
+import com.onlinejudge.grd.repository.JdbcCourseGradeSummaryRepository;
+import com.onlinejudge.grd.repository.JdbcGradeAnalysisSnapshotRepository;
+import com.onlinejudge.grd.repository.JdbcGradeChangeLogRepository;
+import com.onlinejudge.grd.repository.JdbcGradeItemRepository;
+import com.onlinejudge.grd.repository.JdbcGradeRecordRepository;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
+import org.springframework.boot.test.autoconfigure.jdbc.JdbcTest;
+import org.springframework.context.annotation.Import;
+import org.springframework.test.context.jdbc.Sql;
+
+import java.math.BigDecimal;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.time.Duration;
+import java.time.LocalDateTime;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+@JdbcTest(properties = {
+        "spring.datasource.url=jdbc:h2:mem:grade_item_repository;MODE=MySQL;DATABASE_TO_LOWER=TRUE;CASE_INSENSITIVE_IDENTIFIERS=TRUE;DB_CLOSE_DELAY=-1"
+})
+@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
+@Import({
+        JdbcGradeItemRepository.class,
+        JdbcGradeRecordRepository.class,
+        JdbcCourseGradeSummaryRepository.class,
+        JdbcGradeAnalysisSnapshotRepository.class,
+        JdbcGradeChangeLogRepository.class
+})
+@Sql(scripts = "file:../database/migrations/20260525_01_create_grd_grade_item.sql")
+class GradeItemMigrationTest {
+    private final JdbcGradeItemRepository repository;
+    private final JdbcGradeRecordRepository gradeRecordRepository;
+    private final JdbcCourseGradeSummaryRepository courseGradeSummaryRepository;
+    private final JdbcGradeAnalysisSnapshotRepository gradeAnalysisSnapshotRepository;
+    private final JdbcGradeChangeLogRepository gradeChangeLogRepository;
+
+    @Autowired
+    GradeItemMigrationTest(
+            JdbcGradeItemRepository repository,
+            JdbcGradeRecordRepository gradeRecordRepository,
+            JdbcCourseGradeSummaryRepository courseGradeSummaryRepository,
+            JdbcGradeAnalysisSnapshotRepository gradeAnalysisSnapshotRepository,
+            JdbcGradeChangeLogRepository gradeChangeLogRepository
+    ) {
+        this.repository = repository;
+        this.gradeRecordRepository = gradeRecordRepository;
+        this.courseGradeSummaryRepository = courseGradeSummaryRepository;
+        this.gradeAnalysisSnapshotRepository = gradeAnalysisSnapshotRepository;
+        this.gradeChangeLogRepository = gradeChangeLogRepository;
+    }
+
+    @Test
+    void gradeItemMigrationSupportsExecutableRepositoryPersistence() {
+        LocalDateTime now = LocalDateTime.now();
+        GradeItem saved = repository.save(new GradeItem(
+                0L,
+                101L,
+                "实验一",
+                SourceType.LAB,
+                301L,
+                new BigDecimal("100.00"),
+                new BigDecimal("0.4000"),
+                true,
+                true,
+                1,
+                501L,
+                false,
+                now,
+                now
+        ));
+
+        assertThat(saved.id()).isPositive();
+        assertThat(repository.findById(saved.id())).contains(saved);
+        assertThat(repository.findByCourseId(101L)).containsExactly(saved);
+    }
+
+    @Test
+    void gradeItemMigrationAllowsRepeatedRecreateAndSoftDeleteWithSameName() {
+        LocalDateTime now = LocalDateTime.now();
+        GradeItem first = repository.save(new GradeItem(
+                0L,
+                202L,
+                "作业一",
+                SourceType.HWK,
+                401L,
+                new BigDecimal("100.00"),
+                new BigDecimal("0.3000"),
+                true,
+                true,
+                1,
+                501L,
+                false,
+                now,
+                now
+        ));
+        repository.update(first.disable(now.plusMinutes(1)));
+
+        GradeItem second = repository.save(new GradeItem(
+                0L,
+                202L,
+                "作业一",
+                SourceType.HWK,
+                402L,
+                new BigDecimal("100.00"),
+                new BigDecimal("0.3000"),
+                true,
+                true,
+                2,
+                501L,
+                false,
+                now.plusMinutes(2),
+                now.plusMinutes(2)
+        ));
+
+        GradeItem deletedSecond = repository.update(second.disable(now.plusMinutes(3)));
+
+        assertThat(deletedSecond.deleted()).isTrue();
+        assertThat(repository.findByCourseId(202L)).isEmpty();
+    }
+
+    @Test
+    void gradeRecordMigrationSupportsExecutableRecordAndSummaryPersistence() {
+        LocalDateTime now = LocalDateTime.now();
+        GradeRecord record = gradeRecordRepository.upsert(new GradeRecord(
+                0L,
+                303L,
+                601L,
+                1L,
+                SourceType.LAB,
+                301L,
+                new BigDecimal("90.00"),
+                new BigDecimal("36.00"),
+                GradeStatus.SCORED,
+                PublishStatus.UNPUBLISHED,
+                null,
+                now,
+                now,
+                null,
+                now,
+                now
+        ));
+        CourseGradeSummary summary = courseGradeSummaryRepository.upsert(new CourseGradeSummary(
+                0L,
+                303L,
+                601L,
+                new BigDecimal("84.00"),
+                FinalStatus.CALCULATED,
+                PublishStatus.UNPUBLISHED,
+                0L,
+                null,
+                now,
+                now
+        ));
+
+        assertThat(record.id()).isPositive();
+        assertThat(gradeRecordRepository.findByCourseId(303L)).containsExactly(record);
+        assertThat(gradeRecordRepository.findAnalysisSourceVersion(303L, 1L).version()).isEqualTo(1L);
+        assertThat(summary.id()).isPositive();
+        assertThat(courseGradeSummaryRepository.findByCourseId(303L)).containsExactly(summary);
+        assertThat(courseGradeSummaryRepository.findAnalysisSourceVersion(303L).version()).isEqualTo(1L);
+
+        gradeRecordRepository.upsert(new GradeRecord(
+                0L,
+                303L,
+                601L,
+                1L,
+                SourceType.LAB,
+                301L,
+                new BigDecimal("95.00"),
+                new BigDecimal("38.00"),
+                GradeStatus.ADJUSTED,
+                PublishStatus.UNPUBLISHED,
+                null,
+                now.plusMinutes(1),
+                now.plusMinutes(1),
+                null,
+                now,
+                now.plusMinutes(1)
+        ));
+        courseGradeSummaryRepository.upsert(new CourseGradeSummary(
+                0L,
+                303L,
+                601L,
+                new BigDecimal("90.00"),
+                FinalStatus.ADJUSTED,
+                PublishStatus.UNPUBLISHED,
+                0L,
+                null,
+                now,
+                now.plusMinutes(1)
+        ));
+
+        assertThat(gradeRecordRepository.findAnalysisSourceVersion(303L, 1L).version()).isEqualTo(2L);
+        assertThat(courseGradeSummaryRepository.findAnalysisSourceVersion(303L).version()).isEqualTo(2L);
+    }
+
+    @Test
+    void gradeChangeLogMigrationSupportsAdjustmentTracePersistence() {
+        LocalDateTime now = LocalDateTime.now();
+        GradeChangeLog saved = gradeChangeLogRepository.save(new GradeChangeLog(
+                0L,
+                404L,
+                601L,
+                1L,
+                "RECORD_ADJUST",
+                new BigDecimal("90.00"),
+                new BigDecimal("95.00"),
+                "复核测试用例后修正",
+                501L,
+                now
+        ));
+
+        assertThat(saved.id()).isPositive();
+        assertThat(gradeChangeLogRepository.findByCourseId(404L, 601L, null, 1, 20))
+                .singleElement()
+                .satisfies(actual -> {
+                    assertThat(actual.id()).isEqualTo(saved.id());
+                    assertThat(actual.courseId()).isEqualTo(saved.courseId());
+                    assertThat(actual.studentId()).isEqualTo(saved.studentId());
+                    assertThat(actual.gradeItemId()).isEqualTo(saved.gradeItemId());
+                    assertThat(actual.changeType()).isEqualTo(saved.changeType());
+                    assertThat(actual.oldValue()).isEqualByComparingTo(saved.oldValue());
+                    assertThat(actual.newValue()).isEqualByComparingTo(saved.newValue());
+                    assertThat(actual.reason()).isEqualTo(saved.reason());
+                    assertThat(actual.operatorId()).isEqualTo(saved.operatorId());
+                    assertThat(Duration.between(saved.createdAt(), actual.createdAt()).abs())
+                            .isLessThanOrEqualTo(Duration.ofNanos(1_000));
+                });
+        assertThat(gradeChangeLogRepository.countByCourseId(404L, 601L, null)).isEqualTo(1);
+    }
+
+    @Test
+    void gradeAnalysisMigrationSupportsSnapshotPersistence() {
+        LocalDateTime now = LocalDateTime.now();
+        GradeAnalysisSnapshot saved = gradeAnalysisSnapshotRepository.save(new GradeAnalysisSnapshot(
+                0L,
+                505L,
+                "COURSE_TOTAL",
+                null,
+                now.minusMinutes(1),
+                "GRD_ANALYSIS_V2:6a6d0f3f657c0f61b92f7fd105a149781039605365c671414bbc27f6536fa72e",
+                new BigDecimal("78.00"),
+                new BigDecimal("92.00"),
+                new BigDecimal("58.00"),
+                new BigDecimal("0.6667"),
+                new BigDecimal("0.7500"),
+                4,
+                3,
+                1,
+                0,
+                0,
+                "[{\"label\":\"0-59\",\"count\":1}]",
+                501L,
+                now
+        ));
+
+        assertThat(saved.id()).isPositive();
+        assertThat(gradeAnalysisSnapshotRepository.findLatest(505L, "COURSE_TOTAL", null))
+                .get()
+                .satisfies(snapshot -> {
+                    assertThat(snapshot.id()).isEqualTo(saved.id());
+                    assertThat(snapshot.courseId()).isEqualTo(saved.courseId());
+                    assertThat(snapshot.targetType()).isEqualTo(saved.targetType());
+                    assertThat(snapshot.gradeItemId()).isNull();
+                    assertThat(snapshot.sourceFingerprint()).isEqualTo(saved.sourceFingerprint());
+                    assertThat(snapshot.averageScore()).isEqualByComparingTo(saved.averageScore());
+                    assertThat(snapshot.maxScore()).isEqualByComparingTo(saved.maxScore());
+                    assertThat(snapshot.minScore()).isEqualByComparingTo(saved.minScore());
+                    assertThat(snapshot.passRate()).isEqualByComparingTo(saved.passRate());
+                    assertThat(snapshot.completionRate()).isEqualByComparingTo(saved.completionRate());
+                    assertThat(snapshot.totalStudentCount()).isEqualTo(4);
+                    assertThat(snapshot.completedCount()).isEqualTo(3);
+                    assertThat(snapshot.missingCount()).isEqualTo(1);
+                    assertThat(snapshot.unsubmittedCount()).isZero();
+                    assertThat(snapshot.ungradedCount()).isZero();
+                    assertThat(snapshot.distributionJson()).isEqualTo(saved.distributionJson());
+                    assertThat(snapshot.generatedBy()).isEqualTo(saved.generatedBy());
+                    assertThat(Duration.between(saved.sourceDataTime(), snapshot.sourceDataTime()).abs())
+                            .isLessThanOrEqualTo(Duration.ofNanos(1_000));
+                    assertThat(Duration.between(saved.generatedAt(), snapshot.generatedAt()).abs())
+                            .isLessThanOrEqualTo(Duration.ofNanos(1_000));
+                });
+    }
+
+    @Test
+    void mysqlSchemasPreserveVersionedFingerprintsCountsAndSourceVersions() throws Exception {
+        String fingerprintMigration = Files.readString(Path.of(
+                "../database/migrations/20260825_01_add_grd_analysis_source_fingerprint.sql"
+        ));
+        String sourceVersionMigration = Files.readString(Path.of(
+                "../database/migrations/20260825_02_add_grd_analysis_source_version.sql"
+        ));
+        String cleanSchema = Files.readString(Path.of("../database/mysql/compose-schema.sql"));
+
+        assertThat(fingerprintMigration)
+                .contains("ADD COLUMN source_fingerprint VARCHAR(96)")
+                .contains("MODIFY COLUMN source_fingerprint VARCHAR(96)");
+        assertThat(sourceVersionMigration)
+                .contains("total_student_count INT NULL")
+                .contains("completed_count INT NULL")
+                .contains("missing_count INT NULL")
+                .contains("unsubmitted_count INT NULL")
+                .contains("ungraded_count INT NULL")
+                .contains("CREATE TABLE IF NOT EXISTS t_grade_analysis_source_version");
+        assertThat(cleanSchema)
+                .contains("source_fingerprint VARCHAR(96) NULL")
+                .contains("total_student_count INT NULL")
+                .contains("CREATE TABLE IF NOT EXISTS t_grade_analysis_source_version");
+    }
+}

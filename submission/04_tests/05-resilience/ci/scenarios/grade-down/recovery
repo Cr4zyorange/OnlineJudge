@@ -1,0 +1,1 @@
+service=grade-service state=healthy-consumer-restarted; gradeConsumer=ACTIVE(1) gradeDlqMessages=0 sourceTransport=real-rabbitmq sourceGradeOutboxStateAfter=DELIVERED initialPublish=relay gradeInboxStatus=APPLIED gradeProjectionCount=1 duplicateDelivery=CONSUMED duplicateDecision=no-op recoverySeconds=18
