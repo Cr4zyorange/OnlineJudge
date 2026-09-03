@@ -1,9 +1,0 @@
-sequenceDiagram
-  actor Student as 学生
-  participant System as 在线教学平台
-  Student->>System: 打开个人学习统计
-  alt 有统计数据
-    System-->>Student: 展示本人的 7 天趋势、时长、访问与完成数
-  else 无数据或读取失败
-    System-->>Student: 展示空态、缓存提示或重试入口
-  end

@@ -1,9 +1,0 @@
-sequenceDiagram
-  actor User as 学生/教师/管理员
-  actor Admin as 管理员
-  participant System as OnlineJudgeForSE 系统边界
-  User->>System: 登录、退出、修改密码、越权访问等关键事件
-  Note over System: 记录操作时间、操作用户、操作类型、操作对象、结果状态、客户端信息
-  System-->>User: 返回业务结果（成功/拒绝/重新登录）
-  Admin->>System: 按操作人/类型/时间/结果查询审计日志
-  System-->>Admin: 返回分页审计记录（不含明文密码与完整令牌）

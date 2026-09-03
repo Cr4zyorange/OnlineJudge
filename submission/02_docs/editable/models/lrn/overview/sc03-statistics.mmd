@@ -1,8 +1,0 @@
-flowchart LR
-  UI[UI-LRN-03 学习统计] --> API[API-LRN-05]
-  API --> AUTH[AUTH 当前用户]
-  API --> CRS[CRS 成员校验]
-  API --> LRN[LRN 统计聚合]
-  LRN --> RECORD[(DB-LRN-03 行为)]
-  LRN --> PROGRESS[(DB-LRN-02 进度)]
-  LRN --> UI
