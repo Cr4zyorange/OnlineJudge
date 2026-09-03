@@ -128,16 +128,19 @@ def workload_environment(workload: dict[str, Any], git_sha: str) -> dict[str, st
                 "IDENTITY_DATABASE_USERNAME": RUNTIME_ACCOUNT["identity"],
                 "IDENTITY_JWT_KID": "issue318-disposable",
                 "IDENTITY_SERVICE_REVISION": git_sha,
-                "IDENTITY_SEED_DATA_ENABLED": "false",
+                "IDENTITY_SEED_DATA_ENABLED": "${IDENTITY_SEED_DATA_ENABLED:-false}",
             }
         )
     elif name == "course-service":
         environment.update(
             {
+                "COURSE_DATASOURCE_URL": "jdbc:mysql://mysql:3306/oj_course?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC&allowPublicKeyRetrieval=true&useSSL=false",
+                "COURSE_DATABASE_DRIVER": "com.mysql.cj.jdbc.Driver",
                 "COURSE_DATABASE_HOST": "mysql",
                 "COURSE_DATABASE_PORT": "3306",
                 "COURSE_DATABASE_NAME": DATABASE_NAME["course"],
                 "COURSE_DATABASE_USER": RUNTIME_ACCOUNT["course"],
+                "SPRING_SQL_INIT_MODE": "never",
                 "IDENTITY_JWKS_URI": "http://identity-service:8081/.well-known/jwks.json",
                 "RABBITMQ_HOST": "rabbitmq",
                 "RABBITMQ_PORT": "5672",
@@ -148,12 +151,15 @@ def workload_environment(workload: dict[str, Any], git_sha: str) -> dict[str, st
     elif name in {"assessment-api", "assessment-worker"}:
         environment.update(
             {
+                "ASSESSMENT_DATASOURCE_URL": "jdbc:mysql://mysql:3306/oj_assessment?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC&allowPublicKeyRetrieval=true&useSSL=false",
+                "ASSESSMENT_DATABASE_DRIVER": "com.mysql.cj.jdbc.Driver",
                 "ASSESSMENT_DATABASE_HOST": "mysql",
                 "ASSESSMENT_DATABASE_PORT": "3306",
                 "ASSESSMENT_DATABASE_NAME": DATABASE_NAME["assessment"],
                 "ASSESSMENT_DATABASE_USER": RUNTIME_ACCOUNT["assessment"],
+                "SPRING_SQL_INIT_MODE": "never",
                 "IDENTITY_JWKS_URI": "http://identity-service:8081/.well-known/jwks.json",
-                "ASSESSMENT_COURSE_AUTHORIZATION_URI": "http://course-service:8082/internal/v2/courses/{courseId}/members/{userId}/authorization",
+                "ASSESSMENT_COURSE_AUTHORIZATION_URI": "http://course-service:8082/internal/v2/courses/{courseId}/authorizations/{userId}",
                 "ASSESSMENT_COURSE_SERVICE_AUTHORIZATION": "${ASSESSMENT_SERVICE_IDENTITY:?ASSESSMENT_SERVICE_IDENTITY is required}",
                 "ASSESSMENT_RABBIT_HOST": "rabbitmq",
                 "ASSESSMENT_RABBIT_USERNAME": "onlinejudge",
@@ -182,9 +188,9 @@ def workload_environment(workload: dict[str, Any], git_sha: str) -> dict[str, st
                 "GRADE_HTTP_PORT": "8084",
                 "IDENTITY_JWKS_URI": "http://identity-service:8081/.well-known/jwks.json",
                 "GRADE_COURSE_BASE_URL": "http://course-service:8082",
-                "GRADE_COURSE_SERVICE_AUTHORIZATION": "${GRADE_SERVICE_IDENTITY:?GRADE_SERVICE_IDENTITY is required}",
+                "GRADE_COURSE_SERVICE_AUTHORIZATION": "${GRADE_COURSE_SERVICE_IDENTITY:?GRADE_COURSE_SERVICE_IDENTITY is required}",
                 "GRADE_ASSESSMENT_BASE_URL": "http://assessment-api:8083",
-                "GRADE_ASSESSMENT_SERVICE_AUTHORIZATION": "${GRADE_SERVICE_IDENTITY:?GRADE_SERVICE_IDENTITY is required}",
+                "GRADE_ASSESSMENT_SERVICE_AUTHORIZATION": "${GRADE_ASSESSMENT_SERVICE_IDENTITY:?GRADE_ASSESSMENT_SERVICE_IDENTITY is required}",
                 "RABBITMQ_HOST": "rabbitmq",
                 "RABBITMQ_USERNAME": "onlinejudge",
                 "GRADE_RABBIT_ENABLED": "true",
@@ -318,7 +324,7 @@ def compose_service(
         lines.append("    command: [\"--spring.main.web-application-type=none\", \"--assessment.worker.enabled=true\"]")
     if workload["traffic"]["exposed"]:
         port = workload["ports"][0]["containerPort"]
-        lines.extend(["    ports:", "      - " + yaml_scalar("${GATEWAY_HTTP_PORT:-18080}:" + str(port))])
+        lines.extend(["    ports:", "      - " + yaml_scalar("127.0.0.1:${GATEWAY_HTTP_PORT:-18080}:" + str(port))])
     lines.extend(indent(compose_healthcheck(workload), 4))
     lines.extend(indent(compose_resources(workload), 4))
     lines.append("    restart: \"no\"")
@@ -543,6 +549,7 @@ def kube_workload(workload: dict[str, Any], git_sha: str, namespace: str) -> str
             "      labels:",
             "        app.kubernetes.io/name: " + name,
             "    spec:",
+            "      enableServiceLinks: false",
             "      containers:",
             "        - name: " + name,
             "          image: " + image,
@@ -606,6 +613,40 @@ def kube_workload(workload: dict[str, Any], git_sha: str, namespace: str) -> str
         "      targetPort: " + str(port),
     ]
     return "\n---\n".join(["\n".join(lines), "\n".join(service)])
+
+
+def kube_assessment_hpa(namespace: str) -> str:
+    """The #319 HPA belongs beside the rendered Assessment API Deployment."""
+
+    return "\n".join(
+        [
+            "apiVersion: autoscaling/v2",
+            "kind: HorizontalPodAutoscaler",
+            "metadata:",
+            "  name: assessment-api",
+            "  namespace: " + namespace,
+            "  labels:",
+            "    app.kubernetes.io/part-of: onlinejudge-platform",
+            "    delivery.onlinejudge.io/owner-issue: \"319\"",
+            "spec:",
+            "  scaleTargetRef:",
+            "    apiVersion: apps/v1",
+            "    kind: Deployment",
+            "    name: assessment-api",
+            "  minReplicas: 1",
+            "  maxReplicas: 3",
+            "  behavior:",
+            "    scaleDown:",
+            "      stabilizationWindowSeconds: 300",
+            "  metrics:",
+            "    - type: Resource",
+            "      resource:",
+            "        name: cpu",
+            "        target:",
+            "          type: Utilization",
+            "          averageUtilization: 60",
+        ]
+    )
 
 
 def kube_migration_job(job: dict[str, Any], namespace: str) -> str:
@@ -714,6 +755,7 @@ def render_kubernetes(manifest: dict[str, Any], git_sha: str, namespace: str) ->
 
     documents = [kube_namespace(namespace), kube_frontend_proxy_config(namespace)]
     documents.extend(kube_workload(workload, git_sha, namespace) for workload in manifest["workloads"])
+    documents.append(kube_assessment_hpa(namespace))
     documents.append(kube_runtime_account_init(namespace))
     documents.extend(kube_migration_job(job, namespace).replace("${GIT_SHA}", git_sha) for job in manifest["migrationJobs"])
     return (
@@ -752,6 +794,7 @@ def render_kubernetes_stages(manifest: dict[str, Any], git_sha: str, namespace: 
         [
             kube_frontend_proxy_config(namespace),
             *(kube_workload(workload, git_sha, namespace) for workload in applications),
+            kube_assessment_hpa(namespace),
         ]
     )
     stages["80-gateway.yaml"] = kube_workload(gateway, git_sha, namespace)
@@ -777,7 +820,11 @@ def main() -> int:
         repository_root = arguments.repository_root.resolve()
         if not (repository_root / "database/mysql/migrate-service.sh").is_file():
             raise ManifestValidationError("--repository-root must contain database/mysql/migrate-service.sh")
-        compose_frontend_proxy_config = arguments.compose_output.parent / "frontend-disposable.conf"
+        # Compose resolves bind mounts relative to the Compose file, so emit
+        # an absolute host path when the generated file lives under a caller's
+        # evidence directory.  A relative path would be resolved twice and
+        # interpreted as a named volume by Docker Compose.
+        compose_frontend_proxy_config = (arguments.compose_output.parent / "frontend-disposable.conf").resolve()
         write_output(compose_frontend_proxy_config, frontend_proxy_config("127.0.0.11"))
         # The runner creates runtime secrets under umask 077.  This generated
         # Nginx configuration contains no secrets and is mounted into an image

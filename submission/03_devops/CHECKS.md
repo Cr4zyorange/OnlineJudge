@@ -1,13 +1,15 @@
 # 归档校验记录
 
 执行目录：issue #379 隔离 worktree；canonical source 快照来自
-`c56b16f916b4a4c3d33915aa37beab6b05c72888`，PR 候选为
-`82dd58d10eb49f1ceacec7965f7932c123891a1a`。
+`ce87dfabd54239b9d4138736cbb93b06e6c9b260`，PR 候选 head 为
+`82dd58d10eb49f1ceacec7965f7932c123891a1a`；候选 Disposable artifact 内部构建 SHA
+为 `7402fc614933242f7982c2b68c44cb40dfa67045`。
 
 | 检查 | 结果 | 说明 |
 | --- | --- | --- |
 | workload manifest validator | PASS | `9 workloads; 4 ordered migration jobs; schema, ports, dependencies, migrations, promotion, and D3 retirement are valid` |
 | PR candidate CI/D3-adjacent delivery | PASS (candidate only) | run `33707236357` all quality gates and the integrated Disposable delivery job succeeded; it is not `d3-delivery` |
+| final SHA CI/D3 provenance | BLOCKED | current `origin/dev` SHA is `ce87dfab…`; CI run `33710740174` failed on the Grade MySQL contract (5 expected, 4 found), and D3 run `33710760915` consumed a cancelled source run |
 | workflow static checks | PASS | `check-workflows: PASS (67 checks)` |
 | shell syntax | PASS | `bash -n` 覆盖归档的 delivery/kind/platform/docker shell files |
 | JSON syntax | PASS | 归档的 `workloads.json` 与 `workload-manifest.schema.json` |
@@ -18,16 +20,19 @@
 | `git diff --check` | PASS | tracked diff 无 whitespace error |
 | authored text whitespace | PASS | 索引、SOURCE-MAP、验收和契约快照无尾随空白；Actions 原始诊断保留其原始字节，不做格式化 |
 | secret-value scan | PASS with exclusions | 只保留 Secret key/ref；未归档 `.env`、运行时 Secret 和含字面量密码的非 canonical `compose.assessment.yml` |
+| source build-input closure | PASS | Gateway Dockerfile 引用的 `scripts/gateway/**` 已纳入快照；业务源码仍明确由 final SHA 正本提供 |
+| D8 cross-issue evidence linkage | PASS with provenance note | #319/PR #374 已提供 HPA 配置与 Round 8 原始证据；#379 只引用 canonical evidence，不把 `cf2979dc…` 宣称为当前 final SHA |
 
-## 测试环境限制
+## 测试环境
 
-仓库平台单元测试共发现 47 个测试，其中 46 个通过，1 个因本机没有 `node`
-可执行文件而在测试启动阶段报 `FileNotFoundError`：
-`test_disposable_runtime_generates_a_public_jwks_bootstrap_bundle`。这不是该归档
-修改引入的断言失败；GitHub final SHA 的 CI 原始结果仍以
-[ci-quality-gate run 33698399654](https://github.com/Cr4zyorange/OnlineJudge/actions/runs/33698399654)
-为准，并且该 run 的失败原因已归档。候选 run `33707236357` 成功，但只有合入 `dev` 后的
-push 才能触发 issue #379 要求的 `d3-delivery`。
+平台单元测试共发现 67 个测试，在仓库开发容器提供的 Node 22 环境中全部通过；主机
+直接运行时缺少 `node`，因此本地用容器复演该命令，不将主机工具缺失记为产品失败。
+旧基线 run `33698399654` 的失败原因已归档。最新 final SHA 的 CI run `33710740174`
+因 Grade MySQL contract 失败；其 D3 尝试 `33710760915` 消费了被取消的 source run
+`33710071217`。候选 run
+`33707236357` 成功，但其 PR head `82dd…` 与 integrated delivery artifact 记录的
+构建 SHA `7402…` 不同；两者均不能替代合入 `dev` 后由 push 触发的 issue #379 要求的
+`d3-delivery`。
 
 ## 敏感值处理
 

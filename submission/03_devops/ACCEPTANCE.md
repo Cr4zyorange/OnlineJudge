@@ -5,18 +5,19 @@ origin/dev 最终交付链路尚未满足，不以 PR 候选或历史运行替�
 
 | 项目 | 状态 | 依据 |
 | --- | --- | --- |
-| 配置入口与边界 | PASS | [SOURCE-MAP.md](SOURCE-MAP.md)、D3/D7 契约快照 |
+| 配置入口与边界 | PASS | [SOURCE-MAP.md](SOURCE-MAP.md)、D3/D7/D8 契约快照；source 快照基线为 `ce87dfab…` |
 | 9 workloads 与 4 migration jobs | PASS | `source/deploy/platform/workloads.json`，本地 validator 输出待补入校验记录 |
 | Docker/Compose、workflow、Kubernetes/Kind、迁移/seed/账号矩阵 | PASS | `source/` 快照和 SOURCE-MAP |
 | workflow failure gate 与 final SHA 绑定 | PASS | final CI/D3 原始 artifacts；D3 在 quality gate failure 后 build/deploy skipped |
-| origin/dev 基线 CI quality gate | BLOCKED | run 33698399654；backend Course API coverage 404/expected 200 |
+| 前一 dev 基线 CI quality gate | PASS (historical failure archived) | run 33698399654；backend Course API coverage 404/expected 200，原始证据已移入 `historical/baseline-c56/` |
+| 最新 origin/dev final CI quality gate | BLOCKED | run 33710740174 尚未形成稳定可归档结论；对应 D3 消费到已取消的 source run 33710071217 |
 | PR 候选 CI quality gate | PASS (candidate only) | run 33707236357；backend/frontend/contracts/browser E2E/内置 Disposable delivery 均成功 |
-| origin/dev final D3 delivery | BLOCKED | run 33698830921；`quality_gate=failure`，`build_images=skipped`，`deploy_kind=skipped`；合入候选后需重新产生 `d3-delivery` |
+| origin/dev final D3 delivery | BLOCKED | run 33710097381 因 source quality-gate run 33708404785 为 `cancelled` 而阻断；合入候选后需重新产生有效 `d3-delivery` |
 | immutable image tags/digests + OCI revision | BLOCKED | final SHA 未进入 build；历史成功 digest 仅作旧 SHA 追溯 |
 | 成功部署证据 | PASS (historical only) | run 33227922081；旧 SHA、旧 3-workload topology，不能升级为 final PASS |
 | 真实失败与诊断 | PASS (historical only) | run 33628385169；backend CrashLoopBackOff、rollout timeout、diagnostics、bounded cleanup |
-| rollback/recovery 证据 | BLOCKED | origin/dev final SHA 没有成功部署可回滚；需合入后追加合规 D3 证据 |
-| D8 HPA / observability | BLOCKED | origin/dev final SHA 无 HPA/observability source/evidence 文件 |
+| rollback/recovery 证据 | BLOCKED | latest final SHA 没有成功部署可回滚；需合入后追加合规 D3 证据 |
+| D8 HPA / observability | PASS (cross-issue input) | #319 已合入 `origin/dev`（PR #374），配置为 `source/deploy/platform/observability-hpa-experiment.json`；正式 Round 8 原始证据仍由 `docs/过程/测试/Issue-319-HPA实验证据-20260902T161736Z/` 维护，provenance tested SHA 为 `cf2979dc…`，不冒充当前 final D3 |
 | Helm source | N/A | 当前 D7 契约使用渲染的 Kubernetes/Kind manifests，仓库无 Helm chart |
 | Secret 值未归档 | PASS | source 仅保留键名/引用；原始 artifacts 未发现 Secret 实值，字面量密码的非 canonical compose 被排除 |
 | hash、YAML/JSON/shell、链接检查 | PASS with limitation | [CHECKS.md](CHECKS.md)；Compose `!reset` 扩展标签由 Compose 语法保留，通用 PyYAML 解析不适用 |
@@ -24,6 +25,6 @@ origin/dev 最终交付链路尚未满足，不以 PR 候选或历史运行替�
 ## 解阻条件
 
 1. 将 PR 候选合入 `dev`，以产生新的 origin/dev final SHA。
-2. 取得该 SHA 的 `ci-quality-gate=success`；若 404 回归复现，再由独立修复 issue 处理。
+2. 取得该 SHA 的 `ci-quality-gate=success`；若 Course API 404 回归复现，再由独立修复 issue 处理。
 3. 让该 SHA 的 `d3-delivery` 完成镜像构建、9 workload/4 migration Kind 验收，并归档 image inspect、部署、诊断和恢复/回滚证据。
 4. 若 #321 仍要求 D8 输入，再同步 HPA/observability 的真实运行证据；不得复用旧 SHA 的 PASS。

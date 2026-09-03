@@ -1,0 +1,21 @@
+# A reproducible runtime-only fallback for registry-constrained verification runners.
+# Build the jar first, then provide a locally cached, immutable Java 21 base:
+# docker build --build-arg RUNTIME_BASE=onlinejudge/backend:<known-sha> ...
+ARG RUNTIME_BASE=eclipse-temurin:21-jre@sha256:7a65df4b22d2de92d4e04056e884f3b9122d70b21e2847fd66084278bd0ce037
+FROM ${RUNTIME_BASE}
+
+WORKDIR /opt/onlinejudge-identity
+
+ARG GIT_SHA
+ARG IMAGE_SOURCE=https://github.com/Cr4zyorange/OnlineJudge
+LABEL org.opencontainers.image.revision="$GIT_SHA" \
+      org.opencontainers.image.version="$GIT_SHA" \
+      org.opencontainers.image.source="$IMAGE_SOURCE"
+
+COPY --chown=10001:10001 services/identity/target/onlinejudge-identity-service-0.1.0-SNAPSHOT.jar app.jar
+
+EXPOSE 8081
+
+USER 10001:10001
+
+ENTRYPOINT ["java", "-jar", "/opt/onlinejudge-identity/app.jar", "--spring.config.additional-location=classpath:/application-compose.properties"]

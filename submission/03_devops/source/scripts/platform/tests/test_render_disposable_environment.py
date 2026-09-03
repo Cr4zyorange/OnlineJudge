@@ -126,6 +126,11 @@ class DisposableEnvironmentRendererTest(unittest.TestCase):
         self.assertNotIn("assessment-password", compose)
         self.assertNotIn("root-password", kubernetes)
 
+    def test_gateway_is_loopback_only_and_e2e_seed_is_opt_in(self) -> None:
+        compose, _ = self.render()
+        self.assertIn('127.0.0.1:${GATEWAY_HTTP_PORT:-18080}:8080', compose)
+        self.assertIn('IDENTITY_SEED_DATA_ENABLED: "${IDENTITY_SEED_DATA_ENABLED:-false}"', compose)
+
     def test_jwks_bootstrap_secret_fails_closed_when_omitted(self) -> None:
         compose, _ = self.render()
 
@@ -177,6 +182,14 @@ class DisposableEnvironmentRendererTest(unittest.TestCase):
             worker,
         )
 
+    def test_kubernetes_workloads_disable_service_link_environment_injection(self) -> None:
+        _, kubernetes = self.render()
+
+        # Service-link variables can collide with explicitly typed runtime
+        # settings (for example RABBITMQ_PORT). Every rendered workload Pod
+        # must therefore opt out before the container environment is built.
+        self.assertEqual(kubernetes.count("      enableServiceLinks: false"), 9)
+
     def test_kubernetes_stage_files_keep_migrations_before_workloads_and_gateway(self) -> None:
         stages = self.render_stages()
 
@@ -201,11 +214,35 @@ class DisposableEnvironmentRendererTest(unittest.TestCase):
         self.assertNotIn("name: gateway", stages["70-applications.yaml"])
         self.assertIn("name: gateway", stages["80-gateway.yaml"])
 
+    def test_assessment_api_stage_declares_the_issue_319_cpu_hpa(self) -> None:
+        stages = self.render_stages()
+
+        applications = stages["70-applications.yaml"]
+        self.assertIn("kind: HorizontalPodAutoscaler", applications)
+        self.assertIn("name: assessment-api", applications)
+        self.assertIn("minReplicas: 1", applications)
+        self.assertIn("maxReplicas: 3", applications)
+        self.assertIn("averageUtilization: 60", applications)
+        self.assertIn("stabilizationWindowSeconds: 300", applications)
+
     def test_assessment_worker_waits_for_the_shared_assessment_schema_migration(self) -> None:
         compose, _ = self.render()
         worker = compose[compose.index("\n  assessment-worker:") : compose.index("\n  grade-service:")]
 
         self.assertIn("      assessment-migrations:\n        condition: service_completed_successfully", worker)
+
+    def test_course_and_assessment_runtime_use_the_migrated_mysql_schemas(self) -> None:
+        compose, _ = self.render()
+
+        course = compose[compose.index("\n  course-service:") : compose.index("\n  assessment-api:")]
+        assessment = compose[compose.index("\n  assessment-api:") : compose.index("\n  grade-service:")]
+
+        self.assertIn('COURSE_DATASOURCE_URL: "jdbc:mysql://mysql:3306/oj_course?', course)
+        self.assertIn('COURSE_DATABASE_DRIVER: "com.mysql.cj.jdbc.Driver"', course)
+        self.assertIn('SPRING_SQL_INIT_MODE: "never"', course)
+        self.assertIn('ASSESSMENT_DATASOURCE_URL: "jdbc:mysql://mysql:3306/oj_assessment?', assessment)
+        self.assertIn('ASSESSMENT_DATABASE_DRIVER: "com.mysql.cj.jdbc.Driver"', assessment)
+        self.assertIn('SPRING_SQL_INIT_MODE: "never"', assessment)
 
     def test_frontend_legacy_backend_upstream_resolves_to_the_gateway_in_both_targets(self) -> None:
         compose, kubernetes = self.render()
@@ -220,6 +257,38 @@ class DisposableEnvironmentRendererTest(unittest.TestCase):
         self.assertIn("subPath: frontend-disposable.conf", kubernetes)
         self.assertIn("resolver kube-dns.kube-system.svc.cluster.local ipv6=off valid=10s", kubernetes)
         self.assertNotIn("aliases:\n          - backend", compose)
+
+    def test_compose_frontend_proxy_bind_mount_is_absolute(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory)
+            compose = output / "compose.yml"
+            kubernetes = output / "platform.yaml"
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(RENDERER),
+                    "--schema",
+                    str(SCHEMA),
+                    "--manifest",
+                    str(MANIFEST),
+                    "--git-sha",
+                    GIT_SHA,
+                    "--compose-output",
+                    str(compose),
+                    "--kubernetes-output",
+                    str(kubernetes),
+                ],
+                cwd=REPOSITORY_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            frontend = compose.read_text(encoding="utf-8")[
+                compose.read_text(encoding="utf-8").index("\n  frontend:") :
+                compose.read_text(encoding="utf-8").index("\n  rabbitmq:")
+            ]
+            self.assertIn(f'"{(output / "frontend-disposable.conf").resolve()}:/etc/nginx/conf.d/default.conf:ro"', frontend)
 
     def test_compose_frontend_proxy_file_remains_readable_when_runtime_secrets_use_a_private_umask(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

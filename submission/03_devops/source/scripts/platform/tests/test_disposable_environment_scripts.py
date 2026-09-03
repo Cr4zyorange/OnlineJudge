@@ -19,6 +19,11 @@ RUN = REPOSITORY_ROOT / "scripts/platform/run_disposable_environment.sh"
 ROLLBACK = REPOSITORY_ROOT / "scripts/platform/rollback_disposable_environment.sh"
 KUBERNETES_DEPLOY = REPOSITORY_ROOT / "scripts/platform/deploy_kubernetes_disposable_environment.sh"
 CI_DELIVERY = REPOSITORY_ROOT / "scripts/ci/disposable-delivery.sh"
+HPA_EXPERIMENT = REPOSITORY_ROOT / "scripts/platform/run_hpa_observability_experiment.sh"
+GRADE_MYSQL_LIVE = REPOSITORY_ROOT / "scripts/test/verify-grade-service-mysql-live.sh"
+GRADE_SOURCE_PROJECTION_STATUS_MIGRATION = (
+    REPOSITORY_ROOT / "database/migrations/grade/V20260902_03__drop_legacy_grade_source_projection_status.sql"
+)
 CI_WORKFLOW = REPOSITORY_ROOT / ".github/workflows/ci.yml"
 JWKS_BUNDLE = REPOSITORY_ROOT / "scripts/platform/generate_jwks_trust_bundle.mjs"
 
@@ -72,7 +77,9 @@ class DisposableEnvironmentScriptsTest(unittest.TestCase):
         # interception); the shared default must stay on Docker's bridge
         # network, so the unconditional --network=host flag must not return.
         self.assertIn("OJ318_DOCKER_BUILD_NETWORK", source)
-        self.assertIn('"${docker_build_network_args[@]}"', source)
+        self.assertIn('if ((${#docker_build_network_args[@]})); then', source)
+        self.assertIn('retry 3 docker build "${docker_build_network_args[@]}"', source)
+        self.assertIn('retry 3 docker build --file', source)
         self.assertNotIn("docker build --network=host", source)
 
     def test_frontend_image_installation_retries_transient_registry_failures(self) -> None:
@@ -147,6 +154,148 @@ class DisposableEnvironmentScriptsTest(unittest.TestCase):
         self.assertEqual(bundle["keys"][0]["use"], "sig")
         self.assertEqual(bundle["keys"][0]["alg"], "RS256")
         self.assertNotIn("d", bundle["keys"][0], "the bootstrap bundle must never contain a private key")
+
+    def test_run_command_has_argv_safe_e2e_hook_and_context(self) -> None:
+        source = self.assert_help(RUN)
+        self.assertIn("--after-ready", source)
+        self.assertIn("three-service-context.json", source)
+        self.assertIn('"${after_ready_command[@]}"', source)
+        self.assertNotIn('eval "$after_ready', source)
+
+    def test_run_command_cleanup_works_with_macos_bash_and_records_remaining_resources(self) -> None:
+        source = self.assert_help(RUN)
+        self.assertNotIn("mapfile -t cleanup_", source)
+        self.assertIn("while IFS= read -r cleanup_container; do", source)
+        self.assertIn("while IFS= read -r cleanup_volume; do", source)
+        self.assertIn('cleanup_arguments=("$output_dir/cleanup-summary.json" "$project_name" "$cleanup_status")', source)
+        self.assertIn('cleanup_arguments+=(--)', source)
+        self.assertNotIn('"${cleanup_containers[@]}" -- "${cleanup_volumes[@]}"', source)
+        self.assertIn("cleanup-summary.json", source)
+
+    def test_run_command_does_not_report_a_cleanup_failure_before_runtime_env_exists(self) -> None:
+        source = self.assert_help(RUN)
+        self.assertIn('runtime_env_ready=0', source)
+        self.assertIn('runtime_env_ready=1', source)
+        self.assertIn('if (( runtime_env_ready )); then', source)
+
+    def test_run_command_collects_post_hook_diagnostics_before_propagating_failure(self) -> None:
+        source = self.assert_help(RUN)
+        self.assertIn("collect_diagnostics after-ready-success", source)
+        self.assertIn("collect_diagnostics after-ready-failure", source)
+        self.assertIn("exit \"$after_ready_status\"", source)
+
+    def test_run_command_uses_a_portable_unique_runtime_secret_template(self) -> None:
+        source = self.assert_help(RUN)
+        self.assertNotIn('onlinejudge-issue318.XXXXXX.env', source)
+        self.assertIn('onlinejudge-issue318.XXXXXX")', source)
+
+    def test_hpa_experiment_captures_scale_timeline_and_diagnostics_on_success_or_failure(self) -> None:
+        source = self.assert_help(HPA_EXPERIMENT)
+        self.assertIn("--gateway-url", source)
+        self.assertIn("top pod", source)
+        self.assertIn("get hpa", source)
+        self.assertIn("request_latency_p95", source)
+        self.assertIn("rabbitmq_queue_backlog", source)
+        self.assertIn("assessment_outbox_pending_and_lease", source)
+        self.assertIn("grade_projection_watermark", source)
+        # AC-319-03: the outage phase must prove RabbitMQ really went away
+        # (statefulset readyReplicas at zero AND service endpoints empty) and
+        # must record assessment-api availability samples from inside that
+        # verified outage window; a rollout status on an already-ready
+        # deployment returns immediately and is not evidence.
+        self.assertIn("rabbitmq_outage_window_seconds", source)
+        self.assertIn("status.readyReplicas", source)
+        self.assertIn("endpoints/rabbitmq", source)
+        self.assertIn("endpoints assessment-api", source)
+        self.assertIn("availableReplicas", source)
+        self.assertIn("rabbitmq confirmed unavailable", source)
+        self.assertIn("rabbitmq restored", source)
+        # AC-319-04: the two diagnostics signals must carry raw database
+        # values, not just application logs; the logs stay as context files.
+        self.assertIn("lease_owner, lease_until, heartbeat_at", source)
+        self.assertIn("grade_source_projection_watermark", source)
+        self.assertIn("assessment-outbox-lease-timeline", source)
+        self.assertIn("assessment-api-applog", source)
+        self.assertIn("grade-service-applog", source)
+        self.assertIn('"finishedAtUtc"', source)
+        self.assertIn("request_id", source)
+        self.assertIn("rabbitmq_outage=1", source)
+        self.assertIn("kubectl -n \"$namespace\" scale statefulset/rabbitmq", source)
+        self.assertIn("wait_for_replicas", source)
+        self.assertIn("scaled up", source)
+        self.assertIn("scaled down", source)
+        self.assertIn("--authorization-file", source)
+        self.assertIn("--request-method", source)
+        self.assertIn("--request-body-file", source)
+        self.assertIn("may be repeated", source)
+        self.assertIn("request_urls+=(", source)
+        self.assertIn("--noproxy", source)
+        # wait_for_replicas must branch on the comparison explicitly; a bare
+        # `A && B || C && D` chain parses left-associative and the -le branch
+        # would veto every successful scale-up, so each branch is guarded by
+        # its own comparison instead.
+        self.assertIn('[[ "$comparison" == "-gt" ]] && (( current > baseline ))', source)
+        self.assertIn('[[ "$comparison" == "-le" ]] && (( current <= baseline ))', source)
+        # The committed runner SHA and the deployed image SHA must be recorded
+        # separately: a run is only reproducible when the evidence states which
+        # commit executed the experiment and which GIT_SHA was under test.
+        self.assertIn('GIT_SHA")].value', source)
+        self.assertIn('"deploymentVersion": sys.argv[11]', source)
+        self.assertNotIn('"deploymentVersion": sys.argv[7]', source)
+        self.assertIn("EXPERIMENT_FAILURE", source)
+        self.assertIn("EXPERIMENT_READY", source)
+
+    def test_hpa_experiment_proves_the_rabbitmq_outage_window_and_records_projection_leases(self) -> None:
+        source = self.assert_help(HPA_EXPERIMENT)
+        # AC-319-03 requires an actual non-ready RabbitMQ window, rather than
+        # only an accepted scale command or an already-ready rollout status.
+        self.assertIn("wait_for_rabbitmq_outage", source)
+        self.assertIn("rabbitmq_outage_window_seconds=15", source)
+        self.assertIn("readyReplicas", source)
+        self.assertIn("endpoints/rabbitmq", source)
+        self.assertIn("assessment availability during RabbitMQ outage", source)
+        # Kubernetes omits status.readyReplicas entirely once a StatefulSet
+        # reaches zero.  The runner must normalize that empty jsonpath result
+        # before deciding whether the outage has actually begun.
+        self.assertIn('printf \'%s\\n\' "${ready_replicas:-0}"', source)
+        # An interrupted run must retain a non-zero status; otherwise the EXIT
+        # trap could publish an empty run as EXPERIMENT_READY.
+        self.assertIn("trap 'exit 130' INT TERM", source)
+        # The real runner must work on a macOS host as well as Linux: its
+        # correlation id source cannot rely solely on /proc.
+        self.assertIn("new_request_id()", source)
+        self.assertIn("uuidgen | tr '[:upper:]' '[:lower:]'", source)
+        # Kubernetes snapshots can contain a temporarily injected service
+        # Authorization value.  Evidence must preserve the resource state
+        # without copying that credential into raw files.
+        self.assertIn("redact_bearer_values()", source)
+        self.assertIn("redact_bearer_values", source)
+        self.assertIn("<redacted>", source)
+        # AC-319-04 requires database-backed diagnostic signals. Application
+        # logs alone cannot prove projection catch-up or an active task lease.
+        self.assertIn("capture_projection_and_lease_diagnostics", source)
+        self.assertIn("grade_source_projection_watermark", source)
+        self.assertIn("evaluation_task", source)
+        self.assertIn("lease_owner", source)
+        # Terminal tasks retain the last real lease fields too.  Restricting
+        # diagnostics to RUNNING rows can make a completed experiment look as
+        # though it had never exercised the worker lease protocol.
+        self.assertIn("ORDER BY updated_at DESC, id", source)
+        self.assertNotIn("WHERE lease_owner IS NOT NULL OR state = 'RUNNING'", source)
+
+    def test_grade_mysql_runtime_migration_removes_the_legacy_projection_status(self) -> None:
+        source = GRADE_MYSQL_LIVE.read_text(encoding="utf-8")
+        self.assertIn("V20260902_03__drop_legacy_grade_source_projection_status.sql", source)
+        self.assertNotIn("projection_status_nullable", source)
+
+        migration = GRADE_SOURCE_PROJECTION_STATUS_MIGRATION.read_text(encoding="utf-8")
+        self.assertIn("DROP COLUMN status", migration)
+
+    def test_run_command_can_retain_a_temporary_runtime_env_for_resilience_restart_probes(self) -> None:
+        source = self.assert_help(RUN)
+        self.assertIn("--keep-runtime-env", source)
+        self.assertIn("--runtime-env-path", source)
+        self.assertIn("if (( ! keep_runtime_env )); then rm -f \"$runtime_env\"; fi", source)
 
     def test_rollback_command_requires_an_immutable_artifact_manifest(self) -> None:
         source = self.assert_help(ROLLBACK)

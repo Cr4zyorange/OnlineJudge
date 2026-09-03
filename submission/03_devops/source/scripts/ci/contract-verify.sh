@@ -88,6 +88,17 @@ if [[ "$side" == "consumer" || "$side" == "all" ]]; then
       scripts.platform.tests.test_validate_workload_manifest
     log_run env PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v \
       scripts.platform.tests.test_plan_delivery
+
+    # #319 starts before #318's service adapters exist.  Keep the HPA,
+    # readiness and evidence contract executable in the same gate so later
+    # deployment work cannot silently discard the pre-environment RED cases.
+    log_run env PYTHONDONTWRITEBYTECODE=1 python3 \
+      scripts/platform/validate_observability_experiment.py \
+      --workload-schema deploy/platform/workload-manifest.schema.json \
+      --workload-manifest deploy/platform/workloads.json \
+      --experiment deploy/platform/observability-hpa-experiment.json
+    log_run env PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v \
+      scripts.platform.tests.test_validate_observability_experiment
   )
 fi
 

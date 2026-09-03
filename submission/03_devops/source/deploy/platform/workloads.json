@@ -185,17 +185,18 @@
       },
       "ports": [{"name": "http", "containerPort": 8084, "protocol": "TCP", "external": false}],
       "health": {
-        "startup": {"kind": "http", "target": "/health/ready", "requiredDependencies": ["mysql"]},
-        "liveness": {"kind": "http", "target": "/health/ready", "requiredDependencies": ["mysql"]},
-        "readiness": {"kind": "http", "target": "/health/ready", "requiredDependencies": ["mysql"]}
+        "startup": {"kind": "http", "target": "/health/ready", "requiredDependencies": ["mysql", "rabbitmq"]},
+        "liveness": {"kind": "http", "target": "/health/ready", "requiredDependencies": ["mysql", "rabbitmq"]},
+        "readiness": {"kind": "http", "target": "/health/ready", "requiredDependencies": ["mysql", "rabbitmq"]}
       },
-      "dependsOn": ["mysql"],
+      "dependsOn": ["mysql", "rabbitmq"],
       "migrationJob": "grade-migrations",
       "configuration": ["GRADE_HTTP_PORT", "MYSQL_HOST", "MYSQL_PORT", "GRADE_DATABASE_NAME", "GRADE_DATABASE_USER", "IDENTITY_JWT_ISSUER", "IDENTITY_JWT_AUDIENCE", "IDENTITY_JWKS_URI", "IDENTITY_JWKS_REFRESH_INTERVAL", "IDENTITY_JWKS_REFRESH_INITIAL_DELAY", "IDENTITY_JWKS_REQUEST_TIMEOUT", "RABBITMQ_HOST", "RABBITMQ_PORT"],
       "secrets": [
         {"key": "GRADE_DATABASE_PASSWORD", "injectedAs": "runtime-secret", "redact": true, "imageBuild": "forbidden"},
         {"key": "IDENTITY_JWKS_TRUST_BUNDLE", "injectedAs": "runtime-secret", "redact": true, "imageBuild": "forbidden"},
-        {"key": "GRADE_SERVICE_IDENTITY", "injectedAs": "workload-identity", "redact": true, "imageBuild": "forbidden"},
+        {"key": "GRADE_COURSE_SERVICE_IDENTITY", "injectedAs": "workload-identity", "redact": true, "imageBuild": "forbidden"},
+        {"key": "GRADE_ASSESSMENT_SERVICE_IDENTITY", "injectedAs": "workload-identity", "redact": true, "imageBuild": "forbidden"},
         {"key": "RABBITMQ_PASSWORD", "injectedAs": "runtime-secret", "redact": true, "imageBuild": "forbidden"}
       ],
       "resources": {"requests": {"cpu": "200m", "memory": "256Mi"}, "limits": {"cpu": "1000m", "memory": "1Gi"}},
