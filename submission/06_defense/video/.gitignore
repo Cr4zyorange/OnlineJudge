@@ -1,0 +1,6 @@
+raw/*
+work/*
+final/*
+!raw/.gitkeep
+!work/.gitkeep
+!final/.gitkeep
