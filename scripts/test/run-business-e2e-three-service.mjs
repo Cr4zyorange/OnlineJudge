@@ -146,9 +146,13 @@ export function redact(value, secrets) {
 export function validateEvidenceManifest(manifest) {
   const required = ['AUTH-CRS', 'ASSESSMENT-WORKER', 'GRD-LRN'];
   const representative = manifest?.representative;
-  if (!Array.isArray(representative)
+  if (!Array.isArray(representative) || representative.length !== required.length
     || !required.every((group) => representative.some((entry) => entry?.group === group))) {
     throw new Error('evidence must include AUTH-CRS, ASSESSMENT-WORKER and GRD-LRN representative groups');
+  }
+  if (new Set(representative.map((entry) => entry.group)).size !== required.length
+    || new Set(representative.map((entry) => entry.proofId)).size !== required.length) {
+    throw new Error('representative evidence groups and proof identities must be distinct');
   }
   for (const group of representative) {
     if (!group.requestResponse || !group.uiAssertion || !group.proofId || !group.logExcerpt) {
@@ -156,6 +160,180 @@ export function validateEvidenceManifest(manifest) {
     }
   }
   return manifest;
+}
+
+function requireOperation(record, key, expectedMethod, expectedPath) {
+  const operation = record?.chain?.[key];
+  if (!operation || operation.method !== expectedMethod || operation.path !== expectedPath
+    || !Number.isInteger(operation.status) || operation.status < 200 || operation.status >= 300) {
+    throw new Error(`${record?.group || 'unknown'} representative evidence is missing ${key} ${expectedMethod} ${expectedPath}`);
+  }
+  if (!operation.response || typeof operation.response !== 'object') {
+    throw new Error(`${record.group} representative evidence ${key} response is missing`);
+  }
+  return operation;
+}
+
+function positiveIdentity(value, label) {
+  const number = Number(value);
+  if (!Number.isSafeInteger(number) || number <= 0) {
+    throw new Error(`${label} must be a positive numeric identity`);
+  }
+  return number;
+}
+
+function findRuntimeLine(logs, label, needles) {
+  const lines = logs.split(/\r?\n/);
+  const offset = lines.findIndex((line) => needles.every((needle) => line.includes(needle)));
+  if (offset < 0) {
+    throw new Error(`runtime evidence is missing ${label}: ${needles.join(' + ')}`);
+  }
+  return { line: lines[offset], offset };
+}
+
+function findLastRuntimeLine(logs, label, needles) {
+  const lines = logs.split(/\r?\n/);
+  const offset = lines.findLastIndex((line) => needles.every((needle) => line.includes(needle)));
+  if (offset < 0) {
+    throw new Error(`runtime evidence is missing ${label}: ${needles.join(' + ')}`);
+  }
+  return { line: lines[offset], offset };
+}
+
+function runtimeValue(line, key, label) {
+  const value = line.match(new RegExp(`\\b${key}=([^\\s,]+)`))?.[1];
+  if (!value) {
+    throw new Error(`${label} is missing ${key}`);
+  }
+  return value;
+}
+
+function requireUiEvidence(record, junit) {
+  const ui = record?.uiAssertion;
+  if (!ui?.route?.startsWith('/') || !ui.selector || !ui.expected || !ui.screenshot || !ui.junitCase) {
+    throw new Error(`${record?.group || 'unknown'} representative evidence is missing browser assertion or screenshot`);
+  }
+  if (!existsSync(ui.screenshot)) {
+    throw new Error(`${record.group} representative screenshot was not retained: ${ui.screenshot}`);
+  }
+  if (!junit.includes(ui.junitCase)) {
+    throw new Error(`${record.group} representative JUnit testcase was not retained: ${ui.junitCase}`);
+  }
+  return ui;
+}
+
+function evidenceEntry(group, proofId, requestResponse, uiAssertion, logExcerpt) {
+  return {
+    group,
+    proofId,
+    requestResponse: JSON.stringify(requestResponse),
+    uiAssertion: JSON.stringify(uiAssertion),
+    logExcerpt
+  };
+}
+
+/**
+ * Builds only current-run, group-specific evidence.  It deliberately joins
+ * browser-captured API entities with post-E2E runtime logs; startup/readiness
+ * logs and a generic first request cannot satisfy this contract.
+ */
+export function buildRepresentativeEvidence({ baseUrl, records, logs, junit }) {
+  if (!/^http:\/\/127\.0\.0\.1:\d+$/.test(baseUrl || '') || !Array.isArray(records) || typeof logs !== 'string') {
+    throw new Error('representative evidence requires a loopback runtime, records and raw runtime logs');
+  }
+  if (typeof junit !== 'string') {
+    throw new Error('representative evidence requires the Playwright JUnit report');
+  }
+  const byGroup = new Map(records.map((record) => [record?.group, record]));
+  if (byGroup.size !== 3 || !['AUTH-CRS', 'ASSESSMENT-WORKER', 'GRD-LRN'].every((group) => byGroup.has(group))) {
+    throw new Error('representative evidence must contain one record for each required group');
+  }
+  if (new Set(records.map((record) => record?.proofId)).size !== 3) {
+    throw new Error('representative evidence proof identities must be distinct');
+  }
+
+  const auth = byGroup.get('AUTH-CRS');
+  const authLogin = requireOperation(auth, 'login', 'POST', '/api/v1/auth/login');
+  const courseId = positiveIdentity(auth?.chain?.courseDetail?.response?.courseId, 'AUTH-CRS course id');
+  const authCourse = requireOperation(auth, 'courseDetail', 'GET', `/api/v1/courses/${courseId}`);
+  const teacherId = positiveIdentity(authLogin.response.userId, 'AUTH-CRS login user id');
+  if (auth?.proofId !== `course-${courseId}` || authCourse.response.member !== true) {
+    throw new Error('AUTH-CRS representative identity does not join the authenticated teacher course detail');
+  }
+  const authLog = findRuntimeLine(logs, 'AUTH-CRS course read', [`GET /api/v1/courses/${courseId}`]);
+  const authUi = requireUiEvidence(auth, junit);
+
+  const worker = byGroup.get('ASSESSMENT-WORKER');
+  const workerSubmit = requireOperation(worker, 'submit', 'POST', worker?.chain?.submit?.path);
+  if (!/^\/api\/v1\/homeworks\/\d+\/submissions$/.test(workerSubmit.path)) {
+    throw new Error('ASSESSMENT-WORKER representative submission path is invalid');
+  }
+  const publicSubmissionId = positiveIdentity(workerSubmit.response.submissionId, 'ASSESSMENT-WORKER public submission id');
+  const workerRead = requireOperation(worker, 'finalRead', 'GET', `/api/v1/submissions/${publicSubmissionId}/evaluation`);
+  const taskId = positiveIdentity(workerRead.response.taskId, 'ASSESSMENT-WORKER task id');
+  if (worker?.proofId !== `task-${taskId}`
+    || positiveIdentity(workerRead.response.submissionId, 'ASSESSMENT-WORKER final read submission id') !== publicSubmissionId
+    || workerRead.response.taskState !== 'SUCCEEDED') {
+    throw new Error('ASSESSMENT-WORKER POST, passive GET and task identities do not agree');
+  }
+  const queued = findRuntimeLine(logs, 'ASSESSMENT-WORKER queued submission', [
+    'homework_submission_queued', `publicSubmissionId=${publicSubmissionId}`, `taskId=${taskId}`
+  ]);
+  const internalSubmissionId = runtimeValue(queued.line, 'submissionId', 'ASSESSMENT-WORKER queued submission');
+  const terminal = findRuntimeLine(logs, 'ASSESSMENT-WORKER terminal worker completion', [
+    'assessment_worker_terminal', `taskId=${taskId}`, `submissionId=${internalSubmissionId}`, 'taskState=SUCCEEDED'
+  ]);
+  const workerGet = findLastRuntimeLine(logs, 'ASSESSMENT-WORKER passive final GET', [
+    `GET /api/v1/submissions/${publicSubmissionId}/evaluation`
+  ]);
+  if (!(queued.offset < terminal.offset && terminal.offset < workerGet.offset)) {
+    throw new Error('ASSESSMENT-WORKER evidence must prove submit then worker completion then passive GET');
+  }
+  const workerUi = requireUiEvidence(worker, junit);
+
+  const grade = byGroup.get('GRD-LRN');
+  const gradePublish = requireOperation(grade, 'publish', 'POST', grade?.chain?.publish?.path);
+  if (!/^\/api\/v1\/courses\/\d+\/grades\/publish$/.test(gradePublish.path)) {
+    throw new Error('GRD-LRN representative publication path is invalid');
+  }
+  const publishId = positiveIdentity(gradePublish.response.publishId, 'GRD-LRN publish id');
+  const notification = requireOperation(grade, 'notification', 'GET', '/api/v1/notifications?type=GRADE&size=100');
+  const notificationId = positiveIdentity(notification.response.notificationId, 'GRD-LRN notification id');
+  if (grade?.proofId !== `notification-${notificationId}`
+    || positiveIdentity(notification.response.sourceId, 'GRD-LRN notification source id') !== publishId
+    || notification.response.sourceModule !== 'GRD') {
+    throw new Error('GRD-LRN publication and notification identities do not agree');
+  }
+  const projected = findRuntimeLine(logs, 'GRD-LRN notification projection', [
+    'lrn_notification_projected', 'sourceModule=GRD', `sourceId=${publishId}`, 'notificationIds=['
+  ]);
+  const projectedNotificationIds = (projected.line.match(/notificationIds=\[([^\]]*)\]/)?.[1] || '')
+    .split(',').map((value) => Number(value.trim())).filter(Number.isSafeInteger);
+  if (!projectedNotificationIds.includes(notificationId)) {
+    throw new Error('GRD-LRN projection did not retain the final notification identity');
+  }
+  const eventId = runtimeValue(projected.line, 'eventId', 'GRD-LRN notification projection');
+  const correlationId = runtimeValue(projected.line, 'correlationId', 'GRD-LRN notification projection');
+  const notificationGet = findLastRuntimeLine(logs, 'GRD-LRN final notification GET', [
+    'GET /api/v1/notifications?type=GRADE&size=100'
+  ]);
+  if (projected.offset >= notificationGet.offset) {
+    throw new Error('GRD-LRN evidence must prove publication projection before the final notification GET');
+  }
+  const gradeUi = requireUiEvidence(grade, junit);
+
+  return {
+    baseUrl,
+    representative: [
+      evidenceEntry('AUTH-CRS', auth.proofId, { login: { ...authLogin, response: { userId: teacherId } }, courseDetail: authCourse }, authUi, authLog.line),
+      evidenceEntry('ASSESSMENT-WORKER', worker.proofId,
+        { submit: workerSubmit, finalRead: workerRead, internalSubmissionId, taskId }, workerUi,
+        `${queued.line}\n${terminal.line}\n${workerGet.line}`),
+      evidenceEntry('GRD-LRN', grade.proofId,
+        { publish: gradePublish, notification, eventId, correlationId }, gradeUi,
+        `${projected.line}\n${notificationGet.line}`)
+    ]
+  };
 }
 
 export function validateCleanup(cleanup) {
@@ -198,11 +376,41 @@ async function run(command, args, options) {
   });
 }
 
+async function capture(command, args, options) {
+  return new Promise((resolveCapture, rejectCapture) => {
+    const child = spawn(command, args, { ...options, stdio: ['ignore', 'pipe', 'pipe'] });
+    let stdout = '';
+    let stderr = '';
+    child.stdout.on('data', (chunk) => { stdout += chunk; });
+    child.stderr.on('data', (chunk) => { stderr += chunk; });
+    child.once('error', rejectCapture);
+    child.once('exit', (code, signal) => {
+      if (code === 0) {
+        resolveCapture(`${stdout}${stderr}`);
+      } else {
+        rejectCapture(new Error(`${command} ${args.slice(0, 2).join(' ')} exited with ${signal || `code ${code}`} while collecting runtime evidence`));
+      }
+    });
+  });
+}
+
 async function writePrivateFile(path, content) {
   await writeFile(path, content, { encoding: 'utf8', mode: 0o600 });
   if (process.platform !== 'win32') {
     await chmod(path, 0o600);
   }
+}
+
+async function captureRuntimeLogs(context, artifactDir) {
+  if (typeof context.composeFile !== 'string' || !context.composeFile.trim()) {
+    throw new Error('three-service context must provide its Compose file for post-E2E runtime evidence');
+  }
+  const output = await capture('docker', [
+    'compose', '--project-name', context.projectName, '--file', context.composeFile, 'logs', '--no-color'
+  ], { cwd: repositoryRoot, env: process.env });
+  const rawLogPath = join(artifactDir, 'three-service-runtime-evidence.log');
+  await writePrivateFile(rawLogPath, redact(output, [process.env.E2E_THREE_SERVICE_TOKEN || '']));
+  return rawLogPath;
 }
 
 async function requestEnvelope(baseUrl, path, options, label, normalizeBareSuccess) {
@@ -370,6 +578,7 @@ async function runInsidePlatform() {
   const proofPath = join(proofDir, 'disposable-proof.json');
   const junitPath = join(artifactDir, 'playwright-junit.xml');
   const summaryPath = join(artifactDir, 'test-summary.json');
+  const representativePath = join(artifactDir, 'representative-evidence.raw.jsonl');
   let commandError = '';
   let summary = { total: 0, passed: 0, failed: 1, skipped: 0 };
 
@@ -383,6 +592,7 @@ async function runInsidePlatform() {
       contextPath: resolve(contextPath),
       evidenceDir: artifactDir
     }, null, 2)}\n`);
+    await writePrivateFile(representativePath, '');
 
     const scenario = await bootstrapScenarioCourse(context, artifactDir);
 
@@ -403,6 +613,8 @@ async function runInsidePlatform() {
           E2E_GRADE_SUMMARY_ID: String(scenario.gradeSummaryId),
           E2E_THREE_SERVICE_PROOF_FILE: proofPath,
           E2E_THREE_SERVICE_TOKEN: token,
+          E2E_THREE_SERVICE_REPRESENTATIVE_EVIDENCE_FILE: representativePath,
+          E2E_THREE_SERVICE_ARTIFACT_DIR: artifactDir,
           PLAYWRIGHT_JUNIT_OUTPUT_FILE: junitPath
         }
       });
@@ -415,7 +627,10 @@ async function runInsidePlatform() {
     }
     await writeFile(summaryPath, `${JSON.stringify({ ...summary, commandError }, null, 2)}\n`, 'utf8');
     if (!commandError && isSuccessfulSummary(summary)) {
-      const evidence = validateEvidenceManifest(await writeEvidenceManifest(context, artifactDir, junitPath));
+      const runtimeLogPath = await captureRuntimeLogs(context, artifactDir);
+      const evidence = validateEvidenceManifest(await writeEvidenceManifest(
+        context, artifactDir, junitPath, representativePath, runtimeLogPath
+      ));
       await writeFile(join(artifactDir, 'representative-evidence.json'), `${JSON.stringify(evidence, null, 2)}\n`, 'utf8');
     }
     if (commandError || !isSuccessfulSummary(summary)) {
@@ -433,31 +648,26 @@ async function runInsidePlatform() {
   }
 }
 
-async function writeEvidenceManifest(context, artifactDir, junitPath) {
-  const readinessPath = join(artifactDir, 'gateway-readiness.json');
-  const logPath = join(artifactDir, 'compose-success.log');
-  const [readiness, logs] = await Promise.all([
-    readFile(readinessPath, 'utf8'),
-    readFile(logPath, 'utf8')
+async function writeEvidenceManifest(context, artifactDir, junitPath, representativePath, runtimeLogPath) {
+  const [junit, serializedRecords, logs] = await Promise.all([
+    readFile(junitPath, 'utf8'),
+    readFile(representativePath, 'utf8'),
+    readFile(runtimeLogPath, 'utf8')
   ]);
-  const proofLines = logs.split(/\r?\n/).filter((line) => /(?:taskId|eventId|correlationId|requestId)/i.test(line));
-  if (!proofLines.length) {
-    throw new Error('three-service logs did not retain a taskId, eventId, correlationId or requestId proof');
-  }
-  const proofId = proofLines[0].match(/(?:taskId|eventId|correlationId|requestId)[=:\"]+([^,\s\"]+)/i)?.[1];
-  if (!proofId) {
-    throw new Error('three-service logs contained no extractable asynchronous proof identifier');
-  }
-  const requestResponse = redact(readiness, [process.env.E2E_THREE_SERVICE_TOKEN || '']).slice(0, 2_000);
-  const uiAssertion = `Playwright JUnit completed 24 browser scenarios: ${junitPath}`;
-  const logExcerpt = redact(proofLines[0], [process.env.E2E_THREE_SERVICE_TOKEN || '']);
+  const records = serializedRecords.split(/\r?\n/).filter(Boolean).map((line, index) => {
+    try {
+      return JSON.parse(line);
+    } catch (error) {
+      throw new Error(`representative evidence record ${index + 1} is not valid JSON: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  });
+  const evidence = buildRepresentativeEvidence({ baseUrl: context.baseUrl, records, logs, junit });
   return {
-    baseUrl: context.baseUrl,
-    representative: [
-      { group: 'AUTH-CRS', requestResponse, uiAssertion, proofId, logExcerpt },
-      { group: 'ASSESSMENT-WORKER', requestResponse, uiAssertion, proofId, logExcerpt },
-      { group: 'GRD-LRN', requestResponse, uiAssertion, proofId, logExcerpt }
-    ]
+    ...evidence,
+    rawRuntimeLog: runtimeLogPath,
+    rawRepresentativeRecords: representativePath,
+    junit: junitPath,
+    artifactDir
   };
 }
 

@@ -1,9 +1,11 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 import test from 'node:test';
 
 import {
+  buildRepresentativeEvidence,
   createGrdSummaryFixtureLabPayload,
   createBootstrapRequestId,
   isSuccessfulSummary,
@@ -140,6 +142,80 @@ test('requires the three representative evidence groups', () => {
     () => validateEvidenceManifest({ representative: [] }),
     /AUTH.*Worker.*GRD/i
   );
+});
+
+test('requires three independent browser-to-runtime representative evidence chains', () => {
+  const evidenceDir = mkdtempSync(join(tmpdir(), 'issue320-representative-'));
+  const screenshot = (name) => {
+    const path = join(evidenceDir, `${name}.png`);
+    writeFileSync(path, 'screenshot');
+    return path;
+  };
+  const authCase = '教师建课并展示章节/资源/公告管理入口，学生公开加入';
+  const workerCase = '多类型提交验证代码后台评测并覆盖附件异常、过期、越权与重评';
+  const gradeCase = '@grd-main @grd-alternative @grd-exception runs LAB/HWK -> GRD -> LRN with real APIs';
+  const records = [
+    {
+      group: 'AUTH-CRS', proofId: 'course-418',
+      chain: {
+        login: { method: 'POST', path: '/api/v1/auth/login', status: 200, response: { userId: 901 } },
+        courseDetail: { method: 'GET', path: '/api/v1/courses/418', status: 200, response: { courseId: 418, member: true } }
+      },
+      uiAssertion: { route: '/courses/418', selector: 'button[name="管理章节"]', expected: 'visible', screenshot: screenshot('auth'), junitCase: authCase }
+    },
+    {
+      group: 'ASSESSMENT-WORKER', proofId: 'task-519',
+      chain: {
+        submit: { method: 'POST', path: '/api/v1/homeworks/418/submissions', status: 201, response: { submissionId: 419, evaluationStatus: 'PENDING' } },
+        finalRead: { method: 'GET', path: '/api/v1/submissions/419/evaluation', status: 200, response: { submissionId: 419, taskId: 519, taskState: 'SUCCEEDED', evaluationStatus: 'ACCEPTED', score: 100 } }
+      },
+      uiAssertion: { route: '/courses/418/homeworks/1/submissions/419/result', selector: '[data-testid="evaluation-score"]', expected: '100', screenshot: screenshot('worker'), junitCase: workerCase }
+    },
+    {
+      group: 'GRD-LRN', proofId: 'notification-620',
+      chain: {
+        publish: { method: 'POST', path: '/api/v1/courses/418/grades/publish', status: 200, response: { publishId: 617, publishedCount: 1 } },
+        notification: { method: 'GET', path: '/api/v1/notifications?type=GRADE&size=100', status: 200, response: { notificationId: 620, sourceId: 617, sourceModule: 'GRD', title: '成绩已发布' } }
+      },
+      uiAssertion: { route: '/notifications', selector: '[data-testid="notification-card-620"]', expected: '成绩已发布', screenshot: screenshot('grade'), junitCase: gradeCase }
+    }
+  ];
+  const logs = [
+    'gateway | "GET /api/v1/courses/418 HTTP/1.1" 200',
+    'gateway | "GET /api/v1/submissions/419/evaluation HTTP/1.1" 200 early-poll',
+    'assessment | homework_submission_queued publicSubmissionId=419 submissionId=internal-419 taskId=519',
+    'assessment | assessment_worker_terminal taskId=519 submissionId=internal-419 sourceType=HWK taskState=SUCCEEDED evaluationStatus=ACCEPTED score=100',
+    'gateway | "GET /api/v1/submissions/419/evaluation HTTP/1.1" 200',
+    'gateway | "GET /api/v1/notifications?type=GRADE&size=100 HTTP/1.1" 200 early-poll',
+    'course | lrn_notification_projected eventId=event-617 correlationId=correlation-617 sourceModule=GRD sourceId=617 notificationIds=[620]',
+    'gateway | "GET /api/v1/notifications?type=GRADE&size=100 HTTP/1.1" 200'
+  ].join('\n');
+  const junit = [authCase, workerCase, gradeCase].map((name) => `<testcase name="${name}"/>`).join('\n');
+
+  const manifest = buildRepresentativeEvidence({ baseUrl: 'http://127.0.0.1:18080', records, logs, junit });
+
+  assert.deepEqual(manifest.representative.map((entry) => entry.group), [
+    'AUTH-CRS', 'ASSESSMENT-WORKER', 'GRD-LRN'
+  ]);
+  assert.equal(new Set(manifest.representative.map((entry) => entry.proofId)).size, 3);
+  assert.match(manifest.representative[1].requestResponse, /internal-419/);
+  assert.match(manifest.representative[2].logExcerpt, /notifications\?type=GRADE/);
+  assert.throws(() => buildRepresentativeEvidence({
+    baseUrl: 'http://127.0.0.1:18080', logs, junit,
+    records: [...records.slice(0, 2), { ...records[2], proofId: 'task-519' }]
+  }), /distinct/i);
+  assert.throws(() => buildRepresentativeEvidence({
+    baseUrl: 'http://127.0.0.1:18080', logs, junit,
+    records: records.map((record) => record.group === 'ASSESSMENT-WORKER'
+      ? { ...record, chain: { submit: record.chain.submit } }
+      : record)
+  }), /finalRead/i);
+  assert.throws(() => buildRepresentativeEvidence({
+    baseUrl: 'http://127.0.0.1:18080', logs, junit,
+    records: records.map((record) => record.group === 'GRD-LRN'
+      ? { ...record, chain: { publish: record.chain.publish } }
+      : record)
+  }), /notification/i);
 });
 
 test('rejects cleanup records that leave project resources behind', () => {

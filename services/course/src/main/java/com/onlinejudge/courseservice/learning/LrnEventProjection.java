@@ -6,6 +6,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.onlinejudge.courseservice.persistence.CourseRepository;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -25,6 +27,7 @@ import java.util.List;
  */
 @Component
 public class LrnEventProjection {
+    private static final Logger log = LoggerFactory.getLogger(LrnEventProjection.class);
     private final ObjectMapper mapper;
     private final LrnEventInboxRepository inbox;
     private final LrnTaskService tasks;
@@ -220,8 +223,10 @@ public class LrnEventProjection {
         if (receivers.isEmpty()) return;
         long parsedSourceId = sourceIdField == null ? 0 : parseId(payload.path(sourceIdField).asText());
         Long sourceId = parsedSourceId > 0 ? parsedSourceId : null;
-        notifications.createForFact(eventId, eventTypeOf(sourceModule), notificationType, courseId, sourceModule, sourceId,
-                receivers, defaultTitle, defaultTitle + "，请前往对应课程查看。", 1, "/learning/tasks");
+        LrnNotificationService.NotificationEventResult result = notifications.createForFact(eventId, eventTypeOf(sourceModule), notificationType,
+                courseId, sourceModule, sourceId, receivers, defaultTitle, defaultTitle + "，请前往对应课程查看。", 1, "/learning/tasks");
+        log.info("lrn_notification_projected eventId={} correlationId={} sourceModule={} sourceId={} notificationIds={}",
+                eventId, correlationId, sourceModule, sourceId, result.notificationIds());
     }
 
     /** Same transaction: keep the original envelope replayable and record the open roster gap. */

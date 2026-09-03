@@ -1,9 +1,13 @@
-import type { APIRequestContext, APIResponse, TestInfo } from '@playwright/test';
+import type { APIRequestContext, APIResponse, Page, TestInfo } from '@playwright/test';
 import { expect, test } from '@playwright/test';
 import { timingSafeEqual } from 'node:crypto';
 import { readFileSync, realpathSync, statSync } from 'node:fs';
 import { basename, dirname, isAbsolute, relative } from 'node:path';
 import { verifyThreeServiceDisposableProof } from '../three-service-disposable-proof';
+import {
+  captureIssue320RepresentativeScreenshot,
+  recordIssue320Representative
+} from '../issue320-representative-evidence';
 
 type ApiEnvelope<T> = {
   code: string;
@@ -60,7 +64,7 @@ test.describe('@grd GRD real source lifecycle', () => {
     'Mutating GRD lifecycle must run through npm run test:e2e:grd:disposable'
   );
 
-  test('@grd-main @grd-alternative @grd-exception runs LAB/HWK -> GRD -> LRN with real APIs', async ({ request }, testInfo) => {
+  test('@grd-main @grd-alternative @grd-exception runs LAB/HWK -> GRD -> LRN with real APIs', async ({ page, request }, testInfo) => {
     test.setTimeout(120_000);
 
     const marker = `grd266-${Date.now()}-${testInfo.workerIndex}`;
@@ -232,14 +236,16 @@ test.describe('@grd GRD real source lifecycle', () => {
     });
     await error(fullPublish, 400, 'ERR-GRD-04', 'reject full publish with partial missing grades');
 
+    const publishResponse = await request.post(`/api/v1/courses/${courseId}/grades/publish`, {
+      headers: teacherHeaders,
+      data: { publishScope: 'PARTIAL_STUDENTS', studentIds: [student.user.id], gradeItemIds: [] }
+    });
     const publish = await ok<{ publishId: number; publishedCount: number; notificationStatus: string }>(
-      await request.post(`/api/v1/courses/${courseId}/grades/publish`, {
-        headers: teacherHeaders,
-        data: { publishScope: 'PARTIAL_STUDENTS', studentIds: [student.user.id], gradeItemIds: [] }
-      }),
+      publishResponse,
       'publish complete student only'
     );
     expect(publish).toMatchObject({ publishedCount: 1, notificationStatus: 'SENT' });
+    expect(publish.publishId).toBeGreaterThan(0);
 
     const repeatedPublish = await ok<typeof publish>(await request.post(`/api/v1/courses/${courseId}/grades/publish`, {
       headers: teacherHeaders,
@@ -299,6 +305,68 @@ test.describe('@grd GRD real source lifecycle', () => {
       intervals: [100, 250, 500, 1_000]
     }).toEqual({ publicationVisible: true, reviewVisible: true });
 
+    const finalNotificationsResponse = await request.get('/api/v1/notifications?type=GRADE&size=100', {
+      headers: studentHeaders
+    });
+    const finalNotifications = await ok<{
+      records: Array<{
+        notificationId: number;
+        title: string;
+        sourceModule: string;
+        sourceId: number;
+      }>;
+    }>(finalNotificationsResponse, 'read published grade notification after projection');
+    const publicationNotification = finalNotifications.records.find((notification) => (
+      notification.title === '成绩已发布'
+      && notification.sourceModule === 'GRD'
+      && notification.sourceId === publish.publishId
+    ));
+    expect(publicationNotification).toEqual(expect.objectContaining({
+      notificationId: expect.any(Number),
+      sourceId: publish.publishId
+    }));
+
+    await loginBrowser(page, DEMO_STUDENT);
+    await page.goto('/notifications');
+    await expect(page.getByTestId(`notification-card-${publicationNotification!.notificationId}`)).toBeVisible();
+    await expect(page.getByTestId(`notification-card-${publicationNotification!.notificationId}`))
+      .toContainText('成绩已发布');
+    const screenshot = await captureIssue320RepresentativeScreenshot(page, 'grd-lrn');
+    recordIssue320Representative({
+      group: 'GRD-LRN',
+      proofId: `notification-${publicationNotification!.notificationId}`,
+      chain: {
+        publish: {
+          method: 'POST',
+          path: `/api/v1/courses/${courseId}/grades/publish`,
+          status: publishResponse.status(),
+          response: {
+            publishId: publish.publishId,
+            publishedCount: publish.publishedCount,
+            notificationStatus: publish.notificationStatus
+          }
+        },
+        notification: {
+          method: 'GET',
+          path: '/api/v1/notifications?type=GRADE&size=100',
+          status: finalNotificationsResponse.status(),
+          response: {
+            notificationId: publicationNotification!.notificationId,
+            sourceModule: publicationNotification!.sourceModule,
+            sourceId: publicationNotification!.sourceId,
+            title: publicationNotification!.title
+          }
+        }
+      },
+      uiAssertion: {
+        route: new URL(page.url()).pathname,
+        selector: `[data-testid="notification-card-${publicationNotification!.notificationId}"]`,
+        expected: 'student notification center displays the grade publication notification',
+        screenshot,
+        junitCase: '@grd-main @grd-alternative @grd-exception runs LAB/HWK -> GRD -> LRN with real APIs'
+      }
+    });
+
     const invalidAnalysis = await request.get(`/api/v1/courses/${courseId}/grade-analysis?targetType=INVALID`, {
       headers: teacherHeaders
     });
@@ -311,6 +379,14 @@ test.describe('@grd GRD real source lifecycle', () => {
     expect(anonymousGrades.status(), await responseLabel(anonymousGrades, 'reject anonymous grade access')).toBe(401);
   });
 });
+
+async function loginBrowser(page: Page, credentials: { account: string; password: string }) {
+  await page.goto('/login');
+  await page.locator('input[name="account"]').fill(credentials.account);
+  await page.locator('input[name="password"]').fill(credentials.password);
+  await page.locator('form[data-auth-form="login"] button[type="submit"]').click();
+  await expect(page.locator('.auth-feedback.success')).toHaveText('登录成功');
+}
 
 function verifyDisposableProof(): boolean {
   const proofFile = process.env.E2E_GRD_DISPOSABLE_PROOF_FILE?.trim();

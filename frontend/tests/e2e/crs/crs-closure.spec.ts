@@ -1,4 +1,8 @@
 import { expect, test } from '../fixtures';
+import {
+  captureIssue320RepresentativeScreenshot,
+  recordIssue320Representative
+} from '../issue320-representative-evidence';
 
 /**
  * CRS 主流程闭环浏览器用例（共享 E2E 入口，Issue #267）。
@@ -17,7 +21,17 @@ test.describe('@crs CRS 主流程闭环', () => {
     loginAs,
     waitForBusinessState
   }) => {
+    const teacherLoginResponse = page.waitForResponse((response) => (
+      new URL(response.url()).pathname === '/api/v1/auth/login'
+      && response.request().method() === 'POST'
+    ));
     await loginAs('teacher');
+    const teacherLoginHttp = await teacherLoginResponse;
+    const teacherLogin = await teacherLoginHttp.json() as {
+      data?: { user?: { id?: number } };
+    };
+    const teacherId = Number(teacherLogin.data?.user?.id);
+    expect(teacherId).toBeGreaterThan(0);
     await page.goto('/courses');
     await expect(page.getByText('数据结构全流程演示课')).toBeVisible();
 
@@ -37,12 +51,52 @@ test.describe('@crs CRS 主流程闭环', () => {
     // 管理页的课程卡片不可直接打开详情；切回可进入详情的全部课程页。
     await page.getByRole('button', { name: '全部课程' }).click();
     const teacherCourseCard = page.locator('.course-card').filter({ hasText: courseName });
+    const courseDetailResponse = page.waitForResponse((response) => (
+      /^\/api\/v1\/courses\/\d+$/.test(new URL(response.url()).pathname)
+      && response.request().method() === 'GET'
+    ));
     await teacherCourseCard.getByRole('button', { name: '管理课程' }).click();
+    const courseDetailHttp = await courseDetailResponse;
+    const courseDetail = await courseDetailHttp.json() as {
+      data?: { id?: number; member?: boolean; role?: string };
+    };
+    const courseId = Number(courseDetail.data?.id);
+    expect(courseId).toBeGreaterThan(0);
 
     // 进入课程详情，验证管理入口。
     await expect(page.getByRole('button', { name: /管理章节/ })).toBeVisible();
     await expect(page.getByRole('button', { name: /管理资源/ })).toBeVisible();
     await expect(page.getByRole('button', { name: /管理公告/ })).toBeVisible();
+    const screenshot = await captureIssue320RepresentativeScreenshot(page, 'auth-crs');
+    recordIssue320Representative({
+      group: 'AUTH-CRS',
+      proofId: `course-${courseId}`,
+      chain: {
+        login: {
+          method: 'POST',
+          path: '/api/v1/auth/login',
+          status: teacherLoginHttp.status(),
+          response: { userId: teacherId, role: 'TEACHER' }
+        },
+        courseDetail: {
+          method: 'GET',
+          path: `/api/v1/courses/${courseId}`,
+          status: courseDetailHttp.status(),
+          response: {
+            courseId,
+            member: courseDetail.data?.member === true,
+            role: String(courseDetail.data?.role ?? '')
+          }
+        }
+      },
+      uiAssertion: {
+        route: new URL(page.url()).pathname,
+        selector: 'button[name="管理章节"], button[name="管理资源"], button[name="管理公告"]',
+        expected: 'teacher course detail exposes all three management controls',
+        screenshot,
+        junitCase: '教师建课并展示章节/资源/公告管理入口，学生公开加入'
+      }
+    });
 
     // 学生公开加入（同一用例内切换会话：先退出教师）
     await page.getByRole('button', { name: /退出/ }).click();

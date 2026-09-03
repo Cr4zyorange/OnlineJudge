@@ -26,6 +26,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
@@ -40,6 +42,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/v1")
 public class HomeworkController {
+    private static final Logger log = LoggerFactory.getLogger(HomeworkController.class);
     private final HomeworkService homeworks;
     private final CoursePermissionClient coursePermissions;
     private final CourseMembershipGuard membershipGuard;
@@ -77,6 +80,10 @@ public class HomeworkController {
                     : request.fileIds() != null
                     ? submissions.submitFile(homeworkId, user.id(), request.fileIds())
                     : submissions.submit(homeworkId, user.id(), request.codeText(), request.language());
+            if (submitted.taskId() != null) {
+                log.info("homework_submission_queued publicSubmissionId={} submissionId={} taskId={}",
+                        submitted.publicSubmissionId(), submitted.submissionId(), submitted.taskId());
+            }
             return success(submissionResponse(submissions.find(submitted.publicSubmissionId())));
         } catch (NoSuchElementException missing) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "homework not found", missing);

@@ -1,5 +1,9 @@
 import type { APIRequestContext, APIResponse, Page } from '@playwright/test';
 import { expect, test } from '../fixtures';
+import {
+  captureIssue320RepresentativeScreenshot,
+  recordIssue320Representative
+} from '../issue320-representative-evidence';
 
 const COURSE_ID = Number(process.env.E2E_COURSE_ID || 9501);
 const CHAPTER_ID = Number(process.env.E2E_CHAPTER_ID || 950101);
@@ -54,6 +58,14 @@ interface SubmissionRecord {
   submissionId: number;
   evaluationStatus: string;
   autoScore?: number | null;
+}
+
+interface EvaluationResult {
+  submissionId: number;
+  taskId: number;
+  taskState: string;
+  evaluationStatus: string;
+  score: number | null;
 }
 
 interface AttachmentRecord {
@@ -255,7 +267,7 @@ test.describe('@hwk HWK 真实业务闭环', () => {
     expect(objectiveSubmission.evaluationStatus).toBe('ACCEPTED');
     expect(objectiveSubmission.autoScore).toBe(100);
 
-    const acceptedCodeSubmission = await apiData<SubmissionRecord>(await request.post(
+    const acceptedCodeResponse = await request.post(
       `/api/v1/homeworks/${code.id}/submissions`,
       {
         headers: studentHeaders,
@@ -264,7 +276,8 @@ test.describe('@hwk HWK 真实业务闭环', () => {
           language: 'python'
         }
       }
-    ));
+    );
+    const acceptedCodeSubmission = await apiData<SubmissionRecord>(acceptedCodeResponse);
     expect(acceptedCodeSubmission.evaluationStatus).toBe('PENDING');
     const acceptedCodeResult = await waitForSubmissionTerminal(
       request,
@@ -273,6 +286,55 @@ test.describe('@hwk HWK 真实业务闭环', () => {
     );
     expect(acceptedCodeResult.evaluationStatus).toBe('ACCEPTED');
     expect(acceptedCodeResult.autoScore).toBe(100);
+    const acceptedCodeEvaluationResponse = await request.get(
+      `/api/v1/submissions/${acceptedCodeSubmission.submissionId}/evaluation`,
+      { headers: studentHeaders }
+    );
+    const acceptedCodeEvaluation = await apiData<EvaluationResult>(acceptedCodeEvaluationResponse);
+    expect(acceptedCodeEvaluation).toMatchObject({
+      submissionId: acceptedCodeSubmission.submissionId,
+      taskState: 'SUCCEEDED',
+      evaluationStatus: 'ACCEPTED',
+      score: 100
+    });
+    expect(acceptedCodeEvaluation.taskId).toBeGreaterThan(0);
+    await page.goto(`/courses/${COURSE_ID}/homeworks/${code.id}/submissions/${acceptedCodeSubmission.submissionId}/result`);
+    await expect(page.getByTestId('evaluation-score')).toContainText('100');
+    const screenshot = await captureIssue320RepresentativeScreenshot(page, 'assessment-worker');
+    recordIssue320Representative({
+      group: 'ASSESSMENT-WORKER',
+      proofId: `task-${acceptedCodeEvaluation.taskId}`,
+      chain: {
+        submit: {
+          method: 'POST',
+          path: `/api/v1/homeworks/${code.id}/submissions`,
+          status: acceptedCodeResponse.status(),
+          response: {
+            submissionId: acceptedCodeSubmission.submissionId,
+            evaluationStatus: acceptedCodeSubmission.evaluationStatus
+          }
+        },
+        finalRead: {
+          method: 'GET',
+          path: `/api/v1/submissions/${acceptedCodeSubmission.submissionId}/evaluation`,
+          status: acceptedCodeEvaluationResponse.status(),
+          response: {
+            submissionId: acceptedCodeEvaluation.submissionId,
+            taskId: acceptedCodeEvaluation.taskId,
+            taskState: acceptedCodeEvaluation.taskState,
+            evaluationStatus: acceptedCodeEvaluation.evaluationStatus,
+            score: acceptedCodeEvaluation.score
+          }
+        }
+      },
+      uiAssertion: {
+        route: new URL(page.url()).pathname,
+        selector: '[data-testid="evaluation-score"]',
+        expected: 'student result page displays the terminal automatic score 100',
+        screenshot,
+        junitCase: '多类型提交验证代码后台评测并覆盖附件异常、过期、越权与重评'
+      }
+    });
 
     const failedCodeSubmission = await apiData<SubmissionRecord>(await request.post(
       `/api/v1/homeworks/${code.id}/submissions`,
