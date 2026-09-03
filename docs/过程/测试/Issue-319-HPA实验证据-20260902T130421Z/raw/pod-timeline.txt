@@ -1,0 +1,132 @@
+NAME                             READY   STATUS    RESTARTS   AGE     IP            NODE                         NOMINATED NODE   READINESS GATES
+assessment-api-bdf6946cb-vqxc9   1/1     Running   0          5m22s   10.244.0.39   oj319-rework-control-plane   <none>           <none>
+NAME                             READY   STATUS    RESTARTS   AGE     IP            NODE                         NOMINATED NODE   READINESS GATES
+assessment-api-bdf6946cb-vqxc9   1/1     Running   0          5m27s   10.244.0.39   oj319-rework-control-plane   <none>           <none>
+NAME                             READY   STATUS    RESTARTS   AGE     IP            NODE                         NOMINATED NODE   READINESS GATES
+assessment-api-bdf6946cb-vqxc9   1/1     Running   0          5m33s   10.244.0.39   oj319-rework-control-plane   <none>           <none>
+NAME                             READY   STATUS    RESTARTS   AGE     IP            NODE                         NOMINATED NODE   READINESS GATES
+assessment-api-bdf6946cb-vqxc9   1/1     Running   0          5m38s   10.244.0.39   oj319-rework-control-plane   <none>           <none>
+NAME                             READY   STATUS              RESTARTS   AGE     IP            NODE                         NOMINATED NODE   READINESS GATES
+assessment-api-bdf6946cb-jkrs4   0/1     ContainerCreating   0          0s      <none>        oj319-rework-control-plane   <none>           <none>
+assessment-api-bdf6946cb-rg29m   0/1     ContainerCreating   0          0s      <none>        oj319-rework-control-plane   <none>           <none>
+assessment-api-bdf6946cb-vqxc9   1/1     Running             0          5m43s   10.244.0.39   oj319-rework-control-plane   <none>           <none>
+NAME                             READY   STATUS    RESTARTS   AGE     IP            NODE                         NOMINATED NODE   READINESS GATES
+assessment-api-bdf6946cb-jkrs4   0/1     Running   0          5s      10.244.0.43   oj319-rework-control-plane   <none>           <none>
+assessment-api-bdf6946cb-rg29m   0/1     Running   0          5s      10.244.0.44   oj319-rework-control-plane   <none>           <none>
+assessment-api-bdf6946cb-vqxc9   1/1     Running   0          5m48s   10.244.0.39   oj319-rework-control-plane   <none>           <none>
+NAME                             READY   STATUS    RESTARTS   AGE     IP            NODE                         NOMINATED NODE   READINESS GATES
+assessment-api-bdf6946cb-jkrs4   0/1     Running   0          11s     10.244.0.43   oj319-rework-control-plane   <none>           <none>
+assessment-api-bdf6946cb-rg29m   0/1     Running   0          11s     10.244.0.44   oj319-rework-control-plane   <none>           <none>
+assessment-api-bdf6946cb-vqxc9   1/1     Running   0          5m54s   10.244.0.39   oj319-rework-control-plane   <none>           <none>
+NAME                             READY   STATUS    RESTARTS   AGE     IP            NODE                         NOMINATED NODE   READINESS GATES
+assessment-api-bdf6946cb-jkrs4   0/1     Running   0          16s     10.244.0.43   oj319-rework-control-plane   <none>           <none>
+assessment-api-bdf6946cb-rg29m   0/1     Running   0          16s     10.244.0.44   oj319-rework-control-plane   <none>           <none>
+assessment-api-bdf6946cb-vqxc9   1/1     Running   0          5m59s   10.244.0.39   oj319-rework-control-plane   <none>           <none>
+NAME                             READY   STATUS    RESTARTS   AGE    IP            NODE                         NOMINATED NODE   READINESS GATES
+assessment-api-bdf6946cb-jkrs4   1/1     Running   0          21s    10.244.0.43   oj319-rework-control-plane   <none>           <none>
+assessment-api-bdf6946cb-rg29m   1/1     Running   0          21s    10.244.0.44   oj319-rework-control-plane   <none>           <none>
+assessment-api-bdf6946cb-vqxc9   1/1     Running   0          6m4s   10.244.0.39   oj319-rework-control-plane   <none>           <none>
+NAME                             READY   STATUS    RESTARTS   AGE     IP            NODE                         NOMINATED NODE   READINESS GATES
+assessment-api-bdf6946cb-jkrs4   1/1     Running   0          27s     10.244.0.43   oj319-rework-control-plane   <none>           <none>
+assessment-api-bdf6946cb-rg29m   1/1     Running   0          27s     10.244.0.44   oj319-rework-control-plane   <none>           <none>
+assessment-api-bdf6946cb-vqxc9   1/1     Running   0          6m10s   10.244.0.39   oj319-rework-control-plane   <none>           <none>
+NAME                             READY   STATUS    RESTARTS   AGE     IP            NODE                         NOMINATED NODE   READINESS GATES
+assessment-api-bdf6946cb-jkrs4   1/1     Running   0          32s     10.244.0.43   oj319-rework-control-plane   <none>           <none>
+assessment-api-bdf6946cb-rg29m   1/1     Running   0          32s     10.244.0.44   oj319-rework-control-plane   <none>           <none>
+assessment-api-bdf6946cb-vqxc9   1/1     Running   0          6m15s   10.244.0.39   oj319-rework-control-plane   <none>           <none>
+NAME                             READY   STATUS    RESTARTS   AGE     IP            NODE                         NOMINATED NODE   READINESS GATES
+assessment-api-bdf6946cb-jkrs4   1/1     Running   0          37s     10.244.0.43   oj319-rework-control-plane   <none>           <none>
+assessment-api-bdf6946cb-rg29m   1/1     Running   0          37s     10.244.0.44   oj319-rework-control-plane   <none>           <none>
+assessment-api-bdf6946cb-vqxc9   1/1     Running   0          6m20s   10.244.0.39   oj319-rework-control-plane   <none>           <none>
+NAME                             READY   STATUS    RESTARTS   AGE     IP            NODE                         NOMINATED NODE   READINESS GATES
+assessment-api-bdf6946cb-jkrs4   1/1     Running   0          42s     10.244.0.43   oj319-rework-control-plane   <none>           <none>
+assessment-api-bdf6946cb-rg29m   1/1     Running   0          42s     10.244.0.44   oj319-rework-control-plane   <none>           <none>
+assessment-api-bdf6946cb-vqxc9   1/1     Running   0          6m25s   10.244.0.39   oj319-rework-control-plane   <none>           <none>
+NAME                             READY   STATUS    RESTARTS   AGE     IP            NODE                         NOMINATED NODE   READINESS GATES
+assessment-api-bdf6946cb-jkrs4   1/1     Running   0          47s     10.244.0.43   oj319-rework-control-plane   <none>           <none>
+assessment-api-bdf6946cb-rg29m   1/1     Running   0          47s     10.244.0.44   oj319-rework-control-plane   <none>           <none>
+assessment-api-bdf6946cb-vqxc9   1/1     Running   0          6m30s   10.244.0.39   oj319-rework-control-plane   <none>           <none>
+NAME                             READY   STATUS    RESTARTS   AGE     IP            NODE                         NOMINATED NODE   READINESS GATES
+assessment-api-bdf6946cb-jkrs4   1/1     Running   0          53s     10.244.0.43   oj319-rework-control-plane   <none>           <none>
+assessment-api-bdf6946cb-rg29m   1/1     Running   0          53s     10.244.0.44   oj319-rework-control-plane   <none>           <none>
+assessment-api-bdf6946cb-vqxc9   1/1     Running   0          6m36s   10.244.0.39   oj319-rework-control-plane   <none>           <none>
+NAME                             READY   STATUS    RESTARTS   AGE     IP            NODE                         NOMINATED NODE   READINESS GATES
+assessment-api-bdf6946cb-jkrs4   1/1     Running   0          58s     10.244.0.43   oj319-rework-control-plane   <none>           <none>
+assessment-api-bdf6946cb-rg29m   1/1     Running   0          58s     10.244.0.44   oj319-rework-control-plane   <none>           <none>
+assessment-api-bdf6946cb-vqxc9   1/1     Running   0          6m41s   10.244.0.39   oj319-rework-control-plane   <none>           <none>
+NAME                             READY   STATUS    RESTARTS   AGE     IP            NODE                         NOMINATED NODE   READINESS GATES
+assessment-api-bdf6946cb-jkrs4   1/1     Running   0          63s     10.244.0.43   oj319-rework-control-plane   <none>           <none>
+assessment-api-bdf6946cb-rg29m   1/1     Running   0          63s     10.244.0.44   oj319-rework-control-plane   <none>           <none>
+assessment-api-bdf6946cb-vqxc9   1/1     Running   0          6m46s   10.244.0.39   oj319-rework-control-plane   <none>           <none>
+NAME                             READY   STATUS    RESTARTS   AGE     IP            NODE                         NOMINATED NODE   READINESS GATES
+assessment-api-bdf6946cb-jkrs4   1/1     Running   0          68s     10.244.0.43   oj319-rework-control-plane   <none>           <none>
+assessment-api-bdf6946cb-rg29m   1/1     Running   0          68s     10.244.0.44   oj319-rework-control-plane   <none>           <none>
+assessment-api-bdf6946cb-vqxc9   1/1     Running   0          6m51s   10.244.0.39   oj319-rework-control-plane   <none>           <none>
+NAME                             READY   STATUS    RESTARTS   AGE     IP            NODE                         NOMINATED NODE   READINESS GATES
+assessment-api-bdf6946cb-jkrs4   1/1     Running   0          73s     10.244.0.43   oj319-rework-control-plane   <none>           <none>
+assessment-api-bdf6946cb-rg29m   1/1     Running   0          73s     10.244.0.44   oj319-rework-control-plane   <none>           <none>
+assessment-api-bdf6946cb-vqxc9   1/1     Running   0          6m56s   10.244.0.39   oj319-rework-control-plane   <none>           <none>
+NAME                             READY   STATUS    RESTARTS   AGE    IP            NODE                         NOMINATED NODE   READINESS GATES
+assessment-api-bdf6946cb-jkrs4   1/1     Running   0          79s    10.244.0.43   oj319-rework-control-plane   <none>           <none>
+assessment-api-bdf6946cb-rg29m   1/1     Running   0          79s    10.244.0.44   oj319-rework-control-plane   <none>           <none>
+assessment-api-bdf6946cb-vqxc9   1/1     Running   0          7m2s   10.244.0.39   oj319-rework-control-plane   <none>           <none>
+NAME                             READY   STATUS    RESTARTS   AGE    IP            NODE                         NOMINATED NODE   READINESS GATES
+assessment-api-bdf6946cb-jkrs4   1/1     Running   0          84s    10.244.0.43   oj319-rework-control-plane   <none>           <none>
+assessment-api-bdf6946cb-rg29m   1/1     Running   0          84s    10.244.0.44   oj319-rework-control-plane   <none>           <none>
+assessment-api-bdf6946cb-vqxc9   1/1     Running   0          7m7s   10.244.0.39   oj319-rework-control-plane   <none>           <none>
+NAME                             READY   STATUS    RESTARTS   AGE     IP            NODE                         NOMINATED NODE   READINESS GATES
+assessment-api-bdf6946cb-jkrs4   1/1     Running   0          89s     10.244.0.43   oj319-rework-control-plane   <none>           <none>
+assessment-api-bdf6946cb-rg29m   1/1     Running   0          89s     10.244.0.44   oj319-rework-control-plane   <none>           <none>
+assessment-api-bdf6946cb-vqxc9   1/1     Running   0          7m12s   10.244.0.39   oj319-rework-control-plane   <none>           <none>
+NAME                             READY   STATUS    RESTARTS   AGE     IP            NODE                         NOMINATED NODE   READINESS GATES
+assessment-api-bdf6946cb-jkrs4   1/1     Running   0          94s     10.244.0.43   oj319-rework-control-plane   <none>           <none>
+assessment-api-bdf6946cb-rg29m   1/1     Running   0          94s     10.244.0.44   oj319-rework-control-plane   <none>           <none>
+assessment-api-bdf6946cb-vqxc9   1/1     Running   0          7m17s   10.244.0.39   oj319-rework-control-plane   <none>           <none>
+NAME                             READY   STATUS    RESTARTS   AGE     IP            NODE                         NOMINATED NODE   READINESS GATES
+assessment-api-bdf6946cb-jkrs4   1/1     Running   0          99s     10.244.0.43   oj319-rework-control-plane   <none>           <none>
+assessment-api-bdf6946cb-rg29m   1/1     Running   0          99s     10.244.0.44   oj319-rework-control-plane   <none>           <none>
+assessment-api-bdf6946cb-vqxc9   1/1     Running   0          7m22s   10.244.0.39   oj319-rework-control-plane   <none>           <none>
+NAME                             READY   STATUS    RESTARTS   AGE     IP            NODE                         NOMINATED NODE   READINESS GATES
+assessment-api-bdf6946cb-jkrs4   1/1     Running   0          105s    10.244.0.43   oj319-rework-control-plane   <none>           <none>
+assessment-api-bdf6946cb-rg29m   1/1     Running   0          105s    10.244.0.44   oj319-rework-control-plane   <none>           <none>
+assessment-api-bdf6946cb-vqxc9   1/1     Running   0          7m28s   10.244.0.39   oj319-rework-control-plane   <none>           <none>
+NAME                             READY   STATUS    RESTARTS   AGE     IP            NODE                         NOMINATED NODE   READINESS GATES
+assessment-api-bdf6946cb-jkrs4   1/1     Running   0          110s    10.244.0.43   oj319-rework-control-plane   <none>           <none>
+assessment-api-bdf6946cb-rg29m   1/1     Running   0          110s    10.244.0.44   oj319-rework-control-plane   <none>           <none>
+assessment-api-bdf6946cb-vqxc9   1/1     Running   0          7m33s   10.244.0.39   oj319-rework-control-plane   <none>           <none>
+NAME                             READY   STATUS    RESTARTS   AGE     IP            NODE                         NOMINATED NODE   READINESS GATES
+assessment-api-bdf6946cb-jkrs4   1/1     Running   0          115s    10.244.0.43   oj319-rework-control-plane   <none>           <none>
+assessment-api-bdf6946cb-rg29m   1/1     Running   0          115s    10.244.0.44   oj319-rework-control-plane   <none>           <none>
+assessment-api-bdf6946cb-vqxc9   1/1     Running   0          7m38s   10.244.0.39   oj319-rework-control-plane   <none>           <none>
+NAME                             READY   STATUS    RESTARTS   AGE     IP            NODE                         NOMINATED NODE   READINESS GATES
+assessment-api-bdf6946cb-jkrs4   1/1     Running   0          2m      10.244.0.43   oj319-rework-control-plane   <none>           <none>
+assessment-api-bdf6946cb-rg29m   1/1     Running   0          2m      10.244.0.44   oj319-rework-control-plane   <none>           <none>
+assessment-api-bdf6946cb-vqxc9   1/1     Running   0          7m43s   10.244.0.39   oj319-rework-control-plane   <none>           <none>
+NAME                             READY   STATUS    RESTARTS   AGE     IP            NODE                         NOMINATED NODE   READINESS GATES
+assessment-api-bdf6946cb-jkrs4   1/1     Running   0          2m6s    10.244.0.43   oj319-rework-control-plane   <none>           <none>
+assessment-api-bdf6946cb-rg29m   1/1     Running   0          2m6s    10.244.0.44   oj319-rework-control-plane   <none>           <none>
+assessment-api-bdf6946cb-vqxc9   1/1     Running   0          7m49s   10.244.0.39   oj319-rework-control-plane   <none>           <none>
+NAME                             READY   STATUS    RESTARTS   AGE     IP            NODE                         NOMINATED NODE   READINESS GATES
+assessment-api-bdf6946cb-jkrs4   1/1     Running   0          2m11s   10.244.0.43   oj319-rework-control-plane   <none>           <none>
+assessment-api-bdf6946cb-rg29m   1/1     Running   0          2m11s   10.244.0.44   oj319-rework-control-plane   <none>           <none>
+assessment-api-bdf6946cb-vqxc9   1/1     Running   0          7m54s   10.244.0.39   oj319-rework-control-plane   <none>           <none>
+NAME                             READY   STATUS    RESTARTS   AGE     IP            NODE                         NOMINATED NODE   READINESS GATES
+assessment-api-bdf6946cb-jkrs4   1/1     Running   0          2m16s   10.244.0.43   oj319-rework-control-plane   <none>           <none>
+assessment-api-bdf6946cb-rg29m   1/1     Running   0          2m16s   10.244.0.44   oj319-rework-control-plane   <none>           <none>
+assessment-api-bdf6946cb-vqxc9   1/1     Running   0          7m59s   10.244.0.39   oj319-rework-control-plane   <none>           <none>
+NAME                             READY   STATUS    RESTARTS   AGE     IP            NODE                         NOMINATED NODE   READINESS GATES
+assessment-api-bdf6946cb-jkrs4   1/1     Running   0          2m21s   10.244.0.43   oj319-rework-control-plane   <none>           <none>
+assessment-api-bdf6946cb-rg29m   1/1     Running   0          2m21s   10.244.0.44   oj319-rework-control-plane   <none>           <none>
+assessment-api-bdf6946cb-vqxc9   1/1     Running   0          8m4s    10.244.0.39   oj319-rework-control-plane   <none>           <none>
+NAME                             READY   STATUS    RESTARTS   AGE     IP            NODE                         NOMINATED NODE   READINESS GATES
+assessment-api-bdf6946cb-jkrs4   1/1     Running   0          2m27s   10.244.0.43   oj319-rework-control-plane   <none>           <none>
+assessment-api-bdf6946cb-rg29m   1/1     Running   0          2m27s   10.244.0.44   oj319-rework-control-plane   <none>           <none>
+assessment-api-bdf6946cb-vqxc9   1/1     Running   0          8m10s   10.244.0.39   oj319-rework-control-plane   <none>           <none>
+NAME                             READY   STATUS    RESTARTS   AGE     IP            NODE                         NOMINATED NODE   READINESS GATES
+assessment-api-bdf6946cb-jkrs4   1/1     Running   0          2m32s   10.244.0.43   oj319-rework-control-plane   <none>           <none>
+assessment-api-bdf6946cb-rg29m   1/1     Running   0          2m32s   10.244.0.44   oj319-rework-control-plane   <none>           <none>
+assessment-api-bdf6946cb-vqxc9   1/1     Running   0          8m15s   10.244.0.39   oj319-rework-control-plane   <none>           <none>
+NAME                             READY   STATUS    RESTARTS   AGE     IP            NODE                         NOMINATED NODE   READINESS GATES
+assessment-api-bdf6946cb-jkrs4   1/1     Running   0          2m37s   10.244.0.43   oj319-rework-control-plane   <none>           <none>
+assessment-api-bdf6946cb-rg29m   1/1     Running   0          2m37s   10.244.0.44   oj319-rework-control-plane   <none>           <none>
+assessment-api-bdf6946cb-vqxc9   1/1     Running   0          8m20s   10.244.0.39   oj319-rework-control-plane   <none>           <none>

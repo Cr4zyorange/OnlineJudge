@@ -1,0 +1,70 @@
+NAME             REFERENCE                   TARGETS       MINPODS   MAXPODS   REPLICAS   AGE
+assessment-api   Deployment/assessment-api   cpu: 5%/60%   1         3         1          61m
+NAME             REFERENCE                   TARGETS       MINPODS   MAXPODS   REPLICAS   AGE
+assessment-api   Deployment/assessment-api   cpu: 5%/60%   1         3         1          61m
+NAME             REFERENCE                   TARGETS       MINPODS   MAXPODS   REPLICAS   AGE
+assessment-api   Deployment/assessment-api   cpu: 4%/60%   1         3         1          61m
+NAME             REFERENCE                   TARGETS       MINPODS   MAXPODS   REPLICAS   AGE
+assessment-api   Deployment/assessment-api   cpu: 4%/60%   1         3         1          62m
+NAME             REFERENCE                   TARGETS         MINPODS   MAXPODS   REPLICAS   AGE
+assessment-api   Deployment/assessment-api   cpu: 167%/60%   1         3         1          62m
+NAME             REFERENCE                   TARGETS         MINPODS   MAXPODS   REPLICAS   AGE
+assessment-api   Deployment/assessment-api   cpu: 167%/60%   1         3         1          62m
+NAME             REFERENCE                   TARGETS         MINPODS   MAXPODS   REPLICAS   AGE
+assessment-api   Deployment/assessment-api   cpu: 167%/60%   1         3         1          62m
+NAME             REFERENCE                   TARGETS         MINPODS   MAXPODS   REPLICAS   AGE
+assessment-api   Deployment/assessment-api   cpu: 192%/60%   1         3         3          62m
+NAME             REFERENCE                   TARGETS         MINPODS   MAXPODS   REPLICAS   AGE
+assessment-api   Deployment/assessment-api   cpu: 192%/60%   1         3         3          62m
+NAME             REFERENCE                   TARGETS         MINPODS   MAXPODS   REPLICAS   AGE
+assessment-api   Deployment/assessment-api   cpu: 192%/60%   1         3         3          62m
+NAME             REFERENCE                   TARGETS         MINPODS   MAXPODS   REPLICAS   AGE
+assessment-api   Deployment/assessment-api   cpu: 204%/60%   1         3         3          62m
+NAME             REFERENCE                   TARGETS         MINPODS   MAXPODS   REPLICAS   AGE
+assessment-api   Deployment/assessment-api   cpu: 204%/60%   1         3         3          62m
+NAME             REFERENCE                   TARGETS         MINPODS   MAXPODS   REPLICAS   AGE
+assessment-api   Deployment/assessment-api   cpu: 204%/60%   1         3         3          62m
+NAME             REFERENCE                   TARGETS         MINPODS   MAXPODS   REPLICAS   AGE
+assessment-api   Deployment/assessment-api   cpu: 147%/60%   1         3         3          62m
+NAME             REFERENCE                   TARGETS         MINPODS   MAXPODS   REPLICAS   AGE
+assessment-api   Deployment/assessment-api   cpu: 147%/60%   1         3         3          62m
+NAME             REFERENCE                   TARGETS         MINPODS   MAXPODS   REPLICAS   AGE
+assessment-api   Deployment/assessment-api   cpu: 147%/60%   1         3         3          63m
+NAME             REFERENCE                   TARGETS        MINPODS   MAXPODS   REPLICAS   AGE
+assessment-api   Deployment/assessment-api   cpu: 44%/60%   1         3         3          63m
+NAME             REFERENCE                   TARGETS        MINPODS   MAXPODS   REPLICAS   AGE
+assessment-api   Deployment/assessment-api   cpu: 44%/60%   1         3         3          63m
+NAME             REFERENCE                   TARGETS        MINPODS   MAXPODS   REPLICAS   AGE
+assessment-api   Deployment/assessment-api   cpu: 44%/60%   1         3         3          63m
+NAME             REFERENCE                   TARGETS        MINPODS   MAXPODS   REPLICAS   AGE
+assessment-api   Deployment/assessment-api   cpu: 37%/60%   1         3         3          63m
+NAME             REFERENCE                   TARGETS        MINPODS   MAXPODS   REPLICAS   AGE
+assessment-api   Deployment/assessment-api   cpu: 37%/60%   1         3         3          63m
+NAME             REFERENCE                   TARGETS        MINPODS   MAXPODS   REPLICAS   AGE
+assessment-api   Deployment/assessment-api   cpu: 37%/60%   1         3         3          63m
+NAME             REFERENCE                   TARGETS        MINPODS   MAXPODS   REPLICAS   AGE
+assessment-api   Deployment/assessment-api   cpu: 32%/60%   1         3         3          63m
+NAME             REFERENCE                   TARGETS        MINPODS   MAXPODS   REPLICAS   AGE
+assessment-api   Deployment/assessment-api   cpu: 32%/60%   1         3         3          63m
+NAME             REFERENCE                   TARGETS        MINPODS   MAXPODS   REPLICAS   AGE
+assessment-api   Deployment/assessment-api   cpu: 32%/60%   1         3         3          63m
+NAME             REFERENCE                   TARGETS        MINPODS   MAXPODS   REPLICAS   AGE
+assessment-api   Deployment/assessment-api   cpu: 31%/60%   1         3         3          63m
+NAME             REFERENCE                   TARGETS        MINPODS   MAXPODS   REPLICAS   AGE
+assessment-api   Deployment/assessment-api   cpu: 31%/60%   1         3         3          64m
+NAME             REFERENCE                   TARGETS        MINPODS   MAXPODS   REPLICAS   AGE
+assessment-api   Deployment/assessment-api   cpu: 32%/60%   1         3         3          64m
+NAME             REFERENCE                   TARGETS        MINPODS   MAXPODS   REPLICAS   AGE
+assessment-api   Deployment/assessment-api   cpu: 32%/60%   1         3         3          64m
+NAME             REFERENCE                   TARGETS        MINPODS   MAXPODS   REPLICAS   AGE
+assessment-api   Deployment/assessment-api   cpu: 32%/60%   1         3         3          64m
+NAME             REFERENCE                   TARGETS        MINPODS   MAXPODS   REPLICAS   AGE
+assessment-api   Deployment/assessment-api   cpu: 34%/60%   1         3         3          64m
+NAME             REFERENCE                   TARGETS        MINPODS   MAXPODS   REPLICAS   AGE
+assessment-api   Deployment/assessment-api   cpu: 34%/60%   1         3         3          64m
+NAME             REFERENCE                   TARGETS        MINPODS   MAXPODS   REPLICAS   AGE
+assessment-api   Deployment/assessment-api   cpu: 34%/60%   1         3         3          64m
+NAME             REFERENCE                   TARGETS        MINPODS   MAXPODS   REPLICAS   AGE
+assessment-api   Deployment/assessment-api   cpu: 34%/60%   1         3         3          64m
+NAME             REFERENCE                   TARGETS        MINPODS   MAXPODS   REPLICAS   AGE
+assessment-api   Deployment/assessment-api   cpu: 34%/60%   1         3         3          64m

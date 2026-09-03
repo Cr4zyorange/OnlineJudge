@@ -1,0 +1,3 @@
+# Worker convergence after experiment (PENDING evaluation_task drain)
+sampled at ~08:18-08:21 UTC, worker online:
+pending=2301 -> 2290 -> 2282 (decreasing; ~1 task/5s bounded by SYSTEM_ERROR retry backoff, sandbox absent in this disposable env)

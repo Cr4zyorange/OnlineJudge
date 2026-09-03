@@ -1,0 +1,7 @@
+assessment-api enableServiceLinks=false
+assessment-worker enableServiceLinks=false
+grade-service enableServiceLinks=false
+assessment-worker RABBITMQ_PORT=absent
+assessment-worker port-binding-crash-log-matches=0
+grade-service RABBITMQ_PORT=absent
+grade-service port-binding-crash-log-matches=0

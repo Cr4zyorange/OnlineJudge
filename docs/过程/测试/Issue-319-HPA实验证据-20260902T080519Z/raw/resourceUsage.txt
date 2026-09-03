@@ -1,0 +1,2 @@
+NAME                              CPU(cores)   MEMORY(bytes)
+assessment-api-5dd8d575fc-8l47p   15m          475Mi

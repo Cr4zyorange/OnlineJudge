@@ -1,0 +1,83 @@
+NAME                              READY   STATUS    RESTARTS   AGE     IP            NODE                     NOMINATED NODE   READINESS GATES
+assessment-api-5dd8d575fc-8l47p   1/1     Running   0          3h26m   10.244.0.17   issue319-control-plane   <none>           <none>
+NAME                              READY   STATUS    RESTARTS   AGE     IP            NODE                     NOMINATED NODE   READINESS GATES
+assessment-api-5dd8d575fc-8l47p   1/1     Running   0          3h26m   10.244.0.17   issue319-control-plane   <none>           <none>
+NAME                              READY   STATUS    RESTARTS   AGE     IP            NODE                     NOMINATED NODE   READINESS GATES
+assessment-api-5dd8d575fc-8l47p   1/1     Running   0          3h26m   10.244.0.17   issue319-control-plane   <none>           <none>
+NAME                              READY   STATUS    RESTARTS   AGE     IP            NODE                     NOMINATED NODE   READINESS GATES
+assessment-api-5dd8d575fc-8l47p   1/1     Running   0          3h26m   10.244.0.17   issue319-control-plane   <none>           <none>
+NAME                              READY   STATUS    RESTARTS   AGE     IP            NODE                     NOMINATED NODE   READINESS GATES
+assessment-api-5dd8d575fc-8l47p   1/1     Running   0          3h26m   10.244.0.17   issue319-control-plane   <none>           <none>
+NAME                              READY   STATUS    RESTARTS   AGE     IP            NODE                     NOMINATED NODE   READINESS GATES
+assessment-api-5dd8d575fc-8l47p   1/1     Running   0          3h26m   10.244.0.17   issue319-control-plane   <none>           <none>
+NAME                              READY   STATUS    RESTARTS   AGE     IP            NODE                     NOMINATED NODE   READINESS GATES
+assessment-api-5dd8d575fc-8l47p   1/1     Running   0          3h26m   10.244.0.17   issue319-control-plane   <none>           <none>
+NAME                              READY   STATUS              RESTARTS   AGE     IP            NODE                     NOMINATED NODE   READINESS GATES
+assessment-api-5dd8d575fc-8l47p   1/1     Running             0          3h26m   10.244.0.17   issue319-control-plane   <none>           <none>
+assessment-api-5dd8d575fc-z92lq   0/1     ContainerCreating   0          1s      <none>        issue319-control-plane   <none>           <none>
+NAME                              READY   STATUS    RESTARTS   AGE     IP            NODE                     NOMINATED NODE   READINESS GATES
+assessment-api-5dd8d575fc-8l47p   1/1     Running   0          3h26m   10.244.0.17   issue319-control-plane   <none>           <none>
+assessment-api-5dd8d575fc-z92lq   0/1     Running   0          7s      10.244.0.60   issue319-control-plane   <none>           <none>
+NAME                              READY   STATUS    RESTARTS   AGE     IP            NODE                     NOMINATED NODE   READINESS GATES
+assessment-api-5dd8d575fc-8l47p   1/1     Running   0          3h27m   10.244.0.17   issue319-control-plane   <none>           <none>
+assessment-api-5dd8d575fc-z92lq   1/1     Running   0          13s     10.244.0.60   issue319-control-plane   <none>           <none>
+NAME                              READY   STATUS    RESTARTS   AGE     IP            NODE                     NOMINATED NODE   READINESS GATES
+assessment-api-5dd8d575fc-8l47p   1/1     Running   0          3h27m   10.244.0.17   issue319-control-plane   <none>           <none>
+assessment-api-5dd8d575fc-z92lq   1/1     Running   0          19s     10.244.0.60   issue319-control-plane   <none>           <none>
+NAME                              READY   STATUS    RESTARTS   AGE     IP            NODE                     NOMINATED NODE   READINESS GATES
+assessment-api-5dd8d575fc-8l47p   1/1     Running   0          3h27m   10.244.0.17   issue319-control-plane   <none>           <none>
+assessment-api-5dd8d575fc-z92lq   1/1     Running   0          25s     10.244.0.60   issue319-control-plane   <none>           <none>
+NAME                              READY   STATUS    RESTARTS   AGE     IP            NODE                     NOMINATED NODE   READINESS GATES
+assessment-api-5dd8d575fc-8l47p   1/1     Running   0          3h27m   10.244.0.17   issue319-control-plane   <none>           <none>
+assessment-api-5dd8d575fc-z92lq   1/1     Running   0          30s     10.244.0.60   issue319-control-plane   <none>           <none>
+NAME                              READY   STATUS    RESTARTS   AGE     IP            NODE                     NOMINATED NODE   READINESS GATES
+assessment-api-5dd8d575fc-8l47p   1/1     Running   0          3h27m   10.244.0.17   issue319-control-plane   <none>           <none>
+assessment-api-5dd8d575fc-z92lq   1/1     Running   0          36s     10.244.0.60   issue319-control-plane   <none>           <none>
+NAME                              READY   STATUS    RESTARTS   AGE     IP            NODE                     NOMINATED NODE   READINESS GATES
+assessment-api-5dd8d575fc-8l47p   1/1     Running   0          3h27m   10.244.0.17   issue319-control-plane   <none>           <none>
+assessment-api-5dd8d575fc-z92lq   1/1     Running   0          42s     10.244.0.60   issue319-control-plane   <none>           <none>
+NAME                              READY   STATUS    RESTARTS   AGE     IP            NODE                     NOMINATED NODE   READINESS GATES
+assessment-api-5dd8d575fc-8l47p   1/1     Running   0          3h27m   10.244.0.17   issue319-control-plane   <none>           <none>
+assessment-api-5dd8d575fc-z92lq   1/1     Running   0          48s     10.244.0.60   issue319-control-plane   <none>           <none>
+NAME                              READY   STATUS    RESTARTS   AGE     IP            NODE                     NOMINATED NODE   READINESS GATES
+assessment-api-5dd8d575fc-8l47p   1/1     Running   0          3h27m   10.244.0.17   issue319-control-plane   <none>           <none>
+assessment-api-5dd8d575fc-z92lq   1/1     Running   0          54s     10.244.0.60   issue319-control-plane   <none>           <none>
+NAME                              READY   STATUS    RESTARTS   AGE     IP            NODE                     NOMINATED NODE   READINESS GATES
+assessment-api-5dd8d575fc-8l47p   1/1     Running   0          3h27m   10.244.0.17   issue319-control-plane   <none>           <none>
+assessment-api-5dd8d575fc-z92lq   1/1     Running   0          60s     10.244.0.60   issue319-control-plane   <none>           <none>
+NAME                              READY   STATUS    RESTARTS   AGE     IP            NODE                     NOMINATED NODE   READINESS GATES
+assessment-api-5dd8d575fc-8l47p   1/1     Running   0          3h27m   10.244.0.17   issue319-control-plane   <none>           <none>
+assessment-api-5dd8d575fc-z92lq   1/1     Running   0          66s     10.244.0.60   issue319-control-plane   <none>           <none>
+NAME                              READY   STATUS    RESTARTS   AGE     IP            NODE                     NOMINATED NODE   READINESS GATES
+assessment-api-5dd8d575fc-8l47p   1/1     Running   0          3h28m   10.244.0.17   issue319-control-plane   <none>           <none>
+assessment-api-5dd8d575fc-z92lq   1/1     Running   0          72s     10.244.0.60   issue319-control-plane   <none>           <none>
+NAME                              READY   STATUS    RESTARTS   AGE     IP            NODE                     NOMINATED NODE   READINESS GATES
+assessment-api-5dd8d575fc-8l47p   1/1     Running   0          3h28m   10.244.0.17   issue319-control-plane   <none>           <none>
+assessment-api-5dd8d575fc-z92lq   1/1     Running   0          78s     10.244.0.60   issue319-control-plane   <none>           <none>
+NAME                              READY   STATUS    RESTARTS   AGE     IP            NODE                     NOMINATED NODE   READINESS GATES
+assessment-api-5dd8d575fc-8l47p   1/1     Running   0          3h28m   10.244.0.17   issue319-control-plane   <none>           <none>
+assessment-api-5dd8d575fc-z92lq   1/1     Running   0          84s     10.244.0.60   issue319-control-plane   <none>           <none>
+NAME                              READY   STATUS    RESTARTS   AGE     IP            NODE                     NOMINATED NODE   READINESS GATES
+assessment-api-5dd8d575fc-8l47p   1/1     Running   0          3h28m   10.244.0.17   issue319-control-plane   <none>           <none>
+assessment-api-5dd8d575fc-z92lq   1/1     Running   0          90s     10.244.0.60   issue319-control-plane   <none>           <none>
+NAME                              READY   STATUS    RESTARTS   AGE     IP            NODE                     NOMINATED NODE   READINESS GATES
+assessment-api-5dd8d575fc-8l47p   1/1     Running   0          3h28m   10.244.0.17   issue319-control-plane   <none>           <none>
+assessment-api-5dd8d575fc-z92lq   1/1     Running   0          96s     10.244.0.60   issue319-control-plane   <none>           <none>
+NAME                              READY   STATUS    RESTARTS   AGE     IP            NODE                     NOMINATED NODE   READINESS GATES
+assessment-api-5dd8d575fc-8l47p   1/1     Running   0          3h28m   10.244.0.17   issue319-control-plane   <none>           <none>
+assessment-api-5dd8d575fc-z92lq   1/1     Running   0          102s    10.244.0.60   issue319-control-plane   <none>           <none>
+NAME                              READY   STATUS    RESTARTS   AGE     IP            NODE                     NOMINATED NODE   READINESS GATES
+assessment-api-5dd8d575fc-8l47p   1/1     Running   0          3h28m   10.244.0.17   issue319-control-plane   <none>           <none>
+assessment-api-5dd8d575fc-z92lq   1/1     Running   0          108s    10.244.0.60   issue319-control-plane   <none>           <none>
+NAME                              READY   STATUS    RESTARTS   AGE     IP            NODE                     NOMINATED NODE   READINESS GATES
+assessment-api-5dd8d575fc-8l47p   1/1     Running   0          3h28m   10.244.0.17   issue319-control-plane   <none>           <none>
+assessment-api-5dd8d575fc-z92lq   1/1     Running   0          114s    10.244.0.60   issue319-control-plane   <none>           <none>
+NAME                              READY   STATUS    RESTARTS   AGE     IP            NODE                     NOMINATED NODE   READINESS GATES
+assessment-api-5dd8d575fc-8l47p   1/1     Running   0          3h28m   10.244.0.17   issue319-control-plane   <none>           <none>
+assessment-api-5dd8d575fc-z92lq   1/1     Running   0          2m      10.244.0.60   issue319-control-plane   <none>           <none>
+NAME                              READY   STATUS    RESTARTS   AGE     IP            NODE                     NOMINATED NODE   READINESS GATES
+assessment-api-5dd8d575fc-8l47p   1/1     Running   0          3h28m   10.244.0.17   issue319-control-plane   <none>           <none>
+assessment-api-5dd8d575fc-z92lq   1/1     Running   0          2m6s    10.244.0.60   issue319-control-plane   <none>           <none>
+NAME                              READY   STATUS    RESTARTS   AGE     IP            NODE                     NOMINATED NODE   READINESS GATES
+assessment-api-5dd8d575fc-8l47p   1/1     Running   0          3h29m   10.244.0.17   issue319-control-plane   <none>           <none>
+assessment-api-5dd8d575fc-z92lq   1/1     Running   0          2m12s   10.244.0.60   issue319-control-plane   <none>           <none>

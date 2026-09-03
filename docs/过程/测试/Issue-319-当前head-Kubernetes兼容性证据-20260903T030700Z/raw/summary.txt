@@ -1,0 +1,3 @@
+core-ready-count=3
+hpa=1/3 cpu-target=60
+git-sha=f11ad9a9aee3467af5100213f01901c3f608713b

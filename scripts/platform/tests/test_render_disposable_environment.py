@@ -182,6 +182,14 @@ class DisposableEnvironmentRendererTest(unittest.TestCase):
             worker,
         )
 
+    def test_kubernetes_workloads_disable_service_link_environment_injection(self) -> None:
+        _, kubernetes = self.render()
+
+        # Service-link variables can collide with explicitly typed runtime
+        # settings (for example RABBITMQ_PORT). Every rendered workload Pod
+        # must therefore opt out before the container environment is built.
+        self.assertEqual(kubernetes.count("      enableServiceLinks: false"), 9)
+
     def test_kubernetes_stage_files_keep_migrations_before_workloads_and_gateway(self) -> None:
         stages = self.render_stages()
 
@@ -205,6 +213,17 @@ class DisposableEnvironmentRendererTest(unittest.TestCase):
         self.assertIn("name: identity-migrations", stages["30-identity-migrations.yaml"])
         self.assertNotIn("name: gateway", stages["70-applications.yaml"])
         self.assertIn("name: gateway", stages["80-gateway.yaml"])
+
+    def test_assessment_api_stage_declares_the_issue_319_cpu_hpa(self) -> None:
+        stages = self.render_stages()
+
+        applications = stages["70-applications.yaml"]
+        self.assertIn("kind: HorizontalPodAutoscaler", applications)
+        self.assertIn("name: assessment-api", applications)
+        self.assertIn("minReplicas: 1", applications)
+        self.assertIn("maxReplicas: 3", applications)
+        self.assertIn("averageUtilization: 60", applications)
+        self.assertIn("stabilizationWindowSeconds: 300", applications)
 
     def test_assessment_worker_waits_for_the_shared_assessment_schema_migration(self) -> None:
         compose, _ = self.render()

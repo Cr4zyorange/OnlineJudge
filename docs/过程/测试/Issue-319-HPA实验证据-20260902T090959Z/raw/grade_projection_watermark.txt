@@ -1,0 +1,55 @@
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+
+ :: Spring Boot ::                (v3.4.5)
+
+2026-09-02T05:47:19.087Z  INFO 1 --- [grade-service] [           main] c.o.g.GradeServiceApplication            : Starting GradeServiceApplication v0.1.0-SNAPSHOT using Java 21.0.12 with PID 1 (/opt/onlinejudge-grade/app.jar started by onlinejudge in /opt/onlinejudge-grade)
+2026-09-02T05:47:19.089Z  INFO 1 --- [grade-service] [           main] c.o.g.GradeServiceApplication            : No active profile set, falling back to 1 default profile: "default"
+2026-09-02T05:47:21.899Z  INFO 1 --- [grade-service] [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port 8084 (http)
+2026-09-02T05:47:21.911Z  INFO 1 --- [grade-service] [           main] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+2026-09-02T05:47:21.911Z  INFO 1 --- [grade-service] [           main] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/10.1.40]
+2026-09-02T05:47:22.029Z  INFO 1 --- [grade-service] [           main] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring embedded WebApplicationContext
+2026-09-02T05:47:22.030Z  INFO 1 --- [grade-service] [           main] w.s.c.ServletWebServerApplicationContext : Root WebApplicationContext: initialization completed in 2844 ms
+2026-09-02T05:47:22.685Z  INFO 1 --- [grade-service] [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
+2026-09-02T05:47:22.988Z  INFO 1 --- [grade-service] [           main] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Added connection com.mysql.cj.jdbc.ConnectionImpl@1b0e031b
+2026-09-02T05:47:22.989Z  INFO 1 --- [grade-service] [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
+2026-09-02T05:47:24.909Z  INFO 1 --- [grade-service] [           main] o.s.b.a.e.web.EndpointLinksResolver      : Exposing 2 endpoints beneath base path '/actuator'
+2026-09-02T05:47:25.183Z  INFO 1 --- [grade-service] [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat started on port 8084 (http) with context path '/'
+2026-09-02T05:47:25.202Z  INFO 1 --- [grade-service] [           main] c.o.g.GradeServiceApplication            : Started GradeServiceApplication in 7.074 seconds (process running for 7.766)
+2026-09-02T05:47:26.928Z  INFO 1 --- [grade-service] [nio-8084-exec-1] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring DispatcherServlet 'dispatcherServlet'
+2026-09-02T05:47:26.928Z  INFO 1 --- [grade-service] [nio-8084-exec-1] o.s.web.servlet.DispatcherServlet        : Initializing Servlet 'dispatcherServlet'
+2026-09-02T05:47:26.929Z  INFO 1 --- [grade-service] [nio-8084-exec-1] o.s.web.servlet.DispatcherServlet        : Completed initialization in 0 ms
+2026-09-02T06:13:45.561Z  WARN 1 --- [grade-service] [On Write Thread] c.r.c.impl.ForgivingExceptionHandler     : An unexpected connection driver error occurred (Exception message: Connection reset by peer)
+2026-09-02T06:19:23.298Z  WARN 1 --- [grade-service] [On Write Thread] c.r.c.impl.ForgivingExceptionHandler     : An unexpected connection driver error occurred (Exception message: Connection reset by peer)
+2026-09-02T06:24:53.264Z  WARN 1 --- [grade-service] [On Write Thread] c.r.c.impl.ForgivingExceptionHandler     : An unexpected connection driver error occurred (Exception message: Connection reset by peer)
+2026-09-02T06:30:29.660Z  WARN 1 --- [grade-service] [On Write Thread] c.r.c.impl.ForgivingExceptionHandler     : An unexpected connection driver error occurred (Exception message: Connection reset by peer)
+2026-09-02T06:42:20.785Z  WARN 1 --- [grade-service] [On Write Thread] c.r.c.impl.ForgivingExceptionHandler     : An unexpected connection driver error occurred (Exception message: Connection reset by peer)
+2026-09-02T07:02:02.166Z  WARN 1 --- [grade-service] [On Write Thread] c.r.c.impl.ForgivingExceptionHandler     : An unexpected connection driver error occurred (Exception message: Connection reset by peer)
+2026-09-02T07:22:13.800Z  WARN 1 --- [grade-service] [On Write Thread] c.r.c.impl.ForgivingExceptionHandler     : An unexpected connection driver error occurred (Exception message: Connection reset by peer)
+2026-09-02T07:34:27.297Z  WARN 1 --- [grade-service] [On Write Thread] c.r.c.impl.ForgivingExceptionHandler     : An unexpected connection driver error occurred (Exception message: Connection reset by peer)
+2026-09-02T07:34:57.998Z ERROR 1 --- [grade-service] [.96.247.50:5672] c.r.c.impl.ForgivingExceptionHandler     : Caught an exception during connection recovery!
+
+java.net.SocketTimeoutException: Connect timed out
+	at java.base/sun.nio.ch.NioSocketImpl.timedFinishConnect(Unknown Source) ~[na:na]
+	at java.base/sun.nio.ch.NioSocketImpl.connect(Unknown Source) ~[na:na]
+	at java.base/java.net.SocksSocketImpl.connect(Unknown Source) ~[na:na]
+	at java.base/java.net.Socket.connect(Unknown Source) ~[na:na]
+	at com.rabbitmq.client.impl.SocketFrameHandlerFactory.create(SocketFrameHandlerFactory.java:61) ~[amqp-client-5.24.0.jar!/:5.24.0]
+	at com.rabbitmq.client.impl.recovery.RecoveryAwareAMQConnectionFactory.newConnection(RecoveryAwareAMQConnectionFactory.java:69) ~[amqp-client-5.24.0.jar!/:5.24.0]
+	at com.rabbitmq.client.impl.recovery.AutorecoveringConnection.recoverConnection(AutorecoveringConnection.java:628) ~[amqp-client-5.24.0.jar!/:5.24.0]
+	at com.rabbitmq.client.impl.recovery.AutorecoveringConnection.beginAutomaticRecovery(AutorecoveringConnection.java:589) ~[amqp-client-5.24.0.jar!/:5.24.0]
+	at com.rabbitmq.client.impl.recovery.AutorecoveringConnection.lambda$addAutomaticRecoveryListener$3(AutorecoveringConnection.java:524) ~[amqp-client-5.24.0.jar!/:5.24.0]
+	at com.rabbitmq.client.impl.AMQConnection.notifyRecoveryCanBeginListeners(AMQConnection.java:839) ~[amqp-client-5.24.0.jar!/:5.24.0]
+	at com.rabbitmq.client.impl.AMQConnection.doFinalShutdown(AMQConnection.java:816) ~[amqp-client-5.24.0.jar!/:5.24.0]
+	at com.rabbitmq.client.impl.AMQConnection$MainLoop.run(AMQConnection.java:700) ~[amqp-client-5.24.0.jar!/:5.24.0]
+	at java.base/java.lang.Thread.run(Unknown Source) ~[na:na]
+
+2026-09-02T07:56:02.879Z  WARN 1 --- [grade-service] [On Write Thread] c.r.c.impl.ForgivingExceptionHandler     : An unexpected connection driver error occurred (Exception message: Connection reset by peer)
+2026-09-02T08:05:20.426Z  WARN 1 --- [grade-service] [On Write Thread] c.r.c.impl.ForgivingExceptionHandler     : An unexpected connection driver error occurred (Exception message: Connection reset by peer)
+2026-09-02T09:01:13.545Z  WARN 1 --- [grade-service] [On Write Thread] c.r.c.impl.ForgivingExceptionHandler     : An unexpected connection driver error occurred (Exception message: Connection reset by peer)
+2026-09-02T09:10:01.473Z  WARN 1 --- [grade-service] [On Write Thread] c.r.c.impl.ForgivingExceptionHandler     : An unexpected connection driver error occurred (Exception message: Connection reset by peer)

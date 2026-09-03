@@ -1,0 +1,2 @@
+scaled up replicas=2 baseline=1
+scaled down replicas=1 baseline=1

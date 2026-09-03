@@ -1,0 +1,47 @@
+{
+  "apiVersion": "operations.onlinejudge.io/v1",
+  "kind": "ScalabilityExperiment",
+  "metadata": {
+    "ownerIssue": "#319",
+    "environmentGate": "ENVIRONMENT_READY",
+    "targetWorkload": "assessment-api"
+  },
+  "hpa": {
+    "minReplicas": 1,
+    "maxReplicas": 3,
+    "metrics": [
+      {"type": "Resource", "resource": "cpu", "targetAverageUtilization": 60}
+    ],
+    "scaleDownStabilizationSeconds": 300
+  },
+  "readinessPolicy": {
+    "criticalDependencies": ["mysql"],
+    "nonCriticalDependencies": ["rabbitmq"],
+    "assertion": "rabbitmq outage records backlog and diagnostics without making assessment-api unready"
+  },
+  "measurements": [
+    {"name": "pod_count", "source": "kubectl get deployment,hpa"},
+    {"name": "cpu_usage", "source": "kubectl top pod"},
+    {"name": "memory_usage", "source": "kubectl top pod"},
+    {"name": "throughput", "source": "load-generator raw summary"},
+    {"name": "request_latency_avg", "source": "load-generator raw summary"},
+    {"name": "request_latency_p95", "source": "load-generator raw summary"},
+    {"name": "error_rate", "source": "load-generator raw summary"},
+    {"name": "timeline", "source": "UTC timestamped samples"}
+  ],
+  "diagnostics": {
+    "requiredLogFields": ["requestId", "correlationId", "workload"],
+    "signals": [
+      "gateway_request_correlation",
+      "rabbitmq_queue_backlog",
+      "assessment_outbox_pending_and_lease",
+      "grade_projection_watermark"
+    ],
+    "secretHandling": "redact runtime secrets and workload identities from every captured artifact"
+  },
+  "evidence": {
+    "requiredMetadata": ["baseSha", "headSha", "deploymentVersion", "environment", "startedAtUtc", "finishedAtUtc"],
+    "requiredRawOutputs": ["hpa", "pods", "resourceUsage", "loadSummary", "diagnostics"],
+    "failureRetention": "retain raw output and failure reason"
+  }
+}
