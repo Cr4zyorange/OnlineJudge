@@ -96,6 +96,13 @@ require_text "$delivery_script" 'controlled MySQL outage readiness body must not
 require_text "$delivery_script" '[[ "$status" == 503 ]]'
 require_text "$delivery_script" '--max-time 45'
 
+kind_deploy_script="$repo_root/scripts/kind/k8s-deploy.sh"
+require_file "$kind_deploy_script"
+require_text "$kind_deploy_script" 'scripts/platform/generate_jwks_trust_bundle.mjs'
+require_text "$kind_deploy_script" 'IDENTITY_JWKS_TRUST_BUNDLE'
+require_text "$kind_deploy_script" 'kindlib_require_cmd openssl'
+require_text "$kind_deploy_script" 'kindlib_require_cmd node'
+
 require_text "$evidence_script" 'docker image inspect'
 require_text "$evidence_script" 'org.opencontainers.image.revision'
 require_text "$evidence_script" 'kubectl'

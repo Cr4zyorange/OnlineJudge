@@ -64,6 +64,7 @@
 | `MYSQL_USER` | 应用数据库用户名；用户名不是口令，但不得在日志中与 Secret 拼接输出 | Compose environment / Kubernetes ConfigMap | 是，`onlinejudge` | `mysql` 初始化和 `backend` JDBC。 |
 | `ONLINEJUDGE_DEMO_DATA_ENABLED` | 是否加载演示数据 | Compose environment / Kubernetes ConfigMap | 是，`true` | `backend`。 |
 | `ONLINEJUDGE_EVALUATION_SANDBOX_MODE` | 评测模式：`fake` 或 `docker` | Compose environment / Kubernetes ConfigMap | 是，`fake` | `backend`、#289 增强评测 Compose 覆盖层。 |
+| `IDENTITY_JWKS_URI` | Identity JWKS 远程刷新地址；D3 三服务基线未部署独立 Identity，必须显式为空以只使用离线信任包 | Kubernetes ConfigMap | 是，空字符串 | `backend`、#288、#292。 |
 | `ONLINEJUDGE_EVALUATION_DOCKER_COMMAND` | Docker 评测 CLI 命令 | Compose 增强评测覆盖层 / Kubernetes ConfigMap（仅 docker 模式） | 是，`docker` | `backend` 的 Docker sandbox。 |
 | `ONLINEJUDGE_EVALUATION_DOCKER_PYTHON_IMAGE` | Docker 评测 Python 基础镜像 | Compose 本地增强评测覆盖层 / Kubernetes ConfigMap（仅 docker 模式） | 是，`python:3.12-alpine` | `backend` 的 Docker sandbox。 |
 
@@ -76,8 +77,9 @@
 | `MYSQL_PASSWORD` | 应用数据库用户口令 | Compose 本地 `.env`/受控环境、GitHub Secrets、Kubernetes Secret -> `backend` 与 `mysql` | 否 | `mysql` 初始化、`backend` JDBC、#289/#288/#292。 |
 | `MYSQL_ROOT_PASSWORD` | MySQL 管理员口令，仅用于 MySQL 初始化和 `mysqladmin` 健康探测 | Compose 本地 `.env`/受控环境、GitHub Secrets、Kubernetes Secret -> `mysql` | 否 | `mysql`、#289/#288/#292。 |
 | `ONLINEJUDGE_NOTIFICATIONS_INTERNAL_TOKEN` | 内部通知调用鉴别令牌 | GitHub Secrets、Kubernetes Secret -> `backend`；本地受控环境变量 | 否；功能未启用时可不注入，但不得以仓库内空字符串冒充 Secret | `backend`、#290/#292。 |
+| `IDENTITY_JWKS_TRUST_BUNDLE` | 后端离线 JWT 校验使用的公开 JWKS；D3 部署脚本每次运行生成临时 RSA 私钥并只注入派生的公钥包，私钥不得落盘、输出或归档 | Kubernetes Secret -> `backend` | 否；由 #288 部署入口在触碰集群前生成 | `backend`、#288/#292。 |
 
-ConfigMap 只保存 4.1 的非敏感键；Secret 只保存本节键名及由平台在运行时提供的值。Actions 日志、`kubectl describe`、Compose 输出和归档证据必须遮蔽 Secret 值，且不能把 `.env`、Secret YAML 实值或私有 registry 凭据加入镜像构建上下文。
+ConfigMap 只保存 4.1 的非敏感键；Secret 只保存本节键名及由平台在运行时提供或生成的值。Actions 日志、`kubectl describe`、Compose 输出和归档证据必须遮蔽 Secret 值，且不能把 `.env`、Secret YAML 实值、临时私钥或私有 registry 凭据加入镜像构建上下文。
 
 ### 4.3 现值到 D3 统一值的显式差异
 
@@ -121,7 +123,7 @@ Kubernetes 的 MySQL probes 使用 `mysqladmin ping`；backend 的 `startupProbe
 
 - [ ] 所有引用仅使用 `mysql`、`backend`、`frontend` 三个服务名，端口与方向符合第 2 节。
 - [ ] 两个自建 image 的 tag 和 `org.opencontainers.image.revision` 都等于同一个完整 `GIT_SHA`，且没有 `latest` 作为唯一 tag。
-- [ ] 非敏感键来自同名 environment/ConfigMap，三项敏感键只来自 Secret 或 GitHub Secrets，证据中没有值；Compose、`.env.example` 和 `application-compose.properties` 没有密码 fallback，三份权威文档同步说明必填 Secret 输入。
+- [ ] 非敏感键来自同名 environment/ConfigMap，敏感键只来自 Secret、GitHub Secrets 或部署时生成的公钥信任包，证据中没有值；临时私钥不落盘、不输出、不归档；Compose、`.env.example` 和 `application-compose.properties` 没有密码 fallback，三份权威文档同步说明必填 Secret 输入。
 - [ ] MySQL、backend liveness、backend readiness、frontend 静态服务和 frontend-to-backend readiness 均按第 5 节断言；无 `Authorization` 的 readiness 在数据库可用时必须成功、数据库不可用时必须失败，且失败时保留原始输出并返回非零。
 - [ ] 变更只触及责任表中本 Issue 的路径；若需要改变本契约，先更新本文件并在相关 Issue/PR 中说明消费者影响。
 
