@@ -51,6 +51,7 @@ mkdir -p "$fake_bin"
 kubectl_log="$fixture_root/kubectl.log"
 docker_log="$fixture_root/docker.log"
 kind_log="$fixture_root/kind.log"
+captured_secret="$fixture_root/captured-onlinejudge-secrets.yaml"
 
 cleanup_fixture() {
   rm -rf -- "$fixture_root"
@@ -69,6 +70,12 @@ for arg in "$@"; do
   record+=" $(printf '%q' "$arg")"
 done
 printf '%s\n' "$record" >>"$KUBECTL_LOG"
+
+for arg in "$@"; do
+  if [[ "$arg" == */onlinejudge-secrets.yaml ]]; then
+    cp -- "$arg" "$CAPTURED_SECRET_FILE"
+  fi
+done
 
 for arg in "$@"; do
   if [[ "$arg" == "-" ]]; then
@@ -153,6 +160,7 @@ run_env=(
   KUBECTL_LOG="$kubectl_log"
   DOCKER_LOG="$docker_log"
   KIND_LOG="$kind_log"
+  CAPTURED_SECRET_FILE="$captured_secret"
   MYSQL_PASSWORD="$test_password"
   MYSQL_ROOT_PASSWORD="$test_root_password"
 )
@@ -161,6 +169,7 @@ reset_logs() {
   : >"$kubectl_log"
   : >"$docker_log"
   : >"$kind_log"
+  rm -f -- "$captured_secret"
 }
 
 assert_secret_not_leaked() {
@@ -302,6 +311,23 @@ pass "kind image loading uses contract image references"
 
 grep -q -- 'onlinejudge-secrets.yaml' "$kubectl_log" \
   || fail "deploy must apply a generated secret manifest"
+[[ -f "$captured_secret" ]] || fail "generated secret manifest was not captured"
+grep -q -- '^  IDENTITY_JWKS_TRUST_BUNDLE:' "$captured_secret" \
+  || fail "generated secret must inject IDENTITY_JWKS_TRUST_BUNDLE"
+jwks_bundle="$(sed -n "s/^  IDENTITY_JWKS_TRUST_BUNDLE: '\(.*\)'$/\1/p" "$captured_secret")"
+[[ -n "$jwks_bundle" ]] || fail "generated JWKS trust bundle must not be empty"
+JWKS_BUNDLE="$jwks_bundle" node -e '
+  const bundle = JSON.parse(process.env.JWKS_BUNDLE);
+  if (!Array.isArray(bundle.keys) || bundle.keys.length !== 1) process.exit(1);
+  const key = bundle.keys[0];
+  if (key.kty !== "RSA" || key.alg !== "RS256" || key.use !== "sig"
+      || !key.kid || !key.n || !key.e || key.d) process.exit(1);
+' || fail "generated JWKS trust bundle must contain one public RSA/RS256 signing key"
+grep -q -- '^  IDENTITY_JWKS_URI: ""' "$render_dir/01-configmap.yaml" \
+  || fail "D3 ConfigMap must explicitly disable remote JWKS refresh with an empty IDENTITY_JWKS_URI"
+if grep -Eq -- 'PRIVATE KEY|IDENTITY_JWT_SIGNING_KEY|^[[:space:]]*d:' "$captured_secret"; then
+  fail "generated secret must not persist the ephemeral private signing key"
+fi
 if grep -q -- '02-secret.example' "$kubectl_log"; then
   fail "deploy must never apply the secret example file"
 fi
@@ -312,6 +338,15 @@ if find "$render_dir" -type f | grep -q .; then
   assert_secret_not_leaked "rendered files" "$(find "$render_dir" -type f)"
 fi
 pass "secret values never reach logs, rendered manifests, or tool arguments"
+
+openssl_preflight_line="$(grep -nF -- 'kindlib_require_cmd openssl' "$kind_scripts/k8s-deploy.sh" | head -1 | cut -d: -f1)"
+node_preflight_line="$(grep -nF -- 'kindlib_require_cmd node' "$kind_scripts/k8s-deploy.sh" | head -1 | cut -d: -f1)"
+kind_create_line="$(grep -nF -- 'bash "$script_dir/kind-create.sh"' "$kind_scripts/k8s-deploy.sh" | head -1 | cut -d: -f1)"
+[[ -n "$openssl_preflight_line" && -n "$node_preflight_line" && -n "$kind_create_line" ]] \
+  || fail "deploy must declare openssl/node preflight and Kind creation"
+[[ "$openssl_preflight_line" -lt "$kind_create_line" && "$node_preflight_line" -lt "$kind_create_line" ]] \
+  || fail "openssl/node preflight must happen before Kind cluster creation"
+pass "JWKS tooling is checked before touching the Kind cluster"
 
 if grep -rnE '^[[:space:]]*sleep[[:space:]]' "$kind_scripts" >/dev/null 2>&1; then
   fail "scripts/kind must not use fixed sleep for readiness"

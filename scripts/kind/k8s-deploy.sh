@@ -20,6 +20,8 @@ source "$script_dir/lib.sh"
 kindlib_require_cmd docker
 kindlib_require_cmd kind
 kindlib_require_cmd kubectl
+kindlib_require_cmd openssl
+kindlib_require_cmd node
 
 GIT_SHA="${GIT_SHA:-}"
 MYSQL_PASSWORD="${MYSQL_PASSWORD:-}"
@@ -35,8 +37,31 @@ kindlib_validate_git_sha "$GIT_SHA" \
 # Linux runners and the schema original is always read from its single home.
 CDPATH= cd -- "$repo_root"
 
+jwks_generator="$repo_root/scripts/platform/generate_jwks_trust_bundle.mjs"
+[[ -f "$jwks_generator" ]] \
+  || kindlib_fail "missing JWKS generator: scripts/platform/generate_jwks_trust_bundle.mjs"
+
+# The D3 baseline has no standalone Identity workload, but the current backend
+# requires an offline JWKS trust bundle at startup. Generate an ephemeral RSA
+# key only to derive its public JWKS; the private key remains in this process,
+# is never written to disk or printed, and is discarded before Kind is touched.
+identity_jwt_kid="d3-kind-${GIT_SHA:0:12}"
+identity_signing_key="$(
+  openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 2>/dev/null \
+    | openssl pkcs8 -topk8 -nocrypt -outform DER \
+    | base64 \
+    | tr -d '\n'
+)"
+identity_jwks_trust_bundle="$(
+  IDENTITY_JWT_SIGNING_KEY="$identity_signing_key" \
+    IDENTITY_JWT_KID="$identity_jwt_kid" \
+    node "$jwks_generator"
+)"
+unset identity_signing_key
+
 stamp="$(date -u +%Y%m%dT%H%M%SZ)"
 render_dir="${KIND_RENDER_DIR:-$repo_root/tmp/kind-render/$stamp}"
+umask 077
 secret_dir="$(mktemp -d "${TMPDIR:-/tmp}/onlinejudge-ci-secret.XXXXXX")"
 secret_file="$secret_dir/onlinejudge-secrets.yaml"
 chmod 700 "$secret_dir"
@@ -73,6 +98,7 @@ kindlib_render_manifests "$repo_root/deploy/k8s" "$render_dir" "$GIT_SHA"
   printf 'apiVersion: v1\nkind: Secret\nmetadata:\n  name: onlinejudge-secrets\n  namespace: %s\ntype: Opaque\nstringData:\n' "$K8S_NAMESPACE"
   printf '  MYSQL_PASSWORD: %s\n' "$(kindlib_yaml_quote "$MYSQL_PASSWORD")"
   printf '  MYSQL_ROOT_PASSWORD: %s\n' "$(kindlib_yaml_quote "$MYSQL_ROOT_PASSWORD")"
+  printf '  IDENTITY_JWKS_TRUST_BUNDLE: %s\n' "$(kindlib_yaml_quote "$identity_jwks_trust_bundle")"
   if [[ -n "$ONLINEJUDGE_NOTIFICATIONS_INTERNAL_TOKEN" ]]; then
     printf '  ONLINEJUDGE_NOTIFICATIONS_INTERNAL_TOKEN: %s\n' "$(kindlib_yaml_quote "$ONLINEJUDGE_NOTIFICATIONS_INTERNAL_TOKEN")"
   fi
